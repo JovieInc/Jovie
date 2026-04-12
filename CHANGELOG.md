@@ -5,29 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.150.1] - 2026-04-12
+## [26.4.151.1] - 2026-04-12
+
+> Sidebar entity header elevation now matches other cards, and About details are consolidated into one cleaner card.
 
 ### Fixed
 
-- Entity header card in dashboard sidebar now has proper elevation matching other entity cards
-- About tab consolidated from three separate cards into a single detail view with two-column metadata layout
+- [internal] Entity header card in dashboard sidebar now has proper elevation matching other entity cards
+- [internal] About tab consolidated from three separate cards into a single detail view with two-column metadata layout
 
-## [26.4.150.0] - 2026-04-12
+## [26.4.151] - 2026-04-12
 
-> Full-screen offline and error screens now use one consistent, design-system-aligned layout.
+> Admin dashboard now opens to a clean funnel scoreboard showing the full pipeline from scrape to paid at a glance.
+
+### Added
+
+- Funnel scoreboard as the default admin view with three hero metrics (MRR, paying customers, WoW growth), a six-step horizontal pipeline, and a 4-week trend chart
+- Shared `formatPercent` and `formatUsd` utilities extracted from duplicated admin code
+- Unit tests for scoreboard rendering, conversion rate math, empty/error states, and formatting utils
 
 ### Changed
 
+- Admin dashboard now uses two tabs: Scoreboard (default) and Workspaces (previous content)
+- Consolidated `formatPercent` (3 copies) and `formatUsd` (2 copies) into `lib/admin/format.ts`
+
+## [26.4.150.0] - 2026-04-12
+
+> Auto-created profiles now pass through a quality gate before going live, preventing broken profiles from reaching artists during claim outreach. Full-screen offline and error screens now use one consistent, design-system-aligned layout.
+
+### Added
+
+- Profile quality gate for auto-created profiles: validates display name, avatar, and link count before setting `isPublic`
+- `evaluateProfileQuality()` and `isEmbarrassingDisplayName()` pure validation functions
+- Quarantined profiles (failing quality bar) are hidden via existing `isPublic: false` mechanism
+- Re-ingest can promote quarantined profiles when quality improves
+- API response includes `quarantined` and `quarantineReasons` fields for admin visibility
+- Unit tests for all quality gate scenarios (18 tests)
+- [internal] Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
+
+### Changed
+
+- `handleNewProfileIngest()` uses quality gate result instead of hardcoded `isPublic: true`
+- `createNewSocialProfile()` uses quality gate result instead of hardcoded `isPublic: true`
+- `ExistingProfileCheck` interface now includes `isPublic` field for re-ingest promotion logic
 - [internal] Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
 - [internal] Removed card wrapper from PublicPageErrorFallback (subtraction principle)
 - [internal] Removed wifi-off icon from offline page (headline says it all)
 - [internal] Added inline SVG logo to root error page (was missing entirely)
 - [internal] Replaced marketing-themed classes in root error with System B dark mode
 - [internal] Bumped service worker cache name to ensure existing users get the updated offline page
-
-### Added
-
-- [internal] Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
 
 ## [26.4.149.2] - 2026-04-12
 
