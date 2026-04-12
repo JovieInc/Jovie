@@ -6,7 +6,10 @@ import Link from 'next/link';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { cn } from '@/lib/utils';
+
+const PRO_DISPLAY_NAME = getPlanDisplayName('pro');
 
 interface TasksUpgradeContentProps {
   readonly heading: string;
@@ -51,7 +54,7 @@ function TasksUpgradeContent({
         {description}
       </p>
       <div className='mt-6 flex flex-wrap items-center justify-center gap-3'>
-        <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>
+        <UpgradeButton size='sm'>Upgrade to {PRO_DISPLAY_NAME}</UpgradeButton>
         {secondaryHref ? (
           <Button asChild variant='outline' size='sm'>
             <Link href={secondaryHref}>{secondaryLabel}</Link>
