@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.1] - 2026-04-12
+
+> Sidebar entity header elevation now matches other cards, and About details are consolidated into one cleaner card.
+
+### Fixed
+
+- [internal] Entity header card in dashboard sidebar now has proper elevation matching other entity cards
+- [internal] About tab consolidated from three separate cards into a single detail view with two-column metadata layout
+
 ## [26.4.151] - 2026-04-12
 
 > Admin dashboard now opens to a clean funnel scoreboard showing the full pipeline from scrape to paid at a glance.
