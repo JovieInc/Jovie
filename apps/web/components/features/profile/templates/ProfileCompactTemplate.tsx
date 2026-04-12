@@ -8,6 +8,7 @@ import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/a
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
 import {
   ProfileNotificationsContext,
   useProfileShell,
@@ -24,6 +25,7 @@ import {
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
@@ -72,7 +74,11 @@ interface ProfileCompactTemplateProps {
     readonly slug: string;
     readonly artworkUrl: string | null;
     readonly releaseDate: Date | string | null;
+    readonly revealDate?: Date | string | null;
     readonly releaseType: string;
+  } | null;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
   } | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
@@ -152,6 +158,7 @@ export function ProfileCompactTemplate({
   socialLinks,
   contacts,
   latestRelease,
+  profileSettings,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
@@ -348,6 +355,11 @@ export function ProfileCompactTemplate({
 
     return `source=${encodeURIComponent(initialSource)}`;
   }, [initialSource]);
+
+  const releaseVisibility = useMemo(
+    () => getProfileReleaseVisibility(latestRelease, profileSettings),
+    [latestRelease, profileSettings]
+  );
 
   const nextTourDate = useMemo(() => {
     const now = Date.now();
@@ -636,7 +648,39 @@ export function ProfileCompactTemplate({
                   <SubscriptionConfirmedBanner />
                 ) : null}
 
-                {latestRelease && mergedDSPs.length > 0 ? (
+                {releaseVisibility?.show &&
+                releaseVisibility.isCountdown &&
+                latestRelease ? (
+                  <Link
+                    href={`/${artist.handle}/${latestRelease.slug}`}
+                    prefetch={false}
+                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    aria-label={`${latestRelease.title} — drops soon`}
+                  >
+                    {latestRelease.artworkUrl ? (
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                        <ImageWithFallback
+                          src={latestRelease.artworkUrl}
+                          alt={latestRelease.title}
+                          fill
+                          sizes='40px'
+                          className='object-cover'
+                          fallbackVariant='release'
+                        />
+                      </div>
+                    ) : null}
+                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
+                      {latestRelease.title}
+                    </p>
+                    <ReleaseCountdown
+                      releaseDate={new Date(latestRelease.releaseDate!)}
+                      compact
+                    />
+                  </Link>
+                ) : releaseVisibility?.show &&
+                  !releaseVisibility.isCountdown &&
+                  latestRelease &&
+                  mergedDSPs.length > 0 ? (
                   <button
                     type='button'
                     onClick={handlePlayClick}
@@ -705,7 +749,9 @@ export function ProfileCompactTemplate({
                       Listen
                     </span>
                   </button>
-                ) : null}
+                ) : (
+                  <div className='min-h-[52px]' aria-hidden='true' />
+                )}
 
                 <ProfileInlineNotificationsCTA
                   artist={artist}
