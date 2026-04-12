@@ -163,6 +163,7 @@ export function clearConsentState(): void {
 
   try {
     globalThis.localStorage?.removeItem(CONSENT_STORAGE_KEY);
+    globalThis.localStorage?.removeItem('jv_cc');
   } catch {
     // localStorage may be unavailable
   }
