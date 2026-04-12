@@ -643,10 +643,35 @@ function OnboardingSidebar({
   currentStep: StepId;
 }>) {
   const displayStep = normalizeSidebarCurrentStep(currentStep);
+  const currentIndex = SIDEBAR_STEPS.findIndex(s => s.id === displayStep);
+  const currentLabel =
+    SIDEBAR_STEPS[currentIndex]?.label ?? SIDEBAR_STEPS[0].label;
 
   return (
     <nav aria-label='Onboarding steps'>
-      <ul className='space-y-1.5'>
+      {/* Compact progress indicator for small screens */}
+      <div className='flex items-center gap-3 sm:hidden'>
+        <span className='text-[13px] font-[560] text-primary-token'>
+          {currentLabel}
+        </span>
+        <span className='text-[12px] text-tertiary-token'>
+          {currentIndex + 1}/{SIDEBAR_STEPS.length}
+        </span>
+        <div className='flex flex-1 gap-1'>
+          {SIDEBAR_STEPS.map((step, i) => (
+            <div
+              key={step.id}
+              className={cn(
+                'h-1 flex-1 rounded-full',
+                i <= currentIndex ? 'bg-primary-token' : 'bg-surface-2'
+              )}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Full step list for sm+ screens */}
+      <ul className='hidden space-y-1.5 sm:block'>
         {SIDEBAR_STEPS.map(step => {
           const state = getSidebarStepState(step.id, displayStep);
           const Icon = state === 'complete' ? Circle : CircleDashed;
