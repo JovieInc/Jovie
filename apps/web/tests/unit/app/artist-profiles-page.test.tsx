@@ -25,7 +25,7 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'A profile that looks like you meant it.',
+        name: 'One link. Every release.',
       })
     ).toBeInTheDocument();
     expect(
@@ -39,7 +39,7 @@ describe('ArtistProfilesPage', () => {
     render(<ArtistProfilesPage />);
 
     expect(
-      screen.getByRole('link', { name: 'See profile example' })
+      screen.getByRole('link', { name: 'See a live example' })
     ).toHaveAttribute(
       'href',
       getCanonicalSurface('public-profile').reviewRoute

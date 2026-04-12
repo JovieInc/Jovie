@@ -17,6 +17,8 @@ export interface MarketingSurfaceCardProps {
   readonly chrome?: MarketingSurfaceChrome;
   readonly className?: string;
   readonly imageClassName?: string;
+  /** Override the default sizes hint for the inner next/image. */
+  readonly imageSizes?: string;
   readonly children?: React.ReactNode;
 }
 
@@ -49,6 +51,7 @@ export function MarketingSurfaceCard({
   testId,
   chrome,
   className,
+  imageSizes,
   imageClassName,
   children,
 }: Readonly<MarketingSurfaceCardProps>) {
@@ -91,7 +94,7 @@ export function MarketingSurfaceCard({
           alt={alt ?? ''}
           fill
           priority={priority}
-          sizes='(max-width: 1024px) 100vw, 900px'
+          sizes={imageSizes ?? '(max-width: 1024px) 100vw, 900px'}
           className={cn('object-cover', imageClassName)}
           style={{ objectPosition }}
         />

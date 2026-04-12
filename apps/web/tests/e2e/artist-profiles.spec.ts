@@ -22,26 +22,45 @@ test.describe('Artist Profiles Landing', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with shared marketing layout and profile proof', async ({
+  test('hero renders with headline, subhead, CTAs, and phone', async ({
     page,
   }) => {
     await expect(
       page.getByRole('heading', {
-        name: /a profile that looks like you meant it/i,
+        name: /one link\. every release\./i,
       })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: /get started free/i })
+      page.getByRole('link', { name: /claim your profile/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /see a live example/i })
     ).toBeVisible();
     await expect(
       page.getByTestId('artist-profiles-hero-surface')
     ).toBeVisible();
     await expect(
-      page.getByText(/give every fan one clean destination/i)
+      page.getByText(/put jov\.ie\/username in your bio/i)
     ).toBeVisible();
-    await expect(page.getByText('Own every contact')).toBeVisible();
-    await expect(page.getByText('Show the right release first')).toBeVisible();
-    await expect(page.getByText('One link for every fan action')).toBeVisible();
+  });
+
+  test('key sections render', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', { name: /every extra click loses fans/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: /one profile that always shows fans/i,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: /turn bio clicks into fans/i,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /claim your profile now/i })
+    ).toBeVisible();
   });
 
   test('hero stays intact on mobile', async ({ page }) => {
@@ -49,13 +68,13 @@ test.describe('Artist Profiles Landing', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: /a profile that looks like you meant it/i,
+        name: /one link\. every release\./i,
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(
-      page.getByRole('link', { name: /get started free/i })
+      page.getByRole('link', { name: /claim your profile/i })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
