@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.150.0] - 2026-04-12
+
+> Auto-created profiles now pass through a quality gate before going live, preventing broken profiles from reaching artists during claim outreach.
+
+### Added
+
+- Profile quality gate for auto-created profiles: validates display name, avatar, and link count before setting `isPublic`
+- `evaluateProfileQuality()` and `isEmbarrassingDisplayName()` pure validation functions
+- Quarantined profiles (failing quality bar) are hidden via existing `isPublic: false` mechanism
+- Re-ingest can promote quarantined profiles when quality improves
+- API response includes `quarantined` and `quarantineReasons` fields for admin visibility
+- Unit tests for all quality gate scenarios (18 tests)
+
+### Changed
+
+- `handleNewProfileIngest()` uses quality gate result instead of hardcoded `isPublic: true`
+- `createNewSocialProfile()` uses quality gate result instead of hardcoded `isPublic: true`
+- `ExistingProfileCheck` interface now includes `isPublic` field for re-ingest promotion logic
+
 ## [26.4.149.2] - 2026-04-12
 
 > Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
