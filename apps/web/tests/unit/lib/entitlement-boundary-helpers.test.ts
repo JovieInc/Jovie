@@ -29,7 +29,7 @@ describe('entitlement registry boundary helpers', () => {
     expect(getLimit('max', 'analyticsRetentionDays')).toBeNull();
 
     expect(getLimit('free', 'contactsLimit')).toBe(100);
-    expect(getLimit('pro', 'contactsLimit')).toBe(5000);
+    expect(getLimit('pro', 'contactsLimit')).toBeNull();
     expect(getLimit('max', 'contactsLimit')).toBeNull();
 
     expect(getLimit('free', 'smartLinksLimit')).toBeNull();
