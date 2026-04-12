@@ -208,6 +208,19 @@ export async function updateUserBillingStatus(
       return await retryUpdateWithFreshData(options);
     }
 
+    // If user was on trial and is now converting to a paid plan, mark conversion
+    if (
+      currentUser.plan === 'trial' &&
+      isPro &&
+      effectivePlan !== 'trial' &&
+      effectivePlan !== 'free'
+    ) {
+      await db
+        .update(users)
+        .set({ trialConvertedAt: new Date() })
+        .where(eq(users.id, currentUser.id));
+    }
+
     // Log to audit table
     try {
       await db.insert(billingAuditLog).values({

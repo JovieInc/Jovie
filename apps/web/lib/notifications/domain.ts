@@ -937,8 +937,9 @@ export const unsubscribeFromNotificationsDomain = async (
       );
     }
 
-    const deleted = await db
-      .delete(notificationSubscriptions)
+    const softDeleted = await db
+      .update(notificationSubscriptions)
+      .set({ unsubscribedAt: new Date() })
       .where(and(...whereClauses))
       .returning({ id: notificationSubscriptions.id });
 
@@ -948,7 +949,7 @@ export const unsubscribeFromNotificationsDomain = async (
       channel: targetChannel,
     });
 
-    return buildUnsubscribeSuccessResponse(deleted.length);
+    return buildUnsubscribeSuccessResponse(softDeleted.length);
   } catch (error) {
     await trackServerError('unsubscribe', error);
     captureError('Notifications Unsubscribe Domain Error', error);
