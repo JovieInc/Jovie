@@ -94,9 +94,9 @@ AI that knows your actual career data:
 
 ## Pricing
 
-- **Free tier**: Create a profile, add releases, collect fans — no credit card required
-- **Pro tier**: Advanced analytics, release notifications, export contacts, priority support
-- **Growth tier**: Team features, advanced audience tools (coming soon)
+- **Free tier**: Artist profile, smart links, basic analytics, 100 contacts — free forever
+- **Pro tier ($39/mo)**: Fan notifications, unlimited contacts, CRM, export, advanced analytics, tipping, ad pixels, verified badge
+- **Max tier ($149/mo)**: Release plan generation, metadata agents, email campaigns, API access, team management, white-label
 
 ## Key URLs
 
