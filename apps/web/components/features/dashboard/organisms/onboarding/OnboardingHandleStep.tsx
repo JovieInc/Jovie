@@ -32,77 +32,6 @@ interface OnboardingHandleStepProps {
   readonly autoSubmitClaimed?: boolean;
 }
 
-function ValidationIcon({
-  checking,
-  hasError,
-  isValid,
-}: {
-  readonly checking: boolean;
-  readonly hasError: boolean;
-  readonly isValid: boolean;
-}) {
-  if (checking) {
-    return <LoadingSpinner size='sm' className='text-tertiary-token' />;
-  }
-
-  if (hasError) {
-    return (
-      <svg
-        viewBox='0 0 20 20'
-        fill='none'
-        aria-hidden='true'
-        className='h-5 w-5'
-      >
-        <circle
-          cx='10'
-          cy='10'
-          r='9'
-          stroke='currentColor'
-          className='text-error'
-          strokeWidth='2'
-        />
-        <path
-          d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-          stroke='currentColor'
-          className='text-error'
-          strokeWidth='2'
-          strokeLinecap='round'
-        />
-      </svg>
-    );
-  }
-
-  if (isValid) {
-    return (
-      <svg
-        viewBox='0 0 20 20'
-        fill='none'
-        aria-hidden='true'
-        className='h-5 w-5'
-      >
-        <circle
-          cx='10'
-          cy='10'
-          r='9'
-          stroke='currentColor'
-          className='text-success'
-          strokeWidth='2'
-        />
-        <path
-          d='M6 10.2l2.6 2.6L14 7.4'
-          stroke='currentColor'
-          className='text-success'
-          strokeWidth='2'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-        />
-      </svg>
-    );
-  }
-
-  return null;
-}
-
 export function OnboardingHandleStep({
   title,
   prompt,
@@ -124,10 +53,6 @@ export function OnboardingHandleStep({
   const disabledReasonId = 'handle-step-disabled-reason';
   const isLoading =
     isSubmitting || (isPendingSubmit && handleValidation.checking);
-  const isValid =
-    Boolean(handleInput) &&
-    handleValidation.clientValid &&
-    handleValidation.available;
   const hasError = Boolean(stateError || handleValidation.error);
 
   const canSubmit =
@@ -158,7 +83,7 @@ export function OnboardingHandleStep({
               hasError && 'border-destructive/60'
             )}
           >
-            <span className='pl-3 text-[15px] whitespace-nowrap text-tertiary-token'>
+            <span className='pl-3 text-[15px] font-[560] whitespace-nowrap text-secondary-token'>
               jov.ie/
             </span>
             <input
@@ -184,114 +109,96 @@ export function OnboardingHandleStep({
               aria-invalid={hasError ? 'true' : undefined}
               className='min-w-0 flex-1 bg-transparent text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
             />
-            <div className='flex items-center gap-1.5 shrink-0'>
-              <div className='h-5 w-5 flex items-center justify-center'>
-                <ValidationIcon
-                  checking={handleValidation.checking}
-                  hasError={hasError}
-                  isValid={isValid}
-                />
-              </div>
-              <button
-                data-testid='onboarding-handle-submit'
-                type='submit'
-                disabled={!canSubmit}
-                aria-describedby={
-                  ctaDisabledReason ? disabledReasonId : undefined
-                }
-                className={cn(
-                  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-200',
-                  'bg-accent text-white hover:bg-accent-hover',
-                  'disabled:cursor-not-allowed disabled:opacity-40'
-                )}
-              >
-                {isLoading ? (
-                  <LoadingSpinner size='sm' className='text-current' />
-                ) : autoSubmitClaimed ? (
-                  <svg
-                    viewBox='0 0 20 20'
-                    fill='none'
-                    aria-hidden='true'
-                    className='h-4 w-4 animate-in zoom-in duration-300'
-                  >
-                    <path
-                      d='M6 10.2l2.6 2.6L14 7.4'
-                      stroke='currentColor'
-                      strokeWidth='2'
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    viewBox='0 0 20 20'
-                    fill='none'
-                    aria-hidden='true'
-                    className='h-4 w-4'
-                  >
-                    <path
-                      d='M4 10h12m0 0l-4-4m4 4l-4 4'
-                      stroke='currentColor'
-                      strokeWidth='2'
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
+            <button
+              data-testid='onboarding-handle-submit'
+              type='submit'
+              disabled={!canSubmit}
+              aria-describedby={
+                ctaDisabledReason ? disabledReasonId : undefined
+              }
+              className={cn(
+                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-200',
+                'bg-accent text-white hover:bg-accent-hover',
+                'disabled:cursor-not-allowed disabled:opacity-40'
+              )}
+            >
+              {isLoading || handleValidation.checking ? (
+                <LoadingSpinner size='sm' className='text-current' />
+              ) : autoSubmitClaimed ? (
+                <svg
+                  viewBox='0 0 20 20'
+                  fill='none'
+                  aria-hidden='true'
+                  className='h-4 w-4 animate-in zoom-in duration-300'
+                >
+                  <path
+                    d='M6 10.2l2.6 2.6L14 7.4'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                  />
+                </svg>
+              ) : (
+                <svg
+                  viewBox='0 0 20 20'
+                  fill='none'
+                  aria-hidden='true'
+                  className='h-4 w-4'
+                >
+                  <path
+                    d='M4 10h12m0 0l-4-4m4 4l-4 4'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                  />
+                </svg>
+              )}
+            </button>
           </div>
 
-          {/* Validation feedback */}
+          {/* Validation feedback + suggestions — tight under input */}
           <output
             data-testid='onboarding-handle-validation-status'
-            className='min-h-[24px] flex items-center justify-center'
+            className='min-h-[20px] flex flex-col items-start gap-2'
             aria-live='polite'
           >
             {autoSubmitClaimed && handleInput ? (
               <span className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'>
                 jov.ie/{handleInput} is yours.
               </span>
-            ) : hasError && handleInput && !handleValidation.checking ? (
+            ) : stateError ||
+              (hasError && handleInput && !handleValidation.checking) ? (
               <span
                 data-testid='handle-unavailable'
                 className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'
               >
-                Not available
+                {stateError || handleValidation.error}
               </span>
             ) : null}
+            {handleValidation.suggestions.length > 0 && (
+              <div className='flex flex-wrap items-center gap-2'>
+                <span className='text-[12px] text-tertiary-token'>Try:</span>
+                {handleValidation.suggestions.map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type='button'
+                    onClick={() =>
+                      onSuggestionClick
+                        ? onSuggestionClick(suggestion)
+                        : onHandleChange(suggestion)
+                    }
+                    className={AUTH_SURFACE.pillOption}
+                  >
+                    jov.ie/{suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </output>
-
-          {/* Suggestions */}
-          {handleValidation.suggestions.length > 0 && (
-            <div className='flex flex-wrap gap-2'>
-              {handleValidation.suggestions.map(suggestion => (
-                <button
-                  key={suggestion}
-                  type='button'
-                  onClick={() =>
-                    onSuggestionClick
-                      ? onSuggestionClick(suggestion)
-                      : onHandleChange(suggestion)
-                  }
-                  className={AUTH_SURFACE.pillOption}
-                >
-                  jov.ie/{suggestion}
-                </button>
-              ))}
-            </div>
-          )}
         </fieldset>
       </form>
-
-      {stateError ? (
-        <output
-          className='text-[13px] text-error text-center'
-          aria-live='polite'
-        >
-          {stateError}
-        </output>
-      ) : null}
       <span id={disabledReasonId} className='sr-only' aria-live='polite'>
         {ctaDisabledReason ?? ''}
       </span>

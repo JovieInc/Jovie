@@ -20,7 +20,6 @@ import { OnboardingExperienceShell } from '@/components/features/onboarding/Onbo
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthBackButton } from '@/features/auth';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
 import { useHandleValidation } from '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation';
 import {
@@ -680,13 +679,25 @@ function StepCircleIcon({
 
 function OnboardingSidebar({
   currentStep,
+  onBack,
 }: Readonly<{
   currentStep: StepId;
+  onBack?: () => void;
 }>) {
   const displayStep = normalizeSidebarCurrentStep(currentStep);
 
   return (
     <nav aria-label='Onboarding steps'>
+      {onBack ? (
+        <button
+          type='button'
+          onClick={onBack}
+          aria-label='Go back'
+          className='mb-3 flex h-7 w-7 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+        >
+          <ArrowRight className='h-4 w-4 rotate-180' />
+        </button>
+      ) : null}
       <ul className='space-y-1.5'>
         {SIDEBAR_STEPS.map(step => {
           const state = getSidebarStepState(step.id, displayStep);
@@ -2145,18 +2156,20 @@ export function OnboardingV2Form({
     <OnboardingExperienceShell
       mode='standalone'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
-      sidebar={<OnboardingSidebar currentStep={currentStep} />}
+      sidebar={
+        <OnboardingSidebar
+          currentStep={currentStep}
+          onBack={
+            currentStep === 'spotify' ||
+            currentStep === 'artist-confirm' ||
+            currentStep === 'upgrade'
+              ? handleGoBack
+              : undefined
+          }
+        />
+      }
       sidebarTitle='Jovie Setup'
       stageVariant='flat'
-      topBar={
-        currentStep === 'spotify' ||
-        currentStep === 'artist-confirm' ||
-        currentStep === 'upgrade' ? (
-          <div className='pb-2'>
-            <AuthBackButton onClick={handleGoBack} ariaLabel='Go back' />
-          </div>
-        ) : null
-      }
       data-testid='onboarding-experience-shell'
     >
       {stepContent}

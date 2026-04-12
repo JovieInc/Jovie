@@ -83,7 +83,7 @@ export function OnboardingExperienceShell({
         <div className='flex min-w-0 flex-1 flex-col'>
           <div
             className={cn(
-              'flex min-w-0 flex-1 flex-col justify-center',
+              'flex min-w-0 flex-1 flex-col pt-[12vh]',
               STAGE_HEIGHT_CLASSNAME[stableStageHeight],
               STAGE_VARIANT_CLASSNAME[stageVariant],
               stageClassName
