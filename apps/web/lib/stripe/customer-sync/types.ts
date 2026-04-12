@@ -32,6 +32,8 @@ export interface UserBillingFields {
   billingVersion: number;
   /** Timestamp of the last processed billing event for event ordering */
   lastBillingEventAt: Date | null;
+  /** When the user's trial ends (null if no trial) */
+  trialEndsAt: Date | null;
 }
 
 /**
@@ -79,6 +81,7 @@ export const BILLING_FIELDS_FULL = [
   'stripePriceId',
   'billingVersion',
   'lastBillingEventAt',
+  'trialEndsAt',
 ] as const satisfies readonly UserBillingFieldKey[];
 
 /**
@@ -239,6 +242,7 @@ export function buildSelectObject<T extends readonly UserBillingFieldKey[]>(
     stripePriceId: users.stripePriceId,
     billingVersion: users.billingVersion,
     lastBillingEventAt: users.lastBillingEventAt,
+    trialEndsAt: users.trialEndsAt,
   } as const;
 
   const selectObj: Partial<typeof fieldMap> = {};

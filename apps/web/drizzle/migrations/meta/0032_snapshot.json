@@ -16239,19 +16239,19 @@
         },
         "trial_started_at": {
           "name": "trial_started_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
         "trial_ends_at": {
           "name": "trial_ends_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
         "trial_converted_at": {
           "name": "trial_converted_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

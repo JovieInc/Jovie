@@ -34,6 +34,7 @@ export async function getUserBillingInfo(): Promise<{
     stripeSubscriptionId: string | null;
     billingVersion: number;
     lastBillingEventAt: Date | null;
+    trialEndsAt: Date | null;
   };
   error?: string;
 }> {
@@ -77,6 +78,7 @@ export async function getUserBillingInfo(): Promise<{
       stripeSubscriptionId: data.stripeSubscriptionId,
       billingVersion: data.billingVersion ?? 1,
       lastBillingEventAt: data.lastBillingEventAt ?? null,
+      trialEndsAt: data.trialEndsAt ?? null,
     },
   };
 }

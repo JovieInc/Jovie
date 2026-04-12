@@ -44,9 +44,9 @@ export const users = pgTable(
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
     // Reverse trial tracking
-    trialStartedAt: timestamp('trial_started_at'),
-    trialEndsAt: timestamp('trial_ends_at'),
-    trialConvertedAt: timestamp('trial_converted_at'),
+    trialStartedAt: timestamp('trial_started_at', { withTimezone: true }),
+    trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+    trialConvertedAt: timestamp('trial_converted_at', { withTimezone: true }),
     trialNotificationsSent: integer('trial_notifications_sent').default(0),
     // Active creator profile (FK added post-create to avoid circular dependency)
     activeProfileId: uuid('active_profile_id'),

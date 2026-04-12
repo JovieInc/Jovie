@@ -381,7 +381,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     const proOption = allOptions.find(
       o =>
         o.priceId &&
-        o.amount === 2000 &&
+        o.amount === 3900 &&
         (o.description === 'Pro' || o.interval === 'month')
     );
     expect(
@@ -390,8 +390,8 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     ).toBeTruthy();
 
     const proPriceId = proOption!.priceId!;
-    expect(proOption!.amount, 'Pro price should be $20/mo (2000 cents)').toBe(
-      2000
+    expect(proOption!.amount, 'Pro price should be $39/mo (3900 cents)').toBe(
+      3900
     );
 
     // Create checkout session with Pro price

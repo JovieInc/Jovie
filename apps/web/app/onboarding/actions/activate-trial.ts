@@ -11,7 +11,7 @@
 
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -43,7 +43,13 @@ export async function activateTrial(clerkId: string): Promise<boolean> {
         trialEndsAt,
         trialNotificationsSent: 0,
       })
-      .where(eq(users.clerkId, clerkId))
+      .where(
+        and(
+          eq(users.clerkId, clerkId),
+          eq(users.plan, 'free'),
+          isNull(users.trialStartedAt)
+        )
+      )
       .returning({ id: users.id, plan: users.plan });
 
     if (result.length === 0) {

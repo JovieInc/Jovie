@@ -21,7 +21,7 @@ vi.mock('@/lib/billing/verified-upgrade', () => ({
     priceId: 'price_123',
     interval: 'month',
   }),
-  formatVerifiedPriceLabel: () => '$20/mo',
+  formatVerifiedPriceLabel: () => '$39/mo',
 }));
 
 vi.mock('@/lib/queries', () => ({

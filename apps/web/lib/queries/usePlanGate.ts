@@ -130,6 +130,7 @@ export function usePlanGate(): PlanGateEntitlements {
   const ent = ENTITLEMENT_REGISTRY[planKey];
 
   // Derive trial days remaining from trialEndsAt if available
+  // TODO(Phase 9): remove cast once billing status API includes trial fields
   const trialEndsAt =
     ((data as Record<string, unknown> | undefined)?.trialEndsAt as
       | string

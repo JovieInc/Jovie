@@ -11,7 +11,7 @@
  * Sets unsubscribedAt instead of deleting the row (soft delete for compliance).
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
@@ -42,13 +42,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await db
       .update(notificationSubscriptions)
       .set({ unsubscribedAt: new Date() })
-      .where(eq(notificationSubscriptions.id, subscriberId))
+      .where(
+        and(
+          eq(notificationSubscriptions.id, subscriberId),
+          eq(notificationSubscriptions.email, email)
+        )
+      )
       .returning({ id: notificationSubscriptions.id });
 
     if (result.length === 0) {
       logger.warn('One-click unsubscribe: subscription not found', {
         subscriberId,
-        email,
       });
     }
 

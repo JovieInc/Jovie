@@ -8,6 +8,7 @@ import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { buildOneClickUnsubscribeUrl } from '@/lib/email/one-click-unsubscribe-token';
 import { escapeHtml } from '../utils';
 
 export interface ReleaseDayNotificationData {
@@ -25,6 +26,10 @@ export interface ReleaseDayNotificationData {
   streamingLinks: Array<{ providerId: string; url: string }>;
   /** Subscriber's name for personalized greeting */
   subscriberName?: string | null;
+  /** Notification subscription ID for one-click unsubscribe */
+  subscriberId?: string;
+  /** Subscriber's email for one-click unsubscribe */
+  subscriberEmail?: string;
 }
 
 /**
@@ -231,19 +236,15 @@ export function getReleaseDayUnsubscribeHeaders(
   const manageUrl = buildManageNotificationsUrl(username);
 
   if (subscriberId && email) {
-    const {
-      buildOneClickUnsubscribeUrl,
-    } = require('@/lib/email/one-click-unsubscribe-token');
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     const oneClickUrl = buildOneClickUnsubscribeUrl(
-      baseUrl,
+      BASE_URL,
       subscriberId,
       email
     );
 
     if (oneClickUrl) {
       return {
-        'List-Unsubscribe': `<${oneClickUrl}>, <${manageUrl}>`,
+        'List-Unsubscribe': `<${oneClickUrl}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       };
     }
@@ -264,6 +265,10 @@ export function getReleaseDayNotificationEmail(
     subject: getReleaseDayNotificationSubject(data),
     text: getReleaseDayNotificationText(data),
     html: getReleaseDayNotificationHtml(data),
-    headers: getReleaseDayUnsubscribeHeaders(data.username),
+    headers: getReleaseDayUnsubscribeHeaders(
+      data.username,
+      data.subscriberId,
+      data.subscriberEmail
+    ),
   };
 }

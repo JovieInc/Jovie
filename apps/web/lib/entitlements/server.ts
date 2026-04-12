@@ -126,8 +126,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   let trialEndsAt: string | null = null;
   let trialDaysRemaining: number | null = null;
 
-  const rawTrialEndsAt = (billing.data as Record<string, unknown>)
-    .trialEndsAt as Date | null;
+  const rawTrialEndsAt = billing.data.trialEndsAt ?? null;
 
   if (dbPlan === 'trial' && rawTrialEndsAt) {
     const now = new Date();
