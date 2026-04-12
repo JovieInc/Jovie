@@ -107,7 +107,7 @@ export function ReleasesEmptyState({
   return (
     <DrawerSurfaceCard
       variant='card'
-      className='flex min-h-[204px] flex-col items-center justify-center px-5 py-8 text-center'
+      className={emptyCardClassName}
       testId='releases-empty-state-disconnected'
     >
       <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
@@ -122,7 +122,7 @@ export function ReleasesEmptyState({
       <DrawerButton
         tone='primary'
         onClick={onConnectSpotify}
-        className='mt-2.5 h-7 rounded-[8px] px-2.5 text-[11px]'
+        className='mt-3 h-7 rounded-[8px] px-2.5 text-[11px]'
       >
         Connect Spotify
       </DrawerButton>
