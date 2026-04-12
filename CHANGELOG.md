@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.149.0] - 2026-04-12
+
+### Changed
+
+- Redesign onboarding handle step with inline `jov.ie/` prefix, pearl composer-style input, and circular arrow submit button
+- Simplify Spotify search step to single headline "Are you on Spotify?" with no redundant copy
+- Fix sidebar layout to sit beside content at 1024px+ instead of stacking on top (Tailwind v4 cascade fix)
+- Vertically position onboarding content in upper third of viewport for consistent headline placement
+- Replace filled sidebar circles with hollow stroke icons: solid (complete), half-solid/half-dotted (in-progress), dotted (pending)
+- Add per-step accent colors to sidebar step indicators
+- Simplify artist-confirm step to single clear message with always-enabled Continue button
+- Show specific handle validation errors instead of generic "Not available" message
+- Move Back button into sidebar for consistent alignment with "Jovie Setup" title
+
+### Added
+
+- Reserve top artist Spotify IDs as unavailable in search dropdown for social proof
+- "Need help?" / "Contact support" mailto link in search dropdown footer
+- Handle suggestions shown as clickable `jov.ie/` pills with "Try:" label
+
+### Fixed
+
+- Fix dropdown flickering during typing with `placeholderData: keepPreviousData`
+- Errors on artist-confirm step stay in context instead of bouncing to "Are you on Spotify?"
+- Split generic server error "That handle can't be used" into specific messages (reserved, too short, invalid characters)
+
 ## [26.4.148.1] - 2026-04-12
 
 ### Removed
