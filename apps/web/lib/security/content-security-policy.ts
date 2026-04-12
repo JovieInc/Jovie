@@ -95,6 +95,8 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.accounts.dev',
     'https://clerk.jov.ie',
     'https://challenges.cloudflare.com',
+    'https://r2.leadsy.ai',
+    'https://tag.trovo-tag.com',
   ].join(' '),
 
   // Pre-computed img-src from canonical CDN domain registry
@@ -122,6 +124,8 @@ const STATIC_CSP_PARTS = {
     'https://clerk-telemetry.com',
     'https://vercel.live',
     'wss://ws-us3.pusher.com',
+    'https://r2.leadsy.ai',
+    'https://wvbknd.leadsy.ai',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)

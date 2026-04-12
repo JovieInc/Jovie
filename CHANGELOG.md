@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.149.2] - 2026-04-12
 
+> Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
+
 ### Changed
 
 - Pricing page CTA updated to mention 14-day Pro trial
@@ -17,6 +19,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Pro analytics retention corrected from 90 to 180 days in docs
 - Free AI message limit corrected from 25 to 10/day in chat-ai docs
 - LLMs route pricing section updated with accurate tier descriptions and trial mention
+
+## [26.4.143] - 2026-04-12
+
+### Added
+
+- Instantly.ai / Leadsy tracking pixel for email campaign attribution
+- `isMarketingAllowed()` consent helper with fire-by-default model (respects GPC/DNT opt-out)
+- CSP allowlist for r2.leadsy.ai, tag.trovo-tag.com, and wvbknd.leadsy.ai
+- 14 unit tests covering all pixel consent and route-gating codepaths
 
 ## [26.4.149.1] - 2026-04-12
 
