@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.144] - 2026-04-12
+
+> Admin dashboard now opens to a clean funnel scoreboard showing the full pipeline from scrape to paid at a glance.
+
+### Added
+
+- Funnel scoreboard as the default admin view with three hero metrics (MRR, paying customers, WoW growth), a six-step horizontal pipeline, and a 4-week trend chart
+- Shared `formatPercent` and `formatUsd` utilities extracted from duplicated admin code
+- Unit tests for scoreboard rendering, conversion rate math, empty/error states, and formatting utils
+
+### Changed
+
+- Admin dashboard now uses two tabs: Scoreboard (default) and Workspaces (previous content)
+- Consolidated `formatPercent` (3 copies) and `formatUsd` (2 copies) into `lib/admin/format.ts`
+
 ## [26.4.149.2] - 2026-04-12
 
 > Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
