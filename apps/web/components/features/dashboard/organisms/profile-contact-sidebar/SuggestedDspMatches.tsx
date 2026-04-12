@@ -3,7 +3,7 @@
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
@@ -159,24 +159,30 @@ function SuggestedMatchRow({
   const label =
     PROVIDER_LABELS[match.providerId as DspProviderId] ?? match.providerId;
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const hoverTimeout = useState<ReturnType<typeof setTimeout> | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = useCallback(() => {
-    const id = setTimeout(() => setPopoverOpen(true), 300);
-    hoverTimeout[1](id);
-  }, [hoverTimeout]);
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => setPopoverOpen(true), 300);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverTimeout[0]) clearTimeout(hoverTimeout[0]);
-    hoverTimeout[1](null);
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = null;
     setPopoverOpen(false);
-  }, [hoverTimeout]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: hover triggers popover, not a click action
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: mouse events trigger popover display, not a click action
     <li
       className={cn(
-        'group flex items-center gap-2 rounded-[6px] px-2 py-1 transition-colors hover:bg-surface-1',
+        'group flex items-center gap-2 rounded-[6px] px-2 py-1 transition-colors hover:bg-surface-1 focus-within:bg-surface-1',
         isLoading && 'opacity-60'
       )}
       onMouseEnter={handleMouseEnter}
@@ -189,20 +195,10 @@ function SuggestedMatchRow({
               provider={match.providerId as DspProviderId}
               size='sm'
             />
-            {/* On mobile, tapping the name opens the external profile */}
-            <a
-              href={match.externalArtistUrl ?? undefined}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='min-w-0 flex-1 truncate text-[13px] font-[450] text-primary-token lg:pointer-events-none'
-              onClick={e => {
-                // Desktop: prevent navigation (popover handles it)
-                if (window.innerWidth >= 1024) e.preventDefault();
-              }}
-            >
+            <span className='min-w-0 flex-1 truncate text-[13px] font-[450] text-primary-token'>
               {match.externalArtistName || label}
-            </a>
-            <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-lg:opacity-100'>
+            </span>
+            <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100'>
               <button
                 type='button'
                 onClick={e => {
@@ -210,7 +206,7 @@ function SuggestedMatchRow({
                   onConfirm();
                 }}
                 disabled={isLoading}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success'
+                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
                 aria-label={`Confirm ${label} match for ${match.externalArtistName || 'Unknown'}`}
               >
                 {isConfirming ? (
@@ -226,7 +222,7 @@ function SuggestedMatchRow({
                   onReject();
                 }}
                 disabled={isLoading}
-                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error'
+                className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
                 aria-label={`Reject ${label} match for ${match.externalArtistName || 'Unknown'}`}
               >
                 {isRejecting ? (
@@ -317,21 +313,21 @@ function MatchPopoverContent({
 
       <div className='flex items-center gap-1.5'>
         {match.externalArtistUrl && (
-          <a
-            href={match.externalArtistUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex-1'
+          <Button
+            asChild
+            variant='ghost'
+            size='sm'
+            className='h-7 flex-1 rounded-full text-[12px] font-[510]'
           >
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-7 w-full rounded-full text-[12px] font-[510]'
+            <a
+              href={match.externalArtistUrl}
+              target='_blank'
+              rel='noopener noreferrer'
             >
               <ExternalLink className='mr-1 h-3 w-3' />
               Open
-            </Button>
-          </a>
+            </a>
+          </Button>
         )}
         <Button
           variant='ghost'
