@@ -14,7 +14,7 @@ vi.mock('@/lib/auth/session', () => ({
   getSessionContext: vi.fn().mockResolvedValue({
     clerkUserId: 'user_clerk_abc',
     user: {
-      id: 'db-user-123',
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       clerkId: 'user_clerk_abc',
       email: 'artist@example.com',
       isAdmin: false,
