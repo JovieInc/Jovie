@@ -255,9 +255,13 @@ export function ChatPageClient({
 
   const handleArchive = useCallback(async () => {
     if (!conversationId) return;
-    await deleteConversation.mutateAsync({ conversationId });
-    router.push(APP_ROUTES.CHAT);
-    notifications.success('Thread archived');
+    try {
+      await deleteConversation.mutateAsync({ conversationId });
+      router.push(APP_ROUTES.CHAT);
+      notifications.success('Thread archived');
+    } catch {
+      notifications.error('Could not archive thread. Please try again.');
+    }
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {

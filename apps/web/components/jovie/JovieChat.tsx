@@ -161,6 +161,11 @@ export function JovieChat({
     }
   }, [initialQuery, isLoadingConversation, submitMessage]);
 
+  // Reset known message IDs when conversation changes (component reused across navigations)
+  useEffect(() => {
+    knownMessageIdsRef.current = new Set();
+  }, [conversationId]);
+
   // Populate known message IDs from hydrated conversation to skip entrance animations
   useEffect(() => {
     if (messages.length > 0 && knownMessageIdsRef.current.size === 0) {
