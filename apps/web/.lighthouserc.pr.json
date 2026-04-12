@@ -4,6 +4,7 @@
       "numberOfRuns": 3,
       "url": [
         "http://localhost:3000/",
+        "http://localhost:3000/tim",
         "http://localhost:3000/legal/privacy",
         "http://localhost:3000/legal/terms",
         "http://localhost:3000/legal/cookies"

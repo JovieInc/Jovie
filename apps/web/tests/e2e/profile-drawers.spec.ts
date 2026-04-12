@@ -91,7 +91,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -130,7 +132,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -172,7 +176,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -213,7 +219,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -254,7 +262,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -296,7 +306,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
 
     await closeDrawer(page);
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);
@@ -355,7 +367,9 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     // Close menu via Escape (menus typically lack a close button)
     await page.keyboard.press('Escape');
 
-    await page.waitForTimeout(500);
+    await drawerContent
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
     const contentStillVisible = await drawerContent
       .isVisible()
       .catch(() => false);

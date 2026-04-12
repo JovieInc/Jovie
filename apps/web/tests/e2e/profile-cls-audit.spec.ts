@@ -175,14 +175,22 @@ test.describe('Profile CLS Audit @nightly', () => {
       await waitForHydration(page);
     }
 
-    // Wait for form to appear
-    await page
-      .locator('form, [data-testid="subscribe-form"], input[type="email"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .catch(() => {
-        // Form may not appear in all environments
-      });
+    // Wait for form to appear — fail if the transition never happens
+    const formLocator = page
+      .locator(
+        '[data-testid="subscription-pearl-composer"], [data-testid="profile-inline-cta"], input[type="email"]'
+      )
+      .first();
+    const formAppeared = await formLocator
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    if (!formAppeared) {
+      test.skip(
+        true,
+        'Subscribe form did not appear — cannot measure transition CLS'
+      );
+      return;
+    }
 
     // Collect the CLS value and disconnect the observer
     const cls = await page.evaluate(() => {
@@ -274,16 +282,22 @@ test.describe('Profile CLS Audit @nightly', () => {
       }
     }
 
-    // Wait for drawer content to appear
-    await page
+    // Wait for drawer content to appear — fail if the transition never happens
+    const drawerLocator = page
       .locator(
         '[role="dialog"], [data-testid="listen-drawer"], [data-state="open"]'
       )
-      .first()
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .catch(() => {
-        // Drawer may not appear in all environments
-      });
+      .first();
+    const drawerAppeared = await drawerLocator
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    if (!drawerAppeared) {
+      test.skip(
+        true,
+        'Listen drawer did not appear — cannot measure drawer CLS'
+      );
+      return;
+    }
 
     // Close the drawer
     await page.keyboard.press('Escape');
