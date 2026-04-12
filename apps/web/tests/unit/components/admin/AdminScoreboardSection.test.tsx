@@ -175,8 +175,8 @@ describe('AdminScoreboardSection', () => {
     render(Component);
 
     // The WoW Growth hero metric should show em dash
-    const wowLabel = screen.getByLabelText(/week over week growth/i);
-    expect(wowLabel).toBeInTheDocument();
+    const wowSection = screen.getByLabelText(/week over week growth/i);
+    expect(wowSection.querySelector('p')).toHaveTextContent('\u2014');
   });
 
   it('renders empty state when all data is zero', async () => {

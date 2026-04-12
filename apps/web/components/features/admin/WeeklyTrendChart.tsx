@@ -31,7 +31,8 @@ const LEGEND_ITEMS = [
 const LazyTrendChart = dynamic(
   () =>
     import('recharts').then(mod => {
-      const { CartesianGrid, Line, LineChart, XAxis } = mod;
+      const { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis } =
+        mod;
 
       function RechartsTrendChart({
         data,
@@ -44,53 +45,53 @@ const LazyTrendChart = dynamic(
         }));
 
         return (
-          <LineChart
-            data={formatted}
-            margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-            width={800}
-            height={144}
-          >
-            <CartesianGrid
-              strokeDasharray='3 3'
-              vertical={false}
-              stroke='var(--linear-border-subtle)'
-              opacity={0.15}
-            />
-            <XAxis
-              dataKey='label'
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 11, fill: 'var(--linear-text-tertiary)' }}
-            />
-            <Line
-              type='monotone'
-              dataKey='scraped'
-              stroke='var(--linear-text-tertiary)'
-              strokeWidth={1.5}
-              dot={false}
-            />
-            <Line
-              type='monotone'
-              dataKey='contacted'
-              stroke='hsl(var(--color-info))'
-              strokeWidth={1.5}
-              dot={false}
-            />
-            <Line
-              type='monotone'
-              dataKey='signups'
-              stroke='hsl(var(--color-accent))'
-              strokeWidth={1.5}
-              dot={false}
-            />
-            <Line
-              type='monotone'
-              dataKey='paid'
-              stroke='hsl(var(--color-success))'
-              strokeWidth={1.5}
-              dot={false}
-            />
-          </LineChart>
+          <ResponsiveContainer width='100%' height={144}>
+            <LineChart
+              data={formatted}
+              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+            >
+              <CartesianGrid
+                strokeDasharray='3 3'
+                vertical={false}
+                stroke='var(--linear-border-subtle)'
+                opacity={0.15}
+              />
+              <XAxis
+                dataKey='label'
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 11, fill: 'var(--linear-text-tertiary)' }}
+              />
+              <Line
+                type='monotone'
+                dataKey='scraped'
+                stroke='var(--linear-text-tertiary)'
+                strokeWidth={1.5}
+                dot={false}
+              />
+              <Line
+                type='monotone'
+                dataKey='contacted'
+                stroke='hsl(var(--color-info))'
+                strokeWidth={1.5}
+                dot={false}
+              />
+              <Line
+                type='monotone'
+                dataKey='signups'
+                stroke='hsl(var(--color-accent))'
+                strokeWidth={1.5}
+                dot={false}
+              />
+              <Line
+                type='monotone'
+                dataKey='paid'
+                stroke='hsl(var(--color-success))'
+                strokeWidth={1.5}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         );
       }
 
