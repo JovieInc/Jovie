@@ -175,3 +175,15 @@
     color: var(--linear-text-primary);
   }
 }
+
+@keyframes flow-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(3px);
+  }
+}
