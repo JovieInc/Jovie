@@ -211,6 +211,12 @@ async function selectSpotifyInDialog(page: import('@playwright/test').Page) {
 
 test.describe
   .serial('Presence Page @presence', () => {
+    // Presence page now redirects to artist profile settings (Music tab).
+    // Suggested DSP matches are shown inline in the profile sidebar drawer.
+    test.skip(
+      true,
+      'Presence page retired — redirects to settings/artist-profile'
+    );
     test.skip(!databaseUrl, 'Presence E2E coverage requires DATABASE_URL');
     test.skip(
       !useTestAuthBypass,

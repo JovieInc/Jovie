@@ -124,18 +124,6 @@ const creatorRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
-    path: APP_ROUTES.PRESENCE,
-    name: 'Presence',
-    kind: 'render',
-    surface: 'creator',
-    authRole: 'user',
-    contentSelector:
-      '[data-testid="dsp-presence-workspace"], [data-testid="dsp-presence-content-panel"]',
-    contentFallbackSelector: '[data-testid="presence-empty-state"]',
-    requiresUserButton: true,
-    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
-  },
-  {
     path: APP_ROUTES.DASHBOARD_RELEASES,
     name: 'Releases',
     kind: 'render',
