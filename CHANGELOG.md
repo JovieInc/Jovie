@@ -28,6 +28,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
 - Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
