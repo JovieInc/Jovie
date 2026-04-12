@@ -24,6 +24,7 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
+  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
@@ -943,28 +944,32 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
-            <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
-              <div className='flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
+              testId='releases-empty-state-connected'
+            >
+              <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
                 <Icon
                   name='Disc3'
                   className='h-4 w-4 text-tertiary-token'
                   aria-hidden='true'
                 />
               </div>
-              <h3 className='mt-4 text-[14px] font-[590] tracking-[-0.012em] text-primary-token'>
+              <h3 className='text-[13px] font-[510] text-primary-token'>
                 No releases yet
               </h3>
-              <p className='mt-1 max-w-sm text-[12px] leading-[18px] text-secondary-token'>
+              <p className='mt-0.5 max-w-sm text-[12px] leading-[17px] text-secondary-token'>
                 {canCreateManualReleases
                   ? 'Sync from Spotify or create one manually to start generating smart links.'
                   : 'Sync from Spotify to start generating smart links.'}
               </p>
-              <div className='mt-4 flex flex-wrap items-center justify-center gap-2.5'>
+              <div className='mt-3 flex flex-wrap items-center justify-center gap-2.5'>
                 <DrawerButton
                   tone='primary'
                   disabled={isSyncing}
                   onClick={experienceAdapter?.onSync ?? handleSync}
-                  className='inline-flex items-center gap-2'
+                  className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
                   data-testid='sync-spotify-empty-state'
                 >
                   <Icon
@@ -980,7 +985,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 {canCreateManualReleases && (
                   <DrawerButton
                     onClick={handleNewRelease}
-                    className='inline-flex items-center gap-2'
+                    className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
                     data-testid='create-release-empty-state'
                   >
                     <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
@@ -988,7 +993,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   </DrawerButton>
                 )}
               </div>
-            </div>
+            </DrawerSurfaceCard>
           </PageShell>
         )}
       </div>

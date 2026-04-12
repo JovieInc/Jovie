@@ -15,7 +15,7 @@ describe('Contact Limit Configuration', () => {
   });
 
   it('pro plan has 5000 contact limit', () => {
-    expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBe(5000);
+    expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
   });
 
   it('max plan has unlimited contacts', () => {

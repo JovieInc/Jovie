@@ -2,9 +2,7 @@
 
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AuthButton } from '@/features/auth';
-import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 
 interface HandleValidationState {
@@ -34,128 +32,6 @@ interface OnboardingHandleStepProps {
   readonly autoSubmitClaimed?: boolean;
 }
 
-function ValidationIcon({
-  checking,
-  hasError,
-  isValid,
-}: {
-  readonly checking: boolean;
-  readonly hasError: boolean;
-  readonly isValid: boolean;
-}) {
-  if (checking) {
-    return <LoadingSpinner size='sm' className='text-tertiary-token' />;
-  }
-
-  if (hasError) {
-    return (
-      <svg
-        viewBox='0 0 20 20'
-        fill='none'
-        aria-hidden='true'
-        className='h-5 w-5'
-      >
-        <circle
-          cx='10'
-          cy='10'
-          r='9'
-          stroke='currentColor'
-          className='text-error'
-          strokeWidth='2'
-        />
-        <path
-          d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
-          stroke='currentColor'
-          className='text-error'
-          strokeWidth='2'
-          strokeLinecap='round'
-        />
-      </svg>
-    );
-  }
-
-  if (isValid) {
-    return (
-      <svg
-        viewBox='0 0 20 20'
-        fill='none'
-        aria-hidden='true'
-        className='h-5 w-5'
-      >
-        <circle
-          cx='10'
-          cy='10'
-          r='9'
-          stroke='currentColor'
-          className='text-success'
-          strokeWidth='2'
-        />
-        <path
-          d='M6 10.2l2.6 2.6L14 7.4'
-          stroke='currentColor'
-          className='text-success'
-          strokeWidth='2'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-        />
-      </svg>
-    );
-  }
-
-  return null;
-}
-
-function ButtonContent({
-  isSubmitting,
-  isPendingSubmit,
-  isChecking,
-  autoSubmitClaimed,
-}: {
-  readonly isSubmitting: boolean;
-  readonly isPendingSubmit: boolean;
-  readonly isChecking: boolean;
-  readonly autoSubmitClaimed: boolean;
-}) {
-  const isLoading = isSubmitting || (isPendingSubmit && isChecking);
-  let buttonLabel = 'Continue';
-  if (isSubmitting) buttonLabel = 'Saving…';
-  else if (isLoading) buttonLabel = 'Checking…';
-
-  if (autoSubmitClaimed) {
-    return (
-      <span className='inline-flex items-center justify-center gap-2'>
-        <svg
-          viewBox='0 0 20 20'
-          fill='none'
-          aria-hidden='true'
-          className='h-4 w-4 animate-in zoom-in duration-300'
-        >
-          <circle cx='10' cy='10' r='9' stroke='currentColor' strokeWidth='2' />
-          <path
-            d='M6 10.2l2.6 2.6L14 7.4'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-          />
-        </svg>
-        <span>Claimed!</span>
-      </span>
-    );
-  }
-
-  return (
-    <span className='inline-flex items-center justify-center gap-2'>
-      <span
-        className={`inline-flex transition-opacity duration-150 ${isLoading ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}
-      >
-        <LoadingSpinner size='sm' className='text-current' />
-      </span>
-      <span>{buttonLabel}</span>
-    </span>
-  );
-}
-
 export function OnboardingHandleStep({
   title,
   prompt,
@@ -175,163 +51,157 @@ export function OnboardingHandleStep({
   autoSubmitClaimed = false,
 }: OnboardingHandleStepProps) {
   const disabledReasonId = 'handle-step-disabled-reason';
+  const isLoading =
+    isSubmitting || (isPendingSubmit && handleValidation.checking);
+  const hasError = Boolean(stateError || handleValidation.error);
 
-  function renderValidationStatus(): React.ReactNode {
-    if (autoSubmitClaimed && handleInput) {
-      return (
-        <div className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-          @{handleInput} claimed.
-        </div>
-      );
-    }
-
-    if (!handleInput || stateError) return null;
-    // Checking state is shown via spinner icon in the input — no text needed
-    if (handleValidation.checking) return null;
-    if (handleValidation.clientValid && handleValidation.available) return null;
-    if (handleValidation.error) {
-      return (
-        <div
-          data-testid='handle-unavailable'
-          className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'
-        >
-          {handleValidation.error}
-        </div>
-      );
-    }
-    return null;
-  }
+  const canSubmit =
+    !Boolean(ctaDisabledReason) && !isTransitioning && !isLoading;
 
   return (
-    <div className='flex flex-col items-center justify-center h-full'>
-      <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
-        <div className={cn(FORM_LAYOUT.headerSection, 'mb-6')}>
-          <h1 className={FORM_LAYOUT.title}>{title}</h1>
-          {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
-          {isReservedHandle ? (
-            <ContentSurfaceCard className='mt-3 flex flex-col items-center gap-1 px-3 py-2.5 text-center'>
-              <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
-                @{handleInput}
-              </p>
-              <p className='text-[13px] text-secondary-token'>
-                We reserved this for you. Edit below if you prefer something
-                else.
-              </p>
-            </ContentSurfaceCard>
-          ) : null}
-        </div>
-
-        <ContentSurfaceCard className='p-4 sm:p-5'>
-          <form
-            className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}
-            onSubmit={onSubmit}
-          >
-            <fieldset disabled={!isHydrated} className='min-w-0'>
-              <div>
-                <div
-                  className={cn(
-                    AUTH_SURFACE.fieldShell,
-                    (stateError || handleValidation.error) &&
-                      AUTH_SURFACE.fieldShellError
-                  )}
-                >
-                  <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
-                    @
-                  </span>
-                  <input
-                    id='handle-input'
-                    ref={inputRef}
-                    name='username'
-                    aria-label='Enter your desired handle'
-                    type='text'
-                    value={handleInput}
-                    onChange={e =>
-                      onHandleChange(
-                        e.target.value
-                          .toLowerCase()
-                          .replaceAll(/\s+/g, '')
-                          .replace(/^@+/, '')
-                      )
-                    }
-                    placeholder='yourhandle'
-                    autoComplete='username'
-                    autoCapitalize='none'
-                    autoCorrect='off'
-                    spellCheck={false}
-                    aria-invalid={handleValidation.error ? 'true' : undefined}
-                    className={AUTH_SURFACE.fieldInput}
-                  />
-                  <div className='h-5 w-5 flex items-center justify-center'>
-                    <ValidationIcon
-                      checking={handleValidation.checking}
-                      hasError={Boolean(stateError || handleValidation.error)}
-                      isValid={
-                        Boolean(handleInput) &&
-                        handleValidation.clientValid &&
-                        handleValidation.available
-                      }
-                    />
-                  </div>
-                </div>
-
-                <output
-                  data-testid='onboarding-handle-validation-status'
-                  className={FORM_LAYOUT.errorContainer}
-                  aria-live='polite'
-                >
-                  {renderValidationStatus()}
-                </output>
-
-                {handleValidation.suggestions.length > 0 && (
-                  <div className='mt-1 flex flex-wrap justify-center gap-2'>
-                    {handleValidation.suggestions.map(suggestion => (
-                      <button
-                        key={suggestion}
-                        type='button'
-                        onClick={() =>
-                          onSuggestionClick
-                            ? onSuggestionClick(suggestion)
-                            : onHandleChange(suggestion)
-                        }
-                        className={AUTH_SURFACE.pillOption}
-                      >
-                        @{suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <AuthButton
-                data-testid='onboarding-handle-submit'
-                type='submit'
-                disabled={Boolean(ctaDisabledReason) || isTransitioning}
-                aria-describedby={
-                  ctaDisabledReason ? disabledReasonId : undefined
-                }
-                variant='primary'
-              >
-                <ButtonContent
-                  isSubmitting={isSubmitting}
-                  isPendingSubmit={isPendingSubmit}
-                  isChecking={handleValidation.checking}
-                  autoSubmitClaimed={autoSubmitClaimed}
-                />
-              </AuthButton>
-            </fieldset>
-          </form>
-        </ContentSurfaceCard>
-
-        <output
-          className={cn(FORM_LAYOUT.footerHint, 'mt-4')}
-          aria-live='polite'
-        >
-          {stateError ?? null}
-        </output>
-        <span id={disabledReasonId} className='sr-only' aria-live='polite'>
-          {ctaDisabledReason ?? ''}
-        </span>
+    <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
+      <div className='space-y-3'>
+        <h1 className='text-3xl font-[620] tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
+          {title}
+        </h1>
+        {prompt ? (
+          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-[15px]'>
+            {prompt}
+          </p>
+        ) : null}
       </div>
+
+      <form onSubmit={onSubmit} className='space-y-4'>
+        <fieldset disabled={!isHydrated} className='min-w-0 space-y-4'>
+          {/* Inline input with claim button */}
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-200',
+              'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))]',
+              'hover:border-default hover:bg-surface-0',
+              'focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
+              hasError && 'border-destructive/60'
+            )}
+          >
+            <span className='pl-3 text-[15px] font-[560] whitespace-nowrap text-secondary-token'>
+              jov.ie/
+            </span>
+            <input
+              id='handle-input'
+              ref={inputRef}
+              name='username'
+              aria-label='Claim your handle'
+              type='text'
+              value={handleInput}
+              onChange={e =>
+                onHandleChange(
+                  e.target.value
+                    .toLowerCase()
+                    .replaceAll(/\s+/g, '')
+                    .replace(/^@+/, '')
+                )
+              }
+              placeholder='yourname'
+              autoComplete='username'
+              autoCapitalize='none'
+              autoCorrect='off'
+              spellCheck={false}
+              aria-invalid={hasError ? 'true' : undefined}
+              className='min-w-0 flex-1 bg-transparent text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
+            />
+            <button
+              data-testid='onboarding-handle-submit'
+              type='submit'
+              disabled={!canSubmit}
+              aria-describedby={
+                ctaDisabledReason ? disabledReasonId : undefined
+              }
+              className={cn(
+                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-200',
+                'bg-accent text-white hover:bg-accent-hover',
+                'disabled:cursor-not-allowed disabled:opacity-40'
+              )}
+            >
+              {isLoading || handleValidation.checking ? (
+                <LoadingSpinner size='sm' className='text-current' />
+              ) : autoSubmitClaimed ? (
+                <svg
+                  viewBox='0 0 20 20'
+                  fill='none'
+                  aria-hidden='true'
+                  className='h-4 w-4 animate-in zoom-in duration-300'
+                >
+                  <path
+                    d='M6 10.2l2.6 2.6L14 7.4'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                  />
+                </svg>
+              ) : (
+                <svg
+                  viewBox='0 0 20 20'
+                  fill='none'
+                  aria-hidden='true'
+                  className='h-4 w-4'
+                >
+                  <path
+                    d='M4 10h12m0 0l-4-4m4 4l-4 4'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Validation feedback + suggestions — tight under input */}
+          <output
+            data-testid='onboarding-handle-validation-status'
+            className='min-h-[20px] flex flex-col items-start gap-2'
+            aria-live='polite'
+          >
+            {autoSubmitClaimed && handleInput ? (
+              <span className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'>
+                jov.ie/{handleInput} is yours.
+              </span>
+            ) : stateError ||
+              (hasError && handleInput && !handleValidation.checking) ? (
+              <span
+                data-testid='handle-unavailable'
+                className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'
+              >
+                {stateError || handleValidation.error}
+              </span>
+            ) : null}
+            {handleValidation.suggestions.length > 0 && (
+              <div className='flex flex-wrap items-center gap-2'>
+                <span className='text-[12px] text-tertiary-token'>Try:</span>
+                {handleValidation.suggestions.map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type='button'
+                    onClick={() =>
+                      onSuggestionClick
+                        ? onSuggestionClick(suggestion)
+                        : onHandleChange(suggestion)
+                    }
+                    className={AUTH_SURFACE.pillOption}
+                  >
+                    jov.ie/{suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </output>
+        </fieldset>
+      </form>
+      <span id={disabledReasonId} className='sr-only' aria-live='polite'>
+        {ctaDisabledReason ?? ''}
+      </span>
     </div>
   );
 }

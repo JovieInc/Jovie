@@ -3,7 +3,6 @@ import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
   TEST_MODE_HEADER,
-  TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
@@ -15,7 +14,7 @@ export {
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
   TEST_USER_ID_HEADER,
-};
+} from '@/lib/auth/test-mode-constants';
 
 const TRUSTED_PREVIEW_HOSTS = new Set(['preview.jov.ie']);
 

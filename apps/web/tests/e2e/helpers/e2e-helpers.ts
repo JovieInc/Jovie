@@ -517,7 +517,7 @@ export async function completeOnboardingV2(
     .locator('button[type="submit"]')
     .first();
   const spotifyHeading = page.getByRole('heading', {
-    name: 'Pick your Spotify artist',
+    name: 'Are you on Spotify?',
   });
   // Seeded handles arrive from the query string, and the V2 form immediately
   // revalidates them on mount. Waiting briefly avoids clicking during the

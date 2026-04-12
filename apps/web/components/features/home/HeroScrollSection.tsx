@@ -13,7 +13,7 @@ export function HeroScrollSection() {
       <div className='hero-glow pointer-events-none absolute inset-0' />
 
       <Container size='homepage'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <div className='hero-stagger'>
             <div className='max-w-[44rem] text-center lg:text-left'>
               <p className='homepage-section-eyebrow'>

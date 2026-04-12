@@ -4,8 +4,9 @@ import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/
 
 describe('OnboardingHandleStep', () => {
   const baseProps = {
-    title: 'Claim your handle',
-    prompt: 'This is how fans will find you.',
+    title: 'Claim your link',
+    prompt:
+      'This is the only link you need to share your music. Make it yours.',
     handleInput: 'artistname',
     isHydrated: true,
     handleValidation: {
@@ -24,17 +25,16 @@ describe('OnboardingHandleStep', () => {
     onSubmit: vi.fn(),
   };
 
-  it('elevates reserved handles with a primary identity headline', () => {
-    render(<OnboardingHandleStep {...baseProps} isReservedHandle />);
+  it('renders the handle input with jov.ie/ prefix', () => {
+    render(<OnboardingHandleStep {...baseProps} />);
 
-    expect(screen.getByText(/@artistname/)).toBeInTheDocument();
-    expect(screen.getByText(/We reserved this for you/)).toBeInTheDocument();
+    expect(screen.getByText('jov.ie/')).toBeInTheDocument();
+    expect(screen.getByLabelText('Claim your handle')).toBeInTheDocument();
   });
 
   it('keeps the standard layout for non-reserved handles', () => {
     render(<OnboardingHandleStep {...baseProps} isReservedHandle={false} />);
 
-    expect(screen.queryByText(/@artistname/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/We reserved this for you/)
     ).not.toBeInTheDocument();
@@ -43,7 +43,6 @@ describe('OnboardingHandleStep', () => {
   it('keeps the form non-interactive until hydration completes', () => {
     render(<OnboardingHandleStep {...baseProps} isHydrated={false} />);
 
-    expect(screen.getByLabelText('Enter your desired handle')).toBeDisabled();
-    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+    expect(screen.getByLabelText('Claim your handle')).toBeDisabled();
   });
 });

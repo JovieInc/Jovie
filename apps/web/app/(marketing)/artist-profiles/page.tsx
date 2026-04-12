@@ -79,7 +79,7 @@ export default function ArtistProfilesPage() {
         />
         <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
 
-        <div className='relative mx-auto max-w-[1120px] px-6 sm:px-8 lg:px-10'>
+        <div className='relative mx-auto max-w-[1200px] px-6 sm:px-8 lg:px-10'>
           <div className='mx-auto max-w-[42rem] text-center'>
             <h1
               id='artist-profiles-heading'

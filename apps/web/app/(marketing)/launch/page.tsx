@@ -142,7 +142,7 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 /* ─── Shared inline style helpers ─── */
-const WRAP = 'mx-auto w-full max-w-[1120px] px-6 sm:px-8 lg:px-10';
+const WRAP = 'mx-auto w-full max-w-[1200px] px-6 sm:px-8 lg:px-10';
 
 const LOGOS = [
   'Spotify',
