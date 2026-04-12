@@ -54,8 +54,8 @@ describe('ProfileAboutTab', () => {
 
       expect(screen.getByText('I make beats.')).toBeInTheDocument();
       expect(screen.getByText('Los Angeles, CA')).toBeInTheDocument();
-      expect(screen.getByText('From Chicago, IL')).toBeInTheDocument();
-      expect(screen.getByText('Active since 2015')).toBeInTheDocument();
+      expect(screen.getByText('Chicago, IL')).toBeInTheDocument();
+      expect(screen.getByText('2015')).toBeInTheDocument();
       expect(screen.getByText('hip-hop')).toBeInTheDocument();
       expect(screen.getByText('electronic')).toBeInTheDocument();
     });
