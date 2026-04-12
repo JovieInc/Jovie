@@ -428,7 +428,7 @@ export function ProfileInlineNotificationsCTA({
   const enterVariant = getEnterVariant(instant);
 
   return (
-    <div data-testid='profile-inline-cta'>
+    <div data-testid='profile-inline-cta' className='min-h-[48px]'>
       <AnimatePresence mode='wait' initial={false}>
         {step === 'cta' && (
           <motion.div key='inline-cta' exit={getExitVariant(instant)}>
