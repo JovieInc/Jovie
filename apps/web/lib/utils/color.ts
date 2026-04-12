@@ -155,6 +155,7 @@ export function getContrastSafeIconColor(
   brandHex: string,
   isDarkTheme: boolean
 ): string {
+  if (!brandHex) return isDarkTheme ? '#ffffff' : '#737373';
   if (isDarkTheme && isBrandDark(brandHex)) return '#ffffff';
   const bgHex = isDarkTheme ? '#17171a' : '#fcfcfc';
   return ensureContrast(brandHex, bgHex);
