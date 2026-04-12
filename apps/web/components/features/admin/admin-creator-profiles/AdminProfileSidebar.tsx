@@ -172,6 +172,7 @@ export function AdminProfileSidebar({
             hometown={profile.hometown ?? null}
             activeSinceYear={profile.activeSinceYear ?? null}
             allowPhotoDownloads={false}
+            showOldReleases={false}
           />
         ) : selectedCategory === 'algorithm' ? (
           <AlgorithmHealthPanel

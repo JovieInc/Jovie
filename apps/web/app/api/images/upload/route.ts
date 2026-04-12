@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache, invalidateProfileCache } from '@/lib/cache';
 import { isPressPhotoSchemaUnavailableError } from '@/lib/db/queries/press-photos';
@@ -296,7 +296,7 @@ async function handleUploadError(error: unknown): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   // Auth check first to avoid wrapping in transaction when unauthorized
-  const { userId: clerkUserId } = await getCachedAuth();
+  const { userId: clerkUserId } = await getOptionalAuth();
   if (!clerkUserId) {
     return errorResponse(
       'Please sign in to upload a profile photo.',

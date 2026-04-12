@@ -212,13 +212,19 @@ async function requireOwnProfile() {
  * Stored in the profile's settings JSONB field, mirroring the
  * allowArtworkDownloads pattern used for album art.
  */
-export async function updateAllowProfilePhotoDownloads(
-  allowDownloads: boolean
+
+/**
+ * Generic helper to update a single boolean setting on the creator profile.
+ */
+async function updateProfileBooleanSetting(
+  key: string,
+  value: boolean,
+  label: string
 ): Promise<void> {
   noStore();
 
-  if (typeof allowDownloads !== 'boolean') {
-    throw new TypeError('allowDownloads must be a boolean');
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`${label} must be a boolean`);
   }
 
   try {
@@ -230,7 +236,7 @@ export async function updateAllowProfilePhotoDownloads(
       .set({
         settings: {
           ...currentSettings,
-          allowProfilePhotoDownloads: allowDownloads,
+          [key]: value,
         },
         updatedAt: new Date(),
       })
@@ -241,16 +247,40 @@ export async function updateAllowProfilePhotoDownloads(
       throw new Error('Profile update failed — profile not found');
     }
 
-    // Invalidate cached public profile so visitors see the updated setting
     if (profile.usernameNormalized) {
       await invalidateProfileCache(profile.usernameNormalized);
     }
   } catch (error) {
     if (!isExpectedProfileActionError(error)) {
-      await captureError('updateAllowProfilePhotoDownloads failed', error, {
+      await captureError(`${label} failed`, error, {
         route: 'dashboard/actions/creator-profile',
       });
     }
     throw error;
   }
+}
+
+export async function updateAllowProfilePhotoDownloads(
+  allowDownloads: boolean
+): Promise<void> {
+  return updateProfileBooleanSetting(
+    'allowProfilePhotoDownloads',
+    allowDownloads,
+    'updateAllowProfilePhotoDownloads'
+  );
+}
+
+/**
+ * Update the "show old releases" setting for a creator profile.
+ * When false (default), releases older than 90 days are hidden from the
+ * public profile card. Setting to true keeps them visible.
+ */
+export async function updateShowOldReleases(
+  showOldReleases: boolean
+): Promise<void> {
+  return updateProfileBooleanSetting(
+    'showOldReleases',
+    showOldReleases,
+    'updateShowOldReleases'
+  );
 }

@@ -62,6 +62,28 @@ export const PLATFORM_CDN_DOMAINS: Record<string, readonly string[]> = {
 };
 
 /**
+ * CDN domains for audio/video previews loaded by the browser.
+ *
+ * Separate from image domains because they map to CSP `media-src`
+ * (not `img-src`). Platforms whose preview URLs are only fetched
+ * server-side do not need entries here — CSP only governs browser requests.
+ */
+export const PLATFORM_MEDIA_DOMAINS: Record<string, readonly string[]> = {
+  // Audio preview CDNs (loaded by HTMLAudioElement in the browser)
+  spotify: ['*.scdn.co', '*.spotifycdn.com'],
+  apple_music: ['*.mzstatic.com'],
+  deezer: ['*.dzcdn.net'],
+};
+
+/**
+ * Infrastructure media domains not tied to a specific platform.
+ */
+export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
+  // Vercel Blob storage (demo video, uploaded media)
+  '*.blob.vercel-storage.com',
+];
+
+/**
  * Infrastructure image domains not tied to a specific platform.
  */
 export const INFRASTRUCTURE_IMAGE_DOMAINS: readonly string[] = [
@@ -138,4 +160,16 @@ export function getImageServingPlatformIds(): string[] {
   return ALL_PLATFORMS.filter(p =>
     IMAGE_SERVING_CATEGORIES.has(p.category)
   ).map(p => p.id);
+}
+
+/**
+ * Returns all media domains prefixed with `https://` for CSP media-src.
+ * Used by content-security-policy.ts.
+ */
+export function getCspMediaSrcDomains(): string[] {
+  const allDomains = [
+    ...Object.values(PLATFORM_MEDIA_DOMAINS).flat(),
+    ...INFRASTRUCTURE_MEDIA_DOMAINS,
+  ];
+  return [...new Set(allDomains)].map(d => `https://${d}`);
 }

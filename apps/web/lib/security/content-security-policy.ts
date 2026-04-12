@@ -1,4 +1,7 @@
-import { getCspImgSrcDomains } from '@/constants/platforms/cdn-domains';
+import {
+  getCspImgSrcDomains,
+  getCspMediaSrcDomains,
+} from '@/constants/platforms/cdn-domains';
 import { isDevelopment } from '@/lib/utils/platform-detection/environment';
 import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
 
@@ -67,6 +70,10 @@ const STATIC_CSP_PARTS = {
   styleSrc: "style-src 'self' 'unsafe-inline'",
   fontSrc:
     "font-src 'self' data: https://vercel.live https://assets.vercel.com",
+  // Pre-computed media-src from canonical media domain registry
+  // @see constants/platforms/cdn-domains.ts
+  mediaSrc: ["media-src 'self'", ...getCspMediaSrcDomains()].join(' '),
+
   workerSrc: "worker-src 'self' blob:",
   manifestSrc: "manifest-src 'self'",
 
@@ -173,6 +180,7 @@ const buildCspDirectives = ({
     connectSrc,
     STATIC_CSP_PARTS.fontSrc,
     frameSrc,
+    STATIC_CSP_PARTS.mediaSrc,
     STATIC_CSP_PARTS.workerSrc,
     STATIC_CSP_PARTS.manifestSrc,
   ];

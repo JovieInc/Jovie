@@ -9,7 +9,6 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { determineReleasePhase } from '@/app/[username]/[slug]/_lib/release-phase';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
@@ -30,6 +29,7 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';

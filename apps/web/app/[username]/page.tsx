@@ -627,6 +627,9 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        profileSettings={{
+          showOldReleases: profileSettings.showOldReleases === true,
+        }}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
