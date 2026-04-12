@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.150.1] - 2026-04-12
 
+> Settings cards now use consistent spacing across all sections.
+
 ### Fixed
 
 - Settings page cards now have consistent padding across all sections (Email, Appearance, Billing, etc.) by removing redundant card-level padding that was doubling up with child padding
