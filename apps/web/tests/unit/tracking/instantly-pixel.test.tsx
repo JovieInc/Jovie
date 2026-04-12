@@ -205,4 +205,11 @@ describe('isMarketingAllowed', () => {
     localStorage.setItem('jv_cc', 'not-json');
     expect(isMarketingAllowed()).toBe(true);
   });
+
+  it('returns false when legacy jovie_tracking_consent is rejected (no jv_cc)', async () => {
+    vi.doUnmock('@/lib/tracking/consent');
+    const { isMarketingAllowed } = await import('@/lib/tracking/consent');
+    localStorage.setItem('jovie_tracking_consent', 'rejected');
+    expect(isMarketingAllowed()).toBe(false);
+  });
 });

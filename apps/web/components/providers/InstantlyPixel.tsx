@@ -19,7 +19,9 @@ const DENIED_PREFIXES = [
 
 function isDeniedRoute(pathname: string | null): boolean {
   if (!pathname) return false;
-  return DENIED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  return DENIED_PREFIXES.some(
+    prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 export function InstantlyPixel() {
@@ -30,7 +32,7 @@ export function InstantlyPixel() {
   const isDemo = isDemoRecordingClient();
   const skip = !pixelId || isPassive || isDenied || isDemo;
 
-  const [allowed, setAllowed] = useState(() => !skip && isMarketingAllowed());
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
     if (skip) return;

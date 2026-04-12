@@ -111,6 +111,11 @@ export function isMarketingAllowed(): boolean {
 
   if (isGPCEnabled() || isDNTEnabled()) return false;
 
+  // Respect legacy tracking opt-out (jovie_tracking_consent) as a hard fallback.
+  // Users who rejected via the old consent flow have no jv_cc entry yet.
+  const legacyState = getConsentState();
+  if (legacyState === 'rejected') return false;
+
   try {
     const raw = globalThis.localStorage?.getItem('jv_cc');
     if (!raw) return true; // No consent interaction yet — fire by default
