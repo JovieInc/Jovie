@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.148.2] - 2026-04-12
+## [26.4.149.1] - 2026-04-12
 
 ### Changed
 
@@ -13,6 +13,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
 - Align table base text to 13px per DESIGN.md specification
 - Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
+
+## [26.4.149.0] - 2026-04-12
+
+### Added
+
+- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
+- Dot indicator on Music tab when unreviewed suggestions exist
+- One-line explanation for first-time users seeing suggested profiles
+
+### Changed
+
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
 
 ## [26.4.148.1] - 2026-04-12
 
@@ -24,6 +37,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
 - Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
