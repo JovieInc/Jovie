@@ -18,6 +18,22 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
 - Removed Presence link from sidebar navigation
 
+## [26.4.148.1] - 2026-04-12
+
+### Removed
+
+- Delete 23 dead loading skeletons on redirect-only routes that never rendered
+- Remove orphaned `WaitlistSkeleton` component and Storybook story
+- Remove unused `BrandingSettingsLoading`, `NotificationsSettingsLoading`, and `BillingSettingsLoading` exports
+
+### Fixed
+
+- Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
+- Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
+- Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
+- Add missing ad-pixels section skeleton to audience settings loader
+- Fix billing settings loader description text ("Subscription" to "Plan")
+
 ## [26.4.148.0] - 2026-04-11
 
 ### Fixed
