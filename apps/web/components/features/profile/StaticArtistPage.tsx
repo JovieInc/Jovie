@@ -29,6 +29,9 @@ export interface StaticArtistPageProps {
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly showShopButton?: boolean;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
+  } | null;
   readonly viewerCountryCode?: string | null;
 }
 
@@ -52,6 +55,7 @@ export function StaticArtistPage({
   visitTrackingToken,
   showSubscriptionConfirmedBanner = false,
   showShopButton = false,
+  profileSettings,
   viewerCountryCode,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
@@ -74,6 +78,7 @@ export function StaticArtistPage({
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
     showShopButton,
+    profileSettings,
   });
 
   return (
@@ -95,6 +100,7 @@ export function StaticArtistPage({
       showSubscriptionConfirmedBanner={
         viewModel.showSubscriptionConfirmedBanner
       }
+      profileSettings={viewModel.profileSettings}
       viewerCountryCode={viewerCountryCode}
     />
   );

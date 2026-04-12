@@ -14,7 +14,10 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
+import {
+  updateAllowProfilePhotoDownloads,
+  updateShowOldReleases,
+} from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';
 import {
@@ -36,6 +39,7 @@ interface ProfileAboutTabProps {
   readonly hometown: string | null;
   readonly activeSinceYear: number | null;
   readonly allowPhotoDownloads: boolean;
+  readonly showOldReleases: boolean;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly onBioChange?: (bio: string) => void;
   readonly onLocationChange?: (location: string | null) => void;
@@ -573,6 +577,7 @@ export function ProfileAboutTab({
   hometown,
   activeSinceYear,
   allowPhotoDownloads,
+  showOldReleases,
   pressPhotos = [],
   onBioChange,
   onLocationChange,
@@ -729,6 +734,17 @@ export function ProfileAboutTab({
             on
               ? 'Photo downloads enabled for visitors'
               : 'Photo downloads disabled'
+          }
+        />
+        <DrawerAsyncToggle
+          label='Show releases older than 90 days'
+          ariaLabel='Keep showing releases older than 90 days on your public profile'
+          checked={showOldReleases}
+          onToggle={updateShowOldReleases}
+          successMessage={on =>
+            on
+              ? 'Old releases will stay visible on your profile'
+              : 'Releases older than 90 days will be hidden'
           }
         />
       </DrawerSection>

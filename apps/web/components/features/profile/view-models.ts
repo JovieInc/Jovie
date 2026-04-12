@@ -30,6 +30,9 @@ interface BuildProfilePublicViewModelInput {
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly showShopButton?: boolean;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
+  } | null;
   readonly showFooter?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
@@ -46,6 +49,7 @@ export function buildProfilePublicViewModel({
   autoOpenCapture,
   enableDynamicEngagement = false,
   latestRelease,
+  profileSettings,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   pressPhotos = [],
@@ -90,6 +94,7 @@ export function buildProfilePublicViewModel({
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
     showShopButton,
+    profileSettings,
   };
 }
 
