@@ -21,6 +21,9 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   plan: 'free',
   isPro: false,
   hasAdvancedFeatures: false,
+  isTrialing: false,
+  trialEndsAt: null,
+  trialDaysRemaining: null,
   ...ENTITLEMENT_REGISTRY.free.booleans,
   ...ENTITLEMENT_REGISTRY.free.limits,
 };
@@ -115,11 +118,32 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
   const effectiveEmail = emailFromDb || clerkEmail;
 
-  // Determine plan from billing data
-  // isPro in DB means they have an active subscription
-  // dbPlan contains the actual plan type if available
+  // Determine plan from billing data.
+  // Trial check comes BEFORE isPro gate because trial users have isPro=false
+  // (no Stripe subscription yet) but need pro-level entitlements.
   let plan: UserPlan = 'free';
-  if (isPro) {
+  let isTrialing = false;
+  let trialEndsAt: string | null = null;
+  let trialDaysRemaining: number | null = null;
+
+  const rawTrialEndsAt = (billing.data as Record<string, unknown>)
+    .trialEndsAt as Date | null;
+
+  if (dbPlan === 'trial' && rawTrialEndsAt) {
+    const now = new Date();
+    const trialActive = rawTrialEndsAt > now;
+    plan = trialActive ? 'trial' : 'free';
+    isTrialing = trialActive;
+    trialEndsAt = rawTrialEndsAt.toISOString();
+    if (trialActive) {
+      trialDaysRemaining = Math.max(
+        0,
+        Math.floor(
+          (rawTrialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+    }
+  } else if (isPro) {
     plan = (dbPlan as UserPlan) || 'pro';
   }
 
@@ -133,6 +157,9 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     plan,
     isPro: isProPlan(plan),
     hasAdvancedFeatures: hasAdvancedFeatures(plan),
+    isTrialing,
+    trialEndsAt,
+    trialDaysRemaining,
     ...ent.booleans,
     ...ent.limits,
   };
