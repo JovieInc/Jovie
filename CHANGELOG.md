@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.149.1] - 2026-04-12
+
+### Changed
+
+- Replace hardcoded hex colors in mobile swipe actions with design system tokens
+- Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
+- Align table base text to 13px per DESIGN.md specification
+- Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
+
 ## [26.4.149.0] - 2026-04-12
 
 ### Changed
@@ -18,12 +27,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Simplify artist-confirm step to single clear message with always-enabled Continue button
 - Show specific handle validation errors instead of generic "Not available" message
 - Move Back button into sidebar for consistent alignment with "Jovie Setup" title
+- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
+- Removed Presence link from sidebar navigation
 
 ### Added
 
 - Reserve top artist Spotify IDs as unavailable in search dropdown for social proof
 - "Need help?" / "Contact support" mailto link in search dropdown footer
 - Handle suggestions shown as clickable `jov.ie/` pills with "Try:" label
+- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
+- Dot indicator on Music tab when unreviewed suggestions exist
+- One-line explanation for first-time users seeing suggested profiles
 
 ### Fixed
 
@@ -41,6 +55,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
 - Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
@@ -112,9 +128,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-<<<<<<< HEAD
 - Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
-=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact

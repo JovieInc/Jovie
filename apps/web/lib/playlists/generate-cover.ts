@@ -128,10 +128,10 @@ async function createGradientBackground(): Promise<Buffer> {
 function createTextOverlay(text: string): Buffer {
   // Escape XML entities
   const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 
   // Calculate font size based on text length
   let fontSize = 100;
