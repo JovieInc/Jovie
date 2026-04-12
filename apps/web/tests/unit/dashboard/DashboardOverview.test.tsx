@@ -101,7 +101,7 @@ describe('DashboardOverview', () => {
 
   it('marks tasks complete based on data', () => {
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, false);
@@ -132,7 +132,7 @@ describe('DashboardOverview', () => {
     (navigator as any).clipboard = { writeText };
 
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, true);
@@ -181,7 +181,7 @@ describe('DashboardOverview', () => {
 
   it('uses shared compact shell sizing for header action buttons', () => {
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, true);
