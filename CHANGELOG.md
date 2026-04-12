@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.3] - 2026-04-12
+
+> Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
+
+### Added
+
+- [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
+
 ## [26.4.151.2] - 2026-04-12
 
 > Settings cards now use consistent spacing across all sections.
