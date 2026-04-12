@@ -22,6 +22,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
 
+## [26.4.143] - 2026-04-12
+
+### Added
+
+- Instantly.ai / Leadsy tracking pixel for email campaign attribution
+- `isMarketingAllowed()` consent helper with fire-by-default model (respects GPC/DNT opt-out)
+- CSP allowlist for r2.leadsy.ai, tag.trovo-tag.com, and wvbknd.leadsy.ai
+- 14 unit tests covering all pixel consent and route-gating codepaths
+
 ## [26.4.149.1] - 2026-04-12
 
 ### Changed
