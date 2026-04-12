@@ -29,6 +29,7 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useDeletePressPhotoMutation,
+  useDspMatchesQuery,
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
   useProfileMonetizationSummary,
@@ -57,13 +58,31 @@ function computeTargetCategory(
   return null;
 }
 
-/** Tab options for the profile sidebar categories */
-const PROFILE_TAB_OPTIONS = [
+/** Base tab options for the profile sidebar categories */
+const PROFILE_TAB_OPTIONS_BASE = [
   { value: 'social' as const, label: 'Social' },
   { value: 'dsp' as const, label: 'Music' },
   { value: 'earnings' as const, label: 'Earn' },
   { value: 'about' as const, label: 'About' },
-];
+] as const;
+
+/** Build tab options with optional dot indicator on the Music tab */
+function buildTabOptions(hasSuggestions: boolean) {
+  if (!hasSuggestions) return PROFILE_TAB_OPTIONS_BASE;
+  return PROFILE_TAB_OPTIONS_BASE.map(tab =>
+    tab.value === 'dsp'
+      ? {
+          ...tab,
+          label: (
+            <span className='inline-flex items-center gap-1.5'>
+              Music
+              <span className='h-1.5 w-1.5 rounded-full bg-accent' />
+            </span>
+          ),
+        }
+      : tab
+  );
+}
 
 const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
   'social',
@@ -219,6 +238,18 @@ export function ProfileContactSidebar() {
   const selectedCategoryRef = useRef<CategoryOption | 'about'>('social');
   selectedCategoryRef.current = selectedCategory;
 
+  // Suggested DSP matches — used for dot indicator on Music tab
+  const { data: suggestedMatches } = useDspMatchesQuery({
+    profileId: selectedProfile?.id ?? '',
+    status: 'suggested',
+    enabled: !!selectedProfile?.id,
+  });
+  const hasSuggestions = (suggestedMatches?.length ?? 0) > 0;
+  const tabOptions = useMemo(
+    () => buildTabOptions(hasSuggestions),
+    [hasSuggestions]
+  );
+
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
   const pressPhotoUploadMutation = usePressPhotoUploadMutation(
@@ -245,7 +276,7 @@ export function ProfileContactSidebar() {
 
   // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
-    if (PROFILE_TAB_OPTIONS.some(tab => tab.value === selectedCategory)) {
+    if (PROFILE_TAB_OPTIONS_BASE.some(tab => tab.value === selectedCategory)) {
       return selectedCategory;
     }
     return 'social' as const;
@@ -698,7 +729,7 @@ export function ProfileContactSidebar() {
                 onValueChange={value =>
                   setSelectedCategory(value as CategoryOption | 'about')
                 }
-                options={PROFILE_TAB_OPTIONS}
+                options={tabOptions}
                 ariaLabel='Profile sidebar view'
                 actions={
                   supportsAddAction ? (
@@ -706,7 +737,7 @@ export function ProfileContactSidebar() {
                       type='button'
                       onClick={() => handleAddLink(resolvedCategory)}
                       className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
-                      ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+                      ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
                     >
                       <Plus className='h-3.5 w-3.5' />
                     </AppIconButton>
@@ -756,6 +787,7 @@ export function ProfileContactSidebar() {
                   onAddLink={handleAddLink}
                   onRemoveLink={handleRemoveLink}
                   dspConnections={dspConnections}
+                  profileId={selectedProfile?.id}
                   surface='plain'
                 />
 
