@@ -11,16 +11,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
-- Removed card wrapper from PublicPageErrorFallback (subtraction principle)
-- Removed wifi-off icon from offline page (headline says it all)
-- Added inline SVG logo to root error page (was missing entirely)
-- Replaced marketing-themed classes in root error with System B dark mode
-- Bumped service worker cache name to ensure existing users get the updated offline page
+- [internal] Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
+- [internal] Removed card wrapper from PublicPageErrorFallback (subtraction principle)
+- [internal] Removed wifi-off icon from offline page (headline says it all)
+- [internal] Added inline SVG logo to root error page (was missing entirely)
+- [internal] Replaced marketing-themed classes in root error with System B dark mode
+- [internal] Bumped service worker cache name to ensure existing users get the updated offline page
 
 ### Added
 
-- Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
+- [internal] Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
 
 ## [26.4.143] - 2026-04-12
 
