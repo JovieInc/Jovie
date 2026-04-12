@@ -666,9 +666,11 @@ export function ProfileContactSidebar() {
 
   const profileUrl = `${BASE_URL}${profilePath}`;
 
+  const profileSettingsRaw =
+    (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
   const allowPhotoDownloads =
-    (selectedProfile?.settings as Record<string, unknown> | null)
-      ?.allowProfilePhotoDownloads === true;
+    profileSettingsRaw.allowProfilePhotoDownloads === true;
+  const showOldReleases = profileSettingsRaw.showOldReleases === true;
 
   return (
     <EntitySidebarShell
@@ -725,6 +727,7 @@ export function ProfileContactSidebar() {
                 hometown={hometown}
                 activeSinceYear={activeSinceYear}
                 allowPhotoDownloads={allowPhotoDownloads}
+                showOldReleases={showOldReleases}
                 pressPhotos={pressPhotos}
                 onBioChange={handleBioChange}
                 onLocationChange={handleLocationChange}

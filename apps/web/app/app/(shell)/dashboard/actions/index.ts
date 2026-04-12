@@ -23,6 +23,7 @@ export {
   publishProfileBasics,
   updateAllowProfilePhotoDownloads,
   updateCreatorProfile,
+  updateShowOldReleases,
 } from './creator-profile';
 
 // Core dashboard data fetching

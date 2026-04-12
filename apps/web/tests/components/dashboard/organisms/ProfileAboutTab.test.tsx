@@ -5,6 +5,7 @@ import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-
 
 vi.mock('@/app/app/(shell)/dashboard/actions/creator-profile', () => ({
   updateAllowProfilePhotoDownloads: vi.fn(),
+  updateShowOldReleases: vi.fn(),
 }));
 
 vi.mock('@/components/molecules/GenrePicker', () => ({

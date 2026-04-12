@@ -8,7 +8,7 @@
  */
 
 import { Badge, Button } from '@jovie/ui';
-import { Link2, Link2Off } from 'lucide-react';
+import { CheckCircle, Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
@@ -120,11 +120,8 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                       {label}
                     </p>
                     {isVerified ? (
-                      <Badge
-                        variant='success'
-                        size='sm'
-                        className='rounded-[6px] border border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-300'
-                      >
+                      <Badge variant='success' size='sm' className='gap-1'>
+                        <CheckCircle className='h-3.5 w-3.5' aria-hidden />
                         Verified
                       </Badge>
                     ) : null}
