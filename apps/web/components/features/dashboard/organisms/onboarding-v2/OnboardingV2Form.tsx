@@ -1773,9 +1773,7 @@ export function OnboardingV2Form({
                   {hasError ? 'Try again' : 'Choose a different artist'}
                 </Button>
                 <Button
-                  onClick={
-                    hasError ? () => setCurrentStep('upgrade') : advanceFromStep
-                  }
+                  onClick={() => setCurrentStep('upgrade')}
                   disabled={isImporting}
                 >
                   Continue
