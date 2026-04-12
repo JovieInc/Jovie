@@ -22,6 +22,7 @@ interface SharedMarketingHeroProps {
   readonly subcopy?: string;
   readonly proofPoints?: readonly string[];
   readonly copyClassName?: string;
+  readonly titleClassName?: string;
   readonly mediaClassName?: string;
   readonly gridClassName?: string;
 }
@@ -43,6 +44,7 @@ export function SharedMarketingHero({
   subcopy,
   proofPoints = [],
   copyClassName,
+  titleClassName,
   mediaClassName,
   gridClassName,
 }: Readonly<SharedMarketingHeroProps>) {
@@ -68,11 +70,16 @@ export function SharedMarketingHero({
             )}
           >
             <div className={cn('max-w-[34rem]', copyClassName)}>
-              <p className='homepage-section-eyebrow'>{eyebrow}</p>
+              {eyebrow ? (
+                <p className='homepage-section-eyebrow'>{eyebrow}</p>
+              ) : null}
               <h1
                 id={headingId}
                 data-testid={titleTestId}
-                className='marketing-h1-linear mt-5 text-primary-token'
+                className={cn(
+                  'marketing-h1-linear mt-5 text-primary-token',
+                  titleClassName
+                )}
               >
                 {title}
               </h1>

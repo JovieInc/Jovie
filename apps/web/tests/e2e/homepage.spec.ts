@@ -145,6 +145,34 @@ test.describe('Homepage', () => {
     );
   });
 
+  test('marketing content has no empty state or placeholder indicators', async ({
+    page,
+  }) => {
+    const bodyText = (await page.textContent('body')) ?? '';
+    // No absurd countdown values from far-future dates
+    expect(bodyText).not.toContain('2099');
+    // No Calvin Harris attribution on homepage (The Deep End is Cosmic Gate & Tim White)
+    expect(bodyText).not.toContain('Calvin Harris');
+    // No empty state indicators
+    await expect(page.getByText('Loading...')).toHaveCount(0);
+    await expect(page.getByText('No releases')).toHaveCount(0);
+  });
+
+  test('all product screenshot images load successfully', async ({ page }) => {
+    const images = page.locator('img[src*="product-screenshots"]');
+    const count = await images.count();
+    expect(count).toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      const img = images.nth(i);
+      await img.scrollIntoViewIfNeeded();
+      const naturalWidth = await img.evaluate(
+        (el: HTMLImageElement) => el.naturalWidth
+      );
+      expect(naturalWidth).toBeGreaterThan(0);
+    }
+  });
+
   test('loads without critical console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {

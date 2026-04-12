@@ -30,8 +30,21 @@ import { musicfetchCircuitBreaker } from './musicfetch-circuit-breaker';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * Services the MusicFetch API rejects with a hard 400.
+ * Kept in sync with the comment in lib/dsp-enrichment/providers/musicfetch.ts.
+ */
+const INVALID_MUSICFETCH_SERVICES = new Set([
+  'allMusic',
+  'youtubeShorts',
+  'napster',
+  'telmoreMusik',
+]);
+
 /** The musicfetch service IDs to request (camelCase, as the API expects) */
-const TARGET_SERVICES = MUSICFETCH_ALL_SERVICES;
+const TARGET_SERVICES = MUSICFETCH_ALL_SERVICES.filter(
+  s => !INVALID_MUSICFETCH_SERVICES.has(s)
+);
 
 // ============================================================================
 // Types

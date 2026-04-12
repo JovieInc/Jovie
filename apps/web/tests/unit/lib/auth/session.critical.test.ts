@@ -269,7 +269,7 @@ describe('@critical session.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
       const mockUser = {
-        id: 'db-user-123',
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         clerkId: 'clerk_123',
         email: 'test@example.com',
         isAdmin: false,
@@ -359,7 +359,9 @@ describe('@critical session.ts', () => {
       });
 
       const { getProfileByDbUserId } = await import('@/lib/auth/session');
-      const result = await getProfileByDbUserId('db-user-123');
+      const result = await getProfileByDbUserId(
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      );
 
       expect(result).toEqual({ ...mockQueryResult, isClaimed: true });
     });
@@ -376,7 +378,9 @@ describe('@critical session.ts', () => {
       });
 
       const { getProfileByDbUserId } = await import('@/lib/auth/session');
-      const result = await getProfileByDbUserId('db-user-123');
+      const result = await getProfileByDbUserId(
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      );
 
       expect(result).toBeNull();
     });
@@ -399,14 +403,14 @@ describe('@critical session.ts', () => {
 
       // The new implementation uses a single JOIN query returning combined data
       const mockJoinResult = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
         userIsPro: true,
         userStatus: 'active',
         profileId: 'profile-123',
-        profileUserId: 'db-user-123',
+        profileUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         profileUsername: 'testuser',
         profileUsernameNormalized: 'testuser',
         profileDisplayName: 'Test User',
@@ -422,7 +426,7 @@ describe('@critical session.ts', () => {
       const result = await getSessionContext();
 
       expect(result.clerkUserId).toBe('clerk_123');
-      expect(result.user.id).toBe('db-user-123');
+      expect(result.user.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
       expect(result.user.clerkId).toBe('clerk_123');
       expect(result.profile?.id).toBe('profile-123');
     });
@@ -444,7 +448,7 @@ describe('@critical session.ts', () => {
 
       // User exists but no profile (profileId is null from LEFT JOIN)
       const mockJoinResult = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
@@ -475,7 +479,7 @@ describe('@critical session.ts', () => {
 
       // User exists but no profile (profileId is null from LEFT JOIN)
       const mockJoinResultNoProfile = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
@@ -519,14 +523,14 @@ describe('@critical session.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
       const mockJoinResult = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
         userIsPro: false,
         userStatus: 'active',
         profileId: 'profile-123',
-        profileUserId: 'db-user-123',
+        profileUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         profileUsername: 'testuser',
         profileUsernameNormalized: 'testuser',
         profileDisplayName: 'Test User',
@@ -549,7 +553,7 @@ describe('@critical session.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
       const mockJoinResultNoProfile = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
@@ -593,7 +597,7 @@ describe('@critical session.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
       const mockJoinResult = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,
@@ -622,7 +626,7 @@ describe('@critical session.ts', () => {
         expect.objectContaining({
           clerkUserId: 'clerk_123',
           user: expect.objectContaining({
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             clerkId: 'clerk_123',
           }),
         })
@@ -634,7 +638,7 @@ describe('@critical session.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
 
       const mockJoinResult = {
-        userId: 'db-user-123',
+        userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         userClerkId: 'clerk_123',
         userEmail: 'test@example.com',
         userIsAdmin: false,

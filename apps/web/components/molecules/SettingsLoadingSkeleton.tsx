@@ -95,43 +95,6 @@ export function ProfileSettingsLoading() {
   );
 }
 
-/** Billing settings loading skeleton */
-export function BillingSettingsLoading() {
-  return (
-    <SettingsLoadingSkeleton titleWidth='w-64' descriptionWidth='w-96'>
-      <SettingsCardSkeleton height='h-20' />
-      <SettingsButtonSkeleton width='w-44' />
-    </SettingsLoadingSkeleton>
-  );
-}
-
-/** Notifications settings loading skeleton */
-export function NotificationsSettingsLoading() {
-  return (
-    <SettingsLoadingSkeleton titleWidth='w-56' descriptionWidth='w-96'>
-      <ToggleRowSkeleton labelWidth='w-56' />
-      <ToggleRowSkeleton labelWidth='w-64' />
-      <ToggleRowSkeleton labelWidth='w-48' />
-    </SettingsLoadingSkeleton>
-  );
-}
-
-/** Branding settings loading skeleton retained for legacy route loading states. */
-export function BrandingSettingsLoading() {
-  return (
-    <SettingsLoadingSkeleton titleWidth='w-56' descriptionWidth='w-96'>
-      <div className='flex items-center justify-between gap-4 rounded-xl bg-surface-0 px-3 py-3'>
-        <div className='space-y-2'>
-          <div className='h-4 w-56 rounded skeleton' />
-          <div className='h-4 w-80 rounded skeleton' />
-        </div>
-        <div className='h-6 w-10 rounded-full skeleton' />
-      </div>
-      <SettingsButtonSkeleton width='w-44' />
-    </SettingsLoadingSkeleton>
-  );
-}
-
 /** Inline skeleton for Touring section — matches disconnected/form state shape */
 export function TouringSectionSkeleton() {
   return (
