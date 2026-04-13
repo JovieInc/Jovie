@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.0] - 2026-04-12
+
+### Fixed
+- OTP verification: expired or invalid codes no longer allow submitting (all subscribe components)
+- OTP auto-clears after error so fans get a fresh slate to retype
+- Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
+
+### Added
+- "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
+- Segmented birthday input with grouped [MM]/[DD]/[YYYY] digit boxes (replaces plain text input)
+- `useSegmentedInput` shared hook powering both OTP and birthday digit inputs
+- Birthday now captures the full year (stored as YYYY-MM-DD, backwards-compatible with legacy MM-DD)
+
 ## [26.4.151.6] - 2026-04-12
 
 > Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
