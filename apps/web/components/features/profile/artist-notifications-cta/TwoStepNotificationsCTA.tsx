@@ -238,7 +238,7 @@ function ChannelInputRow({
         <button
           type='button'
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
           className={subscriptionPrimaryActionClassName}
           style={noFontSynthesisStyle}
         >

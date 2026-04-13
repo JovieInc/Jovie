@@ -72,7 +72,6 @@ vi.mock('@/features/profile/artist-notifications-cta/BirthdayInput', () => ({
   }) => (
     <input
       data-testid='inline-birthday-input'
-      aria-label='Birthday month, day, and year'
       value={value}
       onChange={event => {
         onChange(event.target.value);
@@ -329,10 +328,6 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     const birthdayInput = screen.getByTestId('inline-birthday-input');
     expect(birthdayInput).toBeInTheDocument();
-    expect(birthdayInput).toHaveAttribute(
-      'aria-label',
-      'Birthday month, day, and year'
-    );
   });
 
   it('shows "Notifications on" in done step', async () => {

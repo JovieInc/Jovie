@@ -193,8 +193,8 @@ export function useSubscriptionForm({
     validateCurrent();
   }, [channel, phoneInput, emailInput, validateCurrent]);
 
-  const handleConfirmSubscription = useCallback(async () => {
-    if (isSubmitting) return;
+  const handleConfirmSubscription = useCallback(async (): Promise<boolean> => {
+    if (isSubmitting) return false;
 
     setIsSubmitting(true);
     setError(null);
@@ -253,6 +253,7 @@ export function useSubscriptionForm({
         setNotificationsState('success');
         showSuccess(getNotificationSubscribeSuccessMessage(channel));
       }
+      return true;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;
@@ -273,6 +274,7 @@ export function useSubscriptionForm({
         source: 'profile_inline',
         handle: artist.handle,
       });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -295,6 +297,11 @@ export function useSubscriptionForm({
 
   const handleOtpChange = useCallback(
     (value: string) => {
+      // Cancel any pending auto-clear timer so fresh input isn't wiped
+      if (otpClearTimerRef.current) {
+        clearTimeout(otpClearTimerRef.current);
+        otpClearTimerRef.current = null;
+      }
       setOtpCode(value.replaceAll(/[^\d]/g, '').slice(0, 6));
       if (error) setError(null);
     },
@@ -365,9 +372,9 @@ export function useSubscriptionForm({
       handle: artist.handle,
     });
 
-    try {
-      await handleConfirmSubscription();
+    const success = await handleConfirmSubscription();
 
+    if (success) {
       track('otp_resend_success', {
         source: 'profile_inline',
         handle: artist.handle,
@@ -375,11 +382,11 @@ export function useSubscriptionForm({
 
       setOtpCode('');
       setResendCooldownEnd(Date.now() + 30_000);
-    } catch {
+    } else {
       setError('Failed to resend code. Please try again.');
-    } finally {
-      setIsResending(false);
     }
+
+    setIsResending(false);
   }, [
     artist.handle,
     handleConfirmSubscription,

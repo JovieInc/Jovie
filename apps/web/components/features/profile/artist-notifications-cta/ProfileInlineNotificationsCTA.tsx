@@ -195,10 +195,10 @@ function OtpResendLink({
   const canResend = remaining === 0 && !isResending;
 
   useEffect(() => {
-    if (remaining <= 0) return;
+    if (resendCooldownEnd <= Date.now()) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [remaining]);
+  }, [resendCooldownEnd]);
 
   return (
     <div className='mt-1 text-center'>

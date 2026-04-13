@@ -495,7 +495,7 @@ export function ArtistNotificationsCTA({
             onClick={() => {
               handleFormSubmit();
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
             className={
               otpStep === 'verify'
                 ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
