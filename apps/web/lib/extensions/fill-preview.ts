@@ -141,7 +141,7 @@ export async function buildExtensionFillPreview(
   profileId: string
 ): Promise<ExtensionFillPreviewResponse | null> {
   const release = await getReleaseById(request.entityId);
-  if (!release || release.creatorProfileId !== profileId) return null;
+  if (release?.creatorProfileId !== profileId) return null;
 
   const releaseTitle = release.title.trim();
   const artistName =
