@@ -197,7 +197,7 @@ export function DrawerEditableTextField({
             </span>
           </button>
         ) : null}
-        {!editable ? (
+        {editable ? null : (
           <span
             className={cn(
               'block min-w-0 w-full truncate text-[13px] text-primary-token',
@@ -210,7 +210,7 @@ export function DrawerEditableTextField({
           >
             {displayValue}
           </span>
-        ) : null}
+        )}
       </div>
 
       {actionSlotIds.length > 0 ? (
@@ -245,8 +245,9 @@ export function DrawerEditableTextField({
             </DrawerInlineIconButton>
           ) : null}
 
-          {!isEditing
-            ? visibleActions.map(action =>
+          {isEditing
+            ? null
+            : visibleActions.map(action =>
                 action.href ? (
                   <a
                     key={action.id}
@@ -275,8 +276,7 @@ export function DrawerEditableTextField({
                     {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
                   </DrawerInlineIconButton>
                 )
-              )
-            : null}
+              )}
         </div>
       ) : null}
     </div>
