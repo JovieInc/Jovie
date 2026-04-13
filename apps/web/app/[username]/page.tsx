@@ -2,6 +2,7 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
@@ -24,6 +25,8 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
+import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
@@ -588,6 +591,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   }
 
   const tourDatesPromise = getPublicTourDates(profile.id);
+  const releasesPromise = getReleasesForProfileLite(profile.id);
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
@@ -605,13 +609,28 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     profile.avatar_url
   );
 
-  // Await tour dates (started above, non-blocking — errors resolve to empty)
+  // Await tour dates + releases (started above, non-blocking — errors resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const tourDates = (
-    await tourDatesPromise.catch(() => [] as TourDateViewModel[])
-  ).sort(
+  const [tourDatesRaw, allReleases] = await Promise.all([
+    tourDatesPromise.catch(() => [] as TourDateViewModel[]),
+    releasesPromise.catch(
+      () => [] as Awaited<ReturnType<typeof getReleasesForProfileLite>>
+    ),
+  ]);
+  const tourDates = tourDatesRaw.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+
+  // Serialize releases for client: newest-first, lean shape
+  const releases: PublicRelease[] = [...allReleases].reverse().map(r => ({
+    id: r.id,
+    title: r.title,
+    slug: r.slug,
+    releaseType: r.releaseType,
+    releaseDate: r.releaseDate ? new Date(r.releaseDate).toISOString() : null,
+    artworkUrl: r.artworkUrl,
+    artistNames: r.artistNames,
+  }));
 
   // Generate structured data for SEO (after tour dates resolve)
   const structuredData = generateProfileStructuredData(
@@ -663,6 +682,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
+        releases={releases}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
