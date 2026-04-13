@@ -4,12 +4,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import { readPendingClaimContext } from '@/lib/claim/context';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 
-const { onboardingWrapperPropsSpy, redirectMock } = vi.hoisted(() => ({
-  onboardingWrapperPropsSpy: vi.fn(),
-  redirectMock: vi.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`);
-  }),
-}));
+const { onboardingWrapperPropsSpy, redirectMock, mockBootstrapProfileLimit } =
+  vi.hoisted(() => ({
+    onboardingWrapperPropsSpy: vi.fn(),
+    redirectMock: vi.fn((url: string) => {
+      throw new Error(`REDIRECT:${url}`);
+    }),
+    mockBootstrapProfileLimit: vi.fn(),
+  }));
 
 vi.mock('@sentry/nextjs', () => ({
   captureMessage: vi.fn(),
@@ -20,10 +22,27 @@ vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }));
 
-vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: vi.fn().mockResolvedValue({
-    selectedProfile: null,
-  }),
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: mockBootstrapProfileLimit,
+        })),
+      })),
+    })),
+  },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: {
+    id: 'id',
+    username: 'username',
+    displayName: 'displayName',
+    avatarUrl: 'avatarUrl',
+    bio: 'bio',
+    genres: 'genres',
+  },
 }));
 
 vi.mock('@/features/dashboard/organisms/OnboardingFormWrapper', () => ({
@@ -88,6 +107,7 @@ vi.mock('@/lib/claim/context', () => ({
 }));
 
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
+  buildHandleCandidates: vi.fn().mockReturnValue([]),
   reserveOnboardingHandle: vi.fn().mockResolvedValue(null),
 }));
 
@@ -103,6 +123,8 @@ describe('onboarding page', () => {
     redirectMock.mockClear();
     vi.mocked(reserveOnboardingHandle).mockClear();
     vi.mocked(readPendingClaimContext).mockResolvedValue(null);
+    mockBootstrapProfileLimit.mockReset();
+    mockBootstrapProfileLimit.mockResolvedValue([]);
   });
 
   it('redirects waitlist-state users back to the waitlist instead of rendering onboarding', async () => {
@@ -115,9 +137,6 @@ describe('onboarding page', () => {
 
   it('allows active users to resume onboarding when a resume target is present', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'ACTIVE',
@@ -131,9 +150,8 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: {
+    mockBootstrapProfileLimit.mockResolvedValueOnce([
+      {
         id: 'profile_123',
         username: 'artist',
         displayName: 'Artist',
@@ -141,7 +159,7 @@ describe('onboarding page', () => {
         bio: null,
         genres: null,
       },
-    });
+    ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume: 'dsp' }),
@@ -153,9 +171,6 @@ describe('onboarding page', () => {
 
   it('allows active users to stay in onboarding on the spotify resume path', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'ACTIVE',
@@ -169,9 +184,8 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: {
+    mockBootstrapProfileLimit.mockResolvedValueOnce([
+      {
         id: 'profile_123',
         username: 'artist',
         displayName: 'Artist',
@@ -179,7 +193,7 @@ describe('onboarding page', () => {
         bio: null,
         genres: null,
       },
-    });
+    ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume: 'spotify' }),
@@ -195,9 +209,6 @@ describe('onboarding page', () => {
     'late-arrivals',
   ] as const)('allows active users to stay in onboarding on the %s resume path', async resume => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'ACTIVE',
@@ -211,9 +222,8 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: {
+    mockBootstrapProfileLimit.mockResolvedValueOnce([
+      {
         id: 'profile_123',
         username: 'artist',
         displayName: 'Artist',
@@ -221,7 +231,7 @@ describe('onboarding page', () => {
         bio: null,
         genres: null,
       },
-    });
+    ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume }),
@@ -233,9 +243,6 @@ describe('onboarding page', () => {
 
   it('allows active users to continue onboarding when the handle query is still present', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'ACTIVE',
@@ -249,9 +256,8 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: {
+    mockBootstrapProfileLimit.mockResolvedValueOnce([
+      {
         id: 'profile_123',
         username: 'artist',
         displayName: 'Artist',
@@ -259,7 +265,7 @@ describe('onboarding page', () => {
         bio: null,
         genres: null,
       },
-    });
+    ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ handle: 'artist' }),
@@ -271,9 +277,6 @@ describe('onboarding page', () => {
 
   it('allows active users to continue onboarding when a pending claim cookie exists', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'ACTIVE',
@@ -295,8 +298,8 @@ describe('onboarding page', () => {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: {
+    mockBootstrapProfileLimit.mockResolvedValueOnce([
+      {
         id: 'profile_123',
         username: 'artist',
         displayName: 'Artist',
@@ -304,7 +307,7 @@ describe('onboarding page', () => {
         bio: null,
         genres: null,
       },
-    });
+    ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({}),
@@ -317,9 +320,6 @@ describe('onboarding page', () => {
   it('does not fall back to the dev test-auth username for fresh onboarding handles', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
     const { getCachedCurrentUser } = await import('@/lib/auth/cached');
-    const { getDashboardData } = await import(
-      '@/app/app/(shell)/dashboard/actions'
-    );
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'NEEDS_ONBOARDING',
@@ -336,9 +336,6 @@ describe('onboarding page', () => {
     vi.mocked(getCachedCurrentUser).mockResolvedValueOnce({
       username: 'browse-test-user',
     } as never);
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
-      selectedProfile: null,
-    });
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({}),

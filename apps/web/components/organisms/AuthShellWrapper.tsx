@@ -25,7 +25,6 @@ import {
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
-import { ReleaseTablePendingShell } from '@/features/dashboard/organisms/ReleaseTablePendingShell';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
@@ -136,6 +135,7 @@ function AuthShellWrapperInner({
   const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const releasesShellOverlayRef = useRef<HTMLDivElement | null>(null);
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -190,31 +190,49 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
-  const clearPendingShell = useCallback((route?: PendingShellRoute) => {
-    setPendingShellRoute(current =>
-      route && current !== route ? current : null
-    );
-    if (pendingShellTimerRef.current) {
-      clearTimeout(pendingShellTimerRef.current);
-      pendingShellTimerRef.current = null;
+  const setReleasesShellVisible = useCallback((visible: boolean) => {
+    const node = releasesShellOverlayRef.current;
+    if (!node) {
+      return;
     }
+
+    node.style.display = visible ? 'flex' : 'none';
+    node.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }, []);
+
+  const clearPendingShell = useCallback(
+    (route?: PendingShellRoute) => {
+      setPendingShellRoute(current =>
+        route && current !== route ? current : null
+      );
+      setReleasesShellVisible(false);
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+        pendingShellTimerRef.current = null;
+      }
+    },
+    [setReleasesShellVisible]
+  );
 
   const showPendingShell = useCallback(
     (route: Exclude<PendingShellRoute, null>) => {
       setPendingShellRoute(route);
+      if (route === 'releases') {
+        setReleasesShellVisible(true);
+      }
       if (pendingShellTimerRef.current) {
         clearTimeout(pendingShellTimerRef.current);
       }
 
       pendingShellTimerRef.current = setTimeout(() => {
+        setReleasesShellVisible(false);
         setPendingShellRoute(activeRoute =>
           activeRoute === route ? null : activeRoute
         );
         pendingShellTimerRef.current = null;
       }, 10_000);
     },
-    []
+    [setReleasesShellVisible]
   );
 
   useEffect(
@@ -241,19 +259,36 @@ function AuthShellWrapperInner({
     }),
     [clearPendingShell, pendingShellRoute, showPendingShell]
   );
-  const shellChildren =
-    pendingShellRoute === 'releases' ? (
-      <div className='relative min-h-full'>
-        <div aria-hidden='true' className='pointer-events-none opacity-0'>
-          {children}
-        </div>
-        <div className='absolute inset-0 z-10'>
-          <ReleaseTablePendingShell showHeader={false} />
+  const shellChildren = (
+    <div className='relative min-h-full'>
+      {children}
+      <div
+        ref={releasesShellOverlayRef}
+        aria-hidden='true'
+        className='absolute inset-0 z-10 hidden items-start justify-center bg-page/96 px-4 py-6 sm:px-6'
+        data-testid='releases-shell-ready'
+      >
+        <div className='w-full max-w-3xl rounded-2xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
+          <div className='flex items-center justify-between gap-4'>
+            <div>
+              <p className='text-sm font-[560] tracking-[-0.02em] text-primary-token'>
+                Opening Releases
+              </p>
+              <p className='mt-1 text-sm text-secondary-token'>
+                Preparing your release workspace.
+              </p>
+            </div>
+            <div
+              aria-hidden='true'
+              className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)]'
+            >
+              <div className='h-full w-1/2 animate-pulse rounded-full bg-primary-token/65' />
+            </div>
+          </div>
         </div>
       </div>
-    ) : (
-      children
-    );
+    </div>
+  );
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>

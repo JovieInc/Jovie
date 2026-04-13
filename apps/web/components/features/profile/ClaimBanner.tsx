@@ -3,13 +3,8 @@
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
+import type { ClaimBannerVariant } from '@/app/[username]/_lib/claim-banner-state';
 import { track } from '@/lib/analytics';
-
-type ClaimBannerVariant =
-  | 'organic'
-  | 'claim_intent'
-  | 'direct_in_progress'
-  | 'unsupported';
 
 export interface ClaimBannerProps {
   readonly profileHandle: string;

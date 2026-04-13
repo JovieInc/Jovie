@@ -81,4 +81,17 @@ describe('resolveClaimBannerState', () => {
       shouldShowClaimBanner: false,
     });
   });
+
+  it('falls back to the organic banner for invalid pending-claim contexts', () => {
+    expect(
+      resolveClaimBannerState({
+        visitorState: 'claim_invalid',
+        directClaimSupported: true,
+        isClaimed: false,
+      })
+    ).toEqual({
+      claimBannerVariant: 'organic',
+      shouldShowClaimBanner: true,
+    });
+  });
 });

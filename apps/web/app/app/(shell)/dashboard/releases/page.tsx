@@ -14,12 +14,12 @@ import { ReleasesPageClient } from './ReleasesPageClient';
 export const runtime = 'nodejs';
 
 /**
- * Releases page — client-first with server prefetch.
+ * Releases page — client-first with shell-only server work.
  *
- * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. On first visit,
- * the release matrix is prefetched into TanStack Query cache and hydrated to
- * the client. On subsequent navigations, the client component renders from
- * cache instantly (no skeleton), with background refetch if stale.
+ * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. The shared shell
+ * and /app route warm the release matrix cache ahead of navigation, so this
+ * page keeps warm transitions instant while still hydrating release data on
+ * direct visits, refreshes, and bookmarks.
  */
 export default async function ReleasesPage() {
   const { userId } = await getCachedAuth();
@@ -47,22 +47,30 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  // Prefetch release matrix into TanStack cache — must await to guarantee
-  // the data is included in getDehydratedState() (no loading skeleton).
   const profileId = dashboardData.selectedProfile?.id;
   if (profileId) {
     const queryClient = getQueryClient();
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.releases.matrix(profileId),
-      queryFn: () => loadReleaseMatrix(profileId),
-    });
+    try {
+      await queryClient.fetchQuery({
+        queryKey: queryKeys.releases.matrix(profileId),
+        queryFn: () => loadReleaseMatrix(profileId),
+      });
+    } catch (error) {
+      void captureError(
+        'Release matrix prefetch failed on releases page',
+        error,
+        {
+          route: APP_ROUTES.DASHBOARD_RELEASES,
+        }
+      );
+    }
   }
 
   return (
-    <ReleasesClientBoundary>
-      <HydrateClient state={getDehydratedState()}>
+    <HydrateClient state={getDehydratedState()}>
+      <ReleasesClientBoundary>
         <ReleasesPageClient />
-      </HydrateClient>
-    </ReleasesClientBoundary>
+      </ReleasesClientBoundary>
+    </HydrateClient>
   );
 }

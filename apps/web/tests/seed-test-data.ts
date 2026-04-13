@@ -133,21 +133,47 @@ function isMissingActiveProfileIdColumn(error: unknown): boolean {
 }
 
 export function isRetryableSeedDatabaseError(error: unknown): boolean {
-  const message = (
-    error instanceof Error ? error.message : String(error)
-  ).toLowerCase();
-  const code =
-    typeof error === 'object' && error !== null
-      ? ((error as { code?: string; cause?: { code?: string } }).code ??
-        (error as { cause?: { code?: string } }).cause?.code)
-      : undefined;
+  const messages: string[] = [];
+  const codes = new Set<string>();
+
+  let current: unknown = error;
+  while (current) {
+    if (typeof current === 'object') {
+      const message =
+        current instanceof Error
+          ? current.message
+          : typeof (current as { message?: unknown }).message === 'string'
+            ? (current as { message: string }).message
+            : String(current);
+      messages.push(message);
+
+      const code = (current as { code?: string }).code;
+      if (typeof code === 'string' && code.length > 0) {
+        codes.add(code);
+      }
+
+      current = 'cause' in current ? current.cause : undefined;
+      continue;
+    }
+
+    messages.push(String(current));
+
+    break;
+  }
+
+  const message = messages.join(' ').toLowerCase();
 
   return (
     message.includes('password authentication failed') ||
+    message.includes('requested endpoint could not be found') ||
+    message.includes("you don't have access to it") ||
     message.includes('connection terminated unexpectedly') ||
     message.includes('server closed the connection unexpectedly') ||
     message.includes('the database system is starting up') ||
-    code === '57P03'
+    message.includes('fetch failed') ||
+    codes.has('57P03') ||
+    codes.has('XX000') ||
+    codes.has('ECONNRESET')
   );
 }
 
@@ -261,7 +287,10 @@ function getSeedEnv() {
   // Next's server-only env modules.
   return {
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL:
+      process.env.DATABASE_URL?.trim() ||
+      process.env.DATABASE_URL_DIRECT?.trim(),
+    DATABASE_URL_DIRECT: process.env.DATABASE_URL_DIRECT?.trim(),
     E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
@@ -1039,7 +1068,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
   const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
-    console.warn('⚠ DATABASE_URL not set, skipping seed');
+    console.warn('⚠ DATABASE_URL/DATABASE_URL_DIRECT not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
   }
 

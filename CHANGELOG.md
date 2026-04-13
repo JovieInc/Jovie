@@ -19,6 +19,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Initialize null trial notification counters correctly and remove redundant entitlements lookups in release notification cron jobs
 - Harden pending-claim cookie parsing and normalize follow-up claim URLs when the base URL has a trailing slash
 
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
+
+### Fixed
+
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
+
 ## [26.4.151.4] - 2026-04-12
 
 ### Fixed

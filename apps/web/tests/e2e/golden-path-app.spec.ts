@@ -91,7 +91,7 @@ test.describe('Golden Path: Welcome Message', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // Handle step
-    const handleEl = page.getByLabel('Enter your desired handle');
+    const handleEl = page.getByLabel('Claim your handle');
     await expect(handleEl).toBeVisible({ timeout: 10_000 });
     await expect
       .poll(async () => (await handleEl.inputValue()).trim(), {

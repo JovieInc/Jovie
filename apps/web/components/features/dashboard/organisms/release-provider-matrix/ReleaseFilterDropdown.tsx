@@ -43,6 +43,9 @@ const RELEASE_TYPE_OPTIONS: {
   { id: 'ep', label: 'EP', iconName: 'Disc' },
   { id: 'single', label: 'Single', iconName: 'Music' },
   { id: 'compilation', label: 'Compilation', iconName: 'ListMusic' },
+  { id: 'live', label: 'Live', iconName: 'Radio' },
+  { id: 'mixtape', label: 'Mixtape', iconName: 'Shuffle' },
+  { id: 'other', label: 'Other', iconName: 'MoreHorizontal' },
 ];
 
 /** Popularity filter options */
