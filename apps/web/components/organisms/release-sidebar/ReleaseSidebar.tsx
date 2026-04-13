@@ -730,7 +730,8 @@ export function ReleaseSidebar({
                     >
                       Loading tasks...
                     </div>
-                  ) : canAccessTasksWorkspace ? (
+                  ) : null}
+                  {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (
                     <ReleaseTaskChecklist
                       releaseId={release.id}
                       variant='compact'
@@ -743,11 +744,12 @@ export function ReleaseSidebar({
                           );
                       }}
                     />
-                  ) : (
+                  ) : null}
+                  {!isTasksWorkspaceGateLoading && !canAccessTasksWorkspace ? (
                     <CompactReleasePlanUpgradeCard
                       onDismiss={() => setActiveTab('details')}
                     />
-                  )}
+                  ) : null}
                 </div>
               )}
 
