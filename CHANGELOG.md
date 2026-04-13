@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.0] - 2026-04-13
+
+### Added
+
+- Music video release type: artists can now create video releases that show an embedded YouTube player with email subscribe CTA on the release landing page
+- YouTube URL parser and Data API metadata fetcher with graceful degradation
+- Embed timeout-based error detection: redirects to artist profile on load failure, fires tracking beacon for broken video monitoring
+- Demo seed data includes a Calvin Harris music video release for testing
+
+### Changed
+
+- Artist profile latest release now excludes music_video releases to keep the profile focused on email conversion
+- Release filter counts and type styles updated to include music_video
+
 ## [26.4.152.0] - 2026-04-12
 
 ### Added
