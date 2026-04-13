@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowRight, Check } from 'lucide-react';
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { AUTH_SURFACE } from '@/lib/auth/constants';
@@ -46,33 +47,13 @@ function SubmitButtonIcon({
   }
   if (autoSubmitClaimed) {
     return (
-      <svg
-        viewBox='0 0 20 20'
-        fill='none'
+      <Check
         aria-hidden='true'
-        className='h-4 w-4 animate-in zoom-in duration-300'
-      >
-        <path
-          d='M6 10.2l2.6 2.6L14 7.4'
-          stroke='currentColor'
-          strokeWidth='2'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-        />
-      </svg>
+        className='size-4 animate-in zoom-in duration-300'
+      />
     );
   }
-  return (
-    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-4 w-4'>
-      <path
-        d='M4 10h12m0 0l-4-4m4 4l-4 4'
-        stroke='currentColor'
-        strokeWidth='2'
-        strokeLinecap='round'
-        strokeLinejoin='round'
-      />
-    </svg>
-  );
+  return <ArrowRight aria-hidden='true' className='size-4' />;
 }
 
 export function OnboardingHandleStep({
