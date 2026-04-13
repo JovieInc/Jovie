@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.1] - 2026-04-13
+
+### Fixed
+
+- Remove double logo on auth pages (hide Clerk's built-in logoBox, keep custom BrandLogo)
+- Change sign-in/sign-up CTA button from purple to white with dark text
+
 ## [26.4.152.0] - 2026-04-12
 
 ### Added
