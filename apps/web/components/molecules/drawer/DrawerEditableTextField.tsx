@@ -196,7 +196,8 @@ export function DrawerEditableTextField({
               {displayValue}
             </span>
           </button>
-        ) : !editable ? (
+        ) : null}
+        {!editable ? (
           <span
             className={cn(
               'block min-w-0 w-full truncate text-[13px] text-primary-token',
