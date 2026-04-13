@@ -195,6 +195,17 @@ function TrackListRow({
 
   const controlLabel = getControlLabel();
 
+  let trackButtonContent: React.JSX.Element;
+  if (isActiveTrack && isTrackPlaying) {
+    trackButtonContent = <Pause className='h-3.5 w-3.5' aria-hidden='true' />;
+  } else if (isActiveTrack) {
+    trackButtonContent = (
+      <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
+    );
+  } else {
+    trackButtonContent = <span aria-hidden='true'>{trackLabel}</span>;
+  }
+
   return (
     <div
       className={cn(
@@ -220,15 +231,7 @@ function TrackListRow({
         aria-label={controlLabel}
         data-testid={`release-track-control-${track.id}`}
       >
-        {isActiveTrack ? (
-          isTrackPlaying ? (
-            <Pause className='h-3.5 w-3.5' aria-hidden='true' />
-          ) : (
-            <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
-          )
-        ) : (
-          <span aria-hidden='true'>{trackLabel}</span>
-        )}
+        {trackButtonContent}
       </button>
 
       <div className='min-w-0 flex-1'>
