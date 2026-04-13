@@ -53,9 +53,14 @@ function parsePendingClaimCookie(value: string): PendingClaimContext | null {
     return null;
   }
 
-  const parsed = JSON.parse(
-    Buffer.from(body, 'base64url').toString('utf8')
-  ) as PendingClaimContext;
+  let parsed: PendingClaimContext;
+  try {
+    parsed = JSON.parse(
+      Buffer.from(body, 'base64url').toString('utf8')
+    ) as PendingClaimContext;
+  } catch {
+    return null;
+  }
 
   if (
     !parsed?.creatorProfileId ||

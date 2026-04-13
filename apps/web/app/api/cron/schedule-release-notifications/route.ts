@@ -62,32 +62,6 @@ type NotificationInsertValue = {
   metadata: { releaseTitle: string | null; channel: string };
 };
 
-/** Fetch eligible creator IDs based on plan entitlements. */
-async function getEligibleCreatorIds(
-  creatorProfileIds: string[]
-): Promise<Set<string> | null> {
-  const eligible = new Set<string>();
-  try {
-    const entitlementsMap =
-      await getBatchCreatorEntitlements(creatorProfileIds);
-    for (const [profileId, { entitlements }] of entitlementsMap) {
-      if (entitlements.booleans.canSendNotifications) {
-        eligible.add(profileId);
-      }
-    }
-  } catch (error) {
-    logger.warn(
-      '[schedule-release-notifications] Batch entitlements lookup failed, preserving releases for retry',
-      {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        creatorCount: creatorProfileIds.length,
-      }
-    );
-    return null;
-  }
-  return eligible;
-}
-
 const SUBSCRIBER_PAGE_SIZE = 500;
 const INSERT_BATCH_SIZE = 500;
 const INSERT_CONCURRENCY = 5;
@@ -255,14 +229,23 @@ export async function scheduleReleaseNotifications(): Promise<{
   ];
   const releaseIds = [...new Set(upcomingReleases.map(r => r.id))];
 
-  const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
-  if (!eligibleCreatorIds) {
+  let entitlementsMap: Awaited<ReturnType<typeof getBatchCreatorEntitlements>>;
+  try {
+    entitlementsMap = await getBatchCreatorEntitlements(creatorProfileIds);
+  } catch (error) {
+    logger.warn(
+      '[schedule-release-notifications] Batch entitlements lookup failed, preserving releases for retry',
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        creatorCount: creatorProfileIds.length,
+      }
+    );
     throw new Error(
       'Creator entitlements lookup failed while scheduling release notifications'
     );
   }
 
-  const [creatorRows, smartLinkRows, entitlementsMap] = await Promise.all([
+  const [creatorRows, smartLinkRows] = await Promise.all([
     db
       .select({
         id: creatorProfiles.id,
@@ -285,8 +268,13 @@ export async function scheduleReleaseNotifications(): Promise<{
           drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
         )
       ),
-    getBatchCreatorEntitlements(creatorProfileIds),
   ]);
+
+  const eligibleCreatorIds = new Set(
+    [...entitlementsMap.entries()]
+      .filter(([, value]) => value.entitlements.booleans.canSendNotifications)
+      .map(([profileId]) => profileId)
+  );
 
   const creatorMap = new Map(creatorRows.map(row => [row.id, row]));
   const smartLinkReleaseIds = new Set(

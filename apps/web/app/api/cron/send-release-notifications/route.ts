@@ -197,10 +197,37 @@ async function incrementTrialNotificationCount(userId: string): Promise<void> {
   await db
     .update(users)
     .set({
-      trialNotificationsSent: drizzleSql`${users.trialNotificationsSent} + 1`,
+      trialNotificationsSent: drizzleSql`COALESCE(${users.trialNotificationsSent}, 0) + 1`,
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));
+}
+
+async function persistTrialNotificationCount(
+  notificationId: string,
+  ownerUserId: string,
+  trialState: {
+    isTrialing: boolean;
+    trialNotificationsSent: number;
+  }
+): Promise<void> {
+  if (!trialState.isTrialing) {
+    return;
+  }
+
+  try {
+    await incrementTrialNotificationCount(ownerUserId);
+    trialState.trialNotificationsSent += 1;
+  } catch (error) {
+    logger.error(
+      '[send-release-notifications] Failed to persist trial notification count:',
+      error
+    );
+    await captureError('Failed to persist trial notification count', error, {
+      notificationId,
+      userId: ownerUserId,
+    });
+  }
 }
 
 function getCancellationReason(
@@ -510,8 +537,11 @@ async function processNotificationWithBatchedData(
       );
 
       if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
-        await incrementTrialNotificationCount(creator.ownerUserId);
-        trialState.trialNotificationsSent += 1;
+        await persistTrialNotificationCount(
+          notification.id,
+          creator.ownerUserId,
+          trialState
+        );
       }
 
       return result;

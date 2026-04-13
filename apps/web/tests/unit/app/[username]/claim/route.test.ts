@@ -2,13 +2,17 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockClearPendingClaimContext,
   mockGetOptionalAuth,
   mockGetProfileByUsername,
   mockReadPendingClaimContext,
+  mockWritePendingClaimContext,
 } = vi.hoisted(() => ({
+  mockClearPendingClaimContext: vi.fn(),
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
+  mockWritePendingClaimContext: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -20,9 +24,9 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 vi.mock('@/lib/claim/context', () => ({
-  clearPendingClaimContext: vi.fn(),
+  clearPendingClaimContext: mockClearPendingClaimContext,
   readPendingClaimContext: mockReadPendingClaimContext,
-  writePendingClaimContext: vi.fn(),
+  writePendingClaimContext: mockWritePendingClaimContext,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -84,5 +88,25 @@ describe('Claim route', () => {
       'http://localhost/testartist?claim=1'
     );
     expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
+  });
+
+  it('does not clear an unrelated pending claim when a bad token is used', async () => {
+    const { isClaimTokenValid } = await import('@/lib/services/profile');
+
+    mockReadPendingClaimContext.mockResolvedValueOnce(null);
+    vi.mocked(isClaimTokenValid).mockResolvedValueOnce(false);
+
+    const response = await GET(
+      new NextRequest('http://localhost/TestArtist/claim?token=bad-token'),
+      {
+        params: Promise.resolve({ username: 'TestArtist' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/testartist?claim=1'
+    );
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
 });

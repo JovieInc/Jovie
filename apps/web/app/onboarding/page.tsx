@@ -106,7 +106,9 @@ export default async function OnboardingPage({
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
-    resolvedSearchParams?.handle || spotifySuggestedHandle;
+    resolvedSearchParams?.handle ||
+    pendingClaim?.username ||
+    spotifySuggestedHandle;
   const handleReservationPromise = !earlyProvidedHandle
     ? reserveOnboardingHandle(earlyDisplayName)
     : Promise.resolve(null);

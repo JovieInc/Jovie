@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockCaptureError,
   mockClearLeadAttributionCookie,
   mockGetProfileByUsername,
   mockHashClaimToken,
@@ -12,6 +13,7 @@ const {
   mockSetLeadAttributionCookieFromToken,
   mockWritePendingClaimContext,
 } = vi.hoisted(() => ({
+  mockCaptureError: vi.fn(),
   mockClearLeadAttributionCookie: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockHashClaimToken: vi.fn(),
@@ -21,6 +23,10 @@ const {
   mockMarkLeadClaimPageViewedFromToken: vi.fn(),
   mockSetLeadAttributionCookieFromToken: vi.fn(),
   mockWritePendingClaimContext: vi.fn(),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/claim/context', () => ({
@@ -52,6 +58,7 @@ import { GET } from '../../../app/claim/[token]/route';
 describe('Claim token route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClearLeadAttributionCookie.mockResolvedValue(undefined);
     mockLookupLeadByClaimToken.mockResolvedValue(null);
     mockHashClaimToken.mockResolvedValue('hashed-token');
     mockGetProfileByUsername.mockResolvedValue({
@@ -110,5 +117,27 @@ describe('Claim token route', () => {
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
+  });
+
+  it('fails closed to the homepage when the resolver throws unexpectedly', async () => {
+    mockLookupUsernameByClaimToken.mockRejectedValueOnce(new Error('boom'));
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-token'),
+      {
+        params: Promise.resolve({ token: 'valid-token' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Claim token resolver failed',
+      expect.any(Error),
+      expect.objectContaining({
+        route: 'app/claim/[token]/route',
+      })
+    );
+    expect(mockClearLeadAttributionCookie).toHaveBeenCalled();
   });
 });

@@ -154,26 +154,10 @@ export async function reservePrebuiltProfileForUser(
     displayName: string;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
-  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
-  const expectedUsername = params.expectedUsername.toLowerCase();
-
-  if (profile.usernameNormalized !== expectedUsername) {
-    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
-  }
-
-  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
-
-  if (profile.userId && profile.userId !== params.userId) {
-    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
-  }
-
-  if (profile.isClaimed && profile.userId !== params.userId) {
-    throw new Error(
-      '[PROFILE_CONFLICT] This profile has already been claimed.'
-    );
-  }
-
-  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
+  const { expectedUsername, profile } = await validateAndPrepareClaimTarget(
+    tx,
+    params
+  );
 
   await tx
     .update(creatorProfiles)
@@ -205,27 +189,11 @@ export async function claimPrebuiltProfileForUser(
     finalizeOnboarding?: boolean;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
-  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
-  const expectedUsername = params.expectedUsername.toLowerCase();
+  const { expectedUsername, profile } = await validateAndPrepareClaimTarget(
+    tx,
+    params
+  );
   const now = new Date();
-
-  if (profile.usernameNormalized !== expectedUsername) {
-    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
-  }
-
-  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
-
-  if (profile.userId && profile.userId !== params.userId) {
-    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
-  }
-
-  if (profile.isClaimed && profile.userId !== params.userId) {
-    throw new Error(
-      '[PROFILE_CONFLICT] This profile has already been claimed.'
-    );
-  }
-
-  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
 
   await tx
     .update(creatorProfiles)
@@ -276,4 +244,39 @@ export async function claimPrebuiltProfileForUser(
     username: expectedUsername,
     status: 'updated',
   };
+}
+
+async function validateAndPrepareClaimTarget(
+  tx: DbOrTransaction,
+  params: {
+    userId: string;
+    creatorProfileId: string;
+    expectedUsername: string;
+  }
+): Promise<{
+  expectedUsername: string;
+  profile: Awaited<ReturnType<typeof getClaimTargetProfile>>;
+}> {
+  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
+  const expectedUsername = params.expectedUsername.toLowerCase();
+
+  if (profile.usernameNormalized !== expectedUsername) {
+    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
+  }
+
+  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
+
+  if (profile.userId && profile.userId !== params.userId) {
+    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
+  }
+
+  if (profile.isClaimed && profile.userId !== params.userId) {
+    throw new Error(
+      '[PROFILE_CONFLICT] This profile has already been claimed.'
+    );
+  }
+
+  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
+
+  return { expectedUsername, profile };
 }

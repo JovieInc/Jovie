@@ -1,6 +1,8 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { readPendingClaimContext } from '@/lib/claim/context';
+import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 
 const { onboardingWrapperPropsSpy, redirectMock } = vi.hoisted(() => ({
   onboardingWrapperPropsSpy: vi.fn(),
@@ -81,6 +83,10 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
+vi.mock('@/lib/claim/context', () => ({
+  readPendingClaimContext: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
   reserveOnboardingHandle: vi.fn().mockResolvedValue(null),
 }));
@@ -95,6 +101,8 @@ describe('onboarding page', () => {
   beforeEach(() => {
     onboardingWrapperPropsSpy.mockClear();
     redirectMock.mockClear();
+    vi.mocked(reserveOnboardingHandle).mockClear();
+    vi.mocked(readPendingClaimContext).mockResolvedValue(null);
   });
 
   it('redirects waitlist-state users back to the waitlist instead of rendering onboarding', async () => {
@@ -388,10 +396,6 @@ describe('onboarding page', () => {
 
   it('prefills a reserved handle when no explicit handle is provided', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { reserveOnboardingHandle } = await import(
-      '@/lib/onboarding/reserved-handle'
-    );
-
     vi.mocked(resolveUserState).mockResolvedValueOnce({
       state: 'NEEDS_ONBOARDING',
       clerkUserId: 'clerk_123',
@@ -419,5 +423,42 @@ describe('onboarding page', () => {
         userId: 'clerk_123',
       })
     );
+  });
+
+  it('does not reserve a handle when a pending claim already provides one', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+    vi.mocked(readPendingClaimContext).mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'claimed-handle',
+      expectedSpotifyArtistId: 'spotify_123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({}),
+    });
+    render(page);
+
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialHandle: 'claimed-handle',
+        isReservedHandle: false,
+      })
+    );
+    expect(vi.mocked(reserveOnboardingHandle).mock.calls).toHaveLength(0);
   });
 });

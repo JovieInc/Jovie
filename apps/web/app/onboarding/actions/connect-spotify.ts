@@ -32,6 +32,7 @@ import {
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { captureError } from '@/lib/error-tracking';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { runBackgroundSyncOperations } from './sync';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -276,6 +277,7 @@ export async function connectOnboardingSpotifyArtist(
       await clearPendingClaimContext();
       await invalidateProfileCache(profile.handle);
       void invalidateProxyUserStateCache(userId);
+      runBackgroundSyncOperations(userId, profile.handle);
       void import('./activate-trial').then(({ activateTrial }) =>
         activateTrial(userId)
       );

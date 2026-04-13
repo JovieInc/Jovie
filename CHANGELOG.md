@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.0] - 2026-04-12
+
+### Fixed
+
+- Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links
+- Fail closed on unexpected `/claim/[token]` resolver errors instead of surfacing a 500 page
+- Run post-claim username and Clerk metadata sync after direct-profile Spotify claim finalization
+- Skip stray onboarding handle reservations when a pending claim already provides the target username
+- Prevent delivered release notifications from being downgraded to failed when trial quota bookkeeping errors occur
+- Initialize null trial notification counters correctly and remove redundant entitlements lookups in release notification cron jobs
+- Harden pending-claim cookie parsing and normalize follow-up claim URLs when the base URL has a trailing slash
+
 ## [26.4.151.4] - 2026-04-12
 
 ### Fixed

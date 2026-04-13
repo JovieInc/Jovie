@@ -592,7 +592,6 @@ export default async function ArtistPage({
   const shouldShowClaimBanner =
     !profile.is_claimed &&
     visitorState !== 'owner' &&
-    (!viewerClerkUserId || pendingClaimContext !== null) &&
     claimBannerVariant !== null;
 
   // Generate a short-lived HMAC token so the client can authenticate its visit

@@ -77,7 +77,7 @@ export function getProfileNotificationReadiness(
     return 'waiting_for_release';
   }
 
-  if (!input.hasEligibleRelease) {
+  if (input.hasEligibleRelease === false) {
     return 'waiting_for_release';
   }
 
