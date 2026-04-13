@@ -22,4 +22,9 @@ export interface ArtistNotificationsCTAProps {
    * profile surfaces.
    */
   readonly hideListenFallback?: boolean;
+  /**
+   * Analytics source identifier for tracking where subscriptions originate.
+   * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.
+   */
+  readonly source?: string;
 }

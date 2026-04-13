@@ -27,6 +27,7 @@ import { buildPhoneE164, getMaxNationalDigits } from './utils';
 
 interface UseSubscriptionFormOptions {
   artist: Artist;
+  source?: string;
 }
 
 interface UseSubscriptionFormReturn {
@@ -68,7 +69,9 @@ interface UseSubscriptionFormReturn {
 
 export function useSubscriptionForm({
   artist,
+  source: sourceProp,
 }: UseSubscriptionFormOptions): UseSubscriptionFormReturn {
+  const source = sourceProp ?? 'profile_inline';
   const {
     state: notificationsState,
     setState: setNotificationsState,
@@ -225,12 +228,12 @@ export function useSubscriptionForm({
         email: channel === 'email' ? trimmedEmail : undefined,
         phone: channel === 'sms' ? phoneE164 : undefined,
         countryCode: channel === 'sms' ? country.code : undefined,
-        source: 'profile_inline',
+        source,
       });
 
       track('notifications_subscribe_success', {
         channel,
-        source: 'profile_inline',
+        source,
         handle: artist.handle,
         pending_confirmation: response.pendingConfirmation ?? false,
       });
@@ -265,13 +268,13 @@ export function useSubscriptionForm({
         artistId: artist.id,
         artistHandle: artist.handle,
         channel,
-        source: 'profile_inline',
+        source,
       });
 
       track('notifications_subscribe_error', {
         error_type: 'submission_error',
         channel,
-        source: 'profile_inline',
+        source,
         handle: artist.handle,
       });
       return false;
@@ -287,6 +290,7 @@ export function useSubscriptionForm({
     emailInput,
     isSubmitting,
     phoneInput,
+    source,
     subscribeMutation,
     setNotificationsState,
     setSubscribedChannels,
@@ -368,7 +372,7 @@ export function useSubscriptionForm({
     setError(null);
 
     track('otp_resend_attempt', {
-      source: 'profile_inline',
+      source,
       handle: artist.handle,
     });
 
@@ -376,7 +380,7 @@ export function useSubscriptionForm({
 
     if (success) {
       track('otp_resend_success', {
-        source: 'profile_inline',
+        source,
         handle: artist.handle,
       });
 
@@ -392,6 +396,7 @@ export function useSubscriptionForm({
     handleConfirmSubscription,
     isResending,
     resendCooldownEnd,
+    source,
   ]);
 
   // Clean up OTP auto-clear timer on unmount
@@ -407,7 +412,7 @@ export function useSubscriptionForm({
     // Track button click intent (before validation)
     track('subscribe_click', {
       channel,
-      source: 'profile_inline',
+      source,
       handle: artist.handle,
     });
 
@@ -415,7 +420,7 @@ export function useSubscriptionForm({
       track('notifications_subscribe_error', {
         error_type: 'validation_error',
         channel,
-        source: 'profile_inline',
+        source,
         handle: artist.handle,
       });
       return;
@@ -423,7 +428,7 @@ export function useSubscriptionForm({
 
     track('notifications_subscribe_attempt', {
       channel,
-      source: 'profile_inline',
+      source,
       handle: artist.handle,
     });
 
@@ -433,6 +438,7 @@ export function useSubscriptionForm({
     channel,
     handleConfirmSubscription,
     isSubmitting,
+    source,
     validateCurrent,
   ]);
 

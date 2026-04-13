@@ -342,6 +342,7 @@ export function ArtistNotificationsCTA({
   autoOpen = false,
   forceExpanded = false,
   hideListenFallback = false,
+  source,
 }: ArtistNotificationsCTAProps) {
   const {
     country,
@@ -370,7 +371,7 @@ export function ArtistNotificationsCTA({
     registerInputFocus,
     hydrationStatus,
     smsEnabled,
-  } = useSubscriptionForm({ artist });
+  } = useSubscriptionForm({ artist, source });
 
   const inputId = useId();
   const disclaimerId = useId();
