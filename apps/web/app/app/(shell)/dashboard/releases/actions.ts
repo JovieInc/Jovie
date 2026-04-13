@@ -256,8 +256,7 @@ function mapReleaseToViewModel(
     title: release.title,
     artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
-    status:
-      (release.status as 'draft' | 'scheduled' | 'released') ?? 'released',
+    status: (release.status as ReleaseStatusValue) ?? 'released',
     revealDate: toISOStringOrNull(release.revealDate) ?? undefined,
     deletedAt: toISOStringOrNull(release.deletedAt) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
@@ -2253,9 +2252,9 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
-function determineReleaseStatus(
-  releaseDate: Date | null
-): 'draft' | 'scheduled' | 'released' {
+type ReleaseStatusValue = 'draft' | 'scheduled' | 'released';
+
+function determineReleaseStatus(releaseDate: Date | null): ReleaseStatusValue {
   if (!releaseDate) return 'draft';
   return releaseDate > new Date() ? 'scheduled' : 'released';
 }
@@ -2263,7 +2262,7 @@ function determineReleaseStatus(
 function computeRevealDate(
   formRevealDate: string | null,
   releaseDate: Date | null,
-  status: 'draft' | 'scheduled' | 'released'
+  status: ReleaseStatusValue
 ): Date | null {
   if (formRevealDate) return new Date(formRevealDate);
   if (!releaseDate || status !== 'scheduled') return null;
