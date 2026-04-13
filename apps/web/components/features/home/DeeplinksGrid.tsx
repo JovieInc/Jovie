@@ -126,7 +126,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
           Powered by Jovie
         </p>
       </div>

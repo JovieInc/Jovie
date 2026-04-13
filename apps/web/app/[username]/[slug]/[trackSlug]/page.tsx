@@ -9,7 +9,6 @@
 
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { generateMusicStructuredData } from '@/app/[username]/[slug]/_lib/structured-data';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
@@ -29,6 +28,7 @@ import {
   getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
+import { generateMusicStructuredData } from '../music-structured-data';
 
 export const revalidate = 300;
 
@@ -88,10 +88,12 @@ export default async function TrackDeepLinkPage({
 
   await guardUnreleasedContent(track, creator.id);
 
+  const effectiveProviderLinks = track.providerLinks;
+
   // Build provider data for the landing page
   const allProviders = (Object.keys(PROVIDER_CONFIG) as ProviderKey[])
     .map(key => {
-      const link = track.providerLinks.find(l => l.providerId === key);
+      const link = effectiveProviderLinks.find(l => l.providerId === key);
       return {
         key,
         label: PROVIDER_CONFIG[key].label,
@@ -105,7 +107,7 @@ export default async function TrackDeepLinkPage({
     audioUrl: null,
     previewUrl: track.previewUrl ?? null,
     metadata: track.previewMetadata ?? null,
-    providerLinks: track.providerLinks,
+    providerLinks: effectiveProviderLinks,
   });
 
   const artistName = creator.displayName ?? creator.username;
@@ -122,7 +124,7 @@ export default async function TrackDeepLinkPage({
       slug: `${slug}/${trackSlug}`,
       artworkUrl: track.artworkUrl,
       releaseDate: track.releaseDate,
-      providerLinks: track.providerLinks,
+      providerLinks: effectiveProviderLinks,
       durationMs: track.durationMs,
       isrc: track.isrc,
       trackNumber: track.trackNumber,
@@ -132,7 +134,8 @@ export default async function TrackDeepLinkPage({
         id: `${releaseUrl}#release`,
       },
     },
-    creator
+    creator,
+    BASE_URL
   );
 
   // Add the deeper breadcrumb (4 levels instead of 3)
