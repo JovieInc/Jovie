@@ -352,7 +352,7 @@ export function LeadTable({
           const count =
             funnelCounts && opt.value ? funnelCounts[opt.value] : undefined;
           const label =
-            count !== undefined ? `${opt.label} (${count})` : opt.label;
+            count === undefined ? opt.label : `${opt.label} (${count})`;
           return (
             <PageToolbarTabButton
               key={opt.value}
