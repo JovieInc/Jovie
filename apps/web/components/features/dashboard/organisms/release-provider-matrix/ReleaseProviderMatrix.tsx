@@ -253,17 +253,27 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [rows, openEditor]
   );
 
-  // Table display preferences (column visibility)
-  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
-    useReleaseTablePreferences();
+  // Table display preferences (column visibility, tracks toggle)
+  const {
+    columnVisibility,
+    rowHeight,
+    groupByYear,
+    onGroupByYearChange,
+    showTracks,
+    onShowTracksChange,
+  } = useReleaseTablePreferences();
+
+  // Derive releaseView from persisted showTracks preference
+  const releaseView: ReleaseView = showTracks ? 'tracks' : 'releases';
+  const setReleaseView = useCallback(
+    (view: ReleaseView) => onShowTracksChange(view === 'tracks'),
+    [onShowTracksChange]
+  );
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
     DEFAULT_RELEASE_FILTERS
   );
-
-  // View toggle (releases vs tracks)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
