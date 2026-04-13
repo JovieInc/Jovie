@@ -134,6 +134,7 @@ describe('ReleaseTableSubheader', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
+        allReleases={[] as ReleaseViewModel[]}
         selectedIds={new Set<string>()}
         filters={DEFAULT_RELEASE_FILTERS}
         onFiltersChange={() => undefined}
@@ -153,6 +154,7 @@ describe('ReleaseTableSubheader', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
+        allReleases={[] as ReleaseViewModel[]}
         selectedIds={new Set<string>()}
         filters={DEFAULT_RELEASE_FILTERS}
         onFiltersChange={() => undefined}
