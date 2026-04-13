@@ -511,6 +511,7 @@ async function seedDemoReleases(profileId: string): Promise<string[]> {
         totalTracks: release.totalTracks,
         upc: release.upc ? `DEMO${release.upc}` : undefined,
         label: release.label ?? undefined,
+        metadata: release.metadata ?? {},
         sourceType: 'manual',
       })
       .returning({ id: discogReleases.id });

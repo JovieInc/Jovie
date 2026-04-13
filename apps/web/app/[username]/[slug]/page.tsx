@@ -20,6 +20,7 @@ import {
   MysteryReleasePage,
   ScheduledReleasePage,
   UnreleasedReleaseHero,
+  VideoReleasePage,
 } from '@/features/release';
 import {
   derivePreviewState,
@@ -31,7 +32,7 @@ import {
 } from '@/lib/discography/config';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
-import type { ProviderKey } from '@/lib/discography/types';
+import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
@@ -361,6 +362,43 @@ function ContentPageBody({
         }}
       />
     );
+  }
+
+  // Music video releases render an embedded YouTube player + email CTA
+  if (content.releaseType === 'music_video') {
+    const videoMeta = (content.metadata ??
+      {}) as unknown as Partial<MusicVideoMetadata>;
+    const youtubeLink = content.providerLinks.find(
+      l => l.providerId === 'youtube'
+    );
+    if (videoMeta.youtubeVideoId) {
+      return (
+        <VideoReleasePage
+          release={{
+            title: content.title,
+            slug: content.slug,
+            artworkUrl: content.artworkUrl,
+          }}
+          artist={{
+            id: creator.id,
+            name: artistName,
+            handle: creator.usernameNormalized,
+            avatarUrl: creator.avatarUrl,
+            ownerUserId: creator.userId ?? '',
+          }}
+          videoId={videoMeta.youtubeVideoId}
+          youtubeUrl={
+            youtubeLink?.url ??
+            `https://www.youtube.com/watch?v=${videoMeta.youtubeVideoId}`
+          }
+        />
+      );
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        `[ContentPageBody] music_video release "${content.slug}" missing youtubeVideoId`
+      );
+    }
   }
 
   return (

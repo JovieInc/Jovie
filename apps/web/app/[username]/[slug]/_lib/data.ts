@@ -194,6 +194,8 @@ export interface ContentData {
     metadata?: Record<string, unknown> | null;
   }>;
   artworkSizes?: Record<string, string> | null;
+  /** Raw release metadata JSONB (includes MusicVideoMetadata for music_video releases) */
+  metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
@@ -238,6 +240,7 @@ export interface CachedContentData {
     metadata?: Record<string, unknown> | null;
   }>;
   artworkSizes?: Record<string, string> | null;
+  metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
@@ -258,6 +261,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
   const [creator] = await db
     .select({
       id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
       displayName: creatorProfiles.displayName,
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
@@ -387,6 +391,7 @@ const fetchContentBySlug = async (
       revealDate: toISOStringOrNull(release.revealDate),
       providerLinks: links,
       artworkSizes,
+      metadata: release.metadata as Record<string, unknown> | null,
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
       releaseId: release.id,
