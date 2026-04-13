@@ -238,7 +238,7 @@ function ChannelInputRow({
         <button
           type='button'
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
           className={subscriptionPrimaryActionClassName}
           style={noFontSynthesisStyle}
         >
@@ -259,7 +259,7 @@ function ChannelInputRow({
             value={otpCode}
             onChange={handleOtpChange}
             onComplete={() => {
-              handleVerifyOtp().catch(() => {});
+              if (!error) handleVerifyOtp().catch(() => {});
             }}
             autoFocus
             aria-label='Enter 6-digit verification code'
