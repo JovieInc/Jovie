@@ -12,7 +12,6 @@ import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
-import { getOptionalAuth } from '@/lib/auth/cached';
 import {
   getProfileVisitorState,
   supportsDirectProfileClaim,
@@ -561,7 +560,6 @@ export default async function ArtistPage({
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
-  const { userId: viewerClerkUserId } = await getOptionalAuth();
   const directClaimSupported = supportsDirectProfileClaim({
     spotifyId: profile.spotify_id,
   });
@@ -573,7 +571,7 @@ export default async function ArtistPage({
       userClerkId: creatorClerkId,
       spotifyId: profile.spotify_id,
     },
-    authUserId: viewerClerkUserId,
+    authUserId: null,
     pendingClaimContext: null,
   });
   const { claimBannerVariant, shouldShowClaimBanner } = resolveClaimBannerState(

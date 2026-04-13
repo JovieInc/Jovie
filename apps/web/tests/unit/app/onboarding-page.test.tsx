@@ -13,6 +13,10 @@ const { onboardingWrapperPropsSpy, redirectMock, mockBootstrapProfileLimit } =
     mockBootstrapProfileLimit: vi.fn(),
   }));
 
+vi.mock('drizzle-orm', () => ({
+  eq: (_column: unknown, value: unknown) => value,
+}));
+
 vi.mock('@sentry/nextjs', () => ({
   captureMessage: vi.fn(),
   captureException: vi.fn(),
@@ -26,8 +30,8 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: mockBootstrapProfileLimit,
+        where: vi.fn((requestedId: string | null) => ({
+          limit: () => mockBootstrapProfileLimit(requestedId),
         })),
       })),
     })),
@@ -124,7 +128,40 @@ describe('onboarding page', () => {
     vi.mocked(reserveOnboardingHandle).mockClear();
     vi.mocked(readPendingClaimContext).mockResolvedValue(null);
     mockBootstrapProfileLimit.mockReset();
-    mockBootstrapProfileLimit.mockResolvedValue([]);
+    mockBootstrapProfileLimit.mockImplementation(
+      async (requestedId: string | null) => {
+        if (requestedId === 'claim_target_profile') {
+          return [
+            {
+              id: 'claim_target_profile',
+              username: 'claimed-handle',
+              displayName: 'Claim Target',
+              avatarUrl: 'https://example.com/avatar.jpg',
+              bio: 'Target bio',
+              genres: ['pop'],
+            },
+          ];
+        }
+
+        if (
+          requestedId === 'current_profile' ||
+          requestedId === 'profile_123'
+        ) {
+          return [
+            {
+              id: requestedId,
+              username: 'artist',
+              displayName: 'Artist',
+              avatarUrl: null,
+              bio: null,
+              genres: null,
+            },
+          ];
+        }
+
+        return [];
+      }
+    );
   });
 
   it('redirects waitlist-state users back to the waitlist instead of rendering onboarding', async () => {
@@ -150,17 +187,6 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-    mockBootstrapProfileLimit.mockResolvedValueOnce([
-      {
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        avatarUrl: null,
-        bio: null,
-        genres: null,
-      },
-    ]);
-
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume: 'dsp' }),
     });
@@ -184,17 +210,6 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-    mockBootstrapProfileLimit.mockResolvedValueOnce([
-      {
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        avatarUrl: null,
-        bio: null,
-        genres: null,
-      },
-    ]);
-
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume: 'spotify' }),
     });
@@ -222,17 +237,6 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-    mockBootstrapProfileLimit.mockResolvedValueOnce([
-      {
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        avatarUrl: null,
-        bio: null,
-        genres: null,
-      },
-    ]);
-
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ resume }),
     });
@@ -256,17 +260,6 @@ describe('onboarding page', () => {
         email: 'artist@example.com',
       },
     });
-    mockBootstrapProfileLimit.mockResolvedValueOnce([
-      {
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        avatarUrl: null,
-        bio: null,
-        genres: null,
-      },
-    ]);
-
     const page = await OnboardingPage({
       searchParams: Promise.resolve({ handle: 'artist' }),
     });
@@ -326,17 +319,6 @@ describe('onboarding page', () => {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });
-    mockBootstrapProfileLimit.mockResolvedValueOnce([
-      {
-        id: 'claim_target_profile',
-        username: 'claimed-handle',
-        displayName: 'Claim Target',
-        avatarUrl: 'https://example.com/avatar.jpg',
-        bio: 'Target bio',
-        genres: ['pop'],
-      },
-    ]);
-
     const page = await OnboardingPage({
       searchParams: Promise.resolve({}),
     });
@@ -479,7 +461,7 @@ describe('onboarding page', () => {
       state: 'NEEDS_ONBOARDING',
       clerkUserId: 'clerk_123',
       dbUserId: 'db_123',
-      profileId: 'profile_123',
+      profileId: null,
       redirectTo: APP_ROUTES.ONBOARDING,
       context: {
         isAdmin: false,
