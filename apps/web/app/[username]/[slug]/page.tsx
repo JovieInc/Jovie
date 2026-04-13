@@ -517,11 +517,14 @@ export async function generateMetadata({
   const isMystery = metadataPhase === 'mystery';
 
   // In mystery phase, hide release title and artwork from OG tags
-  const title = isMystery
-    ? `New music from ${artistName} - Coming Soon`
-    : isUnreleased
-      ? `${content.title} by ${artistName} - Coming Soon`
-      : `${content.title} by ${artistName} - Stream Now`;
+  let title: string;
+  if (isMystery) {
+    title = `New music from ${artistName} - Coming Soon`;
+  } else if (isUnreleased) {
+    title = `${content.title} by ${artistName} - Coming Soon`;
+  } else {
+    title = `${content.title} by ${artistName} - Stream Now`;
+  }
 
   const description = isMystery
     ? `${artistName} has something new coming. Get notified when it drops.`
