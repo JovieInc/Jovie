@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.2] - 2026-04-13
+
+### Added
+
+- Agent guardrail: "No Redundant Chrome" rule (4d) prevents AI agents from adding duplicate titles, headers, and card wrappers inside containers that already provide them
+- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, and DashboardHeader to the chrome they provide
+- Mechanical 4-step checklist for agents to verify container-aware design before PRs
+
+### Changed
+
+- Subtraction Principle (4b) now explicitly requires reading parent container chrome before building child components
+- No AI-Slop rule (4c) now names specific parent surfaces (Sheet, Drawer, existing Card) instead of generic "every block"
+
 ## [26.4.153.0] - 2026-04-13
 
 ### Added
