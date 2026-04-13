@@ -66,6 +66,7 @@ export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
           {/* CTA Button */}
           <Link
             href={signupUrl}
+            prefetch={false}
             className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
             data-testid='claim-banner-cta'
             aria-label={`Claim profile for ${name}`}

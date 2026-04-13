@@ -90,7 +90,7 @@ export function NewLandingSections() {
                       key={step.number}
                       className='bg-surface-0 px-5 py-5 sm:px-6 sm:py-6'
                     >
-                      <p className='text-[11px] font-medium uppercase tracking-[0.18em] text-quaternary-token'>
+                      <p className='text-[11px] font-medium uppercase tracking-[0.18em] text-secondary-token'>
                         {step.number}
                       </p>
                       <h3 className='mt-3 text-[1rem] font-medium tracking-[-0.02em] text-primary-token sm:text-[1.05rem]'>

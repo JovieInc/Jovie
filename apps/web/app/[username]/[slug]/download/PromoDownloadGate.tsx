@@ -196,6 +196,7 @@ export function PromoDownloadGate({
               <a
                 href={(file as DownloadFile).downloadUrl}
                 download={file.fileName}
+                aria-label={`Download ${file.title}`}
                 className='ml-2 shrink-0 rounded-md bg-white/10 px-2.5 py-1 text-2xs font-semibold text-white transition-colors hover:bg-white/20'
               >
                 <Icon
@@ -215,7 +216,11 @@ export function PromoDownloadGate({
           <p className='text-muted-foreground text-center text-xs'>
             Enter your email to download
           </p>
+          <label htmlFor='promo-download-email' className='sr-only'>
+            Email address
+          </label>
           <input
+            id='promo-download-email'
             ref={emailInputRef}
             type='email'
             value={email}

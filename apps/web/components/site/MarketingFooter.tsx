@@ -16,8 +16,8 @@ export function MarketingFooter() {
       <div className='mx-auto flex w-full max-w-[var(--linear-content-max)] flex-col items-center gap-5 px-5 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left lg:px-0'>
         <Link
           href='/'
+          prefetch={false}
           className='inline-flex items-center gap-2 rounded-md p-1 -m-1 focus-ring-themed'
-          aria-label='Jovie home'
         >
           <BrandLogo size={20} tone='white' />
           <span
@@ -32,6 +32,7 @@ export function MarketingFooter() {
             <Link
               key={link.href}
               href={link.href}
+              prefetch={false}
               className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
               style={{ color: 'var(--linear-text-tertiary)' }}
             >

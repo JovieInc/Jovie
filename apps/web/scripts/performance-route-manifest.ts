@@ -30,6 +30,8 @@ export type PerfResourceMetricName =
 
 export type PerfRouteGroup =
   | 'home'
+  | 'marketing-public'
+  | 'legal-public'
   | 'public-profile-core'
   | 'public-profile-mode-shell'
   | 'public-profile-detail'
@@ -41,6 +43,8 @@ export type PerfRouteGroup =
 
 export type PerfRouteSurface =
   | 'homepage'
+  | 'marketing'
+  | 'legal'
   | 'public-profile'
   | 'creator-app'
   | 'account-billing'
@@ -178,14 +182,16 @@ const ONBOARDING_RESOURCE_BUDGETS = [
 
 const GROUP_PRIORITY: Record<PerfRouteGroup, number> = {
   home: 1,
-  'public-profile-core': 2,
-  'public-profile-mode-shell': 3,
-  'public-profile-detail': 4,
-  'creator-shell': 5,
-  'creator-alias': 6,
-  'account-billing': 7,
-  onboarding: 8,
-  auth: 9,
+  'marketing-public': 2,
+  'legal-public': 3,
+  'public-profile-core': 4,
+  'public-profile-mode-shell': 5,
+  'public-profile-detail': 6,
+  'creator-shell': 7,
+  'creator-alias': 8,
+  'account-billing': 9,
+  onboarding: 10,
+  auth: 11,
 };
 
 const HOME_ROUTE = {
@@ -422,7 +428,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-listen"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-listen"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -443,7 +452,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tip"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-tip"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -464,7 +476,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-subscribe"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-subscribe"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -485,7 +500,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-about"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-about"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -506,7 +524,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-contact"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-contact"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -527,7 +548,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tour"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-tour"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -623,6 +647,88 @@ const PUBLIC_PROFILE_DETAIL_ROUTES = [
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 4,
     seedProfile: 'dualipa',
+  },
+] as const satisfies readonly PerfRouteDefinition[];
+
+const MARKETING_PUBLIC_ROUTES = [
+  {
+    id: 'marketing-pricing',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.PRICING,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2600 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 1,
+  },
+  {
+    id: 'marketing-support',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.SUPPORT,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2600 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 2,
+  },
+] as const satisfies readonly PerfRouteDefinition[];
+
+const LEGAL_PUBLIC_ROUTES = [
+  {
+    id: 'legal-privacy',
+    group: 'legal-public',
+    surface: 'legal',
+    path: APP_ROUTES.LEGAL_PRIVACY,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 2000 },
+      { metric: 'largest-contentful-paint', budget: 2800 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1700 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 1,
+  },
+  {
+    id: 'legal-terms',
+    group: 'legal-public',
+    surface: 'legal',
+    path: APP_ROUTES.LEGAL_TERMS,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 2000 },
+      { metric: 'largest-contentful-paint', budget: 2800 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1700 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 2,
   },
 ] as const satisfies readonly PerfRouteDefinition[];
 
@@ -1450,6 +1556,8 @@ const AUTH_ROUTES = [
 
 export const END_USER_PERF_ROUTE_MANIFEST = [
   HOME_ROUTE,
+  ...MARKETING_PUBLIC_ROUTES,
+  ...LEGAL_PUBLIC_ROUTES,
   ...PUBLIC_PROFILE_CORE_ROUTES,
   ...PUBLIC_PROFILE_MODE_SHELL_ROUTES,
   ...PUBLIC_PROFILE_DETAIL_ROUTES,

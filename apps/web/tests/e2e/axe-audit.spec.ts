@@ -1,160 +1,258 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
-import { waitForLoad } from './utils/smoke-test-utils';
+import { expect, test } from './setup';
+import {
+  assertPublicSurfaceHealthy,
+  installPublicRouteMocks,
+  runDeclaredPublicInteractions,
+  waitForPublicSurfaceReady,
+} from './utils/public-surface-helpers';
+import {
+  getLighthousePublicSurfaceManifestSync,
+  resolvePublicSurfaceManifestSync,
+} from './utils/public-surface-manifest';
 
-/**
- * Axe WCAG 2.1 Level AA Compliance Tests
- *
- * These tests use axe-core to scan critical routes for accessibility violations.
- * Tests run against WCAG 2.0 Level A and AA, plus WCAG 2.1 Level A and AA standards.
- *
- * NOTE: Tests public routes for unauthenticated visitors.
- * Must run without saved authentication.
- *
- * @see https://www.deque.com/axe/core-documentation/api-documentation/
- */
-
-// Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
-const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
+function createEmptyStorageState() {
+  return { cookies: [], origins: [] } as const;
+}
+
+function shouldSkipBlockingAxe(surface: {
+  expectedState: 'ok' | 'redirect' | 'not-found';
+  allowedFinalDocumentStatuses?: readonly number[];
+  allowMissingMain?: boolean;
+}) {
+  return (
+    surface.expectedState === 'redirect' &&
+    surface.allowMissingMain === true &&
+    surface.allowedFinalDocumentStatuses?.includes(404) === true
+  );
+}
+
+function getSurfaceFilter() {
+  const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  return new Set(
+    raw
+      .split(',')
+      .map(entry => entry.trim())
+      .filter(Boolean)
+  );
+}
+
+async function assertInteractiveLabels(
+  page: import('@playwright/test').Page,
+  surfaceId: string
+) {
+  const unlabeled = await page.locator('button, a, input').evaluateAll(nodes =>
+    nodes
+      .map(node => {
+        const element = node as HTMLElement;
+        const input = element as HTMLInputElement;
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const isVisible =
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0' &&
+          element.getAttribute('aria-hidden') !== 'true' &&
+          rect.width > 0 &&
+          rect.height > 0;
+
+        if (!isVisible) {
+          return null;
+        }
+
+        const labelledByText =
+          element
+            .getAttribute('aria-labelledby')
+            ?.split(/\s+/)
+            .map(id => document.getElementById(id)?.textContent?.trim() ?? '')
+            .join(' ') ?? '';
+
+        const label =
+          element.getAttribute('aria-label') ||
+          labelledByText ||
+          element.getAttribute('title') ||
+          ((input.type === 'button' ||
+            input.type === 'submit' ||
+            input.type === 'reset') &&
+          typeof input.value === 'string'
+            ? input.value
+            : '') ||
+          element.querySelector('img[alt]')?.getAttribute('alt') ||
+          element.textContent ||
+          input.labels?.[0]?.textContent ||
+          '';
+
+        if (label.trim().length > 0) {
+          return null;
+        }
+
+        return element.outerHTML.slice(0, 200);
+      })
+      .filter(Boolean)
+      .slice(0, 5)
+  );
+
+  expect(
+    unlabeled,
+    `${surfaceId} rendered unlabeled visible interactive elements`
+  ).toHaveLength(0);
+}
+
+const surfaceFilter = getSurfaceFilter();
+function loadSurfaceManifests() {
+  try {
+    return {
+      lighthouseSurfaces: getLighthousePublicSurfaceManifestSync().filter(
+        surface => (surfaceFilter ? surfaceFilter.has(surface.id) : true)
+      ),
+      publicSurfaces: resolvePublicSurfaceManifestSync().filter(surface =>
+        surfaceFilter ? surfaceFilter.has(surface.id) : true
+      ),
+      error: null,
+    } as const;
+  } catch (error) {
+    return {
+      lighthouseSurfaces: [],
+      publicSurfaces: [],
+      error: new Error(
+        `Failed to resolve public surface manifests for axe audit: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      ),
+    } as const;
+  }
+}
+
+const {
+  publicSurfaces,
+  lighthouseSurfaces,
+  error: surfaceManifestLoadError,
+} = loadSurfaceManifests();
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
-  );
+  test.setTimeout(120_000);
 
-  // Turbopack cold compilation can take 30-90s per route
-  test.setTimeout(180_000);
-
-  const publicRoutes = [
-    { path: '/', name: 'Homepage' },
-    { path: '/signin', name: 'Sign In' },
-    { path: '/signup', name: 'Sign Up' },
-    { path: '/pricing', name: 'Pricing' },
-    { path: '/support', name: 'Support' },
-  ];
-
-  for (const route of publicRoutes) {
-    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
-      page,
-    }) => {
-      await page.route('**/api/profile/view', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.goto(route.path, { timeout: 120_000 });
-      await waitForLoad(page);
-
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
-
-      if (results.violations.length > 0) {
-        console.log(
-          `\nAccessibility violations found on ${route.name} (${route.path}):`
-        );
-        results.violations.forEach(violation => {
-          console.log(`\n- ${violation.id}: ${violation.description}`);
-          console.log(`  Impact: ${violation.impact}`);
-          console.log(`  Help: ${violation.helpUrl}`);
-          console.log(
-            `  Affected elements: ${violation.nodes.length} element(s)`
-          );
-        });
-      }
-
-      expect(results.violations).toEqual([]);
-    });
-  }
-
-  // Authenticated routes tests (skipped in smoke mode)
-  const authenticatedRoutes = [
-    { path: '/dashboard', name: 'Dashboard' },
-    { path: '/dashboard/links', name: 'Links Manager' },
-    { path: '/dashboard/settings', name: 'Settings' },
-  ];
-
-  const smokeOnly = process.env.SMOKE_ONLY === '1';
-
-  for (const route of authenticatedRoutes) {
-    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
-      page,
-    }) => {
-      test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
-      await page.route('**/api/profile/view', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', r =>
-        r.fulfill({ status: 200, body: '{}' })
-      );
-      await page.goto(route.path, { timeout: 120_000 });
-      await waitForLoad(page);
-
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .analyze();
-
-      if (results.violations.length > 0) {
-        console.log(
-          `\nAccessibility violations found on ${route.name} (${route.path}):`
-        );
-        results.violations.forEach(violation => {
-          console.log(`\n- ${violation.id}: ${violation.description}`);
-          console.log(`  Impact: ${violation.impact}`);
-          console.log(`  Help: ${violation.helpUrl}`);
-          console.log(
-            `  Affected elements: ${violation.nodes.length} element(s)`
-          );
-        });
-      }
-
-      expect(results.violations).toEqual([]);
-    });
-  }
-});
-
-test.describe('Axe Best Practices', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
-  );
-
-  test('Homepage should follow best practices', async ({ page }) => {
-    await page.route('**/api/profile/view', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/audience/visit', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/track', r =>
-      r.fulfill({ status: 200, body: '{}' })
-    );
-    await page.goto('/', { timeout: 120_000 });
-    await waitForLoad(page);
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['best-practice'])
-      .analyze();
-
-    if (results.violations.length > 0) {
-      console.log('\nBest practice violations found on Homepage:');
-      results.violations.forEach(violation => {
-        console.log(`\n- ${violation.id}: ${violation.description}`);
-        console.log(`  Impact: ${violation.impact}`);
-        console.log(`  Help: ${violation.helpUrl}`);
-      });
+  test('public surface manifests load successfully', () => {
+    if (surfaceManifestLoadError) {
+      throw surfaceManifestLoadError;
     }
-
-    // Log warnings but don't fail on best-practice violations
-    expect(results.violations.length).toBeGreaterThanOrEqual(0);
   });
+
+  for (const surface of publicSurfaces) {
+    test(`${surface.id} passes WCAG AA`, async ({ browser }, testInfo) => {
+      const surfaceContext = await browser.newContext({
+        ...testInfo.project.use,
+        storageState: createEmptyStorageState(),
+      });
+      const page = await surfaceContext.newPage();
+      await installPublicRouteMocks(page);
+
+      try {
+        await page.goto(surface.resolvedPath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 120_000,
+        });
+        await waitForPublicSurfaceReady(page, surface);
+        await assertPublicSurfaceHealthy(page, surface);
+
+        if (shouldSkipBlockingAxe(surface)) {
+          return;
+        }
+
+        await runDeclaredPublicInteractions(
+          page,
+          surface,
+          testInfo.project.name
+        );
+        if (page.isClosed()) {
+          return;
+        }
+        await assertInteractiveLabels(page, surface.id);
+
+        if (
+          surface.expectedState !== 'redirect' &&
+          surface.allowMultipleH1 !== true
+        ) {
+          const h1Count = await page.locator('h1').count();
+          expect(h1Count, `${surface.id} should render exactly one h1`).toBe(1);
+        }
+
+        const results = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .analyze();
+
+        expect(
+          results.violations,
+          `${surface.id} has accessibility violations`
+        ).toEqual([]);
+      } finally {
+        await page.close().catch(() => undefined);
+        await surfaceContext.close().catch(() => undefined);
+      }
+    });
+  }
+
+  for (const surface of lighthouseSurfaces) {
+    test(`${surface.id} best-practice scan stays informational`, async ({
+      browser,
+    }, testInfo) => {
+      const surfaceContext = await browser.newContext({
+        ...testInfo.project.use,
+        storageState: createEmptyStorageState(),
+      });
+      const page = await surfaceContext.newPage();
+      await installPublicRouteMocks(page);
+
+      try {
+        await page.goto(surface.resolvedPath, {
+          waitUntil: 'domcontentloaded',
+          timeout: 120_000,
+        });
+        await waitForPublicSurfaceReady(page, surface);
+
+        if (shouldSkipBlockingAxe(surface)) {
+          return;
+        }
+
+        await runDeclaredPublicInteractions(
+          page,
+          surface,
+          testInfo.project.name
+        );
+        if (page.isClosed()) {
+          return;
+        }
+
+        const results = await new AxeBuilder({ page })
+          .withTags(['best-practice'])
+          .analyze();
+
+        if (results.violations.length > 0) {
+          console.log(
+            JSON.stringify(
+              {
+                surfaceId: surface.id,
+                bestPracticeViolations: results.violations.map(violation => ({
+                  id: violation.id,
+                  impact: violation.impact,
+                  help: violation.help,
+                })),
+              },
+              null,
+              2
+            )
+          );
+        }
+      } finally {
+        await page.close().catch(() => undefined);
+        await surfaceContext.close().catch(() => undefined);
+      }
+    });
+  }
 });

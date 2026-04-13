@@ -80,6 +80,7 @@ export function useProfileVisitTracking(
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistId) return;
+    if (process.env.NEXT_PUBLIC_CI === 'true') return;
 
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;

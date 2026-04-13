@@ -91,7 +91,7 @@ export function HeroProfilePreview() {
 
         {/* Branding */}
         <div className='pb-3 pt-1 text-center'>
-          <p className='text-[9px] uppercase tracking-[0.15em] text-tertiary-token/40'>
+          <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
             Powered by Jovie
           </p>
         </div>

@@ -71,9 +71,36 @@ interface EnsureClerkTestUserOptions {
   readonly metadata?: Record<string, string>;
 }
 
-function isDuplicateKeyError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('duplicate key value');
+function isDuplicateKeyError(
+  error: unknown,
+  seen = new Set<unknown>()
+): boolean {
+  if (!error || (typeof error !== 'object' && !(error instanceof Error))) {
+    return String(error).includes('duplicate key value');
+  }
+
+  if (seen.has(error)) {
+    return false;
+  }
+  seen.add(error);
+
+  const candidate = error as {
+    readonly cause?: unknown;
+    readonly code?: string;
+    readonly message?: string;
+  };
+
+  if (candidate.code === '23505') {
+    return true;
+  }
+
+  if (typeof candidate.message === 'string') {
+    if (candidate.message.includes('duplicate key value')) {
+      return true;
+    }
+  }
+
+  return isDuplicateKeyError(candidate.cause, seen);
 }
 
 function isClerkIdentificationExistsError(error: unknown): boolean {
@@ -103,6 +130,28 @@ function isClerkIdentificationExistsError(error: unknown): boolean {
   );
 }
 
+function isClerkUnauthorizedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    readonly status?: number;
+    readonly errors?: ReadonlyArray<{ readonly code?: string }>;
+  };
+
+  return (
+    candidate.status === 401 ||
+    candidate.status === 403 ||
+    Boolean(
+      candidate.errors?.some(
+        ({ code }) =>
+          code === 'unauthorized' || code === 'authentication_invalid'
+      )
+    )
+  );
+}
+
 export function isAllowlistedTestAccountEmail(
   email: string | null | undefined
 ): email is string {
@@ -121,7 +170,7 @@ export function isAllowlistedPrivilegedTestAccountEmail(
   );
 }
 
-function buildDeterministicClerkId(email: string): string {
+export function getDeterministicTestClerkId(email: string): string {
   const normalizedEmail = normalizeEmail(email);
   const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
   return `user_dev_${stableId || 'browse'}`;
@@ -181,26 +230,34 @@ export async function resolveClerkTestUserId(
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!normalizedEmail) {
-    return fallbackClerkId ?? buildDeterministicClerkId(email);
+    return fallbackClerkId ?? getDeterministicTestClerkId(email);
   }
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   const clerk = createClerkClient({ secretKey });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [normalizedEmail],
-  });
+  let existingUsers;
+  try {
+    existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+  } catch (error) {
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
+    }
+    throw error;
+  }
 
   return (
     existingUsers.data[0]?.id ??
     fallbackClerkId ??
-    buildDeterministicClerkId(normalizedEmail)
+    getDeterministicTestClerkId(normalizedEmail)
   );
 }
 
@@ -216,18 +273,26 @@ export async function ensureClerkTestUser({
   const secretKey = process.env.CLERK_SECRET_KEY;
 
   if (!secretKey?.startsWith('sk_test_')) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   if (!isAllowlistedTestAccountEmail(normalizedEmail)) {
-    return fallbackClerkId ?? buildDeterministicClerkId(normalizedEmail);
+    return fallbackClerkId ?? getDeterministicTestClerkId(normalizedEmail);
   }
 
   const clerk = createClerkClient({ secretKey });
-  const existingUsers = await clerk.users.getUserList({
-    emailAddress: [normalizedEmail],
-  });
-  const existingUser = existingUsers.data[0];
+  let existingUser: { id: string } | undefined;
+  try {
+    const existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+    existingUser = existingUsers.data[0];
+  } catch (error) {
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
+    }
+    throw error;
+  }
 
   if (existingUser) {
     return existingUser.id;
@@ -245,14 +310,26 @@ export async function ensureClerkTestUser({
 
     return createdUser.id;
   } catch (error) {
+    if (isClerkUnauthorizedError(error) && fallbackClerkId) {
+      return fallbackClerkId;
+    }
+
     if (!isClerkIdentificationExistsError(error)) {
       throw error;
     }
 
-    const racedUsers = await clerk.users.getUserList({
-      emailAddress: [normalizedEmail],
-    });
-    const racedUser = racedUsers.data[0];
+    let racedUser: { id: string } | undefined;
+    try {
+      const racedUsers = await clerk.users.getUserList({
+        emailAddress: [normalizedEmail],
+      });
+      racedUser = racedUsers.data[0];
+    } catch (raceError) {
+      if (isClerkUnauthorizedError(raceError) && fallbackClerkId) {
+        return fallbackClerkId;
+      }
+      throw raceError;
+    }
 
     if (!racedUser) {
       throw error;
@@ -339,32 +416,83 @@ export async function ensureCreatorProfileRecord(
   database: DbOrTransaction,
   values: SeededCreatorProfileValues
 ): Promise<string> {
-  const findExistingByUserId = async () => {
-    if (!values.userId) {
-      return null;
+  function resolveExistingProfileMatch(
+    existingProfileByUsername:
+      | {
+          id: string;
+          userId: string | null;
+          isClaimed: boolean | null;
+        }
+      | undefined,
+    existingClaimedProfileForUser:
+      | {
+          id: string;
+        }
+      | undefined
+  ) {
+    if (
+      existingProfileByUsername &&
+      existingClaimedProfileForUser &&
+      existingProfileByUsername.id !== existingClaimedProfileForUser.id
+    ) {
+      throw new Error(
+        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+      );
     }
 
-    const [profile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, values.userId))
-      .limit(1);
+    if (existingClaimedProfileForUser) {
+      return existingClaimedProfileForUser;
+    }
 
-    return profile ?? null;
-  };
+    if (
+      existingProfileByUsername &&
+      values.userId &&
+      existingProfileByUsername.userId &&
+      existingProfileByUsername.userId !== values.userId
+    ) {
+      throw new Error(
+        `Conflicting creator profile matches for ${values.usernameNormalized} and user ${values.userId}`
+      );
+    }
 
-  const findExistingByUsername = async () => {
-    const [profile] = await database
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
-      .limit(1);
+    return existingProfileByUsername;
+  }
 
-    return profile ?? null;
-  };
+  const [existingProfileByUsername] = await database
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      isClaimed: creatorProfiles.isClaimed,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+    .limit(1);
 
-  const existingProfile =
-    (await findExistingByUserId()) ?? (await findExistingByUsername());
+  const existingClaimedProfilesForUser =
+    values.userId && values.isClaimed
+      ? await database
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(
+            and(
+              eq(creatorProfiles.userId, values.userId),
+              eq(creatorProfiles.isClaimed, true)
+            )
+          )
+          .limit(2)
+      : [];
+
+  if (existingClaimedProfilesForUser.length > 1) {
+    throw new Error(
+      `Ambiguous claimed creator profiles for user ${values.userId}`
+    );
+  }
+
+  const existingClaimedProfileForUser = existingClaimedProfilesForUser[0];
+  const existingProfile = resolveExistingProfileMatch(
+    existingProfileByUsername,
+    existingClaimedProfileForUser
+  );
 
   if (existingProfile) {
     await database
@@ -385,8 +513,41 @@ export async function ensureCreatorProfileRecord(
       throw error;
     }
 
-    const racedProfile =
-      (await findExistingByUserId()) ?? (await findExistingByUsername());
+    const [racedProfileByUsername] = await database
+      .select({
+        id: creatorProfiles.id,
+        userId: creatorProfiles.userId,
+        isClaimed: creatorProfiles.isClaimed,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+      .limit(1);
+
+    const racedClaimedProfilesForUser =
+      values.userId && values.isClaimed
+        ? await database
+            .select({ id: creatorProfiles.id })
+            .from(creatorProfiles)
+            .where(
+              and(
+                eq(creatorProfiles.userId, values.userId),
+                eq(creatorProfiles.isClaimed, true)
+              )
+            )
+            .limit(2)
+        : [];
+
+    if (racedClaimedProfilesForUser.length > 1) {
+      throw new Error(
+        `Ambiguous claimed creator profiles for user ${values.userId}`
+      );
+    }
+
+    const racedClaimedProfileForUser = racedClaimedProfilesForUser[0];
+    const racedProfile = resolveExistingProfileMatch(
+      racedProfileByUsername,
+      racedClaimedProfileForUser
+    );
 
     if (!racedProfile) {
       throw error;
