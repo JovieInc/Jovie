@@ -239,7 +239,7 @@ export const updateSubscriberName = async (
 export type UpdateSubscriberBirthdayPayload = {
   artistId: string;
   email: string;
-  birthday: string; // "MM-DD" format
+  birthday: string; // "YYYY-MM-DD" (ISO date); legacy: "MM-DD"
 };
 
 export const updateSubscriberBirthday = async (
