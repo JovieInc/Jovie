@@ -145,7 +145,7 @@ function TrackListRow({
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
   const trackDuration =
-    track.durationMs != null ? formatDuration(track.durationMs) : null;
+    track.durationMs == null ? null : formatDuration(track.durationMs);
 
   const handleTogglePlayback = useCallback(() => {
     if (isActiveTrack) {

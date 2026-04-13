@@ -433,9 +433,9 @@ export function MetadataAgentPanel({
       {error ? (
         <div
           className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
-            !storageAvailable
-              ? 'border-amber-200 bg-amber-50 text-amber-700'
-              : 'border-red-200 bg-red-50 text-red-700'
+            storageAvailable
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-amber-200 bg-amber-50 text-amber-700'
           }`}
         >
           {error}
