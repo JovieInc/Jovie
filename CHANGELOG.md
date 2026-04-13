@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.152.0] - 2026-04-12
 
+> Claim and onboarding reliability improved, especially for profile claims and release-notification delivery. This release also hardens retry and error handling so successful actions do not surface as failures.
+
 ### Fixed
 
 - Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links

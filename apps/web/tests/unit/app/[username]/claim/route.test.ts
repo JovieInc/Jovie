@@ -93,7 +93,16 @@ describe('Claim route', () => {
   it('does not clear an unrelated pending claim when a bad token is used', async () => {
     const { isClaimTokenValid } = await import('@/lib/services/profile');
 
-    mockReadPendingClaimContext.mockResolvedValueOnce(null);
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'other-profile',
+      username: 'otherartist',
+      claimTokenHash: 'hash',
+      leadId: null,
+      expectedSpotifyArtistId: 'spotify-other',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
     vi.mocked(isClaimTokenValid).mockResolvedValueOnce(false);
 
     const response = await GET(

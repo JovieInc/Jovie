@@ -55,15 +55,18 @@ async function ensureNoClaimedProfileConflict(
 ): Promise<void> {
   const [existingClaim] = await tx
     .select({
-      id: creatorProfiles.id,
+      id: userProfileClaims.creatorProfileId,
       usernameNormalized: creatorProfiles.usernameNormalized,
     })
-    .from(creatorProfiles)
+    .from(userProfileClaims)
+    .innerJoin(
+      creatorProfiles,
+      eq(creatorProfiles.id, userProfileClaims.creatorProfileId)
+    )
     .where(
       and(
-        eq(creatorProfiles.userId, userId),
-        eq(creatorProfiles.isClaimed, true),
-        ne(creatorProfiles.id, creatorProfileId)
+        eq(userProfileClaims.userId, userId),
+        ne(userProfileClaims.creatorProfileId, creatorProfileId)
       )
     )
     .for('update')
@@ -257,6 +260,13 @@ async function validateAndPrepareClaimTarget(
   expectedUsername: string;
   profile: Awaited<ReturnType<typeof getClaimTargetProfile>>;
 }> {
+  await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, params.userId))
+    .for('update')
+    .limit(1);
+
   const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
   const expectedUsername = params.expectedUsername.toLowerCase();
 

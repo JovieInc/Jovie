@@ -215,9 +215,10 @@ async function persistTrialNotificationCount(
     return;
   }
 
+  trialState.trialNotificationsSent += 1;
+
   try {
     await incrementTrialNotificationCount(ownerUserId);
-    trialState.trialNotificationsSent += 1;
   } catch (error) {
     logger.error(
       '[send-release-notifications] Failed to persist trial notification count:',

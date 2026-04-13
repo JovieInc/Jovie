@@ -270,6 +270,22 @@ export async function scheduleReleaseNotifications(): Promise<{
       ),
   ]);
 
+  const subscriberCountRows = await db
+    .select({
+      creatorProfileId: notificationSubscriptions.creatorProfileId,
+      verifiedSubscriberCount: drizzleSql<number>`COUNT(*)`.mapWith(Number),
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        drizzleSql`${notificationSubscriptions.creatorProfileId} = ANY(${creatorProfileIds})`,
+        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
+        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+      )
+    )
+    .groupBy(notificationSubscriptions.creatorProfileId);
+
   const eligibleCreatorIds = new Set(
     [...entitlementsMap.entries()]
       .filter(([, value]) => value.entitlements.booleans.canSendNotifications)
@@ -277,6 +293,12 @@ export async function scheduleReleaseNotifications(): Promise<{
   );
 
   const creatorMap = new Map(creatorRows.map(row => [row.id, row]));
+  const subscriberCountMap = new Map(
+    subscriberCountRows.map(row => [
+      row.creatorProfileId,
+      row.verifiedSubscriberCount,
+    ])
+  );
   const smartLinkReleaseIds = new Set(
     smartLinkRows.flatMap(row => (row.releaseId ? [row.releaseId] : []))
   );
@@ -306,7 +328,8 @@ export async function scheduleReleaseNotifications(): Promise<{
       spotifyId: creator.spotifyId,
       spotifyImportStatus,
       trialNotificationsSent: creator.trialNotificationsSent ?? 0,
-      verifiedSubscriberCount: 1,
+      verifiedSubscriberCount:
+        subscriberCountMap.get(release.creatorProfileId) ?? 0,
     });
 
     return eligibility.eligible;
@@ -314,13 +337,13 @@ export async function scheduleReleaseNotifications(): Promise<{
   const skippedCount = upcomingReleases.length - eligibleReleases.length;
   if (skippedCount > 0) {
     logger.info(
-      `[schedule-release-notifications] Skipped ${skippedCount} releases from free-plan creators`
+      `[schedule-release-notifications] Skipped ${skippedCount} ineligible releases`
     );
   }
 
   if (eligibleReleases.length === 0) {
     logger.info(
-      '[schedule-release-notifications] No eligible releases after plan check'
+      '[schedule-release-notifications] No eligible releases after eligibility checks'
     );
     return { scheduled: 0, releasesFound: upcomingReleases.length };
   }

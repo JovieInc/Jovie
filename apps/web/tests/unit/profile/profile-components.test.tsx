@@ -137,7 +137,7 @@ describe('ClaimBanner', () => {
 
     const cta = screen.getByTestId('claim-banner-cta');
     expect(cta.getAttribute('aria-label')).toBe(
-      'Claim profile for Test Artist'
+      'Claim Profile for Test Artist'
     );
   });
 
@@ -174,7 +174,7 @@ describe('ClaimBanner', () => {
     );
 
     const cta = screen.getByTestId('claim-banner-cta');
-    expect(cta.getAttribute('aria-label')).toBe('Claim profile for testartist');
+    expect(cta.getAttribute('aria-label')).toBe('Claim Profile for testartist');
   });
 });
 

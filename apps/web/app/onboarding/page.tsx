@@ -32,6 +32,7 @@ export default async function OnboardingPage({
   searchParams,
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
+  const pendingClaim = await readPendingClaimContext();
   const shouldSkipDashboardPrefetch =
     isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
 
@@ -53,7 +54,9 @@ export default async function OnboardingPage({
   }
 
   const hasOnboardingContinuationSignal = Boolean(
-    resolvedSearchParams?.handle || resolvedSearchParams?.resume
+    resolvedSearchParams?.handle ||
+      resolvedSearchParams?.resume ||
+      pendingClaim?.username
   );
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
@@ -79,8 +82,6 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
-  const pendingClaim = await readPendingClaimContext();
-
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 

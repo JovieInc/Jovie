@@ -30,6 +30,8 @@ const hoisted = vi.hoisted(() => {
     .fn()
     .mockResolvedValue(undefined);
   const runBackgroundSyncOperationsMock = vi.fn();
+  const cookiesSetMock = vi.fn();
+  const cookiesMock = vi.fn().mockResolvedValue({ set: cookiesSetMock });
 
   const selectMock = vi.fn(() => {
     const result = selectResults.shift() ?? [];
@@ -71,6 +73,8 @@ const hoisted = vi.hoisted(() => {
     invalidateProfileCacheMock,
     invalidateProxyUserStateCacheMock,
     runBackgroundSyncOperationsMock,
+    cookiesMock,
+    cookiesSetMock,
     updateMock,
     updateSetArgs,
     withDbSessionTxMock,
@@ -81,6 +85,10 @@ vi.mock('next/cache', () => ({
   revalidatePath: hoisted.revalidatePathMock,
   revalidateTag: hoisted.revalidateTagMock,
   unstable_noStore: hoisted.noStoreMock,
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: hoisted.cookiesMock,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -160,6 +168,10 @@ vi.mock('@/lib/dsp-enrichment/jobs', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
+}));
+
+vi.mock('@/lib/env-server', () => ({
+  isSecureEnv: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/lib/server-analytics', () => ({
@@ -375,6 +387,15 @@ describe('connectOnboardingSpotifyArtist', () => {
       })
     );
     expect(hoisted.clearPendingClaimContextMock).toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).toHaveBeenCalledWith(
+      'jovie_onboarding_complete',
+      '1',
+      expect.objectContaining({
+        httpOnly: true,
+        maxAge: 120,
+        path: '/',
+      })
+    );
     expect(hoisted.runBackgroundSyncOperationsMock).toHaveBeenCalledWith(
       'clerk_123',
       'artist'

@@ -219,11 +219,9 @@ export function AiDemo({
       <style>{`
         @keyframes segmentIn {
           from {
-            opacity: 0;
             filter: blur(4px);
           }
           to {
-            opacity: 1;
             filter: blur(0);
           }
         }
@@ -336,7 +334,7 @@ export function AiDemo({
           aria-live='polite'
           className={cn(
             'block text-[13px] leading-[1.75]',
-            isPremium ? 'text-white/90' : 'text-secondary-token'
+            isPremium ? 'text-white/90' : 'text-primary-token'
           )}
         >
           {currentDemo.segments.map((segment, index) => {
@@ -353,7 +351,7 @@ export function AiDemo({
                     ? {
                         color: isPremium
                           ? 'rgb(196 181 253)'
-                          : 'var(--linear-accent)',
+                          : 'rgb(255 255 255)',
                         fontWeight: 500,
                       }
                     : {}),
@@ -370,7 +368,7 @@ export function AiDemo({
               style={{
                 backgroundColor: isPremium
                   ? 'rgb(196 181 253)'
-                  : 'var(--linear-accent)',
+                  : 'rgb(167 139 250)',
                 animation: 'cursorBlink 1s step-end infinite',
               }}
               aria-hidden='true'

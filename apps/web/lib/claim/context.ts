@@ -9,13 +9,21 @@ import type { ClaimEntryMode, PendingClaimContext } from './types';
 export const PENDING_CLAIM_COOKIE = 'jovie_pending_claim';
 export const PENDING_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PENDING_CLAIM_SECRET_DOMAIN = 'pending-claim-cookie';
+const DEV_PENDING_CLAIM_SECRET = crypto.randomBytes(32).toString('hex');
 
 function getPendingClaimSecret(): string {
   const secret = env.URL_ENCRYPTION_KEY;
   if (!secret) {
-    throw new Error(
-      'URL_ENCRYPTION_KEY must be configured for pending claim cookies'
-    );
+    if (isSecureEnv()) {
+      throw new Error(
+        'URL_ENCRYPTION_KEY must be configured for pending claim cookies'
+      );
+    }
+
+    return crypto
+      .createHmac('sha256', DEV_PENDING_CLAIM_SECRET)
+      .update(PENDING_CLAIM_SECRET_DOMAIN)
+      .digest('hex');
   }
 
   return crypto

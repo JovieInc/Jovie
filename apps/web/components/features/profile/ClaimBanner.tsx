@@ -88,7 +88,7 @@ export function ClaimBanner({
               href={ctaHref}
               className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
               data-testid='claim-banner-cta'
-              aria-label={`Claim profile for ${name}`}
+              aria-label={`${resolvedCtaLabel} for ${name}`}
               onClick={() => {
                 track('profile_claim_banner_click', {
                   profile_handle: profileHandle,
