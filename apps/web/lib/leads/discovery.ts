@@ -269,6 +269,47 @@ async function shouldSkipSeenSearchResult(
   return false;
 }
 
+async function deduplicateSearchResults(
+  results: Awaited<ReturnType<typeof searchGoogleCSE>>,
+  query: string,
+  currentOffset: number
+): Promise<{ candidates: DiscoveryCandidate[]; duplicatesSkipped: number }> {
+  let duplicatesSkipped = 0;
+  const candidatesByHandle = new Map<string, DiscoveryCandidate>();
+
+  for (const [index, item] of results.entries()) {
+    if (!isLinktreeUrl(item.link)) continue;
+
+    const handle = extractLinktreeHandle(item.link);
+    if (!handle) continue;
+
+    const skipSeen = await shouldSkipSeenSearchResult(
+      query,
+      item.link,
+      currentOffset + index
+    );
+    if (skipSeen) {
+      duplicatesSkipped++;
+      continue;
+    }
+
+    candidatesByHandle.set(handle, {
+      linktreeHandle: handle,
+      linktreeUrl: `https://linktr.ee/${handle}`,
+      discoverySource: 'google_cse',
+      discoveryQuery: query,
+      sourcePlatform: 'linktree',
+      sourceHandle: handle,
+      sourceUrl: `https://linktr.ee/${handle}`,
+    });
+  }
+
+  return {
+    candidates: Array.from(candidatesByHandle.values()),
+    duplicatesSkipped,
+  };
+}
+
 /**
  * Runs one discovery cycle: picks keywords, searches Google CSE, inserts new leads.
  * Respects daily query budget and rotates through keywords via lastDiscoveryQueryIndex.
@@ -347,34 +388,12 @@ export async function runDiscovery(
       const results = await searchGoogleCSE(keyword.query, currentOffset);
       diagnostic.rawResultCount = results.length;
 
-      const candidatesByHandle = new Map<string, DiscoveryCandidate>();
-      for (const [index, item] of results.entries()) {
-        if (!isLinktreeUrl(item.link)) continue;
-
-        const handle = extractLinktreeHandle(item.link);
-        if (!handle) continue;
-
-        const skipSeen = await shouldSkipSeenSearchResult(
-          keyword.query,
-          item.link,
-          currentOffset + index
-        );
-        if (skipSeen) {
-          result.duplicatesSkipped++;
-          continue;
-        }
-
-        candidatesByHandle.set(handle, {
-          linktreeHandle: handle,
-          linktreeUrl: `https://linktr.ee/${handle}`,
-          discoverySource: 'google_cse',
-          discoveryQuery: keyword.query,
-          sourcePlatform: 'linktree',
-          sourceHandle: handle,
-          sourceUrl: `https://linktr.ee/${handle}`,
-        });
-      }
-      const candidates = Array.from(candidatesByHandle.values());
+      const { candidates, duplicatesSkipped } = await deduplicateSearchResults(
+        results,
+        keyword.query,
+        currentOffset
+      );
+      result.duplicatesSkipped += duplicatesSkipped;
       diagnostic.linktreeUrlsFound = candidates.length;
       result.candidatesProcessed += candidates.length;
 
