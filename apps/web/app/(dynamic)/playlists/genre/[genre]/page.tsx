@@ -51,9 +51,9 @@ async function getPlaylistsByGenre(genre: string) {
 
 export default async function GenreHubPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ genre: string }>;
-}) {
+}>) {
   const { genre } = await params;
   const decoded = decodeURIComponent(genre);
   const playlists = await getPlaylistsByGenre(genre);
