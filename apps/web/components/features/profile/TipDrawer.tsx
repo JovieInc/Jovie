@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { TipSelector } from '@/components/molecules/TipSelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import { ProfileTipDrawerContent } from './ProfileTipDrawerContent';
 
 interface TipDrawerProps {
   readonly open: boolean;
@@ -99,10 +99,9 @@ export function TipDrawer({
       title={`Tip ${artistName}`}
       subtitle='Send support instantly with Venmo.'
     >
-      <TipSelector
+      <ProfileTipDrawerContent
         amounts={amounts}
-        onContinue={handleAmountSelected}
-        paymentLabel='Venmo'
+        onAmountSelected={handleAmountSelected}
       />
     </ProfileDrawerShell>
   );

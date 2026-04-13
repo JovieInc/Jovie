@@ -1,129 +1,120 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
+import { HOME_STORY_SCENES } from '@/features/home/home-scroll-scenes';
 
-vi.mock('@/features/home/ArtistProfileModesShowcase', () => ({
-  ArtistProfileModesShowcase: () => (
-    <div data-testid='artist-profile-modes-showcase'>modes showcase</div>
-  ),
-}));
+class MockIntersectionObserver {
+  observe = vi.fn();
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+}
 
-vi.mock('@/features/home/HomeHeroSurfaceCluster', () => ({
-  HomeHeroSurfaceCluster: () => (
-    <div>
-      <div data-testid='homepage-hero-profile-card'>profile</div>
-      <div data-testid='homepage-hero-release-card'>release</div>
-      <div data-testid='homepage-hero-task-card-1'>task-1</div>
-      <div data-testid='homepage-hero-task-card-2'>task-2</div>
-      <div data-testid='homepage-hero-task-card-3'>task-3</div>
-    </div>
-  ),
-}));
-
-vi.mock('@/features/home/BentoFeatureGrid', () => ({
-  BentoFeatureGrid: () => (
-    <div data-testid='homepage-bento-feature-grid'>bento grid</div>
-  ),
+const matchMediaMock = vi.fn().mockImplementation(() => ({
+  matches: false,
+  media: '(prefers-reduced-motion: reduce)',
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  onchange: null,
+  dispatchEvent: vi.fn(),
 }));
 
 describe('HomePageNarrative', () => {
-  it('renders the 6-section homepage narrative in order', () => {
+  const originalIntersectionObserver = globalThis.IntersectionObserver;
+  const originalMatchMedia = globalThis.matchMedia;
+
+  beforeAll(() => {
+    // @ts-expect-error test shim
+    globalThis.IntersectionObserver = MockIntersectionObserver;
+    // @ts-expect-error test shim
+    globalThis.matchMedia = matchMediaMock;
+  });
+
+  afterAll(() => {
+    globalThis.IntersectionObserver = originalIntersectionObserver;
+    globalThis.matchMedia = originalMatchMedia;
+  });
+
+  it('renders the new hero, scenes, infrastructure section, and final CTA', () => {
+    render(<HomePageNarrative />);
+
+    const eyebrow = screen.getAllByText('For artists')[0];
+    const heading = screen.getAllByRole('heading', {
+      name: 'The link your music deserves.',
+    })[0];
+    const subhead = screen.getAllByText(
+      'One artist profile that updates itself for every release and notifies fans automatically.'
+    )[0];
+    const vanityUrl = screen.getAllByTestId('homepage-hero-url-lockup')[0];
+    const primaryCta = screen.getAllByRole('link', {
+      name: 'Claim your profile',
+    })[0];
+
+    expect(eyebrow.compareDocumentPosition(heading)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(heading.compareDocumentPosition(subhead)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(subhead.compareDocumentPosition(vanityUrl)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(vanityUrl.compareDocumentPosition(primaryCta)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    expect(vanityUrl).toHaveTextContent('jov.ie/you');
+
+    for (const scene of HOME_STORY_SCENES) {
+      expect(
+        screen.getAllByRole('heading', { name: scene.headline }).length
+      ).toBeGreaterThan(0);
+    }
+
+    expect(
+      screen.getByRole('heading', { name: 'Runs itself underneath.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Claim your profile.' })
+    ).toBeInTheDocument();
+  });
+
+  it('removes the old homepage framing', () => {
     render(<HomePageNarrative />);
 
     expect(
-      screen.getByRole('heading', {
-        name: 'Drop more music. Crush every release.',
-      })
-    ).toBeInTheDocument();
+      screen.queryByRole('heading', { name: 'Profiles that convert.' })
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', {
-        name: 'Profiles that convert.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
+      screen.queryByRole('heading', {
         name: 'Share every release. Reach every fan. Automatically.',
       })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'You made the song. Now make it hit.',
-      })
-    ).toBeInTheDocument();
-  });
-
-  it('renders consolidated 6-section structure without old sections', () => {
-    render(<HomePageNarrative />);
-
-    // Old sections should NOT be present
-    expect(
-      screen.queryByRole('heading', {
-        name: 'Your release operating system.',
-      })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Fans know before you do.',
+        name: 'A command center for your career.',
       })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', {
-        name: 'Never start from zero.',
-      })
-    ).not.toBeInTheDocument();
-
-    // BentoFeatureGrid should be present
-    expect(
-      screen.getByTestId('homepage-bento-feature-grid')
-    ).toBeInTheDocument();
   });
 
-  it('renders the hero cluster and release destinations', () => {
+  it('keeps proof hidden by default', () => {
     render(<HomePageNarrative />);
 
+    expect(screen.queryByTestId('homepage-live-proof')).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('homepage-hero-profile-card')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('homepage-hero-release-card')
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-hero-task-card-1')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-hero-task-card-2')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-hero-task-card-3')).toBeInTheDocument();
-    expect(
-      screen.getByTestId('artist-profile-modes-showcase')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('homepage-release-destination-presave')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('homepage-release-destination-live')
-    ).toBeInTheDocument();
-  });
-
-  it('does not render notification pills', () => {
-    render(<HomePageNarrative />);
-
-    // Notification cards were removed in the proof system reframe
-    expect(
-      screen.queryByTestId('homepage-release-destination-notification')
+      screen.queryByTestId('homepage-secondary-cta')
     ).not.toBeInTheDocument();
   });
 
-  it('renders release destinations with Before/After labels', () => {
-    render(<HomePageNarrative />);
+  it('renders the proof slot when proof is enabled', () => {
+    render(
+      <HomePageNarrative
+        proofAvailability='visible'
+        proofSection={<div data-testid='mock-proof-section'>proof</div>}
+      />
+    );
 
-    expect(screen.getByText('Before Launch')).toBeInTheDocument();
-    expect(screen.getByText('After Launch')).toBeInTheDocument();
-  });
-
-  it('renders "Get Started" CTA consistently', () => {
-    render(<HomePageNarrative />);
-
-    const ctaButtons = screen.getAllByText('Get Started');
-    expect(ctaButtons.length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
-    expect(screen.getByTestId('final-cta-headline')).toBeInTheDocument();
-    expect(screen.getByTestId('final-cta-action')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-proof-section')).toBeInTheDocument();
   });
 });

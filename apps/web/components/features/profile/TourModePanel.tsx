@@ -3,8 +3,9 @@
 import { Calendar, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import type { ProfileRenderMode } from '@/features/profile/contracts';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -64,12 +65,14 @@ function TourDateRow({
   distanceMiles,
   showNearbyBadge,
   compact = false,
+  renderMode = 'interactive',
 }: {
   readonly artistHandle: string;
   readonly date: TourDateViewModel;
   readonly distanceMiles: number | null;
   readonly showNearbyBadge: boolean;
   readonly compact?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }) {
   const parsedDate = new Date(date.startDate);
   const location = formatLocationString([date.city, date.region, date.country]);
@@ -83,11 +86,6 @@ function TourDateRow({
   const dayLabel = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
   }).format(parsedDate);
-  const handleTicketClick = useTourDateTicketClick(
-    artistHandle,
-    date.id,
-    date.ticketUrl
-  );
   const ticketStatusClassName = getTicketStatusClassName(
     date.ticketStatus,
     canBuyTickets,
@@ -99,15 +97,15 @@ function TourDateRow({
   );
 
   const ticketStatusContent = canBuyTickets ? (
-    <a
-      href={date.ticketUrl ?? undefined}
-      onClick={handleTicketClick}
-      target='_blank'
-      rel='noopener noreferrer'
+    <TourTicketLink
+      artistHandle={artistHandle}
+      dateId={date.id}
+      ticketUrl={date.ticketUrl}
       className={ticketStatusClassName}
+      renderMode={renderMode}
     >
       {ticketStatusLabel}
-    </a>
+    </TourTicketLink>
   ) : (
     <p className={ticketStatusClassName}>{ticketStatusLabel}</p>
   );
@@ -189,11 +187,13 @@ function TourDatesContent({
   nearby,
   remaining,
   compact = false,
+  renderMode = 'interactive',
 }: {
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly remaining: TourDateWithProximity[];
   readonly compact?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }) {
   if (nearby.length === 0 && remaining.length === 0) {
     return (
@@ -243,6 +243,7 @@ function TourDatesContent({
               distanceMiles={item.distanceMiles}
               showNearbyBadge
               compact={compact}
+              renderMode={renderMode}
             />
           ))}
         </section>
@@ -261,6 +262,7 @@ function TourDatesContent({
               distanceMiles={item.distanceMiles}
               showNearbyBadge={false}
               compact={compact}
+              renderMode={renderMode}
             />
           ))}
         </section>
@@ -269,14 +271,79 @@ function TourDatesContent({
   );
 }
 
+function InteractiveTourTicketLink({
+  artistHandle,
+  dateId,
+  ticketUrl,
+  className,
+  children,
+}: Readonly<{
+  readonly artistHandle: string;
+  readonly dateId: string;
+  readonly ticketUrl: string | null;
+  readonly className: string;
+  readonly children: ReactNode;
+}>) {
+  const handleTicketClick = useTourDateTicketClick(
+    artistHandle,
+    dateId,
+    ticketUrl
+  );
+
+  return (
+    <a
+      href={ticketUrl ?? undefined}
+      onClick={handleTicketClick}
+      target='_blank'
+      rel='noopener noreferrer'
+      className={className}
+    >
+      {children}
+    </a>
+  );
+}
+
+function TourTicketLink({
+  artistHandle,
+  dateId,
+  ticketUrl,
+  className,
+  children,
+  renderMode,
+}: Readonly<{
+  readonly artistHandle: string;
+  readonly dateId: string;
+  readonly ticketUrl: string | null;
+  readonly className: string;
+  readonly children: ReactNode;
+  readonly renderMode: ProfileRenderMode;
+}>) {
+  if (renderMode === 'preview') {
+    return <p className={className}>{children}</p>;
+  }
+
+  return (
+    <InteractiveTourTicketLink
+      artistHandle={artistHandle}
+      dateId={dateId}
+      ticketUrl={ticketUrl}
+      className={className}
+    >
+      {children}
+    </InteractiveTourTicketLink>
+  );
+}
+
 export function TourDrawerContent({
   artist,
   tourDates,
   compact = false,
+  renderMode = 'interactive',
 }: Readonly<{
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
   readonly compact?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }>) {
   const { location } = useUserLocation();
 
@@ -325,6 +392,7 @@ export function TourDrawerContent({
           nearby={nearbyDates}
           remaining={remainingDates}
           compact={false}
+          renderMode={renderMode}
         />
       </div>
     );
@@ -360,6 +428,7 @@ export function TourDrawerContent({
         nearby={nearbyDates}
         remaining={remainingDates}
         compact={compact}
+        renderMode={renderMode}
       />
     </div>
   );
