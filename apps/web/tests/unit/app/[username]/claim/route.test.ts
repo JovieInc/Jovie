@@ -1,28 +1,18 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGetOptionalAuth,
   mockGetProfileByUsername,
   mockReadPendingClaimContext,
-  mockRedirect,
 } = vi.hoisted(() => ({
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
-  mockRedirect: vi.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`);
-  }),
 }));
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
-}));
-
-vi.mock('next/navigation', () => ({
-  notFound: vi.fn(() => {
-    throw new Error('NOT_FOUND');
-  }),
-  redirect: mockRedirect,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -63,9 +53,9 @@ vi.mock('@/lib/services/profile', () => ({
   isClaimTokenValid: vi.fn(),
 }));
 
-import ClaimPage from '../../../../../app/[username]/claim/page';
+import { GET } from '../../../../../app/[username]/claim/route';
 
-describe('ClaimPage', () => {
+describe('Claim route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetOptionalAuth.mockResolvedValue({ userId: null });
@@ -82,13 +72,17 @@ describe('ClaimPage', () => {
   });
 
   it('canonicalizes legacy claim routes back to the public profile preview', async () => {
-    await expect(
-      ClaimPage({
+    const response = await GET(
+      new NextRequest('http://localhost/TestArtist/claim'),
+      {
         params: Promise.resolve({ username: 'TestArtist' }),
-        searchParams: Promise.resolve({}),
-      })
-    ).rejects.toThrow('REDIRECT:/testartist?claim=1');
+      }
+    );
 
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/testartist?claim=1'
+    );
     expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
   });
 });

@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation';
+import { type NextRequest, NextResponse } from 'next/server';
 import { writePendingClaimContext } from '@/lib/claim/context';
 import {
   clearLeadAttributionCookie,
@@ -13,33 +13,42 @@ import {
   lookupUsernameByClaimToken,
 } from '@/lib/services/profile/queries';
 
-interface ClaimTokenPageProps {
+interface ClaimTokenRouteContext {
   readonly params: Promise<{ readonly token: string }>;
 }
 
-export default async function ClaimTokenPage({ params }: ClaimTokenPageProps) {
+function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
+  return new URL(pathname, request.url);
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: ClaimTokenRouteContext
+): Promise<NextResponse> {
   const { token } = await params;
 
   if (!token) {
-    notFound();
+    return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
   }
 
   const username = await lookupUsernameByClaimToken(token);
   if (!username) {
     await clearLeadAttributionCookie();
-    notFound();
+    return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
   }
 
   const isValid = await isClaimTokenValid(username, token);
   if (!isValid) {
     await clearLeadAttributionCookie();
-    notFound();
+    return NextResponse.redirect(
+      buildAbsoluteUrl(request, `/${encodeURIComponent(username)}?claim=1`)
+    );
   }
 
   const profile = await getProfileByUsername(username);
   if (!profile) {
     await clearLeadAttributionCookie();
-    notFound();
+    return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
   }
 
   const lead = await lookupLeadByClaimToken(token);
@@ -56,5 +65,10 @@ export default async function ClaimTokenPage({ params }: ClaimTokenPageProps) {
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
-  redirect(`/${profile.usernameNormalized}?claim=1`);
+  return NextResponse.redirect(
+    buildAbsoluteUrl(
+      request,
+      `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+    )
+  );
 }

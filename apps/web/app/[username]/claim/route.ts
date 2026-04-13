@@ -1,7 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { type Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
-import { BASE_URL } from '@/constants/app';
+import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import {
@@ -27,12 +25,16 @@ import {
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
 
-interface Props {
+interface ClaimRouteContext {
   readonly params: Promise<{ readonly username: string }>;
-  readonly searchParams?: Promise<{
-    readonly next?: string;
-    readonly token?: string;
-  }>;
+}
+
+function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
+  return new URL(pathname, request.url);
+}
+
+function redirectTo(request: NextRequest, pathname: string): NextResponse {
+  return NextResponse.redirect(buildAbsoluteUrl(request, pathname));
 }
 
 function getCanonicalSpotifyUrl(profile: {
@@ -87,35 +89,38 @@ function buildAuthStartPath(params: {
   return `${APP_ROUTES.SIGNUP}?${signUpParams.toString()}`;
 }
 
-export default async function ClaimPage({ params, searchParams }: Props) {
+export async function GET(
+  request: NextRequest,
+  { params }: ClaimRouteContext
+): Promise<NextResponse> {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
   const normalizedUsername = username.toLowerCase();
 
   if (
     username.length > USERNAME_MAX_LENGTH ||
     !USERNAME_PATTERN.test(username)
   ) {
-    notFound();
+    return redirectTo(request, '/');
   }
 
   const profile = await getProfileByUsername(normalizedUsername);
 
   if (!profile) {
-    redirect('/');
+    return redirectTo(request, '/');
   }
 
   const { userId } = await getOptionalAuth();
   if (userId && (await hasActiveCreatorProfile(userId))) {
-    redirect(APP_ROUTES.DASHBOARD);
+    return redirectTo(request, APP_ROUTES.DASHBOARD);
   }
 
   const existingPendingClaim = await readPendingClaimContext({
     username: profile.usernameNormalized,
   });
   const claimPreviewUrl = `/${profile.usernameNormalized}?claim=1`;
+  const searchParams = request.nextUrl.searchParams;
+  const token = searchParams.get('token')?.trim();
 
-  const token = resolvedSearchParams?.token?.trim();
   if (token) {
     const isValid = await isClaimTokenValid(profile.usernameNormalized, token);
     if (isValid) {
@@ -131,8 +136,9 @@ export default async function ClaimPage({ params, searchParams }: Props) {
         expectedSpotifyArtistId: profile.spotifyId ?? null,
       });
 
-      if (resolvedSearchParams?.next === 'auth') {
-        redirect(
+      if (searchParams.get('next') === 'auth') {
+        return redirectTo(
+          request,
           buildAuthStartPath({
             username: profile.usernameNormalized,
             spotifyArtistName: profile.displayName ?? profile.username,
@@ -142,18 +148,18 @@ export default async function ClaimPage({ params, searchParams }: Props) {
         );
       }
 
-      redirect(claimPreviewUrl);
+      return redirectTo(request, claimPreviewUrl);
     }
 
     await clearLeadAttributionCookie();
     await clearPendingClaimContext();
-    redirect(claimPreviewUrl);
+    return redirectTo(request, claimPreviewUrl);
   }
 
-  if (resolvedSearchParams?.next === 'auth') {
+  if (searchParams.get('next') === 'auth') {
     if (profile.isClaimed) {
       await clearPendingClaimContext();
-      redirect(`/${profile.usernameNormalized}`);
+      return redirectTo(request, `/${profile.usernameNormalized}`);
     }
 
     if (
@@ -161,7 +167,8 @@ export default async function ClaimPage({ params, searchParams }: Props) {
       existingPendingClaim.creatorProfileId === profile.id &&
       existingPendingClaim.username === profile.usernameNormalized
     ) {
-      redirect(
+      return redirectTo(
+        request,
         buildAuthStartPath({
           username: profile.usernameNormalized,
           spotifyArtistName: profile.displayName ?? profile.username,
@@ -172,7 +179,10 @@ export default async function ClaimPage({ params, searchParams }: Props) {
     }
 
     if (!profile.spotifyId) {
-      redirect(`/${profile.usernameNormalized}?claim=unsupported`);
+      return redirectTo(
+        request,
+        `/${profile.usernameNormalized}?claim=unsupported`
+      );
     }
 
     await writePendingClaimContext({
@@ -182,7 +192,8 @@ export default async function ClaimPage({ params, searchParams }: Props) {
       expectedSpotifyArtistId: profile.spotifyId,
     });
 
-    redirect(
+    return redirectTo(
+      request,
       buildAuthStartPath({
         username: profile.usernameNormalized,
         spotifyArtistName: profile.displayName ?? profile.username,
@@ -192,18 +203,8 @@ export default async function ClaimPage({ params, searchParams }: Props) {
     );
   }
 
-  redirect(
+  return redirectTo(
+    request,
     profile.isClaimed ? `/${profile.usernameNormalized}` : claimPreviewUrl
   );
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { username } = await params;
-
-  return {
-    title: `Claim Your Profile - @${username}`,
-    robots: { index: false, follow: false },
-    alternates: { canonical: `${BASE_URL}/${username}` },
-    other: { referrer: 'no-referrer' },
-  };
 }
