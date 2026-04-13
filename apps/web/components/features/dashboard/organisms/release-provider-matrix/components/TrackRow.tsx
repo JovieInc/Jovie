@@ -146,9 +146,9 @@ export const TrackRow = memo(function TrackRow({
                 }
               >
                 {isPlaying ? (
-                  <Pause className='h-3 w-3' />
+                  <Pause className='h-3.5 w-3.5' />
                 ) : (
-                  <Play className='h-3 w-3' />
+                  <Play className='h-3.5 w-3.5' />
                 )}
               </button>
             ) : (
@@ -192,6 +192,7 @@ export const TrackRow = memo(function TrackRow({
                     variant='secondary'
                     className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
                     title='Explicit content'
+                    aria-label='Explicit content'
                   >
                     E
                   </Badge>
