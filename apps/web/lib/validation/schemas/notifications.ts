@@ -132,7 +132,7 @@ export type UpdateSubscriberNameInput = z.infer<
 /**
  * Schema for updating a subscriber's birthday after signup.
  * Identified by artist_id + email (no auth required — fan just subscribed).
- * Birthday is stored as MM-DD (month-day only, no year).
+ * Birthday stored as YYYY-MM-DD (ISO date); legacy MM-DD also accepted.
  */
 export const updateSubscriberBirthdaySchema = z.object({
   artist_id: uuidSchema,
@@ -140,12 +140,14 @@ export const updateSubscriberBirthdaySchema = z.object({
   birthday: z
     .string()
     .regex(
-      /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/,
-      'Birthday must be in MM-DD format'
+      /^(?:\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/,
+      'Birthday must be in YYYY-MM-DD or MM-DD format'
     )
     .refine(
       value => {
-        const [mm, dd] = value.split('-').map(Number);
+        const parts = value.split('-').map(Number);
+        const mm = parts.length === 3 ? parts[1] : parts[0];
+        const dd = parts.length === 3 ? parts[2] : parts[1];
         const maxDay = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mm];
         return dd <= maxDay;
       },

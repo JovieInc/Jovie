@@ -2994,7 +2994,10 @@ jobs:
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            if deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
+            if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
+              --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+              --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" \
+              --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
               deploy_exit=0
             else
               deploy_exit=$?
@@ -3020,6 +3023,8 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Alias preview to staging.jov.ie
         run: |

@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
+- Segmented birthday input with grouped [MM]/[DD]/[YYYY] digit boxes (replaces plain text input)
+- `useSegmentedInput` shared hook powering both OTP and birthday digit inputs
+- Birthday now captures the full year (stored as YYYY-MM-DD, backwards-compatible with legacy MM-DD)
 - Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
 - Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
 - Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
@@ -22,6 +26,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- OTP verification: expired or invalid codes no longer allow submitting (all subscribe components)
+- OTP auto-clears after error so fans get a fresh slate to retype
+- Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
 - `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
 - Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links
 - Fail closed on unexpected `/claim/[token]` resolver errors instead of surfacing a 500 page

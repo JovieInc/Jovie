@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import {
   COUNTRY_OPTIONS,
@@ -41,6 +41,8 @@ interface UseSubscriptionFormReturn {
   isSubmitting: boolean;
   isCountryOpen: boolean;
   setIsCountryOpen: (open: boolean) => void;
+  resendCooldownEnd: number;
+  isResending: boolean;
 
   // Handlers
   handleChannelChange: (next: NotificationChannel) => void;
@@ -50,6 +52,7 @@ interface UseSubscriptionFormReturn {
   handleOtpChange: (value: string) => void;
   handleSubscribe: () => Promise<void>;
   handleVerifyOtp: () => Promise<void>;
+  handleResendOtp: () => Promise<void>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
   // From profile notifications context
@@ -89,6 +92,9 @@ export function useSubscriptionForm({
   const [otpStep, setOtpStep] = useState<'input' | 'verify'>('input');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isCountryOpen, setIsCountryOpen] = useState<boolean>(false);
+  const [resendCooldownEnd, setResendCooldownEnd] = useState<number>(0);
+  const [isResending, setIsResending] = useState<boolean>(false);
+  const otpClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { success: showSuccess, error: showError } = useNotifications();
   const subscribeMutation = useSubscribeNotificationsMutation();
@@ -187,8 +193,8 @@ export function useSubscriptionForm({
     validateCurrent();
   }, [channel, phoneInput, emailInput, validateCurrent]);
 
-  const handleConfirmSubscription = useCallback(async () => {
-    if (isSubmitting) return;
+  const handleConfirmSubscription = useCallback(async (): Promise<boolean> => {
+    if (isSubmitting) return false;
 
     setIsSubmitting(true);
     setError(null);
@@ -247,6 +253,7 @@ export function useSubscriptionForm({
         setNotificationsState('success');
         showSuccess(getNotificationSubscribeSuccessMessage(channel));
       }
+      return true;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;
@@ -267,6 +274,7 @@ export function useSubscriptionForm({
         source: 'profile_inline',
         handle: artist.handle,
       });
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -289,6 +297,11 @@ export function useSubscriptionForm({
 
   const handleOtpChange = useCallback(
     (value: string) => {
+      // Cancel any pending auto-clear timer so fresh input isn't wiped
+      if (otpClearTimerRef.current) {
+        clearTimeout(otpClearTimerRef.current);
+        otpClearTimerRef.current = null;
+      }
       setOtpCode(value.replaceAll(/[^\d]/g, '').slice(0, 6));
       if (error) setError(null);
     },
@@ -325,6 +338,13 @@ export function useSubscriptionForm({
         err instanceof Error ? err.message : 'Invalid verification code'
       );
       showError('Please check your code and try again.');
+
+      // Auto-clear OTP boxes after a brief pause so user sees the error state.
+      // Use setOtpCode directly (not handleOtpChange) to preserve the error text.
+      if (otpClearTimerRef.current) clearTimeout(otpClearTimerRef.current);
+      otpClearTimerRef.current = setTimeout(() => {
+        setOtpCode('');
+      }, 600);
     } finally {
       setIsSubmitting(false);
     }
@@ -340,6 +360,46 @@ export function useSubscriptionForm({
     showSuccess,
     verifyEmailOtpMutation,
   ]);
+
+  const handleResendOtp = useCallback(async () => {
+    if (isResending || Date.now() < resendCooldownEnd) return;
+
+    setIsResending(true);
+    setError(null);
+
+    track('otp_resend_attempt', {
+      source: 'profile_inline',
+      handle: artist.handle,
+    });
+
+    const success = await handleConfirmSubscription();
+
+    if (success) {
+      track('otp_resend_success', {
+        source: 'profile_inline',
+        handle: artist.handle,
+      });
+
+      setOtpCode('');
+      setResendCooldownEnd(Date.now() + 30_000);
+    } else {
+      setError('Failed to resend code. Please try again.');
+    }
+
+    setIsResending(false);
+  }, [
+    artist.handle,
+    handleConfirmSubscription,
+    isResending,
+    resendCooldownEnd,
+  ]);
+
+  // Clean up OTP auto-clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (otpClearTimerRef.current) clearTimeout(otpClearTimerRef.current);
+    };
+  }, []);
 
   const handleSubscribe = useCallback(async () => {
     if (isSubmitting) return;
@@ -402,6 +462,8 @@ export function useSubscriptionForm({
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
+    resendCooldownEnd,
+    isResending,
     handleChannelChange,
     handlePhoneChange,
     handleEmailChange,
@@ -409,6 +471,7 @@ export function useSubscriptionForm({
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
+    handleResendOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
