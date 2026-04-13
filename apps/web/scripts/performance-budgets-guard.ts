@@ -36,6 +36,11 @@ interface StorageStateFile {
   readonly cookies?: readonly AuthCookie[];
 }
 
+interface PerfPageWindow extends Window {
+  __perfWarmNavFallbackStart?: number;
+  __perfWarmNavStart?: number;
+}
+
 export interface GuardCliOptions {
   readonly authPath?: string;
   readonly baseUrl: string;
@@ -292,6 +297,21 @@ function resolveAuthStatePath(authPath?: string) {
 
 function loadAuthCookies(baseUrl: string, authPath?: string) {
   const domain = new URL(baseUrl).hostname;
+  const explicitAuthStatePath = authPath
+    ? resolveAuthStatePath(authPath)
+    : undefined;
+
+  if (explicitAuthStatePath && existsSync(explicitAuthStatePath)) {
+    const parsed = JSON.parse(
+      readFileSync(explicitAuthStatePath, 'utf8')
+    ) as StorageStateFile;
+
+    return (parsed.cookies ?? []).map(cookie => ({
+      ...cookie,
+      path: cookie.path || '/',
+      sameSite: normalizeSameSite(cookie.sameSite),
+    }));
+  }
 
   // E2E test auth bypass: inject synthetic bypass cookies so the middleware
   // skips Clerk auth entirely. This allows perf measurement of authenticated
@@ -542,7 +562,8 @@ async function waitForAllHidden(
 async function waitForContentReady(
   page: Page,
   route: PerfRouteDefinition,
-  startedAt: number
+  startedAt: number,
+  usePageWarmStart = false
 ) {
   const loadingSelectors = route.readySelectors.loading;
   const contentSelectors =
@@ -557,13 +578,17 @@ async function waitForContentReady(
   }
 
   await waitForAnyVisible(page, contentSelectors);
+  if (usePageWarmStart) {
+    return await readWarmNavigationElapsed(page);
+  }
   return Date.now() - startedAt;
 }
 
 async function waitForWarmShellReady(
   page: Page,
   route: PerfRouteDefinition,
-  startedAt: number
+  startedAt: number,
+  usePageWarmStart = false
 ) {
   const selectors = [
     ...(route.readySelectors.loading ?? []),
@@ -571,7 +596,58 @@ async function waitForWarmShellReady(
     ...(route.readySelectors.shell ?? []),
   ];
   await waitForAnyVisible(page, selectors.length > 0 ? selectors : undefined);
+  if (usePageWarmStart) {
+    return await readWarmNavigationElapsed(page);
+  }
   return Date.now() - startedAt;
+}
+
+async function armWarmNavigationStart(locator: Locator) {
+  await locator.evaluate(node => {
+    const perfWindow = window as PerfPageWindow;
+    perfWindow.__perfWarmNavStart = undefined;
+    perfWindow.__perfWarmNavFallbackStart = performance.now();
+    node.addEventListener(
+      'pointerdown',
+      () => {
+        if (typeof perfWindow.__perfWarmNavStart !== 'number') {
+          perfWindow.__perfWarmNavStart = performance.now();
+        }
+      },
+      {
+        capture: true,
+        once: true,
+      }
+    );
+    node.addEventListener(
+      'click',
+      () => {
+        if (typeof perfWindow.__perfWarmNavStart !== 'number') {
+          perfWindow.__perfWarmNavStart = performance.now();
+        }
+      },
+      {
+        capture: true,
+        once: true,
+      }
+    );
+  });
+}
+
+async function readWarmNavigationElapsed(page: Page) {
+  return await page.evaluate(() => {
+    const perfWindow = window as PerfPageWindow;
+    const start =
+      typeof perfWindow.__perfWarmNavStart === 'number'
+        ? perfWindow.__perfWarmNavStart
+        : perfWindow.__perfWarmNavFallbackStart;
+
+    if (typeof start !== 'number') {
+      return 0;
+    }
+
+    return performance.now() - start;
+  });
 }
 
 async function measureWarmNavigationRoute(
@@ -584,6 +660,10 @@ async function measureWarmNavigationRoute(
     timeout: NAVIGATION_TIMEOUT_MS,
     waitUntil: 'domcontentloaded',
   });
+  await page
+    .waitForLoadState('networkidle', { timeout: 5_000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(250);
   const visibleTrigger = await waitForVisibleTrigger(
     page,
     route.readySelectors.navTrigger
@@ -598,11 +678,14 @@ async function measureWarmNavigationRoute(
   const navTriggerSelector = route.readySelectors.navTrigger?.[0];
   let routeReadyPromise: Promise<unknown> | null = null;
   if (visibleTrigger) {
+    await armWarmNavigationStart(visibleTrigger);
     routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
     await visibleTrigger.click({ noWaitAfter: true });
   } else if (navTriggerSelector) {
+    const trigger = page.locator(navTriggerSelector).first();
+    await armWarmNavigationStart(trigger);
     routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
-    await page.locator(navTriggerSelector).first().click({ noWaitAfter: true });
+    await trigger.click({ noWaitAfter: true });
   } else {
     await page.goto(url, {
       timeout: NAVIGATION_TIMEOUT_MS,
@@ -611,10 +694,15 @@ async function measureWarmNavigationRoute(
     routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   }
 
-  const warmShellResponse = await waitForWarmShellReady(page, route, startedAt);
   await routeReadyPromise;
+  const warmShellResponse = await waitForWarmShellReady(
+    page,
+    route,
+    startedAt,
+    true
+  );
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
-    ? await waitForContentReady(page, route, startedAt)
+    ? await waitForContentReady(page, route, startedAt, true)
     : 0;
 
   return {

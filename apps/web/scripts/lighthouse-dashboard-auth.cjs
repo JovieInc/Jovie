@@ -7,6 +7,7 @@ const path = require('node:path');
 // so importing the TypeScript source directly is not a safe option here.
 const TEST_MODE_COOKIE = '__e2e_test_mode';
 const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
+const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 
 const webRoot = path.resolve(__dirname, '..');
@@ -274,12 +275,37 @@ async function seedDashboardAuth(browser, { url }) {
         url: origin,
         sameSite: 'Lax',
       },
+      {
+        name: TEST_PERSONA_COOKIE,
+        value: 'creator-ready',
+        url: origin,
+        sameSite: 'Lax',
+      },
     ];
+
     if (browserContext?.setCookie) {
       await browserContext.setCookie(...authCookies);
     } else {
       await page.setCookie(...authCookies);
     }
+
+    if (pathname.startsWith('/app')) {
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      const landedPath = new URL(page.url()).pathname;
+      if (!landedPath.startsWith('/app')) {
+        await page.close();
+        throw new Error(
+          `Auth bypass bootstrap failed for ${url}; landed on ${landedPath}`
+        );
+      }
+      await warmRouteRepeatedly();
+      await page.close();
+      return;
+    }
+
     await warmRouteRepeatedly();
     await page.close();
     return;

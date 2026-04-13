@@ -13,6 +13,15 @@ describe('seedTestData database retry classifier', () => {
     expect(isRetryableSeedDatabaseError(error)).toBe(true);
   });
 
+  it('treats wrapped Neon endpoint bootstrap failures as retryable', () => {
+    const error = new Error('Failed query');
+    error.cause = new Error(
+      "The requested endpoint could not be found, or you don't have access to it."
+    );
+
+    expect(isRetryableSeedDatabaseError(error)).toBe(true);
+  });
+
   it('does not retry non-transient validation failures', () => {
     const error = new Error('duplicate key value violates unique constraint');
 
