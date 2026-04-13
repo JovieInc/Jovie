@@ -5,14 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.151.5] - 2026-04-12
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
 
 ### Fixed
 
-- Snap all releases page font sizes to DESIGN.md type scale (9.5px, 9px, 12.5px, 11.5px, 10.5px off-scale values corrected)
-- Bump undersized touch targets to h-7 minimum on track play button, banner CTAs
-- Add "Explicit content" tooltip to E badge on track rows
-- Fix Overdue badge truncation in task list when sidebar panel is open
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
 
 ## [26.4.151.4] - 2026-04-12
 

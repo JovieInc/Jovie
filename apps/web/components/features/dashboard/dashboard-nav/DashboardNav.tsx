@@ -82,7 +82,7 @@ function formatTaskBadge(
 
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
-  const { showPendingShell } = usePendingShell();
+  const { clearPendingShell, showPendingShell } = usePendingShell();
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -161,6 +161,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -168,11 +169,42 @@ export function DashboardNav(_: DashboardNavProps) {
     []
   );
 
+  useEffect(() => {
+    if (
+      isDemo ||
+      !profileId ||
+      releasesPrefetchedProfileIdRef.current === profileId ||
+      pathname !== APP_ROUTES.DASHBOARD
+    ) {
+      return;
+    }
+
+    releasesPrefetchedProfileIdRef.current = profileId;
+    router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
+    void import('@/features/dashboard/organisms/release-provider-matrix').catch(
+      () => {
+        releasesPrefetchedProfileIdRef.current = null;
+      }
+    );
+    void import('@/lib/queries/prefetch-dashboard')
+      .then(({ prefetchForRoute }) =>
+        prefetchForRoute('releases', queryClient, profileId)
+      )
+      .catch(() => {
+        releasesPrefetchedProfileIdRef.current = null;
+      });
+  }, [isDemo, pathname, profileId, queryClient, router]);
+
   const handlePrefetch = useCallback(
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
+        if (itemId === 'releases') {
+          void import(
+            '@/features/dashboard/organisms/release-provider-matrix'
+          ).catch(() => {});
+        }
         void import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
@@ -217,7 +249,14 @@ export function DashboardNav(_: DashboardNavProps) {
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
           onNavigate={
-            isReleasesItem ? () => showPendingShell('releases') : undefined
+            isReleasesItem && !isActive
+              ? () => showPendingShell('releases')
+              : undefined
+          }
+          onCancelNavigate={
+            isReleasesItem && !isActive
+              ? () => clearPendingShell('releases')
+              : undefined
           }
           onPrefetch={() => handlePrefetch(item.id)}
         />
@@ -229,6 +268,7 @@ export function DashboardNav(_: DashboardNavProps) {
       handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
+      clearPendingShell,
       showPendingShell,
       isPreviewOpen,
       isDemo,
