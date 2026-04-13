@@ -2,7 +2,7 @@
 // Network-first for GET navigations (serves offline.html as fallback), pass-through for all other requests.
 
 const OFFLINE_PAGE = '/offline.html';
-const CACHE_NAME = 'jovie-offline-v1';
+const CACHE_NAME = 'jovie-offline-v2';
 const NAV_TIMEOUT_MS = 8000;
 
 self.addEventListener('install', event => {

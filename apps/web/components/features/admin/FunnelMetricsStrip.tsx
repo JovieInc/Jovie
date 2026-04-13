@@ -14,23 +14,11 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+import { formatPercent, formatUsd } from '@/lib/admin/format';
 import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface FunnelMetricsStripProps {
   readonly metrics: AdminFunnelMetrics;
-}
-
-function formatPercent(rate: number | null): string {
-  if (rate === null) return '—';
-  return `${(rate * 100).toFixed(1)}%`;
-}
-
-function formatUsd(value: number): string {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 1000 ? 0 : 2,
-  });
 }
 
 function formatRunway(months: number | null, stripeAvailable: boolean): string {

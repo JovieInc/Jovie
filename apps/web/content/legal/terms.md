@@ -102,13 +102,17 @@ We value your privacy. Please review the [Privacy Policy](#privacy-and-data) to 
 
 ## Payment and Subscriptions
 
-### Free Access Today
+### Plans
 
-Jovie is currently free for all creators. You will not be charged unless we notify you of a paid plan and obtain your consent.
+Jovie offers Free, Pro, and Max plans. The Free plan is available at no cost. Pro and Max are paid plans billed monthly or annually via Stripe. Current pricing is available at [jov.ie/pricing](https://jov.ie/pricing).
 
-### Future Paid Products
+### Free Trial
 
-If we launch paid upgrades, we will clearly communicate pricing, billing intervals, and cancellation steps before charging your payment method.
+New accounts start with a 14-day Pro trial at no charge and no credit card required. After the trial period, your account reverts to the Free plan unless you choose to upgrade.
+
+### Billing and Cancellation
+
+Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period — you retain access to paid features until then.
 
 ## Disclaimers and Liability
 

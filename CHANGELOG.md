@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.3] - 2026-04-12
+
+> Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
+
+### Added
+
+- [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
+
+## [26.4.151.2] - 2026-04-12
+
+> Settings cards now use consistent spacing across all sections.
+
+### Fixed
+
+- Settings page cards now have consistent padding across all sections (Email, Appearance, Billing, etc.) by removing redundant card-level padding that was doubling up with child padding
+
+## [26.4.151.1] - 2026-04-12
+
+> Sidebar entity header elevation now matches other cards, and About details are consolidated into one cleaner card.
+
+### Fixed
+
+- [internal] Entity header card in dashboard sidebar now has proper elevation matching other entity cards
+- [internal] About tab consolidated from three separate cards into a single detail view with two-column metadata layout
+
+## [26.4.151] - 2026-04-12
+
+> Admin dashboard now opens to a clean funnel scoreboard showing the full pipeline from scrape to paid at a glance.
+
+### Added
+
+- Funnel scoreboard as the default admin view with three hero metrics (MRR, paying customers, WoW growth), a six-step horizontal pipeline, and a 4-week trend chart
+- Shared `formatPercent` and `formatUsd` utilities extracted from duplicated admin code
+- Unit tests for scoreboard rendering, conversion rate math, empty/error states, and formatting utils
+
+### Changed
+
+- Admin dashboard now uses two tabs: Scoreboard (default) and Workspaces (previous content)
+- Consolidated `formatPercent` (3 copies) and `formatUsd` (2 copies) into `lib/admin/format.ts`
+
+## [26.4.150.0] - 2026-04-12
+
+> Auto-created profiles now pass through a quality gate before going live, preventing broken profiles from reaching artists during claim outreach. Full-screen offline and error screens now use one consistent, design-system-aligned layout.
+
+### Added
+
+- Profile quality gate for auto-created profiles: validates display name, avatar, and link count before setting `isPublic`
+- `evaluateProfileQuality()` and `isEmbarrassingDisplayName()` pure validation functions
+- Quarantined profiles (failing quality bar) are hidden via existing `isPublic: false` mechanism
+- Re-ingest can promote quarantined profiles when quality improves
+- API response includes `quarantined` and `quarantineReasons` fields for admin visibility
+- Unit tests for all quality gate scenarios (18 tests)
+- [internal] Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
+
+### Changed
+
+- `handleNewProfileIngest()` uses quality gate result instead of hardcoded `isPublic: true`
+- `createNewSocialProfile()` uses quality gate result instead of hardcoded `isPublic: true`
+- `ExistingProfileCheck` interface now includes `isPublic` field for re-ingest promotion logic
+- [internal] Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
+- [internal] Removed card wrapper from PublicPageErrorFallback (subtraction principle)
+- [internal] Removed wifi-off icon from offline page (headline says it all)
+- [internal] Added inline SVG logo to root error page (was missing entirely)
+- [internal] Replaced marketing-themed classes in root error with System B dark mode
+- [internal] Bumped service worker cache name to ensure existing users get the updated offline page
+
+## [26.4.149.2] - 2026-04-12
+
+> Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
+
+### Changed
+
+- Pricing page CTA updated to mention 14-day Pro trial
+- Terms of service payment section rewritten to reflect Free/Pro/Max plans, trial, and billing
+- Docs plans-pricing page fully rewritten: removed stale Founding Member ($12) and Growth ($99) tiers, added current Free/$39 Pro/$149 Max
+- All docs feature pages updated from "Growth" to "Max" plan references (11 files)
+- "Remove Jovie branding" corrected from Pro to Max-only in docs
+- Pro analytics retention corrected from 90 to 180 days in docs
+- Free AI message limit corrected from 25 to 10/day in chat-ai docs
+- LLMs route pricing section updated with accurate tier descriptions and trial mention
+
+## [26.4.143] - 2026-04-12
+
+### Added
+
+- Instantly.ai / Leadsy tracking pixel for email campaign attribution
+- `isMarketingAllowed()` consent helper with fire-by-default model (respects GPC/DNT opt-out)
+- CSP allowlist for r2.leadsy.ai, tag.trovo-tag.com, and wvbknd.leadsy.ai
+- 14 unit tests covering all pixel consent and route-gating codepaths
+
 ## [26.4.149.1] - 2026-04-12
 
 ### Changed
