@@ -8,6 +8,10 @@
  * does NOT fire for cross-origin content (browser security spec).
  * If the embed hasn't loaded within the timeout, calls onError
  * so the parent can redirect instead of showing a dead page.
+ *
+ * Uses loading='eager' (not 'lazy') because the timeout timer starts on mount.
+ * Lazy loading would defer the iframe load, causing false timeout redirects
+ * on mobile where the embed starts below the viewport.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -32,6 +36,12 @@ export function YouTubeEmbed({
   const [loaded, setLoaded] = useState(false);
   const loadedRef = useRef(false);
 
+  // Reset load state when videoId changes
+  useEffect(() => {
+    loadedRef.current = false;
+    setLoaded(false);
+  }, [videoId]);
+
   useEffect(() => {
     if (!onError) return;
 
@@ -42,7 +52,7 @@ export function YouTubeEmbed({
     }, EMBED_LOAD_TIMEOUT_MS);
 
     return () => clearTimeout(timer);
-  }, [onError]);
+  }, [videoId, onError]);
 
   return (
     <div
@@ -57,7 +67,7 @@ export function YouTubeEmbed({
         title={title}
         allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
         allowFullScreen
-        loading='lazy'
+        loading='eager'
         className='absolute inset-0 h-full w-full'
         onLoad={() => {
           loadedRef.current = true;

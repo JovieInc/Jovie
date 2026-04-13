@@ -384,6 +384,7 @@ function ContentPageBody({
             name: artistName,
             handle: creator.usernameNormalized,
             avatarUrl: creator.avatarUrl,
+            ownerUserId: creator.userId ?? '',
           }}
           videoId={videoMeta.youtubeVideoId}
           youtubeUrl={
@@ -391,6 +392,11 @@ function ContentPageBody({
             `https://www.youtube.com/watch?v=${videoMeta.youtubeVideoId}`
           }
         />
+      );
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        `[ContentPageBody] music_video release "${content.slug}" missing youtubeVideoId`
       );
     }
   }

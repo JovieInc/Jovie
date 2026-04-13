@@ -32,6 +32,7 @@ interface VideoReleasePageProps {
     readonly name: string;
     readonly handle: string;
     readonly avatarUrl: string | null;
+    readonly ownerUserId: string;
     readonly spotifyId?: string;
   };
   readonly videoId: string;
@@ -45,7 +46,6 @@ export function VideoReleasePage({
   youtubeUrl,
 }: VideoReleasePageProps) {
   const handleEmbedError = useCallback(() => {
-    // Report the broken video so the system can flag it
     postJsonBeacon(
       '/api/track',
       {
@@ -62,7 +62,6 @@ export function VideoReleasePage({
       () => {}
     );
 
-    // Redirect to the artist's profile instead of showing a dead page
     globalThis.location.replace(`/${artist.handle}`);
   }, [artist.handle, artist.id, videoId, release.slug]);
 
@@ -85,21 +84,18 @@ export function VideoReleasePage({
         </div>
       }
     >
-      {/* Content — embed + subscribe CTA */}
       <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-4'>
-        {/* YouTube embed — redirects to profile on load failure */}
         <YouTubeEmbed
           videoId={videoId}
           title={`Music video: ${release.title} by ${artist.name}`}
           onError={handleEmbedError}
         />
 
-        {/* Email subscribe CTA */}
         <div className='mt-6'>
           <ArtistNotificationsCTA
             artist={{
               id: artist.id,
-              owner_user_id: '',
+              owner_user_id: artist.ownerUserId,
               handle: artist.handle,
               spotify_id: artist.spotifyId ?? '',
               name: artist.name,
@@ -116,7 +112,6 @@ export function VideoReleasePage({
           />
         </div>
 
-        {/* Secondary: Watch on YouTube */}
         <div className='mt-4 flex justify-center'>
           <a
             href={youtubeUrl}
@@ -125,12 +120,11 @@ export function VideoReleasePage({
             aria-label='Watch on YouTube (opens in new tab)'
             className='inline-flex items-center gap-1.5 text-[13px] font-[450] text-white/40 transition-colors hover:text-white/60'
           >
-            <ExternalLink className='h-3.5 w-3.5' />
+            <ExternalLink className='size-3.5' />
             Watch on YouTube
           </a>
         </div>
 
-        {/* Powered by footer */}
         <div className='mt-auto pt-6'>
           <SmartLinkPoweredByFooter />
         </div>

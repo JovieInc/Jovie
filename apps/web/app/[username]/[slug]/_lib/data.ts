@@ -261,6 +261,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
   const [creator] = await db
     .select({
       id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
       displayName: creatorProfiles.displayName,
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
