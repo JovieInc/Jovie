@@ -2,9 +2,7 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
-      "url": [
-        "http://localhost:3200/"
-      ]
+      "url": ["http://localhost:3200/"]
     },
     "assert": {
       "assertMatrix": [
