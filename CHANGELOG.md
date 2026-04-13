@@ -14,6 +14,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Added explicit `apple-mobile-web-app-capable` meta tag for older iOS PWA standalone mode support
 - Aligned offline page theme color and background (`#08090a` → `#0a0a0a`) to match the manifest and layout
 
 ## [26.4.152.2] - 2026-04-13
