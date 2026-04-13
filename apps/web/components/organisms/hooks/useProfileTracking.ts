@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 
 export function useTipPageTracking({
   artistHandle,

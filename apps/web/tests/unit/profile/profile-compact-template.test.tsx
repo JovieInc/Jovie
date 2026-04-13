@@ -88,7 +88,7 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUnsubscribeNotificationsMutation: () => ({
     mutate: vi.fn(),
     isPending: false,
