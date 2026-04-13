@@ -260,6 +260,7 @@ export function ProfileInlineNotificationsCTA({
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const prefersReducedMotion = useReducedMotion();
@@ -342,6 +343,12 @@ export function ProfileInlineNotificationsCTA({
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
       globalThis.removeEventListener('pointerdown', handlePointerIntent);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
     };
   }, []);
 
@@ -591,7 +598,12 @@ export function ProfileInlineNotificationsCTA({
                 onResend={async () => {
                   await handleResendOtp();
                   setConfirmMessage('Code sent!');
-                  setTimeout(() => setConfirmMessage(null), 2000);
+                  if (confirmTimeoutRef.current)
+                    clearTimeout(confirmTimeoutRef.current);
+                  confirmTimeoutRef.current = setTimeout(
+                    () => setConfirmMessage(null),
+                    2000
+                  );
                 }}
               />
             )}

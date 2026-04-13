@@ -1,8 +1,8 @@
 'use client';
 
 import { useId } from 'react';
+import { SegmentedDigitBox } from '@/components/atoms/SegmentedDigitBox';
 import { useSegmentedInput } from '@/hooks/useSegmentedInput';
-import { cn } from '@/lib/utils';
 
 const BIRTHDAY_LENGTH = 8;
 const GROUPS = [2, 2, 4]; // MM / DD / YYYY
@@ -93,73 +93,27 @@ export function BirthdayInput({
               </span>
             )}
             <div className='flex gap-1.5 sm:gap-2'>
-              {group.digits.map(({ index, key }) => {
-                const digit = getDigit(index);
-                const isFocused = focusedIndex === index;
-                const isCursor = isFocused && !digit;
-
-                return (
-                  <div
-                    key={key}
-                    className={cn(
-                      'relative flex min-h-[44px] w-9 items-center justify-center rounded-[18px] border text-[1.3rem] font-[620] tracking-[-0.035em] transition-[transform,border-color,background-color,box-shadow] duration-150 sm:h-[48px] sm:w-10 sm:text-[1.35rem]',
-                      'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl',
-                      isFocused
-                        ? 'scale-[1.01] border-[color:var(--profile-pearl-bg-active)] bg-[var(--profile-pearl-bg-active)] ring-2 ring-[rgb(var(--focus-ring))]/20'
-                        : 'hover:bg-[var(--profile-pearl-bg-hover)]',
-                      error && 'border-red-500/55 ring-2 ring-red-500/12',
-                      disabled && 'opacity-50 cursor-not-allowed',
-                      'active:scale-[0.985]'
-                    )}
-                  >
-                    <input
-                      ref={el => {
-                        inputRefs.current[index] = el;
-                      }}
-                      type='text'
-                      inputMode='numeric'
-                      pattern='[0-9]*'
-                      value={digit}
-                      onChange={e => handleInputChange(index, e.target.value)}
-                      onKeyDown={e => handleKeyDown(index, e)}
-                      onInput={e => handleInput(index, e)}
-                      onFocus={() => handleFocus(index)}
-                      onBlur={handleBlur}
-                      disabled={disabled}
-                      autoComplete='off'
-                      aria-label={`${group.label} digit ${index - group.digits[0].index + 1}`}
-                      className={cn(
-                        'absolute inset-0 h-full w-full bg-transparent text-center text-[1.3rem] font-sans sm:text-[1.35rem]',
-                        'outline-none border-none',
-                        'touch-manipulation [-webkit-tap-highlight-color:transparent]',
-                        disabled && 'cursor-not-allowed'
-                      )}
-                    />
-
-                    {isCursor && (
-                      <span
-                        className='pointer-events-none animate-pulse text-secondary-token motion-reduce:animate-none'
-                        aria-hidden='true'
-                      >
-                        |
-                      </span>
-                    )}
-
-                    {digit && (
-                      <span
-                        className={cn(
-                          'pointer-events-none absolute inset-0 flex items-center justify-center',
-                          'transition-transform duration-100',
-                          'animate-in zoom-in-90 duration-100'
-                        )}
-                        aria-hidden='true'
-                      >
-                        {digit}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+              {group.digits.map(({ index, key }) => (
+                <SegmentedDigitBox
+                  key={key}
+                  digit={getDigit(index)}
+                  isFocused={focusedIndex === index}
+                  error={error}
+                  disabled={disabled}
+                  index={index}
+                  inputRef={el => {
+                    inputRefs.current[index] = el;
+                  }}
+                  onInputChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onInput={handleInput}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  ariaLabel={`${group.label} digit ${index - group.digits[0].index + 1}`}
+                  boxSizeClassName='min-h-[44px] w-9 text-[1.3rem] sm:h-[48px] sm:w-10 sm:text-[1.35rem]'
+                  textSizeClassName='text-[1.3rem] sm:text-[1.35rem]'
+                />
+              ))}
             </div>
           </div>
         ))}

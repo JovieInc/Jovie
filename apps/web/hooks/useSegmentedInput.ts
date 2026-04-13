@@ -137,13 +137,18 @@ export function useSegmentedInput({
       const digit = digits.slice(-1);
 
       if (digit) {
+        // If typing into a position beyond the current value length,
+        // append the digit at the next available position instead of
+        // creating a sparse value (e.g., clicking box 5 when empty).
+        const effectiveIndex = Math.min(index, currentValue.length);
         const chars = currentValue.split('');
-        chars[index] = digit;
+        chars[effectiveIndex] = digit;
         const newValue = chars.join('');
         updateValue(newValue);
 
-        if (index < length - 1) {
-          inputRefs.current[index + 1]?.focus();
+        const nextIndex = effectiveIndex + 1;
+        if (nextIndex < length) {
+          inputRefs.current[nextIndex]?.focus();
         }
       }
     },
