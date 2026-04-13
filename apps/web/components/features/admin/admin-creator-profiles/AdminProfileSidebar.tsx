@@ -174,19 +174,21 @@ export function AdminProfileSidebar({
             allowPhotoDownloads={false}
             showOldReleases={false}
           />
-        ) : selectedCategory === 'algorithm' ? (
+        ) : null}
+        {selectedCategory === 'algorithm' ? (
           <AlgorithmHealthPanel
             profile={profile}
             contact={contact}
             isActive={selectedCategory === 'algorithm'}
           />
-        ) : (
+        ) : null}
+        {selectedCategory !== 'about' && selectedCategory !== 'algorithm' ? (
           <ProfileLinkList
             links={links}
             selectedCategory={selectedCategory as CategoryOption}
             surface='plain'
           />
-        )}
+        ) : null}
       </DrawerTabbedCard>
     </EntitySidebarShell>
   );
