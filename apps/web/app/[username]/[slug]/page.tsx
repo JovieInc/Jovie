@@ -492,6 +492,7 @@ function buildContentDescription(
   content: {
     title: string;
     releaseDate: Date | null;
+    releaseType?: string | null;
     providerLinks: Array<{ providerId: string }>;
   },
   artistName: string,
@@ -500,9 +501,15 @@ function buildContentDescription(
   const releaseYear = content.releaseDate
     ? ` (${content.releaseDate.getFullYear()})`
     : '';
+  const isVideo = content.releaseType === 'music_video';
 
   if (isUnreleased) {
-    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops on Jovie.`;
+    const verb = isVideo ? 'new video' : 'new release';
+    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when the ${verb} drops on Jovie.`;
+  }
+
+  if (isVideo) {
+    return `Watch "${content.title}"${releaseYear} by ${artistName} on Jovie. Subscribe for new releases.`;
   }
 
   const streamingPlatforms =
@@ -541,7 +548,12 @@ export async function generateMetadata({
   }
 
   const artistName = creator.displayName ?? creator.username;
-  const contentType = content.type === 'release' ? 'album' : 'song';
+  const isVideo = content.releaseType === 'music_video';
+  const contentType = isVideo
+    ? 'music video'
+    : content.type === 'release'
+      ? 'album'
+      : 'song';
   const canonicalUrl =
     content.type === 'track' && content.releaseSlug
       ? `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}`
@@ -561,7 +573,9 @@ export async function generateMetadata({
   } else if (isUnreleased) {
     title = `${content.title} by ${artistName} - Coming Soon`;
   } else {
-    title = `${content.title} by ${artistName} - Stream Now`;
+    title = isVideo
+      ? `${content.title} by ${artistName} - Watch Now`
+      : `${content.title} by ${artistName} - Stream Now`;
   }
 
   const description = isMystery
@@ -570,23 +584,38 @@ export async function generateMetadata({
 
   const keywords = isMystery
     ? [artistName, `${artistName} music`, 'new music', 'coming soon']
-    : [
-        content.title,
-        artistName,
-        `${artistName} ${content.title}`,
-        `${content.title} lyrics`,
-        `${content.title} stream`,
-        `${artistName} music`,
-        `${artistName} ${contentType}`,
-        'stream music',
-        'music links',
-      ];
+    : isVideo
+      ? [
+          content.title,
+          artistName,
+          `${artistName} ${content.title}`,
+          `${content.title} music video`,
+          `${artistName} music video`,
+          `${artistName} music`,
+          'watch music video',
+          'music video',
+        ]
+      : [
+          content.title,
+          artistName,
+          `${artistName} ${content.title}`,
+          `${content.title} lyrics`,
+          `${content.title} stream`,
+          `${artistName} music`,
+          `${artistName} ${contentType}`,
+          'stream music',
+          'music links',
+        ];
 
-  const ogType = content.type === 'release' ? 'music.album' : 'music.song';
+  const ogType = isVideo
+    ? 'video.other'
+    : content.type === 'release'
+      ? 'music.album'
+      : 'music.song';
   const ogImage = isMystery
     ? null
     : resolveOgImage(content.artworkSizes, content.artworkUrl);
-  const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
+  const artworkAlt = `${content.title} ${isVideo ? 'music video' : content.type === 'release' ? 'album' : 'track'} artwork`;
 
   return {
     title,

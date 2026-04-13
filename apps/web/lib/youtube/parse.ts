@@ -36,7 +36,8 @@ export function parseYouTubeUrl(url: string): ParsedYouTubeUrl | null {
     let candidate: string | null = null;
 
     if (host === 'youtu.be' || host === 'www.youtu.be') {
-      candidate = parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      candidate = segments.length === 1 ? segments[0] : null;
     } else {
       candidate = parsed.searchParams.get('v');
       if (!candidate) {
