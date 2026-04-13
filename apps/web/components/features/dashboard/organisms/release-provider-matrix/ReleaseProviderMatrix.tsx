@@ -905,6 +905,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               toolbar={
                 <ReleaseTableSubheader
                   releases={filteredRows}
+                  allReleases={rows}
                   selectedIds={selectedIds}
                   filters={filters}
                   onFiltersChange={setFilters}
@@ -928,6 +929,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onDelete={handleDeleteRequest}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
+                showTracks={releaseView === 'tracks'}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}
