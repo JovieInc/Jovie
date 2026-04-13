@@ -37,8 +37,6 @@ export function ProfileDrawerShell({
   const contentClasses = `flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] ${contentClassName ?? ''}`;
   const bodyClasses = `relative z-10 min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 ${bodyClassName ?? ''}`;
 
-  const TitleComponent = presentation === 'embedded' ? 'h2' : Drawer.Title;
-
   const header = (
     <>
       <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.1]' />
@@ -60,19 +58,31 @@ export function ProfileDrawerShell({
         ) : null}
 
         <div className='min-w-0 flex-1 pt-5'>
-          <TitleComponent
-            id={titleId}
-            className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'
-          >
-            {title}
-          </TitleComponent>
-          {subtitle ? (
-            <p
-              id={subtitleId}
-              className='mt-0.5 text-[12px] leading-[1.4] text-white/45'
+          {presentation === 'embedded' ? (
+            <h2
+              id={titleId}
+              className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'
             >
-              {subtitle}
-            </p>
+              {title}
+            </h2>
+          ) : (
+            <Drawer.Title className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'>
+              {title}
+            </Drawer.Title>
+          )}
+          {subtitle ? (
+            presentation === 'embedded' ? (
+              <p
+                id={subtitleId}
+                className='mt-0.5 text-[12px] leading-[1.4] text-white/45'
+              >
+                {subtitle}
+              </p>
+            ) : (
+              <Drawer.Description className='mt-0.5 text-[12px] leading-[1.4] text-white/45'>
+                {subtitle}
+              </Drawer.Description>
+            )
           ) : null}
         </div>
 
@@ -120,12 +130,7 @@ export function ProfileDrawerShell({
       <Drawer.Portal>
         <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
         <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
-          <Drawer.Content
-            className={contentClasses}
-            data-testid={dataTestId}
-            aria-describedby={subtitle ? subtitleId : undefined}
-            aria-labelledby={titleId}
-          >
+          <Drawer.Content className={contentClasses} data-testid={dataTestId}>
             {header}
             {body}
           </Drawer.Content>
