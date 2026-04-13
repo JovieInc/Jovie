@@ -130,7 +130,7 @@ test.describe('Onboarding', () => {
 
     // Claim a unique handle
     const uniqueHandle = `e2e-${Date.now().toString(36)}`;
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Claim your handle');
     await expect(handleInput).toBeVisible({ timeout: 15_000 });
     await handleInput.fill(uniqueHandle);
 
@@ -322,7 +322,7 @@ test.describe('Onboarding', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Claim your handle');
     await expect(handleInput).toBeVisible({ timeout: 10_000 });
 
     const takenHandle = process.env.E2E_TAKEN_HANDLE || 'dualipa';
