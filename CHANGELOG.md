@@ -9,20 +9,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Releases drawer on public artist profiles: industry professionals can browse full discography without opening a DSP app
-- Each release shows artwork, title, collaborator names (profile owner filtered out), release type, and year
-- Music video releases display a glassmorphism "Video" pill badge
-- Conditional year section headers for catalogs with 15+ releases spanning 2+ years
-- `/{username}/releases` redirect route for deep linking
-- `getReleasesForProfileLite()` query that skips provider links for efficient profile loading
-- 14 unit tests covering all drawer states, collaborator filtering, and accessibility
-- Performance route manifest entries for `/releases` route and `?mode=releases` mode
+- Releases drawer on public artist profiles: browse full discography without opening a DSP app
+- Each release shows artwork, title, collaborator names, release type, and year
+- Music video releases display a "Video" pill badge
+- Conditional year section headers for large catalogs (15+ releases spanning 2+ years)
+- Deep link support via `/{username}/releases`
 - Dynamic drawer subtitle showing catalog composition (e.g., "12 singles, 3 EPs, 1 album")
-- aria-label accessibility on release link elements
-
-### Fixed
-
-- Pre-existing test failure in `releases-page-client.test.tsx` caused by missing `next/dynamic` mock
+- Improved keyboard and screen reader support for release links
 
 ## [26.4.152.2] - 2026-04-13
 

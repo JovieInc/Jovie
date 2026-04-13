@@ -609,20 +609,24 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     profile.avatar_url
   );
 
-  // Await tour dates + releases (started above, non-blocking — errors resolve to empty)
+  // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
   const [tourDatesRaw, allReleases] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
-    releasesPromise.catch(
-      () => [] as Awaited<ReturnType<typeof getReleasesForProfileLite>>
-    ),
+    releasesPromise.catch(async error => {
+      await captureError('Error fetching public profile releases', error, {
+        profileId: profile.id,
+        route: '/[username]',
+      });
+      return [] as Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+    }),
   ]);
   const tourDates = tourDatesRaw.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 
-  // Serialize releases for client: newest-first, lean shape
-  const releases: PublicRelease[] = [...allReleases].reverse().map(r => ({
+  // Serialize releases for client (query returns newest-first via DESC NULLS LAST)
+  const releases: PublicRelease[] = allReleases.map(r => ({
     id: r.id,
     title: r.title,
     slug: r.slug,

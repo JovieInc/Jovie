@@ -359,6 +359,15 @@ export function ProfileModeDrawer({
         </div>
       ) : null}
 
+      {activeMode === 'releases' ? (
+        <div data-testid='profile-mode-drawer-releases'>
+          <ProfileModeFallback
+            title='Releases'
+            description='Full discography and streaming links.'
+          />
+        </div>
+      ) : null}
+
       {activeMode === 'pay' ? (
         <div data-testid='profile-mode-drawer-pay'>
           {hasValidVenmoLink ? (

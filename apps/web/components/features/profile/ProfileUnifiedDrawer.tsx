@@ -361,10 +361,15 @@ export function ProfileUnifiedDrawer({
   releases = [],
   onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
+  const visibleReleases = useMemo(
+    () => releases.filter(r => Boolean(r.slug)),
+    [releases]
+  );
+
   const releasesSubtitle = useMemo(() => {
-    if (releases.length === 0) return 'Discography';
+    if (visibleReleases.length === 0) return 'Discography';
     const counts: Record<string, number> = {};
-    for (const r of releases) {
+    for (const r of visibleReleases) {
       const type = r.releaseType === 'music_video' ? 'video' : r.releaseType;
       counts[type] = (counts[type] ?? 0) + 1;
     }
@@ -385,7 +390,7 @@ export function ProfileUnifiedDrawer({
           `${count} ${labels[type] ?? 'release'}${count > 1 ? 's' : ''}`
       );
     return parts.join(', ');
-  }, [releases]);
+  }, [visibleReleases]);
 
   const meta =
     view === 'releases'
@@ -436,13 +441,13 @@ export function ProfileUnifiedDrawer({
       case 'releases':
         track('releases_drawer_open', {
           handle: artist.handle,
-          releases_count: releases.length,
+          releases_count: visibleReleases.length,
         });
         break;
       default:
         break;
     }
-  }, [open, view, artist.handle, contacts.length, releases.length]);
+  }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -695,7 +700,7 @@ export function ProfileUnifiedDrawer({
 
           {view === 'releases' && (
             <ReleasesDrawerContent
-              releases={releases}
+              releases={visibleReleases}
               artistHandle={artist.handle}
               artistName={artist.name}
             />
