@@ -107,17 +107,23 @@ export function mapErrorToUserMessage(
     };
   }
 
-  // Username validation errors
+  // Username validation errors — specific messages
+  if (message.includes('USERNAME_RESERVED')) {
+    return { userMessage: 'This handle is reserved. Try a variation.' };
+  }
+  if (message.includes('USERNAME_TOO_SHORT')) {
+    return { userMessage: 'Handle is too short — use at least 3 characters.' };
+  }
+  if (message.includes('USERNAME_TOO_LONG')) {
+    return {
+      userMessage: 'Handle is too long — use 30 characters or fewer.',
+    };
+  }
   if (
     message.includes('INVALID_USERNAME') ||
-    message.includes('USERNAME_RESERVED') ||
-    message.includes('USERNAME_INVALID_FORMAT') ||
-    message.includes('USERNAME_TOO_SHORT') ||
-    message.includes('USERNAME_TOO_LONG')
+    message.includes('USERNAME_INVALID_FORMAT')
   ) {
-    return {
-      userMessage: "That handle can't be used. Try another one.",
-    };
+    return { userMessage: 'This handle has invalid characters.' };
   }
 
   // Display name content filter

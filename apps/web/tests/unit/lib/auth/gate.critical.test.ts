@@ -203,7 +203,7 @@ function mockClerkUser(email = 'test@example.com') {
 /** Standard DB result from the JOIN query in resolveUserState */
 function mockDbUserResult(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'db-user-123',
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     email: 'test@example.com',
     userStatus: 'active',
     isAdmin: false,
@@ -287,7 +287,7 @@ describe('@critical gate.ts', () => {
 
       expect(result.state).toBe(CanonicalUserState.ACTIVE);
       expect(result.clerkUserId).toBe('clerk_123');
-      expect(result.dbUserId).toBe('db-user-123');
+      expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
       expect(result.profileId).toBe('profile-123');
       expect(result.redirectTo).toBeNull();
     });
@@ -328,7 +328,7 @@ describe('@critical gate.ts', () => {
 
       expect(result.state).toBe(CanonicalUserState.BANNED);
       expect(result.redirectTo).toBe('/unavailable');
-      expect(result.dbUserId).toBe('db-user-123');
+      expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
     it('returns BANNED when user is soft-deleted', async () => {
@@ -487,7 +487,7 @@ describe('@critical gate.ts', () => {
       await resolveUserState();
 
       expect(mockSyncEmailFromClerk).toHaveBeenCalledWith(
-        'db-user-123',
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         'new-email@example.com'
       );
     });

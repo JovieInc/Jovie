@@ -15,13 +15,16 @@ import {
 import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
+  deleteRelease,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
+  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
@@ -177,6 +180,49 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
   const copyHandler = experienceAdapter?.onCopy ?? handleCopy;
 
+  // Delete state and handlers
+  const [deleteTarget, setDeleteTarget] = useState<ReleaseViewModel | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isDistributed = useCallback((release: ReleaseViewModel) => {
+    return (
+      !!release.primaryIsrc &&
+      !!release.releaseDate &&
+      new Date(release.releaseDate) <= new Date()
+    );
+  }, []);
+
+  const handleDeleteRequest = useCallback(
+    (releaseId: string) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (release) {
+        setDeleteTarget(release);
+      }
+    },
+    [rows]
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteRelease({ releaseId: deleteTarget.id });
+      if (result.success) {
+        setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
+        toast.success(`"${deleteTarget.title}" deleted.`);
+      } else {
+        toast.error(result.message ?? 'Failed to delete release.');
+      }
+    } catch {
+      toast.error('Failed to delete release.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, setRows]);
+
   const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
     null
   );
@@ -207,28 +253,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [rows, openEditor]
   );
 
-  // Table display preferences (column visibility)
-  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
-    useReleaseTablePreferences();
+  // Table display preferences (column visibility, tracks toggle)
+  const {
+    columnVisibility,
+    rowHeight,
+    groupByYear,
+    onGroupByYearChange,
+    showTracks,
+    onShowTracksChange,
+  } = useReleaseTablePreferences();
+
+  // Derive releaseView from persisted showTracks preference
+  const releaseView: ReleaseView = showTracks ? 'tracks' : 'releases';
+  const setReleaseView = useCallback(
+    (view: ReleaseView) => onShowTracksChange(view === 'tracks'),
+    [onShowTracksChange]
+  );
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
     DEFAULT_RELEASE_FILTERS
   );
 
-  // View toggle (releases vs tracks)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
-
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // Apply filters and search to rows — all releases shown (no tracks/releases split)
-  // Deduplicate by ID to prevent multiple rows highlighting on click
-  const filteredRows = useMemo(() => {
-    const filtered = filterReleases(rows, filters, deferredSearchQuery);
+  // Deduplicate rows by ID before filtering (prevents inflated counts and double highlights)
+  const dedupedRows = useMemo(() => {
     const seen = new Set<string>();
-    return filtered.filter(r => {
+    return rows.filter(r => {
       if (seen.has(r.id)) {
         if (process.env.NODE_ENV === 'development') {
           console.warn(`[ReleaseTable] duplicate release id: ${r.id}`);
@@ -238,7 +292,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       seen.add(r.id);
       return true;
     });
-  }, [rows, filters, deferredSearchQuery]);
+  }, [rows]);
+
+  // Apply filters and search to deduped rows
+  const filteredRows = useMemo(() => {
+    return filterReleases(dedupedRows, filters, deferredSearchQuery);
+  }, [dedupedRows, filters, deferredSearchQuery]);
 
   // Smart link gating
   const planGate = usePlanGate();
@@ -789,7 +848,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
         {/* Banners — inset from shell edge */}
         {showImportProgress && (
-          <div className='mx-3 lg:mx-4 mt-2.5'>
+          <div className='mx-3 lg:mx-4 mt-3'>
             <Suspense fallback={null}>
               <ImportProgressBanner
                 artistName={artistName}
@@ -859,6 +918,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               toolbar={
                 <ReleaseTableSubheader
                   releases={filteredRows}
+                  allReleases={dedupedRows}
                   selectedIds={selectedIds}
                   filters={filters}
                   onFiltersChange={setFilters}
@@ -879,8 +939,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 artistName={artistName}
                 onCopy={copyHandler}
                 onEdit={handleOpenEditor}
+                onDelete={handleDeleteRequest}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
+                showTracks={showTracks}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}
@@ -897,28 +959,32 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {/* Show "No releases" state when connected but no releases and not importing */}
         {isConnected && rows.length === 0 && !isImporting && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
-            <div className='flex min-h-[260px] w-full flex-1 flex-col items-center justify-center px-4 py-12 text-center'>
-              <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
+              testId='releases-empty-state-connected'
+            >
+              <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
                 <Icon
                   name='Disc3'
-                  className='h-6 w-6 text-tertiary-token'
+                  className='h-4 w-4 text-tertiary-token'
                   aria-hidden='true'
                 />
               </div>
-              <h3 className='mt-4 text-[14px] font-[590] tracking-[-0.012em] text-primary-token'>
+              <h3 className='text-[13px] font-[510] text-primary-token'>
                 No releases yet
               </h3>
-              <p className='mt-1 max-w-sm text-[12px] leading-[18px] text-secondary-token'>
+              <p className='mt-0.5 max-w-sm text-[12px] leading-[17px] text-secondary-token'>
                 {canCreateManualReleases
                   ? 'Sync from Spotify or create one manually to start generating smart links.'
                   : 'Sync from Spotify to start generating smart links.'}
               </p>
-              <div className='mt-4 flex flex-wrap items-center justify-center gap-2.5'>
+              <div className='mt-3 flex flex-wrap items-center justify-center gap-2.5'>
                 <DrawerButton
                   tone='primary'
                   disabled={isSyncing}
                   onClick={experienceAdapter?.onSync ?? handleSync}
-                  className='inline-flex items-center gap-2'
+                  className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
                   data-testid='sync-spotify-empty-state'
                 >
                   <Icon
@@ -934,7 +1000,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 {canCreateManualReleases && (
                   <DrawerButton
                     onClick={handleNewRelease}
-                    className='inline-flex items-center gap-2'
+                    className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
                     data-testid='create-release-empty-state'
                   >
                     <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
@@ -942,7 +1008,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   </DrawerButton>
                 )}
               </div>
-            </div>
+            </DrawerSurfaceCard>
           </PageShell>
         )}
       </div>
@@ -1013,6 +1079,34 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           />
         ) : null}
       </Suspense>
+
+      {/* Delete confirmation / blocking dialog */}
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          onOpenChange={open => {
+            if (!open) setDeleteTarget(null);
+          }}
+          title={
+            isDistributed(deleteTarget)
+              ? 'Release is distributed'
+              : `Delete "${deleteTarget.title}"?`
+          }
+          description={
+            isDistributed(deleteTarget)
+              ? 'Remove this release from distribution before deleting it.'
+              : 'This will remove the release from your dashboard and public profile.'
+          }
+          confirmLabel={isDistributed(deleteTarget) ? 'OK' : 'Delete'}
+          variant={isDistributed(deleteTarget) ? 'default' : 'destructive'}
+          isLoading={isDeleting}
+          onConfirm={
+            isDistributed(deleteTarget)
+              ? () => setDeleteTarget(null)
+              : handleDeleteConfirm
+          }
+        />
+      )}
     </>
   );
 });

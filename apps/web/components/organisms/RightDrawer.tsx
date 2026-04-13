@@ -28,7 +28,7 @@ function hasOpenModalDialog() {
       '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
     )
   ).some(element => {
-    const style = window.getComputedStyle(element);
+    const style = globalThis.getComputedStyle(element);
     return (
       element.getAttribute('aria-hidden') !== 'true' &&
       style.display !== 'none' &&

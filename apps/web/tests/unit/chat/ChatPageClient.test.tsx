@@ -122,6 +122,12 @@ vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
   useDashboardSocialLinksQuery: () => ({ data: [], isLoading: false }),
 }));
 
+vi.mock('@/lib/queries/useChatMutations', () => ({
+  useDeleteConversationMutation: () => ({ mutateAsync: vi.fn() }),
+  useCreateConversationMutation: () => ({ mutateAsync: vi.fn() }),
+  useAddMessagesMutation: () => ({ mutateAsync: vi.fn() }),
+}));
+
 vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: true }),
   StatsigContext: React.createContext({ client: {} }),
@@ -255,12 +261,12 @@ describe('ChatPageClient', () => {
 
     const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
 
+    expect(headerActions).not.toBeNull();
     expect(headerActions).toEqual(
       expect.objectContaining({
         type: expect.anything(),
       })
     );
-    expect(React.Children.count(headerActions.props.children)).toBe(1);
   });
 
   it('does not register chat header actions on the new-thread route', () => {

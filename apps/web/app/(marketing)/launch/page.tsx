@@ -142,7 +142,7 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 /* ─── Shared inline style helpers ─── */
-const WRAP = 'mx-auto w-full max-w-[1120px] px-6 sm:px-8 lg:px-10';
+const WRAP = 'mx-auto w-full max-w-[1200px] px-6 sm:px-8 lg:px-10';
 
 const LOGOS = [
   'Spotify',
@@ -312,7 +312,7 @@ export default function LaunchPage() {
               <div className='mb-4 font-mono tracking-wide text-xs text-tertiary-token'>
                 {item.num}
               </div>
-              <h3 className='font-medium mb-3 text-base tracking-tight leading-snug'>
+              <h3 className='font-medium mb-3 text-base tracking-tight leading-snug text-primary-token'>
                 {item.title}
               </h3>
               <p className='text-sm leading-relaxed text-secondary-token'>
@@ -564,9 +564,15 @@ export default function LaunchPage() {
                           fontSize: '0.6rem',
                           padding: '0.1rem 0.35rem',
                           borderRadius: 2,
-                          background: 'rgba(74,222,128,0.06)',
-                          color: 'rgb(52 211 153)',
-                          opacity: r.badge === 'Pro' ? 0.4 : 0.7,
+                          background:
+                            r.badge === 'Pro'
+                              ? 'rgba(16,185,129,0.16)'
+                              : 'rgba(74,222,128,0.10)',
+                          color:
+                            r.badge === 'Pro'
+                              ? 'rgb(167 243 208)'
+                              : 'rgb(110 231 183)',
+                          opacity: 0.95,
                         }}
                       >
                         {r.badge}
@@ -883,7 +889,7 @@ export default function LaunchPage() {
               <div
                 className='w-full py-2 rounded text-center font-medium mb-1'
                 style={{
-                  background: '#008CFF',
+                  background: '#005fcc',
                   color: 'white',
                   fontSize: '0.7rem',
                 }}
@@ -1433,9 +1439,9 @@ export default function LaunchPage() {
                 className='uppercase tracking-wide px-4 pt-3 pb-1'
                 style={{
                   fontSize: '0.65rem',
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--linear-text-secondary)',
                   letterSpacing: '0.08em',
-                  opacity: 0.6,
+                  opacity: 0.92,
                 }}
               >
                 Admin

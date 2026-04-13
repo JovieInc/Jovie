@@ -168,6 +168,49 @@ type FalNameResult =
       warnings: string[];
     };
 
+function extractArtistNamesFromHtml(html: string): string[] {
+  const names: string[] = [];
+
+  // Try extracting from JSON-LD or embedded data
+  const artistNamePattern =
+    /"name"\s*:\s*"([^"]+)"\s*,\s*"@type"\s*:\s*"MusicGroup"/g;
+  let match = artistNamePattern.exec(html);
+  while (match) {
+    names.push(match[1]);
+    match = artistNamePattern.exec(html);
+  }
+
+  // Fallback: extract from embedded script data
+  if (names.length === 0) {
+    const dataPattern = /"artists":\s*\[([^\]]*)\]/g;
+    let dataMatch = dataPattern.exec(html);
+    while (dataMatch) {
+      const nameMatches = dataMatch[1].matchAll(/"name"\s*:\s*"([^"]+)"/g);
+      for (const nm of nameMatches) {
+        if (nm[1] && !names.includes(nm[1])) {
+          names.push(nm[1]);
+        }
+      }
+      dataMatch = dataPattern.exec(html);
+    }
+  }
+
+  // Final fallback: extract from test ID patterns
+  if (names.length === 0) {
+    const simplePattern = /data-testid="artist-link"[^>]*>([^<]+)</g;
+    let simpleMatch = simplePattern.exec(html);
+    while (simpleMatch) {
+      const name = simpleMatch[1].trim();
+      if (name && !names.includes(name)) {
+        names.push(name);
+      }
+      simpleMatch = simplePattern.exec(html);
+    }
+  }
+
+  return names;
+}
+
 async function scrapeFansAlsoLike(artistId: string): Promise<FalNameResult> {
   try {
     const response = await serverFetch(
@@ -210,48 +253,9 @@ async function scrapeFansAlsoLike(artistId: string): Promise<FalNameResult> {
       };
     }
 
-    const names: string[] = [];
-
-    // Try extracting from JSON-LD or embedded data
-    const artistNamePattern =
-      /"name"\s*:\s*"([^"]+)"\s*,\s*"@type"\s*:\s*"MusicGroup"/g;
-    let match = artistNamePattern.exec(html);
-    while (match) {
-      names.push(match[1]);
-      match = artistNamePattern.exec(html);
-    }
-
-    // Fallback: extract from embedded script data
-    if (names.length === 0) {
-      const dataPattern = /"artists":\s*\[([^\]]*)\]/g;
-      let dataMatch = dataPattern.exec(html);
-      while (dataMatch) {
-        const nameMatches = dataMatch[1].matchAll(/"name"\s*:\s*"([^"]+)"/g);
-        for (const nm of nameMatches) {
-          if (nm[1] && !names.includes(nm[1])) {
-            names.push(nm[1]);
-          }
-        }
-        dataMatch = dataPattern.exec(html);
-      }
-    }
-
-    // Final fallback: extract from test ID patterns
-    if (names.length === 0) {
-      const simplePattern = /data-testid="artist-link"[^>]*>([^<]+)</g;
-      let simpleMatch = simplePattern.exec(html);
-      while (simpleMatch) {
-        const name = simpleMatch[1].trim();
-        if (name && !names.includes(name)) {
-          names.push(name);
-        }
-        simpleMatch = simplePattern.exec(html);
-      }
-    }
-
     return {
       status: 'ready',
-      names,
+      names: extractArtistNamesFromHtml(html),
     };
   } catch (error) {
     await captureError('[FAL Scrape] Error', error, {

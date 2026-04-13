@@ -442,7 +442,15 @@ Never mark a task complete without confirming the fix works:
 - Screenshot test: before and after a perf PR, the fully-loaded page must look identical
 - If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
 
-### 17. Outbound Email Personalization Must Fail Safe
+### 17. CSP Domains Must Stay In Sync With Providers
+
+When adding a new DSP, social platform, or any feature that loads external images or media in the browser, update `apps/web/constants/platforms/cdn-domains.ts`:
+- Image CDNs → `PLATFORM_CDN_DOMAINS` (governs CSP `img-src` + Next.js `remotePatterns`)
+- Audio/video CDNs → `PLATFORM_MEDIA_DOMAINS` (governs CSP `media-src`)
+
+These registries are the **single source of truth** consumed by the CSP builder, Next.js config, and avatar hostname validation. Do **NOT** edit CSP directives in `content-security-policy.ts` directly — add domains to the registry instead.
+
+### 18. Outbound Email Personalization Must Fail Safe
 
 - In cold email, lifecycle email, or claim-invite copy, **NEVER** greet recipients with raw usernames, handles, emoji names, or other guessed merge fields
 - Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener
@@ -1441,6 +1449,8 @@ AI agents confidently make decisions about topics they have zero context on. The
 
 5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
 
+6. **Verify before trusting.** When the user (or another agent's output) states something verifiable — "we use X," "competitor Y doesn't do Z," "this API returns W" — check it. A quick grep, file read, or doc lookup takes seconds. If the claim is wrong, say so clearly. This is how we catch agent drift (an agent introduced something it shouldn't have), stale assumptions, and documentation gaps. Being corrected is a feature, not a problem.
+
 ### Operational Awareness Checklist
 
 Before merging any PR that introduces background/scheduled work, verify:
@@ -1690,3 +1700,10 @@ Key routing rules:
 - Design system, brand → invoke `design-consultation`
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
+
+## CI Seeding Guardrail
+
+- In shared CI lanes that audit public routes (`Lighthouse`, `a11y`, public smoke), seed scripts must fail only on required schema.
+- Optional fixtures that depend on add-on relations, such as `promo_downloads`, must warn and skip when the relation is missing unless that lane explicitly provisions the schema first.
+- Playwright route-audit specs must not resolve manifests or env-dependent surface lists in a way that can crash the module import. Catch resolution failures and surface them through an always-registered test or equivalent explicit failure path; `beforeAll` alone is insufficient if manifest failure can result in zero generated tests.
+- Test-bypass health/debug endpoints must fail closed on production deploys. Preview-only bypass logic may exist for CI smoke runs, but `VERCEL_ENV=production` must hard-block access regardless of spoofable headers or bypass flags.

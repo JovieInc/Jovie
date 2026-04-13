@@ -82,7 +82,7 @@ function HowItWorksSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>How it works</p>
@@ -162,7 +162,7 @@ function BenefitsSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <div className='marketing-divider mb-14' />
 
           <div className='homepage-section-intro'>
@@ -226,7 +226,7 @@ function SocialProofSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-[1120px]'>
+        <div className='mx-auto max-w-[1200px]'>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>Built for real-world artists</p>

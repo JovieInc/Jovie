@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: vi.fn().mockResolvedValue({
+  getDashboardDataEssential: vi.fn().mockResolvedValue({
     selectedProfile: null,
   }),
 }));
@@ -82,6 +82,7 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
+  buildHandleCandidates: vi.fn().mockReturnValue([]),
   reserveOnboardingHandle: vi.fn().mockResolvedValue(null),
 }));
 
@@ -107,7 +108,7 @@ describe('onboarding page', () => {
 
   it('allows active users to resume onboarding when a resume target is present', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
+    const { getDashboardDataEssential } = await import(
       '@/app/app/(shell)/dashboard/actions'
     );
 
@@ -124,7 +125,7 @@ describe('onboarding page', () => {
       },
     });
 
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
+    vi.mocked(getDashboardDataEssential).mockResolvedValueOnce({
       selectedProfile: {
         id: 'profile_123',
         username: 'artist',
@@ -145,7 +146,7 @@ describe('onboarding page', () => {
 
   it('allows active users to stay in onboarding on the spotify resume path', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
+    const { getDashboardDataEssential } = await import(
       '@/app/app/(shell)/dashboard/actions'
     );
 
@@ -162,7 +163,7 @@ describe('onboarding page', () => {
       },
     });
 
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
+    vi.mocked(getDashboardDataEssential).mockResolvedValueOnce({
       selectedProfile: {
         id: 'profile_123',
         username: 'artist',
@@ -187,7 +188,7 @@ describe('onboarding page', () => {
     'late-arrivals',
   ] as const)('allows active users to stay in onboarding on the %s resume path', async resume => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
+    const { getDashboardDataEssential } = await import(
       '@/app/app/(shell)/dashboard/actions'
     );
 
@@ -204,7 +205,7 @@ describe('onboarding page', () => {
       },
     });
 
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
+    vi.mocked(getDashboardDataEssential).mockResolvedValueOnce({
       selectedProfile: {
         id: 'profile_123',
         username: 'artist',
@@ -225,7 +226,7 @@ describe('onboarding page', () => {
 
   it('allows active users to continue onboarding when the handle query is still present', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
-    const { getDashboardData } = await import(
+    const { getDashboardDataEssential } = await import(
       '@/app/app/(shell)/dashboard/actions'
     );
 
@@ -242,7 +243,7 @@ describe('onboarding page', () => {
       },
     });
 
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
+    vi.mocked(getDashboardDataEssential).mockResolvedValueOnce({
       selectedProfile: {
         id: 'profile_123',
         username: 'artist',
@@ -264,7 +265,7 @@ describe('onboarding page', () => {
   it('does not fall back to the dev test-auth username for fresh onboarding handles', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
     const { getCachedCurrentUser } = await import('@/lib/auth/cached');
-    const { getDashboardData } = await import(
+    const { getDashboardDataEssential } = await import(
       '@/app/app/(shell)/dashboard/actions'
     );
 
@@ -283,7 +284,7 @@ describe('onboarding page', () => {
     vi.mocked(getCachedCurrentUser).mockResolvedValueOnce({
       username: 'browse-test-user',
     } as never);
-    vi.mocked(getDashboardData).mockResolvedValueOnce({
+    vi.mocked(getDashboardDataEssential).mockResolvedValueOnce({
       selectedProfile: null,
     });
 

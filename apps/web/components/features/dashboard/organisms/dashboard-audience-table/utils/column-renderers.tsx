@@ -279,6 +279,14 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
 
 type SubtitlePart = { key: string; text: string; className?: string };
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function buildUserSubtitleParts(
   m: AudienceMember,
   hiddenMetadataColumns: {
@@ -289,41 +297,32 @@ function buildUserSubtitleParts(
 ): SubtitlePart[] {
   const parts: SubtitlePart[] = [];
 
-  if (hiddenMetadataColumns.engagement) {
-    if (m.intentLevel === 'high') {
-      parts.push({
-        key: 'intent',
-        text: 'High',
-        className: 'font-[510] text-emerald-600 dark:text-emerald-400',
-      });
-    } else if (m.intentLevel === 'medium') {
-      parts.push({
-        key: 'intent',
-        text: 'Medium',
-        className: 'font-[510] text-amber-600 dark:text-amber-400',
-      });
-    }
-
-    if (m.visits > 0) {
-      parts.push({
-        key: 'visits',
-        text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
-      });
-    }
+  if (hiddenMetadataColumns.engagement && m.intentLevel === 'high') {
+    parts.push({
+      key: 'intent',
+      text: 'High',
+      className: 'font-[510] text-emerald-600 dark:text-emerald-400',
+    });
+  } else if (hiddenMetadataColumns.engagement && m.intentLevel === 'medium') {
+    parts.push({
+      key: 'intent',
+      text: 'Medium',
+      className: 'font-[510] text-amber-600 dark:text-amber-400',
+    });
   }
 
-  if (hiddenMetadataColumns.location) {
-    const locationCity = m.geoCity ?? m.geoCountry ?? null;
-    if (locationCity) {
-      try {
-        parts.push({
-          key: 'location',
-          text: decodeURIComponent(locationCity),
-        });
-      } catch {
-        parts.push({ key: 'location', text: locationCity });
-      }
-    }
+  if (hiddenMetadataColumns.engagement && m.visits > 0) {
+    parts.push({
+      key: 'visits',
+      text: `${m.visits} ${m.visits === 1 ? 'visit' : 'visits'}`,
+    });
+  }
+
+  const locationCity = hiddenMetadataColumns.location
+    ? (m.geoCity ?? m.geoCountry ?? null)
+    : null;
+  if (locationCity) {
+    parts.push({ key: 'location', text: safeDecode(locationCity) });
   }
 
   if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {

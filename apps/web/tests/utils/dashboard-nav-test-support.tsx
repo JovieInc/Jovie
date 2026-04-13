@@ -16,6 +16,8 @@ export const mockUsePlanGate = vi.fn(() => ({
   isLoading: false,
 }));
 export const mockToastInfo = vi.fn();
+export const mockShowPendingShell = vi.fn();
+export const mockClearPendingShell = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -62,6 +64,14 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
     open: vi.fn(),
     close: vi.fn(),
     toggle: vi.fn(),
+  }),
+}));
+
+vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+  usePendingShell: () => ({
+    clearPendingShell: (...args: unknown[]) => mockClearPendingShell(...args),
+    pendingShellRoute: null,
+    showPendingShell: (...args: unknown[]) => mockShowPendingShell(...args),
   }),
 }));
 
@@ -142,6 +152,8 @@ export function resetDashboardNavTestMocks() {
     isLoading: false,
   });
   mockToastInfo.mockReset();
+  mockShowPendingShell.mockReset();
+  mockClearPendingShell.mockReset();
 }
 
 export function renderDashboardNav({

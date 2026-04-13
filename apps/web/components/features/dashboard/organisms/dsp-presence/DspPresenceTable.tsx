@@ -155,7 +155,7 @@ export function DspPresenceTable({
   return (
     <UnifiedTable
       data={items}
-      columns={columns as ColumnDef<DspPresenceItem, unknown>[]}
+      columns={columns}
       onRowClick={onRowSelect}
       getRowId={getRowId}
       getRowTestId={getRowTestId}

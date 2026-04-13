@@ -5,6 +5,7 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getConversionFunnelData } from '@/lib/admin/conversion-funnel';
+import { formatPercent } from '@/lib/admin/format';
 
 const FUNNEL_SKELETON_KEYS = [
   'visitors',
@@ -13,11 +14,6 @@ const FUNNEL_SKELETON_KEYS = [
   'subscribers',
   'paid',
 ] as const;
-
-function formatPercent(rate: number | null): string {
-  if (rate === null) return '—';
-  return `${(rate * 100).toFixed(1)}%`;
-}
 
 export async function AdminConversionFunnelSection() {
   const funnel = await getConversionFunnelData('all');

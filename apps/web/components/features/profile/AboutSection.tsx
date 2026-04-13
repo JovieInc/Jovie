@@ -158,7 +158,10 @@ export function AboutSection({
                       void downloadPressPhoto(photo, artist, index);
                     }}
                     className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors duration-150 hover:bg-black/40 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50'
-                    aria-label={`Download ${photo.originalFilename ?? `press photo ${index + 1}`}`}
+                    aria-label={
+                      'Download ' +
+                      (photo.originalFilename ?? `press photo ${index + 1}`)
+                    }
                   >
                     <Download className='h-4 w-4' />
                   </button>

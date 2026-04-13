@@ -115,8 +115,7 @@ export const HOME_RELEASE_DESTINATION_PRESAVE_MOCK: HomepageReleaseMock = {
   id: 'the-deep-end-presave',
   title: 'The Deep End',
   artist: 'Cosmic Gate & Tim White',
-  // Far-future date so presave state does not expire in demo/proof surfaces.
-  releaseLabel: 'Drops December 31, 2099',
+  releaseLabel: 'Dropping soon',
   modeLabel: 'Countdown Presave',
   state: 'presave',
   stateDetail: 'Presave is open',
@@ -133,7 +132,7 @@ export const HOME_HERO_RELEASE_MOCK = HOME_RELEASE_DESTINATION_PRESAVE_MOCK;
 export const HOME_RELEASE_DESTINATION_LIVE_MOCK: HomepageReleaseMock = {
   id: 'take-me-over-live',
   title: 'Take Me Over',
-  artist: 'Tim White',
+  artist: 'Tim White feat. Erica Gibson',
   releaseLabel: 'Released October 1, 2014',
   modeLabel: 'Live Smart Link',
   state: 'live',

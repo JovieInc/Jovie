@@ -5,6 +5,188 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.1] - 2026-04-13
+
+### Fixed
+
+- Remove double logo on auth pages (hide Clerk's built-in logoBox, keep custom BrandLogo)
+- Change sign-in/sign-up CTA button from purple to white with dark text
+
+## [26.4.152.0] - 2026-04-12
+
+### Added
+
+- "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
+- Segmented birthday input with grouped [MM]/[DD]/[YYYY] digit boxes (replaces plain text input)
+- `useSegmentedInput` shared hook powering both OTP and birthday digit inputs
+- Birthday now captures the full year (stored as YYYY-MM-DD, backwards-compatible with legacy MM-DD)
+- Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
+- Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
+- Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
+
+### Changed
+
+- Venmo clicks fire `venmo_link_click` instead of `tip_intent` to distinguish unverifiable Venmo link opens from Stripe payment intents in analytics
+- Profile query in tip checkout now includes `stripeAccountId` and `stripePayoutsEnabled` fields
+
+### Fixed
+
+- OTP verification: expired or invalid codes no longer allow submitting (all subscribe components)
+- OTP auto-clears after error so fans get a fresh slate to retype
+- Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
+- `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
+
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
+
+### Fixed
+
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
+
+## [26.4.151.4] - 2026-04-12
+
+### Fixed
+
+- Handle `DYNAMIC_SERVER_USAGE` error in root layout so public profile pages can use ISR with `revalidate` without crashing the build
+
+## [26.4.151.3] - 2026-04-12
+
+> Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
+
+### Added
+
+- [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
+
+## [26.4.148.1] - 2026-04-12
+
+### Removed
+
+- Delete 23 dead loading skeletons on redirect-only routes that never rendered
+- Remove orphaned `WaitlistSkeleton` component and Storybook story
+- Remove unused `BrandingSettingsLoading`, `NotificationsSettingsLoading`, and `BillingSettingsLoading` exports
+
+### Fixed
+
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
+- Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
+- Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
+- Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
+- Add missing ad-pixels section skeleton to audience settings loader
+- Fix billing settings loader description text ("Subscription" to "Plan")
+
+## [26.4.148.0] - 2026-04-11
+
+### Fixed
+
+- Eliminate chat message flickering by skipping entrance animation on messages loaded from persistence
+- Rewrite chat skeleton loader to match actual message layout (circular logo above bubble, correct border styling)
+- Cap chat thread and input width at 44rem to prevent overly wide layouts on large screens
+
+### Changed
+
+- Chat copy buttons now show icon-only with circle background only on hover, matching the sidebar toggle pattern
+- Replace top-right Copy Session ID button with an ellipsis dropdown menu containing Copy and Archive actions
+
+## [26.4.147.0] - 2026-04-11
+
+### Fixed
+
+- Gracefully handle missing Clerk middleware context on `/api/images/upload` instead of throwing unhandled errors (Fixes JOVIE-WEB-JC)
+- Add CSP `media-src` directive to allow audio previews from Spotify, Apple Music, and Deezer CDNs, and video from Vercel blob storage (Fixes JOVIE-WEB-JD)
+
+### Added
+
+- Centralized media CDN domain registry (`PLATFORM_MEDIA_DOMAINS`) alongside existing image CDN registry, so CSP stays in sync when new providers are added
+- AGENTS.md guardrail requiring CSP domain updates go through the CDN registry, not direct CSP edits
+
+## [26.4.146.3] - 2026-04-11
+
+### Changed
+
+- Standardize badge styling across settings pages to use Badge component variants instead of custom inline classes
+- Add CheckCircle icon to "Verified" badge in Connected Accounts for consistency with Email section
+- Convert raw `<span>` "Current session" badge to Badge component in Session Management
+- Correct theme selector card border radius from 12px to 10px in Appearance settings
+
+## [26.4.146.2] - 2026-04-11
+
+### Fixed
+
+- Pass CSP nonce from middleware to theme-init Script in root layout, fixing hydration mismatch on authenticated pages
+- Suppress expected hydration warning on smart link URLs where server/client origins intentionally differ
+
+## [26.4.146.1] - 2026-04-11
+
+### Changed
+
+- Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
+- Align SettingsPanel title letter-spacing to -0.02em to match row components
+- Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
+- Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
+- Added dedicated playlist layout to preserve site header, footer, and dark theme styling
+
+## [26.4.146.0] - 2026-04-11
+
+### Fixed
+
+- Staging auth routes (/signup, /signin) returning 500, blocking CI canary health gate since April 8
+- Detect production Clerk keys on staging and skip middleware instead of crashing on domain mismatch
+- Add try-catch safety net around staging Clerk middleware call
+- Fix auth layout tests missing CLERK_SECRET_KEY in test environment
+- Gate x-clerk-publishable-key header injection on both PK and SK presence
+
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+- Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
+## [26.4.145.1] - 2026-04-10
+
+### Fixed
+
+- Bumped `next` 16.2.1 → 16.2.3 across all apps to fix Server Components DoS vulnerability
+- Bumped `drizzle-orm` override to 0.45.2 to fix SQL injection via improperly escaped identifiers
+- Bumped `vite` override to ^6.4.2 to fix arbitrary file read and path traversal (dev-only)
+- Bumped `basic-ftp` override to ^5.2.2 to fix FTP command injection via CRLF (dev-only)
+- Bumped `lodash` override to >=4.18.1 to fix code injection and prototype pollution
+- Added overrides for `lodash-es`, `handlebars`, `@xmldom/xmldom`, and `brace-expansion` to remediate transitive dependency vulnerabilities
+
+## [26.4.145] - 2026-04-10
+
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
+
 ## [26.4.144.1] - 2026-04-10
 
 ### Added

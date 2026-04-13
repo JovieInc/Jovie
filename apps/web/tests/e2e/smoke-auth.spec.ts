@@ -72,8 +72,8 @@ async function assertDashboardRouteLoaded(
 
   if (path === APP_ROUTES.CHAT) {
     await expect(
-      page.getByPlaceholder(/ask jovie anything/i),
-      'Chat: input did not render'
+      page.getByLabel(/chat message input/i),
+      'Chat: composer did not render'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     return;
   }

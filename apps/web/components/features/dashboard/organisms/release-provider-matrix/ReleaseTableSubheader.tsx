@@ -60,8 +60,10 @@ export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
 export type ReleaseView = 'tracks' | 'releases';
 
 interface ReleaseTableSubheaderProps {
-  /** All releases for export */
+  /** Filtered releases for export */
   readonly releases: ReleaseViewModel[];
+  /** All unfiltered releases for computing filter counts */
+  readonly allReleases: ReleaseViewModel[];
   /** Selected release IDs for filtered export */
   readonly selectedIds: Set<string>;
   /** Current filter state */
@@ -117,6 +119,7 @@ function ReleaseViewButtons({
  */
 export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   releases,
+  allReleases,
   selectedIds,
   filters,
   onFiltersChange,
@@ -129,8 +132,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onCreateRelease,
   canCreateManualReleases = false,
 }: ReleaseTableSubheaderProps) {
-  // Compute filter counts for displaying badges
-  const counts = useReleaseFilterCounts(releases);
+  // Compute filter counts from all (unfiltered) releases so counts stay stable
+  const counts = useReleaseFilterCounts(allReleases);
   const showToolbarExtras = useCodeFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
 
   return (

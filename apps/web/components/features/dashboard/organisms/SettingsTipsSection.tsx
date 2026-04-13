@@ -63,7 +63,8 @@ export function SettingsTipsSection() {
       }
 
       const nextSearch = nextParams.toString();
-      router.replace(`${pathname}${nextSearch ? `?${nextSearch}` : ''}#tips`, {
+      const searchSuffix = nextSearch ? `?${nextSearch}` : '';
+      router.replace(`${pathname}${searchSuffix}#tips`, {
         scroll: false,
       });
     },

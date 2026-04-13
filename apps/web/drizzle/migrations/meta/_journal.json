@@ -211,6 +211,27 @@
       "when": 1775682246100,
       "tag": "0029_normalize_is_bot",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1775682246200,
+      "tag": "0030_normalize_audience_jsonb",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1775885889990,
+      "tag": "0031_needy_blindfold",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1775975959585,
+      "tag": "0032_tricky_thing",
+      "breakpoints": true
     }
   ]
 }

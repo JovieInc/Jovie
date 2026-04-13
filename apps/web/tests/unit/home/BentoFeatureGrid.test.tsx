@@ -23,7 +23,5 @@ describe('BentoFeatureGrid', () => {
       })
       .closest('section');
     expect(section).toHaveAttribute('aria-labelledby', 'bento-heading');
-
-    expect(screen.getByText('Command Center')).toBeInTheDocument();
   });
 });

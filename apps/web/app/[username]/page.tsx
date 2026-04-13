@@ -45,9 +45,10 @@ import {
 import type { PressPhoto } from '@/types/press-photos';
 import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
+import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
-const MAX_EVENT_SCHEMAS = 10;
+const MAX_EVENT_SCHEMAS = 5;
 
 /**
  * Map ticketStatus enum to schema.org Event properties.
@@ -425,7 +426,8 @@ const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
     process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development'
+    process.env.NODE_ENV === 'development' ||
+    shouldBypassPublicProfileQaCache()
   ) {
     return fetchProfileAndLinks(username);
   }
@@ -625,6 +627,9 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        profileSettings={{
+          showOldReleases: profileSettings.showOldReleases === true,
+        }}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />

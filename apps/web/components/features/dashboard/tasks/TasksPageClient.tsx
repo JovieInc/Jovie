@@ -1180,6 +1180,12 @@ export function TasksPageClient() {
     [canShowTaskDocumentAlongsideReleaseSidebar]
   );
 
+  // Close release sidebar when the active task changes — the sidebar is only
+  // useful alongside the task that owns the release.
+  useEffect(() => {
+    setSelectedReleaseId(null);
+  }, [effectiveSelectedTaskId]);
+
   useEffect(() => {
     if (!selectedReleaseId || canShowTaskDocumentAlongsideReleaseSidebar) {
       return;

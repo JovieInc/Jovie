@@ -20,7 +20,7 @@ function formatUsd(value: number): string {
   return value.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0,
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
   });
 }
 

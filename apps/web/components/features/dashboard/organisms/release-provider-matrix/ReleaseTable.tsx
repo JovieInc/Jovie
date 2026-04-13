@@ -49,6 +49,7 @@ export function ReleaseTable({
   artistName,
   onCopy,
   onEdit,
+  onDelete,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -75,11 +76,19 @@ export function ReleaseTable({
         release,
         onEdit,
         onCopy,
+        onDelete,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
       }),
-    [onEdit, onCopy, artistName, isSmartLinkLocked, getSmartLinkLockReason]
+    [
+      onEdit,
+      onCopy,
+      onDelete,
+      artistName,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    ]
   );
 
   // Stable callbacks for UnifiedTable props
@@ -271,7 +280,7 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className='text-[12.5px] text-primary-token'
+      className='text-[13px] text-primary-token'
       containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}

@@ -91,6 +91,8 @@ export interface PageHeaderProps {
   /** Desktop sidebar trigger for dashboard pages */
   readonly sidebarTrigger?: ReactNode;
   readonly className?: string;
+  readonly titleClassName?: string;
+  readonly subtitleClassName?: string;
 }
 
 /**
@@ -124,6 +126,8 @@ export function PageHeader({
   mobileSidebarTrigger,
   sidebarTrigger,
   className,
+  titleClassName,
+  subtitleClassName,
 }: PageHeaderProps) {
   return (
     <ContentSectionHeader
@@ -146,6 +150,8 @@ export function PageHeader({
       actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}
       bodyClassName='min-w-0'
+      titleClassName={titleClassName}
+      subtitleClassName={subtitleClassName}
     />
   );
 }

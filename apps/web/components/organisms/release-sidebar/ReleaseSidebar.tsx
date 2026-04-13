@@ -235,6 +235,7 @@ function ReleaseEntityHeader({
             meta={
               <ReleaseFields
                 releaseDate={release.releaseDate}
+                revealDate={release.revealDate}
                 releaseType={release.releaseType}
                 totalTracks={release.totalTracks}
                 platformCount={release.providers.length}
@@ -729,7 +730,8 @@ export function ReleaseSidebar({
                     >
                       Loading tasks...
                     </div>
-                  ) : canAccessTasksWorkspace ? (
+                  ) : null}
+                  {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (
                     <ReleaseTaskChecklist
                       releaseId={release.id}
                       variant='compact'
@@ -742,11 +744,12 @@ export function ReleaseSidebar({
                           );
                       }}
                     />
-                  ) : (
+                  ) : null}
+                  {!isTasksWorkspaceGateLoading && !canAccessTasksWorkspace ? (
                     <CompactReleasePlanUpgradeCard
                       onDismiss={() => setActiveTab('details')}
                     />
-                  )}
+                  ) : null}
                 </div>
               )}
 

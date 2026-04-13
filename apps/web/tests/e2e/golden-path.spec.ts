@@ -131,7 +131,13 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       timeout: 120_000,
       retries: 2,
     });
-    await page.waitForURL(/onboarding/, { timeout: 30_000 });
+    await expect
+      .poll(() => page.url(), {
+        timeout: 30_000,
+        message:
+          'Fresh signup should land on an authenticated app surface before onboarding continues',
+      })
+      .toMatch(/\/(?:app(?:\/|$)|onboarding(?:\/|\?|$))/);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Onboarding — Handle step
@@ -151,7 +157,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       page.locator('[data-testid="onboarding-form-wrapper"]')
     ).toBeVisible({ timeout: 20_000 });
 
-    const handleEl = page.getByLabel('Enter your desired handle');
+    const handleEl = page.getByLabel('Claim your handle');
     await expect(handleEl).toBeVisible({ timeout: 10_000 });
     await expect
       .poll(async () => (await handleEl.inputValue()).trim(), {

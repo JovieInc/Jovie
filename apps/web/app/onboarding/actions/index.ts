@@ -367,6 +367,11 @@ export async function completeOnboarding({
     // Step 8: Sync operations (parallel, fire-and-forget)
     runBackgroundSyncOperations(userId, completion.username);
 
+    // Step 9: Activate 14-day Pro trial (fire-and-forget)
+    void import('./activate-trial').then(({ activateTrial }) =>
+      activateTrial(userId)
+    );
+
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s
     // This handles the race between transaction commit and proxy's DB read

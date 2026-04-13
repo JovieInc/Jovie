@@ -203,7 +203,7 @@ export function GtmSpeedDial() {
           </>
         ) : (
           <>
-            <span className='mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-tertiary-token' />
+            <span className='mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-tertiary-token' />{' '}
             Pipeline paused
           </>
         )}

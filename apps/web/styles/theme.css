@@ -40,6 +40,11 @@
   font-feature-settings: var(--linear-font-features);
 }
 
+/* --- A2. Hide Clerk's built-in logo (we render our own BrandLogo above the card) --- */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-logoBox {
+  display: none;
+}
+
 /* --- B. Card container --- */
 :is(.cl-signIn-root, .cl-signUp-root),
 :is(.cl-signIn-root, .cl-signUp-root) .cl-cardBox {
@@ -251,8 +256,8 @@
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
   min-height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: var(--color-accent);
-  color: #ffffff;
+  background: #ffffff;
+  color: #08090a;
   border-radius: var(--radius-pill);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.32);
   font-size: 0.9375rem;
@@ -264,7 +269,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:hover {
-  background: var(--color-accent-hover);
+  background: #f0f0f0;
 }
 
 @media (hover: hover) {

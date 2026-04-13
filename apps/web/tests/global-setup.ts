@@ -29,6 +29,8 @@ const isCuratedFastLane = process.env.E2E_FAST_CURATED === '1';
 const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
 const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const resolvedDatabaseUrl =
+  process.env.DATABASE_URL || process.env.DATABASE_URL_DIRECT;
 const shouldSkipSeeding =
   isAuthRefreshOnly ||
   (!isCI && isFastIteration) ||
@@ -180,7 +182,7 @@ async function globalSetup() {
   if (shouldSkipSeeding) {
     console.log('Skipping test data seeding for fast local iteration');
   } else if (
-    process.env.DATABASE_URL &&
+    resolvedDatabaseUrl &&
     (!hasExternalBaseUrl || shouldSeedExternalPreview)
   ) {
     try {
@@ -196,7 +198,9 @@ async function globalSetup() {
       }
     }
   } else {
-    console.log('DATABASE_URL not set, skipping test data seeding');
+    console.log(
+      'DATABASE_URL/DATABASE_URL_DIRECT not set, skipping test data seeding'
+    );
   }
 
   if (hasExternalBaseUrl) {

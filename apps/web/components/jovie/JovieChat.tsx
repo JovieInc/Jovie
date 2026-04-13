@@ -42,6 +42,8 @@ export function JovieChat({
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  // Track message IDs that were loaded from persistence to skip entrance animation
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const {
     input,
     setInput,
@@ -158,6 +160,15 @@ export function JovieChat({
       submitMessage(initialQuery);
     }
   }, [initialQuery, isLoadingConversation, submitMessage]);
+
+  // Populate known message IDs from hydrated conversation to skip entrance animations
+  useEffect(() => {
+    if (messages.length > 0 && knownMessageIdsRef.current.size === 0) {
+      for (const m of messages) {
+        knownMessageIdsRef.current.add(m.id);
+      }
+    }
+  }, [messages]);
 
   // ─── Synthetic thinking message (render-only) ───────────────────
   // Append a placeholder when waiting for the AI to start responding.
@@ -322,7 +333,7 @@ export function JovieChat({
             {shouldVirtualizeMessages ? (
               <div
                 ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full flex-col'
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
                 style={{
                   position: 'relative',
                   height: Math.max(
@@ -361,6 +372,9 @@ export function JovieChat({
                             message.role === 'user' ? avatarUrl : undefined
                           }
                           profileId={profileId}
+                          skipEntrance={knownMessageIdsRef.current.has(
+                            message.id
+                          )}
                         />
                       </div>
                     </div>
@@ -370,7 +384,7 @@ export function JovieChat({
             ) : (
               <div
                 ref={totalSizeRef}
-                className='mx-auto flex min-h-full w-full flex-col'
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
               >
                 {displayMessages.map((message, index) => {
                   const isThinking = message.id === THINKING_PLACEHOLDER_ID;
@@ -388,6 +402,9 @@ export function JovieChat({
                           message.role === 'user' ? avatarUrl : undefined
                         }
                         profileId={profileId}
+                        skipEntrance={knownMessageIdsRef.current.has(
+                          message.id
+                        )}
                       />
                     </div>
                   );
@@ -420,18 +437,21 @@ export function JovieChat({
 
           {/* Input at bottom */}
           <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            {isRateLimited && (
-              <p className='text-xs text-tertiary-token' aria-live='polite'>
-                Sending too fast. Please wait a second before your next message.
-              </p>
-            )}
-            <ChatInput
-              {...chatInputProps}
-              placeholder='Ask a follow-up...'
-              variant='compact'
-              quickActions={followUpQuickActions}
-              onQuickActionSelect={handleSuggestedPrompt}
-            />
+            <div className='mx-auto w-full max-w-[44rem]'>
+              {isRateLimited && (
+                <p className='text-xs text-tertiary-token' aria-live='polite'>
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
+              )}
+              <ChatInput
+                {...chatInputProps}
+                placeholder='Ask a follow-up...'
+                variant='compact'
+                quickActions={followUpQuickActions}
+                onQuickActionSelect={handleSuggestedPrompt}
+              />
+            </div>
           </div>
         </div>
       ) : (

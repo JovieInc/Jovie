@@ -60,13 +60,24 @@ async function renderAuthRouteLayout({
     ),
   }));
 
+  const mockHeaders: Record<string, string> = {
+    host: forwardedHost,
+    'x-forwarded-host': forwardedHost,
+    'x-forwarded-proto': forwardedProto,
+  };
+  // Simulate what middleware does: set the pre-resolved publishable key header.
+  // On staging hosts, middleware resolves staging keys separately so we only
+  // set the header for non-staging hosts (matching production behavior).
+  const isStagingHost = forwardedHost.startsWith('staging.');
+  if (publishableKey && !isStagingHost) {
+    mockHeaders['x-clerk-publishable-key'] = publishableKey;
+  }
+  if (stagingPublishableKey && isStagingHost) {
+    mockHeaders['x-clerk-publishable-key'] = stagingPublishableKey;
+  }
+
   vi.doMock('next/headers', () => ({
-    headers: async () =>
-      new Headers({
-        host: forwardedHost,
-        'x-forwarded-host': forwardedHost,
-        'x-forwarded-proto': forwardedProto,
-      }),
+    headers: async () => new Headers(mockHeaders),
   }));
 
   vi.doMock('@/features/auth', () => ({

@@ -63,7 +63,7 @@ export function SentryExamplePageClient() {
               >
                 Next.js docs
               </a>
-              .
+              {'.'}
             </p>
           </div>
 
@@ -106,7 +106,7 @@ export function SentryExamplePageClient() {
             </ContentSurfaceCard>
           ) : null}
 
-          {!isConnected ? (
+          {isConnected ? null : (
             <ContentSurfaceCard
               surface='nested'
               className='border-[color-mix(in_oklab,var(--linear-warning)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] p-4'
@@ -122,7 +122,7 @@ export function SentryExamplePageClient() {
                 </p>
               </div>
             </ContentSurfaceCard>
-          ) : null}
+          )}
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>
