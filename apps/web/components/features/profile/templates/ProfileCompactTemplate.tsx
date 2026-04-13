@@ -130,7 +130,7 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
 }
 
 function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return fallbackMode;
   }
 
@@ -215,7 +215,7 @@ export function ProfileCompactTemplate({
   }, [artist.image_url, photoDownloadSizes]);
 
   const initialSource = useMemo(() => {
-    if (typeof globalThis.window === 'undefined') return null;
+    if (globalThis.window === undefined) return null;
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
@@ -648,110 +648,112 @@ export function ProfileCompactTemplate({
                   <SubscriptionConfirmedBanner />
                 ) : null}
 
-                {releaseVisibility?.show &&
-                releaseVisibility.isCountdown &&
-                latestRelease ? (
-                  <Link
-                    href={`/${artist.handle}/${latestRelease.slug}`}
-                    prefetch={false}
-                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`${latestRelease.title} — drops soon`}
-                  >
-                    {latestRelease.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
-                        <ImageWithFallback
-                          src={latestRelease.artworkUrl}
-                          alt={latestRelease.title}
-                          fill
-                          sizes='40px'
-                          className='object-cover'
-                          fallbackVariant='release'
-                        />
-                      </div>
-                    ) : null}
-                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                      {latestRelease.title}
-                    </p>
-                    <ReleaseCountdown
-                      releaseDate={new Date(latestRelease.releaseDate!)}
-                      compact
-                    />
-                  </Link>
-                ) : releaseVisibility?.show &&
-                  !releaseVisibility.isCountdown &&
-                  latestRelease &&
-                  mergedDSPs.length > 0 ? (
-                  <button
-                    type='button'
-                    onClick={handlePlayClick}
-                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`Listen to ${latestRelease.title}`}
-                  >
-                    {latestRelease.artworkUrl ? (
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
-                        <ImageWithFallback
-                          src={latestRelease.artworkUrl}
-                          alt={latestRelease.title}
-                          fill
-                          sizes='40px'
-                          className='object-cover'
-                          fallbackVariant='release'
-                        />
-                      </div>
-                    ) : null}
-                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                      {latestRelease.title}
-                    </p>
-                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                      Listen
-                    </span>
-                  </button>
-                ) : nextTourDate ? (
-                  <a
-                    href={nextTourDate.ticketUrl ?? ticketlessTourHref}
-                    target={nextTourDate.ticketUrl ? '_blank' : undefined}
-                    rel={
-                      nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined
-                    }
-                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                  >
-                    <div className='flex shrink-0 flex-col items-center leading-none'>
-                      <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
-                        {new Intl.DateTimeFormat('en-US', {
-                          month: 'short',
-                        }).format(new Date(nextTourDate.startDate))}
+                <div className='min-h-[52px]'>
+                  {releaseVisibility?.show &&
+                  releaseVisibility.isCountdown &&
+                  latestRelease ? (
+                    <Link
+                      href={`/${artist.handle}/${latestRelease.slug}`}
+                      prefetch={false}
+                      className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                      aria-label={`${latestRelease.title} — drops soon`}
+                    >
+                      {latestRelease.artworkUrl ? (
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                          <ImageWithFallback
+                            src={latestRelease.artworkUrl}
+                            alt={latestRelease.title}
+                            fill
+                            sizes='40px'
+                            className='object-cover'
+                            fallbackVariant='release'
+                          />
+                        </div>
+                      ) : null}
+                      <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
+                        {latestRelease.title}
+                      </p>
+                      <ReleaseCountdown
+                        releaseDate={new Date(latestRelease.releaseDate!)}
+                        compact
+                      />
+                    </Link>
+                  ) : releaseVisibility?.show &&
+                    !releaseVisibility.isCountdown &&
+                    latestRelease &&
+                    mergedDSPs.length > 0 ? (
+                    <button
+                      type='button'
+                      onClick={handlePlayClick}
+                      className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                      aria-label={`Listen to ${latestRelease.title}`}
+                    >
+                      {latestRelease.artworkUrl ? (
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                          <ImageWithFallback
+                            src={latestRelease.artworkUrl}
+                            alt={latestRelease.title}
+                            fill
+                            sizes='40px'
+                            className='object-cover'
+                            fallbackVariant='release'
+                          />
+                        </div>
+                      ) : null}
+                      <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
+                        {latestRelease.title}
+                      </p>
+                      <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                        Listen
                       </span>
-                      <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
-                        {new Intl.DateTimeFormat('en-US', {
-                          day: 'numeric',
-                        }).format(new Date(nextTourDate.startDate))}
+                    </button>
+                  ) : nextTourDate ? (
+                    <a
+                      href={nextTourDate.ticketUrl ?? ticketlessTourHref}
+                      target={nextTourDate.ticketUrl ? '_blank' : undefined}
+                      rel={
+                        nextTourDate.ticketUrl
+                          ? 'noopener noreferrer'
+                          : undefined
+                      }
+                      className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                    >
+                      <div className='flex shrink-0 flex-col items-center leading-none'>
+                        <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
+                          {new Intl.DateTimeFormat('en-US', {
+                            month: 'short',
+                          }).format(new Date(nextTourDate.startDate))}
+                        </span>
+                        <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
+                          {new Intl.DateTimeFormat('en-US', {
+                            day: 'numeric',
+                          }).format(new Date(nextTourDate.startDate))}
+                        </span>
+                      </div>
+                      <p className='min-w-0 flex-1 truncate text-[13px] font-[510] text-white/80'>
+                        {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
+                      </p>
+                      <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                        {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
                       </span>
-                    </div>
-                    <p className='min-w-0 flex-1 truncate text-[13px] font-[510] text-white/80'>
-                      {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
-                    </p>
-                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                      {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
-                    </span>
-                  </a>
-                ) : mergedDSPs.length > 0 ? (
-                  <button
-                    type='button'
-                    onClick={handlePlayClick}
-                    className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
-                    aria-label={`Listen to ${artist.name}`}
-                  >
-                    <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
-                    <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>
-                      Listen to {artist.name}
-                    </p>
-                    <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                      Listen
-                    </span>
-                  </button>
-                ) : (
-                  <div className='min-h-[52px]' aria-hidden='true' />
-                )}
+                    </a>
+                  ) : mergedDSPs.length > 0 ? (
+                    <button
+                      type='button'
+                      onClick={handlePlayClick}
+                      className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                      aria-label={`Listen to ${artist.name}`}
+                    >
+                      <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
+                      <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>
+                        Listen to {artist.name}
+                      </p>
+                      <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                        Listen
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
 
                 <ProfileInlineNotificationsCTA
                   artist={artist}

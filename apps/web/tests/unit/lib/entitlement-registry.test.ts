@@ -149,7 +149,7 @@ describe('Entitlement Registry Consistency', () => {
     );
     expect(ENTITLEMENT_REGISTRY.pro.booleans.canSendNotifications).toBe(true);
     expect(ENTITLEMENT_REGISTRY.pro.marketing.features).toContain(
-      'Release notifications'
+      'Release notifications to fans'
     );
   });
 
@@ -193,8 +193,8 @@ describe('Entitlement Registry Consistency', () => {
   });
 
   it('registry plan IDs match PlanId type values', () => {
-    // PlanId = 'free' | 'pro' | 'max' in registry.ts
-    const expectedPlans: PlanId[] = ['free', 'pro', 'max'];
+    // PlanId = 'free' | 'trial' | 'pro' | 'max' in registry.ts
+    const expectedPlans: PlanId[] = ['free', 'trial', 'pro', 'max'];
     expect([...planIds]).toEqual(expectedPlans);
   });
 

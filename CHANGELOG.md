@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.148.2] - 2026-04-12
+## [26.4.151.4] - 2026-04-12
 
 ### Fixed
 
 - Handle `DYNAMIC_SERVER_USAGE` error in root layout so public profile pages can use ISR with `revalidate` without crashing the build
+
+## [26.4.151.3] - 2026-04-12
+
+> Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
+
+### Added
+
+- [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
 
 ## [26.4.148.1] - 2026-04-12
 
@@ -21,6 +29,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
 - Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
 - Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
 - Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
@@ -92,9 +102,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-<<<<<<< HEAD
 - Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
-=======
 - Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
 - Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
 - Removed double shadow on chat input that caused visible border artifact

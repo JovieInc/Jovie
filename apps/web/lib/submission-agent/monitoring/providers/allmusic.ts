@@ -209,9 +209,9 @@ function normalizeComparableValue(
   const normalized = value
     .toLowerCase()
     .replaceAll('&', ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/[^a-z0-9]+/g, ' ')
     .trim()
-    .replace(/\s+/g, ' ');
+    .replaceAll(/\s+/g, ' ');
 
   return normalized.length > 0 ? normalized : null;
 }

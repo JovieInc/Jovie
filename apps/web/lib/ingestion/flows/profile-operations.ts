@@ -23,6 +23,7 @@ export interface ExistingProfileCheck {
     displayName: string | null;
     avatarLockedByUser: boolean;
     displayNameLocked: boolean;
+    isPublic: boolean | null;
     claimToken: string | null;
     claimTokenExpiresAt: Date | null;
   } | null;
@@ -95,6 +96,7 @@ export async function checkExistingProfile(
         displayName: creatorProfiles.displayName,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         displayNameLocked: creatorProfiles.displayNameLocked,
+        isPublic: creatorProfiles.isPublic,
         claimToken: creatorProfiles.claimToken,
         claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
       })

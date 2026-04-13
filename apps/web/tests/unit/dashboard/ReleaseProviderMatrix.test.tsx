@@ -35,7 +35,7 @@ const mockUsePlanGate = vi.fn(() => ({
   smartLinksLimit: null,
   isPro: true,
   canCreateManualReleases: true,
-  canGenerateReleasePlans: true,
+  canGenerateReleasePlans: false,
   canEditSmartLinks: true,
   canAccessFutureReleases: true,
 }));
@@ -563,7 +563,7 @@ describe('ReleaseProviderMatrix', () => {
       smartLinksLimit: null,
       isPro: true,
       canCreateManualReleases: true,
-      canGenerateReleasePlans: true,
+      canGenerateReleasePlans: false,
       canEditSmartLinks: true,
       canAccessFutureReleases: true,
     });
@@ -761,12 +761,14 @@ describe('ReleaseProviderMatrix', () => {
       });
       expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
       expect(
-        await screen.findByRole('heading', { name: 'Generate Release Plan' })
+        await screen.findByRole('heading', {
+          name: 'Upgrade To Generate A Release Plan',
+        })
       ).toBeInTheDocument();
       expect(mockRouterRefresh).not.toHaveBeenCalled();
     });
 
-    it('prompts pro users to generate a release plan after creating a release', async () => {
+    it('prompts pro users to upgrade for release plan generation after creating a release', async () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease('existing-release')]}
@@ -789,16 +791,27 @@ describe('ReleaseProviderMatrix', () => {
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
 
       expect(
-        await screen.findByRole('heading', { name: 'Generate Release Plan' })
+        await screen.findByRole('heading', {
+          name: 'Upgrade To Generate A Release Plan',
+        })
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Create the step-by-step tasks for this release and jump straight into the plan.'
+          'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.'
         )
       ).toBeInTheDocument();
     });
 
     it('generates a release plan and routes to the release tasks page', async () => {
+      // Override to simulate Max-tier user who can generate release plans
+      mockUsePlanGate.mockReturnValue({
+        smartLinksLimit: null,
+        isPro: true,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: true,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease('existing-release')]}
@@ -950,7 +963,9 @@ describe('ReleaseProviderMatrix', () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByRole('heading', { name: 'Generate Release Plan' })
+          screen.queryByRole('heading', {
+            name: 'Upgrade To Generate A Release Plan',
+          })
         ).not.toBeInTheDocument();
       });
 
@@ -984,7 +999,9 @@ describe('ReleaseProviderMatrix', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('heading', { name: 'Generate Release Plan' })
+          screen.getByRole('heading', {
+            name: 'Upgrade To Generate A Release Plan',
+          })
         ).toBeInTheDocument();
       });
 
@@ -1030,7 +1047,9 @@ describe('ReleaseProviderMatrix', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('heading', { name: 'Generate Release Plan' })
+          screen.getByRole('heading', {
+            name: 'Upgrade To Generate A Release Plan',
+          })
         ).toBeInTheDocument();
       });
 
