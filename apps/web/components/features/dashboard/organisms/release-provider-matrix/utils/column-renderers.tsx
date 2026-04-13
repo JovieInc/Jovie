@@ -518,7 +518,7 @@ export function renderStatsCell({
       </div>
 
       {/* Date - fixed width, right aligned */}
-      <span className='w-[54px] text-right text-[9.5px]'>{dateStr ?? '—'}</span>
+      <span className='w-[60px] text-right text-[11px]'>{dateStr ?? '—'}</span>
     </div>
   );
 }

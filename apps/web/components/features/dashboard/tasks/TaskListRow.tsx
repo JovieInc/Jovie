@@ -178,7 +178,7 @@ export function TaskListRow({
       </div>
 
       <div className='flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5'>
-        <div className='min-w-0 flex-1 truncate text-right'>
+        <div className='flex-1 text-right'>
           {task.dueAt ? (
             <ReleaseDueBadge
               dueDate={task.dueAt}

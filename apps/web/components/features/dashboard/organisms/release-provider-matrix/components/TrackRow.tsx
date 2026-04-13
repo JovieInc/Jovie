@@ -140,7 +140,7 @@ export const TrackRow = memo(function TrackRow({
               <button
                 type='button'
                 onClick={handleTogglePlayback}
-                className='flex h-5 w-5 items-center justify-center rounded-full border border-transparent text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={
                   isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
                 }
@@ -152,7 +152,7 @@ export const TrackRow = memo(function TrackRow({
                 )}
               </button>
             ) : (
-              <span className='flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,transparent)] text-secondary-token/80'>
+              <span className='flex h-7 w-7 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,transparent)] text-secondary-token/80'>
                 <VolumeX
                   className='h-3.5 w-3.5'
                   aria-label='No preview available'
@@ -181,7 +181,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-[12.5px] font-[510] text-primary-token'
+                  className='text-[12px] font-[510] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -190,7 +190,8 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[9px] text-tertiary-token'
+                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+                    title='Explicit content'
                   >
                     E
                   </Badge>
