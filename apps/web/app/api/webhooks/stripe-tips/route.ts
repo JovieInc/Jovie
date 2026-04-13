@@ -7,6 +7,7 @@ import { tips } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { processTipCompleted } from '@/lib/services/tips/process-tip-completed';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -175,6 +176,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     session_id: session.id,
     tipper_email: tipperEmail,
   });
+
+  // Process fan data pipeline: audience upsert + thank-you email.
+  // Only runs when `inserted` is truthy (not a duplicate), providing idempotency.
+  // Wrapped in try/catch so failures don't cause 500 → Stripe retries.
+  if (tipperEmail) {
+    try {
+      const result = await processTipCompleted({
+        profileId: creatorProfileId,
+        email: tipperEmail,
+        name: tipperName,
+        amountCents: session.amount_total ?? 0,
+        source: 'tip',
+        metadata: { paymentIntentId, checkoutSessionId: session.id },
+      });
+
+      if (result.errors.length > 0) {
+        logger.warn('Tip post-processing had errors', {
+          tip_id: inserted.id,
+          errors: result.errors,
+        });
+      }
+    } catch (error) {
+      logger.error('Tip post-processing threw unexpectedly', {
+        tip_id: inserted.id,
+        error,
+      });
+    }
+  }
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {

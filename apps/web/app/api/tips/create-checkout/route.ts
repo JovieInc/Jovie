@@ -70,13 +70,15 @@ export async function POST(req: NextRequest) {
 
     const { profileId, amountCents, handle } = parsed.data;
 
-    // Look up the artist profile
+    // Look up the artist profile (including Stripe Connect fields)
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
         displayName: creatorProfiles.displayName,
         username: creatorProfiles.username,
         isPublic: creatorProfiles.isPublic,
+        stripeAccountId: creatorProfiles.stripeAccountId,
+        stripePayoutsEnabled: creatorProfiles.stripePayoutsEnabled,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
@@ -129,16 +131,48 @@ export async function POST(req: NextRequest) {
       cancel_url: `${baseUrl}/${handle}/tip`,
     };
 
-    // Check if Stripe Connect direct transfers should be used
-    if (FEATURE_FLAGS.STRIPE_CONNECT_ENABLED) {
-      // Future: look up stripe_account_id from profile and add transfer_data
-      // sessionParams.payment_intent_data.transfer_data = {
-      //   destination: stripeAccountId,
-      // };
-      // sessionParams.payment_intent_data.application_fee_amount = platformFeeCents;
-      logger.info('Stripe Connect enabled but no account configured', {
-        profileId,
-      });
+    // Route tip directly to creator's Stripe Connect account when available
+    if (
+      FEATURE_FLAGS.STRIPE_CONNECT_ENABLED &&
+      profile.stripeAccountId &&
+      profile.stripePayoutsEnabled
+    ) {
+      try {
+        // Verify account is still active before routing money
+        const account = await stripe.accounts.retrieve(profile.stripeAccountId);
+        if (
+          account.charges_enabled &&
+          account.payouts_enabled &&
+          !account.requirements?.currently_due?.length
+        ) {
+          sessionParams.payment_intent_data!.transfer_data = {
+            destination: profile.stripeAccountId,
+          };
+          sessionParams.payment_intent_data!.application_fee_amount =
+            platformFeeCents;
+          logger.info('Stripe Connect: routing tip to creator account', {
+            profileId,
+            stripeAccountId: profile.stripeAccountId,
+            platformFeeCents,
+          });
+        } else {
+          logger.warn(
+            'Stripe Connect: account not fully active, falling back to platform',
+            {
+              profileId,
+              stripeAccountId: profile.stripeAccountId,
+              chargesEnabled: account.charges_enabled,
+              payoutsEnabled: account.payouts_enabled,
+              currentlyDue: account.requirements?.currently_due,
+            }
+          );
+        }
+      } catch (error) {
+        logger.warn(
+          'Stripe Connect: failed to verify account, falling back to platform',
+          { profileId, error }
+        );
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);

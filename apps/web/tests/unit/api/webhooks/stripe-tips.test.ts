@@ -24,6 +24,14 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
 }));
 
+vi.mock('@/lib/services/tips/process-tip-completed', () => ({
+  processTipCompleted: vi.fn().mockResolvedValue({
+    audienceUpserted: true,
+    emailSent: true,
+    errors: [],
+  }),
+}));
+
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
     webhooks: {
