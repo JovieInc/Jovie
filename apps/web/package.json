@@ -230,7 +230,7 @@
     "@sentry/node": "^10.45.0",
     "@storybook/addon-a11y": "^10.3.3",
     "@storybook/addon-docs": "^10.3.3",
-    "@storybook/addon-vitest": "^10.3.3",
+    "@storybook/addon-vitest": "^10.3.5",
     "@storybook/nextjs-vite": "^10.3.4",
     "@tailwindcss/postcss": "^4.2.2",
     "@tanstack/react-query-devtools": "^5.95.2",
