@@ -5,16 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.153.0] - 2026-04-13
+## [26.4.154.0] - 2026-04-13
 
 ### Changed
 
-- PWA install banner now shows only for paid Pro subscribers (not free trials), replacing the disabled feature flag with billing-based gating
+- PWA install banner now shows only for paid subscribers (not free trials), replacing the disabled feature flag with billing-based gating
 - Lighthouse CI build config switched from `lighthouse:no-pwa` to `lighthouse:recommended` preset with PWA score tracking at 0.7 minimum
 
 ### Fixed
 
-- Added missing `apple-mobile-web-app-capable` meta tag for older iOS PWA standalone mode support
 - Aligned offline page theme color and background (`#08090a` → `#0a0a0a`) to match the manifest and layout
 
 ## [26.4.152.2] - 2026-04-13
