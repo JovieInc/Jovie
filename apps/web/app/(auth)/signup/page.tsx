@@ -3,10 +3,11 @@
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
+import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
@@ -173,8 +174,11 @@ function SignUpOauthErrorBanner() {
 
 function SignUpPageContent() {
   const [isMounted, setIsMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+
+  useNormalizeClerkHomeLink(containerRef);
 
   useEffect(() => {
     setIsMounted(true);
@@ -189,24 +193,26 @@ function SignUpPageContent() {
       <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
       <SignUpClaimDataPersistence />
       <SignUpOauthErrorBanner />
-      <SignUp
-        routing='hash'
-        oauthFlow='redirect'
-        signInUrl={signInUrl}
-        fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
-      />
-      <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
+      <div ref={containerRef}>
+        <SignUp
+          routing='hash'
+          oauthFlow='redirect'
+          signInUrl={signInUrl}
+          fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+        />
+      </div>
+      <p className='mt-4 text-center text-[11px] leading-relaxed text-white/80'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
         >
           Privacy Policy
         </Link>

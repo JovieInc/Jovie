@@ -23,6 +23,8 @@ describe('performance route manifest', () => {
   it('keeps the deterministic group execution order from the approved workflow', () => {
     expect(END_USER_PERF_GROUP_ORDER).toEqual([
       'home',
+      'marketing-public',
+      'legal-public',
       'public-profile-core',
       'public-profile-mode-shell',
       'public-profile-detail',

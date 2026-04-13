@@ -3,16 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProfileShell } from '@/components/organisms/profile-shell';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
-const { handleNotificationsClickMock, routerPushMock, useSearchParamsMock } =
-  vi.hoisted(() => ({
-    handleNotificationsClickMock: vi.fn(),
-    routerPushMock: vi.fn(),
-    useSearchParamsMock: vi.fn(() => new URLSearchParams()),
-  }));
+const { handleNotificationsClickMock, routerPushMock } = vi.hoisted(() => ({
+  handleNotificationsClickMock: vi.fn(),
+  routerPushMock: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
-  useSearchParams: () => useSearchParamsMock(),
+  usePathname: () => window.location.pathname,
   useRouter: () => ({
     push: routerPushMock,
     replace: vi.fn(),
@@ -79,13 +76,15 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
 describe('useProfileShell mode overrides', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useSearchParamsMock.mockReturnValue(
-      new URLSearchParams('mode=profile&source=from-search')
+    window.history.replaceState(
+      null,
+      '',
+      '/testartist?mode=profile&source=from-search'
     );
   });
 
   it('uses modeOverride for non-profile notification routing', () => {
-    useSearchParamsMock.mockReturnValue(new URLSearchParams('mode=profile'));
+    window.history.replaceState(null, '', '/testartist?mode=profile');
 
     const { result } = renderHook(() =>
       useProfileShell({

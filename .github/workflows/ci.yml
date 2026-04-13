@@ -112,7 +112,7 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
-          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           if echo "$CHANGED_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
           else
@@ -392,29 +392,12 @@ jobs:
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-      - name: Resolve Neon DB URL
-        id: resolve-db-url
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.create-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-      - name: Resolve Neon pooled DB URL
-        id: resolve-db-url-pooled
-        if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.create-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.create-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
-          DB_URL="${{ steps.resolve-db-url.outputs.database_url }}"
-          DB_URL_POOLED="${{ steps.resolve-db-url-pooled.outputs.database_url }}"
+          DB_URL="${{ steps.create-branch.outputs.db_url }}"
+          DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
 
           if [ -z "$DB_URL" ]; then
             echo "Neon branch creation did not return db_url."
@@ -437,8 +420,8 @@ jobs:
         run: |
           mkdir -p /tmp/neon-db-artifact
           jq -n \
-            --arg db_url "${{ steps.resolve-db-url.outputs.database_url }}" \
-            --arg db_url_pooled "${{ steps.resolve-db-url-pooled.outputs.database_url }}" \
+            --arg db_url "${{ steps.create-branch.outputs.db_url }}" \
+            --arg db_url_pooled "${{ steps.create-branch.outputs.db_url_pooled }}" \
             --arg branch_id "${{ steps.create-branch.outputs.branch_id }}" \
             --arg branch_name "${{ steps.sanitize-branch.outputs.name }}" \
             '{
@@ -528,22 +511,18 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        id: resolve-drizzle-neon-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          echo "Using Neon DB URL from neon-db artifact"
-          echo "DATABASE_URL=${{ steps.resolve-drizzle-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          echo "Using direct-first Neon DB URL from neon-db artifact for Drizzle check"
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -654,10 +633,11 @@ jobs:
         id: check_changes
         shell: bash
         run: |
-          # Run when UI/component paths changed (build or test patterns cover a11y-relevant changes).
+          # Run when UI/component paths or public QA inputs changed.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -778,12 +758,12 @@ jobs:
 
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
-    needs: [ci-build-public, ci-path-changes]
+    needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
@@ -796,6 +776,7 @@ jobs:
           branch_name: public-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         id: resolve-neon-db-url
@@ -817,6 +798,12 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Seed public QA fixtures
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -826,7 +813,7 @@ jobs:
       - name: Extract build artifact
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
-      - name: Run Lighthouse CI (PR thresholds)
+      - name: Run Lighthouse CI (public launch thresholds)
         run: |
           cd apps/web
           cleanup() {
@@ -834,12 +821,10 @@ jobs:
           }
           trap cleanup EXIT
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
-            echo "Standalone server not found — build may not have produced standalone output"
-            exit 1
-          fi
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          node .next/standalone/apps/web/server.js &
+          PORT=3000 pnpm --filter=@jovie/web exec next start &
           SERVER_PID=$!
 
           echo "Waiting for server to start..."
@@ -858,16 +843,20 @@ jobs:
             exit 1
           fi
 
-          pnpm exec lhci autorun --config=.lighthouserc.pr.json
+          pnpm run test:lighthouse:public:launch
         env:
+          CI: true
+          BASE_URL: http://127.0.0.1:3000
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          PUBLIC_NOAUTH_SMOKE: '1'
           URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-public-ci
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -907,7 +896,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -918,6 +907,7 @@ jobs:
           branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1023,7 +1013,7 @@ jobs:
 
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1043,7 +1033,7 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
@@ -1053,6 +1043,7 @@ jobs:
           branch_name: onboarding-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         id: resolve-onboarding-neon-db-url
@@ -1183,20 +1174,17 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        id: resolve-build-neon-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-build-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1449,7 +1437,7 @@ jobs:
 
       - name: Install Playwright (Chromium only)
         if: steps.check-creds.outputs.skip != 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Wait for CDN propagation
         if: steps.check-creds.outputs.skip != 'true'
@@ -1723,12 +1711,10 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    # Informational only — never blocks PRs or merge queue.
-    needs: [ci-build-public, ci-path-changes]
+    needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1738,10 +1724,11 @@ jobs:
         id: check_changes
         shell: bash
         run: |
-          # Align with ci-build-public: run when build OR test paths changed.
+          # Align with ci-build-public so public QA config changes still run the blocking lane.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -1756,6 +1743,31 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
+      - name: Create ephemeral Neon database branch (with retry)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: public-a11y-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve-a11y-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1767,7 +1779,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Download build artifact
         id: download
@@ -1780,6 +1792,22 @@ jobs:
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number || github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed public QA fixtures
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
 
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1797,19 +1825,16 @@ jobs:
             if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
             sleep 1
           done
-          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line || EXIT_CODE=$?
+          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
           kill $SERVER_PID 2>/dev/null || true
-          # Non-blocking: the production server lacks runtime secrets (DB, Clerk)
-          # so all routes return 500. Axe fails on the error page, not the app.
-          # TODO: re-enable blocking once test env has proper mocks.
-          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
-            echo "::warning::A11y audit failed (exit $EXIT_CODE) — non-blocking until test env is fixed"
-          fi
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
           CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          URL_ENCRYPTION_KEY: a11y-public-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: a11y-public-ci
 
       - name: Upload Playwright Report on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
@@ -1819,12 +1844,21 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 3
 
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
     environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1858,6 +1892,7 @@ jobs:
           branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1893,7 +1928,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Run E2E Smoke (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1935,7 +1970,7 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
-    needs: [ci-fast, ci-path-changes]
+    needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1967,6 +2002,7 @@ jobs:
           branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2002,7 +2038,7 @@ jobs:
 
       - name: Install Playwright (Chromium)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Load quarantined E2E specs
         id: quarantine
@@ -2103,20 +2139,17 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for E2E
-        id: resolve-e2e-artifact-db-url
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-e2e-artifact-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: |
+          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
+          if [ ! -f "$CONNECTION_FILE" ]; then
+            echo "Neon DB connection artifact missing."
+            exit 1
+          fi
+
+          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
+          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2167,20 +2200,19 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for E2E
-        id: resolve-e2e-tests-db-url
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-e2e-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL
         run: |
-          echo "Using Neon DB URL from neon-db artifact"
-          echo "DATABASE_URL=${{ steps.resolve-e2e-tests-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=${{ steps.resolve-e2e-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
           echo "RESOLVED_DB_SOURCE=neon-artifact" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
@@ -2204,7 +2236,7 @@ jobs:
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           # Always Chrome-only for speed; Firefox runs weekly via e2e-full-matrix workflow
-          pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+          pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Load quarantined E2E specs
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -2695,18 +2727,18 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
-      - name: Resolve DATABASE_URL for Smoke DB
-        id: resolve-smoke-db-url
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL
-        run: echo "DATABASE_URL=${{ steps.resolve-smoke-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Run migrations for Smoke DB
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -2726,7 +2758,7 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+        run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Download build artifact from ci-build
         id: download-build
@@ -2769,6 +2801,8 @@ jobs:
           export E2E_USE_TEST_AUTH_BYPASS=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
+          export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
+          export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -2957,7 +2991,10 @@ jobs:
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            if deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
+            if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
+              --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+              --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" \
+              --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
               deploy_exit=0
             else
               deploy_exit=$?
@@ -2983,6 +3020,8 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Alias preview to staging.jov.ie
         run: |

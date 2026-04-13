@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.0] - 2026-04-12
+
+### Added
+
+- "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
+- Segmented birthday input with grouped [MM]/[DD]/[YYYY] digit boxes (replaces plain text input)
+- `useSegmentedInput` shared hook powering both OTP and birthday digit inputs
+- Birthday now captures the full year (stored as YYYY-MM-DD, backwards-compatible with legacy MM-DD)
+- Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
+- Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
+- Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
+
+### Changed
+
+- Venmo clicks fire `venmo_link_click` instead of `tip_intent` to distinguish unverifiable Venmo link opens from Stripe payment intents in analytics
+- Profile query in tip checkout now includes `stripeAccountId` and `stripePayoutsEnabled` fields
+
+### Fixed
+
+- OTP verification: expired or invalid codes no longer allow submitting (all subscribe components)
+- OTP auto-clears after error so fans get a fresh slate to retype
+- Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
+- `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
+
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
+
+### Fixed
+
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
+
 ## [26.4.151.4] - 2026-04-12
 
 ### Fixed

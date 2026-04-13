@@ -369,7 +369,7 @@ export function AddReleaseSidebar({
                 }}
                 className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
               />
-              <p className='mt-1 text-[10.5px] text-tertiary-token'>
+              <p className='mt-1 text-[11px] text-tertiary-token'>
                 Details hidden until this date (mystery page)
               </p>
             </DrawerFormField>
@@ -389,7 +389,7 @@ export function AddReleaseSidebar({
                       genres.map(genre => (
                         <span
                           key={genre}
-                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[10.5px] capitalize text-secondary-token'
+                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[11px] capitalize text-secondary-token'
                         >
                           {genre}
                         </span>

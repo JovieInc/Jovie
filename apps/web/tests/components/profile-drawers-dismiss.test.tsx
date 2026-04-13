@@ -27,6 +27,9 @@ vi.mock('vaul', () => ({
       <div>{children}</div>
     ),
     Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+    Description: ({ children }: { children: React.ReactNode }) => (
+      <p>{children}</p>
+    ),
   },
 }));
 

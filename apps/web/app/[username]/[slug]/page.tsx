@@ -33,13 +33,13 @@ import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
   checkPromoDownloads,
   getContentBySlug,
   getCreatorByUsername,
-  getCreatorPlan,
   getFeaturedSmartLinkStaticParams,
   getReleaseTrackList,
 } from './_lib/data';
@@ -169,6 +169,20 @@ export default async function ContentSmartLinkPage({
       releaseType: content.releaseType,
       totalTracks: content.totalTracks,
       credits: content.credits,
+      durationMs: content.durationMs,
+      isrc: content.isrc,
+      trackNumber: content.trackNumber,
+      inAlbum:
+        content.type === 'track' &&
+        content.releaseId &&
+        content.releaseSlug &&
+        content.releaseTitle
+          ? {
+              id: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}#release`,
+              title: content.releaseTitle,
+              url: `${BASE_URL}/${creator.usernameNormalized}/${content.releaseSlug}`,
+            }
+          : null,
     },
     creator,
     trackList
@@ -182,9 +196,13 @@ export default async function ContentSmartLinkPage({
 
   // Check if the creator's plan allows unreleased content features
   let showUnreleasedHero = false;
+  let creatorEntitlements: Awaited<
+    ReturnType<typeof getCreatorEntitlements>
+  > | null = null;
   if (isUnreleased) {
-    const creatorPlan = await getCreatorPlan(creator.id);
-    showUnreleasedHero = creatorPlan.canAccessFutureReleases;
+    creatorEntitlements = await getCreatorEntitlements(creator.id);
+    showUnreleasedHero =
+      creatorEntitlements.entitlements.booleans.canAccessFutureReleases;
   }
 
   // Check for promo downloads (released content only, not tracks or unreleased releases)

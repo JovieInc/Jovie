@@ -9,7 +9,15 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { type MouseEvent, type ReactNode, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { toast } from 'sonner';
 import {
   SidebarMenuBadge,
@@ -29,6 +37,7 @@ interface NavMenuItemProps {
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
   readonly onNavigate?: () => void;
+  readonly onCancelNavigate?: () => void;
   /** Optional click side effect for links or buttons */
   readonly onClick?: () => void;
   /** When true, keeps link markup but prevents navigation on click */
@@ -92,11 +101,15 @@ export function NavMenuItem({
   actions,
   children,
   onNavigate,
+  onCancelNavigate,
   onClick,
   preventNavigation = false,
   renderAsButton = false,
   onPrefetch,
 }: NavMenuItemProps) {
+  const router = useRouter();
+  const pendingNavigationRef = useRef(false);
+  const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
   const tooltip = useMemo(
@@ -137,21 +150,128 @@ export function NavMenuItem({
     </>
   );
 
+  const showPendingShell = useCallback(() => {
+    if (!onNavigate) {
+      return;
+    }
+
+    onNavigate();
+  }, [onNavigate]);
+
+  const clearPendingNavigationListeners = useCallback(() => {
+    clearPendingNavigationListenersRef.current?.();
+    clearPendingNavigationListenersRef.current = null;
+  }, []);
+
+  const cancelPendingNavigation = useCallback(() => {
+    if (!pendingNavigationRef.current) {
+      return;
+    }
+
+    pendingNavigationRef.current = false;
+    clearPendingNavigationListeners();
+    onCancelNavigate?.();
+  }, [clearPendingNavigationListeners, onCancelNavigate]);
+
+  useEffect(
+    () => clearPendingNavigationListeners,
+    [clearPendingNavigationListeners]
+  );
+
   const handleButtonClick = useCallback(() => {
-    onNavigate?.();
+    const hadPendingPointerNavigation = pendingNavigationRef.current;
+    pendingNavigationRef.current = false;
+    clearPendingNavigationListeners();
+    if (!hadPendingPointerNavigation) {
+      showPendingShell();
+    }
     onClick?.();
-  }, [onClick, onNavigate]);
+  }, [clearPendingNavigationListeners, onClick, showPendingShell]);
 
   const handleLinkClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
+      const hadPendingPointerNavigation = pendingNavigationRef.current;
+      pendingNavigationRef.current = false;
+      clearPendingNavigationListeners();
       if (preventNavigation) {
         event.preventDefault();
       }
-      onNavigate?.();
+      const shouldInterceptNavigation =
+        !preventNavigation &&
+        Boolean(onNavigate) &&
+        event.button === 0 &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey;
+
+      if (!hadPendingPointerNavigation && shouldInterceptNavigation) {
+        showPendingShell();
+      }
       onClick?.();
+
+      if (!shouldInterceptNavigation && onNavigate) {
+        onCancelNavigate?.();
+      }
+
+      if (shouldInterceptNavigation) {
+        event.preventDefault();
+        requestAnimationFrame(() => {
+          router.push(item.href);
+        });
+      }
     },
-    [onClick, onNavigate, preventNavigation]
+    [
+      item.href,
+      clearPendingNavigationListeners,
+      onCancelNavigate,
+      onClick,
+      onNavigate,
+      preventNavigation,
+      router,
+      showPendingShell,
+    ]
   );
+
+  const handlePressStart = useCallback(() => {
+    if (onNavigate && globalThis.window !== undefined) {
+      pendingNavigationRef.current = true;
+      clearPendingNavigationListeners();
+
+      const handlePointerUp = () => {
+        setTimeout(() => {
+          if (pendingNavigationRef.current) {
+            cancelPendingNavigation();
+          }
+        }, 0);
+      };
+      const handlePointerCancel = () => {
+        cancelPendingNavigation();
+      };
+
+      globalThis.addEventListener('pointerup', handlePointerUp, true);
+      globalThis.addEventListener('pointercancel', handlePointerCancel, true);
+      globalThis.addEventListener('blur', handlePointerCancel);
+      clearPendingNavigationListenersRef.current = () => {
+        globalThis.removeEventListener('pointerup', handlePointerUp, true);
+        globalThis.removeEventListener(
+          'pointercancel',
+          handlePointerCancel,
+          true
+        );
+        globalThis.removeEventListener('blur', handlePointerCancel);
+      };
+    }
+
+    showPendingShell();
+    onPrefetch?.();
+  }, [
+    cancelPendingNavigation,
+    clearPendingNavigationListeners,
+    onNavigate,
+    onPrefetch,
+    showPendingShell,
+  ]);
 
   return (
     <ContextMenu>
@@ -162,7 +282,7 @@ export function NavMenuItem({
               <button
                 type='button'
                 onClick={handleButtonClick}
-                onMouseDown={onPrefetch}
+                onPointerDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-pressed={isActive}
@@ -175,7 +295,7 @@ export function NavMenuItem({
                 href={item.href}
                 prefetch={prefetch}
                 onClick={handleLinkClick}
-                onMouseDown={onPrefetch}
+                onPointerDown={handlePressStart}
                 onMouseEnter={onPrefetch}
                 onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}

@@ -127,11 +127,11 @@ export function TipSection({
       venmoUsername ?? ''
     )}`;
 
-    // Fire tip_intent pixel event for retargeting
+    // Fire venmo_link_click pixel event (distinct from tip_intent for Stripe)
     // @ts-expect-error - joviePixel is set by JoviePixel component
     if (globalThis.joviePixel?.track) {
       // @ts-expect-error - joviePixel is set by JoviePixel component
-      globalThis.joviePixel.track('tip_intent', {
+      globalThis.joviePixel.track('venmo_link_click', {
         tipAmount: amount,
         tipMethod: 'venmo',
       });

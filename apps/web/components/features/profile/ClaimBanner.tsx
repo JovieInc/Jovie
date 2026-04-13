@@ -3,64 +3,44 @@
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 
-type ClaimBannerVariant =
-  | 'organic'
-  | 'claim_intent'
-  | 'direct_in_progress'
-  | 'unsupported';
-
 export interface ClaimBannerProps {
+  /** The profile handle/username */
   readonly profileHandle: string;
+  /** Optional: Override the display name shown in the banner */
   readonly displayName?: string;
-  readonly ctaHref?: string;
-  readonly ctaLabel?: string;
-  readonly variant?: ClaimBannerVariant;
 }
 
-const COPY: Record<
-  ClaimBannerVariant,
-  { body: string; ctaLabel: string | null }
-> = {
-  organic: {
-    body: 'Is this your profile? Claim it with Spotify in about a minute.',
-    ctaLabel: 'Claim Profile',
-  },
-  claim_intent: {
-    body: 'Your profile is ready. Claim it to turn on release emails.',
-    ctaLabel: 'Claim Profile',
-  },
-  direct_in_progress: {
-    body: 'Finish claiming this profile to connect Spotify and go live.',
-    ctaLabel: 'Continue Claim',
-  },
-  unsupported: {
-    body: 'This profile needs a claim link before it can be claimed.',
-    ctaLabel: null,
-  },
-};
-
-export function ClaimBanner({
-  profileHandle,
-  displayName,
-  ctaHref,
-  ctaLabel,
-  variant = 'organic',
-}: ClaimBannerProps) {
+/**
+ * ClaimBanner displays a prominent banner on unclaimed profiles,
+ * directing the profile owner to sign up and claim their profile.
+ *
+ * This banner always sends users to sign up and pre-fills their desired
+ * handle from the profile they are viewing.
+ */
+export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
+  const { isLoaded } = useUserSafe();
+  const { isSignedIn } = useAuthSafe();
   const hasTrackedImpression = useRef(false);
-  const copy = COPY[variant];
-  const resolvedCtaLabel = ctaLabel ?? copy.ctaLabel;
+
+  const profilePath = `/${encodeURIComponent(profileHandle)}`;
+  const signupUrl = `/signup?handle=${encodeURIComponent(profileHandle)}&redirect_url=${encodeURIComponent(profilePath)}`;
 
   useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
     if (hasTrackedImpression.current) return;
     hasTrackedImpression.current = true;
 
     track('profile_claim_banner_impression', {
       profile_handle: profileHandle,
-      variant,
+      auth_loaded: isLoaded,
     });
-  }, [profileHandle, variant]);
+  }, [isLoaded, isSignedIn, profileHandle]);
+
+  // Don't show claim banner to signed-in users
+  if (isSignedIn) return null;
 
   const name = displayName || profileHandle;
 
@@ -79,31 +59,31 @@ export function ClaimBanner({
               aria-hidden='true'
             />
             <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
-              {copy.body}
+              Is this your profile? Claim it in 30 seconds.
             </p>
           </div>
 
-          {ctaHref && resolvedCtaLabel ? (
-            <Link
-              href={ctaHref}
-              className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
-              data-testid='claim-banner-cta'
-              aria-label={`Claim profile for ${name}`}
-              onClick={() => {
-                track('profile_claim_banner_click', {
-                  profile_handle: profileHandle,
-                  destination: ctaHref,
-                  variant,
-                });
-              }}
-            >
-              {resolvedCtaLabel}
-              <ArrowRight
-                className='h-3.5 w-3.5 sm:h-4 sm:w-4'
-                aria-hidden='true'
-              />
-            </Link>
-          ) : null}
+          {/* CTA Button */}
+          <Link
+            href={signupUrl}
+            prefetch={false}
+            className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
+            data-testid='claim-banner-cta'
+            aria-label={`Claim profile for ${name}`}
+            onClick={() => {
+              track('profile_claim_banner_click', {
+                profile_handle: profileHandle,
+                destination: signupUrl,
+                auth_loaded: isLoaded,
+              });
+            }}
+          >
+            Claim Profile
+            <ArrowRight
+              className='h-3.5 w-3.5 sm:h-4 sm:w-4'
+              aria-hidden='true'
+            />
+          </Link>
         </div>
       </div>
     </header>

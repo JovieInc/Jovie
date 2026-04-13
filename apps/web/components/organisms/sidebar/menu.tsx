@@ -169,10 +169,7 @@ export const SidebarMenuActions = React.forwardRef<
     ref={ref}
     data-sidebar='menu-actions'
     className={cn(
-      'absolute right-1 top-1 flex items-center gap-1',
-      'peer-data-[size=sm]/menu-button:top-0.5',
-      'peer-data-[size=default]/menu-button:top-1',
-      'peer-data-[size=lg]/menu-button:top-2',
+      'absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1',
       'group-data-[collapsible=icon]:hidden',
       showOnHover &&
         'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 group-focus-within/menu-item:pointer-events-auto group-hover/menu-item:pointer-events-auto lg:pointer-events-none lg:opacity-0',

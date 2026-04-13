@@ -1,5 +1,4 @@
 import { redirectToProfileMode } from '../_lib/mode-route-redirect';
-import { getProfileStaticParams } from '../_lib/profile-static-params';
 
 interface Props {
   readonly params: Promise<{
@@ -7,10 +6,6 @@ interface Props {
   }>;
 }
 
-export async function generateStaticParams() {
-  return getProfileStaticParams(100);
-}
-
 export default async function ContactPage({ params }: Props) {
-  await redirectToProfileMode(params, 'contact');
+  return redirectToProfileMode(params, 'contact');
 }

@@ -1,16 +1,20 @@
 import * as Sentry from '@sentry/nextjs';
+import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
-import { readPendingClaimContext } from '@/lib/claim/context';
+import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
+import {
+  buildHandleCandidates,
+  reserveOnboardingHandle,
+} from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
@@ -18,6 +22,15 @@ interface OnboardingPageProps {
     readonly handle?: string;
     readonly resume?: string;
   }>;
+}
+
+interface OnboardingBootstrapProfile {
+  readonly id: string;
+  readonly username: string | null;
+  readonly displayName: string | null;
+  readonly avatarUrl: string | null;
+  readonly bio: string | null;
+  readonly genres: string[] | null;
 }
 
 /**
@@ -33,6 +46,8 @@ export default async function OnboardingPage({
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
   const shouldSkipDashboardPrefetch =
+    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
+  const assumeInitialHandleAvailable =
     isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
 
   const authResult = await resolveUserState();
@@ -52,9 +67,11 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
+  const hasResumeSignal = Boolean(resolvedSearchParams?.resume);
   const hasOnboardingContinuationSignal = Boolean(
     resolvedSearchParams?.handle || resolvedSearchParams?.resume
   );
+  const shouldLoadExistingProfile = Boolean(authResult.profileId);
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
@@ -79,42 +96,61 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
-  const pendingClaim = await readPendingClaimContext();
 
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
-  const profilePrefetchPromise = shouldSkipDashboardPrefetch
-    ? Promise.resolve(null)
-    : getDashboardData()
-        .then(d => d.selectedProfile)
-        .catch((error: unknown) => {
-          const errorMessage = extractErrorMessage(error, 'Unknown error');
-          if (
-            errorMessage.includes('database') ||
-            errorMessage.includes('connection') ||
-            errorMessage.includes('timeout')
-          ) {
-            Sentry.captureException(error, {
-              tags: { context: 'onboarding_profile_load' },
-              extra: { clerkUserId: authResult.clerkUserId },
-            });
-          }
-          return null;
-        });
+  const profilePrefetchPromise = createProfilePrefetchPromise();
+
+  function createProfilePrefetchPromise() {
+    if (shouldSkipDashboardPrefetch || !shouldLoadExistingProfile) {
+      return Promise.resolve(null);
+    }
+
+    return getOnboardingBootstrapProfile(authResult.profileId!).catch(
+      (error: unknown) => {
+        const errorMessage = extractErrorMessage(error, 'Unknown error');
+        if (
+          errorMessage.includes('database') ||
+          errorMessage.includes('connection') ||
+          errorMessage.includes('timeout')
+        ) {
+          Sentry.captureException(error, {
+            tags: { context: 'onboarding_profile_load' },
+            extra: { clerkUserId: authResult.clerkUserId },
+          });
+        }
+        return null;
+      }
+    );
+  }
 
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
     resolvedSearchParams?.handle || spotifySuggestedHandle;
-  const handleReservationPromise = !earlyProvidedHandle
-    ? reserveOnboardingHandle(earlyDisplayName)
-    : Promise.resolve(null);
+  const reservedHandlePromise =
+    !earlyProvidedHandle && earlyDisplayName
+      ? reserveOnboardingHandle(earlyDisplayName)
+          .then(handle => ({
+            handle,
+            isReserved: true,
+          }))
+          .catch(() => ({
+            handle: buildHandleCandidates(earlyDisplayName)[0] ?? null,
+            isReserved: false,
+          }))
+      : Promise.resolve<{
+          handle: string | null;
+          isReserved: boolean;
+        }>({
+          handle: null,
+          isReserved: false,
+        });
 
-  // Await both in parallel
   const [existingProfile, earlyReservedHandle] = await Promise.all([
     profilePrefetchPromise,
-    handleReservationPromise,
+    reservedHandlePromise,
   ]);
 
   const initialDisplayName =
@@ -122,19 +158,22 @@ export default async function OnboardingPage({
 
   const providedHandle =
     resolvedSearchParams?.handle ||
-    pendingClaim?.username ||
     existingProfile?.username ||
     spotifySuggestedHandle;
 
   // Discard the early reservation if a providedHandle is now available (e.g. from
   // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
-  let reservedHandle = !providedHandle ? earlyReservedHandle : null;
+  let reservedHandle = !providedHandle ? earlyReservedHandle.handle : null;
+  let isReservedHandle = !providedHandle && earlyReservedHandle.isReserved;
   if (
+    shouldLoadExistingProfile &&
     !providedHandle &&
+    !hasResumeSignal &&
     !reservedHandle &&
     initialDisplayName !== earlyDisplayName
   ) {
-    reservedHandle = await reserveOnboardingHandle(initialDisplayName);
+    reservedHandle = buildHandleCandidates(initialDisplayName)[0] ?? null;
+    isReservedHandle = false;
   }
 
   const initialHandle = providedHandle || reservedHandle || '';
@@ -146,9 +185,10 @@ export default async function OnboardingPage({
 
   return (
     <OnboardingFormWrapper
+      assumeInitialHandleAvailable={assumeInitialHandleAvailable}
       initialDisplayName={initialDisplayName}
       initialHandle={initialHandle}
-      isReservedHandle={Boolean(reservedHandle)}
+      isReservedHandle={isReservedHandle}
       userEmail={userEmail}
       userId={userId}
       shouldAutoSubmitHandle={shouldAutoSubmitHandle}
@@ -159,6 +199,25 @@ export default async function OnboardingPage({
       existingGenres={existingProfile?.genres ?? null}
     />
   );
+}
+
+async function getOnboardingBootstrapProfile(
+  profileId: string
+): Promise<OnboardingBootstrapProfile | null> {
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      username: creatorProfiles.username,
+      displayName: creatorProfiles.displayName,
+      avatarUrl: creatorProfiles.avatarUrl,
+      bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  return profile ?? null;
 }
 
 function reportMissingClerkUserId(authResult: {

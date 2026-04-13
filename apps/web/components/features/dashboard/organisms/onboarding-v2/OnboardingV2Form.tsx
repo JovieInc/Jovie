@@ -810,6 +810,7 @@ export function OnboardingV2Form({
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
+      assumeInitialHandleAvailable: Boolean(initialProfileId),
       fullName: initialDisplayName,
       normalizedInitialHandle,
     });
