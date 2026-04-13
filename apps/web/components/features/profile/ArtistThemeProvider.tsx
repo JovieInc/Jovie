@@ -9,7 +9,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useArtistThemeMutation } from '@/lib/queries';
+import { useArtistThemeMutation } from '@/lib/queries/useArtistThemeMutation';
 import { Artist } from '@/types/db';
 
 export type ArtistTheme = 'light' | 'dark' | 'auto';

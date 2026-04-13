@@ -30,7 +30,7 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';

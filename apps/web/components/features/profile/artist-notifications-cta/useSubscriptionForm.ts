@@ -20,7 +20,7 @@ import {
 import {
   useSubscribeNotificationsMutation,
   useVerifyEmailOtpMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import { buildPhoneE164, getMaxNationalDigits } from './utils';
