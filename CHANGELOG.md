@@ -9,8 +9,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 > Claim and onboarding reliability improved, especially for profile claims and release-notification delivery. This release also hardens retry and error handling so successful actions do not surface as failures.
 
+### Added
+
+- Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
+- Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
+- Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
+
+### Changed
+
+- Venmo clicks fire `venmo_link_click` instead of `tip_intent` to distinguish unverifiable Venmo link opens from Stripe payment intents in analytics
+- Profile query in tip checkout now includes `stripeAccountId` and `stripePayoutsEnabled` fields
+
 ### Fixed
 
+- `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
 - Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links
 - Fail closed on unexpected `/claim/[token]` resolver errors instead of surfacing a 500 page
 - Run post-claim username and Clerk metadata sync after direct-profile Spotify claim finalization

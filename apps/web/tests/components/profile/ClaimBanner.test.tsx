@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
@@ -18,18 +18,24 @@ vi.mock('next/link', () => ({
     className,
     'data-testid': testId,
     'aria-label': ariaLabel,
+    onClick,
   }: {
     href: string;
     children: ReactNode;
     className?: string;
     'data-testid'?: string;
     'aria-label'?: string;
+    onClick?: () => void;
   }) => (
     <a
       href={href}
       className={className}
       data-testid={testId}
       aria-label={ariaLabel}
+      onClick={event => {
+        event.preventDefault();
+        onClick?.();
+      }}
     >
       {children}
     </a>
@@ -117,5 +123,23 @@ describe('ClaimBanner', () => {
         variant: 'direct_in_progress',
       }
     );
+  });
+
+  it('redacts tokenized claim URLs in click analytics', () => {
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/claim/sensitive-token'
+        variant='claim_intent'
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('claim-banner-cta'));
+
+    expect(trackMock).toHaveBeenCalledWith('profile_claim_banner_click', {
+      profile_handle: 'testartist',
+      destination: '/claim/[token]',
+      variant: 'claim_intent',
+    });
   });
 });

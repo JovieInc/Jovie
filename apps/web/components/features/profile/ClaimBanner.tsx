@@ -46,6 +46,9 @@ export function ClaimBanner({
   const trackedImpressionKeys = useRef<Set<string>>(new Set());
   const copy = COPY[variant];
   const resolvedCtaLabel = ctaLabel ?? copy.ctaLabel;
+  const trackedDestination = ctaHref?.startsWith('/claim/')
+    ? '/claim/[token]'
+    : ctaHref;
 
   useEffect(() => {
     const impressionKey = `${profileHandle}:${variant}`;
@@ -88,7 +91,7 @@ export function ClaimBanner({
               onClick={() => {
                 track('profile_claim_banner_click', {
                   profile_handle: profileHandle,
-                  destination: ctaHref,
+                  destination: trackedDestination,
                   variant,
                 });
               }}

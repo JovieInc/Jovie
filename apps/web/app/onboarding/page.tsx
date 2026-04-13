@@ -47,6 +47,7 @@ export default async function OnboardingPage({
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
   const pendingClaim = await readPendingClaimContext();
+  const targetProfileId = pendingClaim?.creatorProfileId ?? null;
   const shouldSkipDashboardPrefetch =
     isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
   const assumeInitialHandleAvailable =
@@ -71,11 +72,11 @@ export default async function OnboardingPage({
 
   const hasResumeSignal = Boolean(resolvedSearchParams?.resume);
   const hasOnboardingContinuationSignal = Boolean(
-    resolvedSearchParams?.handle ||
-      resolvedSearchParams?.resume ||
-      pendingClaim?.username
+    resolvedSearchParams?.handle || resolvedSearchParams?.resume
   );
-  const shouldLoadExistingProfile = Boolean(authResult.profileId);
+  const shouldLoadExistingProfile = Boolean(
+    targetProfileId ?? authResult.profileId
+  );
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
@@ -110,22 +111,22 @@ export default async function OnboardingPage({
       return Promise.resolve(null);
     }
 
-    return getOnboardingBootstrapProfile(authResult.profileId!).catch(
-      (error: unknown) => {
-        const errorMessage = extractErrorMessage(error, 'Unknown error');
-        if (
-          errorMessage.includes('database') ||
-          errorMessage.includes('connection') ||
-          errorMessage.includes('timeout')
-        ) {
-          Sentry.captureException(error, {
-            tags: { context: 'onboarding_profile_load' },
-            extra: { clerkUserId: authResult.clerkUserId },
-          });
-        }
-        return null;
+    return getOnboardingBootstrapProfile(
+      (targetProfileId ?? authResult.profileId)!
+    ).catch((error: unknown) => {
+      const errorMessage = extractErrorMessage(error, 'Unknown error');
+      if (
+        errorMessage.includes('database') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('timeout')
+      ) {
+        Sentry.captureException(error, {
+          tags: { context: 'onboarding_profile_load' },
+          extra: { clerkUserId: authResult.clerkUserId },
+        });
       }
-    );
+      return null;
+    });
   }
 
   // Start handle reservation early with what we know now (display name from Clerk)
@@ -198,7 +199,9 @@ export default async function OnboardingPage({
       userEmail={userEmail}
       userId={userId}
       shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-      initialProfileId={existingProfile?.id ?? authResult.profileId}
+      initialProfileId={
+        existingProfile?.id ?? targetProfileId ?? authResult.profileId
+      }
       initialResumeStep={resolvedSearchParams?.resume ?? null}
       existingAvatarUrl={existingProfile?.avatarUrl ?? null}
       existingBio={existingProfile?.bio ?? null}

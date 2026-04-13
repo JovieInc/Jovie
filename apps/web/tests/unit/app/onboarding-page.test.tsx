@@ -275,7 +275,7 @@ describe('onboarding page', () => {
     expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
-  it('allows active users to continue onboarding when a pending claim cookie exists', async () => {
+  it('redirects active users with only a pending claim cookie back to the app shell', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
 
     vi.mocked(resolveUserState).mockResolvedValueOnce({
@@ -298,23 +298,60 @@ describe('onboarding page', () => {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });
+    await expect(
+      OnboardingPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('REDIRECT:/app');
+  });
+
+  it('bootstraps the pending-claim target profile instead of the signed-in user profile', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'current_profile',
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+    vi.mocked(readPendingClaimContext).mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'claim_target_profile',
+      username: 'claimed-handle',
+      expectedSpotifyArtistId: 'spotify_123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
     mockBootstrapProfileLimit.mockResolvedValueOnce([
       {
-        id: 'profile_123',
-        username: 'artist',
-        displayName: 'Artist',
-        avatarUrl: null,
-        bio: null,
-        genres: null,
+        id: 'claim_target_profile',
+        username: 'claimed-handle',
+        displayName: 'Claim Target',
+        avatarUrl: 'https://example.com/avatar.jpg',
+        bio: 'Target bio',
+        genres: ['pop'],
       },
     ]);
 
     const page = await OnboardingPage({
       searchParams: Promise.resolve({}),
     });
+    render(page);
 
-    expect(page).toBeTruthy();
-    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialHandle: 'claimed-handle',
+        initialDisplayName: 'Claim Target',
+        initialProfileId: 'claim_target_profile',
+        existingAvatarUrl: 'https://example.com/avatar.jpg',
+        existingBio: 'Target bio',
+        existingGenres: ['pop'],
+      })
+    );
   });
 
   it('does not fall back to the dev test-auth username for fresh onboarding handles', async () => {
