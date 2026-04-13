@@ -495,7 +495,7 @@ export function ArtistNotificationsCTA({
             onClick={() => {
               handleFormSubmit();
             }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
             className={
               otpStep === 'verify'
                 ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
@@ -520,7 +520,7 @@ export function ArtistNotificationsCTA({
               value={otpCode}
               onChange={handleOtpChange}
               onComplete={() => {
-                handleVerifyOtp();
+                if (!error) handleVerifyOtp();
               }}
               autoFocus
               aria-label='Enter 6-digit verification code'
