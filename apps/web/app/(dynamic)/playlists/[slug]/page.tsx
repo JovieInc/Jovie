@@ -129,9 +129,9 @@ export async function generateMetadata({
 
 export default async function PlaylistPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ slug: string }>;
-}) {
+}>) {
   const { slug } = await params;
   const playlist = await getPlaylist(slug);
   if (!playlist) notFound();

@@ -15,10 +15,10 @@ export interface PlaylistCardData {
 export function PlaylistGrid({
   playlists,
   emptyMessage,
-}: {
+}: Readonly<{
   playlists: PlaylistCardData[];
   emptyMessage: React.ReactNode;
-}) {
+}>) {
   if (playlists.length === 0) {
     return (
       <div className='mt-16 text-center'>

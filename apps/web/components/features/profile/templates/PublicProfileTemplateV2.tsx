@@ -136,7 +136,7 @@ export function PublicProfileTemplateV2({
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
   const venmoUsername = extractVenmoUsername(venmoLink);
   const initialSource = useMemo(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return null;
     }
 
@@ -164,7 +164,7 @@ export function PublicProfileTemplateV2({
   });
 
   const scrollToTourSection = useCallback(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -199,7 +199,7 @@ export function PublicProfileTemplateV2({
   }, [prefersReducedMotion]);
 
   const scrollToSubscribeSection = useCallback(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -215,7 +215,7 @@ export function PublicProfileTemplateV2({
   }, [prefersReducedMotion]);
 
   const scrollToAboutSection = useCallback(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -282,7 +282,7 @@ export function PublicProfileTemplateV2({
   useEffect(() => applyRequestedMode(mode), [applyRequestedMode, mode]);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -295,7 +295,7 @@ export function PublicProfileTemplateV2({
   }, [applyRequestedMode]);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
