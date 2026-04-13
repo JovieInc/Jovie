@@ -8,10 +8,8 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
-import {
-  ProfileNotificationsContext,
-  useProfileShell,
-} from '@/components/organisms/profile-shell';
+import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
+import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -48,7 +46,9 @@ const ProfileUnifiedDrawer = dynamic(
 
 const ProfileInlineNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    ).then(mod => ({
       default: mod.ProfileInlineNotificationsCTA,
     })),
   { ssr: false }

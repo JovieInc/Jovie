@@ -3,10 +3,8 @@
 import { HandCoins, Mail, MapPin } from 'lucide-react';
 import { type RefObject, useState } from 'react';
 import { SocialLink } from '@/components/molecules/SocialLink';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { AvailableDSP } from '@/lib/dsp';

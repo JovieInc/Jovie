@@ -9,7 +9,7 @@ import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClien
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
-import { JoviePixel } from '@/features/tracking';
+import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,

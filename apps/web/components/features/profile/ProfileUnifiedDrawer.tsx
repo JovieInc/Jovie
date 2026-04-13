@@ -17,10 +17,8 @@ import { toast } from 'sonner';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import {
   extractVenmoUsername,

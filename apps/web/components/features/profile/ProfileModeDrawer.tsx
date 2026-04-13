@@ -4,10 +4,8 @@ import { Bell, CalendarDays, Info, Mail, Music2, Ticket } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
