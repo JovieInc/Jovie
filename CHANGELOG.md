@@ -5,47 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.155.0] - 2026-04-14
-
-> Fans now "pay" artists instead of "tipping" them, with higher default amounts ($5/$10/$20) and cleaner support language everywhere.
-
-### Changed
-
-- Renamed "tip" to "pay" across the entire platform, reframing fan payments as meaningful transactions instead of gratuities
-- Default payment amounts changed from $3/$5/$7 to $5/$10/$20 to match the higher-value "pay" framing
-- Profile mode `'tip'` is now `'pay'` with subtitle "Support" instead of "Send a tip"
-- Deeplink path changed from `/tip` to `/pay` (old `/tip` URLs permanently redirect)
-- Marketing landing page moved from `/tips` to `/pay`
-- All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
-- [internal] 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
-- Density-aware proximity algorithm for tour dates: uses local venue clustering to pick 50mi (dense markets) or 150mi (sparse markets) radius instead of a flat threshold
-- Conversion-first tour drawer: when no events are near a fan, shows subscribe CTA with "No events near you." and collapses other dates behind a disclosure
-- New date row layout with date box on left (month + day stacked) and ticket pill on right
-- London tour date (The O2) added to Calvin Harris demo persona for UK testing
-- Shared `useTourDateProximity` hook deduplicating proximity logic between drawer and public tour page
-- Analytics `source` prop on `ArtistNotificationsCTA` for tracking subscription origin (tour drawer vs profile inline)
-- Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
-- Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
-- `?mode=subscribe` now opens the profile with inline notification input focused instead of a separate drawer
-- Tour drawer empty state simplified: removed card-in-card nesting, uses inline subscribe CTA directly
-
-### Fixed
-
-- Dashboard earnings redirects now scroll to the correct anchor (`#pay` instead of broken `#tips`)
-- Legacy `/tip` route uses permanent redirect (301) instead of temporary (307)
-
-## [26.4.154.0] - 2026-04-13
-
-### Changed
-
-- PWA install banner now shows only for paid subscribers (not free trials), replacing the disabled feature flag with billing-based gating
-- Lighthouse CI build config switched from `lighthouse:no-pwa` to `lighthouse:recommended` preset with PWA score tracking at 0.7 minimum
-
-### Fixed
-
-- Added explicit `apple-mobile-web-app-capable` meta tag for older iOS PWA standalone mode support
-- Aligned offline page theme color and background (`#08090a` → `#0a0a0a`) to match the manifest and layout
-
 ## [26.4.152.2] - 2026-04-13
 
 ### Added
@@ -82,8 +41,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.152.0] - 2026-04-12
 
-> Claim and onboarding reliability improved, especially for profile claims and release-notification delivery. This release also hardens retry and error handling so successful actions do not surface as failures.
-
 ### Added
 
 - "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
@@ -105,13 +62,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - OTP auto-clears after error so fans get a fresh slate to retype
 - Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
 - `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
-- Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links
-- Fail closed on unexpected `/claim/[token]` resolver errors instead of surfacing a 500 page
-- Run post-claim username and Clerk metadata sync after direct-profile Spotify claim finalization
-- Skip stray onboarding handle reservations when a pending claim already provides the target username
-- Prevent delivered release notifications from being downgraded to failed when trial quota bookkeeping errors occur
-- Initialize null trial notification counters correctly and remove redundant entitlements lookups in release notification cron jobs
-- Harden pending-claim cookie parsing and normalize follow-up claim URLs when the base URL has a trailing slash
 
 ## [26.4.151.6] - 2026-04-12
 
