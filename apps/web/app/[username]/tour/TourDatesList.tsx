@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceKm, NEAR_YOU_THRESHOLD_KM } from '@/lib/geo';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDateCard } from './TourDateCard';
 
 interface TourDatesListProps {

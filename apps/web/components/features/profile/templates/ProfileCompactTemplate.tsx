@@ -4,7 +4,6 @@ import { BadgeCheck, MoreHorizontal, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -31,6 +30,7 @@ import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';

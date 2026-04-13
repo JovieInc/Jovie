@@ -14,7 +14,6 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -29,6 +28,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';

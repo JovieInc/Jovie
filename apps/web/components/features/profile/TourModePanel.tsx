@@ -4,11 +4,11 @@ import { Calendar, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
