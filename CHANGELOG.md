@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.5] - 2026-04-12
+
+### Fixed
+
+- Snap all releases page font sizes to DESIGN.md type scale (9.5px, 9px, 12.5px, 11.5px, 10.5px off-scale values corrected)
+- Bump undersized touch targets to h-7 minimum on track play button, banner CTAs
+- Add "Explicit content" tooltip to E badge on track rows
+- Fix Overdue badge truncation in task list when sidebar panel is open
+
 ## [26.4.151.4] - 2026-04-12
 
 ### Fixed
