@@ -2253,6 +2253,26 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
+function determineReleaseStatus(
+  releaseDate: Date | null
+): 'draft' | 'scheduled' | 'released' {
+  if (!releaseDate) return 'draft';
+  return releaseDate > new Date() ? 'scheduled' : 'released';
+}
+
+function computeRevealDate(
+  formRevealDate: string | null,
+  releaseDate: Date | null,
+  status: 'draft' | 'scheduled' | 'released'
+): Date | null {
+  if (formRevealDate) return new Date(formRevealDate);
+  if (!releaseDate || status !== 'scheduled') return null;
+  const thirtyDaysBefore = new Date(releaseDate);
+  thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
+  const now = new Date();
+  return thirtyDaysBefore > now ? thirtyDaysBefore : now;
+}
+
 export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
@@ -2287,26 +2307,12 @@ export async function createRelease(formData: {
     ? new Date(formData.releaseDate)
     : null;
 
-  // Determine status based on release date
-  const now = new Date();
-  let status: 'draft' | 'scheduled' | 'released';
-  if (!releaseDate) {
-    status = 'draft';
-  } else if (releaseDate > now) {
-    status = 'scheduled';
-  } else {
-    status = 'released';
-  }
-
-  // Reveal date: use explicit override if provided, otherwise auto-set for scheduled releases
-  let revealDate: Date | null = null;
-  if (formData.revealDate) {
-    revealDate = new Date(formData.revealDate);
-  } else if (releaseDate && status === 'scheduled') {
-    const thirtyDaysBefore = new Date(releaseDate);
-    thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
-    revealDate = thirtyDaysBefore > now ? thirtyDaysBefore : now;
-  }
+  const status = determineReleaseStatus(releaseDate);
+  const revealDate = computeRevealDate(
+    formData.revealDate ?? null,
+    releaseDate,
+    status
+  );
 
   try {
     const [inserted] = await db

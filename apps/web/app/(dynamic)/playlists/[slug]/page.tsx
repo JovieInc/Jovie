@@ -43,7 +43,7 @@ async function getPlaylist(slug: string) {
     .where(eq(joviePlaylists.slug, slug))
     .limit(1);
 
-  if (!playlist || playlist.status !== 'published') return null;
+  if (playlist?.status !== 'published') return null;
   return playlist;
 }
 
