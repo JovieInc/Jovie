@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.152.0] - 2026-04-12
+
+### Added
+
+- Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
+- Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
+- Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
+
+### Changed
+
+- Venmo clicks fire `venmo_link_click` instead of `tip_intent` to distinguish unverifiable Venmo link opens from Stripe payment intents in analytics
+- Profile query in tip checkout now includes `stripeAccountId` and `stripePayoutsEnabled` fields
+
+### Fixed
+
+- `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
+
 ## [26.4.151.6] - 2026-04-12
 
 > Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
