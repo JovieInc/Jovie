@@ -71,6 +71,21 @@ export function buildFilteredEventMap(
   return eventMap;
 }
 
+function tallyLeadEvents(
+  events: Set<string>,
+  breakdown: LeadFunnelBreakdownRow
+): void {
+  if (events.has('qualified')) breakdown.qualified++;
+  if (events.has('approved')) breakdown.approved++;
+  if (hasAnyEvent(events, CONTACT_EVENT_TYPES)) breakdown.contacted++;
+  if (events.has('email_queued')) breakdown.emailQueued++;
+  if (events.has('dm_sent')) breakdown.dmSent++;
+  if (events.has('claim_page_viewed')) breakdown.claimClicks++;
+  if (events.has('signup_completed')) breakdown.signups++;
+  if (events.has('onboarding_completed')) breakdown.onboardingCompleted++;
+  if (events.has('paid_converted')) breakdown.paidConversions++;
+}
+
 export function buildBreakdown(
   cohort: string,
   cohortLeads: LeadRow[],
@@ -81,15 +96,7 @@ export function buildBreakdown(
 
   for (const lead of cohortLeads) {
     const events = eventMap.get(lead.id) ?? new Set<string>();
-    if (events.has('qualified')) breakdown.qualified++;
-    if (events.has('approved')) breakdown.approved++;
-    if (hasAnyEvent(events, CONTACT_EVENT_TYPES)) breakdown.contacted++;
-    if (events.has('email_queued')) breakdown.emailQueued++;
-    if (events.has('dm_sent')) breakdown.dmSent++;
-    if (events.has('claim_page_viewed')) breakdown.claimClicks++;
-    if (events.has('signup_completed')) breakdown.signups++;
-    if (events.has('onboarding_completed')) breakdown.onboardingCompleted++;
-    if (events.has('paid_converted')) breakdown.paidConversions++;
+    tallyLeadEvents(events, breakdown);
   }
 
   return breakdown;

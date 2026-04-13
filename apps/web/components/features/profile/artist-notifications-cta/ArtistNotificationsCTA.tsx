@@ -464,6 +464,40 @@ export function ArtistNotificationsCTA({
   const handleFormSubmit =
     otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
 
+  let leftSlot: React.ReactNode;
+  if (otpStep === 'verify') {
+    leftSlot = undefined;
+  } else if (shouldShowCountrySelector) {
+    leftSlot = (
+      <CountrySelector
+        country={country}
+        isOpen={isCountryOpen}
+        onOpenChange={setIsCountryOpen}
+        onSelect={setCountry}
+      />
+    );
+  } else if (smsEnabled) {
+    leftSlot = (
+      <ChannelToggle
+        channel={channel}
+        isSubmitting={isSubmitting}
+        onChannelChange={handleChannelChange}
+      />
+    );
+  }
+
+  const actionClassName =
+    otpStep === 'verify'
+      ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
+      : subscriptionPrimaryActionClassName;
+
+  let composerClassName: string | undefined;
+  if (otpStep === 'verify') {
+    composerClassName = 'px-3 py-3';
+  } else if (isInputFocused) {
+    composerClassName = subscriptionComposerFocusClassName;
+  }
+
   return (
     <div className='min-h-[180px] space-y-3'>
       <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
@@ -473,22 +507,7 @@ export function ArtistNotificationsCTA({
       <SubscriptionPearlComposer
         dataTestId='subscription-pearl-composer'
         layout={otpStep === 'verify' ? 'stacked' : 'inline'}
-        leftSlot={
-          otpStep === 'verify' ? undefined : shouldShowCountrySelector ? (
-            <CountrySelector
-              country={country}
-              isOpen={isCountryOpen}
-              onOpenChange={setIsCountryOpen}
-              onSelect={setCountry}
-            />
-          ) : smsEnabled ? (
-            <ChannelToggle
-              channel={channel}
-              isSubmitting={isSubmitting}
-              onChannelChange={handleChannelChange}
-            />
-          ) : undefined
-        }
+        leftSlot={leftSlot}
         action={
           <button
             type='button'
@@ -496,23 +515,13 @@ export function ArtistNotificationsCTA({
               handleFormSubmit();
             }}
             disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
-            className={
-              otpStep === 'verify'
-                ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
-                : subscriptionPrimaryActionClassName
-            }
+            className={actionClassName}
             style={noFontSynthesisStyle}
           >
             {getSubmitButtonLabel(isSubmitting, otpStep)}
           </button>
         }
-        className={
-          otpStep === 'verify'
-            ? 'px-3 py-3'
-            : isInputFocused
-              ? subscriptionComposerFocusClassName
-              : undefined
-        }
+        className={composerClassName}
       >
         {otpStep === 'verify' ? (
           <div className='px-2 py-2'>

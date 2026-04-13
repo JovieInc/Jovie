@@ -108,7 +108,18 @@ export type ReleaseType =
   | 'compilation'
   | 'live'
   | 'mixtape'
+  | 'music_video'
   | 'other';
+
+/** Metadata stored in discogReleases.metadata JSONB for music_video releases */
+export interface MusicVideoMetadata {
+  youtubeVideoId: string;
+  youtubeThumbnailUrl?: string;
+  youtubePremiereDate?: string;
+  youtubeChannelId?: string;
+  youtubeChannelName?: string;
+  duration?: number;
+}
 
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 

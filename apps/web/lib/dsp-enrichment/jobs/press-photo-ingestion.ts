@@ -201,6 +201,65 @@ export interface PressPhotoIngestionResult {
   errors: string[];
 }
 
+interface PreparedPressPhoto {
+  platform: string;
+  blobUrl: string;
+  sizeUrls: Record<string, string>;
+  metadata: { width: number | null; height: number | null };
+  confidence: number;
+  originalBuffer: Buffer;
+}
+
+async function processCandidate(
+  candidate: {
+    avatarUrl: string;
+    sourcePlatform: string;
+    confidenceScore: string;
+  },
+  put: Awaited<ReturnType<typeof getVercelBlobUploader>>,
+  username: string,
+  clerkUserId: string
+): Promise<PreparedPressPhoto | null> {
+  const platform = candidate.sourcePlatform;
+  const imageBuffer = await downloadImage(candidate.avatarUrl);
+  if (!imageBuffer) return null;
+
+  const sizeBuffers = await processPressPhotoBufferToSizes(imageBuffer);
+  const originalBuffer = sizeBuffers.original;
+  if (!originalBuffer) return null;
+
+  const metadata = await getImageBufferMetadata(originalBuffer);
+  const seoName = `${username}-press-${platform}-${Date.now()}`;
+  const blobPath = buildBlobPath(seoName, clerkUserId, 'press');
+  const blobUrl = await uploadBufferToBlob(
+    put,
+    blobPath,
+    originalBuffer,
+    'image/avif'
+  );
+
+  const sizeUrls: Record<string, string> = {};
+  for (const [size, buffer] of Object.entries(sizeBuffers)) {
+    if (size === 'original') continue;
+    const sizePath = buildBlobPath(`${seoName}-${size}`, clerkUserId, 'press');
+    sizeUrls[size] = await uploadBufferToBlob(
+      put,
+      sizePath,
+      buffer,
+      'image/avif'
+    );
+  }
+
+  return {
+    platform,
+    blobUrl,
+    sizeUrls,
+    metadata,
+    confidence: DSP_PRESS_CONFIDENCE[platform] ?? 0.5,
+    originalBuffer,
+  };
+}
+
 /**
  * Ingest DSP images as draft press photos for an artist profile.
  *
@@ -239,15 +298,6 @@ export async function ingestDspPressPhotos(
       return result;
     }
 
-    type PreparedPressPhoto = {
-      platform: string;
-      blobUrl: string;
-      sizeUrls: Record<string, string>;
-      metadata: { width: number | null; height: number | null };
-      confidence: number;
-      originalBuffer: Buffer;
-    };
-
     const preparedPhotos: PreparedPressPhoto[] = [];
 
     // Get blob uploader
@@ -264,70 +314,24 @@ export async function ingestDspPressPhotos(
 
     // Process candidate images and upload to blob outside the transaction
     for (const candidate of candidates) {
-      const platform = candidate.sourcePlatform;
-
       try {
-        // Download the image
-        const imageBuffer = await downloadImage(candidate.avatarUrl);
-        if (!imageBuffer) {
-          result.photosSkipped++;
-          continue;
-        }
-
-        // Process through Sharp AVIF pipeline
-        const sizeBuffers = await processPressPhotoBufferToSizes(imageBuffer);
-        const originalBuffer = sizeBuffers.original;
-        if (!originalBuffer) {
-          result.errors.push(`No original buffer for ${platform}`);
-          continue;
-        }
-
-        // Get metadata for dimensions
-        const metadata = await getImageBufferMetadata(originalBuffer);
-
-        // Upload to Vercel Blob
-        const seoName = `${username}-press-${platform}-${Date.now()}`;
-        const blobPath = buildBlobPath(seoName, clerkUserId, 'press');
-        const blobUrl = await uploadBufferToBlob(
+        const prepared = await processCandidate(
+          candidate,
           put,
-          blobPath,
-          originalBuffer,
-          'image/avif'
+          username,
+          clerkUserId
         );
-
-        // Upload size variants
-        const sizeUrls: Record<string, string> = {};
-        for (const [size, buffer] of Object.entries(sizeBuffers)) {
-          if (size === 'original') continue;
-          const sizePath = buildBlobPath(
-            `${seoName}-${size}`,
-            clerkUserId,
-            'press'
-          );
-          sizeUrls[size] = await uploadBufferToBlob(
-            put,
-            sizePath,
-            buffer,
-            'image/avif'
-          );
+        if (prepared) {
+          preparedPhotos.push(prepared);
+        } else {
+          result.photosSkipped++;
         }
-
-        const confidence = DSP_PRESS_CONFIDENCE[platform] ?? 0.5;
-
-        preparedPhotos.push({
-          platform,
-          blobUrl,
-          sizeUrls,
-          metadata,
-          confidence,
-          originalBuffer,
-        });
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        result.errors.push(`${platform}: ${errMsg}`);
+        result.errors.push(`${candidate.sourcePlatform}: ${errMsg}`);
         logger.warn('[press-photo-ingestion] Failed to ingest photo', {
           creatorProfileId,
-          platform,
+          platform: candidate.sourcePlatform,
           error: errMsg,
         });
       }

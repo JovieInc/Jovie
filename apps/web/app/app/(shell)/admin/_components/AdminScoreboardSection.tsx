@@ -79,7 +79,7 @@ function FunnelStep({
           {count.toLocaleString('en-US')}
         </p>
         <p className='mt-0.5 text-[12px] text-tertiary-token'>
-          {conversionRate !== null ? formatPercent(conversionRate) : '\u2014'}
+          {conversionRate === null ? '\u2014' : formatPercent(conversionRate)}
         </p>
       </li>
     </>
@@ -161,7 +161,7 @@ export async function AdminScoreboardSection() {
             <p
               className={`mt-0.5 text-[13px] font-[450] ${wowGrowth.className}`}
             >
-              {wowGrowth.label !== '\u2014' ? 'vs. prior week' : ''}
+              {wowGrowth.label === '\u2014' ? '' : 'vs. prior week'}
             </p>
           }
         />
@@ -195,9 +195,9 @@ export async function AdminScoreboardSection() {
                   label={step.label}
                   count={step.count}
                   conversionRate={
-                    step.prevCount !== null
-                      ? safeConversionRate(step.count, step.prevCount)
-                      : null
+                    step.prevCount === null
+                      ? null
+                      : safeConversionRate(step.count, step.prevCount)
                   }
                   showArrow={i > 0}
                 />

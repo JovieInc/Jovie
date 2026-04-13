@@ -11,7 +11,6 @@ import {
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { useDspMatchActions } from '@/features/dashboard/organisms/dsp-matches/hooks';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { type DspMatch, useDspMatchesQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
@@ -156,8 +155,7 @@ function SuggestedMatchRow({
   onReject,
 }: SuggestedMatchRowProps) {
   const isLoading = isConfirming || isRejecting;
-  const label =
-    PROVIDER_LABELS[match.providerId as DspProviderId] ?? match.providerId;
+  const label = PROVIDER_LABELS[match.providerId] ?? match.providerId;
   const [popoverOpen, setPopoverOpen] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -191,10 +189,7 @@ function SuggestedMatchRow({
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <span className='contents'>
-            <DspProviderIcon
-              provider={match.providerId as DspProviderId}
-              size='sm'
-            />
+            <DspProviderIcon provider={match.providerId} size='sm' />
             <span className='min-w-0 flex-1 truncate text-[13px] font-[450] text-primary-token'>
               {match.externalArtistName || label}
             </span>
@@ -288,10 +283,7 @@ function MatchPopoverContent({
           </div>
         ) : (
           <div className='flex h-8 w-8 items-center justify-center rounded-full border border-subtle bg-surface-1'>
-            <DspProviderIcon
-              provider={match.providerId as DspProviderId}
-              size='md'
-            />
+            <DspProviderIcon provider={match.providerId} size='md' />
           </div>
         )}
         <div className='min-w-0 flex-1'>

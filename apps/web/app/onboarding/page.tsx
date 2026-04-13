@@ -170,7 +170,7 @@ export default async function OnboardingPage({
 
   // Discard the early reservation if a providedHandle is now available (e.g. from
   // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
-  let reservedHandle = !providedHandle ? earlyReservedHandle.handle : null;
+  let reservedHandle = providedHandle ? null : earlyReservedHandle.handle;
   let isReservedHandle = !providedHandle && earlyReservedHandle.isReserved;
   if (
     shouldLoadExistingProfile &&

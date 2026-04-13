@@ -214,9 +214,9 @@ const TAB_OPTIONS = [
 
 export default async function AdminPlaylistsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ tab?: string }>;
-}) {
+}>) {
   const { tab = 'pending' } = await searchParams;
   const currentTab = (
     ['pending', 'published', 'rejected'].includes(tab) ? tab : 'pending'
