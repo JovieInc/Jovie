@@ -107,7 +107,7 @@ export function isTrackingAllowed(): boolean {
  * marketing: false = blocked.
  */
 export function isMarketingAllowed(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof globalThis.window === 'undefined') return false;
 
   if (isGPCEnabled() || isDNTEnabled()) return false;
 

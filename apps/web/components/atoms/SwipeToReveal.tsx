@@ -149,12 +149,12 @@ export const SwipeToReveal = memo(function SwipeToReveal({
       return;
     }
 
-    const timeout = window.setTimeout(() => {
+    const timeout = globalThis.setTimeout(() => {
       setActionsVisible(false);
     }, 350);
 
     return () => {
-      window.clearTimeout(timeout);
+      globalThis.clearTimeout(timeout);
     };
   }, [isDragging, isOpen, offsetX]);
 
