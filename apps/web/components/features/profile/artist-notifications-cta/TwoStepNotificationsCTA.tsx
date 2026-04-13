@@ -204,36 +204,48 @@ function ChannelInputRow({
     }
   };
 
+  let leftSlot: React.ReactNode;
+  if (otpStep === 'verify') {
+    leftSlot = undefined;
+  } else if (shouldShowCountrySelector) {
+    leftSlot = (
+      <CountrySelector
+        country={country}
+        isOpen={isCountryOpen}
+        onOpenChange={setIsCountryOpen}
+        onSelect={setCountry}
+      />
+    );
+  } else if (smsEnabled) {
+    leftSlot = (
+      <button
+        type='button'
+        className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
+        aria-label={getChannelToggleLabel(channel)}
+        onClick={() => handleChannelChange(channel === 'sms' ? 'email' : 'sms')}
+        disabled={isSubmitting}
+      >
+        {channel === 'sms' ? (
+          <Phone className='w-4 h-4' aria-hidden='true' />
+        ) : (
+          <Mail className='w-4 h-4' aria-hidden='true' />
+        )}
+      </button>
+    );
+  }
+
+  let composerClassName = '';
+  if (otpStep === 'verify') {
+    composerClassName = 'px-3 py-3';
+  } else if (isInputFocused) {
+    composerClassName = subscriptionComposerFocusClassName;
+  }
+
   return (
     <SubscriptionPearlComposer
       layout={otpStep === 'verify' ? 'stacked' : 'inline'}
       dataTestId='subscription-pearl-composer'
-      leftSlot={
-        otpStep === 'verify' ? undefined : shouldShowCountrySelector ? (
-          <CountrySelector
-            country={country}
-            isOpen={isCountryOpen}
-            onOpenChange={setIsCountryOpen}
-            onSelect={setCountry}
-          />
-        ) : smsEnabled ? (
-          <button
-            type='button'
-            className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
-            aria-label={getChannelToggleLabel(channel)}
-            onClick={() =>
-              handleChannelChange(channel === 'sms' ? 'email' : 'sms')
-            }
-            disabled={isSubmitting}
-          >
-            {channel === 'sms' ? (
-              <Phone className='w-4 h-4' aria-hidden='true' />
-            ) : (
-              <Mail className='w-4 h-4' aria-hidden='true' />
-            )}
-          </button>
-        ) : undefined
-      }
+      leftSlot={leftSlot}
       action={
         <button
           type='button'
@@ -245,13 +257,7 @@ function ChannelInputRow({
           {getSubmitLabel(isSubmitting, otpStep)}
         </button>
       }
-      className={
-        otpStep === 'verify'
-          ? 'px-3 py-3'
-          : isInputFocused
-            ? subscriptionComposerFocusClassName
-            : ''
-      }
+      className={composerClassName}
     >
       {otpStep === 'verify' ? (
         <div className='px-2 py-2'>
