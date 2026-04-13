@@ -1,10 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ProfileNotificationsContext,
-  useProfileShell,
-} from '@/components/organisms/profile-shell';
+import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
+import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {

@@ -75,8 +75,14 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
     React.createElement('svg', props),
 }));
 
-vi.mock('@/components/organisms/profile-shell', () => ({
-  ProfileNotificationsContext: React.createContext(null),
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    ProfileNotificationsContext: React.createContext(null),
+  })
+);
+
+vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
   useProfileShell: (...args: unknown[]) => mockUseProfileShell(...args),
 }));
 

@@ -25,7 +25,6 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
@@ -35,6 +34,7 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { logger } from '@/lib/utils/logger';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -378,10 +378,15 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    await captureError('Error fetching creator profile', error, {
-      username,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching creator profile',
+      {
+        error,
+        route: '/[username]',
+        username,
+      },
+      'public-profile'
+    );
     return {
       profile: null,
       links: [],
@@ -498,10 +503,15 @@ async function getPublicTourDates(
   try {
     return await getUpcomingTourDatesForProfile(profileId);
   } catch (error) {
-    await captureError('Error fetching public profile tour dates', error, {
-      profileId,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching public profile tour dates',
+      {
+        error,
+        profileId,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
     return [];
   }
 }
