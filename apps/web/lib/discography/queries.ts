@@ -323,6 +323,37 @@ export async function getReleaseStatsByUsername(
 }
 
 /**
+ * Lightweight release list for public profile display.
+ * Returns releases with artist names but skips provider links and track summaries.
+ */
+export async function getReleasesForProfileLite(
+  creatorProfileId: string
+): Promise<Array<DiscogRelease & { artistNames: string[] }>> {
+  const releases = await db
+    .select()
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft')
+      )
+    )
+    .orderBy(discogReleases.releaseDate);
+
+  if (releases.length === 0) return [];
+
+  const artistNamesByRelease = await getArtistNamesForReleases(
+    releases.map(r => r.id)
+  );
+
+  return releases.map(release => ({
+    ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+  }));
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(
