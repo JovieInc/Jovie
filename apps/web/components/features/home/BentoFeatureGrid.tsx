@@ -67,7 +67,7 @@ function GenerateReleasePlanCard() {
           <Sparkles className='h-3.5 w-3.5' aria-hidden='true' />
           Generate Release Plan
         </span>
-        <div className='flex items-center gap-1.5 text-[11px] text-white/30'>
+        <div className='flex items-center gap-1.5 text-[11px] text-white/60'>
           <span className='h-1 w-1 rounded-full bg-emerald-400/60' />
           <span>Brief loaded</span>
         </div>
@@ -89,7 +89,7 @@ function TasksTrackCard() {
             className='h-3.5 w-3.5 text-emerald-400'
             aria-hidden='true'
           />
-          <span className='text-[12px] text-white/40 line-through'>
+          <span className='text-[12px] text-white/65 line-through'>
             Metadata verified
           </span>
         </div>
@@ -122,11 +122,11 @@ function FansKnowCard() {
           <div className='flex h-6 w-6 items-center justify-center rounded-full border border-violet-400/20 bg-violet-400/10'>
             <BellRing className='h-3 w-3 text-violet-300' aria-hidden='true' />
           </div>
-          <span className='text-[12px] text-white/60'>
+          <span className='text-[12px] text-white/78'>
             Fans notified automatically
           </span>
         </div>
-        <p className='pl-[34px] text-[11px] text-white/30'>
+        <p className='pl-[34px] text-[11px] text-white/58'>
           In their timezone.
         </p>
       </div>
@@ -143,15 +143,15 @@ function NeverStartFromZeroCard() {
     >
       <div className='mt-3 space-y-2'>
         <div className='flex items-center justify-between'>
-          <p className='text-[11px] font-[530] text-white/50'>With Jovie</p>
-          <p className='text-[10px] text-emerald-400/60'>Compounding</p>
+          <p className='text-[11px] font-[530] text-white/72'>With Jovie</p>
+          <p className='text-[10px] text-emerald-300/90'>Compounding</p>
         </div>
         <div className='h-[3.5rem]'>
           <MomentumCurve />
         </div>
         <div className='flex items-center justify-between'>
-          <p className='text-[11px] font-[530] text-white/25'>Without</p>
-          <p className='text-[10px] text-white/15'>Flatline</p>
+          <p className='text-[11px] font-[530] text-white/58'>Without</p>
+          <p className='text-[10px] text-white/50'>Flatline</p>
         </div>
         <div className='h-[2rem]'>
           <FlatlineCurve />

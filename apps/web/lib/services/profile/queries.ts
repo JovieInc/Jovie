@@ -306,10 +306,11 @@ export async function getProfileWithLinks(
     return null;
   }
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
-  const redis = getRedis();
+  const shouldUseRedis = !options?.skipCache;
+  const redis = shouldUseRedis ? getRedis() : null;
 
   // Try Redis cache first (unless explicitly skipped)
-  if (redis && !options?.skipCache) {
+  if (redis) {
     try {
       const cached = await redis.get<ProfileWithLinks>(cacheKey);
       if (cached) {

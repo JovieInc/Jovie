@@ -253,28 +253,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [rows, openEditor]
   );
 
-  // Table display preferences (column visibility)
-  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
-    useReleaseTablePreferences();
+  // Table display preferences (column visibility, tracks toggle)
+  const {
+    columnVisibility,
+    rowHeight,
+    groupByYear,
+    onGroupByYearChange,
+    showTracks,
+    onShowTracksChange,
+  } = useReleaseTablePreferences();
+
+  // Derive releaseView from persisted showTracks preference
+  const releaseView: ReleaseView = showTracks ? 'tracks' : 'releases';
+  const setReleaseView = useCallback(
+    (view: ReleaseView) => onShowTracksChange(view === 'tracks'),
+    [onShowTracksChange]
+  );
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
     DEFAULT_RELEASE_FILTERS
   );
 
-  // View toggle (releases vs tracks)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
-
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // Apply filters and search to rows — all releases shown (no tracks/releases split)
-  // Deduplicate by ID to prevent multiple rows highlighting on click
-  const filteredRows = useMemo(() => {
-    const filtered = filterReleases(rows, filters, deferredSearchQuery);
+  // Deduplicate rows by ID before filtering (prevents inflated counts and double highlights)
+  const dedupedRows = useMemo(() => {
     const seen = new Set<string>();
-    return filtered.filter(r => {
+    return rows.filter(r => {
       if (seen.has(r.id)) {
         if (process.env.NODE_ENV === 'development') {
           console.warn(`[ReleaseTable] duplicate release id: ${r.id}`);
@@ -284,7 +292,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       seen.add(r.id);
       return true;
     });
-  }, [rows, filters, deferredSearchQuery]);
+  }, [rows]);
+
+  // Apply filters and search to deduped rows
+  const filteredRows = useMemo(() => {
+    return filterReleases(dedupedRows, filters, deferredSearchQuery);
+  }, [dedupedRows, filters, deferredSearchQuery]);
 
   // Smart link gating
   const planGate = usePlanGate();
@@ -905,6 +918,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               toolbar={
                 <ReleaseTableSubheader
                   releases={filteredRows}
+                  allReleases={dedupedRows}
                   selectedIds={selectedIds}
                   filters={filters}
                   onFiltersChange={setFilters}
@@ -928,6 +942,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onDelete={handleDeleteRequest}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
+                showTracks={showTracks}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}

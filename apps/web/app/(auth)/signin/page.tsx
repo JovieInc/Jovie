@@ -2,10 +2,11 @@
 
 import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
+import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
 /**
@@ -46,12 +47,15 @@ function isValidEmail(value: string): boolean {
 
 function SignInPageContent() {
   const [isMounted, setIsMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const initialValues = isValidEmail(email)
     ? { emailAddress: email }
     : undefined;
   const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
+
+  useNormalizeClerkHomeLink(containerRef);
 
   useEffect(() => {
     setIsMounted(true);
@@ -64,13 +68,15 @@ function SignInPageContent() {
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.SIGNUP} />
-      <SignIn
-        routing='hash'
-        oauthFlow='redirect'
-        signUpUrl={signUpUrl}
-        fallbackRedirectUrl={APP_ROUTES.DASHBOARD}
-        initialValues={initialValues}
-      />
+      <div ref={containerRef}>
+        <SignIn
+          routing='hash'
+          oauthFlow='redirect'
+          signUpUrl={signUpUrl}
+          fallbackRedirectUrl={APP_ROUTES.DASHBOARD}
+          initialValues={initialValues}
+        />
+      </div>
     </>
   );
 }

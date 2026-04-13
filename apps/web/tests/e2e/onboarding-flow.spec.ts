@@ -37,7 +37,7 @@ test.describe('Onboarding Flow', () => {
     // that links to /waitlist. The ClaimHandleForm is behind a feature flag
     // and may not be rendered. Check for either form.
     const handleInput = page.getByLabel(
-      /choose your handle|enter your desired handle/i
+      /choose your handle|claim your handle/i
     );
     const isFormVisible = await handleInput
       .isVisible({ timeout: 5000 })

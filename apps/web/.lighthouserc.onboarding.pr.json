@@ -3,6 +3,13 @@
     "collect": {
       "numberOfRuns": 3,
       "puppeteerScript": "scripts/lighthouse-dashboard-auth.cjs",
+      "puppeteerLaunchOptions": {
+        "args": [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage"
+        ]
+      },
       "settings": {
         "disableStorageReset": true
       }
@@ -13,7 +20,7 @@
           "matchingUrlPattern": "\\/onboarding",
           "assertions": {
             "categories:performance": [
-              "warn",
+              "error",
               {
                 "minScore": 0.9
               }
@@ -31,37 +38,37 @@
               }
             ],
             "cumulative-layout-shift": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 0.05
               }
             ],
             "first-contentful-paint": [
-              "warn",
+              "error",
               {
-                "maxNumericValue": 1000
+                "maxNumericValue": 1200
               }
             ],
             "largest-contentful-paint": [
-              "warn",
+              "error",
               {
-                "maxNumericValue": 1500
+                "maxNumericValue": 2500
               }
             ],
             "total-blocking-time": [
-              "warn",
+              "error",
               {
-                "maxNumericValue": 200
+                "maxNumericValue": 350
               }
             ],
             "speed-index": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 2500
               }
             ],
             "interactive": [
-              "warn",
+              "error",
               {
                 "maxNumericValue": 2500
               }

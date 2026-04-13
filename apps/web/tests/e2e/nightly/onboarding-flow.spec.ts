@@ -105,7 +105,7 @@ test.describe('Full onboarding flow @nightly', () => {
         waitUntil: 'domcontentloaded',
       });
 
-      const handleInput = page.getByLabel('Enter your desired handle');
+      const handleInput = page.getByLabel('Claim your handle');
       await expect(handleInput).toBeVisible({
         timeout: SMOKE_TIMEOUTS.QUICK,
       });

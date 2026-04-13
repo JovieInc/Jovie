@@ -93,13 +93,19 @@ export function FooterBranding({
         className
       )}
     >
-      <Link href={logoHref} aria-label='Jovie home' className={logoLinkClass}>
+      <Link
+        href={logoHref}
+        prefetch={false}
+        aria-label='Jovie home'
+        className={logoLinkClass}
+      >
         {renderLogoMark(mark, size, isLinear, logoClass)}
       </Link>
 
       {showCTA && (
         <Link
           href={signUpLink}
+          prefetch={false}
           className={cn(
             'text-[10px] leading-snug uppercase font-semibold tracking-[0.04em]',
             'transition-all duration-150 ease-out text-center',

@@ -425,6 +425,7 @@ describe('Profile Service Queries', () => {
       await getProfileWithLinks('testartist', { skipCache: true });
 
       expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
     });
 
     it('handles Redis read failure gracefully', async () => {
