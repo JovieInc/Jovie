@@ -134,7 +134,6 @@ export async function readPendingClaimContext(options?: {
   try {
     const parsed = parsePendingClaimCookie(raw);
     if (!parsed) {
-      cookieStore.delete(PENDING_CLAIM_COOKIE);
       return null;
     }
 
@@ -147,7 +146,6 @@ export async function readPendingClaimContext(options?: {
 
     return parsed;
   } catch (error) {
-    cookieStore.delete(PENDING_CLAIM_COOKIE);
     await captureError('Failed to parse pending claim cookie', error, {
       route: 'lib/claim/context',
     });
