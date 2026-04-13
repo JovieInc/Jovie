@@ -9,6 +9,8 @@ import type {
 const DEFAULT_PUBLIC_RELEASE_SLUG = 'neon-skyline';
 const DEFAULT_PUBLIC_TRACK_SLUG = 'neon-skyline';
 const PERF_CHAT_THREAD_TITLE = 'Performance Budget Thread';
+const PERF_RELEASE_SLUG = 'performance-budget-release';
+const PERF_RELEASE_TITLE = 'Performance Budget Release';
 
 function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -18,6 +20,23 @@ function getDatabaseUrl() {
 function getSqlClient() {
   const databaseUrl = getDatabaseUrl();
   return databaseUrl ? neon(databaseUrl) : null;
+}
+
+function resolveClerkUserId(
+  authCookies?: readonly { name?: string; value?: string }[]
+) {
+  const envClerkUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  if (envClerkUserId) {
+    return envClerkUserId;
+  }
+
+  const bypassClerkUserId = authCookies
+    ?.find(cookie => cookie.name === '__e2e_test_user_id')
+    ?.value?.trim();
+
+  return bypassClerkUserId && bypassClerkUserId.length > 0
+    ? bypassClerkUserId
+    : null;
 }
 
 function replaceRouteToken(
@@ -48,11 +67,12 @@ async function queryProfileHandle(handle: string) {
   return rows[0]?.username_normalized ?? null;
 }
 
-async function queryActiveProfile() {
+async function queryActiveProfile(clerkUserId?: string | null) {
   const sql = getSqlClient();
-  const clerkUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  const resolvedClerkUserId =
+    clerkUserId ?? process.env.E2E_CLERK_USER_ID?.trim() ?? null;
 
-  if (!sql || !clerkUserId) {
+  if (!sql || !resolvedClerkUserId) {
     return null;
   }
 
@@ -60,7 +80,7 @@ async function queryActiveProfile() {
     select cp.id, cp.username_normalized
     from users u
     join creator_profiles cp on cp.id = u.active_profile_id
-    where u.clerk_id = ${clerkUserId}
+    where u.clerk_id = ${resolvedClerkUserId}
     limit 1
   `;
 
@@ -82,6 +102,51 @@ async function queryExistingConversationId(profileId: string) {
   `;
 
   return rows[0]?.id ?? null;
+}
+
+async function ensurePerfRelease(profileId: string) {
+  const sql = getSqlClient();
+  if (!sql) {
+    return null;
+  }
+
+  const existing = await sql<Array<{ id: string }>>`
+    select id
+    from discog_releases
+    where creator_profile_id = ${profileId}
+      and slug = ${PERF_RELEASE_SLUG}
+    limit 1
+  `;
+
+  if (existing[0]?.id) {
+    return existing[0].id;
+  }
+
+  const inserted = await sql<Array<{ id: string }>>`
+    insert into discog_releases (
+      creator_profile_id,
+      title,
+      slug,
+      release_type,
+      release_date,
+      status,
+      total_tracks,
+      source_type
+    )
+    values (
+      ${profileId},
+      ${PERF_RELEASE_TITLE},
+      ${PERF_RELEASE_SLUG},
+      'single',
+      now(),
+      'released',
+      1,
+      'manual'
+    )
+    returning id
+  `;
+
+  return inserted[0]?.id ?? null;
 }
 
 async function createConversationViaApp(context: PerfResolveContext) {
@@ -143,6 +208,59 @@ async function createConversationViaApp(context: PerfResolveContext) {
   }
 }
 
+async function resolveActiveProfileViaApp(context: PerfResolveContext) {
+  if (context.authCookies.length === 0) {
+    return null;
+  }
+
+  let browser: Browser | null = null;
+  let pageContext: BrowserContext | null = null;
+  const baseUrl = context.baseUrl.replace(/\/$/, '');
+
+  try {
+    browser = await chromium.launch();
+    pageContext = await browser.newContext();
+    await pageContext.addCookies([...context.authCookies]);
+    const page = await pageContext.newPage();
+    await page.goto(`${baseUrl}${APP_ROUTES.DASHBOARD}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const profile = await page.evaluate(async () => {
+      const response = await fetch('/api/dashboard/profile', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        profile?: {
+          id?: string;
+          usernameNormalized?: string | null;
+          username_normalized?: string | null;
+        };
+      };
+
+      const id = payload.profile?.id ?? null;
+      const usernameNormalized =
+        payload.profile?.usernameNormalized ??
+        payload.profile?.username_normalized ??
+        null;
+
+      return id && usernameNormalized
+        ? { id, username_normalized: usernameNormalized }
+        : null;
+    });
+
+    return profile;
+  } finally {
+    await pageContext?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+  }
+}
+
 async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
   if (context.authCookies.length === 0) {
     return null;
@@ -157,25 +275,36 @@ async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
     pageContext = await browser.newContext();
     await pageContext.addCookies([...context.authCookies]);
     const page = await pageContext.newPage();
+    const originalViewport = page.viewportSize();
+    if (originalViewport) {
+      await page.setViewportSize({
+        width: 390,
+        height: originalViewport.height,
+      });
+    }
+
     await page.goto(`${baseUrl}${APP_ROUTES.DASHBOARD_RELEASES}`, {
       waitUntil: 'domcontentloaded',
     });
 
-    await page.waitForSelector('[data-testid="release-row"]', {
-      timeout: 15_000,
-    });
-    await page.click('[data-testid="release-row"]');
-    await page.waitForSelector('[data-testid="release-sidebar"]', {
-      timeout: 15_000,
-    });
-    await page.click('button:has-text("Tasks")');
-    await page.waitForSelector('[data-testid="release-tasks-card"]', {
-      timeout: 15_000,
-    });
-    await page.click('button:has-text("Open")');
-    await page.waitForURL('**/tasks', {
-      timeout: 15_000,
-    });
+    await page
+      .waitForLoadState('domcontentloaded', { timeout: 10_000 })
+      .catch(() => undefined);
+
+    const mobileRowTestId = await page
+      .locator('[data-testid^="mobile-release-row-"]')
+      .first()
+      .getAttribute('data-testid')
+      .catch(() => null);
+
+    if (originalViewport) {
+      await page.setViewportSize(originalViewport);
+    }
+
+    const mobileReleaseId = mobileRowTestId?.replace('mobile-release-row-', '');
+    if (mobileReleaseId) {
+      return `${APP_ROUTES.DASHBOARD_RELEASES}/${mobileReleaseId}/tasks`;
+    }
 
     const finalUrl = new URL(page.url());
     return `${finalUrl.pathname}${finalUrl.search}`;
@@ -281,7 +410,9 @@ export async function resolveChatConversationPerfPath(
   route: PerfRouteDefinition,
   context: PerfResolveContext
 ): Promise<string> {
-  const activeProfile = await queryActiveProfile();
+  const activeProfile =
+    (await queryActiveProfile(resolveClerkUserId(context.authCookies))) ??
+    (await resolveActiveProfileViaApp(context));
   const existingConversationId = activeProfile
     ? await queryExistingConversationId(activeProfile.id)
     : null;
@@ -300,9 +431,22 @@ export async function resolveReleaseTasksPerfPath(
   context: PerfResolveContext
 ): Promise<string> {
   const sql = getSqlClient();
-  const activeProfile = await queryActiveProfile();
+  if (!sql) {
+    const resolvedPath = await resolveReleaseTasksViaApp(context);
+    if (resolvedPath) {
+      return resolvedPath;
+    }
 
-  if (!sql || !activeProfile) {
+    throw new Error(
+      'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
+    );
+  }
+
+  const activeProfile =
+    (await queryActiveProfile(resolveClerkUserId(context.authCookies))) ??
+    (await resolveActiveProfileViaApp(context));
+
+  if (!activeProfile) {
     const resolvedPath = await resolveReleaseTasksViaApp(context);
     if (resolvedPath) {
       return resolvedPath;
@@ -322,7 +466,9 @@ export async function resolveReleaseTasksPerfPath(
   `;
 
   const releaseId = releases[0]?.id;
-  if (!releaseId) {
+  const resolvedReleaseId =
+    releaseId ?? (await ensurePerfRelease(activeProfile.id));
+  if (!resolvedReleaseId) {
     const resolvedPath = await resolveReleaseTasksViaApp(context);
     if (resolvedPath) {
       return resolvedPath;
@@ -331,5 +477,5 @@ export async function resolveReleaseTasksPerfPath(
     throw new Error('No seeded release found for the active E2E user.');
   }
 
-  return replaceRouteToken(route.path, 'releaseId', releaseId);
+  return replaceRouteToken(route.path, 'releaseId', resolvedReleaseId);
 }

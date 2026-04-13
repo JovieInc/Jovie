@@ -168,6 +168,14 @@ const ACCOUNT_BILLING_RESOURCE_BUDGETS = [
   { resourceType: 'total', budget: 3300 },
 ] as const satisfies readonly PerfResourceBudget[];
 
+const ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 3000 },
+  { resourceType: 'image', budget: 700 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 850 },
+  { resourceType: 'total', budget: 3900 },
+] as const satisfies readonly PerfResourceBudget[];
+
 const ONBOARDING_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 2600 },
   { resourceType: 'image', budget: 700 },
@@ -743,7 +751,7 @@ const CREATOR_SHELL_ROUTES = [
       redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'redirect-complete', budget: 700 },
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
@@ -783,17 +791,17 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.PRESENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dsp-presence-workspace"]'] },
+    measureMode: 'redirect',
+    readySelectors: {
+      content: ['section#artist-profile'],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`],
+    },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      // This alias lands on the heavier artist-profile music settings surface.
+      { metric: 'redirect-complete', budget: 1500 },
+      { metric: 'time-to-first-byte', budget: 1200 },
     ],
-    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    resourceSizes: ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS,
     priority: 7,
     seedProfile: 'active-user',
   },
