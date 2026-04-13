@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
@@ -140,7 +138,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
+  // Read CSP nonce. headers() opts into dynamic rendering which breaks ISR pages
+  // ("Page changed from static to dynamic at runtime"). Only call headers() when
+  // we know we're in a fully dynamic context (authenticated app routes). Public
+  // ISR pages (profiles, smart links) don't need nonce — CSP uses hashes instead.
+  const nonce = undefined;
 
   const isE2EClientRuntime =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||

@@ -405,6 +405,7 @@ const nextConfig = {
       0,
       7
     ),
+    NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
     // Clerk JS bundle URL — decoded from the publishable key at build time.
     // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
     // so Clerk JS + chunks load directly from Clerk infrastructure instead of

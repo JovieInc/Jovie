@@ -1,7 +1,6 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 /**
@@ -9,16 +8,18 @@ import { useEffect, useState } from 'react';
  * Reads `?subscribed=confirmed` from the URL and auto-dismisses after 8 seconds.
  */
 export function SubscriptionConfirmedBanner() {
-  const searchParams = useSearchParams();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (searchParams?.get('subscribed') === 'confirmed') {
+    const subscribed =
+      new URLSearchParams(globalThis.location.search).get('subscribed') ===
+      'confirmed';
+    if (subscribed) {
       setVisible(true);
       const timer = globalThis.setTimeout(() => setVisible(false), 8000);
       return () => globalThis.clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, []);
 
   if (!visible) return null;
 

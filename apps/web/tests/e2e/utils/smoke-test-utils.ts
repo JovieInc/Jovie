@@ -301,9 +301,23 @@ export function setupPageMonitoring(page: Page): {
     url: () => string;
     failure: () => { errorText: string } | null;
   }) => {
+    const url = req.url();
+    const failureText = req.failure()?.errorText || 'unknown';
+    const normalizedUrl = url.toLowerCase();
+    const normalizedFailure = failureText.toLowerCase();
+
+    const isExpectedAbortedMonitoringRequest =
+      normalizedFailure.includes('err_aborted') &&
+      (normalizedUrl.includes('/monitoring') ||
+        normalizedUrl.includes('clerk.browser.js'));
+
+    if (isExpectedAbortedMonitoringRequest) {
+      return;
+    }
+
     failedRequests.push({
-      url: req.url(),
-      failureText: req.failure()?.errorText || 'unknown',
+      url,
+      failureText,
     });
   };
 

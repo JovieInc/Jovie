@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
+
+## [26.4.151.4] - 2026-04-12
+
+### Fixed
+
+- Handle `DYNAMIC_SERVER_USAGE` error in root layout so public profile pages can use ISR with `revalidate` without crashing the build
+
 ## [26.4.151.3] - 2026-04-12
 
 > Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
@@ -12,141 +28,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
-
-## [26.4.151.2] - 2026-04-12
-
-> Settings cards now use consistent spacing across all sections.
-
-### Fixed
-
-- Settings page cards now have consistent padding across all sections (Email, Appearance, Billing, etc.) by removing redundant card-level padding that was doubling up with child padding
-
-## [26.4.151.1] - 2026-04-12
-
-> Sidebar entity header elevation now matches other cards, and About details are consolidated into one cleaner card.
-
-### Fixed
-
-- [internal] Entity header card in dashboard sidebar now has proper elevation matching other entity cards
-- [internal] About tab consolidated from three separate cards into a single detail view with two-column metadata layout
-
-## [26.4.151] - 2026-04-12
-
-> Admin dashboard now opens to a clean funnel scoreboard showing the full pipeline from scrape to paid at a glance.
-
-### Added
-
-- Funnel scoreboard as the default admin view with three hero metrics (MRR, paying customers, WoW growth), a six-step horizontal pipeline, and a 4-week trend chart
-- Shared `formatPercent` and `formatUsd` utilities extracted from duplicated admin code
-- Unit tests for scoreboard rendering, conversion rate math, empty/error states, and formatting utils
-
-### Changed
-
-- Admin dashboard now uses two tabs: Scoreboard (default) and Workspaces (previous content)
-- Consolidated `formatPercent` (3 copies) and `formatUsd` (2 copies) into `lib/admin/format.ts`
-
-## [26.4.150.0] - 2026-04-12
-
-> Auto-created profiles now pass through a quality gate before going live, preventing broken profiles from reaching artists during claim outreach. Full-screen offline and error screens now use one consistent, design-system-aligned layout.
-
-### Added
-
-- Profile quality gate for auto-created profiles: validates display name, avatar, and link count before setting `isPublic`
-- `evaluateProfileQuality()` and `isEmbarrassingDisplayName()` pure validation functions
-- Quarantined profiles (failing quality bar) are hidden via existing `isPublic: false` mechanism
-- Re-ingest can promote quarantined profiles when quality improves
-- API response includes `quarantined` and `quarantineReasons` fields for admin visibility
-- Unit tests for all quality gate scenarios (18 tests)
-- [internal] Full-Screen Status Screens section in DESIGN.md codifying the canonical spec
-
-### Changed
-
-- `handleNewProfileIngest()` uses quality gate result instead of hardcoded `isPublic: true`
-- `createNewSocialProfile()` uses quality gate result instead of hardcoded `isPublic: true`
-- `ExistingProfileCheck` interface now includes `isPublic` field for re-ingest promotion logic
-- [internal] Unified all full-screen error/offline screens to match DESIGN.md: consistent 32px logo, #08090a background, pill buttons, identical layout geometry
-- [internal] Removed card wrapper from PublicPageErrorFallback (subtraction principle)
-- [internal] Removed wifi-off icon from offline page (headline says it all)
-- [internal] Added inline SVG logo to root error page (was missing entirely)
-- [internal] Replaced marketing-themed classes in root error with System B dark mode
-- [internal] Bumped service worker cache name to ensure existing users get the updated offline page
-
-## [26.4.149.2] - 2026-04-12
-
-> Pricing, terms, and docs copy now consistently reflect Free, Pro, and Max plans with a 14-day Pro trial.
-
-### Changed
-
-- Pricing page CTA updated to mention 14-day Pro trial
-- Terms of service payment section rewritten to reflect Free/Pro/Max plans, trial, and billing
-- Docs plans-pricing page fully rewritten: removed stale Founding Member ($12) and Growth ($99) tiers, added current Free/$39 Pro/$149 Max
-- All docs feature pages updated from "Growth" to "Max" plan references (11 files)
-- "Remove Jovie branding" corrected from Pro to Max-only in docs
-- Pro analytics retention corrected from 90 to 180 days in docs
-- Free AI message limit corrected from 25 to 10/day in chat-ai docs
-- LLMs route pricing section updated with accurate tier descriptions and trial mention
-
-## [26.4.143] - 2026-04-12
-
-### Added
-
-- Instantly.ai / Leadsy tracking pixel for email campaign attribution
-- `isMarketingAllowed()` consent helper with fire-by-default model (respects GPC/DNT opt-out)
-- CSP allowlist for r2.leadsy.ai, tag.trovo-tag.com, and wvbknd.leadsy.ai
-- 14 unit tests covering all pixel consent and route-gating codepaths
-
-## [26.4.149.1] - 2026-04-12
-
-### Changed
-
-- Marketing typography: Inter replaced with Satoshi (display) + DM Sans (body) for all marketing pages
-- All marketing container widths unified from 1120px to 1200px across 10 files
-- Feature grid icons replaced with accent-colored title text (no more emoji-on-colored-square pattern)
-- Container homepage variant simplified from padding hack to standard max-width
-- CTA philosophy documented as white-on-black (Apple approach), no saturated brand color
-- Replace hardcoded hex colors in mobile swipe actions with design system tokens
-- Unify empty state styling across releases page (consistent min-height, heading size, button spacing)
-- Align table base text to 13px per DESIGN.md specification
-- Wrap connected-but-empty state in DrawerSurfaceCard for visual consistency
-
-### Added
-
-- Self-hosted Satoshi Variable (42KB) and DM Sans Variable (48KB) font files
-- Marketing font loading via next/font/local, scoped to .linear-marketing wrapper
-- Font families registered in @theme block (--font-display, --font-body)
-- Feature accent color system documented in DESIGN.md with usage rules
-- Explicit anti-patterns added to DESIGN.md: gold colors, emoji-on-square icons, saturated brand colors
-
-## [26.4.149.0] - 2026-04-12
-
-### Changed
-
-- Redesign onboarding handle step with inline `jov.ie/` prefix, pearl composer-style input, and circular arrow submit button
-- Simplify Spotify search step to single headline "Are you on Spotify?" with no redundant copy
-- Fix sidebar layout to sit beside content at 1024px+ instead of stacking on top (Tailwind v4 cascade fix)
-- Vertically position onboarding content in upper third of viewport for consistent headline placement
-- Replace filled sidebar circles with hollow stroke icons: solid (complete), half-solid/half-dotted (in-progress), dotted (pending)
-- Add per-step accent colors to sidebar step indicators
-- Simplify artist-confirm step to single clear message with always-enabled Continue button
-- Show specific handle validation errors instead of generic "Not available" message
-- Move Back button into sidebar for consistent alignment with "Jovie Setup" title
-- Presence page now redirects to artist profile settings (Music tab) instead of loading the broken presence UI
-- Removed Presence link from sidebar navigation
-
-### Added
-
-- Reserve top artist Spotify IDs as unavailable in search dropdown for social proof
-- "Need help?" / "Contact support" mailto link in search dropdown footer
-- Handle suggestions shown as clickable `jov.ie/` pills with "Try:" label
-- Suggested DSP matches now appear in the Music tab of the right drawer sidebar with confirm/reject actions and hover popover details
-- Dot indicator on Music tab when unreviewed suggestions exist
-- One-line explanation for first-time users seeing suggested profiles
-
-### Fixed
-
-- Fix dropdown flickering during typing with `placeholderData: keepPreviousData`
-- Errors on artist-confirm step stay in context instead of bouncing to "Are you on Spotify?"
-- Split generic server error "That handle can't be used" into specific messages (reserved, too short, invalid characters)
 
 ## [26.4.148.1] - 2026-04-12
 

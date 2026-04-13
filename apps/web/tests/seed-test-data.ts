@@ -19,6 +19,8 @@ import {
   ensureCreatorProfileRecord as ensureCreatorProfile,
   ensureSocialLinkRecord as ensureSocialLink,
   ensureUserRecord as ensureUser,
+  ensureUserProfileClaim,
+  getDeterministicTestClerkId as getSeedDeterministicClerkId,
   isAllowlistedPrivilegedTestAccountEmail,
   resolveClerkTestUserId as resolveSeedUserClerkId,
   setActiveProfileForUser as setActiveProfile,
@@ -30,8 +32,11 @@ const {
   creatorContacts,
   discogReleases,
   discogTracks,
+  promoDownloads,
+  providers,
   providerLinks,
   tourDates,
+  users,
 } = schema;
 
 interface TestProfile {
@@ -52,6 +57,42 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+const DEFAULT_TEST_RELEASE_ARTWORK_URL = '/android-chrome-512x512.png';
+
+const REQUIRED_PUBLIC_QA_PROVIDERS = [
+  {
+    id: 'spotify',
+    displayName: 'Spotify',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://open.spotify.com',
+  },
+  {
+    id: 'tiktok_sound',
+    displayName: 'TikTok',
+    kind: 'video' as const,
+    baseUrl: 'https://www.tiktok.com',
+  },
+  {
+    id: 'instagram_reels',
+    displayName: 'Instagram Reels',
+    kind: 'video' as const,
+    baseUrl: 'https://www.instagram.com',
+  },
+  {
+    id: 'youtube_shorts',
+    displayName: 'YouTube Shorts',
+    kind: 'video' as const,
+    baseUrl: 'https://www.youtube.com',
+  },
+] as const;
+
+function getFutureReleaseDate(yearsAhead = 10): Date {
+  const releaseDate = new Date();
+  releaseDate.setUTCFullYear(releaseDate.getUTCFullYear() + yearsAhead);
+  releaseDate.setUTCMonth(11, 1);
+  releaseDate.setUTCHours(0, 0, 0, 0);
+  return releaseDate;
+}
 async function withSeedOperationTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,
@@ -146,22 +187,21 @@ const TEST_PROFILES: TestProfile[] = [
     displayName: 'Dua Lipa',
     bio: 'Pop artist and songwriter',
     spotifyUrl: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
-    avatarUrl: '/avatars/default-user.png',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
   {
     username: 'taylorswift',
     displayName: 'Taylor Swift',
     bio: 'Singer-songwriter',
     spotifyUrl: 'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02',
-    avatarUrl:
-      'https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
   {
     username: 'testartist',
     displayName: 'Test Artist',
     bio: 'Test artist for E2E tipping tests',
     spotifyUrl: 'https://open.spotify.com/artist/test',
-    avatarUrl: '/avatars/default-user.png',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
 ];
 
@@ -182,6 +222,38 @@ type SeededReleaseValues = Pick<
 function isDuplicateKeyError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('duplicate key value');
+}
+
+function isMissingRelationError(error: unknown, relationName: string): boolean {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42P01' || message.includes('does not exist')) &&
+    message.includes(relationName.toLowerCase())
+  );
+}
+
+export function isMissingPromoDownloadsRelationError(error: unknown): boolean {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42P01' && isMissingRelationError(error, 'promo_downloads')) ||
+    /relation ["']?promo_downloads["']? does not exist/.test(message)
+  );
 }
 
 function getSeedEnv() {
@@ -630,8 +702,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'neon-skyline',
     releaseType: 'single',
     releaseDate: new Date('2024-01-15'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv',
     totalTracks: 1,
     upc: '191061000001',
@@ -653,8 +724,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'midnight-drive',
     releaseType: 'album',
     releaseDate: new Date('2023-11-20'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/6JJh8nj3ZPYoEXZwLhRJ7U',
     totalTracks: 10,
     upc: '191061000002',
@@ -667,8 +737,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'fading-signals',
     releaseType: 'ep',
     releaseDate: new Date('2024-03-01'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/3LH4d3cOWNNsVw41Gqt2xx',
     totalTracks: 5,
     upc: '191061000003',
@@ -680,8 +749,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'the-complete-sessions',
     releaseType: 'album',
     releaseDate: new Date('2022-06-15'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/9XX4d3cOWNNsVw41Gqt2yy',
     totalTracks: 55,
     upc: '191061000004',
@@ -694,8 +762,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'best-of-2023',
     releaseType: 'compilation',
     releaseDate: new Date('2023-12-31'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/7ZZ4d3cOWNNsVw41Gqt2zz',
     totalTracks: 20,
     upc: '191061000005',
@@ -708,8 +775,7 @@ const TEST_RELEASES: TestRelease[] = [
     slug: 'raw-energy',
     releaseType: 'single',
     releaseDate: new Date('2024-06-01'),
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
     spotifyUrl: 'https://open.spotify.com/album/1AA4d3cOWNNsVw41Gqt2ww',
     totalTracks: 1,
     tracks: [
@@ -721,6 +787,28 @@ const TEST_RELEASES: TestRelease[] = [
         durationMs: 198000,
         isrc: 'USAT20000099',
         isExplicit: true,
+      },
+    ],
+  },
+  // Future single for public countdown / notify-me coverage
+  {
+    title: 'Future Glow',
+    slug: 'future-glow',
+    releaseType: 'single',
+    releaseDate: getFutureReleaseDate(),
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+    spotifyUrl: 'https://open.spotify.com/album/2BB4d3cOWNNsVw41Gqt2aa',
+    totalTracks: 1,
+    upc: '191061000006',
+    label: 'Neon Records',
+    tracks: [
+      {
+        title: 'Future Glow',
+        slug: 'future-glow',
+        trackNumber: 1,
+        discNumber: 1,
+        durationMs: 201000,
+        isrc: 'USAT20000100',
       },
     ],
   },
@@ -736,6 +824,10 @@ async function seedReleasesForProfile(
   profileId: string
 ) {
   console.log('    Seeding releases for E2E user...');
+
+  for (const provider of REQUIRED_PUBLIC_QA_PROVIDERS) {
+    await db.insert(providers).values(provider).onConflictDoNothing();
+  }
 
   // Get existing releases with their slugs to handle partial seed states
   const existingReleases = await db
@@ -819,6 +911,7 @@ async function seedReleasesForProfile(
       console.log(
         `    ✓ Created release: ${release.title} (${release.releaseType}, ${release.totalTracks} tracks)`
       );
+      existingBySlug.set(release.slug, releaseId);
     } else {
       console.log(`    ✓ Release exists: ${release.title}`);
     }
@@ -836,12 +929,79 @@ async function seedReleasesForProfile(
       })
       .onConflictDoNothing();
 
+    if (release.slug === 'neon-skyline') {
+      await db
+        .insert(providerLinks)
+        .values([
+          {
+            providerId: 'tiktok_sound',
+            ownerType: 'release',
+            releaseId,
+            url: 'https://www.tiktok.com/music/Neon-Skyline-7357000000000000001',
+            isPrimary: false,
+            sourceType: 'manual',
+          },
+          {
+            providerId: 'instagram_reels',
+            ownerType: 'release',
+            releaseId,
+            url: 'https://www.instagram.com/reels/audio/7357000000000000001/',
+            isPrimary: false,
+            sourceType: 'manual',
+          },
+          {
+            providerId: 'youtube_shorts',
+            ownerType: 'release',
+            releaseId,
+            url: 'https://www.youtube.com/source/7357000000000000001/shorts',
+            isPrimary: false,
+            sourceType: 'manual',
+          },
+        ])
+        .onConflictDoNothing();
+    }
+
     // Seed tracks if provided
     if (release.tracks && release.tracks.length > 0) {
       await seedTracksForRelease(db, releaseId, profileId, release.tracks);
     }
 
     console.log(`    ✓ Ensured Spotify link for ${release.title}`);
+  }
+
+  const promoReleaseId = existingBySlug.get('neon-skyline');
+  if (promoReleaseId) {
+    try {
+      await db
+        .insert(promoDownloads)
+        .values({
+          creatorProfileId: profileId,
+          releaseId: promoReleaseId,
+          title: 'Neon Skyline Radio Edit',
+          slug: 'neon-skyline-radio-edit',
+          description: 'Deterministic promo download fixture for public QA.',
+          fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
+          fileName: 'neon-skyline-radio-edit.mp3',
+          fileMimeType: 'audio/mpeg',
+          fileSizeBytes: 4_600_000,
+          artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+          isActive: true,
+          position: 0,
+          metadata: { fixture: true },
+        })
+        .onConflictDoNothing();
+      console.log('    ✓ Ensured promo download fixture for Neon Skyline');
+    } catch (error) {
+      if (isMissingPromoDownloadsRelationError(error)) {
+        console.warn(
+          `    ⚠ promo_downloads is missing; skipping promo download fixture: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      } else {
+        throw error;
+      }
+    }
   }
 
   console.log('    ✓ Releases seeding complete');
@@ -908,7 +1068,10 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
         const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
         const E2E_USERNAME = 'e2e-test-user';
         const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
-          ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+          ? await resolveSeedUserClerkId(
+              E2E_EMAIL,
+              configuredE2EClerkUserId ?? getSeedDeterministicClerkId(E2E_EMAIL)
+            )
           : null;
 
         if (E2E_CLERK_USER_ID) {
@@ -1049,8 +1212,31 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
                 soundcloudId: null,
               };
 
+        let ownerUserId: string | null = null;
+        if (profile.username === 'dualipa') {
+          const publicOwnerEmail = normalizeEmail('dualipa-public@jov.ie');
+          const { id: userId } = await ensureUser(db, {
+            clerkId: getSeedDeterministicClerkId(publicOwnerEmail),
+            email: publicOwnerEmail,
+            name: profile.displayName,
+            userStatus: 'active',
+            isAdmin: false,
+          });
+
+          await db
+            .update(users)
+            .set({
+              isPro: true,
+              plan: 'pro',
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+
+          ownerUserId = userId;
+        }
+
         const createdProfileId = await ensureCreatorProfile(db, {
-          userId: null,
+          userId: ownerUserId,
           username: profile.username,
           usernameNormalized: profile.username.toLowerCase(),
           displayName: profile.displayName,
@@ -1060,11 +1246,15 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           creatorType: 'artist',
           isPublic: true,
           isVerified: false,
-          isClaimed: false,
+          isClaimed: ownerUserId !== null,
           ingestionStatus: 'idle',
           onboardingCompletedAt: null,
           ...dspFields,
         });
+
+        if (ownerUserId) {
+          await ensureUserProfileClaim(db, ownerUserId, createdProfileId);
+        }
 
         console.log(
           `    ✓ Ensured profile ${profile.username} (ID: ${createdProfileId})`
@@ -1136,6 +1326,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
         // Add tour dates for dualipa to test public touring display
         if (profile.username === 'dualipa') {
+          await seedReleasesForProfile(db, createdProfileId);
           await seedTourDatesForProfile(db, createdProfileId);
           await seedPublicContactsForProfile(db, createdProfileId);
         }

@@ -30,7 +30,7 @@ export default function HomeLayout({
           >
             Privacy
           </Link>
-          <span aria-hidden='true' className='text-quaternary-token/40'>
+          <span aria-hidden='true' className='text-secondary-token/60'>
             ·
           </span>
           <Link

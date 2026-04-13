@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ArrowRight } from 'lucide-react';
 import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
@@ -13,6 +14,7 @@ const CHANNELS = [
     href: DOCS_URL,
     external: true,
     event: 'Support Docs Clicked',
+    cta: 'Visit',
   },
   {
     title: 'Email Support',
@@ -20,6 +22,7 @@ const CHANNELS = [
     href: `mailto:${SUPPORT_EMAIL}`,
     external: false,
     event: 'Support Email Clicked',
+    cta: 'Send email',
   },
   {
     title: 'Getting Started',
@@ -27,6 +30,7 @@ const CHANNELS = [
     href: `${DOCS_URL}/getting-started`,
     external: true,
     event: 'Support Getting Started Clicked',
+    cta: 'Visit',
   },
 ] as const;
 
@@ -66,7 +70,8 @@ export function SupportChannels() {
                     ? { target: '_blank', rel: 'noopener noreferrer' }
                     : {})}
                 >
-                  {channel.external ? 'Visit' : 'Send email'} &rarr;
+                  <span>{channel.cta}</span>
+                  <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
                 </a>
               </Button>
             </div>

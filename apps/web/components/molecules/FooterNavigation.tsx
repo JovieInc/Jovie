@@ -38,6 +38,7 @@ export function FooterNavigation({
         <FooterLink
           key={`${link.href}-${link.label}`}
           href={link.href}
+          prefetch={false}
           tone={variant}
           className={linkClassName}
         >
