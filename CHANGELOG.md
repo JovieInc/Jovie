@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.155.0] - 2026-04-13
+
+### Added
+
+- Density-aware proximity algorithm for tour dates: uses local venue clustering to pick 50mi (dense markets) or 150mi (sparse markets) radius instead of a flat threshold
+- Conversion-first tour drawer: when no events are near a fan, shows subscribe CTA with "No events near you." and collapses other dates behind a disclosure
+- New date row layout with date box on left (month + day stacked) and ticket pill on right
+- London tour date (The O2) added to Calvin Harris demo persona for UK testing
+- Shared `useTourDateProximity` hook deduplicating proximity logic between drawer and public tour page
+- Analytics `source` prop on `ArtistNotificationsCTA` for tracking subscription origin (tour drawer vs profile inline)
+
+### Changed
+
+- Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
+- Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
+
 ## [26.4.154.0] - 2026-04-13
 
 ### Changed
