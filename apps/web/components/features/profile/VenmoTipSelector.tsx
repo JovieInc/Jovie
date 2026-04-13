@@ -37,6 +37,16 @@ export default function VenmoTipSelector({
         venmoUsername ?? ''
       )}`;
 
+      // Fire venmo_link_click pixel event for analytics
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      if (globalThis.joviePixel?.track) {
+        // @ts-expect-error - joviePixel is set by JoviePixel component
+        globalThis.joviePixel.track('venmo_link_click', {
+          tipAmount: amount,
+          tipMethod: 'venmo',
+        });
+      }
+
       onContinue?.(url);
       const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
       if (!win) {
