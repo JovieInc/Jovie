@@ -17,7 +17,7 @@ type VenmoTipSelectorProps = {
 export default function VenmoTipSelector({
   venmoLink,
   venmoUsername,
-  amounts = [3, 5, 7],
+  amounts = [5, 10, 20],
   className,
   onContinue,
 }: VenmoTipSelectorProps) {
@@ -68,7 +68,8 @@ export default function VenmoTipSelector({
       <TipSelector
         amounts={amounts}
         onContinue={handleAmountSelected}
-        paymentLabel='Venmo'
+        paymentLabel='Pay'
+        showPaymentIcon={false}
       />
     </section>
   );

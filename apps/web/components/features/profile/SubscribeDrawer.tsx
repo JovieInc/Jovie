@@ -24,8 +24,8 @@ export function SubscribeDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={onOpenChange}
-      title='Get notified'
-      subtitle={`Get notified about new releases and shows from ${artist.name}.`}
+      title='Turn on notifications'
+      subtitle='New releases and shows.'
     >
       {subscribeTwoStep ? (
         <TwoStepNotificationsCTA artist={artist} />

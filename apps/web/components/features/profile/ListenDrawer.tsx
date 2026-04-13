@@ -52,7 +52,7 @@ export function ListenDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title='Listen everywhere'
-      subtitle={`Stream or download ${artist.name} on your favorite platform.`}
+      subtitle={`Stream ${artist.name} on your favorite platform.`}
     >
       <div className='flex justify-center'>
         <StaticListenInterface

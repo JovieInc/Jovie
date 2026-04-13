@@ -24,7 +24,7 @@ export function TipDrawer({
   artistHandle,
   venmoLink,
   venmoUsername,
-  amounts = [3, 5, 7],
+  amounts = [5, 10, 20],
 }: TipDrawerProps) {
   useEffect(() => {
     if (!open) return;
@@ -96,8 +96,8 @@ export function TipDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={`Tip ${artistName}`}
-      subtitle='Send support instantly with Venmo.'
+      title={`Pay ${artistName}`}
+      subtitle='Support in one tap'
     >
       <ProfileTipDrawerContent
         amounts={amounts}

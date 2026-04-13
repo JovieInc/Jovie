@@ -79,7 +79,9 @@ describe('HomeAdaptiveProfileStory', () => {
 
     render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
 
-    for (const panel of screen.getAllByTestId('homepage-phone-state-default')) {
+    for (const panel of screen.getAllByTestId(
+      'homepage-phone-state-streams-latest'
+    )) {
       expect(panel).toHaveAttribute('data-motion-mode', 'reduced');
     }
   });
@@ -91,10 +93,12 @@ describe('HomeAdaptiveProfileStory', () => {
 
     const desktopRail = screen.getByTestId('homepage-desktop-phone-rail');
     expect(
-      within(desktopRail).getByTestId('homepage-phone-state-default')
+      within(desktopRail).getByTestId('homepage-phone-state-streams-latest')
     ).toBeInTheDocument();
 
-    const targetScene = screen.getByTestId('homepage-story-scene-when-its-out');
+    const targetScene = screen.getByTestId(
+      'homepage-story-scene-streams-video'
+    );
     await waitFor(() => {
       expect(MockIntersectionObserver.instances.length).toBeGreaterThan(0);
     });
@@ -116,13 +120,13 @@ describe('HomeAdaptiveProfileStory', () => {
 
     await waitFor(() => {
       expect(
-        within(desktopRail).getByTestId('homepage-phone-state-listen')
+        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
       ).toBeInTheDocument();
     });
 
     expect(
       container.querySelector(
-        '[data-testid="homepage-desktop-phone-rail"] [data-testid="homepage-phone-state-listen"]'
+        '[data-testid="homepage-desktop-phone-rail"] [data-testid="homepage-phone-state-streams-video"]'
       )
     ).toBeTruthy();
   });
@@ -132,10 +136,10 @@ describe('HomeAdaptiveProfileStory', () => {
 
     const desktopRail = screen.getByTestId('homepage-desktop-phone-rail');
     const strongestScene = screen.getByTestId(
-      'homepage-story-scene-when-its-out'
+      'homepage-story-scene-streams-video'
     );
     const weakerScene = screen.getByTestId(
-      'homepage-story-scene-before-the-drop'
+      'homepage-story-scene-streams-presave'
     );
 
     await waitFor(() => {
@@ -159,7 +163,7 @@ describe('HomeAdaptiveProfileStory', () => {
 
     await waitFor(() => {
       expect(
-        within(desktopRail).getByTestId('homepage-phone-state-listen')
+        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
       ).toBeInTheDocument();
     });
 
@@ -178,7 +182,7 @@ describe('HomeAdaptiveProfileStory', () => {
 
     await waitFor(() => {
       expect(
-        within(desktopRail).getByTestId('homepage-phone-state-listen')
+        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
       ).toBeInTheDocument();
     });
   });
@@ -188,32 +192,42 @@ describe('HomeAdaptiveProfileStory', () => {
 
     const mobileRail = screen.getByTestId('homepage-mobile-phone-rail');
     expect(
-      within(mobileRail).getAllByTestId('homepage-phone-state-default')
+      within(mobileRail).getAllByTestId('homepage-phone-state-streams-latest')
     ).toHaveLength(1);
+  });
+
+  it('renders the tip conversion cards inside the story rail', () => {
+    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
+
+    expect(
+      screen.getAllByTestId('homepage-tip-conversion-cards')[0]
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Say thanks.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Thanks for the tip').length).toBeGreaterThan(0);
   });
 
   it('selects the intersecting scene closest to the focus line', () => {
     const scenes: ObservedSceneState[] = [
       {
-        sceneId: 'one-link',
+        sceneId: 'streams-latest',
         isIntersecting: true,
         intersectionRatio: 0.45,
         top: 74,
       },
       {
-        sceneId: 'when-its-out',
+        sceneId: 'streams-video',
         isIntersecting: true,
         intersectionRatio: 0.7,
         top: 8,
       },
       {
-        sceneId: 'support',
+        sceneId: 'tips-open',
         isIntersecting: false,
         intersectionRatio: 0.9,
         top: -18,
       },
     ];
 
-    expect(selectActiveSceneId(scenes, 'one-link')).toBe('when-its-out');
+    expect(selectActiveSceneId(scenes, 'streams-latest')).toBe('streams-video');
   });
 });

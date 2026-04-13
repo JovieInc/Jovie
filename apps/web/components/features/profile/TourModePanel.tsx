@@ -452,6 +452,7 @@ export function TourModePanel({
         open
         onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
         title='Tour Dates'
+        subtitle='Upcoming shows and tickets.'
         dataTestId='tour-drawer'
       >
         <TourDrawerContent artist={artist} tourDates={tourDates} />
@@ -472,6 +473,7 @@ export function TourModePanel({
       open
       onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
       title='Tour Dates'
+      subtitle='Upcoming shows and tickets.'
       contentClassName='bg-[rgb(24,24,28)] border-white/8'
       bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
       dataTestId='tour-drawer'

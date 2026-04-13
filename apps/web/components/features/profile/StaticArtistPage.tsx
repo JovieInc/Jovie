@@ -8,12 +8,15 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
+export type StaticArtistPagePresentation = 'full-public' | 'compact-preview';
+
 export interface StaticArtistPageProps {
   readonly mode: ProfileMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
+  readonly showTipButton?: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
   readonly showFooter?: boolean;
@@ -33,6 +36,7 @@ export interface StaticArtistPageProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly viewerCountryCode?: string | null;
+  readonly presentation?: StaticArtistPagePresentation;
 }
 
 export function StaticArtistPage({
@@ -41,6 +45,7 @@ export function StaticArtistPage({
   socialLinks,
   contacts,
   subtitle,
+  showTipButton,
   showBackButton,
   showTourButton,
   showFooter,
@@ -57,12 +62,14 @@ export function StaticArtistPage({
   showShopButton = false,
   profileSettings,
   viewerCountryCode,
+  presentation = 'full-public',
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
     socialLinks,
     contacts,
+    showTipButton,
     subtitle,
     showBackButton,
     showTourButton,
@@ -81,9 +88,12 @@ export function StaticArtistPage({
     profileSettings,
   });
 
+  // Live public profiles and compact preview callers intentionally share the
+  // same Apple-native compact shell. Homepage preview uses ProfileCompactSurface
+  // directly, so StaticArtistPage should stay aligned to the current public UI.
   return (
     <ProfileCompactTemplate
-      key={viewModel.artist.id}
+      key={`${presentation}-${viewModel.artist.id}`}
       mode={viewModel.mode}
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}

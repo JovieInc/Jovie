@@ -46,7 +46,7 @@ export function ContactDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={`Contact ${artistName}`}
-      subtitle='Management, booking, press, and more.'
+      subtitle='Booking, management, and press.'
       dataTestId='contact-drawer'
     >
       <ProfileContactDrawerContent

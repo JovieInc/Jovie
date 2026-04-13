@@ -6,4 +6,4 @@ export {
 /**
  * Default tip amounts
  */
-export const TIP_AMOUNTS = [3, 5, 7] as const;
+export const TIP_AMOUNTS = [5, 10, 20] as const;

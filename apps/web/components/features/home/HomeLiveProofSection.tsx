@@ -101,7 +101,7 @@ export function HomeLiveProofSection({
               See it live.
             </h2>
             <p className='mt-4 max-w-[31rem] text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
-              Real artist profiles, shown across real release moments.
+              Real artist profiles. Real release moments.
             </p>
           </div>
 

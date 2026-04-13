@@ -17,7 +17,9 @@ export function HomePhoneFrame({
     <div
       className={cn(
         'homepage-phone-frame relative mx-auto flex shrink-0 items-center justify-center',
-        compact ? 'w-full max-w-[23.5rem]' : 'w-full max-w-[27rem]',
+        compact
+          ? 'w-full max-w-[20rem] sm:max-w-[20.25rem]'
+          : 'w-full max-w-[20.5rem]',
         className
       )}
     >

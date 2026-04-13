@@ -36,24 +36,20 @@ describe('HomePageNarrative', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the new hero, scenes, infrastructure section, and final CTA', () => {
+  it('renders the new hero, grouped chapters, lower sections, and final CTA', () => {
     render(<HomePageNarrative />);
 
-    const eyebrow = screen.getAllByText('For artists')[0];
     const heading = screen.getAllByRole('heading', {
       name: 'The link your music deserves.',
     })[0];
     const subhead = screen.getAllByText(
-      'One artist profile that updates itself for every release and notifies fans automatically.'
+      'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.'
     )[0];
     const vanityUrl = screen.getAllByTestId('homepage-hero-url-lockup')[0];
     const primaryCta = screen.getAllByRole('link', {
       name: 'Claim your profile',
     })[0];
 
-    expect(eyebrow.compareDocumentPosition(heading)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
     expect(heading.compareDocumentPosition(subhead)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
@@ -66,14 +62,31 @@ describe('HomePageNarrative', () => {
 
     expect(vanityUrl).toHaveTextContent('jov.ie/you');
 
-    for (const scene of HOME_STORY_SCENES) {
-      expect(
-        screen.getAllByRole('heading', { name: scene.headline }).length
-      ).toBeGreaterThan(0);
-    }
+    expect(
+      screen.getAllByRole('heading', { name: HOME_STORY_SCENES[0].headline })
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByRole('heading', {
+        name: 'Notify every fan every time.',
+      })
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByRole('heading', { name: 'Get paid.' }).length
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getAllByRole('heading', { name: 'Say thanks.' }).length
+    ).toBeGreaterThan(0);
 
     expect(
-      screen.getByRole('heading', { name: 'Runs itself underneath.' })
+      screen.getByRole('heading', { name: 'Keep the momentum going.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Keep every door open.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Opinionated where it counts.',
+      })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Claim your profile.' })
@@ -84,16 +97,16 @@ describe('HomePageNarrative', () => {
     render(<HomePageNarrative />);
 
     expect(
-      screen.queryByRole('heading', { name: 'Profiles that convert.' })
+      screen.queryByRole('heading', { name: 'One link. Every release.' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'Share every release. Reach every fan. Automatically.',
+        name: 'What one link should do.',
       })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'A command center for your career.',
+        name: 'Built for the release cycle.',
       })
     ).not.toBeInTheDocument();
   });

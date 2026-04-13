@@ -5,8 +5,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { fillToMinimum } from './featured-creators-fallback';
 import { HomeAdaptiveProfileStory } from './HomeAdaptiveProfileStory';
+import { HomeBaselineComparisonSection } from './HomeBaselineComparisonSection';
 import { HomeLiveProofSection } from './HomeLiveProofSection';
-import { HomeRunsItselfSection } from './HomeRunsItselfSection';
+import { HomeSecondaryOutcomeModules } from './HomeSecondaryOutcomeModules';
+import { HomeSpecChapter } from './HomeSpecChapter';
 import { type HomeProofAvailability } from './home-scroll-scenes';
 
 interface HomePageNarrativeProps {
@@ -32,7 +34,7 @@ function FinalCallToAction() {
             Claim your profile.
           </h2>
           <p className='mt-4 text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
-            One link for every release.
+            One profile for every release.
           </p>
 
           <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
@@ -72,7 +74,9 @@ export function HomePageNarrative({
   return (
     <>
       <HomeAdaptiveProfileStory proofAvailability={proofAvailability} />
-      <HomeRunsItselfSection />
+      <HomeBaselineComparisonSection />
+      <HomeSecondaryOutcomeModules />
+      <HomeSpecChapter />
       {proofAvailability === 'visible' ? resolvedProofSection : null}
       <FinalCallToAction />
     </>

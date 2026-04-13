@@ -16,7 +16,7 @@ import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
-const TIP_AMOUNTS = [3, 5, 7];
+const TIP_AMOUNTS = [5, 10, 20];
 
 interface SwipeableModeContainerProps {
   readonly artist: Artist;
@@ -110,7 +110,7 @@ function ProfilePane({
           onClick={onSubscribeClick}
           className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0'
         >
-          Get notified
+          Turn on notifications
         </button>
       </div>
     </div>
@@ -204,7 +204,7 @@ function TipPane({
   if (!venmoLink) {
     return (
       <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
-        Tipping is not available for this artist yet.
+        Pay is not available for this artist yet.
       </div>
     );
   }

@@ -66,6 +66,17 @@ interface UseSubscriptionFormReturn {
   smsEnabled: boolean;
 }
 
+const resolveInlineErrorMessage = (
+  error: unknown,
+  fallbackMessage: string
+): string => {
+  if (!(error instanceof Error) || !error.message.trim()) {
+    return fallbackMessage;
+  }
+
+  return error.message === 'Server error' ? fallbackMessage : error.message;
+};
+
 export function useSubscriptionForm({
   artist,
 }: UseSubscriptionFormOptions): UseSubscriptionFormReturn {
@@ -96,7 +107,7 @@ export function useSubscriptionForm({
   const [isResending, setIsResending] = useState<boolean>(false);
   const otpClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { success: showSuccess, error: showError } = useNotifications();
+  const { success: showSuccess } = useNotifications();
   const subscribeMutation = useSubscribeNotificationsMutation();
   const verifyEmailOtpMutation = useVerifyEmailOtpMutation();
 
@@ -255,10 +266,9 @@ export function useSubscriptionForm({
       }
       return true;
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;
-      setError(message);
-      showError(NOTIFICATION_COPY.errors.subscribe);
+      setError(
+        resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.subscribe)
+      );
 
       // Track error in Sentry for monitoring
       void captureError('Notification subscription failed', err, {
@@ -291,7 +301,6 @@ export function useSubscriptionForm({
     setNotificationsState,
     setSubscribedChannels,
     setSubscriptionDetails,
-    showError,
     showSuccess,
   ]);
 
@@ -335,16 +344,8 @@ export function useSubscriptionForm({
       showSuccess("You're all set. We'll keep you in the loop.");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Invalid verification code'
+        resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic)
       );
-      showError('Please check your code and try again.');
-
-      // Auto-clear OTP boxes after a brief pause so user sees the error state.
-      // Use setOtpCode directly (not handleOtpChange) to preserve the error text.
-      if (otpClearTimerRef.current) clearTimeout(otpClearTimerRef.current);
-      otpClearTimerRef.current = setTimeout(() => {
-        setOtpCode('');
-      }, 600);
     } finally {
       setIsSubmitting(false);
     }
@@ -356,7 +357,6 @@ export function useSubscriptionForm({
     setNotificationsState,
     setSubscribedChannels,
     setSubscriptionDetails,
-    showError,
     showSuccess,
     verifyEmailOtpMutation,
   ]);

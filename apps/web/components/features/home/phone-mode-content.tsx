@@ -143,7 +143,7 @@ function TipContent() {
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {([3, 5, 7] as const).map((amount, i) => (
+        {([5, 10, 20] as const).map((amount, i) => (
           <div
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center ${

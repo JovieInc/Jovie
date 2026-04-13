@@ -11,14 +11,16 @@ interface TipSelectorProps {
   readonly className?: string;
   /** Label for the payment method shown on the continue button (e.g. "Venmo", "Apple Pay") */
   readonly paymentLabel?: string;
+  readonly showPaymentIcon?: boolean;
 }
 
 export function TipSelector({
-  amounts = [3, 5, 7],
+  amounts = [5, 10, 20],
   onContinue,
   isLoading = false,
   className = '',
   paymentLabel,
+  showPaymentIcon = paymentLabel === 'Venmo',
 }: TipSelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
@@ -45,11 +47,14 @@ export function TipSelector({
   if (isLoading) {
     continueLabel = 'Processing...';
   } else if (paymentLabel) {
-    continueLabel = `Continue with ${paymentLabel}`;
+    continueLabel =
+      paymentLabel === 'Pay'
+        ? `Pay $${selectedAmount}`
+        : `Continue with ${paymentLabel}`;
   }
 
   return (
-    <div className={`space-y-5 ${className}`} data-test='tip-selector'>
+    <div className={`space-y-4 ${className}`} data-test='tip-selector'>
       <h3 id='tip-selector-heading' className='sr-only'>
         Select tip amount
       </h3>
@@ -57,12 +62,12 @@ export function TipSelector({
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
+      <p className='text-[12px] font-[540] tracking-[-0.015em] text-secondary-token'>
         Choose Amount
       </p>
 
       <fieldset
-        className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
+        className='m-0 grid grid-cols-3 gap-3 border-0 p-0'
         aria-label='Tip amount options'
       >
         {amounts.map((amount, idx) => (
@@ -78,17 +83,19 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-200 hover:border-white/14'
+        className='flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-200 hover:border-white/14'
         size='lg'
         disabled={isLoading}
         variant='primary'
         aria-label={
           paymentLabel
-            ? `Continue with ${paymentLabel} for $${selectedAmount} tip`
+            ? paymentLabel === 'Pay'
+              ? `Pay $${selectedAmount}`
+              : `Continue with ${paymentLabel} for $${selectedAmount} tip`
             : `Continue with $${selectedAmount} tip`
         }
       >
-        {paymentLabel && (
+        {showPaymentIcon && paymentLabel === 'Venmo' && (
           <svg
             width='20'
             height='20'

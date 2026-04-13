@@ -7,8 +7,11 @@ import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
-import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
+import {
+  getProfileMode,
+  getProfileModeDefinition,
+} from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
@@ -482,6 +485,9 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+  readonly searchParams?: Promise<{
+    readonly mode?: string | string[];
+  }>;
 }
 
 async function getPublicTourDates(
@@ -498,8 +504,17 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: Readonly<Props>) {
   const { username } = await params;
+  const resolvedSearchParams = await searchParams;
+  const requestedMode = getProfileMode(
+    Array.isArray(resolvedSearchParams?.mode)
+      ? resolvedSearchParams?.mode[0]
+      : resolvedSearchParams?.mode
+  );
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -565,6 +580,9 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     contacts,
     artist.name
   );
+  const showTipButton = links.some(link => link.platform === 'venmo');
+  const showBackButton = requestedMode !== 'profile';
+  const subtitle = getProfileModeDefinition(requestedMode).subtitle;
 
   // Read profile photo download settings
   const profileSettings =
@@ -608,13 +626,14 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode='profile'
+        mode={requestedMode}
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
-        subtitle='Artist'
-        showBackButton={false}
+        subtitle={subtitle}
+        showBackButton={showBackButton}
+        showTipButton={showTipButton}
         showTourButton={true}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
@@ -634,7 +653,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
-      <ProfileFooter artist={artist} />
     </>
   );
 }

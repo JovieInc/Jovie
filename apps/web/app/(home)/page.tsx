@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     absolute: `${APP_NAME} | The Link Your Music Deserves.`,
   };
   const description =
-    'One artist profile that updates for every release and notifies fans automatically.';
+    'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -121,17 +121,17 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'One artist profile that updates for every release and notifies fans automatically.',
+    'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'One artist profile that adapts before, during, and after a release, with fan notifications built in.'
+  'One profile link that changes with each release, captures fans, shows tour dates, and keeps support in the same place.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie gives artists one profile link that changes with each release and brings fans back automatically.',
+    'Jovie gives artists one profile link for releases, fans, shows, and support.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 

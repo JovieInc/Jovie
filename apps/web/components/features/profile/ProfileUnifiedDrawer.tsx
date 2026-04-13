@@ -2,9 +2,11 @@
 
 import { Switch } from '@jovie/ui';
 import {
+  ArrowRight,
   Bell,
   BellOff,
   CalendarDays,
+  CheckCircle2,
   ChevronRight,
   Info,
   Mail,
@@ -65,31 +67,31 @@ const VIEW_META: Record<DrawerView, DrawerMeta> = {
   menu: { title: 'Menu' },
   notifications: {
     title: 'Notifications',
-    subtitle: 'Choose what you hear about.',
+    subtitle: 'Choose your updates.',
   },
   about: {
     title: 'About',
-    subtitle: 'Profile details, genres, and press assets.',
+    subtitle: 'Profile details and press assets.',
   },
   listen: {
     title: 'Listen',
-    subtitle: 'Stream or download on your favorite platform.',
+    subtitle: 'Stream on your favorite platform.',
   },
   subscribe: {
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
+    title: 'Turn on notifications',
+    subtitle: 'New releases and shows.',
   },
   contact: {
     title: 'Contact',
-    subtitle: 'Management, booking, press, and more.',
+    subtitle: 'Booking, management, and press.',
   },
   tip: {
-    title: 'Tip',
-    subtitle: 'Send support instantly with Venmo.',
+    title: 'Pay',
+    subtitle: 'Support in one tap',
   },
   tour: {
     title: 'Tour Dates',
-    subtitle: 'Upcoming shows and ticket links.',
+    subtitle: 'Upcoming shows and tickets.',
   },
 };
 
@@ -128,41 +130,56 @@ interface ProfileUnifiedDrawerProps {
 const menuItemClass =
   'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
-const TIP_AMOUNTS = [3, 5, 7] as const;
+const TIP_AMOUNTS = [5, 10, 20] as const;
 
 function PreviewSubscribePanel({
   notifications,
 }: Readonly<{
   notifications: ProfilePreviewNotificationsState;
 }>) {
+  const kind = notifications.kind ?? 'button';
+
+  if (kind === 'status') {
+    return (
+      <div data-testid='profile-mode-drawer-subscribe'>
+        <button
+          type='button'
+          className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+        >
+          <CheckCircle2 className='h-4 w-4 shrink-0 text-green-400' />
+          {notifications.label || 'Notifications on'}
+        </button>
+      </div>
+    );
+  }
+
+  if (kind === 'button') {
+    return (
+      <div data-testid='profile-mode-drawer-subscribe'>
+        <button
+          type='button'
+          className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+        >
+          <Bell className='h-4 w-4' />
+          Turn on notifications
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className='space-y-4' data-testid='profile-mode-drawer-subscribe'>
-      <div className='space-y-2 text-center'>
-        <p className='text-[15px] font-[590] tracking-[-0.02em] text-white/88'>
-          {notifications.label}
-        </p>
-        {notifications.helper ? (
-          <p className='text-[12px] leading-[1.6] text-white/48'>
-            {notifications.helper}
-          </p>
-        ) : null}
-      </div>
-
       <SubscriptionPearlComposer
-        layout='stacked'
         action={
           <span
-            className={`${subscriptionPrimaryActionClassName} min-w-[9rem]`}
+            className={`${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0`}
           >
-            {notifications.actionLabel ?? 'Turn on notifications'}
+            <ArrowRight className='h-4 w-4' />
           </span>
         }
       >
-        <div className='rounded-[1.3rem] border border-white/8 bg-white/[0.04] px-4 py-3 text-left'>
-          <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-white/32'>
-            Email
-          </p>
-          <p className='mt-2 text-[15px] font-[560] tracking-[-0.02em] text-white/86'>
+        <div className='min-w-0 px-2 py-1.5'>
+          <p className='truncate text-[15px] font-[560] tracking-[-0.02em] text-white/86'>
             {notifications.value ?? 'fan@example.com'}
           </p>
         </div>
@@ -206,12 +223,9 @@ export function ProfileUnifiedDrawer({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      if (!next) {
-        setTimeout(() => onViewChange('menu'), 200);
-      }
       onOpenChange(next);
     },
-    [onOpenChange, onViewChange]
+    [onOpenChange]
   );
 
   const navigateTo = useCallback(
@@ -277,7 +291,7 @@ export function ProfileUnifiedDrawer({
     };
   }, [hasValidVenmoLink, venmoLink, venmoUsername]);
 
-  const isSubView = view !== 'menu';
+  const isSecondaryView = view === 'notifications';
 
   return (
     <ProfileDrawerShell
@@ -285,7 +299,8 @@ export function ProfileUnifiedDrawer({
       onOpenChange={handleOpenChange}
       title={meta.title}
       subtitle={meta.subtitle}
-      onBack={isSubView ? () => navigateTo('menu') : undefined}
+      onBack={isSecondaryView ? () => navigateTo('menu') : undefined}
+      navigationLevel={isSecondaryView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
     >
@@ -342,7 +357,7 @@ export function ProfileUnifiedDrawer({
                   onClick={() => navigateTo('tip')}
                 >
                   <Ticket className={iconClass} />
-                  Tip
+                  Pay
                 </button>
               ) : null}
 
@@ -512,7 +527,7 @@ export function ProfileUnifiedDrawer({
               ) : (
                 <div className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
                   <p className='text-sm font-[590] text-white/88'>
-                    Tipping is not available yet
+                    Pay is not available yet
                   </p>
                   <p className='mt-2 text-sm leading-6 text-white/54'>
                     This profile has not added a public Venmo link.

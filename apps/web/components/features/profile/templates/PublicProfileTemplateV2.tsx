@@ -50,11 +50,6 @@ interface PublicProfileTemplateV2Props {
   readonly viewerCountryCode?: string | null;
 }
 
-/**
- * @deprecated Legacy: not used by live routes. Kept only for legacy tests and
- * source-history coverage while live profile routes use ProfileCompactTemplate.
- */
-
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 

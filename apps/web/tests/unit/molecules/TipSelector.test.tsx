@@ -9,7 +9,7 @@ describe('TipSelector', () => {
     render(<TipSelector onContinue={onContinue} paymentLabel='Venmo' />);
 
     const continueButton = screen.getByRole('button', {
-      name: /Continue with Venmo for \$5 tip/i,
+      name: /Continue with Venmo for \$10 tip/i,
     });
 
     expect(continueButton).toHaveClass('text-btn-primary-foreground');
@@ -21,7 +21,13 @@ describe('TipSelector', () => {
   it('continues with the selected amount', () => {
     const onContinue = vi.fn();
 
-    render(<TipSelector onContinue={onContinue} paymentLabel='Venmo' />);
+    render(
+      <TipSelector
+        amounts={[3, 7, 11]}
+        onContinue={onContinue}
+        paymentLabel='Venmo'
+      />
+    );
 
     fireEvent.click(
       screen.getByRole('button', { name: /Select \$7 tip amount/i })

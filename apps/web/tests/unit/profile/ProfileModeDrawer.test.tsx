@@ -83,9 +83,10 @@ const mockContacts: PublicContact[] = [
     role: 'manager',
     roleLabel: 'Manager',
     secondaryLabel: 'Team',
-    primaryContactLabel: 'manager@test.com',
+    primaryContactLabel: 'Taylor Lee',
     territorySummary: 'US',
-    channels: [{ type: 'email', value: 'manager@test.com' }],
+    territoryCount: 1,
+    channels: [{ type: 'email', encoded: 'encoded-email' }],
   },
 ];
 

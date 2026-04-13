@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowRight,
   BadgeCheck,
   Bell,
   CheckCircle2,
@@ -77,6 +78,7 @@ interface ProfileCompactRelease {
   readonly releaseDate: Date | string | null;
   readonly revealDate?: Date | string | null;
   readonly releaseType: string;
+  readonly metadata?: Record<string, unknown> | null;
 }
 
 interface ProfileCompactSurfaceProps {
@@ -116,6 +118,7 @@ interface ProfileCompactSurfaceProps {
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly onRevealNotifications?: () => void;
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
+  readonly previewReleaseActionLabel?: string;
   readonly dataTestId?: string;
 }
 
@@ -139,39 +142,91 @@ function PreviewInlineNotifications({
 }: Readonly<{
   notifications: ProfilePreviewNotificationsState;
 }>) {
-  return (
-    <div data-testid='profile-inline-notifications-preview'>
-      <SubscriptionPearlComposer
-        action={
-          <span
-            className={`${subscriptionPrimaryActionClassName} min-w-[9rem]`}
-          >
-            {notifications.actionLabel ?? 'Join fans'}
-          </span>
-        }
-      >
-        <div className='flex min-w-0 items-center gap-3 px-2 py-1'>
-          <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72'>
-            {notifications.tone === 'success' ? (
-              <CheckCircle2 className='h-4 w-4 text-green-400' />
-            ) : (
-              <Bell className='h-4 w-4' />
-            )}
-          </span>
-          <div className='min-w-0'>
-            <p className='truncate text-[13px] font-[560] tracking-[-0.015em] text-white/86'>
-              {notifications.label}
-            </p>
-            <p className='truncate text-[12px] leading-[1.5] text-white/48'>
-              {notifications.value ??
-                notifications.helper ??
-                'Get notified about new music and shows.'}
+  const kind = notifications.kind ?? 'button';
+
+  if (kind === 'input') {
+    return (
+      <div data-testid='profile-inline-notifications-preview'>
+        <SubscriptionPearlComposer
+          action={
+            <span
+              className={`${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0`}
+            >
+              <ArrowRight className='h-4 w-4' />
+            </span>
+          }
+        >
+          <div className='min-w-0 px-2 py-1.5'>
+            <p className='truncate text-[15px] font-[560] tracking-[-0.02em] text-white/86'>
+              {notifications.value ?? 'fan@example.com'}
             </p>
           </div>
-        </div>
-      </SubscriptionPearlComposer>
+        </SubscriptionPearlComposer>
+      </div>
+    );
+  }
+
+  if (kind === 'status') {
+    return (
+      <div data-testid='profile-inline-notifications-preview'>
+        <button
+          type='button'
+          className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+        >
+          <CheckCircle2 className='h-4 w-4 shrink-0 text-green-400' />
+          {notifications.label || 'Notifications on'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid='profile-inline-notifications-preview'>
+      <button
+        type='button'
+        className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+      >
+        <Bell className='h-4 w-4' />
+        Turn on notifications
+      </button>
     </div>
   );
+}
+
+function getReleaseArtistNames(
+  release: ProfileCompactRelease | null | undefined
+) {
+  const metadata = release?.metadata;
+  const artistNames = metadata?.artistNames;
+
+  if (!Array.isArray(artistNames)) {
+    return [];
+  }
+
+  return artistNames.filter(
+    name => typeof name === 'string' && name.length > 0
+  );
+}
+
+function getReleaseSupportingLine(
+  release: ProfileCompactRelease,
+  artistName: string
+) {
+  const artistNames = getReleaseArtistNames(release);
+  if (artistNames.length === 0) {
+    return artistName;
+  }
+
+  const [primaryArtist, ...featuredArtists] = artistNames;
+  if (
+    primaryArtist &&
+    primaryArtist.toLowerCase() === artistName.toLowerCase() &&
+    featuredArtists.length > 0
+  ) {
+    return `w/ ${featuredArtists.join(', ')}`;
+  }
+
+  return artistNames.join(', ');
 }
 
 export function ProfileCompactSurface({
@@ -209,11 +264,11 @@ export function ProfileCompactSurface({
   onRegisterReveal,
   onRevealNotifications,
   previewNotificationsState = {
+    kind: 'button',
     tone: 'quiet',
-    label: 'Join 1.2K subscribers',
-    helper: 'Get notified about new music and shows.',
-    actionLabel: 'Join fans',
+    label: 'Turn on notifications',
   },
+  previewReleaseActionLabel = 'Listen',
   dataTestId,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
@@ -265,6 +320,14 @@ export function ProfileCompactSurface({
       tourDates.find(td => new Date(td.startDate).getTime() >= now) ?? null
     );
   }, [tourDates]);
+  const releaseSupportingLine = useMemo(() => {
+    if (!latestRelease) {
+      return artist.name;
+    }
+
+    return getReleaseSupportingLine(latestRelease, artist.name);
+  }, [artist.name, latestRelease]);
+  const actionCardClassName = `group flex min-h-[60px] w-full items-center gap-3 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
 
   return (
@@ -371,24 +434,29 @@ export function ProfileCompactSurface({
               <Link
                 href={`/${artist.handle}/${latestRelease.slug}`}
                 prefetch={false}
-                className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                className={actionCardClassName}
                 aria-label={`${latestRelease.title} — drops soon`}
               >
                 {latestRelease.artworkUrl ? (
-                  <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
                     <ImageWithFallback
                       src={latestRelease.artworkUrl}
                       alt={latestRelease.title}
                       fill
-                      sizes='40px'
+                      sizes='44px'
                       className='object-cover'
                       fallbackVariant='release'
                     />
                   </div>
                 ) : null}
-                <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                  {latestRelease.title}
-                </p>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-[560] leading-[1.15] text-white/88'>
+                    {latestRelease.title}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
+                    {releaseSupportingLine}
+                  </p>
+                </div>
                 <ReleaseCountdown
                   releaseDate={new Date(latestRelease.releaseDate!)}
                   compact
@@ -401,26 +469,33 @@ export function ProfileCompactSurface({
               <button
                 type='button'
                 onClick={onPlayClick}
-                className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-2.5 py-2 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                className={actionCardClassName}
                 aria-label={`Listen to ${latestRelease.title}`}
               >
                 {latestRelease.artworkUrl ? (
-                  <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
                     <ImageWithFallback
                       src={latestRelease.artworkUrl}
                       alt={latestRelease.title}
                       fill
-                      sizes='40px'
+                      sizes='44px'
                       className='object-cover'
                       fallbackVariant='release'
                     />
                   </div>
                 ) : null}
-                <p className='min-w-0 flex-1 truncate text-[13px] font-[510] leading-[1.15] text-white/88'>
-                  {latestRelease.title}
-                </p>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-[560] leading-[1.15] text-white/88'>
+                    {latestRelease.title}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
+                    {releaseSupportingLine}
+                  </p>
+                </div>
                 <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  Listen
+                  {renderMode === 'preview'
+                    ? previewReleaseActionLabel
+                    : 'Listen'}
                 </span>
               </button>
             ) : nextTourDate ? (
@@ -428,9 +503,9 @@ export function ProfileCompactSurface({
                 href={nextTourDate.ticketUrl ?? '#'}
                 target={nextTourDate.ticketUrl ? '_blank' : undefined}
                 rel={nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined}
-                className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                className={actionCardClassName}
               >
-                <div className='flex shrink-0 flex-col items-center leading-none'>
+                <div className='flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[12px] bg-white/[0.04] leading-none'>
                   <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
                     {new Intl.DateTimeFormat('en-US', {
                       month: 'short',
@@ -442,9 +517,16 @@ export function ProfileCompactSurface({
                     }).format(new Date(nextTourDate.startDate))}
                   </span>
                 </div>
-                <p className='min-w-0 flex-1 truncate text-[13px] font-[510] text-white/80'>
-                  {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
-                </p>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-[560] text-white/88'>
+                    {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
+                    {[nextTourDate.city, nextTourDate.region]
+                      .filter(Boolean)
+                      .join(', ') || 'Upcoming show'}
+                  </p>
+                </div>
                 <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
                   {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
                 </span>
@@ -453,15 +535,22 @@ export function ProfileCompactSurface({
               <button
                 type='button'
                 onClick={onPlayClick}
-                className={`group flex w-full items-center gap-2.5 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`}
+                className={actionCardClassName}
                 aria-label={`Listen to ${artist.name}`}
               >
                 <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
-                <p className='min-w-0 flex-1 text-[13px] font-[510] text-white/80'>
-                  Listen to {artist.name}
-                </p>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-[560] text-white/88'>
+                    Listen to {artist.name}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
+                    Start with the featured release
+                  </p>
+                </div>
                 <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  Listen
+                  {renderMode === 'preview'
+                    ? previewReleaseActionLabel
+                    : 'Listen'}
                 </span>
               </button>
             ) : null}

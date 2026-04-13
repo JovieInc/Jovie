@@ -10,6 +10,7 @@ import {
   TwoStepNotificationsCTA,
 } from '@/features/profile/artist-notifications-cta';
 import type { ProfileMode } from '@/features/profile/contracts';
+import { ProfileContactDrawerContent } from '@/features/profile/ProfileContactDrawerContent';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import {
@@ -22,8 +23,6 @@ import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from './AboutSection';
-import { ChannelIcon } from './artist-contacts-button/ContactIcons';
-import { useArtistContacts } from './artist-contacts-button/useArtistContacts';
 import { StaticListenInterface } from './StaticListenInterface';
 
 export type ProfileDrawerMode = Exclude<ProfileMode, 'profile'>;
@@ -53,37 +52,37 @@ interface DrawerMeta {
 const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
   about: {
     title: 'About',
-    subtitle: 'Profile details, genres, and press assets.',
+    subtitle: 'Profile details and press assets.',
     icon: Info,
   },
   contact: {
     title: 'Contact',
-    subtitle: 'Management, booking, press, and more.',
+    subtitle: 'Booking, management, and press.',
     icon: Mail,
   },
   listen: {
     title: 'Listen',
-    subtitle: 'Stream or download on your favorite platform.',
+    subtitle: 'Stream on your favorite platform.',
     icon: Music2,
   },
   subscribe: {
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
+    title: 'Turn on notifications',
+    subtitle: 'New releases and shows.',
     icon: Bell,
   },
   tip: {
-    title: 'Tip',
-    subtitle: 'Send support instantly with Venmo.',
+    title: 'Pay',
+    subtitle: 'Support in one tap',
     icon: Ticket,
   },
   tour: {
     title: 'Tour Dates',
-    subtitle: 'Upcoming shows and ticket links.',
+    subtitle: 'Upcoming shows and tickets.',
     icon: CalendarDays,
   },
 };
 
-const TIP_AMOUNTS = [3, 5, 7];
+const TIP_AMOUNTS = [5, 10, 20];
 
 function ProfileModeFallback({
   title,
@@ -112,11 +111,6 @@ function ProfileModeDrawerContactList({
   readonly contacts: PublicContact[];
   readonly primaryChannel: (contact: PublicContact) => PublicContactChannel;
 }) {
-  const { getActionHref, trackAction } = useArtistContacts({
-    contacts,
-    artistHandle,
-  });
-
   if (contacts.length === 0) {
     return (
       <ProfileModeFallback
@@ -127,73 +121,15 @@ function ProfileModeDrawerContactList({
   }
 
   return (
-    <div className='space-y-3' data-testid='profile-mode-drawer-contact'>
-      {contacts.map(contact => {
-        const primary = primaryChannel(contact);
-        const primaryHref = getActionHref(primary);
-
-        return (
-          <div
-            key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[26px] border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-white/[0.05]'
-            data-testid='contact-drawer-item'
-          >
-            {primaryHref ? (
-              <a
-                href={primaryHref}
-                className='flex min-w-0 flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                onClick={() => trackAction(primary, contact)}
-              >
-                <div className='flex flex-wrap items-center gap-2'>
-                  <span className='text-sm font-[590] text-white/92'>
-                    {contact.roleLabel}
-                  </span>
-                  {contact.territorySummary ? (
-                    <span className='rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-[590] text-white/58'>
-                      {contact.territorySummary}
-                    </span>
-                  ) : null}
-                </div>
-                {contact.secondaryLabel ? (
-                  <span className='text-xs text-white/58'>
-                    {contact.secondaryLabel}
-                  </span>
-                ) : null}
-                {contact.primaryContactLabel ? (
-                  <span className='text-xs text-white/46'>
-                    {contact.primaryContactLabel}
-                  </span>
-                ) : null}
-              </a>
-            ) : null}
-            <div className='flex shrink-0 items-center gap-2'>
-              {contact.channels.map(channel => {
-                const channelHref = getActionHref(channel);
-                if (!channelHref) return null;
-
-                const channelLabels: Record<string, string> = {
-                  email: 'Email',
-                  sms: 'Text',
-                };
-                const channelLabel = channelLabels[channel.type] ?? 'Call';
-
-                return (
-                  <a
-                    key={`${contact.id}-${channel.type}`}
-                    href={channelHref}
-                    className='flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/82 shadow-[0_14px_32px_rgba(0,0,0,0.18)] transition-[background-color,border-color] hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                    aria-label={`${channelLabel} ${contact.roleLabel}`}
-                    onClick={() => trackAction(channel, contact)}
-                    data-testid='contact-drawer-channel-action'
-                  >
-                    <ChannelIcon type={channel.type} />
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+    <div
+      className='rounded-[26px] border border-white/8 bg-white/[0.035] p-2 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+      data-testid='profile-mode-drawer-contact'
+    >
+      <ProfileContactDrawerContent
+        artistHandle={artistHandle}
+        contacts={contacts}
+        primaryChannel={primaryChannel}
+      />
     </div>
   );
 }
@@ -354,11 +290,12 @@ export function ProfileModeDrawer({
             <TipSelector
               amounts={TIP_AMOUNTS}
               onContinue={handleTipAmountSelected}
-              paymentLabel='Venmo'
+              paymentLabel='Pay'
+              showPaymentIcon={false}
             />
           ) : (
             <ProfileModeFallback
-              title='Tipping is not available yet'
+              title='Pay is not available yet'
               description='This profile has not added a public Venmo link.'
             />
           )}

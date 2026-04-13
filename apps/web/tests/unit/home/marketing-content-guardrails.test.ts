@@ -86,7 +86,12 @@ describe('Marketing content guardrails', () => {
       expect(text).not.toContain('all-in-one');
       expect(text).not.toContain('workflow');
       expect(text).not.toContain('creator career');
+      expect(text).not.toContain('release moment');
+      expect(text).not.toContain('generic funnel');
+      expect(text).not.toContain('runs itself underneath');
+      expect(text).not.toContain('artist-branded notifications');
       expect(text).not.toContain('crush every release');
+      expect(text).not.toContain('more ways it works');
     });
   });
 });

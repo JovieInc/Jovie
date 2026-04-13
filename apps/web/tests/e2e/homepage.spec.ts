@@ -21,6 +21,17 @@ async function interceptAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
+async function scrollStorySceneIntoFocus(
+  page: import('@playwright/test').Page,
+  testId: string
+) {
+  const scene = page.getByTestId(testId);
+  await scene.scrollIntoViewIfNeeded();
+  await scene.evaluate(node =>
+    node.scrollIntoView({ block: 'center', inline: 'nearest' })
+  );
+}
+
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
@@ -36,7 +47,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       page.getByText(
-        'One artist profile that updates itself for every release and notifies fans automatically.'
+        'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.'
       )
     ).toBeVisible();
     await expect(page.getByTestId('homepage-hero-url-lockup')).toBeVisible();
@@ -50,7 +61,7 @@ test.describe('Homepage', () => {
   test('header shows auth actions without marketing nav links', async ({
     page,
   }) => {
-    const header = page.locator('header');
+    const header = page.getByTestId('header-nav');
     await expect(header).toBeVisible();
     await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
@@ -63,76 +74,107 @@ test.describe('Homepage', () => {
   test('desktop story scenes stay in order and update the sticky phone on scroll', async ({
     page,
   }) => {
-    const sceneHeadings = page.locator(
-      '[data-testid^="homepage-story-scene-"] h2'
+    await expect(
+      page.getByRole('heading', { name: 'Drive more streams automatically.' })
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { name: 'Notify every fan every time.' })
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { name: 'Get paid.' }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Say thanks.' }).first()
+    ).toBeVisible();
+
+    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-streams-video');
+
+    await expect(
+      page
+        .getByTestId('homepage-desktop-phone-rail')
+        .getByTestId('homepage-phone-state-streams-video')
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('homepage-desktop-phone-rail')
+        .getByTestId('homepage-overlay-email-preview')
+    ).toBeVisible();
+
+    await scrollStorySceneIntoFocus(
+      page,
+      'homepage-story-scene-fans-song-alert'
     );
-    await expect(sceneHeadings).toHaveText([
-      'One link.',
-      'Before the drop.',
-      "When it's out.",
-      'Fans opt in once.',
-      "When you're on the road.",
-      'When they want to support.',
-      'When business comes calling.',
-      'It never goes dark.',
-    ]);
-
-    await page
-      .getByTestId('homepage-story-scene-when-its-out')
-      .scrollIntoViewIfNeeded();
 
     await expect(
       page
         .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-phone-state-listen')
+        .getByTestId('homepage-phone-state-fans-song-alert')
     ).toBeVisible();
     await expect(
       page
         .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('profile-mode-drawer-listen')
+        .getByTestId('homepage-overlay-email-preview')
     ).toBeVisible();
 
-    await page
-      .getByTestId('homepage-story-scene-on-the-road')
-      .scrollIntoViewIfNeeded();
+    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-tips-open');
 
     await expect(
       page
         .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-phone-state-tour')
+        .getByTestId('homepage-phone-state-tips-open')
     ).toBeVisible();
     await expect(
       page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('profile-mode-drawer-tour')
+        .getByTestId('homepage-story-chapter-tips')
+        .getByTestId('homepage-tip-conversion-cards')
     ).toBeVisible();
-
-    await page
-      .getByTestId('homepage-story-scene-support')
-      .scrollIntoViewIfNeeded();
-
+    await expect(
+      page
+        .getByTestId('homepage-story-chapter-tips')
+        .getByTestId('homepage-tip-thanks-note')
+    ).toBeVisible();
     await expect(
       page
         .getByTestId('homepage-desktop-phone-rail')
         .getByTestId('profile-mode-drawer-tip')
     ).toBeVisible();
 
-    await page
-      .getByTestId('homepage-story-scene-business-calling')
-      .scrollIntoViewIfNeeded();
+    await scrollStorySceneIntoFocus(
+      page,
+      'homepage-story-scene-tips-apple-pay'
+    );
 
     await expect(
       page
         .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('profile-mode-drawer-contact')
+        .getByTestId('homepage-overlay-apple-pay')
+    ).toBeVisible();
+
+    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-tips-followup');
+
+    await expect(
+      page
+        .getByTestId('homepage-desktop-phone-rail')
+        .getByTestId('homepage-overlay-email-preview')
     ).toBeVisible();
   });
 
-  test('infrastructure and final CTA render with the new copy', async ({
+  test('comparison, modules, spec chapter, and final CTA render with the new copy', async ({
     page,
   }) => {
     await expect(
-      page.getByRole('heading', { name: 'Runs itself underneath.' })
+      page.getByRole('heading', { name: 'Keep the momentum going.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Keep every door open.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Opinionated where it counts.',
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-opinionated-design-card')
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-headline')).toHaveText(
       'Claim your profile.'
@@ -164,12 +206,12 @@ test.describe('Homepage', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(
-      page.getByTestId('homepage-mobile-scene-one-link')
+      page.getByTestId('homepage-mobile-scene-streams-latest')
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(
-      page.getByTestId('homepage-mobile-scene-never-goes-dark')
+      page.getByTestId('homepage-mobile-scene-tips-followup')
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });

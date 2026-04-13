@@ -119,7 +119,7 @@ function getPhonePrefillValue(
 function getSubmitLabel(isSubmitting: boolean, otpStep: string): string {
   if (isSubmitting) return 'Working\u2026';
   if (otpStep === 'verify') return 'Verify';
-  return 'Get notified';
+  return 'Turn on notifications';
 }
 
 function getHeading(otpStep: string): string {

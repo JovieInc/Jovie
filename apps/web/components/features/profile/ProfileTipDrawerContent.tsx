@@ -9,7 +9,7 @@ interface ProfileTipDrawerContentProps {
 }
 
 export function ProfileTipDrawerContent({
-  amounts = [3, 5, 7],
+  amounts = [5, 10, 20],
   interactive = true,
   onAmountSelected,
 }: ProfileTipDrawerContentProps) {
@@ -20,7 +20,8 @@ export function ProfileTipDrawerContent({
         onContinue={
           interactive ? amount => onAmountSelected?.(amount) : () => {}
         }
-        paymentLabel='Venmo'
+        paymentLabel='Pay'
+        showPaymentIcon={false}
       />
     </div>
   );

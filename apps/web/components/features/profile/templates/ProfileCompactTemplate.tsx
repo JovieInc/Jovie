@@ -9,13 +9,15 @@ import {
 } from '@/components/organisms/profile-shell';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import type { ProfileMode } from '@/features/profile/contracts';
+import type {
+  ProfileMode,
+  ProfileSurfacePresentation,
+} from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getProfileMode,
   getProfileModeHref,
 } from '@/features/profile/registry';
-import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
@@ -28,6 +30,7 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
+import { ProfileCompactSurface } from './ProfileCompactSurface';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -57,21 +60,6 @@ interface ProfileCompactTemplateProps {
   readonly viewerCountryCode?: string | null;
 }
 
-function unwrapNextImageUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-
-  try {
-    const parsed = new URL(url, 'http://localhost');
-    if (parsed.pathname !== '/_next/image') {
-      return url;
-    }
-
-    return parsed.searchParams.get('url') ?? url;
-  } catch {
-    return url;
-  }
-}
-
 function resolveDrawerView(
   mode: ProfileMode,
   options: {
@@ -98,8 +86,19 @@ function resolveDrawerView(
   }
 }
 
+function unwrapNextImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    if (parsed.pathname !== '/_next/image') return url;
+    return parsed.searchParams.get('url') ?? url;
+  } catch {
+    return url;
+  }
+}
+
 function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (globalThis.window === undefined) {
+  if (typeof globalThis.window === 'undefined') {
     return fallbackMode;
   }
 
@@ -141,6 +140,8 @@ export function ProfileCompactTemplate({
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
+  const [drawerPresentation, setDrawerPresentation] =
+    useState<ProfileSurfacePresentation>('standalone');
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getModeFromLocation(mode)
   );
@@ -155,13 +156,32 @@ export function ProfileCompactTemplate({
           unlock?: () => void;
         })
       | undefined;
-
     if (!orientation?.lock) return;
-
     orientation.lock('portrait').catch(() => {});
     return () => {
       orientation.unlock?.();
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof globalThis.window === 'undefined') {
+      return;
+    }
+
+    const mediaQuery = globalThis.matchMedia('(min-width: 768px)');
+    const syncPresentation = () => {
+      setDrawerPresentation(mediaQuery.matches ? 'embedded' : 'standalone');
+    };
+
+    syncPresentation();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncPresentation);
+      return () => mediaQuery.removeEventListener('change', syncPresentation);
+    }
+
+    mediaQuery.addListener(syncPresentation);
+    return () => mediaQuery.removeListener(syncPresentation);
   }, []);
 
   const mergedDSPs = useMemo(
@@ -173,7 +193,7 @@ export function ProfileCompactTemplate({
     [artist, socialLinks, viewerCountryCode]
   );
 
-  const backdropImageUrl = useMemo(() => {
+  const heroImageUrl = useMemo(() => {
     return unwrapNextImageUrl(
       photoDownloadSizes.find(size => size.key === 'large')?.url ??
         photoDownloadSizes.find(size => size.key === 'original')?.url ??
@@ -183,7 +203,7 @@ export function ProfileCompactTemplate({
   }, [artist.image_url, photoDownloadSizes]);
 
   const initialSource = useMemo(() => {
-    if (globalThis.window === undefined) return null;
+    if (typeof globalThis.window === 'undefined') return null;
     return new URLSearchParams(globalThis.location.search).get('source');
   }, []);
 
@@ -210,6 +230,7 @@ export function ProfileCompactTemplate({
   const subscribedViaEmail = Boolean(
     notificationsContextValue.subscribedChannels.email
   );
+
   const serverPrefs = notificationsController.contentPreferences;
   const [contentPrefs, setContentPrefs] = useState<
     Record<NotificationContentType, boolean>
@@ -221,14 +242,14 @@ export function ProfileCompactTemplate({
   });
 
   useEffect(() => {
-    if (!serverPrefs) return;
-
-    setContentPrefs({
-      newMusic: serverPrefs.newMusic ?? true,
-      tourDates: serverPrefs.tourDates ?? true,
-      merch: serverPrefs.merch ?? true,
-      general: serverPrefs.general ?? true,
-    });
+    if (serverPrefs) {
+      setContentPrefs({
+        newMusic: serverPrefs.newMusic ?? true,
+        tourDates: serverPrefs.tourDates ?? true,
+        merch: serverPrefs.merch ?? true,
+        general: serverPrefs.general ?? true,
+      });
+    }
   }, [serverPrefs]);
 
   const prefsMutation = useUpdateContentPreferencesMutation();
@@ -237,8 +258,8 @@ export function ProfileCompactTemplate({
 
   const handleTogglePref = useCallback(
     (key: NotificationContentType) => {
-      const previous = contentPrefs[key];
-      const next = !previous;
+      const prev = contentPrefs[key];
+      const next = !prev;
       setContentPrefs(state => ({ ...state, [key]: next }));
       prefsMutation.mutate(
         {
@@ -249,12 +270,12 @@ export function ProfileCompactTemplate({
         },
         {
           onError: () => {
-            setContentPrefs(state => ({ ...state, [key]: previous }));
+            setContentPrefs(state => ({ ...state, [key]: prev }));
           },
         }
       );
     },
-    [artist.id, contentPrefs, prefsMutation, subscriberEmail, subscriberPhone]
+    [contentPrefs, artist.id, subscriberEmail, subscriberPhone, prefsMutation]
   );
 
   const handleUnsubscribe = useCallback(() => {
@@ -262,7 +283,6 @@ export function ProfileCompactTemplate({
     const identifier = subscribedViaEmail
       ? { email: subscriberEmail }
       : { phone: subscriberPhone };
-
     unsubMutation.mutate(
       {
         artistId: artist.id,
@@ -281,19 +301,19 @@ export function ProfileCompactTemplate({
     );
   }, [
     artist.id,
-    notificationsContextValue,
-    showSuccess,
+    subscribedViaEmail,
     subscriberEmail,
     subscriberPhone,
-    subscribedViaEmail,
     unsubMutation,
+    notificationsContextValue,
+    showSuccess,
   ]);
 
+  const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip = useMemo(
     () => socialLinks.some(link => link.platform === 'venmo'),
     [socialLinks]
   );
-  const hasContacts = contacts.length > 0;
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -338,11 +358,10 @@ export function ProfileCompactTemplate({
     if (resolved) {
       setDrawerView(resolved);
       setDrawerOpen(true);
-      return;
+    } else {
+      setDrawerView('menu');
+      setDrawerOpen(false);
     }
-
-    setDrawerView('menu');
-    setDrawerOpen(false);
   }, [requestedMode, resolveInitialView]);
 
   useEffect(() => {
@@ -387,7 +406,7 @@ export function ProfileCompactTemplate({
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-  }, [artist.handle, drawerOpen, drawerView, requestedMode, searchSuffix]);
+  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
@@ -432,7 +451,6 @@ export function ProfileCompactTemplate({
       openDrawerMode('subscribe');
       return;
     }
-
     openDrawerMode('listen');
   }, [mergedDSPs.length, openDrawerMode]);
 
@@ -448,7 +466,7 @@ export function ProfileCompactTemplate({
       try {
         await navigator.clipboard.writeText(profileUrl);
       } catch {
-        // Silent fallback for platforms that block clipboard access.
+        // Silent failure
       }
     }
     setRequestedMode('profile');
@@ -460,7 +478,7 @@ export function ProfileCompactTemplate({
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
             <ImageWithFallback
-              src={backdropImageUrl}
+              src={heroImageUrl}
               alt={`${artist.name} background`}
               fill
               sizes='100vw'
@@ -474,9 +492,13 @@ export function ProfileCompactTemplate({
 
         <div className='relative mx-auto flex h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:h-auto md:min-h-[100dvh] md:items-center md:px-6 md:py-8'>
           <main className='relative flex w-full items-stretch md:items-center'>
-            <div className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-clip md:mx-auto md:h-auto md:min-h-0 md:overflow-hidden md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'>
-              {/* live controller -> shared surface -> unified drawer */}
+            <div
+              className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:mx-auto md:h-auto md:min-h-0 md:overflow-hidden md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+              data-testid='profile-compact-shell'
+            >
               <ProfileCompactSurface
+                renderMode='interactive'
+                presentation={drawerPresentation}
                 artist={artist}
                 socialLinks={socialLinks}
                 contacts={contacts}

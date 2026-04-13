@@ -150,11 +150,16 @@ describe('ProfileCompactTemplate', () => {
       )
     );
     mockProfileUnifiedDrawer.mockImplementation(
-      (props: { readonly open: boolean; readonly view: string }) => (
+      (props: {
+        readonly open: boolean;
+        readonly view: string;
+        readonly presentation?: string;
+      }) => (
         <div
           data-testid='mock-profile-unified-drawer'
           data-open={String(props.open)}
           data-view={props.view}
+          data-presentation={props.presentation ?? 'standalone'}
         />
       )
     );
@@ -414,5 +419,41 @@ describe('ProfileCompactTemplate', () => {
     expect(window.location.search).toBe('?mode=listen');
 
     pushStateSpy.mockRestore();
+  });
+
+  it('uses an embedded drawer presentation at desktop widths', async () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(min-width: 768px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as typeof window.matchMedia;
+
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-presentation',
+        'embedded'
+      );
+    });
+
+    window.matchMedia = previousMatchMedia;
   });
 });
