@@ -85,7 +85,7 @@ type BatchRelease = {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
-  sourceType: string;
+  sourceType: string | null;
 };
 
 type BatchCreator = {

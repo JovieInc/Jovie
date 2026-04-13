@@ -3,8 +3,12 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 
+const { trackMock } = vi.hoisted(() => ({
+  trackMock: vi.fn(),
+}));
+
 vi.mock('@/lib/analytics', () => ({
-  track: vi.fn(),
+  track: trackMock,
 }));
 
 vi.mock('next/link', () => ({
@@ -84,5 +88,34 @@ describe('ClaimBanner', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByTestId('claim-banner-cta')).not.toBeInTheDocument();
+  });
+
+  it('tracks impressions for each distinct variant', () => {
+    const { rerender } = render(
+      <ClaimBanner profileHandle='testartist' variant='organic' />
+    );
+
+    rerender(<ClaimBanner profileHandle='testartist' variant='organic' />);
+    rerender(
+      <ClaimBanner profileHandle='testartist' variant='direct_in_progress' />
+    );
+
+    expect(trackMock).toHaveBeenCalledTimes(2);
+    expect(trackMock).toHaveBeenNthCalledWith(
+      1,
+      'profile_claim_banner_impression',
+      {
+        profile_handle: 'testartist',
+        variant: 'organic',
+      }
+    );
+    expect(trackMock).toHaveBeenNthCalledWith(
+      2,
+      'profile_claim_banner_impression',
+      {
+        profile_handle: 'testartist',
+        variant: 'direct_in_progress',
+      }
+    );
   });
 });

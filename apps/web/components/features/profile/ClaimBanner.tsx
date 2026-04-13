@@ -48,13 +48,14 @@ export function ClaimBanner({
   ctaLabel,
   variant = 'organic',
 }: ClaimBannerProps) {
-  const hasTrackedImpression = useRef(false);
+  const trackedImpressionKeys = useRef<Set<string>>(new Set());
   const copy = COPY[variant];
   const resolvedCtaLabel = ctaLabel ?? copy.ctaLabel;
 
   useEffect(() => {
-    if (hasTrackedImpression.current) return;
-    hasTrackedImpression.current = true;
+    const impressionKey = `${profileHandle}:${variant}`;
+    if (trackedImpressionKeys.current.has(impressionKey)) return;
+    trackedImpressionKeys.current.add(impressionKey);
 
     track('profile_claim_banner_impression', {
       profile_handle: profileHandle,

@@ -13,7 +13,6 @@ import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { readPendingClaimContext } from '@/lib/claim/context';
 import {
   getProfileVisitorState,
   supportsDirectProfileClaim,
@@ -49,6 +48,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { resolveClaimBannerState } from './_lib/claim-banner-state';
 import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
 import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
@@ -562,11 +562,6 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
   const { userId: viewerClerkUserId } = await getOptionalAuth();
-  const pendingClaimContext = !profile.is_claimed
-    ? await readPendingClaimContext({
-        username: artist.handle.toLowerCase(),
-      })
-    : null;
   const directClaimSupported = supportsDirectProfileClaim({
     spotifyId: profile.spotify_id,
   });
@@ -579,22 +574,16 @@ export default async function ArtistPage({
       spotifyId: profile.spotify_id,
     },
     authUserId: viewerClerkUserId,
-    pendingClaimContext,
+    pendingClaimContext: null,
   });
-  const claimBannerVariant =
-    visitorState === 'claim_intent_token'
-      ? 'claim_intent'
-      : visitorState === 'claim_intent_direct'
-        ? 'direct_in_progress'
-        : resolvedSearchParams?.claim === 'unsupported' && !directClaimSupported
-          ? 'unsupported'
-          : directClaimSupported
-            ? 'organic'
-            : null;
-  const shouldShowClaimBanner =
-    !profile.is_claimed &&
-    visitorState !== 'owner' &&
-    claimBannerVariant !== null;
+  const { claimBannerVariant, shouldShowClaimBanner } = resolveClaimBannerState(
+    {
+      visitorState,
+      claimSearchParam: resolvedSearchParams?.claim,
+      directClaimSupported,
+      isClaimed: profile.is_claimed,
+    }
+  );
 
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
@@ -654,7 +643,7 @@ export default async function ArtistPage({
         <ClaimBanner
           profileHandle={artist.handle}
           displayName={artist.name}
-          variant={claimBannerVariant}
+          variant={claimBannerVariant ?? undefined}
           ctaHref={
             claimBannerVariant === 'unsupported'
               ? undefined
