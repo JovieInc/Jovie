@@ -35,16 +35,53 @@ vi.mock('@/features/auth/atoms/otp-input', () => ({
   OtpInput: ({
     value,
     onChange,
+    onComplete,
     'aria-label': ariaLabel,
+    error,
   }: {
     readonly value: string;
     readonly onChange: (value: string) => void;
+    readonly onComplete?: (value: string) => void;
     readonly 'aria-label': string;
+    readonly error?: boolean;
   }) => (
     <input
       aria-label={ariaLabel}
       value={value}
-      onChange={event => onChange(event.target.value)}
+      data-error={error ? 'true' : 'false'}
+      onChange={event => {
+        onChange(event.target.value);
+        if (event.target.value.length === 6 && onComplete)
+          onComplete(event.target.value);
+      }}
+    />
+  ),
+}));
+
+vi.mock('@/features/profile/artist-notifications-cta/BirthdayInput', () => ({
+  BirthdayInput: ({
+    value,
+    onChange,
+    onComplete,
+    onSubmit,
+  }: {
+    readonly value: string;
+    readonly onChange: (value: string) => void;
+    readonly onComplete?: (value: string) => void;
+    readonly onSubmit?: () => void;
+  }) => (
+    <input
+      data-testid='inline-birthday-input'
+      aria-label='Birthday month, day, and year'
+      value={value}
+      onChange={event => {
+        onChange(event.target.value);
+        if (event.target.value.length === 8 && onComplete)
+          onComplete(event.target.value);
+      }}
+      onKeyDown={event => {
+        if (event.key === 'Enter') onSubmit?.();
+      }}
     />
   ),
 }));
@@ -122,11 +159,14 @@ function buildFormState(overrides = {}) {
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+    handleResendOtp: vi.fn().mockResolvedValue(undefined),
     handleKeyDown: vi.fn(),
     openSubscription: vi.fn(),
     registerInputFocus: vi.fn(),
     hydrationStatus: 'done' as const,
     smsEnabled: false,
+    resendCooldownEnd: 0,
+    isResending: false,
     ...overrides,
   };
 }
@@ -289,7 +329,10 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     const birthdayInput = screen.getByTestId('inline-birthday-input');
     expect(birthdayInput).toBeInTheDocument();
-    expect(birthdayInput).toHaveAttribute('placeholder', 'Birthday (MM/DD)');
+    expect(birthdayInput).toHaveAttribute(
+      'aria-label',
+      'Birthday month, day, and year'
+    );
   });
 
   it('shows "Notifications on" in done step', async () => {
@@ -351,6 +394,109 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     const container = screen.getByTestId('profile-inline-cta');
     expect(container.className).toContain('min-h-[48px]');
+  });
+
+  it('disables OTP submit button when error is present', async () => {
+    const formState = buildFormState({ notificationsState: 'idle' });
+    mockUseSubscriptionForm.mockReturnValue(formState);
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    // Click to email step
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    // Simulate pending confirmation (OTP step)
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        error: 'Code expired. Request a new code.',
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    // Submit button should be disabled due to error
+    const submitBtn = screen.getByRole('button', { name: /submit/i });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('shows resend link when OTP error is present', async () => {
+    const formState = buildFormState({ notificationsState: 'idle' });
+    mockUseSubscriptionForm.mockReturnValue(formState);
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    // Click to email step
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    // Simulate OTP error
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        error: 'Invalid verification code',
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    // Resend link should be visible
+    expect(
+      screen.getByRole('button', { name: /resend code/i })
+    ).toBeInTheDocument();
+  });
+
+  it('shows cooldown text when resend is on cooldown', async () => {
+    const formState = buildFormState({ notificationsState: 'idle' });
+    mockUseSubscriptionForm.mockReturnValue(formState);
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    // Click to email step
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    // Simulate OTP error with active cooldown
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        error: 'Code expired',
+        resendCooldownEnd: Date.now() + 15_000,
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    // Should show cooldown text instead of resend button
+    expect(screen.getByText(/resend in/i)).toBeInTheDocument();
   });
 
   it('prefills email from Clerk session', async () => {

@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import {
+  type UseSegmentedInputReturn,
+  useSegmentedInput,
+} from '@/hooks/useSegmentedInput';
 import { OTP_LENGTH } from './types';
 
 interface UseOtpInputOptions {
@@ -11,268 +13,21 @@ interface UseOtpInputOptions {
   autoFocus?: boolean;
 }
 
-interface UseOtpInputReturn {
-  // State
-  internalValue: string;
-  currentValue: string;
-  focusedIndex: number | null;
-  isComplete: boolean;
-
-  // Refs
-  inputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
-  autofillInputRef: React.MutableRefObject<HTMLInputElement | null>;
-  containerRef: React.MutableRefObject<HTMLDivElement | null>;
-
-  // Handlers
-  handleInputChange: (index: number, inputValue: string) => void;
-  handleKeyDown: (
-    index: number,
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => void;
-  handleInput: (
-    index: number,
-    event: React.FormEvent<HTMLInputElement>
-  ) => void;
-  handlePaste: (event: React.ClipboardEvent) => void;
-  handleAutofillChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  handleAutofillFocus: () => void;
-  handleFocus: (index: number) => void;
-  handleBlur: () => void;
-
-  // Utilities
-  getDigit: (index: number) => string;
-}
-
 /**
- * Hook to manage OTP input state and handlers.
+ * OTP-specific wrapper around useSegmentedInput.
+ * Fixes length to OTP_LENGTH (6).
  */
 export function useOtpInput({
-  value: controlledValue,
+  value,
   onChange,
   onComplete,
   autoFocus = true,
-}: UseOtpInputOptions): UseOtpInputReturn {
-  const [internalValue, setInternalValue] = useState('');
-  const currentValue = controlledValue ?? internalValue;
-
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const autofillInputRef = useRef<HTMLInputElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  const [isComplete, setIsComplete] = useState(false);
-  const haptic = useHapticFeedback();
-  const lastLengthRef = useRef(0);
-
-  useEffect(() => {
-    if (autoFocus && inputRefs.current[0]) {
-      inputRefs.current[0].focus();
-    }
-  }, [autoFocus]);
-
-  const updateValue = useCallback(
-    (newValue: string, shouldBlurOnComplete = false) => {
-      const sanitized = newValue.replaceAll(/\D/g, '').slice(0, OTP_LENGTH);
-
-      if (sanitized.length > lastLengthRef.current) {
-        if (sanitized.length === OTP_LENGTH) {
-          haptic.success();
-          setIsComplete(true);
-        } else {
-          haptic.light();
-        }
-      }
-
-      if (sanitized.length < OTP_LENGTH) {
-        setIsComplete(false);
-      }
-
-      lastLengthRef.current = sanitized.length;
-
-      if (controlledValue === undefined) {
-        setInternalValue(sanitized);
-      }
-      onChange?.(sanitized);
-
-      if (sanitized.length === OTP_LENGTH) {
-        onComplete?.(sanitized);
-        if (shouldBlurOnComplete) {
-          setTimeout(() => {
-            (document.activeElement as HTMLElement)?.blur?.();
-          }, 50);
-        }
-      }
-    },
-    [controlledValue, onChange, onComplete, haptic]
-  );
-
-  // Handle multi-character input from iOS autofill/paste
-  const handleMultiDigitInput = useCallback(
-    (digits: string) => {
-      const isComplete = digits.length >= OTP_LENGTH;
-      updateValue(digits.slice(0, OTP_LENGTH), isComplete);
-      if (!isComplete) {
-        inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus();
-        haptic.medium();
-      }
-    },
-    [updateValue, haptic]
-  );
-
-  const handleInputChange = useCallback(
-    (index: number, inputValue: string) => {
-      const digits = inputValue.replaceAll(/\D/g, '');
-
-      // Handle multi-character input (iOS autofill inserts full OTP)
-      if (digits.length > 1) {
-        handleMultiDigitInput(digits);
-        return;
-      }
-
-      const digit = digits.slice(-1);
-
-      if (digit) {
-        const chars = currentValue.split('');
-        chars[index] = digit;
-        const newValue = chars.join('');
-        updateValue(newValue);
-
-        if (index < OTP_LENGTH - 1) {
-          inputRefs.current[index + 1]?.focus();
-        }
-      }
-    },
-    [currentValue, updateValue, handleMultiDigitInput]
-  );
-
-  const handleKeyDown = useCallback(
-    (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Backspace') {
-        event.preventDefault();
-
-        if (currentValue[index]) {
-          const chars = currentValue.split('');
-          chars[index] = '';
-          updateValue(chars.join('').replaceAll(/\s/g, ''));
-        } else if (index > 0) {
-          const chars = currentValue.split('');
-          chars[index - 1] = '';
-          updateValue(chars.join('').replaceAll(/\s/g, ''));
-          inputRefs.current[index - 1]?.focus();
-        }
-      } else if (event.key === 'ArrowLeft' && index > 0) {
-        event.preventDefault();
-        inputRefs.current[index - 1]?.focus();
-      } else if (event.key === 'ArrowRight' && index < OTP_LENGTH - 1) {
-        event.preventDefault();
-        inputRefs.current[index + 1]?.focus();
-      }
-    },
-    [currentValue, updateValue]
-  );
-
-  const handleInput = useCallback(
-    (index: number, event: React.FormEvent<HTMLInputElement>) => {
-      const nativeEvent = event.nativeEvent as InputEvent;
-      const inputType = nativeEvent.inputType;
-
-      // Handle backspace when current input is empty
-      if (
-        inputType === 'deleteContentBackward' &&
-        !currentValue[index] &&
-        index > 0
-      ) {
-        const chars = currentValue.split('');
-        chars[index - 1] = '';
-        updateValue(chars.join('').replaceAll(/\s/g, ''));
-        inputRefs.current[index - 1]?.focus();
-        return;
-      }
-
-      // Handle iOS autofill and paste via input event
-      // iOS uses insertReplacementText for OTP keyboard shortcut autofill
-      // and insertFromPaste for clipboard paste
-      if (
-        inputType === 'insertReplacementText' ||
-        inputType === 'insertFromPaste'
-      ) {
-        const target = event.target as HTMLInputElement;
-        const digits = target.value.replaceAll(/\D/g, '');
-
-        if (digits.length > 1) {
-          handleMultiDigitInput(digits);
-        }
-      }
-    },
-    [currentValue, updateValue, handleMultiDigitInput]
-  );
-
-  const handlePaste = useCallback(
-    (event: React.ClipboardEvent) => {
-      event.preventDefault();
-      const pastedData = event.clipboardData.getData('text');
-      const digits = pastedData.replaceAll(/\D/g, '');
-
-      if (digits) {
-        handleMultiDigitInput(digits);
-      }
-    },
-    [handleMultiDigitInput]
-  );
-
-  const handleAutofillChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = event.target.value;
-      updateValue(
-        newValue,
-        newValue.replaceAll(/\D/g, '').length === OTP_LENGTH
-      );
-
-      const digits = newValue.replaceAll(/\D/g, '');
-      if (digits.length < OTP_LENGTH && digits.length > 0) {
-        inputRefs.current[digits.length]?.focus();
-      }
-    },
-    [updateValue]
-  );
-
-  const handleAutofillFocus = useCallback(() => {
-    if (!currentValue) {
-      inputRefs.current[0]?.focus();
-    }
-  }, [currentValue]);
-
-  const handleFocus = useCallback((index: number) => {
-    setFocusedIndex(index);
-    inputRefs.current[index]?.select();
-  }, []);
-
-  const handleBlur = useCallback(() => {
-    setFocusedIndex(null);
-  }, []);
-
-  const getDigit = useCallback(
-    (index: number): string => {
-      return currentValue[index] || '';
-    },
-    [currentValue]
-  );
-
-  return {
-    internalValue,
-    currentValue,
-    focusedIndex,
-    isComplete,
-    inputRefs,
-    autofillInputRef,
-    containerRef,
-    handleInputChange,
-    handleKeyDown,
-    handleInput,
-    handlePaste,
-    handleAutofillChange,
-    handleAutofillFocus,
-    handleFocus,
-    handleBlur,
-    getDigit,
-  };
+}: UseOtpInputOptions): UseSegmentedInputReturn {
+  return useSegmentedInput({
+    length: OTP_LENGTH,
+    value,
+    onChange,
+    onComplete,
+    autoFocus,
+  });
 }

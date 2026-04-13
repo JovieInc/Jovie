@@ -259,7 +259,7 @@ function ChannelInputRow({
             value={otpCode}
             onChange={handleOtpChange}
             onComplete={() => {
-              handleVerifyOtp().catch(() => {});
+              if (!error) handleVerifyOtp().catch(() => {});
             }}
             autoFocus
             aria-label='Enter 6-digit verification code'

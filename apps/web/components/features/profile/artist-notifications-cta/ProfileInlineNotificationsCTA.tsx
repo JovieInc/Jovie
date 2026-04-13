@@ -12,6 +12,7 @@ import {
   useUpdateSubscriberNameMutation,
 } from '@/lib/queries';
 import type { Artist } from '@/types/db';
+import { BirthdayInput } from './BirthdayInput';
 import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
@@ -30,22 +31,22 @@ function getExitVariant(instant: boolean) {
   if (instant) return { opacity: 0 };
   return {
     opacity: 0,
-    y: -4,
-    transition: { duration: 0.16, ease: EASE_FADE },
+    y: -2,
+    transition: { duration: 0.1, ease: EASE_FADE },
   };
 }
 
 function getEnterVariant(instant: boolean) {
   return {
-    initial: instant ? false : ({ opacity: 0, y: 8 } as const),
+    initial: instant ? false : ({ opacity: 0, y: 4 } as const),
     animate: instant
       ? { opacity: 1, y: 0 }
       : {
           opacity: 1,
           y: 0,
           transition: {
-            opacity: { duration: 0.18, ease: EASE_FADE, delay: 0.03 },
-            y: { duration: 0.18, ease: EASE_FADE, delay: 0.03 },
+            opacity: { duration: 0.14, ease: EASE_FADE },
+            y: { duration: 0.14, ease: EASE_FADE },
           },
         },
   };
@@ -86,19 +87,12 @@ function CircularSubmitButton({
   );
 }
 
-/**
- * Format birthday input as MM/DD while typing.
- * Accepts only digits and auto-inserts the slash.
- */
-function formatBirthdayInput(raw: string): string {
-  const digits = raw.replaceAll(/[^\d]/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
-
-/** Convert "MM/DD" display format to "MM-DD" storage format */
-function birthdayDisplayToStorage(display: string): string {
-  return display.replace('/', '-');
+/** Convert raw 8-digit birthday string to YYYY-MM-DD storage format */
+function birthdayDigitsToStorage(digits: string): string {
+  const mm = digits.slice(0, 2);
+  const dd = digits.slice(2, 4);
+  const yyyy = digits.slice(4, 8);
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function isDrawerElement(element: Element | null): boolean {
@@ -187,6 +181,46 @@ function InlineInputStep({
   );
 }
 
+function OtpResendLink({
+  resendCooldownEnd,
+  isResending,
+  onResend,
+}: {
+  readonly resendCooldownEnd: number;
+  readonly isResending: boolean;
+  readonly onResend: () => void;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const remaining = Math.max(0, Math.ceil((resendCooldownEnd - now) / 1000));
+  const canResend = remaining === 0 && !isResending;
+
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [remaining]);
+
+  return (
+    <div className='mt-1 text-center'>
+      {canResend ? (
+        <button
+          type='button'
+          className='text-[12px] text-primary-token/70 underline underline-offset-2 transition-colors hover:text-primary-token'
+          onClick={onResend}
+        >
+          Resend code
+        </button>
+      ) : isResending ? (
+        <span className='text-[12px] text-secondary-token/50'>Sending...</span>
+      ) : (
+        <span className='text-[12px] text-secondary-token/50'>
+          Resend in 0:{remaining.toString().padStart(2, '0')}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
   readonly onManageNotifications?: () => void;
@@ -204,12 +238,15 @@ export function ProfileInlineNotificationsCTA({
     error,
     otpCode,
     isSubmitting,
+    resendCooldownEnd,
+    isResending,
     handleChannelChange,
     handleEmailChange,
     handleFieldBlur,
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
+    handleResendOtp,
     notificationsState,
     notificationsEnabled,
     openSubscription,
@@ -220,7 +257,9 @@ export function ProfileInlineNotificationsCTA({
   const [step, setStep] = useState<Step>('cta');
   const [nameInput, setNameInput] = useState('');
   const [birthdayInput, setBirthdayInput] = useState('');
+  const [birthdayHintShown, setBirthdayHintShown] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const prefersReducedMotion = useReducedMotion();
@@ -277,7 +316,7 @@ export function ProfileInlineNotificationsCTA({
     if (step === 'cta' || step === 'done') return;
     const timeoutId = globalThis.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
-      prefersReducedMotion ? 0 : 350
+      prefersReducedMotion ? 0 : 260
     );
     return () => globalThis.clearTimeout(timeoutId);
   }, [step, prefersReducedMotion]);
@@ -356,11 +395,16 @@ export function ProfileInlineNotificationsCTA({
 
   const handleBirthdaySubmit = useCallback(async () => {
     const digits = birthdayInput.replaceAll(/[^\d]/g, '');
-    if (digits.length < 4) {
+    if (digits.length < 8) {
+      if (!birthdayHintShown) {
+        setBirthdayHintShown(true);
+        return;
+      }
+      // Second submit with incomplete date — skip birthday
       setStep('done');
       return;
     }
-    const stored = birthdayDisplayToStorage(formatBirthdayInput(digits));
+    const stored = birthdayDigitsToStorage(digits);
     try {
       await birthdayMutation.mutateAsync({
         artistId: artist.id,
@@ -375,7 +419,13 @@ export function ProfileInlineNotificationsCTA({
       // Best-effort — don't block the flow
     }
     setStep('done');
-  }, [birthdayInput, artist.id, artist.handle, birthdayMutation]);
+  }, [
+    birthdayInput,
+    birthdayHintShown,
+    artist.id,
+    artist.handle,
+    birthdayMutation,
+  ]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -498,7 +548,9 @@ export function ProfileInlineNotificationsCTA({
                   onClick={() => {
                     handleVerifyOtp().catch(() => {});
                   }}
-                  disabled={otpCode.length !== 6 || isSubmitting}
+                  disabled={
+                    otpCode.length !== 6 || isSubmitting || Boolean(error)
+                  }
                   submitting={isSubmitting}
                 />
               }
@@ -506,9 +558,14 @@ export function ProfileInlineNotificationsCTA({
               <div className='px-2 py-2'>
                 <OtpInput
                   value={otpCode}
-                  onChange={handleOtpChange}
+                  onChange={value => {
+                    handleOtpChange(value);
+                    if (confirmMessage) setConfirmMessage(null);
+                  }}
                   onComplete={() => {
-                    handleVerifyOtp().catch(() => {});
+                    if (!error) {
+                      handleVerifyOtp().catch(() => {});
+                    }
                   }}
                   autoFocus
                   aria-label='Enter 6-digit verification code'
@@ -521,6 +578,22 @@ export function ProfileInlineNotificationsCTA({
               <p className='mt-2 text-center text-[12px] text-red-400'>
                 {error}
               </p>
+            )}
+            {confirmMessage && !error && (
+              <p className='mt-2 text-center text-[12px] text-green-400'>
+                {confirmMessage}
+              </p>
+            )}
+            {error && (
+              <OtpResendLink
+                resendCooldownEnd={resendCooldownEnd}
+                isResending={isResending}
+                onResend={async () => {
+                  await handleResendOtp();
+                  setConfirmMessage('Code sent!');
+                  setTimeout(() => setConfirmMessage(null), 2000);
+                }}
+              />
             )}
           </motion.div>
         )}
@@ -561,28 +634,34 @@ export function ProfileInlineNotificationsCTA({
             animate={enterVariant.animate}
             exit={getExitVariant(instant)}
           >
-            <InlineInputStep
-              inputRef={inputRef}
-              inputId={`${inputId}-birthday`}
-              testId='inline-birthday-input'
-              label='Birthday'
-              inputMode='numeric'
-              placeholder='Birthday (MM/DD)'
-              value={birthdayInput}
-              onChange={e =>
-                setBirthdayInput(formatBirthdayInput(e.target.value))
-              }
-              onSubmit={() => {
-                handleBirthdaySubmit().catch(console.error);
-              }}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setIsInputFocused(false)}
-              disabled={birthdayMutation.isPending}
-              isFocused={isInputFocused}
-              autoComplete='bday'
-              maxLength={5}
-            />
+            <SubscriptionPearlComposer
+              dataTestId='inline-birthday-composer'
+              layout='stacked'
+              className='px-3 py-3'
+            >
+              <div className='px-2 py-2'>
+                <BirthdayInput
+                  value={birthdayInput}
+                  onChange={value => {
+                    setBirthdayInput(value);
+                    if (birthdayHintShown) setBirthdayHintShown(false);
+                  }}
+                  onComplete={() => {
+                    handleBirthdaySubmit().catch(console.error);
+                  }}
+                  onSubmit={() => {
+                    handleBirthdaySubmit().catch(console.error);
+                  }}
+                  autoFocus
+                  disabled={birthdayMutation.isPending}
+                />
+              </div>
+            </SubscriptionPearlComposer>
+            {birthdayHintShown && (
+              <p className='mt-2 text-center text-[12px] text-secondary-token/60'>
+                Enter full date to save
+              </p>
+            )}
           </motion.div>
         )}
 
