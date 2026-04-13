@@ -209,11 +209,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setIsDeleting(true);
     try {
       const result = await deleteRelease({ releaseId: deleteTarget.id });
-      if (!result.success) {
-        toast.error(result.message ?? 'Failed to delete release.');
-      } else {
+      if (result.success) {
         setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
         toast.success(`"${deleteTarget.title}" deleted.`);
+      } else {
+        toast.error(result.message ?? 'Failed to delete release.');
       }
     } catch {
       toast.error('Failed to delete release.');

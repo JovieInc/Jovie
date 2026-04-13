@@ -371,9 +371,9 @@ export function AdminFeedbackTable({
                       {new Date(selected.createdAtIso).toLocaleString()}
                     </p>
                     <p className='text-tertiary-token'>
-                      {selected.status !== 'dismissed'
-                        ? 'Marked as pending'
-                        : formatDismissedLabel(selected.dismissedAtIso)}
+                      {selected.status === 'dismissed'
+                        ? formatDismissedLabel(selected.dismissedAtIso)
+                        : 'Marked as pending'}
                     </p>
                   </div>
                 }
