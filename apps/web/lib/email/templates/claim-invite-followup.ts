@@ -8,7 +8,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { getProfileUrl } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
@@ -41,7 +41,7 @@ export interface FollowUpTemplateData {
  * Build the claim URL with token
  */
 function buildClaimUrl(username: string, claimToken: string): string {
-  return `${getProfileUrl(username)}/claim?token=${encodeURIComponent(claimToken)}`;
+  return `${BASE_URL}/claim/${encodeURIComponent(claimToken)}`;
 }
 
 /**

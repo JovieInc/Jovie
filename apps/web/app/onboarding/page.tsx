@@ -6,6 +6,7 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { readPendingClaimContext } from '@/lib/claim/context';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -78,6 +79,7 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
+  const pendingClaim = await readPendingClaimContext();
 
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
@@ -120,6 +122,7 @@ export default async function OnboardingPage({
 
   const providedHandle =
     resolvedSearchParams?.handle ||
+    pendingClaim?.username ||
     existingProfile?.username ||
     spotifySuggestedHandle;
 

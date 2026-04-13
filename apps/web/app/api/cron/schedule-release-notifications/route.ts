@@ -2,6 +2,7 @@ import {
   and,
   asc,
   sql as drizzleSql,
+  eq,
   gt,
   gte,
   inArray,
@@ -11,10 +12,13 @@ import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
-import { discogReleases } from '@/lib/db/schema/content';
+import { users } from '@/lib/db/schema/auth';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { captureError } from '@/lib/error-tracking';
+import { getReleaseNotificationEligibility } from '@/lib/notifications/release-eligibility';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -231,6 +235,7 @@ export async function scheduleReleaseNotifications(): Promise<{
       creatorProfileId: discogReleases.creatorProfileId,
       title: discogReleases.title,
       releaseDate: discogReleases.releaseDate,
+      sourceType: discogReleases.sourceType,
     })
     .from(discogReleases)
     .where(
@@ -248,6 +253,7 @@ export async function scheduleReleaseNotifications(): Promise<{
   const creatorProfileIds = [
     ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
   ];
+  const releaseIds = [...new Set(upcomingReleases.map(r => r.id))];
 
   const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
   if (!eligibleCreatorIds) {
@@ -256,10 +262,67 @@ export async function scheduleReleaseNotifications(): Promise<{
     );
   }
 
-  // Filter to only eligible releases
-  const eligibleReleases = upcomingReleases.filter(r =>
-    eligibleCreatorIds.has(r.creatorProfileId)
+  const [creatorRows, smartLinkRows, entitlementsMap] = await Promise.all([
+    db
+      .select({
+        id: creatorProfiles.id,
+        isClaimed: creatorProfiles.isClaimed,
+        settings: creatorProfiles.settings,
+        spotifyId: creatorProfiles.spotifyId,
+        trialNotificationsSent: users.trialNotificationsSent,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`),
+    db
+      .select({
+        releaseId: providerLinks.releaseId,
+      })
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
+        )
+      ),
+    getBatchCreatorEntitlements(creatorProfileIds),
+  ]);
+
+  const creatorMap = new Map(creatorRows.map(row => [row.id, row]));
+  const smartLinkReleaseIds = new Set(
+    smartLinkRows.flatMap(row => (row.releaseId ? [row.releaseId] : []))
   );
+
+  const eligibleReleases = upcomingReleases.filter(release => {
+    if (!eligibleCreatorIds.has(release.creatorProfileId)) {
+      return false;
+    }
+
+    const creator = creatorMap.get(release.creatorProfileId);
+    const entitlements = entitlementsMap.get(release.creatorProfileId);
+    if (!creator || !entitlements) {
+      return false;
+    }
+
+    const spotifyImportStatus =
+      typeof creator.settings?.spotifyImportStatus === 'string'
+        ? creator.settings.spotifyImportStatus
+        : null;
+    const eligibility = getReleaseNotificationEligibility({
+      canSendNotifications:
+        entitlements.entitlements.booleans.canSendNotifications,
+      hasSmartLink: smartLinkReleaseIds.has(release.id),
+      isClaimed: creator.isClaimed === true,
+      isTrialing: entitlements.plan === 'trial',
+      releaseSourceType: release.sourceType,
+      spotifyId: creator.spotifyId,
+      spotifyImportStatus,
+      trialNotificationsSent: creator.trialNotificationsSent ?? 0,
+      verifiedSubscriberCount: 1,
+    });
+
+    return eligibility.eligible;
+  });
   const skippedCount = upcomingReleases.length - eligibleReleases.length;
   if (skippedCount > 0) {
     logger.info(

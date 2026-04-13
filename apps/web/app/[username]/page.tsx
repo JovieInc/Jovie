@@ -12,6 +12,12 @@ import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import { getOptionalAuth } from '@/lib/auth/cached';
+import { readPendingClaimContext } from '@/lib/claim/context';
+import {
+  getProfileVisitorState,
+  supportsDirectProfileClaim,
+} from '@/lib/claim/visitor-state';
 import {
   buildBreadcrumbObject,
   buildListenActions,
@@ -480,6 +486,9 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+  readonly searchParams?: Promise<{
+    readonly claim?: string;
+  }>;
 }
 
 async function getPublicTourDates(
@@ -496,8 +505,12 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: Readonly<Props>) {
   const { username } = await params;
+  const resolvedSearchParams = await searchParams;
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -519,6 +532,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     genres,
     status,
     creatorIsPro,
+    creatorClerkId,
     latestRelease: fetchedLatestRelease,
     pressPhotos,
   } = profileResult;
@@ -545,6 +559,41 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
+  const { userId: viewerClerkUserId } = await getOptionalAuth();
+  const pendingClaimContext = !profile.is_claimed
+    ? await readPendingClaimContext({
+        username: artist.handle.toLowerCase(),
+      })
+    : null;
+  const directClaimSupported = supportsDirectProfileClaim({
+    spotifyId: profile.spotify_id,
+  });
+  const visitorState = getProfileVisitorState({
+    profile: {
+      id: profile.id,
+      username: artist.handle,
+      isClaimed: profile.is_claimed,
+      userClerkId: creatorClerkId,
+      spotifyId: profile.spotify_id,
+    },
+    authUserId: viewerClerkUserId,
+    pendingClaimContext,
+  });
+  const claimBannerVariant =
+    visitorState === 'claim_intent_token'
+      ? 'claim_intent'
+      : visitorState === 'claim_intent_direct'
+        ? 'direct_in_progress'
+        : resolvedSearchParams?.claim === 'unsupported' && !directClaimSupported
+          ? 'unsupported'
+          : directClaimSupported
+            ? 'organic'
+            : null;
+  const shouldShowClaimBanner =
+    !profile.is_claimed &&
+    visitorState !== 'owner' &&
+    (!viewerClerkUserId || pendingClaimContext !== null) &&
+    claimBannerVariant !== null;
 
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
@@ -600,9 +649,18 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
-      {!profile.is_claimed && (
-        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
-      )}
+      {shouldShowClaimBanner ? (
+        <ClaimBanner
+          profileHandle={artist.handle}
+          displayName={artist.name}
+          variant={claimBannerVariant}
+          ctaHref={
+            claimBannerVariant === 'unsupported'
+              ? undefined
+              : `/${encodeURIComponent(artist.handle)}/claim?next=auth`
+          }
+        />
+      ) : null}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
