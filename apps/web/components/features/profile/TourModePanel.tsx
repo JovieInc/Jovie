@@ -1,7 +1,6 @@
 'use client';
 
-import { Calendar, ChevronRight, MapPin } from 'lucide-react';
-import Link from 'next/link';
+import { ChevronRight, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
@@ -204,22 +203,16 @@ function TourDatesContent({
   // State 3: No dates at all
   if (allDates.length === 0) {
     return (
-      <div className='rounded-[28px] border border-white/8 bg-white/[0.035] px-5 py-6 text-left'>
-        <div className='mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04]'>
-          <Calendar className='h-[18px] w-[18px] text-white/44' />
-        </div>
-        <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-white/70'>
-          {artist.name} is not currently on tour. Get notified when dates are
-          announced.
+      <div className='space-y-4'>
+        <p className='text-[1.02rem] font-[600] tracking-[-0.02em] text-white'>
+          No upcoming events.
         </p>
-        <div className='mt-5 flex justify-center'>
-          <Link
-            href={`/${artist.handle}?mode=subscribe`}
-            className='inline-flex min-w-[15rem] items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-none transition-opacity duration-200 hover:opacity-92'
-          >
-            Turn on notifications
-          </Link>
-        </div>
+        <ArtistNotificationsCTA
+          artist={artist}
+          forceExpanded
+          hideListenFallback
+          source='tour_drawer'
+        />
       </div>
     );
   }
@@ -322,16 +315,7 @@ export function TourDrawerContent({
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   return (
-    <div
-      className='rounded-[28px] border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'
-      data-testid='tour-drawer-content'
-    >
-      {tourDates.length > 0 && (
-        <p className='mb-4 text-sm text-white/48'>
-          {tourDates.length} upcoming{' '}
-          {tourDates.length === 1 ? 'event' : 'events'}
-        </p>
-      )}
+    <div data-testid='tour-drawer-content'>
       <TourDatesContent
         artist={artist}
         nearby={nearbyDates}

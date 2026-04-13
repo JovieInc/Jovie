@@ -137,7 +137,7 @@ describe('TourModePanel', () => {
   it('renders empty state when no tour dates', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
     expect(screen.getByTestId('tour-drawer-content')).toBeInTheDocument();
-    expect(screen.getByText(/not currently on tour/)).toBeInTheDocument();
+    expect(screen.getByText('No upcoming events.')).toBeInTheDocument();
   });
 
   // State 4: No geolocation — shows all dates without Near You

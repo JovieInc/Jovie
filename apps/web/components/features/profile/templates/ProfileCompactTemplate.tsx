@@ -400,6 +400,22 @@ export function ProfileCompactTemplate({
   }, [mode, requestedMode]);
 
   useEffect(() => {
+    // Subscribe mode: skip the drawer, reveal the inline CTA directly
+    if (requestedMode === 'subscribe') {
+      setDrawerView('menu');
+      setDrawerOpen(false);
+      // Wait for the inline CTA to mount and register its reveal function
+      const tryReveal = (attempts: number) => {
+        if (revealNotificationsRef.current) {
+          revealNotificationsRef.current();
+        } else if (attempts > 0) {
+          setTimeout(() => tryReveal(attempts - 1), 100);
+        }
+      };
+      setTimeout(() => tryReveal(10), 100);
+      return;
+    }
+
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       setDrawerView(resolved);

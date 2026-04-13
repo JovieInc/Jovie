@@ -20,6 +20,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
 - Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
+- `?mode=subscribe` now opens the profile with inline notification input focused instead of a separate drawer
+- Tour drawer empty state simplified: removed card-in-card nesting, uses inline subscribe CTA directly
 
 ## [26.4.154.0] - 2026-04-13
 
