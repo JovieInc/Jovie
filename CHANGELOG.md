@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
+
+### Fixed
+
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
 ## [26.4.151.5] - 2026-04-12
 
 > Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
