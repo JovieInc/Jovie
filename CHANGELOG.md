@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.151.5] - 2026-04-12
 
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
 ### Fixed
 
 - Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
