@@ -110,11 +110,9 @@ describe('performance route resolvers', () => {
 
   it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for chat routes', async () => {
     vi.stubEnv('E2E_CLERK_USER_ID', '');
-
     const route = {
       path: '/app/chat/[id]',
     } as PerfRouteDefinition;
-
     await expect(
       resolveChatConversationPerfPath(route, {
         authCookies: [
@@ -213,11 +211,9 @@ describe('performance route resolvers', () => {
 
   it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for release task routes', async () => {
     vi.stubEnv('E2E_CLERK_USER_ID', '');
-
     const route = {
       path: '/app/dashboard/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;
-
     await expect(
       resolveReleaseTasksPerfPath(route, {
         authCookies: [

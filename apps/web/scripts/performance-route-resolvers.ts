@@ -29,11 +29,9 @@ function resolveClerkUserId(
   if (envClerkUserId) {
     return envClerkUserId;
   }
-
   const bypassClerkUserId = authCookies
     ?.find(cookie => cookie.name === '__e2e_test_user_id')
     ?.value?.trim();
-
   return bypassClerkUserId && bypassClerkUserId.length > 0
     ? bypassClerkUserId
     : null;
