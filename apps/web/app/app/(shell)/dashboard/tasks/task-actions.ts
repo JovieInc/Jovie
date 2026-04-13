@@ -413,6 +413,75 @@ export async function createTask(data: CreateTaskInput): Promise<TaskView> {
   return createTaskForProfile(profileId, data);
 }
 
+function resolveCompletedAt(
+  data: UpdateTaskInput,
+  existingTask: typeof tasks.$inferSelect,
+  nextStatus: string
+): Date | null | undefined {
+  if (data.completedAt !== undefined) return data.completedAt;
+  if (data.status === undefined) return existingTask.completedAt;
+  return nextStatus === 'done'
+    ? (existingTask.completedAt ?? new Date())
+    : null;
+}
+
+function mergeTaskFields(
+  data: UpdateTaskInput,
+  existingTask: typeof tasks.$inferSelect,
+  completedAt: Date | null | undefined,
+  nextStatus: typeof tasks.$inferSelect.status
+) {
+  return {
+    title: data.title ?? existingTask.title,
+    description:
+      data.description === undefined
+        ? existingTask.description
+        : data.description,
+    status: nextStatus,
+    priority: data.priority ?? existingTask.priority,
+    assigneeKind: data.assigneeKind ?? existingTask.assigneeKind,
+    assigneeUserId:
+      data.assigneeUserId === undefined
+        ? existingTask.assigneeUserId
+        : data.assigneeUserId,
+    agentType:
+      data.agentType === undefined ? existingTask.agentType : data.agentType,
+    agentStatus: data.agentStatus ?? existingTask.agentStatus,
+    agentInput:
+      data.agentInput === undefined ? existingTask.agentInput : data.agentInput,
+    agentOutput:
+      data.agentOutput === undefined
+        ? existingTask.agentOutput
+        : data.agentOutput,
+    agentError:
+      data.agentError === undefined ? existingTask.agentError : data.agentError,
+    releaseId:
+      data.releaseId === undefined ? existingTask.releaseId : data.releaseId,
+    parentTaskId:
+      data.parentTaskId === undefined
+        ? existingTask.parentTaskId
+        : data.parentTaskId,
+    category:
+      data.category === undefined ? existingTask.category : data.category,
+    dueAt: data.dueAt === undefined ? existingTask.dueAt : data.dueAt,
+    scheduledFor:
+      data.scheduledFor === undefined
+        ? existingTask.scheduledFor
+        : data.scheduledFor,
+    startedAt:
+      data.startedAt === undefined ? existingTask.startedAt : data.startedAt,
+    completedAt,
+    position: data.position ?? existingTask.position,
+    sourceTemplateId:
+      data.sourceTemplateId === undefined
+        ? existingTask.sourceTemplateId
+        : data.sourceTemplateId,
+    metadata:
+      data.metadata === undefined ? existingTask.metadata : data.metadata,
+    updatedAt: new Date(),
+  };
+}
+
 export async function updateTask(
   taskId: string,
   data: UpdateTaskInput
@@ -424,71 +493,11 @@ export async function updateTask(
   await assertReleaseAccess(profileId, data.releaseId);
 
   const nextStatus = data.status ?? existingTask.status;
-  let completedAt: Date | null | undefined;
-  if (data.completedAt !== undefined) {
-    completedAt = data.completedAt;
-  } else if (data.status === undefined) {
-    completedAt = existingTask.completedAt;
-  } else {
-    completedAt =
-      nextStatus === 'done' ? (existingTask.completedAt ?? new Date()) : null;
-  }
+  const completedAt = resolveCompletedAt(data, existingTask, nextStatus);
 
   const [updated] = await db
     .update(tasks)
-    .set({
-      title: data.title ?? existingTask.title,
-      description:
-        data.description !== undefined
-          ? data.description
-          : existingTask.description,
-      status: nextStatus,
-      priority: data.priority ?? existingTask.priority,
-      assigneeKind: data.assigneeKind ?? existingTask.assigneeKind,
-      assigneeUserId:
-        data.assigneeUserId !== undefined
-          ? data.assigneeUserId
-          : existingTask.assigneeUserId,
-      agentType:
-        data.agentType !== undefined ? data.agentType : existingTask.agentType,
-      agentStatus: data.agentStatus ?? existingTask.agentStatus,
-      agentInput:
-        data.agentInput !== undefined
-          ? data.agentInput
-          : existingTask.agentInput,
-      agentOutput:
-        data.agentOutput !== undefined
-          ? data.agentOutput
-          : existingTask.agentOutput,
-      agentError:
-        data.agentError !== undefined
-          ? data.agentError
-          : existingTask.agentError,
-      releaseId:
-        data.releaseId !== undefined ? data.releaseId : existingTask.releaseId,
-      parentTaskId:
-        data.parentTaskId !== undefined
-          ? data.parentTaskId
-          : existingTask.parentTaskId,
-      category:
-        data.category !== undefined ? data.category : existingTask.category,
-      dueAt: data.dueAt !== undefined ? data.dueAt : existingTask.dueAt,
-      scheduledFor:
-        data.scheduledFor !== undefined
-          ? data.scheduledFor
-          : existingTask.scheduledFor,
-      startedAt:
-        data.startedAt !== undefined ? data.startedAt : existingTask.startedAt,
-      completedAt,
-      position: data.position ?? existingTask.position,
-      sourceTemplateId:
-        data.sourceTemplateId !== undefined
-          ? data.sourceTemplateId
-          : existingTask.sourceTemplateId,
-      metadata:
-        data.metadata !== undefined ? data.metadata : existingTask.metadata,
-      updatedAt: new Date(),
-    })
+    .set(mergeTaskFields(data, existingTask, completedAt, nextStatus))
     .where(eq(tasks.id, taskId))
     .returning();
 

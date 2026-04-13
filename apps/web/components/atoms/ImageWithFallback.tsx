@@ -114,12 +114,12 @@ export function ImageWithFallback({
   ...rest
 }: ImageWithFallbackProps) {
   const [hasError, setHasError] = useState(false);
-  const sourceUrl =
-    typeof src === 'string'
-      ? src
-      : typeof src === 'object' && src !== null && 'src' in src
-        ? src.src
-        : null;
+  let sourceUrl: string | null = null;
+  if (typeof src === 'string') {
+    sourceUrl = src;
+  } else if (typeof src === 'object' && src !== null && 'src' in src) {
+    sourceUrl = src.src;
+  }
 
   // Reset error state when src changes
   useEffect(() => {

@@ -336,23 +336,17 @@ function buildReadyNextActions(
 
   if (verdict.label === 'Healthy') {
     actions.push(
-      'Use these stronger neighbours as playlist, collab, and audience targeting references.'
-    );
-    actions.push(
+      'Use these stronger neighbours as playlist, collab, and audience targeting references.',
       'Re-check after major releases or marketing spikes to confirm adjacency holds.'
     );
   } else if (verdict.label === 'Mixed') {
     actions.push(
-      'Aim for placement near slightly larger artists in the same genre lane.'
-    );
-    actions.push(
+      'Aim for placement near slightly larger artists in the same genre lane.',
       'Audit recent releases and metadata for sharper genre signaling.'
     );
   } else {
     actions.push(
-      'Prioritize adjacency with slightly larger artists instead of broad genre reach.'
-    );
-    actions.push(
+      'Prioritize adjacency with slightly larger artists instead of broad genre reach.',
       'Treat the current neighbourhood as a warning that discovery quality may be compounding downward.'
     );
   }

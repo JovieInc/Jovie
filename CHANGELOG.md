@@ -19,6 +19,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Artist profile latest release now excludes music_video releases to keep the profile focused on email conversion
 - Release filter counts and type styles updated to include music_video
 
+## [26.4.152.1] - 2026-04-13
+
+### Fixed
+
+- Remove double logo on auth pages (hide Clerk's built-in logoBox, keep custom BrandLogo)
+- Change sign-in/sign-up CTA button from purple to white with dark text
+
 ## [26.4.152.0] - 2026-04-12
 
 ### Added

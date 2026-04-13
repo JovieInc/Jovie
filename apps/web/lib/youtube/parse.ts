@@ -41,7 +41,7 @@ export function parseYouTubeUrl(url: string): ParsedYouTubeUrl | null {
       candidate = parsed.searchParams.get('v');
       if (!candidate) {
         const pathMatch = parsed.pathname.match(
-          /^\/(?:embed|shorts)\/([a-zA-Z0-9_-]{11})/
+          /^\/(?:embed|shorts)\/([a-zA-Z0-9_-]{11})\/?$/
         );
         candidate = pathMatch?.[1] ?? null;
       }

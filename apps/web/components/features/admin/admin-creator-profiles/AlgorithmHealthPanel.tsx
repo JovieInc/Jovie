@@ -347,12 +347,15 @@ function buildMeaningBullets(report: AlgorithmHealthReport): string[] {
     ];
   }
 
-  const ratioSummary =
-    report.summary.bigger > report.summary.smaller
-      ? 'More resolved neighbours are bigger than the target.'
-      : report.summary.bigger === report.summary.smaller
-        ? 'The resolved neighbour mix is balanced between larger and smaller artists.'
-        : 'More resolved neighbours are smaller than the target.';
+  let ratioSummary: string;
+  if (report.summary.bigger > report.summary.smaller) {
+    ratioSummary = 'More resolved neighbours are bigger than the target.';
+  } else if (report.summary.bigger === report.summary.smaller) {
+    ratioSummary =
+      'The resolved neighbour mix is balanced between larger and smaller artists.';
+  } else {
+    ratioSummary = 'More resolved neighbours are smaller than the target.';
+  }
 
   return [
     ratioSummary,
