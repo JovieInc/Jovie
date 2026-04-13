@@ -32,6 +32,49 @@ interface OnboardingHandleStepProps {
   readonly autoSubmitClaimed?: boolean;
 }
 
+function SubmitButtonIcon({
+  isLoading,
+  checking,
+  autoSubmitClaimed,
+}: Readonly<{
+  isLoading: boolean;
+  checking: boolean;
+  autoSubmitClaimed: boolean;
+}>) {
+  if (isLoading || checking) {
+    return <LoadingSpinner size='sm' className='text-current' />;
+  }
+  if (autoSubmitClaimed) {
+    return (
+      <svg
+        viewBox='0 0 20 20'
+        fill='none'
+        aria-hidden='true'
+        className='h-4 w-4 animate-in zoom-in duration-300'
+      >
+        <path
+          d='M6 10.2l2.6 2.6L14 7.4'
+          stroke='currentColor'
+          strokeWidth='2'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox='0 0 20 20' fill='none' aria-hidden='true' className='h-4 w-4'>
+      <path
+        d='M4 10h12m0 0l-4-4m4 4l-4 4'
+        stroke='currentColor'
+        strokeWidth='2'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+    </svg>
+  );
+}
+
 export function OnboardingHandleStep({
   title,
   prompt,
@@ -122,39 +165,11 @@ export function OnboardingHandleStep({
                 'disabled:cursor-not-allowed disabled:opacity-40'
               )}
             >
-              {isLoading || handleValidation.checking ? (
-                <LoadingSpinner size='sm' className='text-current' />
-              ) : autoSubmitClaimed ? (
-                <svg
-                  viewBox='0 0 20 20'
-                  fill='none'
-                  aria-hidden='true'
-                  className='h-4 w-4 animate-in zoom-in duration-300'
-                >
-                  <path
-                    d='M6 10.2l2.6 2.6L14 7.4'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                  />
-                </svg>
-              ) : (
-                <svg
-                  viewBox='0 0 20 20'
-                  fill='none'
-                  aria-hidden='true'
-                  className='h-4 w-4'
-                >
-                  <path
-                    d='M4 10h12m0 0l-4-4m4 4l-4 4'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                  />
-                </svg>
-              )}
+              <SubmitButtonIcon
+                isLoading={isLoading}
+                checking={handleValidation.checking}
+                autoSubmitClaimed={autoSubmitClaimed}
+              />
             </button>
           </div>
 
@@ -168,8 +183,10 @@ export function OnboardingHandleStep({
               <span className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'>
                 jov.ie/{handleInput} is yours.
               </span>
-            ) : stateError ||
-              (hasError && handleInput && !handleValidation.checking) ? (
+            ) : null}
+            {!(autoSubmitClaimed && handleInput) &&
+            (stateError ||
+              (hasError && handleInput && !handleValidation.checking)) ? (
               <span
                 data-testid='handle-unavailable'
                 className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'

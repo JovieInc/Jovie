@@ -219,44 +219,41 @@ export function ArtistHero({
           </div>
 
           <div className='flex flex-wrap items-center gap-3'>
-            {primaryAction ? (
-              primaryAction.href ? (
-                <a
-                  href={primaryAction.href}
-                  target={primaryAction.external ? '_blank' : undefined}
-                  rel={
-                    primaryAction.external ? 'noopener noreferrer' : undefined
-                  }
-                  onClick={
-                    primaryAction.external ? undefined : primaryAction.onClick
-                  }
-                  aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                  className={primaryActionClassName}
-                >
-                  {primaryActionKind === 'tickets' ? (
-                    <Ticket
-                      className='mr-2 h-[17px] w-[17px]'
-                      aria-hidden='true'
-                    />
-                  ) : null}
-                  {primaryAction.label}
-                </a>
-              ) : (
-                <button
-                  type='button'
-                  onClick={primaryAction.onClick}
-                  aria-label={primaryAction.ariaLabel ?? primaryAction.label}
-                  className={primaryActionClassName}
-                >
-                  {primaryActionKind === 'tickets' ? (
-                    <Ticket
-                      className='mr-2 h-[17px] w-[17px]'
-                      aria-hidden='true'
-                    />
-                  ) : null}
-                  {primaryAction.label}
-                </button>
-              )
+            {primaryAction?.href ? (
+              <a
+                href={primaryAction.href}
+                target={primaryAction.external ? '_blank' : undefined}
+                rel={primaryAction.external ? 'noopener noreferrer' : undefined}
+                onClick={
+                  primaryAction.external ? undefined : primaryAction.onClick
+                }
+                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                className={primaryActionClassName}
+              >
+                {primaryActionKind === 'tickets' ? (
+                  <Ticket
+                    className='mr-2 h-[17px] w-[17px]'
+                    aria-hidden='true'
+                  />
+                ) : null}
+                {primaryAction.label}
+              </a>
+            ) : null}
+            {primaryAction && !primaryAction.href ? (
+              <button
+                type='button'
+                onClick={primaryAction.onClick}
+                aria-label={primaryAction.ariaLabel ?? primaryAction.label}
+                className={primaryActionClassName}
+              >
+                {primaryActionKind === 'tickets' ? (
+                  <Ticket
+                    className='mr-2 h-[17px] w-[17px]'
+                    aria-hidden='true'
+                  />
+                ) : null}
+                {primaryAction.label}
+              </button>
             ) : null}
           </div>
         </div>
