@@ -452,7 +452,12 @@ async function startStandaloneServer(port: number) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  await waitForServer(baseUrl, child);
+  try {
+    await waitForServer(baseUrl, child);
+  } catch (error) {
+    await stopStandaloneServer(child);
+    throw error;
+  }
   return { baseUrl, child };
 }
 

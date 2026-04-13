@@ -1,11 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
+
+const ReleasesExperience = dynamic(
+  () =>
+    import('@/features/dashboard/organisms/release-provider-matrix').then(
+      mod => mod.ReleasesExperience
+    ),
+  {
+    loading: () => <ReleaseTableSkeleton showHeader={false} />,
+  }
+);
 
 /**
  * Client-first releases page.

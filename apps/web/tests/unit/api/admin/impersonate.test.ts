@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
@@ -45,10 +46,11 @@ vi.mock('@/lib/rate-limit', () => ({
   getClientIP: mockGetClientIP,
 }));
 
+const routeModulePromise = import('@/app/api/admin/impersonate/route');
+
 describe('Admin Impersonate API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     // Set up default auth mock to return proper structure
     mockAuth.mockResolvedValue({ userId: 'admin-123', sessionClaims: {} });
     mockAdminImpersonateLimiter.limit.mockResolvedValue({
@@ -63,12 +65,11 @@ describe('Admin Impersonate API', () => {
 
   describe('GET /api/admin/impersonate', () => {
     it('returns 401 when not admin', async () => {
-      const { NextResponse } = await import('next/server');
       mockRequireAdmin.mockResolvedValue(
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       );
 
-      const { GET } = await import('@/app/api/admin/impersonate/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -80,7 +81,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockIsImpersonationEnabled.mockReturnValue(false);
 
-      const { GET } = await import('@/app/api/admin/impersonate/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -95,7 +96,7 @@ describe('Admin Impersonate API', () => {
       mockGetImpersonationState.mockResolvedValue(null);
       mockGetImpersonationTimeRemaining.mockResolvedValue(0);
 
-      const { GET } = await import('@/app/api/admin/impersonate/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -116,7 +117,7 @@ describe('Admin Impersonate API', () => {
       });
       mockGetImpersonationTimeRemaining.mockResolvedValue(10 * 60 * 1000);
 
-      const { GET } = await import('@/app/api/admin/impersonate/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -130,12 +131,11 @@ describe('Admin Impersonate API', () => {
 
   describe('POST /api/admin/impersonate', () => {
     it('returns 401 when not admin', async () => {
-      const { NextResponse } = await import('next/server');
       mockRequireAdmin.mockResolvedValue(
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       );
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,7 +153,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockIsImpersonationEnabled.mockReturnValue(false);
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,7 +171,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockIsImpersonationEnabled.mockReturnValue(true);
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,7 +190,7 @@ describe('Admin Impersonate API', () => {
       mockIsImpersonationEnabled.mockReturnValue(true);
       mockAuth.mockResolvedValue({ userId: null });
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -215,7 +215,7 @@ describe('Admin Impersonate API', () => {
         reset: new Date(Date.now() + 60_000),
       });
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -240,7 +240,7 @@ describe('Admin Impersonate API', () => {
         error: 'Target user not found',
       });
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,7 +260,7 @@ describe('Admin Impersonate API', () => {
       mockAuth.mockResolvedValue({ userId: 'admin-123' });
       mockStartImpersonation.mockResolvedValue({ success: true });
 
-      const { POST } = await import('@/app/api/admin/impersonate/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,7 +284,7 @@ describe('Admin Impersonate API', () => {
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       );
 
-      const { DELETE } = await import('@/app/api/admin/impersonate/route');
+      const { DELETE } = await routeModulePromise;
       const response = await DELETE();
       const data = await response.json();
 
@@ -296,7 +296,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockEndImpersonation.mockResolvedValue({ success: true });
 
-      const { DELETE } = await import('@/app/api/admin/impersonate/route');
+      const { DELETE } = await routeModulePromise;
       const response = await DELETE();
       const data = await response.json();
 
@@ -309,7 +309,7 @@ describe('Admin Impersonate API', () => {
       mockRequireAdmin.mockResolvedValue(null);
       mockEndImpersonation.mockResolvedValue({ success: false });
 
-      const { DELETE } = await import('@/app/api/admin/impersonate/route');
+      const { DELETE } = await routeModulePromise;
       const response = await DELETE();
       const data = await response.json();
 

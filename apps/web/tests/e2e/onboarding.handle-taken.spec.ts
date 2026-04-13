@@ -89,7 +89,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     // In mocked mode, skip tests if the form isn't on the homepage.
     if (!runWithRealAPI) {
       const handleInput = page.getByLabel(
-        /choose your handle|enter your desired handle/i
+        /choose your handle|claim your handle/i
       );
       const isFormVisible = await handleInput
         .isVisible({ timeout: 5000 })

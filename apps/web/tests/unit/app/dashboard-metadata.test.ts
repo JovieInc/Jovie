@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetSessionContext = vi.fn();
@@ -8,6 +9,10 @@ const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: mockGetSessionContext,
+}));
+
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -21,19 +26,32 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
-const mockGetDashboardData = vi.fn().mockResolvedValue({
+const mockGetDashboardShellData = vi.fn().mockResolvedValue({
   selectedProfile: null,
 });
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: (...args: unknown[]) => mockGetDashboardData(...args),
+  getDashboardShellData: (...args: unknown[]) =>
+    mockGetDashboardShellData(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  loadReleaseMatrix: vi.fn().mockResolvedValue([]),
   checkAppleMusicConnection: vi.fn().mockResolvedValue({
     connected: false,
     artistName: null,
     artistId: null,
   }),
+}));
+
+vi.mock('@/lib/queries/server', () => ({
+  getQueryClient: vi.fn(() => ({
+    prefetchQuery: vi.fn().mockResolvedValue(undefined),
+  })),
+  getDehydratedState: vi.fn(() => null),
+}));
+
+vi.mock('@/lib/queries/HydrateClient', () => ({
+  HydrateClient: ({ children }: { children: ReactNode }) => children,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -94,7 +112,7 @@ describe('dashboard metadata generation', () => {
     );
     const homePage = await import('@/app/app/(shell)/page');
 
-    const result = homePage.default();
-    expect(result.type).toBe(DeferredChatPageClient);
+    const result = await homePage.default();
+    expect(result.props.children.type).toBe(DeferredChatPageClient);
   });
 });
