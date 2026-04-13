@@ -15,7 +15,12 @@ export interface DemoPersonaRelease {
   readonly id: string;
   readonly title: string;
   readonly slug: string;
-  readonly releaseType: 'single' | 'ep' | 'album' | 'compilation';
+  readonly releaseType:
+    | 'single'
+    | 'ep'
+    | 'album'
+    | 'compilation'
+    | 'music_video';
   readonly releaseDate: string;
   readonly artworkUrl: string;
   readonly totalTracks: number;
@@ -28,6 +33,8 @@ export interface DemoPersonaRelease {
   readonly primaryIsrc: string;
   readonly providerUrls: Readonly<Partial<Record<ProviderKey, string>>>;
   readonly tracks?: readonly DemoPersonaTrack[];
+  /** JSONB metadata for the release (e.g., MusicVideoMetadata for music_video type) */
+  readonly metadata?: Record<string, unknown>;
 }
 
 export interface DemoPersonaTourDate {
@@ -442,6 +449,32 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
           isrc: 'GBARL2300722',
         },
       ],
+    },
+    {
+      id: 'calvin-miracle-video',
+      title: 'Miracle (Official Music Video)',
+      slug: 'miracle-official-music-video',
+      releaseType: 'music_video',
+      releaseDate: '2023-04-14',
+      artworkUrl: 'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+      totalTracks: 0,
+      totalDurationMs: 219000,
+      label: 'Columbia',
+      spotifyPopularity: 0,
+      artistNames: ['Calvin Harris', 'Ellie Goulding'],
+      genres: ['Dance', 'House'],
+      primaryIsrc: '',
+      providerUrls: {
+        youtube: 'https://www.youtube.com/watch?v=v7GHn2WJCM4',
+      },
+      metadata: {
+        youtubeVideoId: 'v7GHn2WJCM4',
+        youtubeThumbnailUrl:
+          'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+        youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
+        youtubeChannelName: 'Calvin Harris',
+        duration: 219,
+      },
     },
   ],
   tourDates: [
