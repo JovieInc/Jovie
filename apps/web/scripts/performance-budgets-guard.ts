@@ -387,10 +387,58 @@ function hasTimingBudget(
   return getRouteTimingBudgets(route).some(entry => entry.metric === metric);
 }
 
+function extractRouteTokenValues(
+  templatePath: string,
+  resolvedPath: string
+): ReadonlyMap<string, string> {
+  const templateUrl = new URL(`http://local${templatePath}`);
+  const resolvedUrl = new URL(`http://local${resolvedPath}`);
+  const templateSegments = templateUrl.pathname.split('/').filter(Boolean);
+  const resolvedSegments = resolvedUrl.pathname.split('/').filter(Boolean);
+  const values = new Map<string, string>();
+
+  for (let index = 0; index < templateSegments.length; index += 1) {
+    const templateSegment = templateSegments[index];
+    const resolvedSegment = resolvedSegments[index];
+
+    if (!templateSegment || !resolvedSegment) {
+      continue;
+    }
+
+    if (
+      templateSegment.startsWith('[') &&
+      templateSegment.endsWith(']') &&
+      !templateSegment.startsWith('[...')
+    ) {
+      values.set(templateSegment.slice(1, -1), resolvedSegment);
+    }
+  }
+
+  return values;
+}
+
+function resolveExpectedDynamicPath(
+  templatePath: string,
+  resolvedPath: string
+) {
+  const tokenValues = extractRouteTokenValues(templatePath, resolvedPath);
+  let expectedPath = templatePath;
+
+  for (const [token, value] of tokenValues) {
+    expectedPath = expectedPath.replaceAll(`[${token}]`, value);
+  }
+
+  return expectedPath;
+}
+
 function expectedRoutePaths(route: PerfRouteDefinition, resolvedPath: string) {
   const expected = new Set<string>([
     resolvedPath,
-    ...((route.readySelectors.redirectDestinations ?? []) as readonly string[]),
+    ...(
+      (route.readySelectors.redirectDestinations ?? []) as readonly string[]
+    ).map(expectedPath =>
+      resolveExpectedDynamicPath(expectedPath, resolvedPath)
+    ),
   ]);
   return [...expected];
 }

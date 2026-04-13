@@ -4,6 +4,7 @@ import type { ImageProps } from 'next/image';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { shouldBypassImageOptimization } from '@/lib/utils/dsp-images';
 
 /**
  * Fallback variant determines which placeholder icon is shown when an image fails to load.
@@ -113,6 +114,12 @@ export function ImageWithFallback({
   ...rest
 }: ImageWithFallbackProps) {
   const [hasError, setHasError] = useState(false);
+  const sourceUrl =
+    typeof src === 'string'
+      ? src
+      : typeof src === 'object' && src !== null && 'src' in src
+        ? src.src
+        : null;
 
   // Reset error state when src changes
   useEffect(() => {
@@ -141,6 +148,7 @@ export function ImageWithFallback({
       alt={alt}
       className={className}
       onError={() => setHasError(true)}
+      unoptimized={shouldBypassImageOptimization(sourceUrl)}
       {...rest}
     />
   );

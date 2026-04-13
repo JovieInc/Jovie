@@ -1,9 +1,8 @@
 /**
  * Shared E2E test helpers extracted from golden-path.spec.ts.
  *
- * Used by both golden-path and yc-demo specs. Prefer the shared runtime
- * connection first so CI stays on the stable pooled URL; fall back to the
- * direct URL only when a job does not provide the pooled variant.
+ * Used by both golden-path and yc-demo specs. All functions use
+ * direct Neon HTTP queries (not the pool) to avoid SSR abort races.
  */
 
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
@@ -27,8 +26,7 @@ export const REQUIRED_ENV = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-  DATABASE_URL:
-    process.env.DATABASE_URL?.trim() || process.env.DATABASE_URL_DIRECT?.trim(),
+  DATABASE_URL: process.env.DATABASE_URL,
 } as const;
 
 export function hasRealEnv(): boolean {
@@ -106,19 +104,6 @@ export const DEFAULT_ONBOARDING_SPOTIFY_ARTIST = {
   url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
 } as const;
 
-function getTestDatabaseUrl(context: string): string {
-  const dbUrl =
-    process.env.DATABASE_URL?.trim() || process.env.DATABASE_URL_DIRECT?.trim();
-
-  if (!dbUrl) {
-    throw new Error(
-      `DATABASE_URL or DATABASE_URL_DIRECT required for ${context}`
-    );
-  }
-
-  return dbUrl;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Spotify import helpers                                              */
 /* ------------------------------------------------------------------ */
@@ -171,7 +156,12 @@ export function countPopulatedDspFields(
 }
 
 export async function waitForSpotifyImport(clerkUserId: string) {
-  const sql = neon(getTestDatabaseUrl('Spotify import checks'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for Spotify import checks');
+  }
+
+  const sql = neon(dbUrl);
 
   const [state] = (await sql`
     SELECT
@@ -205,7 +195,12 @@ export async function waitForSpotifyImport(clerkUserId: string) {
 }
 
 export async function waitForMultiDspEnrichment(clerkUserId: string) {
-  const sql = neon(getTestDatabaseUrl('multi-DSP enrichment checks'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for multi-DSP enrichment checks');
+  }
+
+  const sql = neon(dbUrl);
 
   const [state] = (await sql`
     SELECT
@@ -332,7 +327,12 @@ export async function advanceOnboardingToArtistSelection(
 export async function getFirstReleaseForUser(
   clerkUserId: string
 ): Promise<DemoReleaseLookup | null> {
-  const sql = neon(getTestDatabaseUrl('release lookup'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for release lookup');
+  }
+
+  const sql = neon(dbUrl);
 
   const [preferredRelease] = (await sql`
     SELECT
@@ -378,7 +378,12 @@ export async function getTopDemoReleasesForUser(
   clerkUserId: string,
   limit = 3
 ): Promise<DemoReleaseLookup[]> {
-  const sql = neon(getTestDatabaseUrl('release lookup'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for release lookup');
+  }
+
+  const sql = neon(dbUrl);
   const rows = (await sql`
     SELECT
       dr.id,
@@ -413,7 +418,12 @@ export async function getTopDemoReleasesForUser(
 export async function getDemoUserHandle(
   clerkUserId: string
 ): Promise<string | null> {
-  const sql = neon(getTestDatabaseUrl('demo handle lookup'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for demo handle lookup');
+  }
+
+  const sql = neon(dbUrl);
 
   const [row] = (await sql`
     SELECT cp.username
@@ -437,68 +447,6 @@ export function buildValidOnboardingHandle(
   const seedFragment = seed.replaceAll(/[^a-z0-9]/g, '').slice(0, 12);
   const userFragment = clerkUserId.replaceAll(/[^a-z0-9]/gi, '').toLowerCase();
   return `j${seedFragment}${userFragment.slice(-6)}`.slice(0, 30);
-}
-
-type OnboardingCompletionStep =
-  | 'artist-confirm-ready'
-  | 'profile-ready'
-  | 'upgrade'
-  | 'waiting';
-
-async function readOnboardingCompletionStep(
-  profileReadyHeading: ReturnType<Page['getByRole']>,
-  upgradeHeading: ReturnType<Page['getByRole']>,
-  artistConfirmContinue: ReturnType<Page['getByRole']>
-): Promise<OnboardingCompletionStep> {
-  if (await profileReadyHeading.isVisible().catch(() => false)) {
-    return 'profile-ready';
-  }
-
-  if (await upgradeHeading.isVisible().catch(() => false)) {
-    return 'upgrade';
-  }
-
-  if (
-    (await artistConfirmContinue.isVisible().catch(() => false)) &&
-    (await artistConfirmContinue.isEnabled().catch(() => false))
-  ) {
-    return 'artist-confirm-ready';
-  }
-
-  return 'waiting';
-}
-
-async function readPostConfirmStep(
-  profileReadyHeading: ReturnType<Page['getByRole']>,
-  upgradeHeading: ReturnType<Page['getByRole']>
-): Promise<'profile-ready' | 'upgrade' | 'waiting'> {
-  if (await profileReadyHeading.isVisible().catch(() => false)) {
-    return 'profile-ready';
-  }
-
-  if (await upgradeHeading.isVisible().catch(() => false)) {
-    return 'upgrade';
-  }
-
-  return 'waiting';
-}
-
-async function reopenOnboardingAtProfileReadyStep(
-  page: Page,
-  clerkUserId: string
-): Promise<void> {
-  await ensureServerAuthenticated(page, clerkUserId);
-  await smokeNavigateWithRetry(page, '/onboarding?resume=profile-ready', {
-    retries: 1,
-    timeout: 60_000,
-  });
-  await expect(page).toHaveURL(/\/onboarding\?(?:.*&)?resume=profile-ready/, {
-    timeout: 30_000,
-  });
-  await expect(
-    page.locator('[data-testid="onboarding-form-wrapper"]')
-  ).toBeVisible({ timeout: 20_000 });
-  await waitForHydration(page, { timeout: 90_000 });
 }
 
 export async function completeOnboardingV2(
@@ -604,90 +552,148 @@ export async function completeOnboardingV2(
   const upgradeHeading = page.getByRole('heading', {
     name: 'Want the full profile from day one?',
   });
+  const lateArrivalsHeading = page.getByRole('heading', {
+    name: 'A few more things showed up',
+  });
   const artistConfirmContinue = page.getByRole('button', { name: 'Continue' });
-  const profileReadyHeading = page
-    .getByRole('heading', {
-      name: /Your profile is ready|Your Link Is Live/i,
-    })
-    .first();
+  const lateArrivalsFinish = page.getByRole('button', { name: 'Finish setup' });
+  const releasePreviewHeading = page.getByRole('heading', {
+    name: 'Your release preview',
+  });
+  const releasePreviewContinue = page.getByRole('button', { name: 'Continue' });
+  const profileReadyHeading = page.getByRole('heading', {
+    name: /^(Your profile is ready|Your Link Is Live)$/i,
+  });
 
   if (options.clerkUserId) {
     await waitForOnboardingReadiness(page, options.clerkUserId);
   }
 
-  const completionStep = await expect
+  await expect
     .poll(
-      () =>
-        readOnboardingCompletionStep(
-          profileReadyHeading,
-          upgradeHeading,
-          artistConfirmContinue
-        ),
-      {
-        timeout: options.clerkUserId ? 30_000 : 180_000,
-      }
-    )
-    .toMatch(/upgrade|artist-confirm-ready|profile-ready/)
-    .then(() =>
-      readOnboardingCompletionStep(
-        profileReadyHeading,
-        upgradeHeading,
-        artistConfirmContinue
-      )
-    )
-    .catch(async error => {
-      if (!options.clerkUserId) {
-        throw error;
-      }
+      async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
 
-      await reopenOnboardingAtProfileReadyStep(page, options.clerkUserId);
-      return expect
-        .poll(
-          () =>
-            readOnboardingCompletionStep(
-              profileReadyHeading,
-              upgradeHeading,
-              artistConfirmContinue
-            ),
-          { timeout: 30_000 }
-        )
-        .toMatch(/upgrade|artist-confirm-ready|profile-ready/)
-        .then(() =>
-          readOnboardingCompletionStep(
-            profileReadyHeading,
-            upgradeHeading,
-            artistConfirmContinue
-          )
-        );
-    });
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
 
-  if (completionStep === 'artist-confirm-ready') {
+        if (await upgradeHeading.isVisible().catch(() => false)) {
+          return 'upgrade';
+        }
+
+        if (
+          (await artistConfirmContinue.isVisible().catch(() => false)) &&
+          (await artistConfirmContinue.isEnabled().catch(() => false))
+        ) {
+          return 'artist-confirm-ready';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 180_000 }
+    )
+    .toMatch(/upgrade|artist-confirm-ready|profile-ready|dashboard/);
+
+  if (
+    (await artistConfirmContinue.isVisible().catch(() => false)) &&
+    (await artistConfirmContinue.isEnabled().catch(() => false))
+  ) {
     await artistConfirmContinue.click();
   }
 
   const postConfirmStep = await expect
-    .poll(() => readPostConfirmStep(profileReadyHeading, upgradeHeading), {
-      timeout: 30_000,
-    })
-    .toMatch(/profile-ready|upgrade/)
-    .then(() => readPostConfirmStep(profileReadyHeading, upgradeHeading))
-    .catch(async error => {
-      if (!options.clerkUserId) {
-        throw error;
-      }
+    .poll(
+      async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
 
-      await reopenOnboardingAtProfileReadyStep(page, options.clerkUserId);
-      return expect
-        .poll(() => readPostConfirmStep(profileReadyHeading, upgradeHeading), {
-          timeout: 30_000,
-        })
-        .toMatch(/profile-ready|upgrade/)
-        .then(() => readPostConfirmStep(profileReadyHeading, upgradeHeading));
-    });
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
+
+        if (await upgradeHeading.isVisible().catch(() => false)) {
+          return 'upgrade';
+        }
+
+        if (await lateArrivalsHeading.isVisible().catch(() => false)) {
+          return 'late-arrivals';
+        }
+
+        if (await releasePreviewHeading.isVisible().catch(() => false)) {
+          return 'releases';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 30_000 }
+    )
+    .toMatch(/profile-ready|upgrade|late-arrivals|releases|dashboard/)
+    .then(async () =>
+      !page.url().includes('/onboarding')
+        ? 'dashboard'
+        : (await profileReadyHeading.isVisible().catch(() => false))
+          ? 'profile-ready'
+          : (await lateArrivalsHeading.isVisible().catch(() => false))
+            ? 'late-arrivals'
+            : (await releasePreviewHeading.isVisible().catch(() => false))
+              ? 'releases'
+              : 'upgrade'
+    );
+
+  if (postConfirmStep === 'dashboard') {
+    return;
+  }
 
   if (postConfirmStep === 'upgrade') {
     await page.getByRole('button', { name: 'Continue free' }).click();
   }
+
+  if (postConfirmStep === 'releases') {
+    await releasePreviewContinue.click();
+  }
+
+  if (postConfirmStep === 'late-arrivals') {
+    await lateArrivalsFinish.click();
+  }
+
+  await expect
+    .poll(
+      async () => {
+        if (!page.url().includes('/onboarding')) {
+          return 'dashboard';
+        }
+
+        if (await profileReadyHeading.isVisible().catch(() => false)) {
+          return 'profile-ready';
+        }
+
+        if (
+          (await releasePreviewHeading.isVisible().catch(() => false)) &&
+          (await releasePreviewContinue.isVisible().catch(() => false)) &&
+          (await releasePreviewContinue.isEnabled().catch(() => false))
+        ) {
+          await releasePreviewContinue.click();
+          return 'releases';
+        }
+
+        if (
+          (await lateArrivalsHeading.isVisible().catch(() => false)) &&
+          (await lateArrivalsFinish.isVisible().catch(() => false)) &&
+          (await lateArrivalsFinish.isEnabled().catch(() => false))
+        ) {
+          await lateArrivalsFinish.click();
+          return 'late-arrivals';
+        }
+
+        return 'waiting';
+      },
+      { timeout: 120_000 }
+    )
+    .toMatch(/profile-ready|late-arrivals|releases|dashboard/);
 
   if (options.clerkUserId) {
     await expect
@@ -720,34 +726,7 @@ export async function ensureServerAuthenticated(
   }
 
   await setTestAuthBypassSession(page, null, clerkUserId);
-  const originalUrl = page.url();
-  try {
-    await waitForAuthenticatedHealth(page, clerkUserId);
-  } catch {
-    await smokeNavigateWithRetry(page, '/app', {
-      timeout: 45_000,
-      retries: 1,
-    });
-    await expect
-      .poll(() => page.url(), {
-        timeout: 15_000,
-        message:
-          'Auth bypass fallback should still land on an authenticated app surface',
-      })
-      .toMatch(/\/(?:app(?:\/|$)|onboarding(?:\/|\?|$))/);
-
-    if (
-      originalUrl &&
-      !originalUrl.startsWith('about:') &&
-      page.url() !== originalUrl
-    ) {
-      await page.goto(originalUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-    }
-    return;
-  }
+  await waitForAuthenticatedHealth(page, clerkUserId);
 }
 
 async function fetchOnboardingDiscoverySnapshot(
@@ -970,7 +949,10 @@ export async function ensureDbUser(
   email: string,
   knownSpotifyArtistIds: string[] = []
 ) {
-  const sql = neon(getTestDatabaseUrl('DB user creation'));
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
+
+  const sql = neon(dbUrl);
   await clearOnboardingRateLimits();
 
   // Release ALL test-linked Spotify artist IDs from previous test profiles.
@@ -1090,14 +1072,11 @@ export async function interceptTrackingCalls(page: Page) {
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
   const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
-  const username = `gp-${uniqueSeed}`
-    .replaceAll(/[^a-z0-9-]/gi, '')
-    .slice(0, 32);
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
     const clerkUserId = await ensureClerkTestUser({
       email,
-      username,
+      username: `gp-${uniqueSeed}`.replaceAll(/[^a-z0-9-]/gi, '').slice(0, 32),
       firstName: 'Golden',
       lastName: 'Path',
       metadata: { source: 'e2e-smoke-bypass' },
@@ -1140,34 +1119,6 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
   const loaded = await loadClerk();
 
   if (!loaded) {
-    const baseUrl =
-      process.env.BASE_URL ?? page.url() ?? 'http://localhost:3100';
-    const host = (() => {
-      try {
-        return new URL(baseUrl).hostname;
-      } catch {
-        return 'localhost';
-      }
-    })();
-    const isLoopbackHost = host === 'localhost' || host === '127.0.0.1';
-    const shouldUseLoopbackBypassFallback =
-      isLoopbackHost &&
-      (process.env.CI === 'true' ||
-        process.env.E2E_ENABLE_CLERK_BYPASS === 'true');
-
-    if (shouldUseLoopbackBypassFallback) {
-      const clerkUserId = await ensureClerkTestUser({
-        email,
-        username,
-        firstName: 'Golden',
-        lastName: 'Path',
-        metadata: { source: 'golden-path-loopback-fallback' },
-      });
-
-      await setTestAuthBypassSession(page, null, clerkUserId);
-      return { email, clerkUserId };
-    }
-
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
 

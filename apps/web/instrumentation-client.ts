@@ -33,7 +33,15 @@ import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
  * Export the router transition capture for Next.js App Router.
  * This is used by Next.js to track client-side navigation.
  */
-export const onRouterTransitionStart = captureRouterTransitionStart;
+export function onRouterTransitionStart(
+  ...args: Parameters<typeof captureRouterTransitionStart>
+) {
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
+    return;
+  }
+
+  captureRouterTransitionStart(...args);
+}
 
 /**
  * Initialize Sentry with the appropriate SDK variant based on the current route.
@@ -49,6 +57,11 @@ export const onRouterTransitionStart = captureRouterTransitionStart;
   // Skip Sentry in dev — adds bundle overhead with no benefit locally.
   // Cast needed: Next.js narrows NODE_ENV to "production" | "test" in client instrumentation.
   if ((process.env.NODE_ENV as string) !== 'production') {
+    return;
+  }
+
+  // CI preview health checks should not emit client monitoring traffic.
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
     return;
   }
 

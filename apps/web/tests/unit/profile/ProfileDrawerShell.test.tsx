@@ -32,6 +32,13 @@ vi.mock('vaul', () => ({
       readonly children: ReactNode;
       [key: string]: unknown;
     }) => <h2 {...props}>{children}</h2>,
+    Description: ({
+      children,
+      ...props
+    }: {
+      readonly children: ReactNode;
+      [key: string]: unknown;
+    }) => <p {...props}>{children}</p>,
   },
 }));
 
@@ -48,10 +55,10 @@ describe('ProfileDrawerShell', () => {
       </ProfileDrawerShell>
     );
 
-    const dialog = screen.getByRole('dialog', { name: 'Tour Dates' });
+    const dialog = screen.getByRole('dialog');
 
     expect(dialog).toBeInTheDocument();
-    expect(dialog).toHaveAttribute('aria-describedby');
+    expect(screen.getByRole('heading', { name: 'Tour Dates' })).toBeVisible();
     expect(
       screen.getByText('Upcoming shows and ticket links.')
     ).toBeInTheDocument();
