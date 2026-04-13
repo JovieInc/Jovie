@@ -5,6 +5,7 @@ import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
@@ -190,6 +191,7 @@ export default async function RootLayout({
       {children}
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
+      <InstantlyPixel />
     </>
   );
 

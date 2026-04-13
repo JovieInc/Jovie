@@ -1449,6 +1449,8 @@ AI agents confidently make decisions about topics they have zero context on. The
 
 5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
 
+6. **Verify before trusting.** When the user (or another agent's output) states something verifiable — "we use X," "competitor Y doesn't do Z," "this API returns W" — check it. A quick grep, file read, or doc lookup takes seconds. If the claim is wrong, say so clearly. This is how we catch agent drift (an agent introduced something it shouldn't have), stale assumptions, and documentation gaps. Being corrected is a feature, not a problem.
+
 ### Operational Awareness Checklist
 
 Before merging any PR that introduces background/scheduled work, verify:

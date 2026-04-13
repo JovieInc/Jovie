@@ -495,6 +495,48 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 
 ---
 
+## Full-Screen Status Screens
+
+All full-screen takeover screens (offline, global error, root error, public error fallback) share identical layout geometry to prevent layout shift when transitioning between states.
+
+| Property | Value | Notes |
+|----------|-------|-------|
+| Background | `#08090a` | Dark `--color-bg-base` |
+| Text primary | `#ffffff` | |
+| Text secondary | `#969799` | Descriptions |
+| Text quaternary | `#62666d` | Error IDs |
+| Logo | 32px white Jovie icon | `lg` in Logo.tsx scale |
+| Body | `min-height: 100dvh; flex center center; padding: 24px + safe-area` | |
+| Container | `max-width: 320px; width: 100%; flex column; align center; text center` | |
+| Font | Inter + system stack | `font-feature-settings: "cv01", "ss03"` |
+| Headline | 18px / weight 590 / -0.02em / line-height 1.3 | |
+| Description | 14px / weight 400 / line-height 1.5 | |
+| Error ID | 12px / weight 400 | |
+| Logo-to-headline gap | 20px | |
+| Headline-to-description | 8px | |
+| Description-to-buttons | 24px | |
+| Button gap | 12px | Flex row, never stacks |
+| Buttons-to-error-ID | 20px | |
+| Primary button | h-36px, px-16px, pill, bg `#e6e6e6`, text `#08090a` | Hover: `#ffffff` |
+| Secondary button | h-36px, px-16px, pill, transparent, border `white/8%` | |
+| Focus ring | 2px solid `#7170ff`, offset 2px | |
+
+**Rules:**
+- Logo is a quiet identity anchor, not a hero. 32px maximum on status screens.
+- No icons, illustrations, or decorative elements. Logo + text + buttons only.
+- Always dark mode (these screens can't access the theme system).
+- `offline.html` and `global-error.tsx` must be self-contained (no imports).
+- `app/error.tsx` uses inline SVG, not BrandLogo import (resilience over DRY).
+
+**Source files:**
+- `apps/web/public/offline.html` (static HTML)
+- `apps/web/app/global-error.tsx` (React, inline CSS)
+- `apps/web/components/providers/PublicPageErrorFallback.tsx` (React, inline styles)
+- `apps/web/app/error.tsx` (React, Tailwind)
+- `apps/web/public/sw.js` (service worker, bump `CACHE_NAME` when updating offline.html)
+
+---
+
 ## Text Casing
 
 | Context | Convention | Example |

@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 /**
  * llms-full.txt — Extended AI-readable site documentation (llmstxt.org standard).
@@ -94,9 +95,10 @@ AI that knows your actual career data:
 
 ## Pricing
 
-- **Free tier**: Create a profile, add releases, collect fans — no credit card required
-- **Pro tier**: Advanced analytics, release notifications, export contacts, priority support
-- **Growth tier**: Team features, advanced audience tools (coming soon)
+- **Free tier**: Artist profile, smart links, basic analytics, 100 contacts — free forever
+- **Pro tier ($${PLAN_PRICES.pro.monthly}/mo)**: Fan notifications, unlimited contacts, CRM, export, advanced analytics, tipping, ad pixels, verified badge
+- **Max tier ($${PLAN_PRICES.max.monthly}/mo)**: Release plan generation, metadata agents, email campaigns, API access, team management, white-label
+- New accounts start with a 14-day Pro trial — no credit card required
 
 ## Key URLs
 

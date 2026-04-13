@@ -106,4 +106,8 @@ export const publicEnv = {
   get NEXT_PUBLIC_SENTRY_CSP_REPORT_URI() {
     return process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI || undefined;
   },
+  // Instantly.ai / Leadsy tracking pixel
+  get NEXT_PUBLIC_INSTANTLY_PIXEL_ID() {
+    return process.env.NEXT_PUBLIC_INSTANTLY_PIXEL_ID || undefined;
+  },
 } as const;
