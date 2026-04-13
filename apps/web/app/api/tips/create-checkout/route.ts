@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         handle: handle.toLowerCase(),
         profile_id: profileId,
+        platform_fee_cents: String(platformFeeCents),
         source: 'tip_checkout',
       },
       success_url: `${baseUrl}/${handle}/tip/thank-you?session_id={CHECKOUT_SESSION_ID}`,
