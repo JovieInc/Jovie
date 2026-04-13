@@ -439,54 +439,54 @@ export async function updateTask(
     .set({
       title: data.title ?? existingTask.title,
       description:
-        data.description !== undefined
-          ? data.description
-          : existingTask.description,
+        data.description === undefined
+          ? existingTask.description
+          : data.description,
       status: nextStatus,
       priority: data.priority ?? existingTask.priority,
       assigneeKind: data.assigneeKind ?? existingTask.assigneeKind,
       assigneeUserId:
-        data.assigneeUserId !== undefined
-          ? data.assigneeUserId
-          : existingTask.assigneeUserId,
+        data.assigneeUserId === undefined
+          ? existingTask.assigneeUserId
+          : data.assigneeUserId,
       agentType:
-        data.agentType !== undefined ? data.agentType : existingTask.agentType,
+        data.agentType === undefined ? existingTask.agentType : data.agentType,
       agentStatus: data.agentStatus ?? existingTask.agentStatus,
       agentInput:
-        data.agentInput !== undefined
-          ? data.agentInput
-          : existingTask.agentInput,
+        data.agentInput === undefined
+          ? existingTask.agentInput
+          : data.agentInput,
       agentOutput:
-        data.agentOutput !== undefined
-          ? data.agentOutput
-          : existingTask.agentOutput,
+        data.agentOutput === undefined
+          ? existingTask.agentOutput
+          : data.agentOutput,
       agentError:
-        data.agentError !== undefined
-          ? data.agentError
-          : existingTask.agentError,
+        data.agentError === undefined
+          ? existingTask.agentError
+          : data.agentError,
       releaseId:
-        data.releaseId !== undefined ? data.releaseId : existingTask.releaseId,
+        data.releaseId === undefined ? existingTask.releaseId : data.releaseId,
       parentTaskId:
-        data.parentTaskId !== undefined
-          ? data.parentTaskId
-          : existingTask.parentTaskId,
+        data.parentTaskId === undefined
+          ? existingTask.parentTaskId
+          : data.parentTaskId,
       category:
-        data.category !== undefined ? data.category : existingTask.category,
-      dueAt: data.dueAt !== undefined ? data.dueAt : existingTask.dueAt,
+        data.category === undefined ? existingTask.category : data.category,
+      dueAt: data.dueAt === undefined ? existingTask.dueAt : data.dueAt,
       scheduledFor:
-        data.scheduledFor !== undefined
-          ? data.scheduledFor
-          : existingTask.scheduledFor,
+        data.scheduledFor === undefined
+          ? existingTask.scheduledFor
+          : data.scheduledFor,
       startedAt:
-        data.startedAt !== undefined ? data.startedAt : existingTask.startedAt,
+        data.startedAt === undefined ? existingTask.startedAt : data.startedAt,
       completedAt,
       position: data.position ?? existingTask.position,
       sourceTemplateId:
-        data.sourceTemplateId !== undefined
-          ? data.sourceTemplateId
-          : existingTask.sourceTemplateId,
+        data.sourceTemplateId === undefined
+          ? existingTask.sourceTemplateId
+          : data.sourceTemplateId,
       metadata:
-        data.metadata !== undefined ? data.metadata : existingTask.metadata,
+        data.metadata === undefined ? existingTask.metadata : data.metadata,
       updatedAt: new Date(),
     })
     .where(eq(tasks.id, taskId))
