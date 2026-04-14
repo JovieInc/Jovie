@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
-import { HOME_STORY_ARTIST } from '@/features/home/home-scroll-scenes';
+import { HOME_PAGE_ARTIST } from '@/features/home/home-page-content';
 import { HOMEPAGE_PROFILE_PREVIEW_ARTIST } from '@/features/home/homepage-profile-preview-fixture';
 import { MOCK_ARTIST } from '@/features/home/phone-mode-content';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
@@ -25,9 +25,9 @@ describe('Tim White canonical mock identity', () => {
   });
 
   it('keeps the new homepage story artist aligned with the canonical profile', () => {
-    expect(HOME_STORY_ARTIST.name).toBe(TIM_WHITE_PROFILE.name);
-    expect(HOME_STORY_ARTIST.handle).toBe(TIM_WHITE_PROFILE.handle);
-    expect(HOME_STORY_ARTIST.avatarSrc).toBe(TIM_WHITE_PROFILE.avatarSrc);
+    expect(HOME_PAGE_ARTIST.name).toBe(TIM_WHITE_PROFILE.name);
+    expect(HOME_PAGE_ARTIST.handle).toBe(TIM_WHITE_PROFILE.handle);
+    expect(HOME_PAGE_ARTIST.avatarSrc).toBe(TIM_WHITE_PROFILE.avatarSrc);
   });
 
   it('keeps the homepage real-profile fixture aligned with the canonical profile', () => {

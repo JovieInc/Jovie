@@ -12,12 +12,6 @@ vi.mock('@/constants/app', async importOriginal => {
   };
 });
 
-vi.mock('@/features/home/claim-handle', () => ({
-  ClaimHandleForm: () => (
-    <div data-testid='claim-handle-form'>claim handle form</div>
-  ),
-}));
-
 vi.mock('@/features/home/StickyPhoneTour', () => ({
   StickyPhoneTour: (props: Record<string, unknown>) => (
     <div data-testid='sticky-phone-tour'>{String(props.introTitle ?? '')}</div>
@@ -35,8 +29,10 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
-    expect(screen.getByTestId('artist-profiles-cta-form')).toBeInTheDocument();
-    expect(screen.getByTestId('claim-handle-form')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
+      'Claim your profile.'
+    );
   });
 
   it('passes artist-profile modes to the phone tour', () => {

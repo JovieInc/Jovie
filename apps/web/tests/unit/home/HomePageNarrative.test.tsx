@@ -1,123 +1,105 @@
 import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
-import { HOME_STORY_SCENES } from '@/features/home/home-scroll-scenes';
 
-class MockIntersectionObserver {
-  observe = vi.fn();
-  disconnect = vi.fn();
-  unobserve = vi.fn();
-}
-
-const matchMediaMock = vi.fn().mockImplementation(() => ({
-  matches: false,
-  media: '(prefers-reduced-motion: reduce)',
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  onchange: null,
-  dispatchEvent: vi.fn(),
-}));
+vi.mock('@/lib/feature-flags/shared', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, SHOW_HOMEPAGE_SECTIONS: true },
+  };
+});
 
 describe('HomePageNarrative', () => {
-  const originalIntersectionObserver = globalThis.IntersectionObserver;
   const originalMatchMedia = globalThis.matchMedia;
 
   beforeAll(() => {
     // @ts-expect-error test shim
-    globalThis.IntersectionObserver = MockIntersectionObserver;
-    // @ts-expect-error test shim
-    globalThis.matchMedia = matchMediaMock;
+    globalThis.matchMedia = vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: '(prefers-reduced-motion: reduce)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      onchange: null,
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   afterAll(() => {
-    globalThis.IntersectionObserver = originalIntersectionObserver;
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the new hero, grouped chapters, lower sections, and final CTA', () => {
+  it('renders the 7-chapter section order', () => {
     render(<HomePageNarrative />);
 
-    const heading = screen.getAllByRole('heading', {
-      name: 'The link your music deserves.',
-    })[0];
-    const subhead = screen.getAllByText(
-      'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.'
-    )[0];
-    const vanityUrl = screen.getAllByTestId('homepage-hero-url-lockup')[0];
-    const primaryCta = screen.getAllByRole('link', {
-      name: 'Claim your profile',
-    })[0];
+    const hero = screen.getByTestId('homepage-hero');
+    const trust = screen.getByTestId('homepage-trust');
+    const ch1 = screen.getByTestId('homepage-chapter-1');
+    const ch2 = screen.getByTestId('homepage-chapter-2');
+    const ch3 = screen.getByTestId('homepage-chapter-3');
+    const philosophy = screen.getByTestId('homepage-spec-section');
+    const finalCta = screen.getByTestId('final-cta-headline');
 
-    expect(heading.compareDocumentPosition(subhead)).toBe(
+    expect(hero.compareDocumentPosition(ch1)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(subhead.compareDocumentPosition(vanityUrl)).toBe(
+    expect(ch1.compareDocumentPosition(ch2)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(vanityUrl.compareDocumentPosition(primaryCta)).toBe(
+    expect(ch2.compareDocumentPosition(trust)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-
-    expect(vanityUrl).toHaveTextContent('jov.ie/you');
-
-    expect(
-      screen.getAllByRole('heading', { name: HOME_STORY_SCENES[0].headline })
-    ).toHaveLength(2);
-    expect(
-      screen.getAllByRole('heading', {
-        name: 'Notify every fan every time.',
-      })
-    ).toHaveLength(2);
-    expect(
-      screen.getAllByRole('heading', { name: 'Get paid.' }).length
-    ).toBeGreaterThanOrEqual(2);
-    expect(
-      screen.getAllByRole('heading', { name: 'Say thanks.' }).length
-    ).toBeGreaterThan(0);
-
-    expect(
-      screen.getByRole('heading', { name: 'Keep the momentum going.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Keep every door open.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Opinionated where it counts.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Claim your profile.' })
-    ).toBeInTheDocument();
+    expect(trust.compareDocumentPosition(ch3)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(ch3.compareDocumentPosition(philosophy)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(philosophy.compareDocumentPosition(finalCta)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
   });
 
-  it('removes the old homepage framing', () => {
+  it('removes the old sections', () => {
     render(<HomePageNarrative />);
 
     expect(
-      screen.queryByRole('heading', { name: 'One link. Every release.' })
+      screen.queryByTestId('homepage-interstitial')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('homepage-one-profile-section')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('homepage-action-rail')
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', {
-        name: 'What one link should do.',
+        name: 'Algorithms reward consistency.',
       })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', {
-        name: 'Built for the release cycle.',
-      })
+      screen.queryByRole('heading', { name: 'Built into the link.' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders the final CTA with a single pill button', () => {
+    render(<HomePageNarrative />);
+
+    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
+      'Stay in the studio.'
+    );
+    expect(screen.getByTestId('final-cta-action')).toHaveTextContent(
+      'Start free trial'
+    );
+    expect(screen.queryByTestId('final-cta-secondary')).not.toBeInTheDocument();
   });
 
   it('keeps proof hidden by default', () => {
     render(<HomePageNarrative />);
-
     expect(screen.queryByTestId('homepage-live-proof')).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('homepage-secondary-cta')
-    ).not.toBeInTheDocument();
   });
 
   it('renders the proof slot when proof is enabled', () => {
@@ -127,7 +109,6 @@ describe('HomePageNarrative', () => {
         proofSection={<div data-testid='mock-proof-section'>proof</div>}
       />
     );
-
     expect(screen.getByTestId('mock-proof-section')).toBeInTheDocument();
   });
 });

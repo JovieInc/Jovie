@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -16,18 +16,36 @@ import {
   HOMEPAGE_PROFILE_SHOWCASE_STATES,
 } from './homepage-profile-preview-fixture';
 
+export type HomeProfileShowcasePresentation =
+  | 'full-phone'
+  | 'beauty-shot'
+  | 'drawer-crop'
+  | 'featured-card-crop'
+  | 'surface-card';
+
+export type HomeProfileShowcaseOverlayMode = 'auto' | 'hidden' | 'only';
+
+export type HomeProfileShowcaseCropAnchor =
+  | 'center'
+  | 'left'
+  | 'right'
+  | 'bottom';
+
 interface HomeProfileShowcaseProps {
   readonly stateId: ProfileShowcaseStateId;
   readonly compact?: boolean;
   readonly className?: string;
+  readonly presentation?: HomeProfileShowcasePresentation;
+  readonly overlayMode?: HomeProfileShowcaseOverlayMode;
+  readonly cropAnchor?: HomeProfileShowcaseCropAnchor;
 }
 
-function HomeProfileOverlay({
+function HomeProfileOverlayCard({
   stateId,
-  compact = false,
+  mode,
 }: Readonly<{
   stateId: ProfileShowcaseStateId;
-  compact?: boolean;
+  mode: 'absolute' | 'standalone';
 }>) {
   const overlay = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].previewOverlay;
 
@@ -35,9 +53,10 @@ function HomeProfileOverlay({
     return null;
   }
 
-  const shellClassName = compact
-    ? 'left-3 right-3 top-[4.75rem]'
-    : 'left-4 right-4 top-[5.5rem]';
+  const shellClassName =
+    mode === 'absolute'
+      ? 'homepage-showcase-overlay-card homepage-showcase-overlay-card-absolute'
+      : 'homepage-showcase-overlay-card homepage-showcase-overlay-card-standalone';
 
   if (overlay.kind === 'apple-pay') {
     return (
@@ -45,15 +64,15 @@ function HomeProfileOverlay({
         aria-hidden='true'
         data-testid='homepage-overlay-apple-pay'
         className={cn(
-          'pointer-events-none absolute z-20 rounded-[1.4rem] border border-white/12 bg-[linear-gradient(180deg,rgba(248,248,250,0.96),rgba(234,236,242,0.92))] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.38)]',
-          shellClassName
+          shellClassName,
+          'homepage-showcase-overlay-card-apple-pay'
         )}
       >
-        <div className='flex items-center justify-between'>
-          <p className='text-[13px] font-[620] tracking-[-0.02em] text-slate-900'>
+        <div className='flex items-center justify-between gap-3'>
+          <p className='text-[13px] font-[620] tracking-[-0.02em] text-slate-950'>
             {overlay.title}
           </p>
-          <span className='rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-[620] tracking-[0.08em] text-white'>
+          <span className='rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-[620] tracking-[0.08em] text-white'>
             Pay
           </span>
         </div>
@@ -74,8 +93,8 @@ function HomeProfileOverlay({
         aria-hidden='true'
         data-testid='homepage-overlay-thank-you'
         className={cn(
-          'pointer-events-none absolute z-20 rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,24,0.96),rgba(8,11,16,0.95))] p-4 text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)]',
-          shellClassName
+          shellClassName,
+          'homepage-showcase-overlay-card-thank-you'
         )}
       >
         <span className='inline-flex rounded-full bg-emerald-400/16 px-2.5 py-1 text-[10px] font-[620] tracking-[0.08em] text-emerald-300'>
@@ -84,7 +103,7 @@ function HomeProfileOverlay({
         <p className='mt-3 text-[19px] font-[650] tracking-[-0.04em] text-white'>
           {overlay.title}
         </p>
-        <p className='mt-2 text-[12px] leading-[1.6] text-white/66'>
+        <p className='mt-2 text-[12px] leading-[1.6] text-white/68'>
           {overlay.body}
         </p>
         <div className='mt-4 rounded-[1rem] border border-white/8 bg-white/[0.04] px-3 py-2.5 text-[11px] font-[560] text-white/76'>
@@ -98,12 +117,9 @@ function HomeProfileOverlay({
     <div
       aria-hidden='true'
       data-testid='homepage-overlay-email-preview'
-      className={cn(
-        'pointer-events-none absolute z-20 rounded-[1.1rem] border border-white/8 bg-[linear-gradient(180deg,rgba(19,24,31,0.96),rgba(9,12,17,0.95))] p-3.5 text-white shadow-[0_16px_44px_rgba(0,0,0,0.34)]',
-        shellClassName
-      )}
+      className={cn(shellClassName, 'homepage-showcase-overlay-card-email')}
     >
-      <div className='flex items-center justify-between gap-3'>
+      <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-[10px] font-[620] tracking-[0.08em] text-sky-300/88'>
             {overlay.accentLabel}
@@ -137,14 +153,70 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
   }
 }
 
+function ShowcaseSurface({
+  stateId,
+}: Readonly<{
+  stateId: ProfileShowcaseStateId;
+}>) {
+  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
+
+  return (
+    <div className='homepage-showcase-surface relative h-full w-full bg-black/96'>
+      <ProfileCompactSurface
+        dataTestId='homepage-profile-preview'
+        renderMode='preview'
+        presentation='embedded'
+        artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+        socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
+        contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+        latestRelease={getLatestRelease(state.id)}
+        profileSettings={{ showOldReleases: true }}
+        genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres ?? []}
+        photoDownloadSizes={[]}
+        pressPhotos={[]}
+        allowPhotoDownloads={false}
+        tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
+        showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
+        drawerOpen={state.drawerView !== null}
+        drawerView={state.drawerView ?? 'menu'}
+        onDrawerOpenChange={() => {}}
+        onDrawerViewChange={() => {}}
+        onOpenMenu={() => {}}
+        onPlayClick={() => {}}
+        onShare={() => {}}
+        profileHref={`/${HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle}`}
+        artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
+        isSubscribed={
+          state.id === 'fans-confirmed' ||
+          state.id === 'fans-song-alert' ||
+          state.id === 'fans-show-alert'
+        }
+        onTogglePref={() => {}}
+        onUnsubscribe={() => {}}
+        onManageNotifications={() => {}}
+        onRegisterReveal={() => {}}
+        onRevealNotifications={() => {}}
+        previewNotificationsState={state.notifications}
+        previewReleaseActionLabel={state.releaseActionLabel}
+      />
+    </div>
+  );
+}
+
 export function HomeProfileShowcase({
   stateId,
   compact = false,
   className,
+  presentation = 'full-phone',
+  overlayMode = 'auto',
+  cropAnchor = 'center',
 }: Readonly<HomeProfileShowcaseProps>) {
-  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const reducedMotion = useReducedMotion();
   const inertRef = useRef<HTMLDivElement>(null);
+  const shouldRenderSurface = overlayMode !== 'only';
+  const shouldRenderOverlay =
+    overlayMode !== 'hidden' &&
+    HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].previewOverlay;
 
   useEffect(() => {
     const node = inertRef.current;
@@ -152,67 +224,55 @@ export function HomeProfileShowcase({
       return;
     }
 
-    // scene id -> shared showcase state -> shared public-profile renderer
     node.inert = true;
   }, []);
+
+  let content: ReactNode = null;
+
+  if (presentation === 'full-phone' || presentation === 'beauty-shot') {
+    content = (
+      <HomePhoneFrame
+        compact={compact}
+        className='homepage-showcase-phone-frame'
+      >
+        {shouldRenderSurface ? <ShowcaseSurface stateId={stateId} /> : null}
+        {shouldRenderOverlay ? (
+          <HomeProfileOverlayCard stateId={stateId} mode='absolute' />
+        ) : null}
+      </HomePhoneFrame>
+    );
+  } else if (shouldRenderSurface) {
+    content = (
+      <div className='homepage-showcase-crop-viewport'>
+        <div className='homepage-showcase-crop-surface'>
+          <ShowcaseSurface stateId={stateId} />
+        </div>
+        {shouldRenderOverlay ? (
+          <HomeProfileOverlayCard stateId={stateId} mode='absolute' />
+        ) : null}
+      </div>
+    );
+  } else if (shouldRenderOverlay) {
+    content = <HomeProfileOverlayCard stateId={stateId} mode='standalone' />;
+  }
 
   return (
     <div
       ref={inertRef}
       aria-hidden='true'
       inert
+      data-testid={`homepage-phone-state-${stateId}`}
+      data-motion-mode={reducedMotion ? 'reduced' : 'default'}
+      data-presentation={presentation}
+      data-overlay-mode={overlayMode}
+      data-crop-anchor={cropAnchor}
       className={cn(
-        'pointer-events-none select-none',
+        'homepage-showcase pointer-events-none select-none',
         reducedMotion ? 'motion-reduce' : 'motion-default',
         className
       )}
-      data-motion-mode={reducedMotion ? 'reduced' : 'default'}
-      data-testid={`homepage-phone-state-${state.id}`}
     >
-      <HomePhoneFrame compact={compact}>
-        <div className='relative h-full w-full bg-black/96'>
-          <ProfileCompactSurface
-            dataTestId='homepage-profile-preview'
-            renderMode='preview'
-            presentation='embedded'
-            artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
-            socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
-            contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
-            latestRelease={getLatestRelease(state.id)}
-            profileSettings={{ showOldReleases: true }}
-            genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres ?? []}
-            photoDownloadSizes={[]}
-            pressPhotos={[]}
-            allowPhotoDownloads={false}
-            tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
-            showSubscriptionConfirmedBanner={
-              state.showSubscriptionConfirmedBanner
-            }
-            drawerOpen={state.drawerView !== null}
-            drawerView={state.drawerView ?? 'menu'}
-            onDrawerOpenChange={() => {}}
-            onDrawerViewChange={() => {}}
-            onOpenMenu={() => {}}
-            onPlayClick={() => {}}
-            onShare={() => {}}
-            profileHref={`/${HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle}`}
-            artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
-            isSubscribed={
-              state.id === 'fans-confirmed' ||
-              state.id === 'fans-song-alert' ||
-              state.id === 'fans-show-alert'
-            }
-            onTogglePref={() => {}}
-            onUnsubscribe={() => {}}
-            onManageNotifications={() => {}}
-            onRegisterReveal={() => {}}
-            onRevealNotifications={() => {}}
-            previewNotificationsState={state.notifications}
-            previewReleaseActionLabel={state.releaseActionLabel}
-          />
-          <HomeProfileOverlay stateId={stateId} compact={compact} />
-        </div>
-      </HomePhoneFrame>
+      {content}
     </div>
   );
 }

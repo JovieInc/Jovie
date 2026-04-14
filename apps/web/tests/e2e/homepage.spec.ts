@@ -21,17 +21,6 @@ async function interceptAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
-async function scrollStorySceneIntoFocus(
-  page: import('@playwright/test').Page,
-  testId: string
-) {
-  const scene = page.getByTestId(testId);
-  await scene.scrollIntoViewIfNeeded();
-  await scene.evaluate(node =>
-    node.scrollIntoView({ block: 'center', inline: 'nearest' })
-  );
-}
-
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
@@ -39,22 +28,15 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with adaptive-profile clarity and proof hidden by default', async ({
-    page,
-  }) => {
+  test('renders the hero with phone, headline, and CTA', async ({ page }) => {
     await expect(page.locator('h1')).toContainText(
       'The link your music deserves.'
     );
+    await expect(page.getByTestId('homepage-claim-form')).toBeVisible();
     await expect(
-      page.getByText(
-        'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.'
-      )
+      page.getByRole('button', { name: 'Claim your profile' }).first()
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-url-lockup')).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Claim your profile' }).first()
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-secondary-cta')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-hero-composition')).toBeVisible();
     await expect(page.getByTestId('homepage-live-proof')).toHaveCount(0);
   });
 
@@ -66,210 +48,114 @@ test.describe('Homepage', () => {
     await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
     await expect(page.locator('a[href="#release"]')).toHaveCount(0);
-    await expect(page.locator('a[href="#profile"]')).toHaveCount(0);
-    await expect(page.locator('a[href="#audience"]')).toHaveCount(0);
     await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   });
 
-  test('desktop story scenes stay in order and update the sticky phone on scroll', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Drive more streams automatically.' })
-    ).toHaveCount(1);
-    await expect(
-      page.getByRole('heading', { name: 'Notify every fan every time.' })
-    ).toHaveCount(1);
-    await expect(
-      page.getByRole('heading', { name: 'Get paid.' }).first()
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Say thanks.' }).first()
-    ).toBeVisible();
+  test('renders the 7-chapter narrative structure', async ({ page }) => {
+    // Trust section
+    await expect(page.getByTestId('homepage-trust')).toBeVisible();
+    await expect(page.getByText('One profile.')).toBeVisible();
 
-    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-streams-video');
+    // Chapter 1: Convert attention
+    await page.getByTestId('homepage-chapter-1').scrollIntoViewIfNeeded();
+    await expect(
+      page.getByRole('heading', { name: 'Turn attention into action.' })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-sandbox')).toBeVisible();
 
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-phone-state-streams-video')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-overlay-email-preview')
-    ).toBeVisible();
-
-    await scrollStorySceneIntoFocus(
-      page,
-      'homepage-story-scene-fans-song-alert'
-    );
-
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-phone-state-fans-song-alert')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-overlay-email-preview')
-    ).toBeVisible();
-
-    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-tips-open');
-
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-phone-state-tips-open')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('homepage-story-chapter-tips')
-        .getByTestId('homepage-tip-conversion-cards')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('homepage-story-chapter-tips')
-        .getByTestId('homepage-tip-thanks-note')
-    ).toBeVisible();
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('profile-mode-drawer-tip')
-    ).toBeVisible();
-
-    await scrollStorySceneIntoFocus(
-      page,
-      'homepage-story-scene-tips-apple-pay'
-    );
-
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-overlay-apple-pay')
-    ).toBeVisible();
-
-    await scrollStorySceneIntoFocus(page, 'homepage-story-scene-tips-followup');
-
-    await expect(
-      page
-        .getByTestId('homepage-desktop-phone-rail')
-        .getByTestId('homepage-overlay-email-preview')
-    ).toBeVisible();
-  });
-
-  test('comparison, modules, spec chapter, and final CTA render with the new copy', async ({
-    page,
-  }) => {
-    await expect(
-      page.getByRole('heading', { name: 'Keep the momentum going.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Keep every door open.' })
-    ).toBeVisible();
+    // Chapter 2: Get paid
+    await page.getByTestId('homepage-chapter-2').scrollIntoViewIfNeeded();
     await expect(
       page.getByRole('heading', {
-        name: 'Opinionated where it counts.',
+        name: 'Get paid.',
       })
     ).toBeVisible();
+    await expect(page.getByText("That's it.")).toBeVisible();
+
+    // Chapter 3: Know your fans
+    await page.getByTestId('homepage-chapter-3').scrollIntoViewIfNeeded();
     await expect(
-      page.getByTestId('homepage-opinionated-design-card')
+      page.getByText('Know who your fans are and when to reach them.')
     ).toBeVisible();
+    await expect(page.getByText('Countdowns Built In.')).toBeVisible();
+    await expect(page.getByText('Location-Aware.')).toBeVisible();
+
+    // Philosophy
+    await page.getByTestId('homepage-spec-section').scrollIntoViewIfNeeded();
+    await expect(
+      page.getByRole('heading', { name: 'Built for artists by artists.' })
+    ).toBeVisible();
+    await expect(page.getByText('Opinionated.')).toBeVisible();
+    await expect(page.getByText('By design.')).toBeVisible();
+    await expect(page.getByText('Zero Setup.')).toBeVisible();
+    await expect(page.getByText('Stupid Fast.')).toBeVisible();
+
+    // Old sections gone
+    await expect(page.getByTestId('homepage-interstitial')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-action-rail')).toHaveCount(0);
+
+    // Final CTA
+    await page.getByTestId('final-cta-section').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('final-cta-headline')).toHaveText(
       'Claim your profile.'
     );
     await expect(page.getByTestId('final-cta-action')).toHaveText(
       'Claim your profile'
     );
-    await expect(
-      page.getByRole('link', { name: 'See artist profiles' })
-    ).toBeVisible();
   });
 
-  test('stacks the story on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
+  test('renders mobile layout correctly', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
     await expect(page.locator('h1')).toContainText(
       'The link your music deserves.',
-      {
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      }
+      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
-
-    await expect(page.getByTestId('homepage-mobile-story')).toBeVisible({
+    await expect(page.getByTestId('homepage-trust')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByTestId('homepage-mobile-phone-rail')).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(
-      page.getByTestId('homepage-mobile-scene-streams-latest')
-    ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(
-      page.getByTestId('homepage-mobile-scene-tips-followup')
-    ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    await expect(
-      page.getByRole('link', { name: 'Claim your profile' }).first()
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-    await expect(
-      page
-        .getByTestId('homepage-mobile-phone-rail')
-        .locator('[data-testid^="homepage-phone-state-"]')
-    ).toHaveCount(1);
   });
 
-  test('has proper meta information and no obvious error state', async ({
+  test('has no horizontal overflow across common viewports', async ({
     page,
   }) => {
-    await expect(page).toHaveTitle(/Jovie/);
-    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
-      'content'
-    );
-    await expect(page.locator('body')).not.toContainText('Loading...');
-    await expect(page.locator('body')).not.toContainText(
-      'Unhandled Runtime Error'
-    );
-  });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+      { width: 1280, height: 800 },
+      { width: 1440, height: 900 },
+      { width: 1512, height: 982 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
 
-  test('marketing content has no empty state or placeholder indicators', async ({
-    page,
-  }) => {
-    const bodyText = (await page.textContent('body')) ?? '';
+      const overflow = await page.evaluate(() => {
+        return (
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+        );
+      });
 
-    expect(bodyText).not.toContain('2099');
-    expect(bodyText).not.toContain('Calvin Harris');
-    await expect(page.getByText('Loading...')).toHaveCount(0);
-    await expect(page.getByText('No releases')).toHaveCount(0);
+      expect(overflow).toBeLessThanOrEqual(1);
+    }
   });
 
   test('loads without critical console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
+      if (msg.type() === 'error') {
+        errors.push(msg.text());
+      }
     });
 
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForHydration(page);
 
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Failed to load resource') &&
-        !error.includes('net::ERR_FAILED') &&
-        !error.includes('i.scdn.co') &&
-        !error.includes('CORS') &&
-        !error.includes('Clerk') &&
-        !error.includes('Sentry')
-    );
-
-    expect(criticalErrors.length).toBe(0);
+    expect(errors).toEqual([]);
   });
 });

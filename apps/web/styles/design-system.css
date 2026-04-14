@@ -480,12 +480,12 @@
     rgba(255, 255, 255, 0.02) 36%,
     transparent 100%
   );
-  --profile-pearl-bg: rgba(255, 255, 255, 0.07);
-  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.11);
-  --profile-pearl-bg-active: rgba(255, 255, 255, 0.16);
-  --profile-pearl-border: rgba(255, 255, 255, 0.1);
+  --profile-pearl-bg: rgba(255, 255, 255, 0.12);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
+  --profile-pearl-border: rgba(255, 255, 255, 0.16);
   --profile-pearl-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 28px rgba(0, 0, 0, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
   --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
   --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
   --profile-composer-bg: rgba(255, 255, 255, 0.08);

@@ -1,10 +1,11 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import { MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { ClaimHandleForm } from '@/features/home/claim-handle';
+import { FinalCallToAction } from '@/features/home/HomePageNarrative';
+import { HOME_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
 import { ARTIST_PROFILE_MODES } from './artist-profile-modes';
@@ -117,49 +118,7 @@ export default function ArtistProfilesPage() {
       />
 
       {/* ── Final CTA ── */}
-      <section
-        className='section-glow section-glow-cta relative z-10 overflow-hidden'
-        style={{
-          borderTop: '1px solid var(--linear-border-subtle)',
-          paddingTop: 'var(--linear-cta-section-pt)',
-          paddingBottom: 'var(--linear-cta-section-pb)',
-        }}
-      >
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
-          style={{
-            width: '600px',
-            height: '400px',
-            background:
-              'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.3), transparent 65%)',
-            filter: 'blur(40px)',
-          }}
-        />
-
-        <MarketingContainer width='landing'>
-          <div className='relative mx-auto max-w-[38rem] text-center'>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Claim your profile now.
-            </h2>
-
-            <p className='mt-4 text-[15px] leading-[1.6] text-secondary-token sm:text-[16px]'>
-              One link that adapts to every release, tour, and campaign.
-            </p>
-
-            <div
-              data-testid='artist-profiles-cta-form'
-              className='mx-auto mt-7 w-full max-w-[27rem]'
-            >
-              <ClaimHandleForm />
-            </div>
-
-            <p className='mt-5 text-[10px] tracking-[0.01em] text-quaternary-token'>
-              Free forever.
-            </p>
-          </div>
-        </MarketingContainer>
-      </section>
+      <FinalCallToAction content={HOME_FINAL_CTA_CONTENT} />
     </MarketingPageShell>
   );
 }

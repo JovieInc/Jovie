@@ -89,6 +89,9 @@ export const FEATURE_FLAGS = {
   /** Final CTA section on marketing homepage */
   SHOW_FINAL_CTA: true,
 
+  /** Homepage sections below the hero (chapters, notify, bento, spec, CTA) */
+  SHOW_HOMEPAGE_SECTIONS: false,
+
   /** Filter and display toolbar buttons on the releases page. */
   SHOW_RELEASE_TOOLBAR_EXTRAS: false,
 
@@ -124,6 +127,7 @@ export const CODE_FLAG_KEYS = {
   SHOW_LOGO_BAR: 'code:SHOW_LOGO_BAR',
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
   SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
+  SHOW_HOMEPAGE_SECTIONS: 'code:SHOW_HOMEPAGE_SECTIONS',
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
 } as const satisfies Record<CodeFlagName, string>;

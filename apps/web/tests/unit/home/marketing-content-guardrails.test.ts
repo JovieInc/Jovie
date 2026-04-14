@@ -8,19 +8,19 @@ import {
 } from '@/features/home/home-surface-seed';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
-class MockIntersectionObserver {
-  observe = vi.fn();
-  disconnect = vi.fn();
-  unobserve = vi.fn();
-}
+vi.mock('@/lib/feature-flags/shared', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, SHOW_HOMEPAGE_SECTIONS: true },
+  };
+});
 
 describe('Marketing content guardrails', () => {
-  const originalIntersectionObserver = globalThis.IntersectionObserver;
   const originalMatchMedia = globalThis.matchMedia;
 
   beforeAll(() => {
-    // @ts-expect-error test shim
-    globalThis.IntersectionObserver = MockIntersectionObserver;
     // @ts-expect-error test shim
     globalThis.matchMedia = vi.fn().mockImplementation(() => ({
       matches: false,
@@ -35,7 +35,6 @@ describe('Marketing content guardrails', () => {
   });
 
   afterAll(() => {
-    globalThis.IntersectionObserver = originalIntersectionObserver;
     globalThis.matchMedia = originalMatchMedia;
   });
 
@@ -77,21 +76,41 @@ describe('Marketing content guardrails', () => {
   });
 
   describe('homepage copy guardrails', () => {
-    it('keeps banned broad-framing language off the homepage narrative', () => {
+    it('keeps banned jargon and weak framing off the homepage narrative', () => {
       const { container } = render(createElement(HomePageNarrative));
       const text = container.textContent?.toLowerCase() ?? '';
 
-      expect(text).not.toContain('platform');
       expect(text).not.toContain('command center');
       expect(text).not.toContain('all-in-one');
       expect(text).not.toContain('workflow');
       expect(text).not.toContain('creator career');
       expect(text).not.toContain('release moment');
-      expect(text).not.toContain('generic funnel');
-      expect(text).not.toContain('runs itself underneath');
-      expect(text).not.toContain('artist-branded notifications');
-      expect(text).not.toContain('crush every release');
-      expect(text).not.toContain('more ways it works');
+      expect(text).not.toContain('campaign build');
+      expect(text).not.toContain('automatic switching');
+      expect(text).not.toContain('should not require');
+      expect(text).not.toContain('can become');
+      expect(text).not.toContain('dsp order');
+      expect(text).not.toContain('social order');
+      expect(text).not.toContain('support connected');
+      expect(text).not.toContain('support, and business');
+      expect(text).not.toContain('keep the momentum going');
+      expect(text).not.toContain("see who's paying attention");
+      expect(text).not.toContain("see who's paying attention");
+      expect(text).not.toContain('automatic by default');
+      expect(text).not.toContain('location-aware by default');
+    });
+
+    it('includes the locked homepage copy', () => {
+      const { container } = render(createElement(HomePageNarrative));
+      const text = container.textContent ?? '';
+
+      expect(text).toContain('Built for artists by artists');
+      expect(text).toContain('Zero Setup.');
+      expect(text).toContain('Know Every Fan by Name.');
+      expect(text).toContain('Stupid Fast.');
+      expect(text).toContain('Location-Aware.');
+      expect(text).toContain('Turn attention into action.');
+      expect(text).toContain('Get paid.');
     });
   });
 });

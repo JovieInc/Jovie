@@ -1,233 +1,100 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
-import {
-  HomeAdaptiveProfileStory,
-  type ObservedSceneState,
-  selectActiveSceneId,
-} from '@/features/home/HomeAdaptiveProfileStory';
+import { render, screen } from '@testing-library/react';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { HomeAdaptiveProfileStory } from '@/features/home/HomeAdaptiveProfileStory';
 
-const motionState = vi.hoisted(() => ({ reduced: false }));
-
-vi.mock('@/lib/hooks/useReducedMotion', () => ({
-  useReducedMotion: () => motionState.reduced,
-}));
-
-class MockIntersectionObserver {
-  static instances: MockIntersectionObserver[] = [];
-
-  observe = vi.fn();
-  disconnect = vi.fn();
-  unobserve = vi.fn();
-  readonly callback: IntersectionObserverCallback;
-
-  constructor(callback: IntersectionObserverCallback) {
-    this.callback = callback;
-    MockIntersectionObserver.instances.push(this);
-  }
-
-  emit(entries: readonly Partial<IntersectionObserverEntry>[]) {
-    this.callback(
-      entries as IntersectionObserverEntry[],
-      this as unknown as IntersectionObserver
-    );
-  }
-}
+vi.mock('@/lib/feature-flags/shared', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: { ...actual.FEATURE_FLAGS, SHOW_HOMEPAGE_SECTIONS: true },
+  };
+});
 
 describe('HomeAdaptiveProfileStory', () => {
-  const originalIntersectionObserver = globalThis.IntersectionObserver;
+  const originalMatchMedia = globalThis.matchMedia;
 
   beforeAll(() => {
     // @ts-expect-error test shim
-    globalThis.IntersectionObserver = MockIntersectionObserver;
+    globalThis.matchMedia = vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: '(prefers-reduced-motion: reduce)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      onchange: null,
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   afterAll(() => {
-    globalThis.IntersectionObserver = originalIntersectionObserver;
+    globalThis.matchMedia = originalMatchMedia;
   });
 
-  beforeEach(() => {
-    motionState.reduced = false;
-    MockIntersectionObserver.instances = [];
-  });
-
-  it('hides the secondary CTA when proof is unavailable', () => {
-    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
+  it('renders the hero with phone render, headline, and pill CTA', () => {
+    render(<HomeAdaptiveProfileStory />);
 
     expect(
-      screen.queryByTestId('homepage-secondary-cta')
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows the secondary CTA and proof anchor when proof is available', () => {
-    render(<HomeAdaptiveProfileStory proofAvailability='visible' />);
-
-    for (const cta of screen.getAllByTestId('homepage-secondary-cta')) {
-      expect(cta).toHaveAttribute('href', '#homepage-live-proof');
-    }
-  });
-
-  it('disables animated phone transitions in reduced-motion mode', () => {
-    motionState.reduced = true;
-
-    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
-
-    for (const panel of screen.getAllByTestId(
-      'homepage-phone-state-streams-latest'
-    )) {
-      expect(panel).toHaveAttribute('data-motion-mode', 'reduced');
-    }
-  });
-
-  it('updates the desktop phone state when a later scene becomes active', async () => {
-    const { container } = render(
-      <HomeAdaptiveProfileStory proofAvailability='hidden' />
-    );
-
-    const desktopRail = screen.getByTestId('homepage-desktop-phone-rail');
-    expect(
-      within(desktopRail).getByTestId('homepage-phone-state-streams-latest')
+      screen.getByRole('heading', {
+        name: 'The link your music deserves.',
+      })
     ).toBeInTheDocument();
-
-    const targetScene = screen.getByTestId(
-      'homepage-story-scene-streams-video'
-    );
-    await waitFor(() => {
-      expect(MockIntersectionObserver.instances.length).toBeGreaterThan(0);
-    });
-
-    const observer = MockIntersectionObserver.instances.at(-1);
-
-    act(() => {
-      observer?.emit([
-        {
-          target: targetScene,
-          isIntersecting: true,
-          intersectionRatio: 0.72,
-          boundingClientRect: {
-            top: 18,
-          } as DOMRectReadOnly,
-        },
-      ]);
-    });
-
-    await waitFor(() => {
-      expect(
-        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
-      ).toBeInTheDocument();
-    });
-
     expect(
-      container.querySelector(
-        '[data-testid="homepage-desktop-phone-rail"] [data-testid="homepage-phone-state-streams-video"]'
+      screen.getByText(
+        'Streams, drops, tips, bookings, and fan capture in a single page.'
       )
-    ).toBeTruthy();
-  });
-
-  it('keeps the strongest active scene when later callbacks only update weaker overlaps', async () => {
-    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
-
-    const desktopRail = screen.getByTestId('homepage-desktop-phone-rail');
-    const strongestScene = screen.getByTestId(
-      'homepage-story-scene-streams-video'
-    );
-    const weakerScene = screen.getByTestId(
-      'homepage-story-scene-streams-presave'
-    );
-
-    await waitFor(() => {
-      expect(MockIntersectionObserver.instances.length).toBeGreaterThan(0);
-    });
-
-    const observer = MockIntersectionObserver.instances.at(-1);
-
-    act(() => {
-      observer?.emit([
-        {
-          target: strongestScene,
-          isIntersecting: true,
-          intersectionRatio: 0.72,
-          boundingClientRect: {
-            top: 18,
-          } as DOMRectReadOnly,
-        },
-      ]);
-    });
-
-    await waitFor(() => {
-      expect(
-        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
-      ).toBeInTheDocument();
-    });
-
-    act(() => {
-      observer?.emit([
-        {
-          target: weakerScene,
-          isIntersecting: true,
-          intersectionRatio: 0.21,
-          boundingClientRect: {
-            top: -24,
-          } as DOMRectReadOnly,
-        },
-      ]);
-    });
-
-    await waitFor(() => {
-      expect(
-        within(desktopRail).getByTestId('homepage-phone-state-streams-video')
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('renders one shared phone instance for the mobile story rail', () => {
-    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
-
-    const mobileRail = screen.getByTestId('homepage-mobile-phone-rail');
-    expect(
-      within(mobileRail).getAllByTestId('homepage-phone-state-streams-latest')
-    ).toHaveLength(1);
-  });
-
-  it('renders the tip conversion cards inside the story rail', () => {
-    render(<HomeAdaptiveProfileStory proofAvailability='hidden' />);
-
-    expect(
-      screen.getAllByTestId('homepage-tip-conversion-cards')[0]
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Say thanks.').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Thanks for the tip').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
+    expect(screen.getByText('jov.ie/')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Claim your profile' })
+    ).toBeInTheDocument();
+
+    expect(screen.getByTestId('homepage-hero-composition')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('homepage-phone-state-catalog')
+    ).toBeInTheDocument();
   });
 
-  it('selects the intersecting scene closest to the focus line', () => {
-    const scenes: ObservedSceneState[] = [
-      {
-        sceneId: 'streams-latest',
-        isIntersecting: true,
-        intersectionRatio: 0.45,
-        top: 74,
-      },
-      {
-        sceneId: 'streams-video',
-        isIntersecting: true,
-        intersectionRatio: 0.7,
-        top: 8,
-      },
-      {
-        sceneId: 'tips-open',
-        isIntersecting: false,
-        intersectionRatio: 0.9,
-        top: -18,
-      },
-    ];
+  it('renders the trust logo strip', () => {
+    render(<HomeAdaptiveProfileStory />);
 
-    expect(selectActiveSceneId(scenes, 'streams-latest')).toBe('streams-video');
+    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+  });
+
+  it('renders chapter 1 with sandbox card', () => {
+    render(<HomeAdaptiveProfileStory />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Turn attention into action.' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-sandbox')).toBeInTheDocument();
+  });
+
+  it('renders chapter 2 with tip bento card', () => {
+    render(<HomeAdaptiveProfileStory />);
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Get paid.',
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByText("That's it.")).toBeInTheDocument();
+  });
+
+  it('does not render old sections', () => {
+    const { container } = render(<HomeAdaptiveProfileStory />);
+
+    expect(
+      screen.queryByTestId('homepage-interstitial')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('homepage-action-rail')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('homepage-notifications-section')
+    ).not.toBeInTheDocument();
+    expect(container.querySelector('.homepage-primary-progress')).toBeNull();
   });
 });

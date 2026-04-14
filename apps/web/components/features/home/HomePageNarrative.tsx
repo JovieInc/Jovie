@@ -2,14 +2,20 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { fillToMinimum } from './featured-creators-fallback';
 import { HomeAdaptiveProfileStory } from './HomeAdaptiveProfileStory';
-import { HomeBaselineComparisonSection } from './HomeBaselineComparisonSection';
+import { HomeAutoNotifySection } from './HomeAutoNotifySection';
+import { HomeChapter3 } from './HomeChapter3';
+import { HomeEngageBentoSection } from './HomeEngageBentoSection';
 import { HomeLiveProofSection } from './HomeLiveProofSection';
-import { HomeSecondaryOutcomeModules } from './HomeSecondaryOutcomeModules';
 import { HomeSpecChapter } from './HomeSpecChapter';
-import { type HomeProofAvailability } from './home-scroll-scenes';
+import {
+  HOMEPAGE_FINAL_CTA_CONTENT,
+  type HomeFinalCtaContent,
+  type HomeProofAvailability,
+} from './home-page-content';
 
 interface HomePageNarrativeProps {
   readonly proofAvailability?: HomeProofAvailability;
@@ -17,39 +23,36 @@ interface HomePageNarrativeProps {
   readonly proofCreators?: readonly FeaturedCreator[];
 }
 
-function FinalCallToAction() {
+export interface FinalCallToActionProps {
+  readonly content?: HomeFinalCtaContent;
+}
+
+export function FinalCallToAction({
+  content = HOMEPAGE_FINAL_CTA_CONTENT,
+}: FinalCallToActionProps) {
   return (
     <section
       data-testid='final-cta-section'
-      className='border-t border-subtle bg-page py-24 sm:py-28 lg:py-32'
+      className='homepage-final-cta-section'
       aria-labelledby='final-cta-headline'
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-[34rem] text-center'>
+        <div className='mx-auto max-w-[1200px] text-center'>
           <h2
             id='final-cta-headline'
             data-testid='final-cta-headline'
-            className='marketing-h2-linear text-primary-token'
+            className='marketing-h1-linear mx-auto text-primary-token'
           >
-            Claim your profile.
+            {content.title}
           </h2>
-          <p className='mt-4 text-[15px] leading-[1.7] text-secondary-token sm:text-[16px]'>
-            One profile for every release.
-          </p>
-
+          <p className='homepage-final-cta-body'>{content.body}</p>
           <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
             <Link
               href={APP_ROUTES.SIGNUP}
               data-testid='final-cta-action'
-              className='public-action-primary focus-ring-themed'
+              className='homepage-pill-primary focus-ring-themed'
             >
-              Claim your profile
-            </Link>
-            <Link
-              href={APP_ROUTES.ARTIST_PROFILES}
-              className='public-action-secondary focus-ring-themed'
-            >
-              See artist profiles
+              {content.primaryCtaLabel}
             </Link>
           </div>
         </div>
@@ -71,14 +74,21 @@ export function HomePageNarrative({
     <HomeLiveProofSection creators={fallbackProofCreators} />
   );
 
+  const showSections = FEATURE_FLAGS.SHOW_HOMEPAGE_SECTIONS;
+
   return (
     <>
-      <HomeAdaptiveProfileStory proofAvailability={proofAvailability} />
-      <HomeBaselineComparisonSection />
-      <HomeSecondaryOutcomeModules />
-      <HomeSpecChapter />
-      {proofAvailability === 'visible' ? resolvedProofSection : null}
-      <FinalCallToAction />
+      <HomeAdaptiveProfileStory />
+      {showSections && (
+        <>
+          <HomeAutoNotifySection />
+          <HomeEngageBentoSection />
+          <HomeChapter3 />
+          <HomeSpecChapter />
+          {proofAvailability === 'visible' ? resolvedProofSection : null}
+          <FinalCallToAction />
+        </>
+      )}
     </>
   );
 }

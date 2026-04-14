@@ -140,7 +140,7 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close drawer overlay'
-          className='absolute inset-0 z-10 bg-black/48 backdrop-blur-sm'
+          className='fixed inset-0 z-10 bg-black/48 backdrop-blur-sm'
           onClick={() => onOpenChange(false)}
         />
         <div
