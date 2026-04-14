@@ -52,12 +52,10 @@ export function useTourDateProximity(
 
     // Collect venue coordinates for density calculation
     const venueCoords: Coordinates[] = [];
-    const coordIndices: number[] = [];
     for (let i = 0; i < tourDates.length; i++) {
       const td = tourDates[i];
       if (td.latitude != null && td.longitude != null) {
         venueCoords.push({ latitude: td.latitude, longitude: td.longitude });
-        coordIndices.push(i);
       }
     }
 

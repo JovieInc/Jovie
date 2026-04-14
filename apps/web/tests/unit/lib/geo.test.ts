@@ -4,7 +4,6 @@ import {
   calculateDistanceMiles,
   calculateLocalNearbyRadius,
   DENSE_RADIUS_MILES,
-  DENSITY_THRESHOLD,
   isNearUser,
   NEAR_YOU_THRESHOLD_KM,
   SPARSE_RADIUS_MILES,
@@ -139,10 +138,6 @@ describe('calculateLocalNearbyRadius', () => {
     const radius = calculateLocalNearbyRadius(atlanticUser, denseCluster);
     // Nearest venue is one of the east coast cities, which has 3+ neighbors
     expect(radius).toBe(DENSE_RADIUS_MILES);
-  });
-
-  it('DENSITY_THRESHOLD is 3', () => {
-    expect(DENSITY_THRESHOLD).toBe(3);
   });
 });
 

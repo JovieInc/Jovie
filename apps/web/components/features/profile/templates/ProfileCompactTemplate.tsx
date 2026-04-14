@@ -176,6 +176,7 @@ export function ProfileCompactTemplate({
     getModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const pendingInlineRevealRef = useRef(false);
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
 
@@ -404,15 +405,11 @@ export function ProfileCompactTemplate({
     if (requestedMode === 'subscribe') {
       setDrawerView('menu');
       setDrawerOpen(false);
-      // Wait for the inline CTA to mount and register its reveal function
-      const tryReveal = (attempts: number) => {
-        if (revealNotificationsRef.current) {
-          revealNotificationsRef.current();
-        } else if (attempts > 0) {
-          setTimeout(() => tryReveal(attempts - 1), 100);
-        }
-      };
-      setTimeout(() => tryReveal(10), 100);
+      pendingInlineRevealRef.current = true;
+      if (revealNotificationsRef.current) {
+        pendingInlineRevealRef.current = false;
+        revealNotificationsRef.current();
+      }
       return;
     }
 
@@ -776,6 +773,10 @@ export function ProfileCompactTemplate({
                   onManageNotifications={() => openDrawerMode('notifications')}
                   onRegisterReveal={fn => {
                     revealNotificationsRef.current = fn;
+                    if (pendingInlineRevealRef.current) {
+                      pendingInlineRevealRef.current = false;
+                      fn();
+                    }
                   }}
                 />
 

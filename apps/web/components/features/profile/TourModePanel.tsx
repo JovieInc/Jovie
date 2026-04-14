@@ -2,7 +2,7 @@
 
 import { ChevronRight, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
@@ -40,14 +40,16 @@ function getTicketStatusLabel(
   return 'No tickets';
 }
 
-/** Date box showing month + day stacked vertically */
+/** Date box showing month + day stacked vertically, formatted in UTC to avoid timezone shift */
 function DateBox({ date }: { readonly date: string }) {
   const parsedDate = new Date(date);
   const monthLabel = new Intl.DateTimeFormat('en-US', {
     month: 'short',
+    timeZone: 'UTC',
   }).format(parsedDate);
   const dayLabel = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
+    timeZone: 'UTC',
   }).format(parsedDate);
 
   return (
@@ -151,11 +153,13 @@ function OtherCitiesDisclosure({
   expanded,
   onToggle,
   children,
+  listId,
 }: {
   readonly count: number;
   readonly expanded: boolean;
   readonly onToggle: () => void;
   readonly children: React.ReactNode;
+  readonly listId: string;
 }) {
   return (
     <div>
@@ -163,7 +167,7 @@ function OtherCitiesDisclosure({
         type='button'
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-controls='tour-dates-list'
+        aria-controls={listId}
         className='flex w-full items-center justify-between py-3 text-[0.85rem] font-[590] text-white/48 transition-colors hover:text-white/62 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(24,24,28)]'
       >
         <span>
@@ -175,7 +179,7 @@ function OtherCitiesDisclosure({
       </button>
       {expanded && (
         <div
-          id='tour-dates-list'
+          id={listId}
           className='animate-in fade-in slide-in-from-top-1 duration-200'
         >
           {children}
@@ -190,15 +194,14 @@ function TourDatesContent({
   nearby,
   allDates,
   hasLocation,
-  isLocationLoading,
 }: {
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly allDates: TourDateWithProximity[];
   readonly hasLocation: boolean;
-  readonly isLocationLoading: boolean;
 }) {
   const [showAllDates, setShowAllDates] = useState(false);
+  const disclosureId = useId();
 
   // State 3: No dates at all
   if (allDates.length === 0) {
@@ -289,6 +292,7 @@ function TourDatesContent({
         count={allDates.length}
         expanded={showAllDates}
         onToggle={() => setShowAllDates(prev => !prev)}
+        listId={disclosureId}
       >
         {allDates.map(item => (
           <TourDateRow
@@ -311,7 +315,7 @@ export function TourDrawerContent({
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
 }>) {
-  const { location, isLoading: isLocationLoading } = useUserLocation();
+  const { location } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   return (
@@ -321,7 +325,6 @@ export function TourDrawerContent({
         nearby={nearbyDates}
         allDates={allDates}
         hasLocation={location !== null}
-        isLocationLoading={isLocationLoading}
       />
     </div>
   );

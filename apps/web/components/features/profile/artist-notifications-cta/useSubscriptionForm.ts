@@ -23,11 +23,12 @@ import {
 } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
+import type { NotificationSource } from './types';
 import { buildPhoneE164, getMaxNationalDigits } from './utils';
 
 interface UseSubscriptionFormOptions {
   artist: Artist;
-  source?: string;
+  source?: NotificationSource;
 }
 
 interface UseSubscriptionFormReturn {
