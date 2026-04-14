@@ -1,7 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { hydrateRoot } from 'react-dom/client';
-import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
@@ -245,60 +243,32 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('preserves subscribe deep links through hydration', async () => {
+  it('redirects subscribe deep links to inline CTA instead of preserving URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
-    const pushStateSpy = vi.spyOn(window.history, 'pushState');
 
     const { ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
     );
 
-    const ui = (
-      <React.StrictMode>
-        <ProfileCompactTemplate
-          mode='profile'
-          artist={mockArtist}
-          socialLinks={[]}
-          contacts={[]}
-        />
-      </React.StrictMode>
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
     );
 
-    const windowDescriptor = Object.getOwnPropertyDescriptor(
-      globalThis,
-      'window'
-    );
-    Object.defineProperty(globalThis, 'window', {
-      value: undefined,
-      configurable: true,
-    });
-    const serverMarkup = renderToString(ui);
-    if (windowDescriptor) {
-      Object.defineProperty(globalThis, 'window', windowDescriptor);
-    }
-
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    container.innerHTML = serverMarkup;
-
-    const root = hydrateRoot(container, ui);
-
+    // Subscribe mode now resets requestedMode so the URL cleans up.
+    // The inline CTA reveal is triggered instead of opening a drawer.
     await waitFor(() => {
-      expect(window.location.search).toBe('?mode=subscribe');
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          modeOverride: 'subscribe',
+          modeOverride: 'profile',
         })
       );
     });
-
-    const pushedHrefs = pushStateSpy.mock.calls.map(call => call[2]);
-    expect(pushedHrefs).not.toContain('/test-artist');
-
-    root.unmount();
-    container.remove();
-    pushStateSpy.mockRestore();
   });
 
   it('uses the mode prop as the fallback when the URL has no mode param', async () => {
