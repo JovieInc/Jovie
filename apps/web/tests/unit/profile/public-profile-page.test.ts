@@ -482,7 +482,7 @@ describe('Public Profile Page Logic', () => {
       ['profile', 'Artist'],
       ['pay', 'Support'],
       ['listen', 'Listen now'],
-      ['subscribe', 'Get notified'],
+      ['subscribe', 'Turn on notifications'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
       expect(getProfileModeSubtitle(mode)).toBe(expectedSubtitle);
     });
@@ -491,9 +491,11 @@ describe('Public Profile Page Logic', () => {
       expect(getProfileModeSubtitle('unknown')).toBe('Artist');
     });
 
-    it('passes social links through so compact profile tipping can derive from venmo links', () => {
+    it('passes social links and pay button flag through to StaticArtistPage', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('showPayButton=');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'showPayButton={showPayButton}'
+      );
     });
 
     it('shows back button only for non-profile modes', () => {

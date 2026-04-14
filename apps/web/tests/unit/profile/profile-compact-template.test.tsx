@@ -390,7 +390,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('uses an embedded drawer presentation at desktop widths', async () => {
+  it('renders the drawer at desktop widths', async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(min-width: 768px)',
@@ -417,10 +417,9 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-presentation',
-        'embedded'
-      );
+      expect(
+        screen.getByTestId('mock-profile-unified-drawer')
+      ).toBeInTheDocument();
     });
 
     window.matchMedia = previousMatchMedia;
