@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.155.0] - 2026-04-14
+
+### Changed
+
+- Renamed "tip" to "pay" across the entire platform, reframing fan payments as meaningful transactions instead of gratuities
+- Default payment amounts changed from $3/$5/$7 to $5/$10/$20 to match the higher-value "pay" framing
+- Profile mode `'tip'` is now `'pay'` with subtitle "Support" instead of "Send a tip"
+- Deeplink path changed from `/tip` to `/pay` (old `/tip` URLs permanently redirect)
+- Marketing landing page moved from `/tips` to `/pay`
+- All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
+- 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
+
+### Fixed
+
+- Dashboard earnings redirects now scroll to the correct anchor (`#pay` instead of broken `#tips`)
+- Legacy `/tip` route uses permanent redirect (301) instead of temporary (307)
+
 ## [26.4.154.0] - 2026-04-13
 
 ### Changed
