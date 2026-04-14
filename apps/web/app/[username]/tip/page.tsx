@@ -1,4 +1,4 @@
-import { redirectToProfileMode } from '../_lib/mode-route-redirect';
+import { redirect } from 'next/navigation';
 
 interface Props {
   readonly params: Promise<{
@@ -6,6 +6,8 @@ interface Props {
   }>;
 }
 
-export default async function TipPage({ params }: Readonly<Props>) {
-  return redirectToProfileMode(params, 'tip');
+/** Legacy /tip route — permanently redirects to /pay */
+export default async function TipRedirectPage({ params }: Readonly<Props>) {
+  const { username } = await params;
+  redirect(`/${username}/pay`);
 }

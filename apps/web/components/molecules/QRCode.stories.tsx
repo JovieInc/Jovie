@@ -49,11 +49,11 @@ export const MobileProfile: Story = {
   },
 };
 
-export const TipLink: Story = {
+export const PayLink: Story = {
   args: {
-    data: 'https://jov.ie/drake?mode=tip',
+    data: 'https://jov.ie/drake?mode=pay',
     size: 120,
-    label: 'Scan to tip via Apple Pay',
+    label: 'Scan to pay via Apple Pay',
   },
 };
 

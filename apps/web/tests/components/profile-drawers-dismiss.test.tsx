@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { TipDrawer } from '@/features/profile/TipDrawer';
+import { PayDrawer } from '@/features/profile/PayDrawer';
 
 vi.mock('vaul', () => ({
   Drawer: {
@@ -37,8 +37,8 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/components/molecules/TipSelector', () => ({
-  TipSelector: () => <div>tip selector</div>,
+vi.mock('@/components/molecules/PaySelector', () => ({
+  PaySelector: () => <div>tip selector</div>,
 }));
 
 vi.mock('@/features/profile/StaticListenInterface', () => ({
@@ -58,7 +58,7 @@ describe('profile drawers dismiss behavior', () => {
       .mockImplementation(() => undefined);
 
     render(
-      <TipDrawer
+      <PayDrawer
         open
         onOpenChange={onOpenChange}
         artistName='A'

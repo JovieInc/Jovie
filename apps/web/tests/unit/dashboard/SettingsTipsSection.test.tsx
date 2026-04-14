@@ -1,6 +1,6 @@
 import { fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
+import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { fastRender } from '@/tests/utils/fast-render';
 
 const {
@@ -54,13 +54,13 @@ vi.mock('@/components/molecules/settings/SettingsPanel', () => ({
   ),
 }));
 
-vi.mock('@/features/dashboard/molecules/ProfileTipsSurface', () => ({
-  ProfileTipsSurface: ({ summary }: { summary: { narrative: string } }) => (
+vi.mock('@/features/dashboard/molecules/ProfilePaySurface', () => ({
+  ProfilePaySurface: ({ summary }: { summary: { narrative: string } }) => (
     <div data-testid='profile-tips-surface'>{summary.narrative}</div>
   ),
 }));
 
-describe('SettingsTipsSection', () => {
+describe('SettingsPaySection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRefetch.mockResolvedValue(undefined);
@@ -76,9 +76,9 @@ describe('SettingsTipsSection', () => {
       refetch: mockRefetch,
     });
 
-    const { getByRole, getByTestId } = fastRender(<SettingsTipsSection />);
+    const { getByRole, getByTestId } = fastRender(<SettingsPaySection />);
 
-    expect(getByRole('heading', { name: 'Tips' })).toBeDefined();
+    expect(getByRole('heading', { name: 'Payments' })).toBeDefined();
     expect(getByTestId('profile-tips-surface')).toHaveTextContent(
       'Tips are live.'
     );
@@ -92,10 +92,10 @@ describe('SettingsTipsSection', () => {
       refetch: mockRefetch,
     });
 
-    const { getByRole, getByText } = fastRender(<SettingsTipsSection />);
+    const { getByRole, getByText } = fastRender(<SettingsPaySection />);
 
     expect(
-      getByText('Could not load your tips summary right now.')
+      getByText('Could not load your payments summary right now.')
     ).toBeDefined();
 
     fireEvent.click(getByRole('button', { name: 'Try Again' }));

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { TipSection } from './TipSection';
+import { PaySection } from './PaySection';
 
-const meta: Meta<typeof TipSection> = {
-  title: 'Organisms/TipSection',
-  component: TipSection,
+const meta: Meta<typeof PaySection> = {
+  title: 'Organisms/PaySection',
+  component: PaySection,
   parameters: {
     layout: 'centered',
   },
@@ -96,7 +96,7 @@ export const LoadingDemo: Story = {
     };
 
     return (
-      <TipSection
+      <PaySection
         handle='dualipa'
         amounts={[5, 10, 20]}
         onStripePayment={handlePayment}
@@ -118,7 +118,7 @@ export const InteractiveDemo: Story = {
     };
 
     return (
-      <TipSection
+      <PaySection
         handle='oliviarodrigo'
         amounts={[3, 5, 10]}
         onStripePayment={handleStripePayment}

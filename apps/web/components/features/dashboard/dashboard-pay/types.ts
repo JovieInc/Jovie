@@ -8,7 +8,7 @@ export interface VenmoEditState {
   saveSuccess: string | null;
 }
 
-export interface UseDashboardTippingReturn {
+export interface UseDashboardPayReturn {
   artist: Artist | null;
   venmoHandle: string;
   setVenmoHandle: (value: string) => void;

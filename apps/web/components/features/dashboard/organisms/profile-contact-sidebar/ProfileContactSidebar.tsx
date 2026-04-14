@@ -24,7 +24,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
+import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
@@ -771,7 +771,7 @@ export function ProfileContactSidebar() {
               <>
                 {resolvedCategory === 'earnings' && monetizationSummary ? (
                   <div className='mb-2.5'>
-                    <ProfileTipsSurface
+                    <ProfilePaySurface
                       summary={monetizationSummary}
                       variant='drawer'
                       onSetUsername={handleSetUsername}

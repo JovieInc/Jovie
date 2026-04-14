@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 
-interface TipDrawerProps {
+interface PayDrawerProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly artistName: string;
@@ -17,15 +17,15 @@ interface TipDrawerProps {
   readonly amounts?: number[];
 }
 
-export function TipDrawer({
+export function PayDrawer({
   open,
   onOpenChange,
   artistName,
   artistHandle,
   venmoLink,
   venmoUsername,
-  amounts = [3, 5, 7],
-}: TipDrawerProps) {
+  amounts = [5, 10, 20],
+}: PayDrawerProps) {
   useEffect(() => {
     if (!open) return;
 
@@ -96,10 +96,10 @@ export function TipDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={handleOpenChange}
-      title={`Tip ${artistName}`}
+      title={`Support ${artistName}`}
       subtitle='Send support instantly with Venmo.'
     >
-      <TipSelector
+      <PaySelector
         amounts={amounts}
         onContinue={handleAmountSelected}
         paymentLabel='Venmo'

@@ -2,11 +2,11 @@
 
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 
-type VenmoTipSelectorProps = {
+type VenmoPaySelectorProps = {
   readonly venmoLink: string;
   readonly venmoUsername?: string | null;
   readonly amounts?: number[];
@@ -14,13 +14,13 @@ type VenmoTipSelectorProps = {
   readonly onContinue?: (url: string) => void;
 };
 
-export default function VenmoTipSelector({
+export default function VenmoPaySelector({
   venmoLink,
   venmoUsername,
-  amounts = [3, 5, 7],
+  amounts = [5, 10, 20],
   className,
   onContinue,
-}: VenmoTipSelectorProps) {
+}: VenmoPaySelectorProps) {
   const handleAmountSelected = useCallback(
     (amount: number) => {
       if (!isAllowedVenmoUrl(venmoLink)) {
@@ -65,7 +65,7 @@ export default function VenmoTipSelector({
 
   return (
     <section className={className} aria-label='Venmo Tipping'>
-      <TipSelector
+      <PaySelector
         amounts={amounts}
         onContinue={handleAmountSelected}
         paymentLabel='Venmo'

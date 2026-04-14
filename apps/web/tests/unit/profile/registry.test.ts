@@ -14,7 +14,7 @@ describe('profile registry', () => {
     expect(profileModes).toEqual([
       'profile',
       'listen',
-      'tip',
+      'pay',
       'subscribe',
       'about',
       'contact',

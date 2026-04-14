@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { TipsLanding } from '@/features/tips/TipsLanding';
+import { PayLanding } from '@/features/pay/PayLanding';
 
 export const revalidate = false;
 
@@ -47,5 +47,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function TipsPage() {
-  return <TipsLanding />;
+  return <PayLanding />;
 }
