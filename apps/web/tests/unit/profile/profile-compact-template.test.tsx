@@ -243,7 +243,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('redirects subscribe deep links to inline CTA instead of preserving URL', async () => {
+  it('opens subscribe drawer when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
 
@@ -260,12 +260,11 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    // Subscribe mode now resets requestedMode so the URL cleans up.
-    // The inline CTA reveal is triggered instead of opening a drawer.
+    // Subscribe mode now opens the drawer directly instead of the inline CTA.
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          modeOverride: 'profile',
+          modeOverride: 'subscribe',
         })
       );
     });

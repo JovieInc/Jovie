@@ -120,6 +120,8 @@ interface ProfileCompactSurfaceProps {
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly previewReleaseActionLabel?: string;
   readonly dataTestId?: string;
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -270,6 +272,8 @@ export function ProfileCompactSurface({
   },
   previewReleaseActionLabel = 'Listen',
   dataTestId,
+  hideJovieBranding = false,
+  hideMoreMenu = false,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
     () =>
@@ -364,29 +368,33 @@ export function ProfileCompactSurface({
             className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'
             data-testid='profile-header'
           >
-            <Link
-              href={artistProfilesHref ?? BASE_URL}
-              aria-label='Create your artist profile on Jovie'
-              className='rounded-full opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-            >
-              <BrandLogo
-                size={22}
-                tone='white'
-                rounded={false}
-                className='block'
-                aria-hidden={true}
-              />
-            </Link>
+            {!hideJovieBranding && (
+              <Link
+                href={artistProfilesHref ?? BASE_URL}
+                aria-label='Create your artist profile on Jovie'
+                className='rounded-full opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+              >
+                <BrandLogo
+                  size={22}
+                  tone='white'
+                  rounded={false}
+                  className='block'
+                  aria-hidden={true}
+                />
+              </Link>
+            )}
 
-            <button
-              type='button'
-              onClick={onOpenMenu}
-              className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-              aria-label='More options'
-              aria-haspopup='dialog'
-            >
-              <MoreHorizontal className='h-[15px] w-[15px]' />
-            </button>
+            {!hideMoreMenu && (
+              <button
+                type='button'
+                onClick={onOpenMenu}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
+                aria-label='More options'
+                aria-haspopup='dialog'
+              >
+                <MoreHorizontal className='h-[15px] w-[15px]' />
+              </button>
+            )}
           </div>
 
           <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
