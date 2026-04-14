@@ -23,7 +23,7 @@ export function useTipPageTracking({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistHandle) return;
-    if (mode !== 'tip') return;
+    if (mode !== 'pay') return;
 
     trackTipRef.current.mutate({
       handle: artistHandle,

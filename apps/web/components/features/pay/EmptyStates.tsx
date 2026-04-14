@@ -22,16 +22,16 @@ const EMPTY_STATE_CONFIG = {
   'no-venmo': {
     title: 'No Venmo Account Connected',
     description:
-      'Connect your Venmo account to start receiving tips from your fans.',
+      'Connect your Venmo account to start receiving payments from your fans.',
     illustration: '/images/tipping/empty-venmo.svg',
     altText: 'Illustration of a disconnected Venmo account',
   },
   'pending-metrics': {
-    title: 'Tipping Metrics Coming Soon',
+    title: 'Payment Metrics Coming Soon',
     description:
-      'Your tipping metrics will appear here once you receive your first tip.',
+      'Your payment metrics will appear here once you receive your first payment.',
     illustration: '/images/tipping/empty-metrics.svg',
-    altText: 'Illustration of pending tipping metrics',
+    altText: 'Illustration of pending payment metrics',
   },
 } as const;
 

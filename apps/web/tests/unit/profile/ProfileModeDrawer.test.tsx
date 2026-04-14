@@ -46,8 +46,8 @@ vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/TipSelector', () => ({
-  TipSelector: () => <div data-testid='tip-selector'>Tip content</div>,
+vi.mock('@/components/molecules/PaySelector', () => ({
+  PaySelector: () => <div data-testid='pay-selector'>Pay content</div>,
 }));
 
 vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({

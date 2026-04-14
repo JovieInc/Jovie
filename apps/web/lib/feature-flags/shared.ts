@@ -80,8 +80,6 @@ export const FEATURE_FLAGS = {
   THREADS_ENABLED: false,
   /** "Replaces Linktree + Linkfire + Mailchimp" section on marketing homepage */
   SHOW_REPLACES_SECTION: false,
-  /** PWA install banner in the sidebar */
-  PWA_INSTALL_BANNER: false,
   /** Sticky phone tour on marketing homepage */
   SHOW_PHONE_TOUR: true,
   /** Logo bar ("Trusted by artists on") on marketing homepage */
@@ -122,7 +120,6 @@ export const CODE_FLAG_KEYS = {
   // Code flags
   THREADS_ENABLED: 'code:THREADS_ENABLED',
   SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
-  PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
   SHOW_PHONE_TOUR: 'code:SHOW_PHONE_TOUR',
   SHOW_LOGO_BAR: 'code:SHOW_LOGO_BAR',
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',

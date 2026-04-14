@@ -6,10 +6,10 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 const STAT_CARD_KEYS = ['qr', 'link', 'total'] as const;
 
-const DashboardTipping = dynamic(
+const DashboardPay = dynamic(
   () =>
-    import('@/features/dashboard/dashboard-tipping').then(mod => ({
-      default: mod.DashboardTipping,
+    import('@/features/dashboard/dashboard-pay').then(mod => ({
+      default: mod.DashboardPay,
     })),
   {
     loading: () => (
@@ -79,6 +79,6 @@ const DashboardTipping = dynamic(
   }
 );
 
-export function DashboardTippingGate() {
-  return <DashboardTipping />;
+export function DashboardPayGate() {
+  return <DashboardPay />;
 }

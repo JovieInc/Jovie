@@ -2,14 +2,14 @@
 import { CTASection } from '@/components/organisms/CTASection';
 import { publicEnv } from '@/lib/env-public';
 
-export default function TipPromo() {
+export default function PayPromo() {
   if (publicEnv.NEXT_PUBLIC_FEATURE_TIPS !== 'true') return null;
 
   return (
     <CTASection
       title={
         <>
-          Tip, <span className='text-indigo-400'>instantly.</span>
+          Pay, <span className='text-indigo-400'>instantly.</span>
         </>
       }
       description={
@@ -20,7 +20,7 @@ export default function TipPromo() {
         </>
       }
       buttonText='See it live'
-      buttonHref='/tim/tip'
+      buttonHref='/tim/pay'
       variant='secondary'
       className='py-20'
     />

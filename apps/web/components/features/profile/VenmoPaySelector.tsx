@@ -1,61 +1,31 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
-import { ProfileDrawerShell } from './ProfileDrawerShell';
 
-interface TipDrawerProps {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly artistName: string;
-  readonly artistHandle: string;
+type VenmoPaySelectorProps = {
   readonly venmoLink: string;
   readonly venmoUsername?: string | null;
   readonly amounts?: number[];
-}
+  readonly className?: string;
+  readonly onContinue?: (url: string) => void;
+};
 
-export function TipDrawer({
-  open,
-  onOpenChange,
-  artistName,
-  artistHandle,
+export default function VenmoPaySelector({
   venmoLink,
   venmoUsername,
-  amounts = [3, 5, 7],
-}: TipDrawerProps) {
-  useEffect(() => {
-    if (!open) return;
-
-    track('tip_drawer_open', {
-      handle: artistHandle,
-    });
-
-    // Fire tip_page_view pixel event for retargeting
-    // @ts-expect-error - joviePixel is set by JoviePixel component
-    if (globalThis.joviePixel?.track) {
-      // @ts-expect-error - joviePixel is set by JoviePixel component
-      globalThis.joviePixel.track('tip_page_view');
-    }
-
-    return undefined;
-  }, [open, artistHandle]);
-
-  const handleOpenChange = useCallback(
-    (isOpen: boolean) => {
-      onOpenChange(isOpen);
-    },
-    [onOpenChange]
-  );
-
+  amounts = [5, 10, 20],
+  className,
+  onContinue,
+}: VenmoPaySelectorProps) {
   const handleAmountSelected = useCallback(
     (amount: number) => {
       if (!isAllowedVenmoUrl(venmoLink)) {
         track('tip_handoff_failed', {
           reason: 'invalid_venmo_url',
-          handle: artistHandle,
           venmoLink,
         });
         toast.error('Unable to open Venmo. The payment link is not valid.');
@@ -67,21 +37,22 @@ export function TipDrawer({
         venmoUsername ?? ''
       )}`;
 
-      // Fire tip_intent pixel event for retargeting
+      // Fire venmo_link_click pixel event for analytics
       // @ts-expect-error - joviePixel is set by JoviePixel component
       if (globalThis.joviePixel?.track) {
         // @ts-expect-error - joviePixel is set by JoviePixel component
-        globalThis.joviePixel.track('tip_intent', {
+        globalThis.joviePixel.track('venmo_link_click', {
           tipAmount: amount,
           tipMethod: 'venmo',
         });
       }
 
+      onContinue?.(url);
       const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
       if (!win) {
         track('tip_handoff_failed', {
           reason: 'popup_blocked',
-          handle: artistHandle,
+          venmoLink,
           amount,
         });
         toast.error(
@@ -89,21 +60,16 @@ export function TipDrawer({
         );
       }
     },
-    [venmoLink, venmoUsername, artistHandle]
+    [venmoLink, venmoUsername, onContinue]
   );
 
   return (
-    <ProfileDrawerShell
-      open={open}
-      onOpenChange={handleOpenChange}
-      title={`Tip ${artistName}`}
-      subtitle='Send support instantly with Venmo.'
-    >
-      <TipSelector
+    <section className={className} aria-label='Venmo Payment'>
+      <PaySelector
         amounts={amounts}
         onContinue={handleAmountSelected}
         paymentLabel='Venmo'
       />
-    </ProfileDrawerShell>
+    </section>
   );
 }
