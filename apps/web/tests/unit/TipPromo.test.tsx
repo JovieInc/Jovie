@@ -49,7 +49,7 @@ describe('PayPromo', () => {
     // Check CTA button
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
     expect(ctaButton).toBeInTheDocument();
-    expect(ctaButton).toHaveAttribute('href', '/tim/tip');
+    expect(ctaButton).toHaveAttribute('href', '/tim/pay');
   });
 
   it('has correct styling classes when rendered', () => {
@@ -97,6 +97,6 @@ describe('PayPromo', () => {
     render(<PayPromo />);
 
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
-    expect(ctaButton).toHaveAttribute('href', '/tim/tip');
+    expect(ctaButton).toHaveAttribute('href', '/tim/pay');
   });
 });

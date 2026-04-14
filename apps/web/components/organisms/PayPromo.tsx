@@ -20,7 +20,7 @@ export default function PayPromo() {
         </>
       }
       buttonText='See it live'
-      buttonHref='/tim/tip'
+      buttonHref='/tim/pay'
       variant='secondary'
       className='py-20'
     />

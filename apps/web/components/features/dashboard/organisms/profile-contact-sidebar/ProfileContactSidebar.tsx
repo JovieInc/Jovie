@@ -499,7 +499,7 @@ export function ProfileContactSidebar() {
       nextParams.set('addLink', '1');
       const nextSearch = nextParams.toString();
       const searchSuffix = nextSearch ? `?${nextSearch}` : '';
-      router.replace(`${pathname}${searchSuffix}#tips`, {
+      router.replace(`${pathname}${searchSuffix}#pay`, {
         scroll: false,
       });
     }

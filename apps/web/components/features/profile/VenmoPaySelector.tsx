@@ -64,7 +64,7 @@ export default function VenmoPaySelector({
   );
 
   return (
-    <section className={className} aria-label='Venmo Tipping'>
+    <section className={className} aria-label='Venmo Payment'>
       <PaySelector
         amounts={amounts}
         onContinue={handleAmountSelected}

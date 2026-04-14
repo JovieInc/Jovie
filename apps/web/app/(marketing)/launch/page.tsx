@@ -869,7 +869,7 @@ export default function LaunchPage() {
               }}
             >
               <div className='flex gap-2 mb-3'>
-                {['$3', '$5', '$10'].map(amt => (
+                {['$5', '$10', '$20'].map(amt => (
                   <div
                     key={amt}
                     className='flex-1 text-center py-2 font-semibold rounded'

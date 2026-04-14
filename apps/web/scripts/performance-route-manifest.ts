@@ -453,7 +453,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
-        '[data-testid="profile-mode-drawer-tip"]',
+        '[data-testid="profile-mode-drawer-pay"]',
         '[data-testid="profile-header"]',
       ],
     },

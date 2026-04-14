@@ -752,7 +752,7 @@ const PROFILE_MODE_SURFACES = [
     path: '/[username]?mode=pay',
     resolvePath: () => `/${resolveProfileHandle('pay')}?mode=pay`,
     readySelectors: [
-      '[data-testid="profile-mode-drawer-tip"]',
+      '[data-testid="profile-mode-drawer-pay"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',

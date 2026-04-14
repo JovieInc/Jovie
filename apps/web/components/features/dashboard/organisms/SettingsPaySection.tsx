@@ -64,7 +64,7 @@ export function SettingsPaySection() {
 
       const nextSearch = nextParams.toString();
       const searchSuffix = nextSearch ? `?${nextSearch}` : '';
-      router.replace(`${pathname}${searchSuffix}#tips`, {
+      router.replace(`${pathname}${searchSuffix}#pay`, {
         scroll: false,
       });
     },
@@ -100,7 +100,7 @@ export function SettingsPaySection() {
   }, [router]);
 
   return (
-    <div id='tips'>
+    <div id='pay'>
       <SettingsPanel
         title='Payments'
         description='Let fans support you directly from your profile.'
