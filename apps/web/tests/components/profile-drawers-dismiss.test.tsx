@@ -38,7 +38,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 vi.mock('@/components/molecules/PaySelector', () => ({
-  PaySelector: () => <div>tip selector</div>,
+  PaySelector: () => <div>pay selector</div>,
 }));
 
 vi.mock('@/features/profile/StaticListenInterface', () => ({

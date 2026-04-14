@@ -104,8 +104,8 @@ export function AnimatedArtistPage({
 
         return (
           <motion.div {...fadeUpProps}>
-            <main className='space-y-4' aria-labelledby='tipping-title'>
-              <h1 id='tipping-title' className='sr-only'>
+            <main className='space-y-4' aria-labelledby='pay-title'>
+              <h1 id='pay-title' className='sr-only'>
                 Support {viewModel.artist.name}
               </h1>
 

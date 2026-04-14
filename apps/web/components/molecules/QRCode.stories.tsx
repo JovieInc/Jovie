@@ -71,11 +71,11 @@ export const InContainer: Story = {
       <QRCode
         data='https://jov.ie/arianagrande'
         size={180}
-        label='Scan to tip via Apple Pay'
+        label='Scan to pay via Apple Pay'
         className='mx-auto'
       />
       <p className='text-sm text-gray-600 dark:text-gray-400'>
-        Scan to tip via Apple Pay
+        Scan to pay via Apple Pay
       </p>
     </div>
   ),

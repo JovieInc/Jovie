@@ -93,7 +93,7 @@ export const ListenMode: Story = {
   },
 };
 
-export const TipMode: Story = {
+export const PayMode: Story = {
   args: {
     mode: 'pay',
     artist: mockArtist,
@@ -104,7 +104,7 @@ export const TipMode: Story = {
   },
 };
 
-export const TipModeWithoutVenmo: Story = {
+export const PayModeWithoutVenmo: Story = {
   args: {
     mode: 'pay',
     artist: mockArtist,
@@ -230,7 +230,7 @@ export const InteractiveDemo: Story = {
                 : 'bg-surface-0 text-secondary-token border border-subtle'
             }`}
           >
-            Tip
+            Pay
           </button>
         </div>
 

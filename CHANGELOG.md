@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.155.0] - 2026-04-14
 
+> Fans now "pay" artists instead of "tipping" them, with higher default amounts ($5/$10/$20) and cleaner support language everywhere.
+
 ### Changed
 
 - Renamed "tip" to "pay" across the entire platform, reframing fan payments as meaningful transactions instead of gratuities
@@ -15,7 +17,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Deeplink path changed from `/tip` to `/pay` (old `/tip` URLs permanently redirect)
 - Marketing landing page moved from `/tips` to `/pay`
 - All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
-- 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
+- [internal] 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
 
 ### Fixed
 

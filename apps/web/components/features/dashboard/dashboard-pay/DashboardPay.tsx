@@ -389,7 +389,7 @@ export function DashboardPay() {
 
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
-    const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
+    const tipRelativePath = tipHandle ? `/${tipHandle}/pay` : '/pay';
     const tipRelativePathLink = `${tipRelativePath}?source=link`;
     const tipUrl = `${BASE_URL}${tipRelativePathLink}`;
 

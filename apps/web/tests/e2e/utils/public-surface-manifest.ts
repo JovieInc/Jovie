@@ -750,7 +750,7 @@ const PROFILE_MODE_SURFACES = [
     family: 'profile-mode',
     expectedState: 'ok',
     path: '/[username]?mode=pay',
-    resolvePath: () => `/${resolveProfileHandle('pay')}?mode=pay`,
+    resolvePath: () => `/${resolveProfileHandle('tip')}?mode=pay`,
     readySelectors: [
       '[data-testid="profile-mode-drawer-pay"]',
       '[data-testid="profile-header"]',

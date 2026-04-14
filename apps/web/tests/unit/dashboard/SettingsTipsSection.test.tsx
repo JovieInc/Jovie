@@ -56,7 +56,7 @@ vi.mock('@/components/molecules/settings/SettingsPanel', () => ({
 
 vi.mock('@/features/dashboard/molecules/ProfilePaySurface', () => ({
   ProfilePaySurface: ({ summary }: { summary: { narrative: string } }) => (
-    <div data-testid='profile-tips-surface'>{summary.narrative}</div>
+    <div data-testid='profile-pay-surface'>{summary.narrative}</div>
   ),
 }));
 
@@ -79,7 +79,7 @@ describe('SettingsPaySection', () => {
     const { getByRole, getByTestId } = fastRender(<SettingsPaySection />);
 
     expect(getByRole('heading', { name: 'Payments' })).toBeDefined();
-    expect(getByTestId('profile-tips-surface')).toHaveTextContent(
+    expect(getByTestId('profile-pay-surface')).toHaveTextContent(
       'Tips are live.'
     );
   });

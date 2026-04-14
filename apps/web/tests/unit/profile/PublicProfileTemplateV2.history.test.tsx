@@ -232,7 +232,7 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('maps legacy tip mode to the pay drawer', async () => {
+  it('maps pay mode to the pay drawer', async () => {
     render(
       <PublicProfileTemplateV2
         mode='pay'

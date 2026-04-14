@@ -176,7 +176,7 @@ export function EarningsTab() {
 
   const tipUrl = useMemo(() => {
     if (!handle) return '';
-    return `${BASE_URL}/${handle}/tip`;
+    return `${BASE_URL}/${handle}/pay`;
   }, [handle]);
 
   // ── QR generation state ──────────────────────────

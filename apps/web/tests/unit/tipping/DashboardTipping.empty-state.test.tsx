@@ -27,7 +27,7 @@ vi.mock('@/features/dashboard/dashboard-pay/useDashboardPay', () => ({
   useDashboardPay: () => mockUseDashboardPay(),
 }));
 
-describe('DashboardTipping empty state behavior', () => {
+describe('DashboardPay empty state behavior', () => {
   it('shows a cohesive empty state and hides downstream cards when Venmo is not connected', () => {
     mockUseDashboardData.mockReturnValue({
       tippingStats: {
