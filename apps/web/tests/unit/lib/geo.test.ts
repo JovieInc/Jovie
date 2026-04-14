@@ -75,8 +75,7 @@ describe('NEAR_YOU_THRESHOLD_KM', () => {
 });
 
 describe('calculateLocalNearbyRadius', () => {
-  // India cluster: Bengaluru, Mumbai, Delhi (within ~200mi of each other... actually ~1000mi apart)
-  // For a true dense cluster, use cities that are actually close together
+  // Dense cluster: US Northeast cities within reasonable proximity
   const denseCluster = [
     { latitude: 40.7128, longitude: -74.006 }, // NYC
     { latitude: 40.4406, longitude: -79.9959 }, // Pittsburgh (~300mi, outside 200mi)
