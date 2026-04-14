@@ -358,4 +358,57 @@ describe('performance route resolvers', () => {
     expect(contextClose).toHaveBeenCalledOnce();
     expect(browserClose).toHaveBeenCalledOnce();
   });
+
+  it('fails closed when the app fallback cannot resolve a release tasks route', async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv('DATABASE_URL', '');
+
+    const addCookies = vi.fn().mockResolvedValue(undefined);
+    const contextClose = vi.fn().mockResolvedValue(undefined);
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: browserClose,
+      newContext: vi.fn().mockResolvedValue({
+        addCookies,
+        close: contextClose,
+        newPage: vi.fn().mockResolvedValue({
+          goto: vi.fn().mockResolvedValue(undefined),
+          locator: vi.fn(() => ({
+            first: () => ({
+              getAttribute: vi.fn().mockResolvedValue(null),
+            }),
+          })),
+          setViewportSize: vi.fn().mockResolvedValue(undefined),
+          url: vi.fn(() => 'http://127.0.0.1:4100/app/dashboard/releases'),
+          viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
+          waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    });
+
+    const route = {
+      path: '/app/dashboard/releases/[releaseId]/tasks',
+    } as PerfRouteDefinition;
+
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: 'session',
+            path: '/',
+            value: 'cookie',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).rejects.toThrow(
+      'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
+    );
+
+    expect(addCookies).toHaveBeenCalledOnce();
+    expect(contextClose).toHaveBeenCalledOnce();
+    expect(browserClose).toHaveBeenCalledOnce();
+  });
 });

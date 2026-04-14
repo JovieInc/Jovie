@@ -49,6 +49,22 @@ function replaceRouteToken(
   return template.replaceAll(`[${token}]`, value);
 }
 
+function resolveReleaseTasksPathname(pathname: string, search = '') {
+  const releaseTasksPrefix = `${APP_ROUTES.DASHBOARD_RELEASES}/`;
+  if (
+    !pathname.startsWith(releaseTasksPrefix) ||
+    !pathname.endsWith('/tasks')
+  ) {
+    return null;
+  }
+
+  const releaseId = pathname
+    .slice(releaseTasksPrefix.length, -'/tasks'.length)
+    .replace(/^\/+|\/+$/g, '');
+
+  return releaseId ? `${pathname}${search}` : null;
+}
+
 async function queryProfileHandle(handle: string) {
   const sql = getSqlClient();
   if (!sql) {
@@ -305,7 +321,7 @@ async function resolveReleaseTasksViaApp(context: PerfResolveContext) {
     }
 
     const finalUrl = new URL(page.url());
-    return `${finalUrl.pathname}${finalUrl.search}`;
+    return resolveReleaseTasksPathname(finalUrl.pathname, finalUrl.search);
   } finally {
     await pageContext?.close().catch(() => undefined);
     await browser?.close().catch(() => undefined);
