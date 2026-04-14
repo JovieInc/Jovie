@@ -108,7 +108,7 @@ function resolveDrawerView(
       return options.hasContacts ? mode : null;
     case 'listen':
       return options.hasDSPs ? mode : null;
-    case 'tip':
+    case 'pay':
       return options.hasTip ? mode : null;
     case 'tour':
       return mode;
@@ -144,7 +144,7 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
     case 'subscribe':
     case 'contact':
     case 'listen':
-    case 'tip':
+    case 'pay':
     case 'tour':
       return view;
     default:

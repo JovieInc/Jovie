@@ -4,8 +4,8 @@ import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
-import { TipSelector } from '@/components/molecules/TipSelector';
 import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
@@ -57,7 +57,7 @@ function BackButton({ onClick }: { readonly onClick: () => void }) {
   );
 }
 
-interface TipSectionProps {
+interface PaySectionProps {
   readonly handle: string;
   readonly amounts?: number[];
   readonly venmoLink?: string;
@@ -67,15 +67,15 @@ interface TipSectionProps {
   readonly className?: string;
 }
 
-export function TipSection({
+export function PaySection({
   handle,
-  amounts = [2, 5, 10],
+  amounts = [5, 10, 20],
   venmoLink,
   venmoUsername,
   onStripePayment,
   onVenmoPayment,
   className,
-}: TipSectionProps) {
+}: PaySectionProps) {
   const [loading, setLoading] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'venmo' | null>(
     null
@@ -97,7 +97,7 @@ export function TipSection({
     setLoading(amount);
     try {
       await onStripePayment(amount);
-      toast.success(`Thanks for the $${amount} tip!`, { duration: 5000 });
+      toast.success(`Thanks for the $${amount}!`, { duration: 5000 });
     } catch (error) {
       captureError('Tip payment failed', error, {
         handle,
@@ -161,7 +161,7 @@ export function TipSection({
       <div className={cn('text-center space-y-4', className)}>
         <QRCodeCard
           data={currentUrl}
-          title='Scan to tip via Apple Pay'
+          title='Scan to pay via Apple Pay'
           qrSize={192}
         />
       </div>
@@ -177,7 +177,7 @@ export function TipSection({
             Choose payment method
           </h3>
           <p className='text-center text-xs text-secondary-token mb-5'>
-            Select how you&apos;d like to send your tip
+            Select how you&apos;d like to send your payment
           </p>
           <div className='space-y-3'>
             <button
@@ -218,12 +218,12 @@ export function TipSection({
                 loading={loading === amount}
                 variant='primary'
               >
-                ${amount} Tip
+                ${amount}
               </Button>
             ))}
           </div>
           <p className='mt-4 text-center text-xs text-tertiary-token'>
-            Tips are non-refundable
+            Payments are non-refundable
           </p>
         </div>
       </div>
@@ -236,7 +236,7 @@ export function TipSection({
       <div className={cn('w-full max-w-sm', className)}>
         <div className={CARD_CLASSES}>
           {paymentMethod && <BackButton onClick={goBack} />}
-          <TipSelector
+          <PaySelector
             amounts={amounts}
             onContinue={handleVenmoPayment}
             paymentLabel='Venmo'

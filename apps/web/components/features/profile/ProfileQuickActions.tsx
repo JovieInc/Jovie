@@ -23,7 +23,7 @@ const QUICK_ACTIONS: QuickActionItem[] = [
   { id: 'profile', label: 'Home', icon: House },
   { id: 'tour', label: 'Tour', icon: CalendarDays },
   { id: 'contact', label: 'Book', icon: Mail },
-  { id: 'tip', label: 'Tip', icon: DollarSign },
+  { id: 'pay', label: 'Pay', icon: DollarSign },
   { id: 'about', label: 'About', icon: UserRound },
 ];
 

@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 
-interface TipSelectorProps {
+interface PaySelectorProps {
   readonly amounts?: number[];
   readonly onContinue: (amount: number) => void;
   readonly isLoading?: boolean;
@@ -13,13 +13,13 @@ interface TipSelectorProps {
   readonly paymentLabel?: string;
 }
 
-export function TipSelector({
-  amounts = [3, 5, 7],
+export function PaySelector({
+  amounts = [5, 10, 20],
   onContinue,
   isLoading = false,
   className = '',
   paymentLabel,
-}: TipSelectorProps) {
+}: PaySelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -49,9 +49,9 @@ export function TipSelector({
   }
 
   return (
-    <div className={`space-y-5 ${className}`} data-test='tip-selector'>
-      <h3 id='tip-selector-heading' className='sr-only'>
-        Select tip amount
+    <div className={`space-y-5 ${className}`} data-test='pay-selector'>
+      <h3 id='pay-selector-heading' className='sr-only'>
+        Select amount
       </h3>
 
       {/* Visually hidden live region for screen readers */}
@@ -63,7 +63,7 @@ export function TipSelector({
 
       <fieldset
         className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
-        aria-label='Tip amount options'
+        aria-label='Amount options'
       >
         {amounts.map((amount, idx) => (
           <AmountSelector
@@ -84,8 +84,8 @@ export function TipSelector({
         variant='primary'
         aria-label={
           paymentLabel
-            ? `Continue with ${paymentLabel} for $${selectedAmount} tip`
-            : `Continue with $${selectedAmount} tip`
+            ? `Continue with ${paymentLabel} for $${selectedAmount}`
+            : `Continue with $${selectedAmount}`
         }
       >
         {paymentLabel && (

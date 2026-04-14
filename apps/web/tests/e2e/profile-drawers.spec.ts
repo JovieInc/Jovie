@@ -116,7 +116,7 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    const trigger = page.locator('[data-testid="tip-trigger"]').first();
+    const trigger = page.locator('[data-testid="pay-trigger"]').first();
 
     if (!(await trigger.isVisible().catch(() => false))) {
       test.skip(true, 'Tip trigger not visible — skipping');

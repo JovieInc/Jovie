@@ -30,11 +30,11 @@ export const ARTIST_PROFILE_MODES: readonly PhoneShowcaseModeData[] = [
     summary: 'Nearest date first.',
   },
   {
-    id: 'tip',
-    headline: 'Between sets, fans tip and join your audience.',
+    id: 'pay',
+    headline: 'Between sets, fans pay and join your audience.',
     description:
       'QR code at the merch table. Three preset amounts. You capture the email.',
     outcome: 'Live shows',
-    summary: 'Tips become fans.',
+    summary: 'Payments become fans.',
   },
 ] as const;

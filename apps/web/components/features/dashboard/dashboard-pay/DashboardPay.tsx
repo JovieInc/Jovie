@@ -36,7 +36,7 @@ import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClip
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { cn } from '@/lib/utils';
-import { useDashboardTipping } from './useDashboardTipping';
+import { useDashboardPay } from './useDashboardPay';
 import { formatCount } from './utils';
 
 // =============================================================================
@@ -246,7 +246,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
             Connect Venmo
           </DialogTitle>
           <DialogDescription className='mt-0.5 text-[13px] leading-5 text-secondary-token'>
-            Link your Venmo to start receiving tips from fans.
+            Link your Venmo to start receiving payments from fans.
           </DialogDescription>
         </div>
       </div>
@@ -326,7 +326,7 @@ const TipLinkSection = memo(function TipLinkSection({
         >
           <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
         </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>Tip link</h3>
+        <h3 className='text-[13px] font-[510] text-primary-token'>Pay Link</h3>
       </div>
 
       <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
@@ -343,7 +343,7 @@ const TipLinkSection = memo(function TipLinkSection({
         />
       </div>
       <p className='mt-2 text-[11px] text-tertiary-token sm:text-[13px]'>
-        Share this link anywhere to receive tips.
+        Share this link anywhere to receive payments.
       </p>
     </div>
   );
@@ -355,7 +355,7 @@ const TipLinkSection = memo(function TipLinkSection({
 // Main Component
 // =============================================================================
 
-export function DashboardTipping() {
+export function DashboardPay() {
   const dashboardData = useDashboardData();
   const {
     artist,
@@ -369,7 +369,7 @@ export function DashboardTipping() {
     handleSaveVenmo,
     handleCancel,
     handleDisconnect,
-  } = useDashboardTipping();
+  } = useDashboardPay();
 
   const [isConnectOpen, setIsConnectOpen] = useState(false);
 
@@ -389,7 +389,7 @@ export function DashboardTipping() {
 
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
-    const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
+    const tipRelativePath = tipHandle ? `/${tipHandle}/pay` : '/pay';
     const tipRelativePathLink = `${tipRelativePath}?source=link`;
     const tipUrl = `${BASE_URL}${tipRelativePathLink}`;
 
@@ -444,8 +444,8 @@ export function DashboardTipping() {
                     Connect Venmo to unlock earnings
                   </h2>
                   <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
-                    Link your Venmo once to start receiving tips and reveal your
-                    full earnings dashboard.
+                    Link your Venmo once to start receiving payments and reveal
+                    your full earnings dashboard.
                   </p>
                   <Button
                     onClick={() => setIsConnectOpen(true)}
