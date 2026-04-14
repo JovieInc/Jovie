@@ -44,7 +44,7 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     id: 'set-up-tips',
     label: 'Set Up Tips',
     description: 'Let fans support you directly',
-    href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`,
+    href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`,
   },
 ];
 

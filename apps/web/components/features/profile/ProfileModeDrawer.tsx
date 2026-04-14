@@ -4,7 +4,7 @@ import { Bell, CalendarDays, Info, Mail, Music2, Ticket } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
@@ -71,8 +71,8 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
     subtitle: 'Get notified about new releases and shows.',
     icon: Bell,
   },
-  tip: {
-    title: 'Tip',
+  pay: {
+    title: 'Pay',
     subtitle: 'Send support instantly with Venmo.',
     icon: Ticket,
   },
@@ -83,7 +83,7 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
   },
 };
 
-const TIP_AMOUNTS = [3, 5, 7];
+const PAY_AMOUNTS = [5, 10, 20];
 
 function ProfileModeFallback({
   title,
@@ -234,7 +234,7 @@ export function ProfileModeDrawer({
           contacts_count: contacts.length,
         });
         break;
-      case 'tip':
+      case 'pay':
         track('tip_drawer_open', { handle: artist.handle });
         // @ts-expect-error joviePixel is injected by JoviePixel
         globalThis.joviePixel?.track?.('tip_page_view');
@@ -344,21 +344,21 @@ export function ProfileModeDrawer({
 
       {activeMode === 'tour' ? (
         <div data-testid='profile-mode-drawer-tour'>
-          <TourDrawerContent artist={artist} tourDates={tourDates} compact />
+          <TourDrawerContent artist={artist} tourDates={tourDates} />
         </div>
       ) : null}
 
-      {activeMode === 'tip' ? (
-        <div data-testid='profile-mode-drawer-tip'>
+      {activeMode === 'pay' ? (
+        <div data-testid='profile-mode-drawer-pay'>
           {hasValidVenmoLink ? (
-            <TipSelector
-              amounts={TIP_AMOUNTS}
+            <PaySelector
+              amounts={PAY_AMOUNTS}
               onContinue={handleTipAmountSelected}
               paymentLabel='Venmo'
             />
           ) : (
             <ProfileModeFallback
-              title='Tipping is not available yet'
+              title='Payments not available yet'
               description='This profile has not added a public Venmo link.'
             />
           )}

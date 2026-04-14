@@ -14,12 +14,12 @@ import {
   type ProfileV2OverlayMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
+import { PayDrawer } from '@/features/profile/PayDrawer';
 import { resolveFeaturedContent } from '@/features/profile/ProfileFeaturedCard';
 import { ArtistHero } from '@/features/profile/ProfileHeroCard';
 import { ProfileScrollBody } from '@/features/profile/ProfileScrollBody';
 import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
 import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
-import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -243,7 +243,7 @@ export function PublicProfileTemplateV2({
       if (nextOverlay === 'contact' && !hasContacts) {
         nextOverlay = null;
       }
-      if (nextOverlay === 'tip' && !venmoLink) {
+      if (nextOverlay === 'pay' && !venmoLink) {
         nextOverlay = null;
       }
       if (nextMode === 'subscribe') {
@@ -364,7 +364,7 @@ export function PublicProfileTemplateV2({
       return;
     }
 
-    setOverlayState('tip');
+    setOverlayState('pay');
   }, [setOverlayState, venmoLink]);
 
   const primaryAction = useMemo(() => {
@@ -483,9 +483,9 @@ export function PublicProfileTemplateV2({
         ) : null}
 
         {venmoLink ? (
-          <TipDrawer
-            open={activeOverlay === 'tip'}
-            onOpenChange={open => setOverlayState(open ? 'tip' : null)}
+          <PayDrawer
+            open={activeOverlay === 'pay'}
+            onOpenChange={open => setOverlayState(open ? 'pay' : null)}
             artistName={artist.name}
             artistHandle={artist.handle}
             venmoLink={venmoLink}

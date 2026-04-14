@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.155.0] - 2026-04-14
+
+> Fans now "pay" artists instead of "tipping" them, with higher default amounts ($5/$10/$20) and cleaner support language everywhere.
+
+### Changed
+
+- Renamed "tip" to "pay" across the entire platform, reframing fan payments as meaningful transactions instead of gratuities
+- Default payment amounts changed from $3/$5/$7 to $5/$10/$20 to match the higher-value "pay" framing
+- Profile mode `'tip'` is now `'pay'` with subtitle "Support" instead of "Send a tip"
+- Deeplink path changed from `/tip` to `/pay` (old `/tip` URLs permanently redirect)
+- Marketing landing page moved from `/tips` to `/pay`
+- All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
+- [internal] 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
+- Density-aware proximity algorithm for tour dates: uses local venue clustering to pick 50mi (dense markets) or 150mi (sparse markets) radius instead of a flat threshold
+- Conversion-first tour drawer: when no events are near a fan, shows subscribe CTA with "No events near you." and collapses other dates behind a disclosure
+- New date row layout with date box on left (month + day stacked) and ticket pill on right
+- London tour date (The O2) added to Calvin Harris demo persona for UK testing
+- Shared `useTourDateProximity` hook deduplicating proximity logic between drawer and public tour page
+- Analytics `source` prop on `ArtistNotificationsCTA` for tracking subscription origin (tour drawer vs profile inline)
+- Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
+- Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
+- `?mode=subscribe` now opens the profile with inline notification input focused instead of a separate drawer
+- Tour drawer empty state simplified: removed card-in-card nesting, uses inline subscribe CTA directly
+
+### Fixed
+
+- Dashboard earnings redirects now scroll to the correct anchor (`#pay` instead of broken `#tips`)
+- Legacy `/tip` route uses permanent redirect (301) instead of temporary (307)
+
+## [26.4.154.0] - 2026-04-13
+
+### Changed
+
+- PWA install banner now shows only for paid subscribers (not free trials), replacing the disabled feature flag with billing-based gating
+- Lighthouse CI build config switched from `lighthouse:no-pwa` to `lighthouse:recommended` preset with PWA score tracking at 0.7 minimum
+
+### Fixed
+
+- Added explicit `apple-mobile-web-app-capable` meta tag for older iOS PWA standalone mode support
+- Aligned offline page theme color and background (`#08090a` → `#0a0a0a`) to match the manifest and layout
+
+## [26.4.152.2] - 2026-04-13
+
+### Added
+
+- Agent guardrail: "No Redundant Chrome" rule (4d) prevents AI agents from adding duplicate titles, headers, and card wrappers inside containers that already provide them
+- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, and DashboardHeader to the chrome they provide
+- Mechanical 4-step checklist for agents to verify container-aware design before PRs
+
+### Changed
+
+- Subtraction Principle (4b) now explicitly requires reading parent container chrome before building child components
+- No AI-Slop rule (4c) now names specific parent surfaces (Sheet, Drawer, existing Card) instead of generic "every block"
+
+## [26.4.153.0] - 2026-04-13
+
+### Added
+
+- Music video release type: artists can now create video releases that show an embedded YouTube player with email subscribe CTA on the release landing page
+- YouTube URL parser and Data API metadata fetcher with graceful degradation
+- Embed timeout-based error detection: redirects to artist profile on load failure, fires tracking beacon for broken video monitoring
+- Demo seed data includes a Calvin Harris music video release for testing
+
+### Changed
+
+- Artist profile latest release now excludes music_video releases to keep the profile focused on email conversion
+- Release filter counts and type styles updated to include music_video
+
 ## [26.4.152.1] - 2026-04-13
 
 ### Fixed

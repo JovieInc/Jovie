@@ -36,7 +36,7 @@ describe('profile view models', () => {
       artist: mockArtist,
       socialLinks: [],
       contacts: [],
-      showTipButton: true,
+      showPayButton: true,
     });
 
     expect(viewModel.mode).toBe('tour');

@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
@@ -45,7 +45,7 @@ export type DrawerView =
   | 'listen'
   | 'subscribe'
   | 'contact'
-  | 'tip'
+  | 'pay'
   | 'tour';
 
 interface DrawerMeta {
@@ -75,8 +75,8 @@ const VIEW_META: Record<DrawerView, DrawerMeta> = {
     title: 'Contact',
     subtitle: 'Management, booking, press, and more.',
   },
-  tip: {
-    title: 'Tip',
+  pay: {
+    title: 'Pay',
     subtitle: 'Send support instantly with Venmo.',
   },
   tour: {
@@ -119,7 +119,7 @@ const menuItemClass =
   'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
-const TIP_AMOUNTS = [3, 5, 7];
+const PAY_AMOUNTS = [5, 10, 20];
 
 function ContactList({
   artistHandle,
@@ -259,7 +259,7 @@ export function ProfileUnifiedDrawer({
           contacts_count: contacts.length,
         });
         break;
-      case 'tip':
+      case 'pay':
         track('tip_drawer_open', { handle: artist.handle });
         // @ts-expect-error joviePixel is injected by JoviePixel
         globalThis.joviePixel?.track?.('tip_page_view');
@@ -356,10 +356,10 @@ export function ProfileUnifiedDrawer({
                   type='button'
                   role='menuitem'
                   className={menuItemClass}
-                  onClick={() => navigateTo('tip')}
+                  onClick={() => navigateTo('pay')}
                 >
                   <Ticket className={iconClass} />
-                  Tip
+                  Pay
                 </button>
               ) : null}
 
@@ -502,26 +502,22 @@ export function ProfileUnifiedDrawer({
 
           {view === 'tour' && (
             <div data-testid='profile-mode-drawer-tour'>
-              <TourDrawerContent
-                artist={artist}
-                tourDates={tourDates}
-                compact
-              />
+              <TourDrawerContent artist={artist} tourDates={tourDates} />
             </div>
           )}
 
-          {view === 'tip' && (
-            <div data-testid='profile-mode-drawer-tip'>
+          {view === 'pay' && (
+            <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
-                <TipSelector
-                  amounts={TIP_AMOUNTS}
+                <PaySelector
+                  amounts={PAY_AMOUNTS}
                   onContinue={handleTipAmountSelected}
                   paymentLabel='Venmo'
                 />
               ) : (
                 <div className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
                   <p className='text-sm font-[590] text-white/88'>
-                    Tipping is not available yet
+                    Payments not available yet
                   </p>
                   <p className='mt-2 text-sm leading-6 text-white/54'>
                     This profile has not added a public Venmo link.

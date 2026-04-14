@@ -24,10 +24,10 @@ import {
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 
-const TipDrawer = dynamic(
+const PayDrawer = dynamic(
   () =>
-    import('@/features/profile/TipDrawer').then(mod => ({
-      default: mod.TipDrawer,
+    import('@/features/profile/PayDrawer').then(mod => ({
+      default: mod.PayDrawer,
     })),
   { ssr: false, loading: () => null }
 );
@@ -64,8 +64,8 @@ export function ProfileShell({
   children,
   showSocialBar = true,
   mode,
-  showTipButton = false,
-  isTipModeActive = false,
+  showPayButton = false,
+  isPayModeActive = false,
   showBackButton = false,
   showTourButton = false,
   isTourModeActive = false,
@@ -98,19 +98,19 @@ export function ProfileShell({
 
   const isMobile = useBreakpointDown('md');
   const router = useRouter();
-  const [tipDrawerOpen, setTipDrawerOpen] = useState(false);
+  const [payDrawerOpen, setPayDrawerOpen] = useState(false);
 
-  // Fire tip_page_view pixel event when tip mode is active on page load
+  // Fire tip_page_view pixel event when pay mode is active on page load
   useEffect(() => {
-    if (!isTipModeActive) return;
+    if (!isPayModeActive) return;
     // @ts-expect-error - joviePixel is set by JoviePixel component
     if (globalThis.joviePixel?.track) {
       // @ts-expect-error - joviePixel is set by JoviePixel component
       globalThis.joviePixel.track('tip_page_view');
     }
-  }, [isTipModeActive]);
+  }, [isPayModeActive]);
 
-  // Extract venmo link from social links for the tip drawer
+  // Extract venmo link from social links for the pay drawer
   const venmoLink = useMemo(
     () => socialLinks.find(l => l.platform === 'venmo')?.url ?? null,
     [socialLinks]
@@ -119,7 +119,7 @@ export function ProfileShell({
     () => extractVenmoUsername(venmoLink),
     [venmoLink]
   );
-  const hasTipSupport = showTipButton && Boolean(venmoLink);
+  const hasPaySupport = showPayButton && Boolean(venmoLink);
   const headerSocialLinks = useMemo(
     () => prioritizedSocialLinks.slice(0, 2),
     [prioritizedSocialLinks]
@@ -262,7 +262,7 @@ export function ProfileShell({
 
                   {(showSocialBar ||
                     showTourButton ||
-                    hasTipSupport ||
+                    hasPaySupport ||
                     hasContacts ||
                     showShopButton) && (
                     <PublicSurfaceFooter className='mt-auto pt-6 sm:pt-8'>
@@ -346,23 +346,23 @@ export function ProfileShell({
                           </CircleIconButton>
                         )}
 
-                        {hasTipSupport && venmoLink && (
+                        {hasPaySupport && venmoLink && (
                           <CircleIconButton
                             size='md'
                             variant='pearl'
-                            ariaLabel='Tip'
-                            data-testid='tip-trigger'
+                            ariaLabel='Pay'
+                            data-testid='pay-trigger'
                             className={`transition-[background-color,color,box-shadow] ${
-                              isTipModeActive
+                              isPayModeActive
                                 ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
                                 : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                             }`}
                             onClick={() => {
                               if (isMobile) {
-                                setTipDrawerOpen(true);
+                                setPayDrawerOpen(true);
                                 return;
                               }
-                              router.push(`/${artist.handle}?mode=tip`);
+                              router.push(`/${artist.handle}?mode=pay`);
                             }}
                           >
                             <DollarSign
@@ -377,10 +377,10 @@ export function ProfileShell({
                 </div>
               </div>
 
-              {hasTipSupport && venmoLink && isMobile ? (
-                <TipDrawer
-                  open={tipDrawerOpen}
-                  onOpenChange={setTipDrawerOpen}
+              {hasPaySupport && venmoLink && isMobile ? (
+                <PayDrawer
+                  open={payDrawerOpen}
+                  onOpenChange={setPayDrawerOpen}
                   artistName={artist.name}
                   artistHandle={artist.handle}
                   venmoLink={venmoLink}

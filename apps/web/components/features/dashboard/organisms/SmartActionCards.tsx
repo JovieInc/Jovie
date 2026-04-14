@@ -120,7 +120,7 @@ export const SmartActionCards = memo(function SmartActionCards({
     const tipsHref =
       monetizationSummary.paymentState === 'not_setup' &&
       monetizationSummary.manageHref !== APP_ROUTES.SETTINGS_PAYMENTS
-        ? `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`
+        ? `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
         : monetizationSummary.manageHref;
 
     let tipsHeading: string;

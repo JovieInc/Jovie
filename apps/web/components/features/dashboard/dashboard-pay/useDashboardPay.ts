@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useUpdateVenmoMutation } from '@/lib/queries';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import type { UseDashboardTippingReturn } from './types';
+import type { UseDashboardPayReturn } from './types';
 
 /**
  * Hook to manage dashboard tipping state and handlers.
@@ -16,7 +16,7 @@ import type { UseDashboardTippingReturn } from './types';
  * - Calls router.refresh() to update server data after save
  * - Shows toast notifications for success/error states
  */
-export function useDashboardTipping(): UseDashboardTippingReturn {
+export function useDashboardPay(): UseDashboardPayReturn {
   const router = useRouter();
   const dashboardData = useDashboardData();
   const updateVenmoMutation = useUpdateVenmoMutation();

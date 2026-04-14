@@ -33,7 +33,7 @@ const QR_DOWNLOAD_SIZE = 1024;
 
 type TipsSurfaceVariant = 'settings' | 'drawer';
 
-export interface ProfileTipsSurfaceProps {
+export interface ProfilePaySurfaceProps {
   readonly summary: ProfileMonetizationSummaryResponse;
   readonly variant?: TipsSurfaceVariant;
   readonly onSetUsername: () => void;
@@ -69,7 +69,7 @@ function ProviderPill({
   );
 }
 
-export function ProfileTipsSurface({
+export function ProfilePaySurface({
   summary,
   variant = 'settings',
   onSetUsername,
@@ -77,7 +77,7 @@ export function ProfileTipsSurface({
   onManagePayments,
   onViewAnalytics,
   className,
-}: Readonly<ProfileTipsSurfaceProps>) {
+}: Readonly<ProfilePaySurfaceProps>) {
   const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
   const isDrawer = variant === 'drawer';
   const isShareable =
@@ -117,7 +117,9 @@ export function ProfileTipsSurface({
   const handleCopyTipLink = useCallback(async () => {
     if (summary.tipUrl === null) return;
     const didCopy = await copyToClipboard(summary.tipUrl);
-    setStatusMessage(didCopy ? 'Tip link copied.' : 'Could not copy tip link.');
+    setStatusMessage(
+      didCopy ? 'Payment link copied.' : 'Could not copy payment link.'
+    );
   }, [summary.tipUrl]);
 
   const handlePrimaryAction = useCallback(async () => {
@@ -156,8 +158,8 @@ export function ProfileTipsSurface({
       );
       const response = await fetch(dataUrl);
       const blob = await response.blob();
-      const username = summary.tipUrl.split('/').at(-2) ?? 'tip-link';
-      downloadBlob(blob, `jovie-tip-${username}.png`);
+      const username = summary.tipUrl.split('/').at(-2) ?? 'pay-link';
+      downloadBlob(blob, `jovie-pay-${username}.png`);
       setStatusMessage('QR code downloaded as PNG.');
     } catch {
       setStatusMessage('Could not download PNG QR code.');
@@ -175,9 +177,9 @@ export function ProfileTipsSurface({
         summary.tipUrl,
         QR_DOWNLOAD_SIZE
       );
-      const username = summary.tipUrl.split('/').at(-2) ?? 'tip-link';
+      const username = summary.tipUrl.split('/').at(-2) ?? 'pay-link';
       downloadString(svgString, {
-        filename: `jovie-tip-${username}.svg`,
+        filename: `jovie-pay-${username}.svg`,
         mimeType: 'image/svg+xml',
       });
       setStatusMessage('QR code downloaded as SVG.');
@@ -279,7 +281,7 @@ export function ProfileTipsSurface({
               onClick={onViewAnalytics}
               className='inline-flex w-fit items-start gap-1.5 text-left text-[12px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
             >
-              <span>View tip traffic in Analytics</span>
+              <span>View payment traffic in Analytics</span>
               <ArrowUpRight
                 className='mt-0.5 h-3.5 w-3.5 shrink-0'
                 aria-hidden='true'
@@ -316,7 +318,7 @@ export function ProfileTipsSurface({
           {qrPreviewUrl ? (
             <Image
               src={qrPreviewUrl}
-              alt='Tip QR code'
+              alt='Payment QR code'
               width={isDrawer ? 132 : 124}
               height={isDrawer ? 132 : 124}
               unoptimized
@@ -328,7 +330,7 @@ export function ProfileTipsSurface({
                 <Link2 className='h-4 w-4' aria-hidden='true' />
               </div>
               <p className='text-[11px] leading-[14px] text-tertiary-token'>
-                QR unlocks when tips are live.
+                QR unlocks when payments are live.
               </p>
             </div>
           )}
