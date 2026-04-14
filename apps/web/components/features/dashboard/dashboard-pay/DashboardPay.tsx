@@ -326,7 +326,7 @@ const TipLinkSection = memo(function TipLinkSection({
         >
           <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
         </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>Pay link</h3>
+        <h3 className='text-[13px] font-[510] text-primary-token'>Pay Link</h3>
       </div>
 
       <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
