@@ -82,9 +82,11 @@ function TourDateRow({
     date.ticketStatus !== 'sold_out';
   const monthLabel = new Intl.DateTimeFormat('en-US', {
     month: 'short',
+    timeZone: 'UTC',
   }).format(parsedDate);
   const dayLabel = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
+    timeZone: 'UTC',
   }).format(parsedDate);
   const ticketStatusClassName = getTicketStatusClassName(
     date.ticketStatus,

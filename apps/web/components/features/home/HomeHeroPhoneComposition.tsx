@@ -15,18 +15,23 @@ export function HomeHeroPhoneComposition() {
       return;
     }
 
-    // Track how far the user has scrolled from the top of the page.
-    // Flanks are hidden at scrollY=0 and fully revealed after ~400px of scroll.
     const revealDistance = 400;
+    let raf = 0;
 
     function onScroll() {
-      const raw = window.scrollY / revealDistance;
-      setProgress(Math.max(0, Math.min(1, raw)));
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const raw = window.scrollY / revealDistance;
+        setProgress(Math.max(0, Math.min(1, raw)));
+      });
     }
 
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(raf);
+    };
   }, [reducedMotion]);
 
   // Flanks start hidden behind center, slide out slightly on scroll
