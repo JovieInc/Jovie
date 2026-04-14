@@ -110,6 +110,18 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
+  describe('public claim banner handling', () => {
+    it('does not read search params on the server page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        'const resolvedSearchParams = await searchParams;'
+      );
+    });
+
+    it('delegates claim banner query handling to the client wrapper', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+    });
+  });
+
   describe('generateProfileStructuredData', () => {
     // We test the structured data generation logic directly
     // Since it's a private function, we replicate the logic here for testing

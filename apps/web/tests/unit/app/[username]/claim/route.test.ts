@@ -118,4 +118,37 @@ describe('Claim route', () => {
     );
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
+
+  it('allows resuming a matching pending claim even when the user has an active profile', async () => {
+    mockGetOptionalAuth.mockResolvedValueOnce({ userId: 'clerk_123' });
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_1',
+      username: 'testartist',
+      expectedSpotifyArtistId: 'spotify_123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const { db } = await import('@/lib/db');
+    vi.mocked(db.select).mockReturnValueOnce({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn().mockResolvedValue([{ activeProfileId: 'profile_1' }]),
+        })),
+      })),
+    } as never);
+
+    const response = await GET(
+      new NextRequest('http://localhost/TestArtist/claim?next=auth'),
+      {
+        params: Promise.resolve({ username: 'TestArtist' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/onboarding?handle=testartist'
+    );
+  });
 });

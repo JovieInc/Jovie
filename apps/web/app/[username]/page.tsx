@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
-import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -47,7 +46,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
-import { resolveClaimBannerState } from './_lib/claim-banner-state';
+import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
 import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
@@ -492,9 +491,6 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams?: Promise<{
-    readonly claim?: string;
-  }>;
 }
 
 async function getPublicTourDates(
@@ -516,12 +512,8 @@ async function getPublicTourDates(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -584,14 +576,6 @@ export default async function ArtistPage({
     authUserId: null,
     pendingClaimContext: null,
   });
-  const { claimBannerVariant, shouldShowClaimBanner } = resolveClaimBannerState(
-    {
-      visitorState,
-      claimSearchParam: resolvedSearchParams?.claim,
-      directClaimSupported,
-      isClaimed: profile.is_claimed,
-    }
-  );
 
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
@@ -647,18 +631,13 @@ export default async function ArtistPage({
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
-      {shouldShowClaimBanner ? (
-        <ClaimBanner
-          profileHandle={artist.handle}
-          displayName={artist.name}
-          variant={claimBannerVariant ?? undefined}
-          ctaHref={
-            claimBannerVariant === 'unsupported'
-              ? undefined
-              : `/${encodeURIComponent(artist.handle)}/claim?next=auth`
-          }
-        />
-      ) : null}
+      <PublicClaimBanner
+        profileHandle={artist.handle}
+        displayName={artist.name}
+        directClaimSupported={directClaimSupported}
+        isClaimed={profile.is_claimed}
+        visitorState={visitorState}
+      />
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage

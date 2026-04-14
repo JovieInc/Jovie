@@ -213,13 +213,21 @@ export async function GET(
   }
 
   const { userId } = await getOptionalAuth();
-  if (userId && (await hasActiveCreatorProfile(userId))) {
-    return redirectTo(request, APP_ROUTES.DASHBOARD);
-  }
-
   const existingPendingClaim = await readPendingClaimContext({
     username: profile.usernameNormalized,
   });
+  if (
+    userId &&
+    (await hasActiveCreatorProfile(userId)) &&
+    !(
+      existingPendingClaim &&
+      existingPendingClaim.creatorProfileId === profile.id &&
+      existingPendingClaim.username === profile.usernameNormalized
+    )
+  ) {
+    return redirectTo(request, APP_ROUTES.DASHBOARD);
+  }
+
   const claimPreviewUrl = buildClaimPreviewPath(profile.usernameNormalized);
   const searchParams = request.nextUrl.searchParams;
   const token = searchParams.get('token')?.trim();
