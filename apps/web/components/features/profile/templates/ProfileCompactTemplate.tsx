@@ -410,6 +410,8 @@ export function ProfileCompactTemplate({
         pendingInlineRevealRef.current = false;
         revealNotificationsRef.current();
       }
+      // Reset so the URL cleanup effect runs and refresh doesn't re-trigger
+      setRequestedMode(mode);
       return;
     }
 
@@ -421,7 +423,7 @@ export function ProfileCompactTemplate({
       setDrawerView('menu');
       setDrawerOpen(false);
     }
-  }, [requestedMode, resolveInitialView]);
+  }, [mode, requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
