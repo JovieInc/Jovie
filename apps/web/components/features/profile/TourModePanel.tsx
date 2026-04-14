@@ -194,11 +194,13 @@ function TourDatesContent({
   nearby,
   allDates,
   hasLocation,
+  isLocationLoading,
 }: {
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly allDates: TourDateWithProximity[];
   readonly hasLocation: boolean;
+  readonly isLocationLoading: boolean;
 }) {
   const [showAllDates, setShowAllDates] = useState(false);
   const disclosureId = useId();
@@ -221,7 +223,9 @@ function TourDatesContent({
   }
 
   // State 4 & 5: No geolocation or still loading
-  if (!hasLocation) {
+  // While geo is loading OR denied, show all dates without Near You section.
+  // This prevents the jarring flip from "All Dates" to "No events near you" CTA.
+  if (!hasLocation || isLocationLoading) {
     return (
       <div>
         <SectionLabel>All Dates</SectionLabel>
@@ -315,7 +319,7 @@ export function TourDrawerContent({
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
 }>) {
-  const { location } = useUserLocation();
+  const { location, isLoading } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   return (
@@ -325,6 +329,7 @@ export function TourDrawerContent({
         nearby={nearbyDates}
         allDates={allDates}
         hasLocation={location !== null}
+        isLocationLoading={isLoading}
       />
     </div>
   );
