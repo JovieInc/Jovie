@@ -176,6 +176,7 @@ export function ProfileCompactTemplate({
     getModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const pendingInlineRevealRef = useRef(false);
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
 
@@ -400,6 +401,20 @@ export function ProfileCompactTemplate({
   }, [mode, requestedMode]);
 
   useEffect(() => {
+    // Subscribe mode: skip the drawer, reveal the inline CTA directly
+    if (requestedMode === 'subscribe') {
+      setDrawerView('menu');
+      setDrawerOpen(false);
+      pendingInlineRevealRef.current = true;
+      if (revealNotificationsRef.current) {
+        pendingInlineRevealRef.current = false;
+        revealNotificationsRef.current();
+      }
+      // Reset so the URL cleanup effect runs and refresh doesn't re-trigger
+      setRequestedMode(mode);
+      return;
+    }
+
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       setDrawerView(resolved);
@@ -408,7 +423,7 @@ export function ProfileCompactTemplate({
       setDrawerView('menu');
       setDrawerOpen(false);
     }
-  }, [requestedMode, resolveInitialView]);
+  }, [mode, requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -760,6 +775,10 @@ export function ProfileCompactTemplate({
                   onManageNotifications={() => openDrawerMode('notifications')}
                   onRegisterReveal={fn => {
                     revealNotificationsRef.current = fn;
+                    if (pendingInlineRevealRef.current) {
+                      pendingInlineRevealRef.current = false;
+                      fn();
+                    }
                   }}
                 />
 

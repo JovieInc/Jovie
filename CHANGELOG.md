@@ -18,6 +18,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Marketing landing page moved from `/tips` to `/pay`
 - All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
 - [internal] 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
+- Density-aware proximity algorithm for tour dates: uses local venue clustering to pick 50mi (dense markets) or 150mi (sparse markets) radius instead of a flat threshold
+- Conversion-first tour drawer: when no events are near a fan, shows subscribe CTA with "No events near you." and collapses other dates behind a disclosure
+- New date row layout with date box on left (month + day stacked) and ticket pill on right
+- London tour date (The O2) added to Calvin Harris demo persona for UK testing
+- Shared `useTourDateProximity` hook deduplicating proximity logic between drawer and public tour page
+- Analytics `source` prop on `ArtistNotificationsCTA` for tracking subscription origin (tour drawer vs profile inline)
+- Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
+- Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
+- `?mode=subscribe` now opens the profile with inline notification input focused instead of a separate drawer
+- Tour drawer empty state simplified: removed card-in-card nesting, uses inline subscribe CTA directly
 
 ### Fixed
 

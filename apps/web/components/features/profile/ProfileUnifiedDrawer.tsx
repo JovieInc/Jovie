@@ -502,11 +502,7 @@ export function ProfileUnifiedDrawer({
 
           {view === 'tour' && (
             <div data-testid='profile-mode-drawer-tour'>
-              <TourDrawerContent
-                artist={artist}
-                tourDates={tourDates}
-                compact
-              />
+              <TourDrawerContent artist={artist} tourDates={tourDates} />
             </div>
           )}
 
