@@ -4,6 +4,6 @@ export {
 } from '@/features/profile/utils/venmo';
 
 /**
- * Default tip amounts
+ * Default pay amounts
  */
-export const TIP_AMOUNTS = [5, 10, 20] as const;
+export const PAY_AMOUNTS = [5, 10, 20] as const;

@@ -204,7 +204,7 @@ describe('surface elevation guardrails', () => {
     const earningsView = readFileSync(
       join(
         ROOT,
-        'components/features/dashboard/dashboard-tipping/DashboardTipping.tsx'
+        'components/features/dashboard/dashboard-pay/DashboardPay.tsx'
       ),
       'utf-8'
     );

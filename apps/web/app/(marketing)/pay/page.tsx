@@ -1,27 +1,27 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { TipsLanding } from '@/features/tips/TipsLanding';
+import { PayLanding } from '@/features/pay/PayLanding';
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = 'Turn Every Tip Into a Fan';
-  const ogTitle = `${APP_NAME} — Turn Every Tip Into a Fan`;
+  const title = 'Turn Every Payment Into a Fan';
+  const ogTitle = `${APP_NAME} — Turn Every Payment Into a Fan`;
   const description =
-    'Scan. Tip. Stream. One QR code turns a stranger into a superfan. Perfect for buskers, open mic nights, merch tables, and house shows.';
+    'Scan. Pay. Stream. One QR code turns a stranger into a superfan. Perfect for buskers, open mic nights, merch tables, and house shows.';
 
   return {
     title,
     description,
     metadataBase: new URL(BASE_URL),
     alternates: {
-      canonical: `${BASE_URL}/tips`,
+      canonical: `${BASE_URL}/pay`,
     },
     openGraph: {
       type: 'website',
       title: ogTitle,
       description,
-      url: `${BASE_URL}/tips`,
+      url: `${BASE_URL}/pay`,
       siteName: APP_NAME,
       images: [
         {
@@ -46,6 +46,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function TipsPage() {
-  return <TipsLanding />;
+export default function PayPage() {
+  return <PayLanding />;
 }

@@ -136,7 +136,7 @@ function ListenContent() {
   );
 }
 
-function TipContent() {
+function PayContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
@@ -222,10 +222,10 @@ function ProfileContent() {
 /** Pre-built mode content keyed by mode ID. */
 export const MODE_CONTENT: Record<string, React.ReactNode> = {
   listen: <ListenContent />,
-  tip: <TipContent />,
+  pay: <PayContent />,
   tour: <TourContent />,
   profile: <ProfileContent />,
 };
 
 /** Mode IDs in display order. */
-export const MODE_IDS = ['profile', 'tour', 'tip', 'listen'] as const;
+export const MODE_IDS = ['profile', 'tour', 'pay', 'listen'] as const;

@@ -1,6 +1,6 @@
 'use client';
 
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 
 interface ProfileTipDrawerContentProps {
   readonly amounts?: readonly number[];
@@ -15,13 +15,12 @@ export function ProfileTipDrawerContent({
 }: ProfileTipDrawerContentProps) {
   return (
     <div data-testid='profile-tip-drawer-content'>
-      <TipSelector
+      <PaySelector
         amounts={[...amounts]}
         onContinue={
           interactive ? amount => onAmountSelected?.(amount) : () => {}
         }
         paymentLabel='Pay'
-        showPaymentIcon={false}
       />
     </div>
   );

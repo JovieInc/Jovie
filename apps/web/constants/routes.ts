@@ -110,7 +110,7 @@ export const APP_ROUTES = {
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
   SUPPORT: '/support',
-  TIPS: '/tips',
+  PAY: '/pay',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

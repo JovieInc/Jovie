@@ -16,7 +16,7 @@ export interface StaticArtistPageProps {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton?: boolean;
+  readonly showPayButton?: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
   readonly showFooter?: boolean;
@@ -45,7 +45,7 @@ export function StaticArtistPage({
   socialLinks,
   contacts,
   subtitle,
-  showTipButton,
+  showPayButton,
   showBackButton,
   showTourButton,
   showFooter,
@@ -69,7 +69,7 @@ export function StaticArtistPage({
     artist,
     socialLinks,
     contacts,
-    showTipButton,
+    showPayButton,
     subtitle,
     showBackButton,
     showTourButton,

@@ -5,23 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.155.0] - 2026-04-13
+## [26.4.155.0] - 2026-04-14
 
-### Added
+> Fans now "pay" artists instead of "tipping" them, with higher default amounts ($5/$10/$20) and cleaner support language everywhere.
 
+### Changed
+
+- Renamed "tip" to "pay" across the entire platform, reframing fan payments as meaningful transactions instead of gratuities
+- Default payment amounts changed from $3/$5/$7 to $5/$10/$20 to match the higher-value "pay" framing
+- Profile mode `'tip'` is now `'pay'` with subtitle "Support" instead of "Send a tip"
+- Deeplink path changed from `/tip` to `/pay` (old `/tip` URLs permanently redirect)
+- Marketing landing page moved from `/tips` to `/pay`
+- All user-facing copy updated: "tip"/"tipping" language replaced with "pay"/"payment"/"support"
+- [internal] 15+ component files renamed (TipSelector → PaySelector, TipDrawer → PayDrawer, etc.)
 - Density-aware proximity algorithm for tour dates: uses local venue clustering to pick 50mi (dense markets) or 150mi (sparse markets) radius instead of a flat threshold
 - Conversion-first tour drawer: when no events are near a fan, shows subscribe CTA with "No events near you." and collapses other dates behind a disclosure
 - New date row layout with date box on left (month + day stacked) and ticket pill on right
 - London tour date (The O2) added to Calvin Harris demo persona for UK testing
 - Shared `useTourDateProximity` hook deduplicating proximity logic between drawer and public tour page
 - Analytics `source` prop on `ArtistNotificationsCTA` for tracking subscription origin (tour drawer vs profile inline)
-
-### Changed
-
 - Tour drawer section labels renamed from "In Your Area"/"Upcoming" to "Near You"/"All Dates"
 - Nearby dates now appear in both "Near You" section and chronological "All Dates" list for complete tour routing
 - `?mode=subscribe` now opens the profile with inline notification input focused instead of a separate drawer
 - Tour drawer empty state simplified: removed card-in-card nesting, uses inline subscribe CTA directly
+
+### Fixed
+
+- Dashboard earnings redirects now scroll to the correct anchor (`#pay` instead of broken `#tips`)
+- Legacy `/tip` route uses permanent redirect (301) instead of temporary (307)
 
 ## [26.4.154.0] - 2026-04-13
 

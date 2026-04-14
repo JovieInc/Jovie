@@ -11,7 +11,7 @@ const MODE_LABELS: Record<SwipeableProfileMode, string> = {
   profile: 'Home',
   tour: 'Tour',
   about: 'About',
-  tip: 'Tip',
+  pay: 'Pay',
 };
 
 interface ProfileHeaderV2Props {

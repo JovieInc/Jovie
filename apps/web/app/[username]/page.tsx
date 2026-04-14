@@ -580,7 +580,7 @@ export default async function ArtistPage({
     contacts,
     artist.name
   );
-  const showTipButton = links.some(link => link.platform === 'venmo');
+  const showPayButton = links.some(link => link.platform === 'venmo');
   const showBackButton = requestedMode !== 'profile';
   const subtitle = getProfileModeDefinition(requestedMode).subtitle;
 
@@ -633,7 +633,7 @@ export default async function ArtistPage({
         contacts={publicContacts}
         subtitle={subtitle}
         showBackButton={showBackButton}
-        showTipButton={showTipButton}
+        showPayButton={showPayButton}
         showTourButton={true}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}

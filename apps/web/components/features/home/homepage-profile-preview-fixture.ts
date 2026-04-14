@@ -382,7 +382,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   },
   'tips-open': {
     id: 'tips-open',
-    drawerView: 'tip',
+    drawerView: 'pay',
     latestReleaseKey: 'none',
     notifications: {
       kind: 'button',
@@ -395,7 +395,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   },
   'tips-apple-pay': {
     id: 'tips-apple-pay',
-    drawerView: 'tip',
+    drawerView: 'pay',
     latestReleaseKey: 'none',
     notifications: {
       kind: 'button',

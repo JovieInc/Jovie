@@ -4,24 +4,22 @@ import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 
-interface TipSelectorProps {
+interface PaySelectorProps {
   readonly amounts?: number[];
   readonly onContinue: (amount: number) => void;
   readonly isLoading?: boolean;
   readonly className?: string;
   /** Label for the payment method shown on the continue button (e.g. "Venmo", "Apple Pay") */
   readonly paymentLabel?: string;
-  readonly showPaymentIcon?: boolean;
 }
 
-export function TipSelector({
+export function PaySelector({
   amounts = [5, 10, 20],
   onContinue,
   isLoading = false,
   className = '',
   paymentLabel,
-  showPaymentIcon = paymentLabel === 'Venmo',
-}: TipSelectorProps) {
+}: PaySelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -47,28 +45,25 @@ export function TipSelector({
   if (isLoading) {
     continueLabel = 'Processing...';
   } else if (paymentLabel) {
-    continueLabel =
-      paymentLabel === 'Pay'
-        ? `Pay $${selectedAmount}`
-        : `Continue with ${paymentLabel}`;
+    continueLabel = `Continue with ${paymentLabel}`;
   }
 
   return (
-    <div className={`space-y-4 ${className}`} data-test='tip-selector'>
-      <h3 id='tip-selector-heading' className='sr-only'>
-        Select tip amount
+    <div className={`space-y-5 ${className}`} data-test='pay-selector'>
+      <h3 id='pay-selector-heading' className='sr-only'>
+        Select amount
       </h3>
 
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      <p className='text-[12px] font-[540] tracking-[-0.015em] text-secondary-token'>
+      <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
         Choose Amount
       </p>
 
       <fieldset
-        className='m-0 grid grid-cols-3 gap-3 border-0 p-0'
-        aria-label='Tip amount options'
+        className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
+        aria-label='Amount options'
       >
         {amounts.map((amount, idx) => (
           <AmountSelector
@@ -83,19 +78,17 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-200 hover:border-white/14'
+        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-[15px] font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-200 hover:border-white/14'
         size='lg'
         disabled={isLoading}
         variant='primary'
         aria-label={
           paymentLabel
-            ? paymentLabel === 'Pay'
-              ? `Pay $${selectedAmount}`
-              : `Continue with ${paymentLabel} for $${selectedAmount} tip`
-            : `Continue with $${selectedAmount} tip`
+            ? `Continue with ${paymentLabel} for $${selectedAmount}`
+            : `Continue with $${selectedAmount}`
         }
       >
-        {showPaymentIcon && paymentLabel === 'Venmo' && (
+        {paymentLabel && (
           <svg
             width='20'
             height='20'

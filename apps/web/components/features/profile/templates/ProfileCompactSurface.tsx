@@ -642,9 +642,6 @@ export function ProfileCompactSurface({
         allowPhotoDownloads={allowPhotoDownloads}
         tourDates={tourDates}
         onRevealNotifications={onRevealNotifications}
-        renderMode={renderMode}
-        presentation={presentation}
-        previewNotificationsState={previewNotificationsState}
       />
     </div>
   );

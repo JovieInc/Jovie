@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
-import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
+import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
 import { useProfileMonetizationSummary } from '@/lib/queries';
 
 function LoadingState() {
@@ -31,7 +31,7 @@ function ErrorState({
   return (
     <div className='flex flex-col gap-3 px-4 py-4 sm:px-5'>
       <p className='text-[13px] leading-[19px] text-secondary-token'>
-        Could not load your tips summary right now.
+        Could not load your payments summary right now.
       </p>
       <div>
         <Button type='button' size='sm' variant='secondary' onClick={onRetry}>
@@ -42,7 +42,7 @@ function ErrorState({
   );
 }
 
-export function SettingsTipsSection() {
+export function SettingsPaySection() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -64,7 +64,7 @@ export function SettingsTipsSection() {
 
       const nextSearch = nextParams.toString();
       const searchSuffix = nextSearch ? `?${nextSearch}` : '';
-      router.replace(`${pathname}${searchSuffix}#tips`, {
+      router.replace(`${pathname}${searchSuffix}#pay`, {
         scroll: false,
       });
     },
@@ -100,9 +100,9 @@ export function SettingsTipsSection() {
   }, [router]);
 
   return (
-    <div id='tips'>
+    <div id='pay'>
       <SettingsPanel
-        title='Tips'
+        title='Payments'
         description='Let fans support you directly from your profile.'
       >
         {isError && (
@@ -114,7 +114,7 @@ export function SettingsTipsSection() {
         )}
         {!isError && (isLoading || !summary) && <LoadingState />}
         {!isError && !isLoading && summary && (
-          <ProfileTipsSurface
+          <ProfilePaySurface
             summary={summary}
             variant='settings'
             onSetUsername={handleSetUsername}

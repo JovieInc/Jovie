@@ -17,7 +17,7 @@ interface BuildProfilePublicViewModelInput {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
-  readonly showTipButton?: boolean;
+  readonly showPayButton?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
@@ -45,7 +45,7 @@ export function buildProfilePublicViewModel({
   artist,
   socialLinks,
   contacts,
-  showTipButton = false,
+  showPayButton = false,
   autoOpenCapture,
   enableDynamicEngagement = false,
   latestRelease,
@@ -74,8 +74,8 @@ export function buildProfilePublicViewModel({
     socialLinks,
     contacts,
     subtitle: subtitle ?? definition.subtitle,
-    showTipButton,
-    isTipModeActive: resolvedMode === 'tip',
+    showPayButton,
+    isPayModeActive: resolvedMode === 'pay',
     showBackButton: showBackButton ?? definition.shell.showBackButton,
     showTourButton: showTourButton ?? definition.shell.showTourButton,
     isTourModeActive: resolvedMode === 'tour',

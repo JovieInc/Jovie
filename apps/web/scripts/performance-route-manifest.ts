@@ -383,7 +383,7 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['[data-testid="profile-header"]'],
-      redirectDestinations: ['/[username]?mode=tip'],
+      redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },
@@ -442,10 +442,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     seedProfile: 'dualipa',
   },
   {
-    id: 'public-profile-mode-tip',
+    id: 'public-profile-mode-pay',
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
-    path: '/[username]?mode=tip',
+    path: '/[username]?mode=pay',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
@@ -453,7 +453,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
-        '[data-testid="profile-mode-drawer-tip"]',
+        '[data-testid="profile-mode-drawer-pay"]',
         '[data-testid="profile-header"]',
       ],
     },
