@@ -404,7 +404,7 @@ describe('performance route resolvers', () => {
         baseUrl: 'http://127.0.0.1:4100',
       })
     ).rejects.toThrow(
-      'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
+      'Release tasks require either DATABASE_URL with a resolvable active profile or authenticated authCookies for the app fallback.'
     );
 
     expect(addCookies).toHaveBeenCalledOnce();

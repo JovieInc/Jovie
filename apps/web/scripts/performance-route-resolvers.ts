@@ -11,6 +11,8 @@ const DEFAULT_PUBLIC_TRACK_SLUG = 'neon-skyline';
 const PERF_CHAT_THREAD_TITLE = 'Performance Budget Thread';
 const PERF_RELEASE_SLUG = 'performance-budget-release';
 const PERF_RELEASE_TITLE = 'Performance Budget Release';
+const RELEASE_TASKS_RESOLUTION_ERROR =
+  'Release tasks require either DATABASE_URL with a resolvable active profile or authenticated authCookies for the app fallback.';
 
 function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -451,9 +453,7 @@ export async function resolveReleaseTasksPerfPath(
       return resolvedPath;
     }
 
-    throw new Error(
-      'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
-    );
+    throw new Error(RELEASE_TASKS_RESOLUTION_ERROR);
   }
 
   const activeProfile =
@@ -466,9 +466,7 @@ export async function resolveReleaseTasksPerfPath(
       return resolvedPath;
     }
 
-    throw new Error(
-      'DATABASE_URL and E2E_CLERK_USER_ID are required to resolve release tasks.'
-    );
+    throw new Error(RELEASE_TASKS_RESOLUTION_ERROR);
   }
 
   const releases = await sql<Array<{ id: string }>>`
