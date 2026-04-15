@@ -28,6 +28,7 @@ import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
@@ -525,23 +526,15 @@ export function ProfileCompactTemplate({
     openDrawerMode('listen');
   }, [mergedDSPs.length, openDrawerMode]);
 
-  const handleShare = useCallback(async () => {
-    const profileUrl = `${BASE_URL}/${artist.handle}`;
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({ title: artist.name, url: profileUrl });
-      } else {
-        await navigator.clipboard.writeText(profileUrl);
-      }
-    } catch {
-      try {
-        await navigator.clipboard.writeText(profileUrl);
-      } catch {
-        // Silent failure
-      }
-    }
-    setRequestedMode('profile');
-  }, [artist.handle, artist.name]);
+  const shareContext = useMemo(
+    () =>
+      buildProfileShareContext({
+        username: artist.handle,
+        artistName: artist.name,
+        avatarUrl: heroImageUrl,
+      }),
+    [artist.handle, artist.name, heroImageUrl]
+  );
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -598,6 +591,7 @@ export function ProfileCompactTemplate({
                 >
                   <Link
                     href={APP_ROUTES.ARTIST_PROFILES}
+                    prefetch={false}
                     aria-label='Create your artist profile on Jovie'
                     className='rounded-full opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                   >
@@ -629,6 +623,7 @@ export function ProfileCompactTemplate({
                     <Link
                       data-testid='profile-identity-link'
                       href={profileHref}
+                      prefetch={false}
                       aria-label={`Go to ${artist.name}'s profile`}
                       className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                     >
@@ -840,7 +835,7 @@ export function ProfileCompactTemplate({
           onTogglePref={handleTogglePref}
           onUnsubscribe={handleUnsubscribe}
           isUnsubscribing={unsubMutation.isPending}
-          onShare={handleShare}
+          shareContext={shareContext}
           enableDynamicEngagement={enableDynamicEngagement}
           subscribeTwoStep={subscribeTwoStep}
           hasAbout={hasAbout}

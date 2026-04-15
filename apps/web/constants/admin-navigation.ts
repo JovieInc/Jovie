@@ -34,7 +34,8 @@ export type AdminWorkspaceId =
   | 'growth'
   | 'activity'
   | 'investors'
-  | 'screenshots';
+  | 'screenshots'
+  | 'share_studio';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -56,6 +57,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'screenshots',
+  'share_studio',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -99,6 +101,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'share_studio',
+    label: 'Share Studio',
+    href: APP_ROUTES.ADMIN_SHARE_STUDIO,
+    description: 'Preview story assets, payloads, and tracked share outputs',
     section: 'utilities',
   },
 ] as const;
