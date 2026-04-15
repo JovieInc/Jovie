@@ -182,6 +182,12 @@ export const MENU_ITEM_DESTRUCTIVE =
   '[&_svg]:text-(--linear-error) hover:[&_svg]:text-(--linear-error) data-[highlighted]:[&_svg]:text-(--linear-error)';
 
 /**
+ * Selected/active item state for menus with current choices
+ */
+export const MENU_ITEM_SELECTED =
+  'bg-(--linear-bg-surface-1) text-(--linear-text-primary) [&_svg]:text-(--linear-text-primary)';
+
+/**
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
@@ -248,6 +254,45 @@ export const MENU_SEPARATOR_BASE =
 export const MENU_SHORTCUT_BASE =
   'ml-auto text-[10.5px] font-medium text-(--linear-text-tertiary)';
 
+/**
+ * Shared leading/trailing slots for structured menu rows
+ */
+export const MENU_LEADING_SLOT_BASE =
+  'flex h-4 w-4 shrink-0 items-center justify-center text-(--linear-text-tertiary)';
+
+export const MENU_TRAILING_SLOT_BASE =
+  'ml-auto inline-flex min-w-4 shrink-0 items-center justify-end gap-1 text-(--linear-text-tertiary)';
+
+/**
+ * Secondary line inside a structured menu row
+ */
+export const MENU_ITEM_DESCRIPTION_BASE =
+  'truncate text-[11px] leading-3 text-(--linear-text-tertiary)';
+
+/**
+ * Small count/status badge used in menu rows
+ */
+export const MENU_BADGE_BASE =
+  'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 text-[10.5px] font-medium tabular-nums text-(--linear-text-tertiary)';
+
+/**
+ * Search header and input styles shared by root menus and searchable submenus
+ */
+export const MENU_SEARCH_HEADER_BASE =
+  'border-b border-(--linear-border-subtle) px-2 py-2';
+
+export const MENU_SEARCH_INPUT_BASE =
+  'h-7 w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-7 pr-7 text-[12px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none focus-visible:border-(--linear-border-focus)';
+
+/**
+ * Empty and loading states inside menu surfaces
+ */
+export const MENU_EMPTY_STATE_BASE =
+  'px-3 py-6 text-center text-[12px] text-(--linear-text-tertiary)';
+
+export const MENU_LOADING_STATE_BASE =
+  'flex items-center justify-center px-3 py-6 text-(--linear-text-tertiary)';
+
 // ============================================================================
 // TRIGGER STYLES
 // ============================================================================
@@ -270,11 +315,12 @@ export const SELECT_TRIGGER_BASE =
 // ============================================================================
 
 /**
- * Sub-menu content classes (no max-height constraint)
+ * Sub-menu content classes.
+ * Supports both DropdownMenu.SubContent and ContextMenu.SubContent Radix vars.
  */
 export const subMenuContentClasses = [
   DROPDOWN_CONTENT_BASE,
-  'max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden',
+  'max-h-[min(var(--radix-dropdown-menu-content-available-height,var(--radix-context-menu-content-available-height,320px)),320px)] overflow-y-auto overflow-x-hidden',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   DROPDOWN_SLIDE_ANIMATIONS,
