@@ -1075,9 +1075,9 @@
   --sidebar-border: 255 255 255 / 0.06;
   /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 107 111 118;
+  --sidebar-muted: 138 143 152;
   /* Linear: --linear-app-sidebar-muted-rgb */
-  --sidebar-muted-foreground: 107 111 118;
+  --sidebar-muted-foreground: 138 143 152;
   --sidebar-surface: var(--linear-app-sidebar-background-rgb);
   /* Matches sidebar background */
   --sidebar-surface-hover: 255 255 255 / 0.04;

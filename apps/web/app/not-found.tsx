@@ -10,6 +10,7 @@ export default function NotFound() {
 
       <main
         id='main-content'
+        data-testid='not-found'
         style={{ paddingTop: 'var(--linear-header-height, 64px)' }}
       >
         <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
