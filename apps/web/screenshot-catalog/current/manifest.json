@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-15T08:24:16.628Z",
-    "gitSha": "3d49d4682b0d9d131bb1911f273eca67e826e1aa",
+    "capturedAt": "2026-04-15T11:10:51.085Z",
+    "gitSha": "160ae9b6c511637b2e7647d87929bf6b29650098",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -55,8 +55,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-12T01:42:56.772Z",
-    "gitSha": "42c14873ca304dab04362ebedbee29e261ad5e37",
+    "capturedAt": "2026-04-15T11:11:43.311Z",
+    "gitSha": "160ae9b6c511637b2e7647d87929bf6b29650098",
     "imagePath": "release-presave-mobile.png",
     "publicExportPath": "release-deep-end-phone.png"
   },
@@ -137,8 +137,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-15T08:26:52.649Z",
-    "gitSha": "3d49d4682b0d9d131bb1911f273eca67e826e1aa",
+    "capturedAt": "2026-04-15T11:13:27.787Z",
+    "gitSha": "160ae9b6c511637b2e7647d87929bf6b29650098",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -245,8 +245,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-15T08:29:23.441Z",
-    "gitSha": "3d49d4682b0d9d131bb1911f273eca67e826e1aa",
+    "capturedAt": "2026-04-15T11:15:59.866Z",
+    "gitSha": "160ae9b6c511637b2e7647d87929bf6b29650098",
     "imagePath": "public-profile-desktop.png",
     "publicExportPath": "profile-desktop.png"
   },
@@ -262,8 +262,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-15T08:29:27.372Z",
-    "gitSha": "3d49d4682b0d9d131bb1911f273eca67e826e1aa",
+    "capturedAt": "2026-04-15T11:16:03.889Z",
+    "gitSha": "160ae9b6c511637b2e7647d87929bf6b29650098",
     "imagePath": "public-profile-mobile.png",
     "publicExportPath": "profile-phone.png"
   }
