@@ -89,7 +89,7 @@ function ArtistProfileSpecNode({
           }}
           aria-hidden='true'
         >
-          <Icon className='h-[18px] w-[18px]' strokeWidth={1.9} />
+          <Icon className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <h3 className='text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
           {tile.title}

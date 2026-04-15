@@ -147,13 +147,13 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   },
   {
     id: 'qr-ready',
-    title: 'Trackable QR Codes',
+    title: 'Trackable QR codes',
     body: 'Know which flyer, sticker, etc got you the most fans.',
     accent: 'orange',
   },
   {
     id: 'dark-mode-first',
-    title: 'Dark Mode First',
+    title: 'Dark mode first',
     body: 'Designed for low-light taps in clubs, venues, and late-night scrolls.',
     accent: 'gray',
   },
