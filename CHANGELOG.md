@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.3] - 2026-04-15
+
+### Changed
+
+- Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
+- Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+
+### Fixed
+
+- Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
+
 ## [26.4.153.2] - 2026-04-15
 
 ### Added
