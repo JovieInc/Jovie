@@ -4,6 +4,7 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import type { PublicRelease } from './releases/types';
 
 export const PROFILE_MODE_KEYS = [
   'profile',
@@ -13,6 +14,7 @@ export const PROFILE_MODE_KEYS = [
   'about',
   'contact',
   'tour',
+  'releases',
 ] as const;
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
@@ -86,6 +88,7 @@ export interface ProfilePublicViewModel {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export interface ProfileIdentityFields {

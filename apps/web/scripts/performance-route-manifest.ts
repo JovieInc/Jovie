@@ -422,6 +422,27 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     priority: 9,
     seedProfile: 'dualipa',
   },
+  {
+    id: 'public-profile-releases',
+    group: 'public-profile-core',
+    surface: 'public-profile',
+    path: '/[username]/releases',
+    resolvePath: resolveSeededProfilePath,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'redirect',
+    readySelectors: {
+      content: ['[data-testid="profile-header"]'],
+      redirectDestinations: ['/[username]?mode=releases'],
+    },
+    timings: [
+      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 2400 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 9,
+    seedProfile: 'dualipa',
+  },
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
@@ -558,6 +579,30 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: [
         '[data-testid="profile-mode-drawer-tour"]',
+        '[data-testid="profile-header"]',
+      ],
+    },
+    timings: [
+      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 2400 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 6,
+    seedProfile: 'dualipa',
+  },
+  {
+    id: 'public-profile-mode-releases',
+    group: 'public-profile-mode-shell',
+    surface: 'public-profile',
+    path: '/[username]?mode=releases',
+    resolvePath: resolveSeededProfileModePath,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'interactive-shell',
+    readySelectors: {
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-releases"]',
         '[data-testid="profile-header"]',
       ],
     },

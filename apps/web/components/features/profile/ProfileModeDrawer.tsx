@@ -1,6 +1,14 @@
 'use client';
 
-import { Bell, CalendarDays, Info, Mail, Music2, Ticket } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  Disc3,
+  Info,
+  Mail,
+  Music2,
+  Ticket,
+} from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { PaySelector } from '@/components/molecules/PaySelector';
@@ -78,6 +86,11 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
     title: 'Tour Dates',
     subtitle: 'Upcoming shows and ticket links.',
     icon: CalendarDays,
+  },
+  releases: {
+    title: 'Releases',
+    subtitle: 'Full discography and streaming links.',
+    icon: Disc3,
   },
 };
 
@@ -343,6 +356,15 @@ export function ProfileModeDrawer({
       {activeMode === 'tour' ? (
         <div data-testid='profile-mode-drawer-tour'>
           <TourDrawerContent artist={artist} tourDates={tourDates} />
+        </div>
+      ) : null}
+
+      {activeMode === 'releases' ? (
+        <div data-testid='profile-mode-drawer-releases'>
+          <ProfileModeFallback
+            title='Releases'
+            description='Full discography and streaming links.'
+          />
         </div>
       ) : null}
 

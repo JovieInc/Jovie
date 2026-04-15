@@ -323,6 +323,41 @@ export async function getReleaseStatsByUsername(
 }
 
 /**
+ * Lightweight release list for public profile display.
+ * Returns releases with artist names but skips provider links and track summaries.
+ * Sorted newest-first (DESC NULLS LAST) so null dates appear at the end.
+ * Capped at 200 releases to bound serialisation cost.
+ */
+export async function getReleasesForProfileLite(
+  creatorProfileId: string
+): Promise<Array<DiscogRelease & { artistNames: string[] }>> {
+  const releases = await db
+    .select()
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(200);
+
+  if (releases.length === 0) return [];
+
+  const artistNamesByRelease = await getArtistNamesForReleases(
+    releases.map(r => r.id)
+  );
+
+  return releases.map(release => ({
+    ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+  }));
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(
