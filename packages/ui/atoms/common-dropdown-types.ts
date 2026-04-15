@@ -111,7 +111,7 @@ export interface CommonDropdownSubmenu extends CommonDropdownBaseItem {
   searchPlaceholder?: string;
   emptyMessage?: string;
   isLoading?: boolean;
-  filterItem?: (item: CommonDropdownItem, query: string) => boolean;
+  filterItem?: CommonDropdownFilterItemPredicate;
   onSearchChange?: (query: string) => void;
   minWidth?: number | string;
   maxHeight?: number | string;
@@ -152,6 +152,15 @@ export type CommonDropdownItem =
   | CommonDropdownSeparator
   | CommonDropdownLabel
   | CommonDropdownCustomItem;
+
+export type CommonDropdownFilterItem =
+  | CommonDropdownItem
+  | CommonDropdownRadioItem;
+
+export type CommonDropdownFilterItemPredicate = (
+  item: CommonDropdownFilterItem,
+  query: string
+) => boolean;
 
 /**
  * Main component props
@@ -272,7 +281,7 @@ export interface CommonDropdownProps {
   /**
    * Custom filter for searchable menu items.
    */
-  readonly filterItem?: (item: CommonDropdownItem, query: string) => boolean;
+  readonly filterItem?: CommonDropdownFilterItemPredicate;
 
   /**
    * Reset root search state when the dropdown closes.

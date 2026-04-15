@@ -74,6 +74,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     : contextMenuContentClasses;
 
   const [searchQuery, setSearchQuery] = React.useState('');
+  const searchQueryRef = React.useRef('');
   const didMountRef = React.useRef(false);
 
   const filteredItems = React.useMemo(
@@ -83,6 +84,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
   const handleSearchChange = React.useCallback(
     (query: string) => {
+      if (searchQueryRef.current === query) {
+        return;
+      }
+
+      searchQueryRef.current = query;
       setSearchQuery(query);
       onSearchChange?.(query);
       onSearch?.(query);

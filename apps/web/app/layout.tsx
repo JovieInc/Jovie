@@ -202,7 +202,8 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
-        <script defer src='/theme-init.js' />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Theme init must run before first paint and stays static in /public. */}
+        <script src='/theme-init.js' />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

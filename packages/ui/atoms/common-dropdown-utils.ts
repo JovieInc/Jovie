@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type {
+  CommonDropdownFilterItemPredicate,
   CommonDropdownItem,
   CommonDropdownRadioItem,
 } from './common-dropdown-types';
@@ -47,15 +48,20 @@ function defaultFilterItem(item: CommonDropdownItem, query: string): boolean {
 function itemMatches(
   item: CommonDropdownItem,
   query: string,
-  filterItem?: (item: CommonDropdownItem, query: string) => boolean
+  filterItem?: CommonDropdownFilterItemPredicate
 ): boolean {
   return (filterItem ?? defaultFilterItem)(item, query);
 }
 
 function radioItemMatches(
   item: Omit<CommonDropdownRadioItem, 'type'>,
-  query: string
+  query: string,
+  filterItem?: CommonDropdownFilterItemPredicate
 ): boolean {
+  if (filterItem) {
+    return filterItem({ ...item, type: 'radio' }, query);
+  }
+
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return true;
 
@@ -98,7 +104,7 @@ export function filterItems(
   items: readonly CommonDropdownItem[],
   query: string,
   searchMode: 'root' | 'recursive',
-  filterItem?: (item: CommonDropdownItem, query: string) => boolean
+  filterItem?: CommonDropdownFilterItemPredicate
 ): CommonDropdownItem[] {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
@@ -112,7 +118,7 @@ export function filterItems(
 
     if (isRadioGroup(item)) {
       const matchingItems = item.items.filter(radioItem =>
-        radioItemMatches(radioItem, trimmedQuery)
+        radioItemMatches(radioItem, trimmedQuery, filterItem)
       );
 
       return matchingItems.length > 0
@@ -121,7 +127,8 @@ export function filterItems(
     }
 
     if (isSubmenu(item)) {
-      const submenuMatches = itemMatches(item, trimmedQuery, filterItem);
+      const submenuFilterItem = item.filterItem ?? filterItem;
+      const submenuMatches = itemMatches(item, trimmedQuery, submenuFilterItem);
 
       if (searchMode === 'root') {
         return submenuMatches ? [item] : [];
@@ -131,7 +138,7 @@ export function filterItems(
         item.items,
         trimmedQuery,
         'recursive',
-        item.filterItem ?? filterItem
+        submenuFilterItem
       );
 
       if (submenuMatches) {

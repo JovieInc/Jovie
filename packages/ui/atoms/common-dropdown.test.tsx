@@ -582,6 +582,81 @@ describe('CommonDropdown', () => {
       expect(onSearchChange).toHaveBeenLastCalledWith('');
     });
 
+    it('only reports one empty search value when a controlled menu closes', async () => {
+      const onSearchChange = vi.fn();
+      const user = userEvent.setup({ delay: null });
+      const { rerender } = render(
+        <CommonDropdown
+          items={basicItems}
+          open={true}
+          searchable={true}
+          onSearchChange={onSearchChange}
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'edit');
+      onSearchChange.mockClear();
+
+      rerender(
+        <CommonDropdown
+          items={basicItems}
+          open={false}
+          searchable={true}
+          onSearchChange={onSearchChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+
+      expect(
+        onSearchChange.mock.calls.filter(([query]) => query === '')
+      ).toHaveLength(1);
+    });
+
+    it('uses custom filters for radio item search', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'radio',
+          id: 'density',
+          value: 'comfortable',
+          onValueChange: vi.fn(),
+          items: [
+            { id: 'compact', label: 'Compact', value: 'density-compact' },
+            {
+              id: 'comfortable',
+              label: 'Comfortable',
+              value: 'density-comfortable',
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={items}
+          open={true}
+          searchable={true}
+          filterItem={(item, query) =>
+            item.type === 'radio'
+              ? item.value === query
+              : item.label.toLowerCase().includes(query)
+          }
+        />
+      );
+
+      await user.type(
+        screen.getByPlaceholderText('Search...'),
+        'density-compact'
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Compact')).toBeInTheDocument();
+        expect(screen.queryByText('Comfortable')).not.toBeInTheDocument();
+      });
+    });
+
     it('keeps matching submenu branches during recursive search', async () => {
       const items: CommonDropdownItem[] = [
         { type: 'action', id: 'archive', label: 'Archive', onClick: vi.fn() },
@@ -614,6 +689,43 @@ describe('CommonDropdown', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Share')).toBeInTheDocument();
+        expect(screen.queryByText('Archive')).not.toBeInTheDocument();
+      });
+    });
+
+    it('uses submenu-local filters when matching recursive branches', async () => {
+      const items: CommonDropdownItem[] = [
+        { type: 'action', id: 'archive', label: 'Archive', onClick: vi.fn() },
+        {
+          type: 'submenu',
+          id: 'platforms',
+          label: 'Platforms',
+          filterItem: (item, query) =>
+            item.id === 'platforms' && query === 'destinations',
+          items: [
+            {
+              type: 'action',
+              id: 'spotify',
+              label: 'Spotify',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={items}
+          open={true}
+          searchable={true}
+          searchMode='recursive'
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'destinations');
+
+      await waitFor(() => {
+        expect(screen.getByText('Platforms')).toBeInTheDocument();
         expect(screen.queryByText('Archive')).not.toBeInTheDocument();
       });
     });
