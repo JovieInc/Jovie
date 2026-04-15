@@ -615,34 +615,36 @@ export function ProfileCompactSurface({
         </div>
       </div>
 
-      <ProfileUnifiedDrawer
-        open={drawerOpen}
-        onOpenChange={onDrawerOpenChange}
-        view={drawerView}
-        onViewChange={onDrawerViewChange}
-        artist={artist}
-        socialLinks={socialLinks}
-        contacts={availableContacts}
-        primaryChannel={primaryChannel}
-        dsps={mergedDSPs}
-        isSubscribed={isSubscribed}
-        contentPrefs={contentPrefs}
-        onTogglePref={onTogglePref}
-        onUnsubscribe={onUnsubscribe}
-        isUnsubscribing={isUnsubscribing}
-        onShare={onShare}
-        enableDynamicEngagement={enableDynamicEngagement}
-        subscribeTwoStep={subscribeTwoStep}
-        hasAbout={hasAbout}
-        hasTourDates={tourDates.length > 0}
-        hasTip={hasTip}
-        hasContacts={hasContacts}
-        genres={genres}
-        pressPhotos={pressPhotos}
-        allowPhotoDownloads={allowPhotoDownloads}
-        tourDates={tourDates}
-        onRevealNotifications={onRevealNotifications}
-      />
+      {renderMode !== 'preview' && (
+        <ProfileUnifiedDrawer
+          open={drawerOpen}
+          onOpenChange={onDrawerOpenChange}
+          view={drawerView}
+          onViewChange={onDrawerViewChange}
+          artist={artist}
+          socialLinks={socialLinks}
+          contacts={availableContacts}
+          primaryChannel={primaryChannel}
+          dsps={mergedDSPs}
+          isSubscribed={isSubscribed}
+          contentPrefs={contentPrefs}
+          onTogglePref={onTogglePref}
+          onUnsubscribe={onUnsubscribe}
+          isUnsubscribing={isUnsubscribing}
+          onShare={onShare}
+          enableDynamicEngagement={enableDynamicEngagement}
+          subscribeTwoStep={subscribeTwoStep}
+          hasAbout={hasAbout}
+          hasTourDates={tourDates.length > 0}
+          hasTip={hasTip}
+          hasContacts={hasContacts}
+          genres={genres}
+          pressPhotos={pressPhotos}
+          allowPhotoDownloads={allowPhotoDownloads}
+          tourDates={tourDates}
+          onRevealNotifications={onRevealNotifications}
+        />
+      )}
     </div>
   );
 }
