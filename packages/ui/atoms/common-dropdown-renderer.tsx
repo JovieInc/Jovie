@@ -75,11 +75,11 @@ export function SearchableContent({
           value={query}
           onChange={event => onQueryChange(event.target.value)}
           onKeyDown={event => {
-            event.stopPropagation();
-            if (event.key === 'Escape' && query) {
-              event.preventDefault();
-              onClear();
+            if (event.key === 'Escape') {
+              return;
             }
+
+            event.stopPropagation();
           }}
           className={MENU_SEARCH_INPUT_BASE}
         />

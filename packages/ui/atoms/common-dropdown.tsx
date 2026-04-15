@@ -204,6 +204,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         className={cn(dropdownContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight)}
+        onEscapeKeyDown={event => {
+          if (searchQuery) {
+            event.preventDefault();
+            clearSearch();
+          }
+        }}
       >
         {searchable ? (
           <SearchableContent
@@ -243,6 +249,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight)}
+        onEscapeKeyDown={event => {
+          if (searchQuery) {
+            event.preventDefault();
+            clearSearch();
+          }
+        }}
       >
         {searchable ? (
           <SearchableContent

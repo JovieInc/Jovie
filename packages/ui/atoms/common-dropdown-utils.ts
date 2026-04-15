@@ -142,7 +142,7 @@ export function filterItems(
       );
 
       if (submenuMatches) {
-        return [item];
+        return [{ ...item, items: filteredChildren }];
       }
 
       return filteredChildren.length > 0

@@ -582,6 +582,31 @@ describe('CommonDropdown', () => {
       expect(onSearchChange).toHaveBeenLastCalledWith('');
     });
 
+    it('lets Escape clear search before dismissing the menu', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={basicItems} searchable={true} />);
+
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      await user.type(screen.getByPlaceholderText('Search...'), 'edit');
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search...')).toHaveValue('edit');
+      });
+
+      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
+        key: 'Escape',
+      });
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search...')).toHaveValue('');
+
+      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
+        key: 'Escape',
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+    });
+
     it('only reports one empty search value when a controlled menu closes', async () => {
       const onSearchChange = vi.fn();
       const user = userEvent.setup({ delay: null });
@@ -690,6 +715,41 @@ describe('CommonDropdown', () => {
       await waitFor(() => {
         expect(screen.getByText('Share')).toBeInTheDocument();
         expect(screen.queryByText('Archive')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters submenu descendants even when the submenu label matches', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          items: [
+            {
+              type: 'action',
+              id: 'spotify',
+              label: 'Spotify',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={items}
+          open={true}
+          searchable={true}
+          searchMode='recursive'
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'share');
+      await user.hover(screen.getByText('Share'));
+
+      await waitFor(() => {
+        expect(screen.getByText('No items found')).toBeInTheDocument();
+        expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
       });
     });
 
