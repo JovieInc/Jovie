@@ -4,9 +4,9 @@ import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 import {
-  FEATURE_FLAG_KEYS,
-  type FeatureFlagKey,
-  type FeatureFlagsBootstrap,
+  STATSIG_GATE_KEYS,
+  type StatsigFeatureFlagsBootstrap,
+  type StatsigGateKey,
   type SubscribeCTAVariant,
 } from './shared';
 
@@ -102,7 +102,7 @@ async function initializeStatsig(): Promise<void> {
  */
 export async function checkGate(
   userId: string | null,
-  gateKey: FeatureFlagKey,
+  gateKey: StatsigGateKey,
   defaultValue = false
 ): Promise<boolean> {
   if (isE2ERuntime) {
@@ -180,7 +180,7 @@ export async function getSubscribeCTAVariant(
 ): Promise<SubscribeCTAVariant> {
   const config = await getExperiment(
     artistId,
-    FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
   );
   const variant = config.variant;
   if (variant === 'inline' || variant === 'two_step') return variant;
@@ -193,7 +193,7 @@ export async function getSubscribeCTAVariant(
  */
 export async function getFeatureFlagsBootstrap(
   userId: string | null
-): Promise<FeatureFlagsBootstrap> {
+): Promise<StatsigFeatureFlagsBootstrap> {
   if (isE2ERuntime) {
     return { gates: {} };
   }
@@ -203,7 +203,7 @@ export async function getFeatureFlagsBootstrap(
   const gates: Record<string, boolean> = {};
 
   // Evaluate all gates in parallel
-  const gateEntries = Object.entries(FEATURE_FLAG_KEYS);
+  const gateEntries = Object.entries(STATSIG_GATE_KEYS);
   const results = await Promise.all(
     gateEntries.map(async ([, gateKey]) => {
       const value = await checkGate(userId, gateKey, false);

@@ -6,6 +6,7 @@ import {
   BellOff,
   CalendarDays,
   ChevronRight,
+  Disc3,
   Info,
   Mail,
   Share2,
@@ -14,6 +15,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -36,6 +38,7 @@ import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from './AboutSection';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
 
 export type DrawerView =
@@ -47,7 +50,8 @@ export type DrawerView =
   | 'subscribe'
   | 'contact'
   | 'pay'
-  | 'tour';
+  | 'tour'
+  | 'releases';
 
 interface DrawerMeta {
   readonly title: string;
@@ -88,6 +92,10 @@ const VIEW_META: Record<DrawerView, DrawerMeta> = {
     title: 'Tour Dates',
     subtitle: 'Upcoming shows and ticket links.',
   },
+  releases: {
+    title: 'Releases',
+    subtitle: 'Discography',
+  },
 };
 
 interface ProfileUnifiedDrawerProps {
@@ -116,6 +124,8 @@ interface ProfileUnifiedDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
+  readonly hasReleases: boolean;
+  readonly releases?: readonly PublicRelease[];
   /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
   readonly onRevealNotifications?: () => void;
 }
@@ -198,6 +208,136 @@ function ContactList({
   );
 }
 
+const YEAR_HEADER_THRESHOLD = 15;
+
+function formatReleaseType(type: string): string {
+  switch (type) {
+    case 'single':
+      return 'Single';
+    case 'ep':
+      return 'EP';
+    case 'album':
+      return 'Album';
+    case 'compilation':
+      return 'Compilation';
+    case 'live':
+      return 'Live';
+    case 'mixtape':
+      return 'Mixtape';
+    case 'music_video':
+      return 'Video';
+    default:
+      return 'Release';
+  }
+}
+
+function ReleasesDrawerContent({
+  releases,
+  artistHandle,
+  artistName,
+}: {
+  readonly releases: readonly PublicRelease[];
+  readonly artistHandle: string;
+  readonly artistName: string;
+}) {
+  const ownerNameLower = artistName.toLowerCase();
+
+  // Pre-compute which releases get a year header (no mutation during render)
+  const yearHeaderSet = useMemo(() => {
+    const years = new Set(
+      releases
+        .map(r =>
+          r.releaseDate
+            ? new Date(r.releaseDate).getFullYear().toString()
+            : null
+        )
+        .filter(Boolean)
+    );
+    if (releases.length < YEAR_HEADER_THRESHOLD || years.size < 2) {
+      return new Set<string>();
+    }
+    const headers = new Set<string>();
+    let prev: string | null = null;
+    for (const release of releases) {
+      const year = release.releaseDate
+        ? new Date(release.releaseDate).getFullYear().toString()
+        : null;
+      if (year && year !== prev) {
+        headers.add(release.id);
+        prev = year;
+      }
+    }
+    return headers;
+  }, [releases]);
+
+  return (
+    <div
+      className='flex flex-col gap-0.5'
+      data-testid='profile-mode-drawer-releases'
+    >
+      {releases.map(release => {
+        if (!release.slug) return null;
+
+        const year = release.releaseDate
+          ? new Date(release.releaseDate).getFullYear().toString()
+          : null;
+        const showHeader = yearHeaderSet.has(release.id);
+
+        const collabs = release.artistNames
+          .filter(name => name.toLowerCase() !== ownerNameLower)
+          .join(', ');
+
+        const metaParts = [formatReleaseType(release.releaseType), year].filter(
+          Boolean
+        );
+
+        const ariaLabel = collabs
+          ? `View ${release.title} by ${collabs}`
+          : `View ${release.title}`;
+
+        return (
+          <div key={release.id}>
+            {showHeader ? (
+              <div className='px-4 pb-1 pt-4 text-[11px] font-[510] text-white/30'>
+                {year}
+              </div>
+            ) : null}
+            <a
+              href={`/${artistHandle}/${release.slug}`}
+              className='flex items-center gap-3 rounded-[14px] px-4 py-3 transition-colors duration-150 active:bg-white/[0.06]'
+              aria-label={ariaLabel}
+            >
+              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                <ImageWithFallback
+                  src={release.artworkUrl}
+                  alt={release.title}
+                  fill
+                  sizes='40px'
+                  className='object-cover'
+                />
+              </div>
+              <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+                <span className='truncate text-[14px] font-[470] text-white/88'>
+                  {release.title}
+                </span>
+                <span className='text-[11px] font-[400] text-white/40'>
+                  {collabs ? `${collabs} \u00b7 ` : ''}
+                  {metaParts.join(' \u00b7 ')}
+                  {release.releaseType === 'music_video' ? (
+                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-[510] text-white/50'>
+                      Video
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            </a>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ProfileUnifiedDrawer({
   open,
   onOpenChange,
@@ -224,9 +364,45 @@ export function ProfileUnifiedDrawer({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  hasReleases,
+  releases = [],
   onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
-  const meta = VIEW_META[view];
+  const visibleReleases = useMemo(
+    () => releases.filter(r => Boolean(r.slug)),
+    [releases]
+  );
+
+  const releasesSubtitle = useMemo(() => {
+    if (visibleReleases.length === 0) return 'Discography';
+    const counts: Record<string, number> = {};
+    for (const r of visibleReleases) {
+      const type = r.releaseType === 'music_video' ? 'video' : r.releaseType;
+      counts[type] = (counts[type] ?? 0) + 1;
+    }
+    const labels: Record<string, string> = {
+      single: 'single',
+      ep: 'EP',
+      album: 'album',
+      compilation: 'compilation',
+      live: 'live',
+      mixtape: 'mixtape',
+      video: 'video',
+      other: 'release',
+    };
+    const parts = Object.entries(counts)
+      .filter(([, count]) => count > 0)
+      .map(
+        ([type, count]) =>
+          `${count} ${labels[type] ?? 'release'}${count > 1 ? 's' : ''}`
+      );
+    return parts.join(', ');
+  }, [visibleReleases]);
+
+  const meta =
+    view === 'releases'
+      ? { title: 'Releases', subtitle: releasesSubtitle }
+      : VIEW_META[view];
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -264,10 +440,16 @@ export function ProfileUnifiedDrawer({
         // @ts-expect-error joviePixel is injected by JoviePixel
         globalThis.joviePixel?.track?.('tip_page_view');
         break;
+      case 'releases':
+        track('releases_drawer_open', {
+          handle: artist.handle,
+          releases_count: visibleReleases.length,
+        });
+        break;
       default:
         break;
     }
-  }, [open, view, artist.handle, contacts.length]);
+  }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -336,6 +518,18 @@ export function ProfileUnifiedDrawer({
                 >
                   <Info className={iconClass} />
                   About
+                </button>
+              ) : null}
+
+              {hasReleases ? (
+                <button
+                  type='button'
+                  role='menuitem'
+                  className={menuItemClass}
+                  onClick={() => navigateTo('releases')}
+                >
+                  <Disc3 className={iconClass} />
+                  Releases
                 </button>
               ) : null}
 
@@ -511,6 +705,14 @@ export function ProfileUnifiedDrawer({
             <div data-testid='profile-mode-drawer-tour'>
               <TourDrawerContent artist={artist} tourDates={tourDates} />
             </div>
+          )}
+
+          {view === 'releases' && (
+            <ReleasesDrawerContent
+              releases={visibleReleases}
+              artistHandle={artist.handle}
+              artistName={artist.name}
+            />
           )}
 
           {view === 'pay' && (

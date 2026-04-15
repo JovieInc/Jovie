@@ -13,6 +13,22 @@ const mockProfile = {
   settings: {},
 };
 
+vi.mock('next/dynamic', () => ({
+  default: (loader: () => Promise<{ default: unknown }>) => {
+    let Component: React.ComponentType<Record<string, unknown>> | null = null;
+    const promise = loader().then(mod => {
+      Component = (mod.default ?? mod) as React.ComponentType<
+        Record<string, unknown>
+      >;
+    });
+    // Block-free: vitest hoists mocks, so the promise resolves before render
+    return (props: Record<string, unknown>) => {
+      if (!Component) throw promise;
+      return <Component {...props} />;
+    };
+  },
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({ selectedProfile: mockProfile }),
 }));

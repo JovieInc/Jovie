@@ -511,7 +511,15 @@ describe('Public Profile Page Logic', () => {
     it('shows back button only for non-profile modes', () => {
       const modes = profileModes.filter(mode => mode !== 'contact');
       const showBackButton = modes.map(m => m !== 'profile');
-      expect(showBackButton).toEqual([false, true, true, true, true, true]);
+      expect(showBackButton).toEqual([
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]);
     });
   });
 

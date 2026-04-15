@@ -19,6 +19,7 @@ describe('profile registry', () => {
       'about',
       'contact',
       'tour',
+      'releases',
     ]);
   });
 

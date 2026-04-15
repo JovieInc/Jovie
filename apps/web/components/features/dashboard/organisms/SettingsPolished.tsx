@@ -66,7 +66,7 @@ function getFocusedSettingsHref(sectionId: string): string {
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
     case 'data-privacy':
-      return APP_ROUTES.SETTINGS_DELETE_ACCOUNT;
+      return APP_ROUTES.SETTINGS_DATA_PRIVACY;
     case 'artist-profile':
       return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
     case 'contacts':
