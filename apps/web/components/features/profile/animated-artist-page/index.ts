@@ -4,4 +4,4 @@ export type {
   UseAnimatedArtistPageReturn,
 } from './types';
 export { useAnimatedArtistPage } from './useAnimatedArtistPage';
-export { extractVenmoUsername, findVenmoLink, TIP_AMOUNTS } from './utils';
+export { extractVenmoUsername, findVenmoLink, PAY_AMOUNTS } from './utils';

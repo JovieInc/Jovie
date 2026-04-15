@@ -45,11 +45,16 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
 
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareActionMenuItems: () => [],
-  getUTMShareContextMenuItems: () => [],
-}));
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareActionMenuItems: () => [],
+    getUTMShareContextMenuItems: () => [],
+  };
+});
 
 describe('ReleaseTableRow', () => {
   it('groups share and metadata actions in the row action menu', () => {

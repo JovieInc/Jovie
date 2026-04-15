@@ -693,6 +693,7 @@ export const DashboardAudienceTableUnified = memo(
                     description={emptyStateDescription}
                     action={emptyStatePrimaryAction}
                     secondaryAction={emptyStateSecondaryAction}
+                    testId='dashboard-audience-empty-state'
                   />
                 ) : (
                   <>
@@ -722,6 +723,7 @@ export const DashboardAudienceTableUnified = memo(
                             description={emptyStateDescription}
                             action={emptyStatePrimaryAction}
                             secondaryAction={emptyStateSecondaryAction}
+                            testId='dashboard-audience-empty-state'
                           />
                         }
                         getRowId={row => row.id}

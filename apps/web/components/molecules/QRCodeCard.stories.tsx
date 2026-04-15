@@ -32,11 +32,11 @@ export const WithCustomTitle: Story = {
   },
 };
 
-export const TipCard: Story = {
+export const PayCard: Story = {
   args: {
-    data: 'https://jov.ie/billieeilish?mode=tip',
-    title: 'Tip Artist',
-    description: 'Scan to tip via Apple Pay',
+    data: 'https://jov.ie/billieeilish?mode=pay',
+    title: 'Pay Artist',
+    description: 'Scan to pay via Apple Pay',
     qrSize: 150,
   },
 };

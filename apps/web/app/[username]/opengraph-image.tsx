@@ -31,7 +31,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
 
     // Limit to 2MB to avoid memory pressure in edge runtime
     const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+    if (contentLength && Number.parseInt(contentLength, 10) > 2 * 1024 * 1024) {
       return null;
     }
 

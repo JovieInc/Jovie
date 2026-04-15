@@ -202,7 +202,7 @@ export function ReleaseTableWithTracks({
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const directYear = String(release.releaseDate).match(/^(\d{4})/)?.[1];
+        const directYear = /^(\d{4})/.exec(String(release.releaseDate))?.[1];
         if (directYear) {
           return directYear;
         }
