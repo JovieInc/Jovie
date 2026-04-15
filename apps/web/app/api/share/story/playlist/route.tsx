@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     .where(eq(joviePlaylists.slug, slug))
     .limit(1);
 
-  if (!playlist || playlist.status !== 'published') {
+  if (playlist?.status !== 'published') {
     return NextResponse.json(
       { error: 'Playlist not found' },
       { status: 404, headers: { 'Cache-Control': 'no-store' } }

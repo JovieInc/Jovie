@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   const profile = await getProfileByUsername(username);
-  if (!profile || !profile.isPublic) {
+  if (!profile?.isPublic) {
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: { 'Cache-Control': 'no-store' } }
