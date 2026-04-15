@@ -71,7 +71,7 @@ export function ArtistProfileHowItWorks({
                       aria-hidden='true'
                     />
                     <ArrowRight
-                      className='absolute right-[-1.5rem] top-[3.35rem] hidden h-5 w-5 text-white/42 lg:block'
+                      className='absolute right-[-1.5rem] top-[3.3rem] hidden h-6 w-6 text-white/55 lg:block'
                       strokeWidth={1.4}
                       aria-hidden='true'
                     />
@@ -97,7 +97,7 @@ export function ArtistProfileHowItWorks({
                   {step.description}
                 </p>
                 <span
-                  className='mt-7 flex h-11 w-11 items-center justify-center rounded-full bg-white/[0.06] text-white/74 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                  className='mt-7 flex h-8 w-8 items-center justify-center text-white/58'
                   aria-hidden='true'
                 >
                   <Icon className='h-5 w-5' strokeWidth={1.65} />
