@@ -1,19 +1,24 @@
 import type { FeaturedCreator } from '@/lib/featured-creators';
 
 const FALLBACK_CREATOR_DATA = [
-  { handle: 'tim-white', name: 'Tim White', tagline: 'Afterglow (Deluxe)' },
-  { handle: 'nova-lane', name: 'Nova Lane', tagline: 'Midnight Frequencies' },
   {
-    handle: 'kai-rivers',
-    name: 'Kai Rivers',
-    tagline: 'Still Waters Run Deep',
+    handle: 'tim-white',
+    name: 'Tim White',
+    tagline: 'Afterglow (Deluxe)',
+    src: '/images/avatars/tim-white.jpg',
   },
-  { handle: 'sable-cross', name: 'Sable Cross', tagline: 'Velvet Chains' },
-  { handle: 'maren-echo', name: 'Maren Echo', tagline: 'Half-Light Sessions' },
-  { handle: 'jules-voss', name: 'Jules Voss', tagline: 'Concrete Garden' },
-  { handle: 'rio-santos', name: 'Rio Santos', tagline: 'Sol y Sombra' },
-  { handle: 'eli-wolfe', name: 'Eli Wolfe', tagline: 'Ghost Notes' },
-  { handle: 'dani-park', name: 'Dani Park', tagline: 'Color Theory' },
+  {
+    handle: 'david-guetta',
+    name: 'David Guetta',
+    tagline: 'Release workflow',
+    src: '/images/avatars/music-maker.jpg',
+  },
+  {
+    handle: 'kaskade',
+    name: 'Kaskade',
+    tagline: 'Live profile',
+    src: '/images/avatars/pop-star.jpg',
+  },
 ] as const;
 
 export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_CREATOR_DATA.map(
@@ -21,7 +26,7 @@ export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_CREATOR_DATA.map(
     id: `fallback-${i + 1}`,
     handle: creator.handle,
     name: creator.name,
-    src: `/images/avatars/${creator.handle}.jpg`,
+    src: creator.src,
     tagline: creator.tagline,
     genres: [],
     latestReleaseTitle: null,

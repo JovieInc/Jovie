@@ -14,6 +14,11 @@ describe('SeeItInActionSafe', () => {
     render(<SeeItInActionSafe enabled />);
 
     expect(screen.getByTestId('homepage-live-proof')).toBeInTheDocument();
+    expect(FALLBACK_AVATARS.slice(0, 3).map(creator => creator.name)).toEqual([
+      'Tim White',
+      'David Guetta',
+      'Kaskade',
+    ]);
 
     for (const creator of FALLBACK_AVATARS.slice(0, 3)) {
       expect(screen.getByText(creator.name)).toBeInTheDocument();

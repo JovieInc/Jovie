@@ -11,9 +11,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
 - Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+- Updated homepage demo proof fallbacks to use Tim White, David Guetta, and Kaskade.
 
 ### Fixed
 
+- Increased contrast on the add-release sidebar footer CTA so the Create Release button stays visible on dark surfaces.
 - Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
 
 ## [26.4.153.2] - 2026-04-15
