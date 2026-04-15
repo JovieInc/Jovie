@@ -56,6 +56,28 @@ type SearchableContentProps = {
   readonly inputRef?: React.Ref<HTMLInputElement>;
 };
 
+function focusSiblingMenuItem(
+  input: HTMLInputElement | null,
+  placement: 'first' | 'last'
+): HTMLElement | undefined {
+  const menu = input?.closest('[role="menu"]');
+  if (!menu) return undefined;
+
+  const menuItems = Array.from(
+    menu.querySelectorAll<HTMLElement>(
+      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]'
+    )
+  ).filter(
+    item =>
+      !item.hasAttribute('data-disabled') &&
+      item.getAttribute('aria-disabled') !== 'true'
+  );
+
+  const nextItem = placement === 'first' ? menuItems.at(0) : menuItems.at(-1);
+  nextItem?.focus();
+  return nextItem;
+}
+
 export function SearchableContent({
   query,
   placeholder,
@@ -63,12 +85,30 @@ export function SearchableContent({
   onClear,
   inputRef,
 }: SearchableContentProps) {
+  const localInputRef = React.useRef<HTMLInputElement | null>(null);
+  const setInputRef = React.useCallback(
+    (node: HTMLInputElement | null) => {
+      localInputRef.current = node;
+
+      if (typeof inputRef === 'function') {
+        inputRef(node);
+        return;
+      }
+
+      if (inputRef) {
+        (inputRef as React.MutableRefObject<HTMLInputElement | null>).current =
+          node;
+      }
+    },
+    [inputRef]
+  );
+
   return (
     <div data-menu-header className={MENU_SEARCH_HEADER_BASE}>
       <div className='relative'>
         <Search className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)' />
         <input
-          ref={inputRef}
+          ref={setInputRef}
           type='text'
           placeholder={placeholder}
           aria-label={placeholder}
@@ -79,6 +119,23 @@ export function SearchableContent({
               return;
             }
 
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              event.stopPropagation();
+              focusSiblingMenuItem(
+                localInputRef.current,
+                event.key === 'ArrowDown' ? 'first' : 'last'
+              );
+              return;
+            }
+
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              event.stopPropagation();
+              focusSiblingMenuItem(localInputRef.current, 'first')?.click();
+              return;
+            }
+
             event.stopPropagation();
           }}
           className={MENU_SEARCH_INPUT_BASE}
@@ -86,7 +143,11 @@ export function SearchableContent({
         {query ? (
           <button
             type='button'
-            onClick={onClear}
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => {
+              onClear();
+              localInputRef.current?.focus();
+            }}
             className='absolute right-1.5 top-1/2 inline-flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-(--linear-app-radius-item) text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
             aria-label='Clear search'
           >

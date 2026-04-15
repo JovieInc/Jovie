@@ -91,7 +91,9 @@ export function CommonDropdown(props: CommonDropdownProps) {
       searchQueryRef.current = query;
       setSearchQuery(query);
       onSearchChange?.(query);
-      onSearch?.(query);
+      if (query) {
+        onSearch?.(query);
+      }
     },
     [onSearch, onSearchChange]
   );

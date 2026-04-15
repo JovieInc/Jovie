@@ -580,6 +580,26 @@ describe('CommonDropdown', () => {
       await user.click(screen.getByRole('button', { name: 'Clear search' }));
 
       expect(onSearchChange).toHaveBeenLastCalledWith('');
+      expect(screen.getByPlaceholderText('Search...')).toHaveFocus();
+    });
+
+    it('preserves legacy onSearch for non-empty queries only', async () => {
+      const onSearch = vi.fn();
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={basicItems}
+          open={true}
+          searchable={true}
+          onSearch={onSearch}
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'edit');
+      await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+      expect(onSearch).toHaveBeenCalledWith('edit');
+      expect(onSearch).not.toHaveBeenCalledWith('');
     });
 
     it('lets Escape clear search before dismissing the menu', async () => {
@@ -605,6 +625,24 @@ describe('CommonDropdown', () => {
       await waitFor(() => {
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       });
+    });
+
+    it('lets menu navigation keys leave the search field', async () => {
+      const onClick = vi.fn();
+      const items: CommonDropdownItem[] = [
+        { type: 'action', id: 'edit', label: 'Edit', onClick },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} searchable={true} />);
+
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      const input = screen.getByPlaceholderText('Search...');
+      await user.type(input, 'edit');
+
+      await user.keyboard('{ArrowDown}');
+      await user.keyboard('{Enter}');
+
+      expect(onClick).toHaveBeenCalled();
     });
 
     it('only reports one empty search value when a controlled menu closes', async () => {
