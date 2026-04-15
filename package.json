@@ -106,7 +106,7 @@
     "playwright": "^1.58.2",
     "tsx": "^4.21.0",
     "turbo": "^2.8.20",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.1"
   },
   "lint-staged": {
