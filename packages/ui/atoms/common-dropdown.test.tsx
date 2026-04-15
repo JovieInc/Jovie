@@ -531,6 +531,27 @@ describe('CommonDropdown', () => {
       });
     });
 
+    it('removes section labels when their section has no matching items', async () => {
+      const items: CommonDropdownItem[] = [
+        { type: 'label', id: 'people-label', label: 'People' },
+        { type: 'action', id: 'owner', label: 'Owner', onClick: vi.fn() },
+        { type: 'separator', id: 'section-break' },
+        { type: 'label', id: 'actions-label', label: 'Actions' },
+        { type: 'action', id: 'archive', label: 'Archive', onClick: vi.fn() },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} searchable={true} />);
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'archive');
+
+      await waitFor(() => {
+        expect(screen.getByText('Actions')).toBeInTheDocument();
+        expect(screen.getByText('Archive')).toBeInTheDocument();
+        expect(screen.queryByText('People')).not.toBeInTheDocument();
+        expect(screen.queryByText('Owner')).not.toBeInTheDocument();
+      });
+    });
+
     it('shows empty state when search has no results', async () => {
       const items: CommonDropdownItem[] = [
         { type: 'action', id: 'edit', label: 'Edit', onClick: vi.fn() },

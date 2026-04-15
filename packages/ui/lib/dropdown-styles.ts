@@ -315,11 +315,12 @@ export const SELECT_TRIGGER_BASE =
 // ============================================================================
 
 /**
- * Sub-menu content classes (no max-height constraint)
+ * Sub-menu content classes.
+ * Supports both DropdownMenu.SubContent and ContextMenu.SubContent Radix vars.
  */
 export const subMenuContentClasses = [
   DROPDOWN_CONTENT_BASE,
-  'max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden',
+  'max-h-[min(var(--radix-dropdown-menu-content-available-height,var(--radix-context-menu-content-available-height,320px)),320px)] overflow-y-auto overflow-x-hidden',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   DROPDOWN_SLIDE_ANIMATIONS,

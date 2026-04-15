@@ -319,23 +319,6 @@ export interface CommonDropdownProps {
   readonly children?: ReactNode;
 }
 
-/**
- * Select-specific props for select variant
- */
-export interface CommonDropdownSelectProps
-  extends Omit<CommonDropdownProps, 'variant' | 'items'> {
-  readonly variant: 'select';
-  readonly value: string;
-  readonly onValueChange: (value: string) => void;
-  readonly options: Array<{
-    readonly value: string;
-    readonly label: string;
-    readonly icon?: LucideIcon;
-    readonly disabled?: boolean;
-  }>;
-  readonly placeholder?: string;
-}
-
 // Type guard utilities
 export function isActionItem(
   item: CommonDropdownItem

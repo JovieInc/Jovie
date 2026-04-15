@@ -36,7 +36,7 @@ function isIconComponent(
 ): value is React.ComponentType<{ className?: string }> {
   return (
     typeof value === 'function' ||
-    (typeof value === 'object' && value !== null && '$$typeof' in value)
+    Boolean(value && typeof value === 'object' && '$$typeof' in value)
   );
 }
 
