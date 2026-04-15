@@ -17,6 +17,7 @@ import {
   getProfileMode,
   getProfileModeHref,
 } from '@/features/profile/registry';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
@@ -59,6 +60,7 @@ interface ProfileCompactTemplateProps {
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
 }
 
 function resolveDrawerView(
@@ -67,6 +69,7 @@ function resolveDrawerView(
     readonly hasContacts: boolean;
     readonly hasDSPs: boolean;
     readonly hasTip: boolean;
+    readonly hasReleases: boolean;
   }
 ): DrawerView | null {
   switch (mode) {
@@ -81,6 +84,8 @@ function resolveDrawerView(
       return options.hasTip ? mode : null;
     case 'tour':
       return mode;
+    case 'releases':
+      return options.hasReleases ? mode : null;
     case 'profile':
     default:
       return null;
@@ -115,6 +120,7 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
     case 'listen':
     case 'pay':
     case 'tour':
+    case 'releases':
       return view;
     default:
       return null;
@@ -139,6 +145,7 @@ export function ProfileCompactTemplate({
   visitTrackingToken,
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
+  releases,
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
@@ -316,6 +323,7 @@ export function ProfileCompactTemplate({
     () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
     [showPayButton, socialLinks]
   );
+  const hasReleases = (releases?.length ?? 0) >= 2;
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -330,8 +338,9 @@ export function ProfileCompactTemplate({
         hasContacts,
         hasDSPs: mergedDSPs.length > 0,
         hasTip,
+        hasReleases,
       }),
-    [hasContacts, hasTip, mergedDSPs.length]
+    [hasContacts, hasTip, hasReleases, mergedDSPs.length]
   );
 
   const syncRequestedModeFromLocation = useCallback(() => {
@@ -541,6 +550,7 @@ export function ProfileCompactTemplate({
                 onRevealNotifications={() => {
                   revealNotificationsRef.current?.();
                 }}
+                releases={releases}
               />
             </div>
           </main>

@@ -76,6 +76,8 @@ interface UseSubscriptionFormReturn {
   smsEnabled: boolean;
 }
 
+const OTP_RESEND_COOLDOWN_MS = 30_000;
+
 const resolveInlineErrorMessage = (
   error: unknown,
   fallbackMessage: string
@@ -144,6 +146,7 @@ export function useSubscriptionForm({
       clearError();
       setOtpStep('input');
       setOtpCode('');
+      setResendCooldownEnd(0);
       if (next === 'email') {
         setPhoneInput('');
       } else {
@@ -168,6 +171,7 @@ export function useSubscriptionForm({
       setEmailInput(value);
       if (otpStep !== 'input') setOtpStep('input');
       if (otpCode) setOtpCode('');
+      setResendCooldownEnd(0);
       if (error) clearError();
     },
     [clearError, error, otpCode, otpStep]
@@ -279,6 +283,7 @@ export function useSubscriptionForm({
         // Double opt-in: show pending confirmation state
         setNotificationsState('pending_confirmation');
         setOtpStep('verify');
+        setResendCooldownEnd(Date.now() + OTP_RESEND_COOLDOWN_MS);
         showSuccess('Enter the 6-digit code we sent to your email.');
       } else {
         // Single opt-in: immediate success
@@ -419,7 +424,7 @@ export function useSubscriptionForm({
       });
 
       setOtpCode('');
-      setResendCooldownEnd(Date.now() + 30_000);
+      setResendCooldownEnd(Date.now() + OTP_RESEND_COOLDOWN_MS);
     } else {
       updateError('Failed to resend code. Please try again.', 'resend');
     }

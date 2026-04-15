@@ -88,6 +88,18 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
         showFooter: true,
       },
     },
+    releases: {
+      mode: 'releases',
+      subtitle: 'Discography',
+      pathSegment: 'releases',
+      shell: {
+        showBackButton: true,
+        showSocialBar: false,
+        showNotificationButton: true,
+        showTourButton: true,
+        showFooter: true,
+      },
+    },
   };
 
 export function isProfileMode(

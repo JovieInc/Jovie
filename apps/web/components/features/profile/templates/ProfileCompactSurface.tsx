@@ -28,6 +28,7 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
@@ -103,6 +104,7 @@ interface ProfileCompactSurfaceProps {
   readonly tourDates?: TourDateViewModel[];
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly onDrawerOpenChange: (open: boolean) => void;
@@ -252,6 +254,7 @@ export function ProfileCompactSurface({
   tourDates = [],
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
+  releases = [],
   drawerOpen,
   drawerView,
   onDrawerOpenChange,
@@ -319,6 +322,7 @@ export function ProfileCompactSurface({
     () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
     [showPayButton, socialLinks]
   );
+  const hasReleases = releases.length >= 2;
   const hasAbout = Boolean(
     artist.tagline ||
       artist.location ||
@@ -652,10 +656,12 @@ export function ProfileCompactSurface({
           hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasReleases={hasReleases}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
+          releases={releases}
           onRevealNotifications={onRevealNotifications}
         />
       )}
