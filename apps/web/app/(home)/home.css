@@ -174,10 +174,10 @@
   }
 
   .homepage-hero-composition {
+    position: relative;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    gap: 0;
     width: 100%;
     max-width: 64rem;
     padding: 0 1.5rem;
@@ -185,6 +185,7 @@
   }
 
   .homepage-hero-comp-center {
+    position: relative;
     flex-shrink: 0;
     z-index: 2;
     transform: translateY(3rem);
@@ -195,16 +196,21 @@
   }
 
   .homepage-hero-comp-flank {
-    flex-shrink: 0;
+    position: absolute;
+    top: 3rem;
     z-index: 1;
     will-change: transform, opacity;
   }
 
   .homepage-hero-comp-left {
+    left: 50%;
+    margin-left: -11rem;
     transform-origin: right center;
   }
 
   .homepage-hero-comp-right {
+    right: 50%;
+    margin-right: -11rem;
     transform-origin: left center;
   }
 

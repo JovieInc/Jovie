@@ -427,6 +427,7 @@ export function ProfileCompactTemplate({
 
   const handleDrawerOpenChange = useCallback((nextOpen: boolean) => {
     if (!nextOpen) {
+      suppressNextHistorySyncRef.current = true;
       setRequestedMode('profile');
       setDrawerOpen(false);
       return;

@@ -34,25 +34,27 @@ export function HomeHeroPhoneComposition() {
     };
   }, [reducedMotion]);
 
-  // Flanks start hidden behind center, slide out slightly on scroll
-  const flankOpacity = progress * 0.85;
-  const flankScale = 0.88 + progress * 0.07;
+  // Flanks peek out from behind center phone, sliding outward + downward on scroll
+  const flankOpacity = progress * 0.8;
+  const flankScale = 0.82 + progress * 0.06;
   const ease = reducedMotion
     ? 'none'
     : 'transform 80ms linear, opacity 80ms linear';
 
-  const rotateY = 18 - progress * 6; // 18° → 12° as you scroll
-  // Slide from 0% (hidden behind center) to ~20% outward
-  const slideOut = progress * 20;
+  const rotateY = 22 - progress * 8; // 22° → 14° as you scroll
+  // Slide outward: start fully behind center (0%), peek out to ~30%
+  const slideOut = progress * 30;
+  // Slide downward: drop below center phone
+  const dropDown = progress * 4; // 0 → 4rem
 
   const leftStyle = {
-    transform: `translateX(-${slideOut}%) translateY(1.5rem) rotateY(${rotateY}deg) scale(${flankScale})`,
+    transform: `translateX(-${slideOut}%) translateY(${dropDown}rem) rotateY(${rotateY}deg) scale(${flankScale})`,
     opacity: flankOpacity,
     transition: ease,
   } as const;
 
   const rightStyle = {
-    transform: `translateX(${slideOut}%) translateY(1.5rem) rotateY(-${rotateY}deg) scale(${flankScale})`,
+    transform: `translateX(${slideOut}%) translateY(${dropDown}rem) rotateY(-${rotateY}deg) scale(${flankScale})`,
     opacity: flankOpacity,
     transition: ease,
   } as const;
@@ -68,7 +70,7 @@ export function HomeHeroPhoneComposition() {
         style={leftStyle}
       >
         <HomeProfileShowcase
-          stateId='tips-open'
+          stateId='streams-presave'
           presentation='full-phone'
           className='homepage-hero-comp-phone-small'
         />
