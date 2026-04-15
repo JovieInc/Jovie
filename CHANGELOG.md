@@ -7,10 +7,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.153.4] - 2026-04-15
 
-> Public profile releases now fail safely, show consistent UTC years across timezones, and only open the releases drawer when there are enough navigable items.
+> Release drawers now use compact inspector cards, and public profile releases now fail safely with timezone-consistent year rendering.
 
 ### Changed
 
+- Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
 - Public profile release fetch now uses a fail-safe helper so telemetry/reporting errors do not break page rendering.
 - Release year extraction now uses UTC year semantics across profile and release matrix surfaces.
 - Profile drawer release navigation now gates on visible navigable releases instead of raw release presence flags.
