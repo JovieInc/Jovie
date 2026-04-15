@@ -14,10 +14,13 @@
 
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkShell } from '@/features/release/SmartLinkShell';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import { YouTubeEmbed } from './YouTubeEmbed';
 
@@ -45,6 +48,7 @@ export function VideoReleasePage({
   videoId,
   youtubeUrl,
 }: VideoReleasePageProps) {
+  const [shareOpen, setShareOpen] = useState(false);
   const handleEmbedError = useCallback(() => {
     postJsonBeacon(
       '/api/track',
@@ -64,12 +68,19 @@ export function VideoReleasePage({
 
     globalThis.location.replace(`/${artist.handle}`);
   }, [artist.handle, artist.id, videoId, release.slug]);
+  const shareContext = buildReleaseShareContext({
+    username: artist.handle,
+    slug: release.slug,
+    title: release.title,
+    artistName: artist.name,
+    artworkUrl: release.artworkUrl,
+  });
 
   return (
     <SmartLinkShell
       artworkUrl={release.artworkUrl}
       artworkAlt={`${release.title} artwork`}
-      onMenuOpen={() => {}}
+      onMenuOpen={() => setShareOpen(true)}
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
           <h1 className='text-[15px] font-[510] leading-[1.2] tracking-[-0.01em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
@@ -129,6 +140,17 @@ export function VideoReleasePage({
           <SmartLinkPoweredByFooter />
         </div>
       </div>
+      <ProfileDrawerShell
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title='Share'
+        subtitle='Share this release'
+      >
+        <PublicShareActionList
+          context={shareContext}
+          onActionComplete={() => setShareOpen(false)}
+        />
+      </ProfileDrawerShell>
     </SmartLinkShell>
   );
 }
