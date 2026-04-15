@@ -1,7 +1,6 @@
 import 'server-only';
 
-import { checkGate } from './server';
-import { FEATURE_FLAG_KEYS } from './shared';
+import { FEATURE_FLAGS } from './shared';
 
 /**
  * Check if Stripe Connect onboarding is enabled for a given user.
@@ -15,5 +14,5 @@ import { FEATURE_FLAG_KEYS } from './shared';
 export async function isStripeConnectEnabled(
   userId: string | null
 ): Promise<boolean> {
-  return checkGate(userId, FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED, false);
+  return Boolean(userId) && FEATURE_FLAGS.STRIPE_CONNECT_ENABLED;
 }
