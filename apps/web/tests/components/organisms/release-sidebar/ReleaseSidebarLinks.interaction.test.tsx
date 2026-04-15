@@ -206,6 +206,30 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </div>
   ),
+  DrawerInspectorStack: ({
+    children,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    'data-testid'?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  DrawerInspectorCard: ({
+    children,
+    title,
+    actions,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    title: string;
+    actions?: React.ReactNode;
+    'data-testid'?: string;
+  }) => (
+    <section data-testid={testId}>
+      <h3>{title}</h3>
+      {actions}
+      {children}
+    </section>
+  ),
   DrawerTabs: ({
     value,
     onValueChange,
@@ -314,6 +338,9 @@ vi.mock('@/components/organisms/AvatarUploadable', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
   ReleaseFields: () => <div>Fields</div>,
 }));
+vi.mock('@/components/features/dashboard/release-tasks', () => ({
+  ReleaseTaskChecklist: () => <div>Tasks</div>,
+}));
 vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
   ReleaseTrackList: () => <div>Tracks</div>,
 }));
@@ -382,7 +409,7 @@ const providerConfig = {
   youtube: { label: 'YouTube Music', accent: '#FF0000' },
 } as Record<ProviderKey, { label: string; accent: string }>;
 
-describe('ReleaseSidebar links tab interactions', () => {
+describe('ReleaseSidebar DSP card interactions', () => {
   const onAddDspLink = vi.fn().mockResolvedValue(undefined);
   const onRemoveDspLink = vi.fn().mockResolvedValue(undefined);
 
@@ -412,7 +439,6 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
@@ -447,7 +473,6 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByTestId('drawer-tab-links'));
     await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
@@ -480,7 +505,6 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(
       screen.queryByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();

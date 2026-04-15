@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.4] - 2026-04-15
+
+> Release drawers now use compact inspector cards instead of tabs, making details easier to scan.
+
+### Changed
+
+- Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
+
 ## [26.4.153.3] - 2026-04-15
 
 ### Changed
