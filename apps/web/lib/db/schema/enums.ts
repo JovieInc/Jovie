@@ -73,6 +73,7 @@ export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
   'compilation',
   'live',
   'mixtape',
+  'music_video',
   'other',
 ]);
 

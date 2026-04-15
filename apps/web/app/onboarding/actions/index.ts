@@ -13,6 +13,15 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import {
+  clearPendingClaimContext,
+  readPendingClaimContext,
+} from '@/lib/claim/context';
+import {
+  claimPrebuiltProfileForUser,
+  ensureOnboardingUserRow,
+  reservePrebuiltProfileForUser,
+} from '@/lib/claim/finalize';
 import { withRetry } from '@/lib/db/client';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -122,6 +131,8 @@ export async function completeOnboarding({
   email?: string | null;
   redirectToDashboard?: boolean;
 }): Promise<CompletionResult> {
+  let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
+
   try {
     // Step 1: Authentication check
     const { userId } = await getCachedAuth();
@@ -192,6 +203,9 @@ export async function completeOnboarding({
 
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
+    pendingClaim = await readPendingClaimContext({
+      username: normalizedUsername,
+    });
 
     const userEmail = email ?? clerkIdentity.email ?? null;
 
@@ -204,6 +218,53 @@ export async function completeOnboarding({
         withDbSessionTx(
           async (tx, clerkUserId: string) => {
             const existingUser = await fetchExistingUser(tx, clerkUserId);
+
+            if (pendingClaim) {
+              const userRecord =
+                existingUser ??
+                (await (async () => {
+                  if (userEmail) {
+                    await ensureEmailAvailable(tx, clerkUserId, userEmail);
+                  }
+
+                  return ensureOnboardingUserRow(tx, {
+                    clerkUserId,
+                    userEmail,
+                  });
+                })());
+
+              const existingProfile = await fetchExistingProfile(
+                tx,
+                userRecord.id
+              );
+
+              if (
+                existingProfile?.isClaimed &&
+                existingProfile.id !== pendingClaim.creatorProfileId
+              ) {
+                throw new Error(
+                  `[PROFILE_CONFLICT] You already own @${existingProfile.usernameNormalized}.`
+                );
+              }
+
+              if (pendingClaim.mode === 'direct_profile') {
+                return reservePrebuiltProfileForUser(tx, {
+                  userId: userRecord.id,
+                  creatorProfileId: pendingClaim.creatorProfileId,
+                  expectedUsername: normalizedUsername,
+                  displayName: trimmedDisplayName,
+                });
+              }
+
+              return claimPrebuiltProfileForUser(tx, {
+                userId: userRecord.id,
+                creatorProfileId: pendingClaim.creatorProfileId,
+                expectedUsername: normalizedUsername,
+                displayName: trimmedDisplayName,
+                source: 'token_backed_onboarding',
+                finalizeOnboarding: true,
+              });
+            }
 
             // If the user record does not exist, the stored function will create both user + profile
             if (!existingUser) {
@@ -320,6 +381,10 @@ export async function completeOnboarding({
       throw error;
     });
 
+    if (pendingClaim?.mode === 'token_backed') {
+      await clearPendingClaimContext();
+    }
+
     await Promise.allSettled([
       runBoundedPostOnboardingSideEffect(
         'cache_handle_availability',
@@ -355,6 +420,7 @@ export async function completeOnboarding({
     ]);
 
     // Step 7: Avatar upload (fire-and-forget, background processing)
+    const shouldFinalizeOnboarding = pendingClaim?.mode !== 'direct_profile';
     const profileId = completion.profileId;
     if (profileId && oauthAvatarUrl) {
       void handleBackgroundAvatarUpload(
@@ -365,26 +431,28 @@ export async function completeOnboarding({
     }
 
     // Step 8: Sync operations (parallel, fire-and-forget)
-    runBackgroundSyncOperations(userId, completion.username);
+    if (shouldFinalizeOnboarding) {
+      runBackgroundSyncOperations(userId, completion.username);
+    }
 
     // Step 9: Activate 14-day Pro trial (fire-and-forget)
-    void import('./activate-trial').then(({ activateTrial }) =>
-      activateTrial(userId)
-    );
+    if (shouldFinalizeOnboarding) {
+      void import('./activate-trial').then(({ activateTrial }) =>
+        activateTrial(userId)
+      );
+    }
 
-    // ENG-002: Set completion cookie to prevent redirect loop race condition
-    // The proxy checks this cookie and bypasses needsOnboarding check for 30s
-    // This handles the race between transaction commit and proxy's DB read
-    // IMPORTANT: Always set this cookie on success, even when redirectToDashboard=false,
-    // because the user will navigate to dashboard after seeing the completion step
-    const cookieStore = await cookies();
-    cookieStore.set('jovie_onboarding_complete', '1', {
-      httpOnly: true,
-      secure: isSecureEnv(),
-      sameSite: 'lax',
-      maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
-      path: '/',
-    });
+    if (shouldFinalizeOnboarding) {
+      // ENG-002: Set completion cookie to prevent redirect loop race condition
+      const cookieStore = await cookies();
+      cookieStore.set('jovie_onboarding_complete', '1', {
+        httpOnly: true,
+        secure: isSecureEnv(),
+        sameSite: 'lax',
+        maxAge: 120,
+        path: '/',
+      });
+    }
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete
@@ -396,6 +464,14 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    if (
+      pendingClaim &&
+      error instanceof Error &&
+      (error.message.includes('PROFILE_CONFLICT') ||
+        error.message.includes('CLAIM_NOT_FOUND'))
+    ) {
+      await clearPendingClaimContext();
+    }
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',
     });

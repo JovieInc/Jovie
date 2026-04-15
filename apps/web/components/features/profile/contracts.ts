@@ -1,5 +1,5 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -8,7 +8,7 @@ import type { PressPhoto } from '@/types/press-photos';
 export const PROFILE_MODE_KEYS = [
   'profile',
   'listen',
-  'tip',
+  'pay',
   'subscribe',
   'about',
   'contact',
@@ -17,7 +17,7 @@ export const PROFILE_MODE_KEYS = [
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
 
-export const SWIPEABLE_MODES = ['profile', 'tour', 'tip', 'about'] as const;
+export const SWIPEABLE_MODES = ['profile', 'tour', 'pay', 'about'] as const;
 
 export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
 
@@ -34,7 +34,7 @@ export function supportsProfileV2Mode(
 
 export const PROFILE_V2_OVERLAY_MODES = [
   'listen',
-  'tip',
+  'pay',
   'subscribe',
   'contact',
 ] as const;
@@ -64,8 +64,8 @@ export interface ProfilePublicViewModel {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton: boolean;
-  readonly isTipModeActive: boolean;
+  readonly showPayButton: boolean;
+  readonly isPayModeActive: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton: boolean;
   readonly isTourModeActive: boolean;
