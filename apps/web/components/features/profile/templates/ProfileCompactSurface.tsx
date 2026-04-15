@@ -12,14 +12,15 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
+  profilePrimaryPillClassName,
   SubscriptionPearlComposer,
-  subscriptionPrimaryActionClassName,
 } from '@/features/profile/artist-notifications-cta/shared';
 import type {
   ProfilePreviewNotificationsState,
@@ -89,6 +90,7 @@ interface ProfileCompactSurfaceProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
   readonly latestRelease?: ProfileCompactRelease | null;
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
@@ -102,13 +104,14 @@ interface ProfileCompactSurfaceProps {
   readonly tourDates?: TourDateViewModel[];
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly onDrawerOpenChange: (open: boolean) => void;
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
-  readonly onShare?: () => void;
+  readonly onShare: () => void;
   readonly profileHref: string;
   readonly artistProfilesHref?: string;
   readonly isSubscribed?: boolean;
@@ -124,8 +127,6 @@ interface ProfileCompactSurfaceProps {
   readonly dataTestId?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly hasReleases?: boolean;
-  readonly releases?: readonly PublicRelease[];
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -156,7 +157,7 @@ function PreviewInlineNotifications({
         <SubscriptionPearlComposer
           action={
             <span
-              className={`${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0`}
+              className={`${profilePrimaryPillClassName} !h-10 !w-10 !px-0`}
             >
               <ArrowRight className='h-4 w-4' />
             </span>
@@ -177,7 +178,7 @@ function PreviewInlineNotifications({
       <div data-testid='profile-inline-notifications-preview'>
         <button
           type='button'
-          className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+          className={`${profilePrimaryPillClassName} h-12 w-full justify-center gap-2 px-6`}
         >
           <CheckCircle2 className='h-4 w-4 shrink-0 text-green-400' />
           {notifications.label || 'Notifications on'}
@@ -190,7 +191,7 @@ function PreviewInlineNotifications({
     <div data-testid='profile-inline-notifications-preview'>
       <button
         type='button'
-        className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+        className={`${profilePrimaryPillClassName} h-12 w-full justify-center gap-2 px-6`}
       >
         <Bell className='h-4 w-4' />
         Turn on notifications
@@ -241,6 +242,7 @@ export function ProfileCompactSurface({
   artist,
   socialLinks,
   contacts,
+  showPayButton = true,
   latestRelease,
   profileSettings,
   enableDynamicEngagement = false,
@@ -252,6 +254,7 @@ export function ProfileCompactSurface({
   tourDates = [],
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
+  releases = [],
   drawerOpen,
   drawerView,
   onDrawerOpenChange,
@@ -278,8 +281,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideJovieBranding = false,
   hideMoreMenu = false,
-  hasReleases = false,
-  releases,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
     () =>
@@ -318,9 +319,10 @@ export function ProfileCompactSurface({
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
   const hasTip = useMemo(
-    () => socialLinks.some(link => link.platform === 'venmo'),
-    [socialLinks]
+    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
+    [showPayButton, socialLinks]
   );
+  const hasReleases = releases.length >= 2;
   const hasAbout = Boolean(
     artist.tagline ||
       artist.location ||
@@ -400,15 +402,16 @@ export function ProfileCompactSurface({
             )}
 
             {!hideMoreMenu && (
-              <button
-                type='button'
+              <CircleIconButton
                 onClick={onOpenMenu}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-                aria-label='More options'
+                size='xs'
+                variant='pearlQuiet'
+                className={drawerOpen ? 'bg-white/12 text-white' : undefined}
+                ariaLabel='More options'
                 aria-haspopup='dialog'
               >
                 <MoreHorizontal className='h-[15px] w-[15px]' />
-              </button>
+              </CircleIconButton>
             )}
           </div>
 
@@ -653,11 +656,11 @@ export function ProfileCompactSurface({
           hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasReleases={hasReleases}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
-          hasReleases={hasReleases}
           releases={releases}
           onRevealNotifications={onRevealNotifications}
         />

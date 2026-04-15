@@ -123,11 +123,14 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     phoneInput: '',
     emailInput: '',
     error: null,
+    errorOrigin: null,
     otpCode: '',
     otpStep: 'input' as const,
     isSubmitting: false,
     isCountryOpen: false,
     setIsCountryOpen: vi.fn(),
+    resendCooldownEnd: 0,
+    isResending: false,
     notificationsState: 'idle',
     notificationsEnabled: true,
     channel: 'email' as const,
@@ -139,6 +142,7 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+    handleResendOtp: vi.fn().mockResolvedValue(undefined),
     handleKeyDown: vi.fn(),
     openSubscription: vi.fn(),
     registerInputFocus: vi.fn(),
@@ -189,7 +193,7 @@ describe('CLS-prevention: min-h CSS classes', () => {
     expect(container.querySelector('.min-h-\\[180px\\]')).toBeInTheDocument();
   });
 
-  it('ProfileInlineNotificationsCTA has min-h-[48px] on wrapper', async () => {
+  it('ProfileInlineNotificationsCTA has min-h-[116px] on wrapper', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -199,6 +203,6 @@ describe('CLS-prevention: min-h CSS classes', () => {
     render(<ProfileInlineNotificationsCTA artist={artist} />);
 
     const wrapper = screen.getByTestId('profile-inline-cta');
-    expect(wrapper.className).toContain('min-h-[48px]');
+    expect(wrapper.className).toContain('min-h-[116px]');
   });
 });

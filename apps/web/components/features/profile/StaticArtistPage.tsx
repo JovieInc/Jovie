@@ -101,6 +101,7 @@ export function StaticArtistPage({
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}
       contacts={viewModel.contacts}
+      showPayButton={viewModel.showPayButton}
       latestRelease={viewModel.latestRelease}
       enableDynamicEngagement={viewModel.enableDynamicEngagement}
       subscribeTwoStep={viewModel.subscribeTwoStep}

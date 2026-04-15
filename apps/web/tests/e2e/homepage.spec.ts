@@ -83,7 +83,7 @@ test.describe('Homepage', () => {
     // Philosophy
     await page.getByTestId('homepage-spec-section').scrollIntoViewIfNeeded();
     await expect(
-      page.getByRole('heading', { name: 'Built for artists by artists.' })
+      page.getByRole('heading', { name: 'Built for artists' })
     ).toBeVisible();
     await expect(page.getByText('Opinionated.')).toBeVisible();
     await expect(page.getByText('By design.')).toBeVisible();

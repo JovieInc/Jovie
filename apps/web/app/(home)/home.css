@@ -1282,6 +1282,44 @@
     display: block;
   }
 
+  .homepage-hero--f .homepage-hero-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(22rem, 1fr);
+    align-items: center;
+    gap: 5rem;
+    min-height: min(860px, calc(100svh - var(--linear-header-height)));
+    padding-bottom: 5rem;
+    overflow: visible;
+  }
+
+  .homepage-hero--f .homepage-hero-copy {
+    max-width: 38rem;
+    text-align: left;
+  }
+
+  .homepage-hero--f .homepage-hero-copy .marketing-lead-linear {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .homepage-hero--f .homepage-claim-form {
+    justify-content: flex-start;
+  }
+
+  .homepage-hero--f .homepage-hero-composition {
+    max-width: 34rem;
+    justify-self: end;
+    padding: 0;
+  }
+
+  .homepage-hero--f .homepage-hero-comp-center {
+    transform: translateY(0);
+  }
+
+  .homepage-hero--f .homepage-hero-comp-flank {
+    display: none;
+  }
+
   .homepage-chapter {
     padding: 7rem 0;
   }
