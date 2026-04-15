@@ -73,8 +73,14 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
     React.createElement('svg', props),
 }));
 
-vi.mock('@/components/organisms/profile-shell', () => ({
-  ProfileNotificationsContext: React.createContext(null),
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    ProfileNotificationsContext: React.createContext(null),
+  })
+);
+
+vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
   useProfileShell: (...args: unknown[]) => mockUseProfileShell(...args),
 }));
 
@@ -86,7 +92,7 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUnsubscribeNotificationsMutation: () => ({
     mutate: vi.fn(),
     isPending: false,

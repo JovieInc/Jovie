@@ -61,13 +61,6 @@ function SignUpClaimDataPersistence() {
       if (artistName) {
         persistSignupClaimValue(SIGNUP_ARTIST_NAME_KEY, artistName, now);
       }
-
-      if (handle) {
-        sessionStorage.setItem(
-          'pendingClaim',
-          JSON.stringify({ handle: handle.toLowerCase(), ts: now })
-        );
-      }
     } catch {
       // sessionStorage may be unavailable (incognito quota, etc.)
     }

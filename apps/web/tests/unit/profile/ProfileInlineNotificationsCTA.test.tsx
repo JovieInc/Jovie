@@ -37,7 +37,7 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberBirthdayMutation: () =>
     mockUpdateSubscriberBirthdayMutation(),
   useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),

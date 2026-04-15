@@ -1,8 +1,8 @@
 'use client';
 
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDateCard } from './TourDateCard';
 
 interface TourDatesListProps {

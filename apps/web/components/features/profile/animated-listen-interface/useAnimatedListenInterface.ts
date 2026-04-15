@@ -15,7 +15,7 @@ import {
 } from '@/lib/dsp';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 import { detectPlatformFromUA } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 

@@ -7,7 +7,6 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -17,6 +16,7 @@ import {
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
 import { buildTourDateActions } from './tour-date-actions';

@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 const makeTourDate = (
   overrides: Partial<TourDateViewModel> = {}
