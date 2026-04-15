@@ -1,7 +1,5 @@
 import { Container } from '@/components/site/Container';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { HomeChapter1 } from './HomeChapter1';
-import { HomeChapter2 } from './HomeChapter2';
 import { HomeHeroCTA } from './HomeHeroCTA';
 import { HomeHeroPhoneComposition } from './HomeHeroPhoneComposition';
 import { HomeTrustSection } from './HomeTrustSection';
@@ -53,13 +51,7 @@ export function HomeAdaptiveProfileStory() {
   return (
     <div data-testid='homepage-shell'>
       <HomeHero />
-      {showSections && (
-        <>
-          <HomeChapter1 />
-          <HomeChapter2 />
-          <HomeTrustSection />
-        </>
-      )}
+      {showSections ? <HomeTrustSection /> : null}
     </div>
   );
 }

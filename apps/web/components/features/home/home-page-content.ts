@@ -53,6 +53,40 @@ export interface HomeChapter3Content {
   ];
 }
 
+export interface HomeEngageCard {
+  readonly id: 'smart-links' | 'countdown' | 'tour' | 'tips' | 'fans';
+  readonly title: string;
+  readonly body: string;
+  readonly surfaceId: 'profile' | 'countdown' | 'tour' | 'tips' | 'fans';
+}
+
+export interface HomeEngageContent {
+  readonly title: string;
+  readonly body: string;
+  readonly cards: readonly [
+    HomeEngageCard,
+    HomeEngageCard,
+    HomeEngageCard,
+    HomeEngageCard,
+    HomeEngageCard,
+  ];
+}
+
+export interface HomeRelationshipSectionCard {
+  readonly title: string;
+  readonly body: string;
+}
+
+export interface HomeRelationshipSectionContent {
+  readonly title: string;
+  readonly body: string;
+  readonly cards: readonly [
+    HomeRelationshipSectionCard,
+    HomeRelationshipSectionCard,
+  ];
+  readonly footnote: string;
+}
+
 /* ── Philosophy ───────────────────────────────────────── */
 
 export interface HomePhilosophyCard {
@@ -146,6 +180,61 @@ export const HOME_CHAPTER_3_CONTENT: HomeChapter3Content = {
     },
   ],
 };
+
+export const HOME_ENGAGE_CONTENT: HomeEngageContent = {
+  title: 'Engage.',
+  body: 'The same profile handles listening, countdowns, tour dates, tips, and fan capture without another campaign to build.',
+  cards: [
+    {
+      id: 'smart-links',
+      title: 'Smart links that stay current.',
+      body: 'One profile routes fans to the right release and the right streaming destination.',
+      surfaceId: 'profile',
+    },
+    {
+      id: 'countdown',
+      title: 'Countdowns built in.',
+      body: 'Upcoming drops turn into pre-save and countdown pages from the same link.',
+      surfaceId: 'countdown',
+    },
+    {
+      id: 'tour',
+      title: 'Shows land in the right city.',
+      body: 'Tour dates can lead the page when the next thing that matters is local.',
+      surfaceId: 'tour',
+    },
+    {
+      id: 'tips',
+      title: 'Get paid without losing the moment.',
+      body: 'Fans can tip in one tap and stay inside the same experience.',
+      surfaceId: 'tips',
+    },
+    {
+      id: 'fans',
+      title: 'Recognize the people who care.',
+      body: 'Tips, presaves, listens, and alerts turn into a fan relationship you can build on.',
+      surfaceId: 'fans',
+    },
+  ],
+};
+
+export const HOME_RELATIONSHIP_SECTION_CONTENT: HomeRelationshipSectionContent =
+  {
+    title: 'Turn action into a relationship.',
+    body: 'Get paid in the moment, then keep the fan warm with the same link they already trust.',
+    cards: [
+      {
+        title: 'Take the payment.',
+        body: 'Apple Pay and quick support flows make it easy to capture the moment while someone is ready.',
+      },
+      {
+        title: 'Keep the signal.',
+        body: 'Know who tipped, listened, or turned on notifications so the next follow-up starts warm.',
+      },
+    ],
+    footnote:
+      'A tip, a presave, or a show RSVP becomes a fan you recognize next time.',
+  };
 
 export const HOME_PHILOSOPHY_CONTENT: HomePhilosophyContent = {
   sectionTitle: 'Built for artists by artists.',

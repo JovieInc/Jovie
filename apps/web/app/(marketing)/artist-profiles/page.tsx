@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { MarketingPageShell } from '@/components/marketing';
-import { Container } from '@/components/site/Container';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
@@ -12,7 +11,7 @@ import { HomeEngageBentoSection } from '@/features/home/HomeEngageBentoSection';
 import { FinalCallToAction } from '@/features/home/HomePageNarrative';
 import { HomeSpecChapter } from '@/features/home/HomeSpecChapter';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
-import { HOMEPAGE_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
+import { HOME_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import { ARTIST_PROFILE_MODES } from './artist-profile-modes';
 
@@ -76,21 +75,18 @@ export default function ArtistProfilesPage() {
 
       {/* ── "One profile." interstitial ── */}
       <section className='homepage-chapter' style={{ textAlign: 'center' }}>
-        <Container size='homepage'>
+        <div className='mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8'>
           <h2 className='marketing-h1-linear mx-auto text-primary-token'>
             One profile.
           </h2>
-        </Container>
+        </div>
       </section>
 
       {/* ── All sections (ungated on artist-profiles) ── */}
       <HomeChapter1 />
       <HomeChapter2 />
       <HomeTrustSection />
-      <HomeAutoNotifySection />
-      <HomeEngageBentoSection />
       <HomeChapter3 />
-      <HomeSpecChapter />
 
       <StickyPhoneTour
         modes={ARTIST_PROFILE_MODES}
@@ -99,7 +95,11 @@ export default function ArtistProfilesPage() {
         artistHandle='timwhite'
       />
 
-      <FinalCallToAction content={HOMEPAGE_FINAL_CTA_CONTENT} />
+      <HomeAutoNotifySection />
+      <HomeEngageBentoSection />
+      <HomeSpecChapter />
+
+      <FinalCallToAction content={HOME_FINAL_CTA_CONTENT} />
     </MarketingPageShell>
   );
 }

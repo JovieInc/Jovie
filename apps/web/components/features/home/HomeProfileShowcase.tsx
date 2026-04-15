@@ -38,6 +38,8 @@ interface HomeProfileShowcaseProps {
   readonly presentation?: HomeProfileShowcasePresentation;
   readonly overlayMode?: HomeProfileShowcaseOverlayMode;
   readonly cropAnchor?: HomeProfileShowcaseCropAnchor;
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
 }
 
 function HomeProfileOverlayCard({
@@ -155,8 +157,12 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
 
 function ShowcaseSurface({
   stateId,
+  hideJovieBranding,
+  hideMoreMenu,
 }: Readonly<{
   stateId: ProfileShowcaseStateId;
+  hideJovieBranding: boolean;
+  hideMoreMenu: boolean;
 }>) {
   const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
 
@@ -198,6 +204,8 @@ function ShowcaseSurface({
         onRevealNotifications={() => {}}
         previewNotificationsState={state.notifications}
         previewReleaseActionLabel={state.releaseActionLabel}
+        hideJovieBranding={hideJovieBranding}
+        hideMoreMenu={hideMoreMenu}
       />
     </div>
   );
@@ -210,6 +218,8 @@ export function HomeProfileShowcase({
   presentation = 'full-phone',
   overlayMode = 'auto',
   cropAnchor = 'center',
+  hideJovieBranding = false,
+  hideMoreMenu = false,
 }: Readonly<HomeProfileShowcaseProps>) {
   const reducedMotion = useReducedMotion();
   const inertRef = useRef<HTMLDivElement>(null);
@@ -235,7 +245,13 @@ export function HomeProfileShowcase({
         compact={compact}
         className='homepage-showcase-phone-frame'
       >
-        {shouldRenderSurface ? <ShowcaseSurface stateId={stateId} /> : null}
+        {shouldRenderSurface ? (
+          <ShowcaseSurface
+            stateId={stateId}
+            hideJovieBranding={hideJovieBranding}
+            hideMoreMenu={hideMoreMenu}
+          />
+        ) : null}
         {shouldRenderOverlay ? (
           <HomeProfileOverlayCard stateId={stateId} mode='absolute' />
         ) : null}
@@ -245,7 +261,11 @@ export function HomeProfileShowcase({
     content = (
       <div className='homepage-showcase-crop-viewport'>
         <div className='homepage-showcase-crop-surface'>
-          <ShowcaseSurface stateId={stateId} />
+          <ShowcaseSurface
+            stateId={stateId}
+            hideJovieBranding={hideJovieBranding}
+            hideMoreMenu={hideMoreMenu}
+          />
         </div>
         {shouldRenderOverlay ? (
           <HomeProfileOverlayCard stateId={stateId} mode='absolute' />
