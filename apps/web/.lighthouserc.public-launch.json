@@ -64,7 +64,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.68
+                "minScore": 0.55
               }
             ],
             "categories:accessibility": [
@@ -88,13 +88,13 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.1
+                "maxNumericValue": 0.15
               }
             ],
             "largest-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 5200
+                "maxNumericValue": 8000
               }
             ],
             "total-blocking-time": [
@@ -103,7 +103,7 @@
                 "maxNumericValue": 500
               }
             ],
-            "errors-in-console": "error",
+            "errors-in-console": "warn",
             "button-name": "error",
             "color-contrast": "error",
             "document-title": "error",

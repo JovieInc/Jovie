@@ -9,21 +9,13 @@ import type { ClaimEntryMode, PendingClaimContext } from './types';
 export const PENDING_CLAIM_COOKIE = 'jovie_pending_claim';
 export const PENDING_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PENDING_CLAIM_SECRET_DOMAIN = 'pending-claim-cookie';
-const DEV_PENDING_CLAIM_SECRET = crypto.randomBytes(32).toString('hex');
 
 function getPendingClaimSecret(): string {
   const secret = env.URL_ENCRYPTION_KEY;
   if (!secret) {
-    if (isSecureEnv()) {
-      throw new Error(
-        'URL_ENCRYPTION_KEY must be configured for pending claim cookies'
-      );
-    }
-
-    return crypto
-      .createHmac('sha256', DEV_PENDING_CLAIM_SECRET)
-      .update(PENDING_CLAIM_SECRET_DOMAIN)
-      .digest('hex');
+    throw new Error(
+      'URL_ENCRYPTION_KEY must be configured for pending claim cookies'
+    );
   }
 
   return crypto
@@ -61,14 +53,9 @@ function parsePendingClaimCookie(value: string): PendingClaimContext | null {
     return null;
   }
 
-  let parsed: PendingClaimContext;
-  try {
-    parsed = JSON.parse(
-      Buffer.from(body, 'base64url').toString('utf8')
-    ) as PendingClaimContext;
-  } catch {
-    return null;
-  }
+  const parsed = JSON.parse(
+    Buffer.from(body, 'base64url').toString('utf8')
+  ) as PendingClaimContext;
 
   if (
     !parsed?.creatorProfileId ||
@@ -134,6 +121,7 @@ export async function readPendingClaimContext(options?: {
   try {
     const parsed = parsePendingClaimCookie(raw);
     if (!parsed) {
+      cookieStore.delete(PENDING_CLAIM_COOKIE);
       return null;
     }
 
@@ -146,6 +134,7 @@ export async function readPendingClaimContext(options?: {
 
     return parsed;
   } catch (error) {
+    cookieStore.delete(PENDING_CLAIM_COOKIE);
     await captureError('Failed to parse pending claim cookie', error, {
       route: 'lib/claim/context',
     });

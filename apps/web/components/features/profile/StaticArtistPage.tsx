@@ -89,7 +89,6 @@ export function StaticArtistPage({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
-    releases,
   });
 
   // Live public profiles and compact preview callers intentionally share the
@@ -117,7 +116,7 @@ export function StaticArtistPage({
       }
       profileSettings={viewModel.profileSettings}
       viewerCountryCode={viewerCountryCode}
-      releases={viewModel.releases}
+      releases={releases}
     />
   );
 }

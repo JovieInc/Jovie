@@ -226,8 +226,7 @@ function getReleaseSupportingLine(
 
   const [primaryArtist, ...featuredArtists] = artistNames;
   if (
-    primaryArtist &&
-    primaryArtist.toLowerCase() === artistName.toLowerCase() &&
+    primaryArtist?.toLowerCase() === artistName.toLowerCase() &&
     featuredArtists.length > 0
   ) {
     return `w/ ${featuredArtists.join(', ')}`;

@@ -2,6 +2,9 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+
+export const dynamic = 'force-dynamic';
+
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';

@@ -41,10 +41,7 @@ export interface FollowUpTemplateData {
  * Build the claim URL with token
  */
 function buildClaimUrl(username: string, claimToken: string): string {
-  return new URL(
-    `/claim/${encodeURIComponent(claimToken)}`,
-    BASE_URL
-  ).toString();
+  return `${BASE_URL}/claim/${encodeURIComponent(claimToken)}`;
 }
 
 /**

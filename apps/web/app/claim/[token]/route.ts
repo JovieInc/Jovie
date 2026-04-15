@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { writePendingClaimContext } from '@/lib/claim/context';
-import { captureError } from '@/lib/error-tracking';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -26,58 +25,50 @@ export async function GET(
   request: NextRequest,
   { params }: ClaimTokenRouteContext
 ): Promise<NextResponse> {
-  try {
-    const { token } = await params;
+  const { token } = await params;
 
-    if (!token) {
-      return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
-    }
-
-    const username = await lookupUsernameByClaimToken(token);
-    if (!username) {
-      await clearLeadAttributionCookie();
-      return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
-    }
-
-    const isValid = await isClaimTokenValid(username, token);
-    if (!isValid) {
-      await clearLeadAttributionCookie();
-      return NextResponse.redirect(
-        buildAbsoluteUrl(request, `/${encodeURIComponent(username)}?claim=1`)
-      );
-    }
-
-    const profile = await getProfileByUsername(username);
-    if (!profile) {
-      await clearLeadAttributionCookie();
-      return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
-    }
-
-    const lead = await lookupLeadByClaimToken(token);
-    const claimTokenHash = await hashClaimToken(token);
-
-    await setLeadAttributionCookieFromToken(token);
-    await markLeadClaimPageViewedFromToken(token);
-    await writePendingClaimContext({
-      mode: 'token_backed',
-      creatorProfileId: profile.id,
-      username: profile.usernameNormalized,
-      claimTokenHash,
-      leadId: lead?.id ?? null,
-      expectedSpotifyArtistId: profile.spotifyId ?? null,
-    });
-
-    return NextResponse.redirect(
-      buildAbsoluteUrl(
-        request,
-        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-      )
-    );
-  } catch (error) {
-    await captureError('Claim token resolver failed', error, {
-      route: 'app/claim/[token]/route',
-    });
-    await clearLeadAttributionCookie().catch(() => undefined);
+  if (!token) {
     return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
   }
+
+  const username = await lookupUsernameByClaimToken(token);
+  if (!username) {
+    await clearLeadAttributionCookie();
+    return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
+  }
+
+  const isValid = await isClaimTokenValid(username, token);
+  if (!isValid) {
+    await clearLeadAttributionCookie();
+    return NextResponse.redirect(
+      buildAbsoluteUrl(request, `/${encodeURIComponent(username)}?claim=1`)
+    );
+  }
+
+  const profile = await getProfileByUsername(username);
+  if (!profile) {
+    await clearLeadAttributionCookie();
+    return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
+  }
+
+  const lead = await lookupLeadByClaimToken(token);
+  const claimTokenHash = await hashClaimToken(token);
+
+  await setLeadAttributionCookieFromToken(token);
+  await markLeadClaimPageViewedFromToken(token);
+  await writePendingClaimContext({
+    mode: 'token_backed',
+    creatorProfileId: profile.id,
+    username: profile.usernameNormalized,
+    claimTokenHash,
+    leadId: lead?.id ?? null,
+    expectedSpotifyArtistId: profile.spotifyId ?? null,
+  });
+
+  return NextResponse.redirect(
+    buildAbsoluteUrl(
+      request,
+      `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+    )
+  );
 }

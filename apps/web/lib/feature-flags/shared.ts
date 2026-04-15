@@ -31,9 +31,6 @@ export type StatsigGateKey =
  */
 export const FEATURE_FLAG_KEYS = STATSIG_GATE_KEYS;
 
-/** @deprecated Use StatsigGateKey or CodeFlagName instead. */
-export type FeatureFlagKey = StatsigGateKey;
-
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 
 export interface StatsigFeatureFlagsBootstrap {

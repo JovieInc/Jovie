@@ -82,7 +82,7 @@ export async function toDataUrl(
       }
     }
 
-    if (!response || !response.ok) return null;
+    if (!response?.ok) return null;
 
     const ct = response.headers.get('content-type') ?? '';
     if (!ct.startsWith('image/')) return null;
@@ -99,7 +99,7 @@ export async function toDataUrl(
     const CHUNK = 8192;
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += CHUNK) {
-      chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
     }
     return `data:${ct};base64,${btoa(chunks.join(''))}`;
   } catch {

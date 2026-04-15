@@ -111,7 +111,7 @@ export function buildDistributionDedupeKey(
 }
 
 export function getBioLinkActivationWindowEnd(
-  onboardingCompletedAt: Date | string | null | undefined
+  onboardingCompletedAt: DateInput
 ): Date | null {
   const onboardingDate = coerceDate(onboardingCompletedAt);
   if (!onboardingDate) {

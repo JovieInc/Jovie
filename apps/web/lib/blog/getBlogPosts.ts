@@ -114,7 +114,7 @@ function formatTitleFromSlug(slug: string): string {
 }
 
 function stripHtmlH1Blocks(html: string): string {
-  return html.replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, '');
+  return html.replaceAll(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, '');
 }
 
 async function readBlogPostFile(slug: string): Promise<{
