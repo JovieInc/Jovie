@@ -544,10 +544,7 @@ export function ArtistNotificationsCTA({
               {confirmMessage}
             </span>
           ) : otpStep === 'verify' ? (
-            <span
-              id={disclaimerId}
-              className={subscriptionSuccessTextClassName}
-            >
+            <span id={disclaimerId}>
               Enter the 6-digit code we sent to your email.
             </span>
           ) : isInputFocused ? (
@@ -555,20 +552,23 @@ export function ArtistNotificationsCTA({
           ) : null
         }
         sideAction={
-          otpStep === 'verify' && error && shouldShowDesktopTooltip ? (
-            <SubscriptionDesktopErrorIndicator error={error} />
-          ) : otpStep === 'verify' ? (
-            <SubscriptionOtpResendAction
-              resendCooldownEnd={resendCooldownEnd}
-              isResending={isResending}
-              onResend={() => {
-                requestOtpResendConfirmation({
-                  handleResendOtp,
-                  confirmTimeoutRef,
-                  setConfirmMessage,
-                });
-              }}
-            />
+          otpStep === 'verify' ? (
+            <>
+              {error && shouldShowDesktopTooltip ? (
+                <SubscriptionDesktopErrorIndicator error={error} />
+              ) : null}
+              <SubscriptionOtpResendAction
+                resendCooldownEnd={resendCooldownEnd}
+                isResending={isResending}
+                onResend={() => {
+                  requestOtpResendConfirmation({
+                    handleResendOtp,
+                    confirmTimeoutRef,
+                    setConfirmMessage,
+                  });
+                }}
+              />
+            </>
           ) : error && shouldShowDesktopTooltip ? (
             <SubscriptionDesktopErrorIndicator error={error} />
           ) : null

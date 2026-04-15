@@ -578,9 +578,10 @@ export function ProfileInlineNotificationsCTA({
                 )
               }
               sideAction={
-                error && shouldShowDesktopTooltip ? (
-                  <SubscriptionDesktopErrorIndicator error={error} />
-                ) : (
+                <>
+                  {error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : null}
                   <SubscriptionOtpResendAction
                     resendCooldownEnd={resendCooldownEnd}
                     isResending={isResending}
@@ -592,7 +593,7 @@ export function ProfileInlineNotificationsCTA({
                       });
                     }}
                   />
-                )
+                </>
               }
             />
           </motion.div>

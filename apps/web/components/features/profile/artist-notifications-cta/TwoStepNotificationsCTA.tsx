@@ -550,20 +550,23 @@ export function TwoStepNotificationsCTA({
                   ) : null
                 }
                 sideAction={
-                  otpStep === 'verify' && error && shouldShowDesktopTooltip ? (
-                    <SubscriptionDesktopErrorIndicator error={error} />
-                  ) : otpStep === 'verify' ? (
-                    <SubscriptionOtpResendAction
-                      resendCooldownEnd={resendCooldownEnd}
-                      isResending={isResending}
-                      onResend={() => {
-                        requestOtpResendConfirmation({
-                          handleResendOtp,
-                          confirmTimeoutRef,
-                          setConfirmMessage,
-                        });
-                      }}
-                    />
+                  otpStep === 'verify' ? (
+                    <>
+                      {error && shouldShowDesktopTooltip ? (
+                        <SubscriptionDesktopErrorIndicator error={error} />
+                      ) : null}
+                      <SubscriptionOtpResendAction
+                        resendCooldownEnd={resendCooldownEnd}
+                        isResending={isResending}
+                        onResend={() => {
+                          requestOtpResendConfirmation({
+                            handleResendOtp,
+                            confirmTimeoutRef,
+                            setConfirmMessage,
+                          });
+                        }}
+                      />
+                    </>
                   ) : error && shouldShowDesktopTooltip ? (
                     <SubscriptionDesktopErrorIndicator error={error} />
                   ) : null
