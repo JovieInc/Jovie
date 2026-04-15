@@ -78,15 +78,10 @@ function normalizeVisibleItems(
   const withoutOrphanLabels = items.filter((item, index) => {
     if (!isLabel(item)) return true;
 
-    for (const nextItem of items.slice(index + 1)) {
-      if (isSeparator(nextItem) || isLabel(nextItem)) {
-        return false;
-      }
+    const nextItem = items[index + 1];
+    if (!nextItem) return false;
 
-      return true;
-    }
-
-    return false;
+    return !isSeparator(nextItem) && !isLabel(nextItem);
   });
 
   const normalized: CommonDropdownItem[] = [];

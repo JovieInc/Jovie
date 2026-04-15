@@ -69,7 +69,7 @@ function focusSiblingMenuItem(
     )
   ).filter(
     item =>
-      !item.hasAttribute('data-disabled') &&
+      item.dataset.disabled === undefined &&
       item.getAttribute('aria-disabled') !== 'true'
   );
 
