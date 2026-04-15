@@ -9,18 +9,13 @@ import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import { MobileReleaseList } from './MobileReleaseList';
 import type { ReleaseTableProps } from './ReleaseTable.types';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createExpandableReleaseCellRenderer,
   createRightMetaCellRenderer,
 } from './utils/release-table-renderers';
-
-const MobileReleaseList = lazy(() =>
-  import('./MobileReleaseList').then(m => ({
-    default: m.MobileReleaseList,
-  }))
-);
 
 const TrackRowsContainer = lazy(() =>
   import(
@@ -261,23 +256,15 @@ export function ReleaseTableWithTracks({
     }
 
     return (
-      <Suspense
-        fallback={
-          <div className='border-b border-(--linear-app-frame-seam) px-4 py-3 text-[12px] text-secondary-token'>
-            Loading releases...
-          </div>
-        }
-      >
-        <MobileReleaseList
-          releases={releases}
-          artistName={artistName}
-          onEdit={onEdit}
-          onCopy={onCopy}
-          isSmartLinkLocked={isSmartLinkLocked}
-          getSmartLinkLockReason={getSmartLinkLockReason}
-          groupByYear={groupByYear}
-        />
-      </Suspense>
+      <MobileReleaseList
+        releases={releases}
+        artistName={artistName}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
+        groupByYear={groupByYear}
+      />
     );
   }
 
