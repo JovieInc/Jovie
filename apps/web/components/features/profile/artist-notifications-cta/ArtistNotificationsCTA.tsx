@@ -45,7 +45,7 @@ function ListenNowCTA({
     return (
       <Link
         href={listenHref}
-        prefetch
+        prefetch={false}
         className={subscriptionPrimaryLinkClassName}
       >
         Listen Now
@@ -56,7 +56,7 @@ function ListenNowCTA({
   return (
     <Link
       href={listenHref}
-      prefetch
+      prefetch={false}
       className={subscriptionPrimaryLinkClassName}
     >
       Listen Now

@@ -831,7 +831,12 @@ const CREATOR_SHELL_ROUTES = [
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dashboard-audience-client"]'] },
+    readySelectors: {
+      content: [
+        '[data-testid="dashboard-audience-client"]',
+        '[data-testid="dashboard-audience-empty-state"]',
+      ],
+    },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
       { metric: 'largest-contentful-paint', budget: 3000 },

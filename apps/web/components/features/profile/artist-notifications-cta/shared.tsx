@@ -473,7 +473,7 @@ export function SubscriptionSuccess({
         {handle ? (
           <Link
             href={`/${handle}?mode=listen`}
-            prefetch
+            prefetch={false}
             className={subscriptionPrimaryLinkClassName}
           >
             Listen Now
@@ -498,7 +498,7 @@ export function SubscriptionSuccess({
       {handle ? (
         <Link
           href={`/${handle}?mode=listen`}
-          prefetch
+          prefetch={false}
           className={subscriptionPrimaryLinkClassName}
         >
           Listen Now
