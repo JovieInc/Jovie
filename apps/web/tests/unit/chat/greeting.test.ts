@@ -71,7 +71,7 @@ describe('buildGreeting', () => {
     expect(greeting.profileHref).toBeNull();
   });
 
-  it('falls back to tip activity when no insights are available', () => {
+  it('falls back to payment activity when no insights are available', () => {
     const greeting = buildGreeting({
       isFirstSession: false,
       insights: [],
@@ -82,7 +82,7 @@ describe('buildGreeting', () => {
     });
 
     expect(greeting.body).toBe(
-      "You've received 2 tips since your last check-in."
+      "You've received 2 payments since your last check-in."
     );
   });
 

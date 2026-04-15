@@ -4,15 +4,12 @@ import { BadgeCheck, MoreHorizontal, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
-import {
-  ProfileNotificationsContext,
-  useProfileShell,
-} from '@/components/organisms/profile-shell';
+import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
+import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -30,8 +27,9 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import { buildProfileShareContext } from '@/lib/share/context';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
@@ -49,7 +47,9 @@ const ProfileUnifiedDrawer = dynamic(
 
 const ProfileInlineNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    ).then(mod => ({
       default: mod.ProfileInlineNotificationsCTA,
     })),
   { ssr: false }
@@ -109,7 +109,7 @@ function resolveDrawerView(
       return options.hasContacts ? mode : null;
     case 'listen':
       return options.hasDSPs ? mode : null;
-    case 'tip':
+    case 'pay':
       return options.hasTip ? mode : null;
     case 'tour':
       return mode;
@@ -145,7 +145,7 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
     case 'subscribe':
     case 'contact':
     case 'listen':
-    case 'tip':
+    case 'pay':
     case 'tour':
       return view;
     default:
@@ -177,6 +177,7 @@ export function ProfileCompactTemplate({
     getModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const pendingInlineRevealRef = useRef(false);
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
 
@@ -401,6 +402,20 @@ export function ProfileCompactTemplate({
   }, [mode, requestedMode]);
 
   useEffect(() => {
+    // Subscribe mode: skip the drawer, reveal the inline CTA directly
+    if (requestedMode === 'subscribe') {
+      setDrawerView('menu');
+      setDrawerOpen(false);
+      pendingInlineRevealRef.current = true;
+      if (revealNotificationsRef.current) {
+        pendingInlineRevealRef.current = false;
+        revealNotificationsRef.current();
+      }
+      // Reset so the URL cleanup effect runs and refresh doesn't re-trigger
+      setRequestedMode(mode);
+      return;
+    }
+
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       setDrawerView(resolved);
@@ -409,7 +424,7 @@ export function ProfileCompactTemplate({
       setDrawerView('menu');
       setDrawerOpen(false);
     }
-  }, [requestedMode, resolveInitialView]);
+  }, [mode, requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -753,6 +768,10 @@ export function ProfileCompactTemplate({
                   onManageNotifications={() => openDrawerMode('notifications')}
                   onRegisterReveal={fn => {
                     revealNotificationsRef.current = fn;
+                    if (pendingInlineRevealRef.current) {
+                      pendingInlineRevealRef.current = false;
+                      fn();
+                    }
                   }}
                 />
 

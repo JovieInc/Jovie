@@ -16,6 +16,7 @@ export type { FeatureCardProps } from './FeatureCard';
 export { FeatureCard } from './FeatureCard';
 export { FrostedContainer } from './FrostedContainer';
 export { OptimizedImage } from './OptimizedImage';
+export { PaySelector } from './PaySelector';
 export { PrimaryCTA } from './PrimaryCTA';
 export { ProfileNavButton } from './ProfileNavButton';
 export { getQrCodeUrl, QRCode } from './QRCode';
@@ -23,7 +24,6 @@ export { QRCodeCard } from './QRCodeCard';
 export { SocialLink } from './SocialLink';
 export type { StepCardProps } from './StepCard';
 export { cardBaseClasses, glowEffectClasses, StepCard } from './StepCard';
-export { TipSelector } from './TipSelector';
 // Migrated from atoms (has business logic - useState, useEffect, API calls)
 export {
   LegacySocialLink,
