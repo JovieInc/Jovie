@@ -55,18 +55,15 @@ async function ensureNoClaimedProfileConflict(
 ): Promise<void> {
   const [existingClaim] = await tx
     .select({
-      id: userProfileClaims.creatorProfileId,
+      id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
     })
-    .from(userProfileClaims)
-    .innerJoin(
-      creatorProfiles,
-      eq(creatorProfiles.id, userProfileClaims.creatorProfileId)
-    )
+    .from(creatorProfiles)
     .where(
       and(
-        eq(userProfileClaims.userId, userId),
-        ne(userProfileClaims.creatorProfileId, creatorProfileId)
+        eq(creatorProfiles.userId, userId),
+        eq(creatorProfiles.isClaimed, true),
+        ne(creatorProfiles.id, creatorProfileId)
       )
     )
     .for('update')
@@ -157,10 +154,26 @@ export async function reservePrebuiltProfileForUser(
     displayName: string;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
-  const { expectedUsername, profile } = await validateAndPrepareClaimTarget(
-    tx,
-    params
-  );
+  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
+  const expectedUsername = params.expectedUsername.toLowerCase();
+
+  if (profile.usernameNormalized !== expectedUsername) {
+    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
+  }
+
+  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
+
+  if (profile.userId && profile.userId !== params.userId) {
+    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
+  }
+
+  if (profile.isClaimed && profile.userId !== params.userId) {
+    throw new Error(
+      '[PROFILE_CONFLICT] This profile has already been claimed.'
+    );
+  }
+
+  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
 
   await tx
     .update(creatorProfiles)
@@ -192,11 +205,27 @@ export async function claimPrebuiltProfileForUser(
     finalizeOnboarding?: boolean;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
-  const { expectedUsername, profile } = await validateAndPrepareClaimTarget(
-    tx,
-    params
-  );
+  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
+  const expectedUsername = params.expectedUsername.toLowerCase();
   const now = new Date();
+
+  if (profile.usernameNormalized !== expectedUsername) {
+    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
+  }
+
+  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
+
+  if (profile.userId && profile.userId !== params.userId) {
+    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
+  }
+
+  if (profile.isClaimed && profile.userId !== params.userId) {
+    throw new Error(
+      '[PROFILE_CONFLICT] This profile has already been claimed.'
+    );
+  }
+
+  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
 
   await tx
     .update(creatorProfiles)
@@ -247,46 +276,4 @@ export async function claimPrebuiltProfileForUser(
     username: expectedUsername,
     status: 'updated',
   };
-}
-
-async function validateAndPrepareClaimTarget(
-  tx: DbOrTransaction,
-  params: {
-    userId: string;
-    creatorProfileId: string;
-    expectedUsername: string;
-  }
-): Promise<{
-  expectedUsername: string;
-  profile: Awaited<ReturnType<typeof getClaimTargetProfile>>;
-}> {
-  await tx
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, params.userId))
-    .for('update')
-    .limit(1);
-
-  const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
-  const expectedUsername = params.expectedUsername.toLowerCase();
-
-  if (profile.usernameNormalized !== expectedUsername) {
-    throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
-  }
-
-  await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
-
-  if (profile.userId && profile.userId !== params.userId) {
-    throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
-  }
-
-  if (profile.isClaimed && profile.userId !== params.userId) {
-    throw new Error(
-      '[PROFILE_CONFLICT] This profile has already been claimed.'
-    );
-  }
-
-  await releaseOtherReservedProfiles(tx, params.userId, profile.id);
-
-  return { expectedUsername, profile };
 }
