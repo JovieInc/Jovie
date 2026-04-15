@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APP_ROUTES } from '../constants/routes';
@@ -359,6 +359,17 @@ async function ensureManagedServer() {
     throw new Error('Failed to build @jovie/web for qa:releases:loop');
   }
 
+  const serverEntryPath = resolve(
+    repoRoot,
+    'apps/web/.next/standalone/apps/web/server.js'
+  );
+  if (!existsSync(serverEntryPath)) {
+    throw new Error(
+      `Standalone server not found at ${serverEntryPath}. ` +
+        'Ensure the build completed successfully with output: "standalone".'
+    );
+  }
+
   const server = spawn(
     'doppler',
     [
@@ -369,7 +380,7 @@ async function ensureManagedServer() {
       'dev',
       '--',
       'node',
-      '.next/standalone/apps/web/server.js',
+      'apps/web/.next/standalone/apps/web/server.js',
     ],
     {
       cwd: repoRoot,
