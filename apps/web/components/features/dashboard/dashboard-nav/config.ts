@@ -15,6 +15,7 @@ import {
   Music,
   PieChart,
   Settings,
+  Share2,
   ShieldCheck,
   SquarePen,
   UserCircle,
@@ -168,6 +169,7 @@ const adminIconById = {
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  share_studio: Share2,
 } as const;
 
 function buildAdminNavigationItems(
