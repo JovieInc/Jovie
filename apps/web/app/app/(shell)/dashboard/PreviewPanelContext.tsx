@@ -56,7 +56,7 @@ interface PreviewPanelStateContextValue {
 
 interface PreviewPanelDataContextValue {
   previewData: PreviewPanelData | null;
-  setPreviewData: (data: PreviewPanelData) => void;
+  setPreviewData: (data: PreviewPanelData | null) => void;
 }
 
 // Combined type for backwards compatibility

@@ -222,12 +222,18 @@ export function ChatPageClient({
     (isPreviewPanelOpen || panelParam === 'profile' || fromOnboarding);
 
   useEffect(() => {
+    if (shouldHydratePreviewPanel) return;
+    setPreviewData(null);
+  }, [setPreviewData, shouldHydratePreviewPanel]);
+
+  useEffect(() => {
     return () => {
+      setPreviewData(null);
       if (welcomeChatRetryTimeoutRef.current !== null) {
         globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
       }
     };
-  }, []);
+  }, [setPreviewData]);
 
   useEffect(() => {
     if (needsOnboarding && !selectedProfile && !dashboardLoadError) {

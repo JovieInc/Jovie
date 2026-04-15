@@ -5,17 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.153.4] - 2026-04-15
+## [26.4.153.5] - 2026-04-15
 
 ### Fixed
 
 - Fixed Profile navigation on chat routes so sidebar and mobile Profile clicks open the right drawer from preview-panel state without requiring a profile query parameter.
-- Added regression coverage for Profile nav click behavior, state-open drawer hydration, and profile deep-link hydration.
+- Cleared stale chat preview data while profile drawer hydration is inactive so reopened drawers do not briefly show the previous profile.
+- Added regression coverage for Profile nav click behavior, state-open drawer hydration, profile deep-link hydration, and inactive preview-data cleanup.
+
+## [26.4.153.4] - 2026-04-15
+
+> Release drawers now use compact inspector cards instead of tabs, making details easier to scan.
+
+### Changed
+
+- Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
 
 ## [26.4.153.3] - 2026-04-15
 
 ### Changed
 
+- Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
 - Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
 - Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
 

@@ -51,12 +51,12 @@ export function HomeHero({ layout = 'stacked' }: Readonly<HomeHeroProps>) {
 }
 
 export function HomeAdaptiveProfileStory() {
-  const showSections = FEATURE_FLAGS.SHOW_HOMEPAGE_SECTIONS;
+  const showLogoBar = FEATURE_FLAGS.SHOW_LOGO_BAR;
 
   return (
     <div data-testid='homepage-shell'>
       <HomeHero />
-      {showSections ? <HomeTrustSection /> : null}
+      {showLogoBar ? <HomeTrustSection /> : null}
     </div>
   );
 }

@@ -21,6 +21,7 @@ const {
   mockPreviewPanelState,
   mockSentryAddBreadcrumb,
   mockSentryCaptureMessage,
+  mockSetPreviewData,
   mockTogglePreviewPanel,
   mockUseRegisterRightPanel,
 } = vi.hoisted(() => ({
@@ -29,6 +30,7 @@ const {
   mockPreviewPanelState: { isOpen: false },
   mockSentryAddBreadcrumb: vi.fn(),
   mockSentryCaptureMessage: vi.fn(),
+  mockSetPreviewData: vi.fn(),
   mockTogglePreviewPanel: vi.fn(),
   mockUseRegisterRightPanel: vi.fn(),
 }));
@@ -117,7 +119,7 @@ vi.mock(
       ...actual,
       usePreviewPanelData: () => ({
         previewData: null,
-        setPreviewData: vi.fn(),
+        setPreviewData: mockSetPreviewData,
       }),
       usePreviewPanelState: () => ({
         isOpen: mockPreviewPanelState.isOpen,
@@ -205,6 +207,7 @@ describe('ChatPageClient', () => {
     capturedOnTitleChange = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
+    mockSetPreviewData.mockReset();
     mockPreviewPanelState.isOpen = false;
     globalThis.sessionStorage.clear();
   });
@@ -299,6 +302,15 @@ describe('ChatPageClient', () => {
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
     expect(hasRegisteredRightPanel()).toBe(true);
+  });
+
+  it('clears preview data while profile panel hydration is inactive', () => {
+    mockPreviewPanelState.isOpen = false;
+
+    renderChatPage();
+
+    expect(hasRegisteredRightPanel()).toBe(false);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
   });
 
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {
