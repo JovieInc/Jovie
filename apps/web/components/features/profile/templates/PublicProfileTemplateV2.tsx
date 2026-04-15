@@ -1,11 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import {
-  ProfileNotificationsContext,
-  useProfileShell,
-} from '@/components/organisms/profile-shell';
+import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
+import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
@@ -24,6 +21,7 @@ import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';

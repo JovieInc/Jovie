@@ -92,6 +92,17 @@ vi.mock('@/lib/queries', () => ({
   useVerifyEmailOtpMutation: () => ({ mutateAsync: vi.fn() }),
 }));
 
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
+  useUpdateSubscriberNameMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  }),
+  useUpdateSubscriberBirthdayMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  }),
+}));
+
 const artist: Artist = {
   id: 'artist-1',
   owner_user_id: 'owner-1',

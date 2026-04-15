@@ -10,7 +10,7 @@ import {
 import {
   useNotificationStatusQuery,
   useUnsubscribeNotificationsMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type {
   NotificationChannel,
   NotificationContactValues,

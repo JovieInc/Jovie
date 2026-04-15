@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useProfileNotifications } from '@/components/organisms/profile-shell';
+import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import {
   COUNTRY_OPTIONS,
   type CountryOption,
@@ -20,7 +20,7 @@ import {
 import {
   useSubscribeNotificationsMutation,
   useVerifyEmailOtpMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import type { NotificationSource } from './types';

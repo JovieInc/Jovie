@@ -1,6 +1,6 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface BuildTourDateActionsCallbacks {
   readonly onEdit: (tourDate: TourDateViewModel) => void;

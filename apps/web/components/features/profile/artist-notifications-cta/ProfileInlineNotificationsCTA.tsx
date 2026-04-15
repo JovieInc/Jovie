@@ -10,7 +10,7 @@ import { track } from '@/lib/analytics';
 import {
   useUpdateSubscriberBirthdayMutation,
   useUpdateSubscriberNameMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import { BirthdayInput } from './BirthdayInput';
 import {
