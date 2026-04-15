@@ -24,8 +24,8 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
-import { captureError } from '@/lib/error-tracking';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
 
 export type ContentType = 'release' | 'track';
@@ -194,6 +194,8 @@ export interface ContentData {
     metadata?: Record<string, unknown> | null;
   }>;
   artworkSizes?: Record<string, string> | null;
+  /** Raw release metadata JSONB (includes MusicVideoMetadata for music_video releases) */
+  metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
@@ -238,6 +240,7 @@ export interface CachedContentData {
     metadata?: Record<string, unknown> | null;
   }>;
   artworkSizes?: Record<string, string> | null;
+  metadata?: Record<string, unknown> | null;
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
@@ -258,6 +261,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
   const [creator] = await db
     .select({
       id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
       displayName: creatorProfiles.displayName,
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
@@ -387,6 +391,7 @@ const fetchContentBySlug = async (
       revealDate: toISOStringOrNull(release.revealDate),
       providerLinks: links,
       artworkSizes,
+      metadata: release.metadata as Record<string, unknown> | null,
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
       releaseId: release.id,
@@ -900,13 +905,16 @@ export async function getFeaturedSmartLinkStaticParams(
       slug: row.slug,
     }));
   } catch (error) {
-    void captureError('Failed to load smart-link static params', error, {
-      helper: 'getFeaturedSmartLinkStaticParams',
-      limit,
-      route: '/[username]/[slug]',
-    }).catch(() => {
-      // Ignore telemetry failures so build-time fallback stays resilient.
-    });
+    logger.error(
+      'Failed to load smart-link static params',
+      {
+        error,
+        helper: 'getFeaturedSmartLinkStaticParams',
+        limit,
+        route: '/[username]/[slug]',
+      },
+      'public-smart-link'
+    );
     return [];
   }
 }
@@ -958,13 +966,16 @@ export async function getFeaturedTrackStaticParams(
       trackSlug: row.trackSlug!,
     }));
   } catch (error) {
-    void captureError('Failed to load track static params', error, {
-      helper: 'getFeaturedTrackStaticParams',
-      limit,
-      route: '/[username]/[slug]/[trackSlug]',
-    }).catch(() => {
-      // Ignore telemetry failures so build-time fallback stays resilient.
-    });
+    logger.error(
+      'Failed to load track static params',
+      {
+        error,
+        helper: 'getFeaturedTrackStaticParams',
+        limit,
+        route: '/[username]/[slug]/[trackSlug]',
+      },
+      'public-smart-link'
+    );
     return [];
   }
 }
@@ -992,10 +1003,15 @@ export async function checkPromoDownloads(
 
     return hasDownloads ? `/${usernameNormalized}/${slug}/download` : null;
   } catch (error) {
-    void captureError('Failed to check promo downloads', error, {
-      helper: 'checkPromoDownloads',
-      releaseId,
-    }).catch(() => {});
+    logger.error(
+      'Failed to check promo downloads',
+      {
+        error,
+        helper: 'checkPromoDownloads',
+        releaseId,
+      },
+      'public-smart-link'
+    );
     return null;
   }
 }

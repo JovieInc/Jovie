@@ -233,18 +233,18 @@ const nextConfig = {
       { source: '/app/contacts', destination: '/app/settings/contacts' },
       {
         source: '/app/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       {
         source: '/app/dashboard/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/dashboard/links',
@@ -252,7 +252,7 @@ const nextConfig = {
       },
       {
         source: '/app/dashboard/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/dashboard/profile',
@@ -373,6 +373,12 @@ const nextConfig = {
         permanent: false,
       },
       ...legacyAppRedirects,
+      // Old /tips landing page redirect
+      {
+        source: '/tips',
+        destination: '/pay',
+        permanent: true,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];

@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import { track } from '@/lib/analytics';
-import { useUpdateSubscriberNameMutation } from '@/lib/queries';
+import { useUpdateSubscriberNameMutation } from '@/lib/queries/useNotificationStatusQuery';
 import { cn } from '@/lib/utils';
 import type { NotificationSubscriptionState } from '@/types/notifications';
 
@@ -296,7 +296,7 @@ export function SubscriptionSuccess({
         {handle ? (
           <Link
             href={`/${handle}?mode=listen`}
-            prefetch
+            prefetch={false}
             className={subscriptionPrimaryLinkClassName}
           >
             Listen Now
@@ -321,7 +321,7 @@ export function SubscriptionSuccess({
       {handle ? (
         <Link
           href={`/${handle}?mode=listen`}
-          prefetch
+          prefetch={false}
           className={subscriptionPrimaryLinkClassName}
         >
           Listen Now
