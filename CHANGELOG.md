@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.3] - 2026-04-15
+
+### Changed
+
+- Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
+
 ## [26.4.153.2] - 2026-04-15
 
 ### Added
