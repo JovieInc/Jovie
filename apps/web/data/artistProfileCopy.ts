@@ -213,9 +213,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   opinionated: {
     eyebrow: 'Product philosophy',
-    headline: 'Opinated. By design.',
+    headline: 'Opinionated. By design.',
     headlineOptions: [
-      'Opinated. By design.',
+      'Opinionated. By design.',
       'Built to convert, not decorate.',
       'No template maze.',
     ],

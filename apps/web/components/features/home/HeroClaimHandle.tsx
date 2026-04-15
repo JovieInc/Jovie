@@ -64,7 +64,7 @@ export function HeroClaimHandle({
             autoCorrect='off'
             className='min-w-0 flex-1 bg-transparent placeholder:text-quaternary-token focus-visible:outline-none'
             name='handle'
-            placeholder='your-name'
+            placeholder='you'
             style={{
               fontSize: '16px',
               fontWeight: 500,

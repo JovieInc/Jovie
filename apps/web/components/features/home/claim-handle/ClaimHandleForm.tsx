@@ -341,7 +341,7 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-name'
+            placeholder='you'
             required
             autoCapitalize='none'
             autoCorrect='off'
