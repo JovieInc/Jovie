@@ -2,105 +2,34 @@
 
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Loader2,
-  MoreVertical,
-  Search,
-} from 'lucide-react';
+import { ChevronDown, MoreVertical } from 'lucide-react';
 import * as React from 'react';
 
 import {
-  CHECKBOX_RADIO_ITEM_BASE,
-  CONTEXT_TRANSFORM_ORIGIN,
   contextMenuContentClasses,
   contextMenuContentCompactClasses,
-  DROPDOWN_TRANSFORM_ORIGIN,
   dropdownMenuContentClasses,
   dropdownMenuContentCompactClasses,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
-  MENU_ITEM_DESTRUCTIVE,
-  MENU_LABEL_BASE,
-  MENU_SEPARATOR_BASE,
-  MENU_SHORTCUT_BASE,
-  subMenuContentClasses,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
+import {
+  type MenuPrimitiveKind,
+  type MenuRenderContext,
+  renderItem,
+  renderRootBody,
+  SearchableContent,
+} from './common-dropdown-renderer';
 import type {
-  CommonDropdownActionItem,
-  CommonDropdownCheckboxItem,
   CommonDropdownItem,
   CommonDropdownProps,
-  CommonDropdownRadioGroup,
-  CommonDropdownSubmenu,
 } from './common-dropdown-types';
-import {
-  isActionItem,
-  isCheckboxItem,
-  isCustomItem,
-  isLabel,
-  isRadioGroup,
-  isSeparator,
-  isSubmenu,
-} from './common-dropdown-types';
-
-/** Renders an icon component, handling function components, forwardRef objects, and JSX elements */
-function renderIcon(
-  IconComponent: React.ComponentType<{ className?: string }> | React.ReactNode,
-  className: string
-): React.ReactNode {
-  if (!IconComponent) return null;
-  // Already a rendered React element (e.g. <Icon /> JSX) — return as-is
-  if (React.isValidElement(IconComponent)) {
-    return IconComponent;
-  }
-  // Component reference: function component OR forwardRef/memo object (e.g. Lucide icons)
-  if (
-    typeof IconComponent === 'function' ||
-    (typeof IconComponent === 'object' &&
-      IconComponent !== null &&
-      '$$typeof' in IconComponent)
-  ) {
-    const Comp = IconComponent as React.ComponentType<{ className?: string }>;
-    return <Comp className={className} />;
-  }
-  return IconComponent;
-}
+import { filterItems, getContentStyle } from './common-dropdown-utils';
 
 /**
- * CommonDropdown - Unified dropdown component supporting multiple variants
- *
- * This component consolidates all dropdown patterns across the application:
- * - Action menus (click-to-open menus with actions)
- * - Select dropdowns (single-value selection)
- * - Context menus (right-click menus)
- *
- * Size variants:
- * - 'default': Standard menus (user menu, bulk actions, notifications)
- * - 'compact': Dense menus for tables, sidebars, and inline actions
- *
- * @example
- * // Simple action menu
- * <CommonDropdown
- *   variant="dropdown"
- *   items={[
- *     { type: 'action', id: 'edit', label: 'Edit', icon: Pencil, onClick: handleEdit },
- *     { type: 'separator', id: 'sep-1' },
- *     { type: 'action', id: 'delete', label: 'Delete', icon: Trash2, onClick: handleDelete, variant: 'destructive' },
- *   ]}
- * />
- *
- * @example
- * // Compact table action menu
- * <CommonDropdown
- *   variant="dropdown"
- *   size="compact"
- *   items={tableActions}
- * />
+ * CommonDropdown - Unified dropdown component supporting action, context,
+ * nested, searchable, loading, selected, and destructive menu states.
  */
 export function CommonDropdown(props: CommonDropdownProps) {
   const {
@@ -123,16 +52,20 @@ export function CommonDropdown(props: CommonDropdownProps) {
     searchable = false,
     searchPlaceholder = 'Search...',
     onSearch,
+    onSearchChange,
+    searchMode = 'root',
+    filterItem,
+    resetSearchOnClose = true,
     isLoading = false,
     emptyMessage = 'No items found',
     disabled = false,
+    minWidth,
+    maxHeight,
     children,
   } = props;
 
-  // Resolve size-dependent token classes
   const isCompact = size === 'compact';
   const itemBase = isCompact ? MENU_ITEM_COMPACT : MENU_ITEM_BASE;
-  const itemDestructive = MENU_ITEM_DESTRUCTIVE;
   const dropdownContentBase = isCompact
     ? dropdownMenuContentCompactClasses
     : dropdownMenuContentClasses;
@@ -141,50 +74,72 @@ export function CommonDropdown(props: CommonDropdownProps) {
     : contextMenuContentClasses;
 
   const [searchQuery, setSearchQuery] = React.useState('');
+  const searchQueryRef = React.useRef('');
+  const didMountRef = React.useRef(false);
 
-  // Derive filtered items synchronously to avoid stale state when the menu opens
-  const filteredItems = React.useMemo(() => {
-    if (!searchable || !searchQuery.trim()) {
-      return items;
-    }
+  const filteredItems = React.useMemo(
+    () => filterItems(items, searchQuery, searchMode, filterItem),
+    [filterItem, items, searchMode, searchQuery]
+  );
 
-    const query = searchQuery.toLowerCase();
-    return items.filter(item => {
-      if (isLabel(item) || isSeparator(item) || isCustomItem(item)) return true;
-
-      if (isActionItem(item)) {
-        return item.label.toLowerCase().includes(query);
+  const handleSearchChange = React.useCallback(
+    (query: string) => {
+      if (searchQueryRef.current === query) {
+        return;
       }
 
-      if (isCheckboxItem(item)) {
-        return item.label.toLowerCase().includes(query);
+      searchQueryRef.current = query;
+      setSearchQuery(query);
+      onSearchChange?.(query);
+      if (query) {
+        onSearch?.(query);
       }
+    },
+    [onSearch, onSearchChange]
+  );
 
-      if (isRadioGroup(item)) {
-        return item.items.some(radioItem =>
-          radioItem.label.toLowerCase().includes(query)
-        );
+  const clearSearch = React.useCallback(() => {
+    handleSearchChange('');
+  }, [handleSearchChange]);
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && resetSearchOnClose) {
+        clearSearch();
       }
+      onOpenChange?.(nextOpen);
+    },
+    [clearSearch, onOpenChange, resetSearchOnClose]
+  );
 
-      if (isSubmenu(item)) {
-        return item.label.toLowerCase().includes(query);
-      }
-
-      return false;
-    });
-  }, [searchQuery, items, searchable]);
-
-  // Notify parent of search query changes
   React.useEffect(() => {
-    if (searchable && searchQuery) {
-      onSearch?.(searchQuery);
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
     }
-  }, [searchQuery, searchable, onSearch]);
 
-  // Render context menu variant
+    if (open === false && resetSearchOnClose) {
+      clearSearch();
+    }
+  }, [clearSearch, open, resetSearchOnClose]);
+
+  const renderItems = React.useCallback(
+    (itemsToRender: readonly CommonDropdownItem[], kind: MenuPrimitiveKind) => {
+      const context: MenuRenderContext = {
+        kind,
+        itemBase,
+        disablePortal,
+        portalProps,
+      };
+
+      return itemsToRender.map(item => renderItem(item, context));
+    },
+    [disablePortal, itemBase, portalProps]
+  );
+
   if (variant === 'context') {
     return (
-      <ContextMenuPrimitive.Root>
+      <ContextMenuPrimitive.Root onOpenChange={handleOpenChange}>
         <ContextMenuPrimitive.Trigger asChild disabled={disabled}>
           {children}
         </ContextMenuPrimitive.Trigger>
@@ -193,9 +148,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
     );
   }
 
-  // Render dropdown menu variant
   return (
-    <DropdownMenuPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DropdownMenuPrimitive.Root open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuPrimitive.Trigger
         asChild
         disabled={disabled}
@@ -207,7 +161,6 @@ export function CommonDropdown(props: CommonDropdownProps) {
     </DropdownMenuPrimitive.Root>
   );
 
-  // Helper: Render default trigger
   function renderDefaultTrigger() {
     if (defaultTriggerType === 'select') {
       return (
@@ -237,14 +190,13 @@ export function CommonDropdown(props: CommonDropdownProps) {
           triggerClassName
         )}
         aria-label={ariaLabel || 'More actions'}
-        onClick={e => e.stopPropagation()}
+        onClick={event => event.stopPropagation()}
       >
         <TriggerIcon className='h-4 w-4' />
       </button>
     );
   }
 
-  // Helper: Render dropdown content
   function renderDropdownContent() {
     const content = (
       <DropdownMenuPrimitive.Content
@@ -253,40 +205,28 @@ export function CommonDropdown(props: CommonDropdownProps) {
         sideOffset={sideOffset}
         data-menu-surface='toolbar'
         className={cn(dropdownContentBase, contentClassName)}
+        style={getContentStyle(minWidth, maxHeight)}
+        onEscapeKeyDown={event => {
+          if (searchQuery) {
+            event.preventDefault();
+            clearSearch();
+          }
+        }}
       >
-        {searchable && (
-          <div
-            data-menu-header
-            className='relative border-b border-subtle px-2.5 pb-2 pt-2'
-          >
-            <Search className='absolute left-5 top-[25px] h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
-            <input
-              type='text'
-              placeholder={searchPlaceholder}
-              aria-label={searchPlaceholder}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-[8px] border border-subtle bg-surface-1 py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/15'
-            />
-          </div>
-        )}
-        {(() => {
-          if (isLoading) {
-            return (
-              <div className='flex items-center justify-center py-6'>
-                <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
-              </div>
-            );
-          }
-          if (filteredItems.length === 0) {
-            return (
-              <div className='py-6 text-center text-sm text-tertiary-token'>
-                {emptyMessage}
-              </div>
-            );
-          }
-          return renderItems(filteredItems, false);
-        })()}
+        {searchable ? (
+          <SearchableContent
+            query={searchQuery}
+            placeholder={searchPlaceholder}
+            onQueryChange={handleSearchChange}
+            onClear={clearSearch}
+          />
+        ) : null}
+        {renderRootBody({
+          isLoading,
+          items: filteredItems,
+          emptyMessage,
+          renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
+        })}
       </DropdownMenuPrimitive.Content>
     );
 
@@ -295,36 +235,43 @@ export function CommonDropdown(props: CommonDropdownProps) {
     }
 
     return (
-      <DropdownMenuPrimitive.Portal {...portalProps}>
+      <DropdownMenuPrimitive.Portal
+        {...(portalProps as React.ComponentPropsWithoutRef<
+          typeof DropdownMenuPrimitive.Portal
+        >)}
+      >
         {content}
       </DropdownMenuPrimitive.Portal>
     );
   }
 
-  // Helper: Render context menu content
   function renderContextMenuContent() {
     const content = (
       <ContextMenuPrimitive.Content
         data-menu-surface='toolbar'
         className={cn(contextContentBase, contentClassName)}
+        style={getContentStyle(minWidth, maxHeight)}
+        onEscapeKeyDown={event => {
+          if (searchQuery) {
+            event.preventDefault();
+            clearSearch();
+          }
+        }}
       >
-        {(() => {
-          if (isLoading) {
-            return (
-              <div className='flex items-center justify-center py-6'>
-                <Loader2 className='h-6 w-6 animate-spin text-tertiary-token' />
-              </div>
-            );
-          }
-          if (filteredItems.length === 0) {
-            return (
-              <div className='py-6 text-center text-sm text-tertiary-token'>
-                {emptyMessage}
-              </div>
-            );
-          }
-          return renderItems(filteredItems, true);
-        })()}
+        {searchable ? (
+          <SearchableContent
+            query={searchQuery}
+            placeholder={searchPlaceholder}
+            onQueryChange={handleSearchChange}
+            onClear={clearSearch}
+          />
+        ) : null}
+        {renderRootBody({
+          isLoading,
+          items: filteredItems,
+          emptyMessage,
+          renderItems: itemsToRender => renderItems(itemsToRender, 'context'),
+        })}
       </ContextMenuPrimitive.Content>
     );
 
@@ -333,260 +280,13 @@ export function CommonDropdown(props: CommonDropdownProps) {
     }
 
     return (
-      <ContextMenuPrimitive.Portal {...portalProps}>
+      <ContextMenuPrimitive.Portal
+        {...(portalProps as React.ComponentPropsWithoutRef<
+          typeof ContextMenuPrimitive.Portal
+        >)}
+      >
         {content}
       </ContextMenuPrimitive.Portal>
-    );
-  }
-
-  // Helper: Render items
-  function renderItems(
-    itemsToRender: CommonDropdownItem[],
-    isContextMenu: boolean
-  ): React.ReactNode {
-    return itemsToRender.map(item => {
-      // Separator
-      if (isSeparator(item)) {
-        const Separator = isContextMenu
-          ? ContextMenuPrimitive.Separator
-          : DropdownMenuPrimitive.Separator;
-
-        return (
-          <Separator
-            key={item.id}
-            className={cn(MENU_SEPARATOR_BASE, item.className)}
-          />
-        );
-      }
-
-      // Label
-      if (isLabel(item)) {
-        const Label = isContextMenu
-          ? ContextMenuPrimitive.Label
-          : DropdownMenuPrimitive.Label;
-
-        return (
-          <Label
-            key={item.id}
-            className={cn(
-              MENU_LABEL_BASE,
-              item.inset && 'pl-10',
-              item.className
-            )}
-          >
-            {item.label}
-          </Label>
-        );
-      }
-
-      // Action item
-      if (isActionItem(item)) {
-        return renderActionItem(item, isContextMenu);
-      }
-
-      // Checkbox item
-      if (isCheckboxItem(item)) {
-        return renderCheckboxItem(item, isContextMenu);
-      }
-
-      // Radio group
-      if (isRadioGroup(item)) {
-        return renderRadioGroup(item, isContextMenu);
-      }
-
-      // Submenu
-      if (isSubmenu(item)) {
-        return renderSubmenu(item, isContextMenu);
-      }
-
-      // Custom item
-      if (isCustomItem(item)) {
-        return <React.Fragment key={item.id}>{item.render()}</React.Fragment>;
-      }
-
-      return null;
-    });
-  }
-
-  // Helper: Render action item
-  function renderActionItem(
-    item: CommonDropdownActionItem,
-    isContextMenu: boolean
-  ): React.ReactNode {
-    const MenuItem = isContextMenu
-      ? ContextMenuPrimitive.Item
-      : DropdownMenuPrimitive.Item;
-
-    const IconComponent = item.icon;
-    const IconAfterComponent = item.iconAfter;
-
-    return (
-      <MenuItem
-        key={item.id}
-        data-menu-row=''
-        onClick={e => {
-          e.stopPropagation();
-          if (!item.disabled) {
-            item.onClick?.();
-          }
-        }}
-        disabled={item.disabled}
-        className={cn(
-          itemBase,
-          item.variant === 'destructive' && itemDestructive,
-          item.className
-        )}
-      >
-        {renderIcon(IconComponent, 'h-4 w-4')}
-        <span className='flex-1'>{item.label}</span>
-        {item.badge && (
-          <span
-            className='rounded px-1.5 py-0.5 text-[10px] font-medium'
-            style={{
-              backgroundColor: item.badge.color || 'var(--color-accent-subtle)',
-              color: item.badge.color ? 'white' : 'var(--color-accent)',
-            }}
-          >
-            {item.badge.text}
-          </span>
-        )}
-        {item.subText && (
-          <span className='text-[11px] text-tertiary-token'>
-            {item.subText}
-          </span>
-        )}
-        {item.shortcut && (
-          <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
-        )}
-        {renderIcon(IconAfterComponent, 'ml-auto h-4 w-4')}
-      </MenuItem>
-    );
-  }
-
-  // Helper: Render checkbox item
-  function renderCheckboxItem(
-    item: CommonDropdownCheckboxItem,
-    isContextMenu: boolean
-  ): React.ReactNode {
-    const CheckboxItem = isContextMenu
-      ? ContextMenuPrimitive.CheckboxItem
-      : DropdownMenuPrimitive.CheckboxItem;
-
-    const ItemIndicator = isContextMenu
-      ? ContextMenuPrimitive.ItemIndicator
-      : DropdownMenuPrimitive.ItemIndicator;
-
-    const IconComponent = item.icon;
-
-    return (
-      <CheckboxItem
-        key={item.id}
-        data-menu-row=''
-        checked={item.checked}
-        onCheckedChange={item.onCheckedChange}
-        disabled={item.disabled}
-        className={cn(CHECKBOX_RADIO_ITEM_BASE, item.className)}
-      >
-        <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
-          <ItemIndicator>
-            <Check className='h-4 w-4' />
-          </ItemIndicator>
-        </span>
-        {renderIcon(IconComponent, 'h-4 w-4')}
-        {item.label}
-      </CheckboxItem>
-    );
-  }
-
-  // Helper: Render radio group
-  function renderRadioGroup(
-    item: CommonDropdownRadioGroup,
-    isContextMenu: boolean
-  ): React.ReactNode {
-    const RadioGroup = isContextMenu
-      ? ContextMenuPrimitive.RadioGroup
-      : DropdownMenuPrimitive.RadioGroup;
-
-    const RadioItem = isContextMenu
-      ? ContextMenuPrimitive.RadioItem
-      : DropdownMenuPrimitive.RadioItem;
-
-    const ItemIndicator = isContextMenu
-      ? ContextMenuPrimitive.ItemIndicator
-      : DropdownMenuPrimitive.ItemIndicator;
-
-    return (
-      <RadioGroup
-        key={item.id}
-        value={item.value}
-        onValueChange={item.onValueChange}
-      >
-        {item.items.map(radioItem => {
-          const IconComponent = radioItem.icon;
-
-          return (
-            <RadioItem
-              key={radioItem.id}
-              data-menu-row=''
-              value={radioItem.value}
-              disabled={radioItem.disabled}
-              className={cn(CHECKBOX_RADIO_ITEM_BASE, radioItem.className)}
-            >
-              <span className='absolute left-2 flex h-4 w-4 items-center justify-center'>
-                <ItemIndicator>
-                  <Circle className='h-2 w-2 fill-current' />
-                </ItemIndicator>
-              </span>
-              {renderIcon(IconComponent, 'h-4 w-4')}
-              {radioItem.label}
-            </RadioItem>
-          );
-        })}
-      </RadioGroup>
-    );
-  }
-
-  // Helper: Render submenu
-  function renderSubmenu(
-    item: CommonDropdownSubmenu,
-    isContextMenu: boolean
-  ): React.ReactNode {
-    const Sub = isContextMenu
-      ? ContextMenuPrimitive.Sub
-      : DropdownMenuPrimitive.Sub;
-    const SubTrigger = isContextMenu
-      ? ContextMenuPrimitive.SubTrigger
-      : DropdownMenuPrimitive.SubTrigger;
-    const Portal = isContextMenu
-      ? ContextMenuPrimitive.Portal
-      : DropdownMenuPrimitive.Portal;
-    const SubContent = isContextMenu
-      ? ContextMenuPrimitive.SubContent
-      : DropdownMenuPrimitive.SubContent;
-    const transformOrigin = isContextMenu
-      ? CONTEXT_TRANSFORM_ORIGIN
-      : DROPDOWN_TRANSFORM_ORIGIN;
-
-    return (
-      <Sub key={item.id}>
-        <SubTrigger
-          disabled={item.disabled}
-          data-menu-row=''
-          className={cn(itemBase, item.className)}
-        >
-          {renderIcon(item.icon, 'h-4 w-4')}
-          {item.label}
-          <ChevronRight className='ml-auto' />
-        </SubTrigger>
-        <Portal>
-          <SubContent
-            data-menu-surface='toolbar'
-            className={cn(subMenuContentClasses, transformOrigin)}
-          >
-            {renderItems(item.items, isContextMenu)}
-          </SubContent>
-        </Portal>
-      </Sub>
     );
   }
 }
