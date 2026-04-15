@@ -108,7 +108,7 @@ export function PublicShareActionList({
             type='button'
             className={PUBLIC_SHARE_MENU_ITEM_CLASS}
             onClick={() => {
-              void handleAction(destination);
+              handleAction(destination);
             }}
           >
             {renderDestinationIcon(destination.icon)}
@@ -183,7 +183,7 @@ export function PublicShareMenu({
           label: destination.label,
           icon: renderDestinationIcon(destination.icon),
           onClick: () => {
-            void handleDesktopAction(destination);
+            handleDesktopAction(destination);
           },
         })
       ),
