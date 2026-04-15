@@ -31,12 +31,15 @@ import type {
 } from './common-dropdown-types';
 import { isLabel } from './common-dropdown-types';
 
+function isObjectLike(value: unknown): value is object {
+  return Object(value) === value;
+}
+
 function isIconComponent(
   value: unknown
 ): value is React.ComponentType<{ className?: string }> {
   return (
-    typeof value === 'function' ||
-    (typeof value === 'object' && value !== null && '$$typeof' in value)
+    typeof value === 'function' || (isObjectLike(value) && '$$typeof' in value)
   );
 }
 
