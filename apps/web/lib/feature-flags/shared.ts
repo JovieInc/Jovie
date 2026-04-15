@@ -4,10 +4,7 @@
  * Overrides via dev toolbar are stored in localStorage.
  */
 
-/**
- * @deprecated Use FEATURE_FLAGS + useCodeFlag instead. Kept temporarily for migration.
- */
-export const FEATURE_FLAG_KEYS = {
+export const STATSIG_GATE_KEYS = {
   PROFILE_V2: 'feature_profile_v2',
   CLAIM_HANDLE: 'feature_claim_handle',
   HERO_SPOTIFY_CLAIM_FLOW: 'feature_hero_spotify_claim_flow',
@@ -25,16 +22,26 @@ export const FEATURE_FLAG_KEYS = {
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
 } as const;
 
-/** @deprecated Use CodeFlagName or FEATURE_FLAGS instead. */
-export type FeatureFlagKey =
-  (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
+export type StatsigGateKey =
+  (typeof STATSIG_GATE_KEYS)[keyof typeof STATSIG_GATE_KEYS];
+
+/**
+ * @deprecated Use FEATURE_FLAGS + useCodeFlag for code flags and STATSIG_GATE_KEYS
+ * only when interacting with legacy Statsig server evaluation.
+ */
+export const FEATURE_FLAG_KEYS = STATSIG_GATE_KEYS;
+
+/** @deprecated Use StatsigGateKey or CodeFlagName instead. */
+export type FeatureFlagKey = StatsigGateKey;
 
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 
-/** @deprecated — bootstrap is no longer needed (Statsig removed). */
-export interface FeatureFlagsBootstrap {
+export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
+
+/** @deprecated Compatibility alias. Use StatsigFeatureFlagsBootstrap directly. */
+export interface FeatureFlagsBootstrap extends StatsigFeatureFlagsBootstrap {}
 
 /**
  * All feature flags — toggle the boolean, deploy, done.

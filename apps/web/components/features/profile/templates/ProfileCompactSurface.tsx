@@ -28,6 +28,7 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
@@ -124,6 +125,8 @@ interface ProfileCompactSurfaceProps {
   readonly dataTestId?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly hasReleases?: boolean;
+  readonly releases?: readonly PublicRelease[];
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -276,6 +279,8 @@ export function ProfileCompactSurface({
   dataTestId,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  hasReleases = false,
+  releases,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
     () =>
@@ -654,6 +659,8 @@ export function ProfileCompactSurface({
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
+          hasReleases={hasReleases}
+          releases={releases}
           onRevealNotifications={onRevealNotifications}
         />
       )}
