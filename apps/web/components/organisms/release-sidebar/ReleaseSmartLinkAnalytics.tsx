@@ -17,8 +17,9 @@ import {
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
 import { env } from '@/lib/env-client';
+import { buildTrackedShareDropdownItems } from '@/lib/share/tracked-sources';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
+import { buildUTMContext } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
 function readCookieValue(cookieName: string): string | null {
@@ -124,8 +125,8 @@ function ReleaseSmartLinkControl({
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
   const shareItems = useMemo(() => {
-    const items = getUTMShareDropdownItems({
-      smartLinkUrl,
+    const items = buildTrackedShareDropdownItems({
+      baseUrl: smartLinkUrl,
       context: buildUTMContext({
         smartLinkUrl,
         releaseSlug: release.slug,
@@ -133,6 +134,15 @@ function ReleaseSmartLinkControl({
         artistName: artistName ?? release.artistNames?.[0],
         releaseDate: release.releaseDate,
       }),
+      onCopy: async (url, _label) => {
+        const copied = await copyToClipboard(url);
+        if (copied) {
+          toast.success('Tracked link copied');
+          return;
+        }
+
+        toast.error('Failed to copy link');
+      },
     });
 
     if (items.length === 1 && items[0]?.type === 'submenu') {

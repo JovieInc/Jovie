@@ -31,6 +31,7 @@ import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConf
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
+import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
@@ -106,7 +107,7 @@ interface ProfileCompactSurfaceProps {
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
-  readonly onShare: () => void;
+  readonly onShare?: () => void;
   readonly profileHref: string;
   readonly artistProfilesHref?: string;
   readonly isSubscribed?: boolean;
@@ -291,6 +292,15 @@ export function ProfileCompactSurface({
         null
     );
   }, [artist.image_url, photoDownloadSizes]);
+  const shareContext = useMemo(
+    () =>
+      buildProfileShareContext({
+        username: artist.handle,
+        artistName: artist.name,
+        avatarUrl: heroImageUrl,
+      }),
+    [artist.handle, artist.name, heroImageUrl]
+  );
   const {
     available: availableContacts,
     primaryChannel,
@@ -621,6 +631,7 @@ export function ProfileCompactSurface({
           onOpenChange={onDrawerOpenChange}
           view={drawerView}
           onViewChange={onDrawerViewChange}
+          shareContext={shareContext}
           artist={artist}
           socialLinks={socialLinks}
           contacts={availableContacts}
@@ -631,7 +642,6 @@ export function ProfileCompactSurface({
           onTogglePref={onTogglePref}
           onUnsubscribe={onUnsubscribe}
           isUnsubscribing={isUnsubscribing}
-          onShare={onShare}
           enableDynamicEngagement={enableDynamicEngagement}
           subscribeTwoStep={subscribeTwoStep}
           hasAbout={hasAbout}
