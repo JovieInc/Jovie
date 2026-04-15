@@ -9,8 +9,10 @@ import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
   profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
   SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
@@ -346,11 +348,7 @@ export function ArtistNotificationsCTA({
     openSubscription
   );
   useEffect(() => {
-    return () => {
-      if (confirmTimeoutRef.current) {
-        clearTimeout(confirmTimeoutRef.current);
-      }
-    };
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
   }, []);
 
   const showsSubscribeForm = isSubscribeFormVisible(
@@ -564,19 +562,10 @@ export function ArtistNotificationsCTA({
               resendCooldownEnd={resendCooldownEnd}
               isResending={isResending}
               onResend={() => {
-                void handleResendOtp().then(didResend => {
-                  if (!didResend) {
-                    return;
-                  }
-
-                  setConfirmMessage('Code sent!');
-                  if (confirmTimeoutRef.current) {
-                    clearTimeout(confirmTimeoutRef.current);
-                  }
-                  confirmTimeoutRef.current = setTimeout(
-                    () => setConfirmMessage(null),
-                    2000
-                  );
+                requestOtpResendConfirmation({
+                  handleResendOtp,
+                  confirmTimeoutRef,
+                  setConfirmMessage,
                 });
               }}
             />

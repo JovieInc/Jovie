@@ -14,7 +14,9 @@ import {
 import type { Artist } from '@/types/db';
 import { BirthdayInput } from './BirthdayInput';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
+  requestOtpResendConfirmation,
   SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
@@ -321,9 +323,7 @@ export function ProfileInlineNotificationsCTA({
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
-    };
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
   }, []);
 
   const handleReveal = useCallback(() => {
@@ -585,19 +585,10 @@ export function ProfileInlineNotificationsCTA({
                     resendCooldownEnd={resendCooldownEnd}
                     isResending={isResending}
                     onResend={() => {
-                      void handleResendOtp().then(didResend => {
-                        if (!didResend) {
-                          return;
-                        }
-
-                        setConfirmMessage('Code sent!');
-                        if (confirmTimeoutRef.current) {
-                          clearTimeout(confirmTimeoutRef.current);
-                        }
-                        confirmTimeoutRef.current = setTimeout(
-                          () => setConfirmMessage(null),
-                          2000
-                        );
+                      requestOtpResendConfirmation({
+                        handleResendOtp,
+                        confirmTimeoutRef,
+                        setConfirmMessage,
                       });
                     }}
                   />

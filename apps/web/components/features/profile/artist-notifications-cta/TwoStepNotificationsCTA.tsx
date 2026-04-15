@@ -15,8 +15,10 @@ import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
   profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
   SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
@@ -423,11 +425,7 @@ export function TwoStepNotificationsCTA({
   }, [step, prefersReducedMotion]);
 
   useEffect(() => {
-    return () => {
-      if (confirmTimeoutRef.current) {
-        clearTimeout(confirmTimeoutRef.current);
-      }
-    };
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
   }, []);
 
   const hasSubscriptions = Boolean(
@@ -559,19 +557,10 @@ export function TwoStepNotificationsCTA({
                       resendCooldownEnd={resendCooldownEnd}
                       isResending={isResending}
                       onResend={() => {
-                        void handleResendOtp().then(didResend => {
-                          if (!didResend) {
-                            return;
-                          }
-
-                          setConfirmMessage('Code sent!');
-                          if (confirmTimeoutRef.current) {
-                            clearTimeout(confirmTimeoutRef.current);
-                          }
-                          confirmTimeoutRef.current = setTimeout(
-                            () => setConfirmMessage(null),
-                            2000
-                          );
+                        requestOtpResendConfirmation({
+                          handleResendOtp,
+                          confirmTimeoutRef,
+                          setConfirmMessage,
                         });
                       }}
                     />

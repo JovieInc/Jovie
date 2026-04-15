@@ -130,19 +130,8 @@ export function ArtistProfilePlaceholderShot({
     );
   }
 
-  const outcomeLayout =
-    variant === 'outcome-listen'
-      ? 'grid h-full gap-3 p-4'
-      : variant === 'outcome-local'
-        ? 'grid h-full gap-3 p-4'
-        : variant === 'outcome-support'
-          ? 'grid h-full gap-3 p-4'
-          : variant === 'outcome-capture'
-            ? 'grid h-full gap-3 p-4'
-            : 'grid h-full gap-3 p-4';
-
   return (
-    <div className={cn(outcomeLayout, className)}>
+    <div className={cn('grid h-full gap-3 p-4', className)}>
       <Panel className='h-24 border-white/10 bg-white/[0.06]' />
       <Panel className='h-12' />
       <Panel className='h-12' />

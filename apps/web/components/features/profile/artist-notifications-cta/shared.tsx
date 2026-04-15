@@ -11,7 +11,10 @@ import { AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 import Link from 'next/link';
 import {
   type CSSProperties,
+  type Dispatch,
+  type MutableRefObject,
   type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
@@ -102,6 +105,40 @@ interface SubscriptionOtpResendActionProps {
   readonly resendCooldownEnd: number;
   readonly isResending: boolean;
   readonly onResend: () => void;
+}
+
+interface OtpResendConfirmationOptions {
+  readonly handleResendOtp: () => Promise<boolean>;
+  readonly confirmTimeoutRef: MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>;
+  readonly setConfirmMessage: Dispatch<SetStateAction<string | null>>;
+}
+
+export function clearOtpConfirmTimeout(
+  confirmTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
+) {
+  const confirmTimeout = confirmTimeoutRef.current;
+  if (confirmTimeout) {
+    clearTimeout(confirmTimeout);
+    confirmTimeoutRef.current = null;
+  }
+}
+
+export function requestOtpResendConfirmation({
+  handleResendOtp,
+  confirmTimeoutRef,
+  setConfirmMessage,
+}: OtpResendConfirmationOptions) {
+  void handleResendOtp().then(didResend => {
+    if (!didResend) {
+      return;
+    }
+
+    setConfirmMessage('Code sent!');
+    clearOtpConfirmTimeout(confirmTimeoutRef);
+    confirmTimeoutRef.current = setTimeout(() => setConfirmMessage(null), 2000);
+  });
 }
 
 export function SubscriptionPearlComposer({
