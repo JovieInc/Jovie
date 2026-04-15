@@ -39,12 +39,12 @@ const MODES: ModeData[] = [
     outcome: 'Sell tickets',
   },
   {
-    id: 'tip',
+    id: 'pay',
     headline: 'Turn in-person moments into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
-    slug: 'tip',
-    outcome: 'Earn tips',
+      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.',
+    slug: 'pay',
+    outcome: 'Earn',
   },
   {
     id: 'listen',
@@ -446,7 +446,7 @@ export function DeeplinksGrid() {
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
-                moment: listen, tip, tour, or subscribe.
+                moment: listen, pay, tour, or subscribe.
               </p>
             </div>
 

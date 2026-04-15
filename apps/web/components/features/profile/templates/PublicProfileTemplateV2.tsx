@@ -1,11 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import {
-  ProfileNotificationsContext,
-  useProfileShell,
-} from '@/components/organisms/profile-shell';
+import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
+import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
@@ -14,16 +11,17 @@ import {
   type ProfileV2OverlayMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
+import { PayDrawer } from '@/features/profile/PayDrawer';
 import { resolveFeaturedContent } from '@/features/profile/ProfileFeaturedCard';
 import { ArtistHero } from '@/features/profile/ProfileHeroCard';
 import { ProfileScrollBody } from '@/features/profile/ProfileScrollBody';
 import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
 import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
-import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
@@ -136,7 +134,7 @@ export function PublicProfileTemplateV2({
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
   const venmoUsername = extractVenmoUsername(venmoLink);
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return null;
     }
 
@@ -164,7 +162,7 @@ export function PublicProfileTemplateV2({
   });
 
   const scrollToTourSection = useCallback(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -199,7 +197,7 @@ export function PublicProfileTemplateV2({
   }, [prefersReducedMotion]);
 
   const scrollToSubscribeSection = useCallback(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -215,7 +213,7 @@ export function PublicProfileTemplateV2({
   }, [prefersReducedMotion]);
 
   const scrollToAboutSection = useCallback(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -243,7 +241,7 @@ export function PublicProfileTemplateV2({
       if (nextOverlay === 'contact' && !hasContacts) {
         nextOverlay = null;
       }
-      if (nextOverlay === 'tip' && !venmoLink) {
+      if (nextOverlay === 'pay' && !venmoLink) {
         nextOverlay = null;
       }
       if (nextMode === 'subscribe') {
@@ -282,7 +280,7 @@ export function PublicProfileTemplateV2({
   useEffect(() => applyRequestedMode(mode), [applyRequestedMode, mode]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -295,7 +293,7 @@ export function PublicProfileTemplateV2({
   }, [applyRequestedMode]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return;
     }
 
@@ -364,7 +362,7 @@ export function PublicProfileTemplateV2({
       return;
     }
 
-    setOverlayState('tip');
+    setOverlayState('pay');
   }, [setOverlayState, venmoLink]);
 
   const primaryAction = useMemo(() => {
@@ -483,9 +481,9 @@ export function PublicProfileTemplateV2({
         ) : null}
 
         {venmoLink ? (
-          <TipDrawer
-            open={activeOverlay === 'tip'}
-            onOpenChange={open => setOverlayState(open ? 'tip' : null)}
+          <PayDrawer
+            open={activeOverlay === 'pay'}
+            onOpenChange={open => setOverlayState(open ? 'pay' : null)}
             artistName={artist.name}
             artistHandle={artist.handle}
             venmoLink={venmoLink}

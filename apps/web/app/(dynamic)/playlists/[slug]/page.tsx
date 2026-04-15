@@ -43,7 +43,7 @@ async function getPlaylist(slug: string) {
     .where(eq(joviePlaylists.slug, slug))
     .limit(1);
 
-  if (!playlist || playlist.status !== 'published') return null;
+  if (playlist?.status !== 'published') return null;
   return playlist;
 }
 
@@ -129,9 +129,9 @@ export async function generateMetadata({
 
 export default async function PlaylistPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ slug: string }>;
-}) {
+}>) {
   const { slug } = await params;
   const playlist = await getPlaylist(slug);
   if (!playlist) notFound();

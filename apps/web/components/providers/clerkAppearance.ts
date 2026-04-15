@@ -90,8 +90,8 @@ export const clerkAppearanceBase = {
  * (--clerk-color-*) provide the same values for element-level overrides.
  */
 const authClerkVariables = {
-  colorPrimary: 'var(--color-accent)',
-  colorPrimaryForeground: '#ffffff',
+  colorPrimary: '#ffffff',
+  colorPrimaryForeground: '#08090a',
   colorForeground: '#ffffff',
   colorMutedForeground: '#e3e4e6',
   colorBackground: '#0f1011',

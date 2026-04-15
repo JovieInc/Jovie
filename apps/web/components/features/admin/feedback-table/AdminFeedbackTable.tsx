@@ -177,6 +177,11 @@ function buildFeedbackColumns(deps: {
   ];
 }
 
+function formatDismissedLabel(dismissedAtIso: string | null): string {
+  if (!dismissedAtIso) return 'Dismissed';
+  return `Dismissed ${new Date(dismissedAtIso).toLocaleString()}`;
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -366,15 +371,9 @@ export function AdminFeedbackTable({
                       {new Date(selected.createdAtIso).toLocaleString()}
                     </p>
                     <p className='text-tertiary-token'>
-                      {selected.status !== 'dismissed'
-                        ? 'Marked as pending'
-                        : `Dismissed ${
-                            selected.dismissedAtIso
-                              ? new Date(
-                                  selected.dismissedAtIso
-                                ).toLocaleString()
-                              : ''
-                          }`}
+                      {selected.status === 'dismissed'
+                        ? formatDismissedLabel(selected.dismissedAtIso)
+                        : 'Marked as pending'}
                     </p>
                   </div>
                 }

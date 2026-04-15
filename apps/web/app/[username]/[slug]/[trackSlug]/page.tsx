@@ -139,7 +139,7 @@ export default async function TrackDeepLinkPage({
   );
 
   // Add the deeper breadcrumb (4 levels instead of 3)
-  const graph = structuredData['@graph'] as Array<Record<string, unknown>>;
+  const graph = structuredData['@graph'];
   const bcIndex = graph.findIndex(s => s['@type'] === 'BreadcrumbList');
   if (bcIndex >= 0) {
     graph[bcIndex] = buildBreadcrumbObject([

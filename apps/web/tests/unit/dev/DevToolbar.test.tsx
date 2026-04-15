@@ -21,14 +21,12 @@ vi.mock('@/lib/feature-flags/shared', () => ({
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
-    PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
   },
   FEATURE_FLAGS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     THREADS_ENABLED: false,
-    PWA_INSTALL_BANNER: false,
   },
 }));
 
@@ -295,13 +293,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Should show "5 of 5" initially (all 5 code flags)
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      // Should show "4 of 4" initially (all 4 code flags)
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
     });
 
     it('clears search when clear button is clicked', () => {
@@ -311,11 +309,11 @@ describe('DevToolbar', () => {
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
     });
 
     it('does not show clear button when search is empty', () => {
@@ -343,7 +341,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const sourceLabels = screen.getAllByText(/^code$/);
-      expect(sourceLabels.length).toBe(5); // all code flags
+      expect(sourceLabels.length).toBe(4); // all code flags
     });
   });
 

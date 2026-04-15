@@ -1,6 +1,6 @@
 'use client';
 
-import { usePublicProfileQuery } from '@/lib/queries';
+import { usePublicProfileQuery } from '@/lib/queries/usePublicProfileQuery';
 
 /**
  * Hook to fetch creator profile data by username.

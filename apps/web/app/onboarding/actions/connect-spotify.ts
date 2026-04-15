@@ -6,6 +6,7 @@ import {
   revalidatePath,
   revalidateTag,
 } from 'next/cache';
+import { cookies } from 'next/headers';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
@@ -30,8 +31,10 @@ import {
   processMusicFetchEnrichmentJob,
 } from '@/lib/dsp-enrichment/jobs';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
+import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { runBackgroundSyncOperations } from './sync';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -273,12 +276,33 @@ export async function connectOnboardingSpotifyArtist(
         { clerkUserId: userId }
       );
 
-      await clearPendingClaimContext();
-      await invalidateProfileCache(profile.handle);
-      void invalidateProxyUserStateCache(userId);
-      void import('./activate-trial').then(({ activateTrial }) =>
-        activateTrial(userId)
-      );
+      const cookieStore = await cookies();
+      cookieStore.set('jovie_onboarding_complete', '1', {
+        httpOnly: true,
+        secure: isSecureEnv(),
+        sameSite: 'lax',
+        maxAge: 120,
+        path: '/',
+      });
+
+      await Promise.allSettled([
+        clearPendingClaimContext(),
+        invalidateProfileCache(profile.handle),
+        invalidateProxyUserStateCache(userId),
+      ]);
+      runBackgroundSyncOperations(userId, profile.handle);
+      void import('./activate-trial')
+        .then(({ activateTrial }) => activateTrial(userId))
+        .catch(error => {
+          void captureError(
+            'activateTrial failed after direct profile claim',
+            error,
+            {
+              action: 'connectOnboardingSpotifyArtist',
+              creatorProfileId: profile.id,
+            }
+          );
+        });
     } else {
       await db
         .update(creatorProfiles)

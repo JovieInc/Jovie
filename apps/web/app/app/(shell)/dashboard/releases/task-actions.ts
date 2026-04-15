@@ -157,9 +157,9 @@ export async function instantiateReleaseTasks(releaseId: string) {
       releaseId,
       category: item.category,
       dueAt:
-        releaseDate !== null
-          ? computeDueDate(releaseDate, item.dueDaysOffset)
-          : null,
+        releaseDate === null
+          ? null
+          : computeDueDate(releaseDate, item.dueDaysOffset),
       position: startPosition + index,
       sourceTemplateId: null,
       metadata: {

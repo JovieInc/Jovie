@@ -45,9 +45,9 @@ async function getPlaylistsByMood(mood: string) {
 
 export default async function MoodHubPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ mood: string }>;
-}) {
+}>) {
   const { mood } = await params;
   const decoded = decodeURIComponent(mood);
   const playlists = await getPlaylistsByMood(mood);

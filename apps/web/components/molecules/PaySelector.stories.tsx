@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { TipSelector } from './TipSelector';
+import { PaySelector } from './PaySelector';
 
-const meta: Meta<typeof TipSelector> = {
-  title: 'Molecules/TipSelector',
-  component: TipSelector,
+const meta: Meta<typeof PaySelector> = {
+  title: 'Molecules/PaySelector',
+  component: PaySelector,
   parameters: {
     layout: 'centered',
   },
@@ -97,7 +97,7 @@ export const InteractiveDemo: Story = {
 
     return (
       <div className='max-w-sm'>
-        <TipSelector amounts={[3, 5, 10]} onContinue={handleContinue} />
+        <PaySelector amounts={[3, 5, 10]} onContinue={handleContinue} />
       </div>
     );
   },

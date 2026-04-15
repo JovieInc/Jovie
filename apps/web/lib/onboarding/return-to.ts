@@ -19,6 +19,30 @@ const ALLOWED_POST_CHECKOUT_ROUTES: ReadonlyArray<{
   requiredParams?: Record<string, string>;
 }> = [{ pathname: APP_ROUTES.CHAT, requiredParams: { from: 'onboarding' } }];
 
+function matchPostCheckoutRoute(parsed: URL): string | null {
+  for (const route of ALLOWED_POST_CHECKOUT_ROUTES) {
+    if (parsed.pathname !== route.pathname) continue;
+    if (route.requiredParams) {
+      const allMatch = Object.entries(route.requiredParams).every(
+        ([key, value]) => parsed.searchParams.get(key) === value
+      );
+      if (!allMatch) continue;
+    }
+    // Rebuild from allowlist to prevent injection
+    const url = new URL(route.pathname, 'https://jovie.invalid');
+    if (route.requiredParams) {
+      for (const [key, value] of Object.entries(route.requiredParams)) {
+        url.searchParams.set(key, value);
+      }
+    }
+    // Preserve allowed extra params (panel)
+    const panel = parsed.searchParams.get('panel');
+    if (panel) url.searchParams.set('panel', panel);
+    return `${url.pathname}?${url.searchParams.toString()}`;
+  }
+  return null;
+}
+
 export function normalizeOnboardingReturnTo(raw: unknown): string {
   if (typeof raw !== 'string') {
     return DEFAULT_ONBOARDING_RETURN_TO;
@@ -43,26 +67,5 @@ export function normalizeOnboardingReturnTo(raw: unknown): string {
 
   // Allow post-checkout destinations (e.g. /app/chat?from=onboarding)
   const parsed = new URL(trimmed, 'https://jovie.invalid');
-  for (const route of ALLOWED_POST_CHECKOUT_ROUTES) {
-    if (parsed.pathname !== route.pathname) continue;
-    if (route.requiredParams) {
-      const allMatch = Object.entries(route.requiredParams).every(
-        ([key, value]) => parsed.searchParams.get(key) === value
-      );
-      if (!allMatch) continue;
-    }
-    // Rebuild from allowlist to prevent injection
-    const url = new URL(route.pathname, 'https://jovie.invalid');
-    if (route.requiredParams) {
-      for (const [key, value] of Object.entries(route.requiredParams)) {
-        url.searchParams.set(key, value);
-      }
-    }
-    // Preserve allowed extra params (panel)
-    const panel = parsed.searchParams.get('panel');
-    if (panel) url.searchParams.set('panel', panel);
-    return `${url.pathname}?${url.searchParams.toString()}`;
-  }
-
-  return DEFAULT_ONBOARDING_RETURN_TO;
+  return matchPostCheckoutRoute(parsed) ?? DEFAULT_ONBOARDING_RETURN_TO;
 }

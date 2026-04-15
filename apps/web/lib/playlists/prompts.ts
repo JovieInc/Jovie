@@ -48,7 +48,7 @@ Requirements:
 - Mix well-known tracks (60%) with deeper cuts (30%) and emerging artists (10%)
 - Sequence for flow: open strong, build energy, peak in the middle, cool down at end
 ${genreDirective}${categoryDirective}${avoidList}
-${seed !== undefined ? `Variety seed: ${seed} (use this to explore different directions)` : ''}
+${seed === undefined ? '' : `Variety seed: ${seed} (use this to explore different directions)`}
 
 Respond in JSON format:
 {

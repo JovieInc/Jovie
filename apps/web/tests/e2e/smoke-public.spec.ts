@@ -220,7 +220,7 @@ test.describe('Public Profile - dualipa', () => {
     test.setTimeout(90_000);
     const tipProfile = 'testartist';
 
-    await page.goto(`/${tipProfile}?mode=tip`, {
+    await page.goto(`/${tipProfile}?mode=pay`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });

@@ -6,6 +6,7 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import { readPendingClaimContext } from '@/lib/claim/context';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
@@ -45,6 +46,8 @@ export default async function OnboardingPage({
   searchParams,
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
+  const pendingClaim = await readPendingClaimContext();
+  const targetProfileId = pendingClaim?.creatorProfileId ?? null;
   const shouldSkipDashboardPrefetch =
     isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
   const assumeInitialHandleAvailable =
@@ -71,7 +74,9 @@ export default async function OnboardingPage({
   const hasOnboardingContinuationSignal = Boolean(
     resolvedSearchParams?.handle || resolvedSearchParams?.resume
   );
-  const shouldLoadExistingProfile = Boolean(authResult.profileId);
+  const shouldLoadExistingProfile = Boolean(
+    targetProfileId ?? authResult.profileId
+  );
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
@@ -96,7 +101,6 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
-
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
@@ -107,28 +111,30 @@ export default async function OnboardingPage({
       return Promise.resolve(null);
     }
 
-    return getOnboardingBootstrapProfile(authResult.profileId!).catch(
-      (error: unknown) => {
-        const errorMessage = extractErrorMessage(error, 'Unknown error');
-        if (
-          errorMessage.includes('database') ||
-          errorMessage.includes('connection') ||
-          errorMessage.includes('timeout')
-        ) {
-          Sentry.captureException(error, {
-            tags: { context: 'onboarding_profile_load' },
-            extra: { clerkUserId: authResult.clerkUserId },
-          });
-        }
-        return null;
+    return getOnboardingBootstrapProfile(
+      (targetProfileId ?? authResult.profileId)!
+    ).catch((error: unknown) => {
+      const errorMessage = extractErrorMessage(error, 'Unknown error');
+      if (
+        errorMessage.includes('database') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('timeout')
+      ) {
+        Sentry.captureException(error, {
+          tags: { context: 'onboarding_profile_load' },
+          extra: { clerkUserId: authResult.clerkUserId },
+        });
       }
-    );
+      return null;
+    });
   }
 
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
-    resolvedSearchParams?.handle || spotifySuggestedHandle;
+    resolvedSearchParams?.handle ||
+    pendingClaim?.username ||
+    spotifySuggestedHandle;
   const reservedHandlePromise =
     !earlyProvidedHandle && earlyDisplayName
       ? reserveOnboardingHandle(earlyDisplayName)
@@ -158,12 +164,13 @@ export default async function OnboardingPage({
 
   const providedHandle =
     resolvedSearchParams?.handle ||
+    pendingClaim?.username ||
     existingProfile?.username ||
     spotifySuggestedHandle;
 
   // Discard the early reservation if a providedHandle is now available (e.g. from
   // existingProfile.username) — otherwise isReservedHandle would incorrectly be true.
-  let reservedHandle = !providedHandle ? earlyReservedHandle.handle : null;
+  let reservedHandle = providedHandle ? null : earlyReservedHandle.handle;
   let isReservedHandle = !providedHandle && earlyReservedHandle.isReserved;
   if (
     shouldLoadExistingProfile &&
@@ -192,7 +199,9 @@ export default async function OnboardingPage({
       userEmail={userEmail}
       userId={userId}
       shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-      initialProfileId={existingProfile?.id ?? authResult.profileId}
+      initialProfileId={
+        existingProfile?.id ?? targetProfileId ?? authResult.profileId
+      }
       initialResumeStep={resolvedSearchParams?.resume ?? null}
       existingAvatarUrl={existingProfile?.avatarUrl ?? null}
       existingBio={existingProfile?.bio ?? null}

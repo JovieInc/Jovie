@@ -2,15 +2,13 @@
 
 import { HandCoins, Mail, MapPin } from 'lucide-react';
 import { type RefObject, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SocialLink } from '@/components/molecules/SocialLink';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -320,7 +318,7 @@ function UtilityRail({
             onClick={onTipClick}
           >
             <HandCoins className='h-4 w-4' aria-hidden='true' />
-            Tip
+            Pay
           </button>
         ) : null}
       </div>

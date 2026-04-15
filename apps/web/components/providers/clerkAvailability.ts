@@ -8,6 +8,10 @@ const PRIVATE_IPV4_BLOCKS = [
   /^172\.(1[6-9]|2\d|3[0-1])\./,
 ] as const;
 
+type LocationLike =
+  | Pick<Location, 'hostname' | 'protocol'>
+  | Pick<URL, 'hostname' | 'protocol'>;
+
 interface HeaderReader {
   get(name: string): string | null;
 }
@@ -23,10 +27,7 @@ export function isMockPublishableKey(publishableKey: string): boolean {
 export function shouldBypassClerk(
   publishableKey: string | undefined,
   clerkMockFlag: string | undefined,
-  locationLike:
-    | Pick<Location, 'hostname' | 'protocol'>
-    | Pick<URL, 'hostname' | 'protocol'>
-    | undefined = globalThis.window === undefined
+  locationLike: LocationLike | undefined = globalThis.window === undefined
     ? undefined
     : globalThis.location
 ): boolean {
@@ -121,10 +122,7 @@ export function getRequestLocationFromHeaders(
 }
 
 export function shouldDisableClerkProxyForLocation(
-  locationLike:
-    | Pick<Location, 'hostname' | 'protocol'>
-    | Pick<URL, 'hostname' | 'protocol'>
-    | undefined
+  locationLike: LocationLike | undefined
 ): boolean {
   if (!locationLike) return false;
 
@@ -135,10 +133,7 @@ export function shouldDisableClerkProxyForLocation(
 }
 
 export function getClerkProxyUrl(
-  locationLike:
-    | Pick<Location, 'hostname' | 'protocol'>
-    | Pick<URL, 'hostname' | 'protocol'>
-    | undefined = globalThis.window === undefined
+  locationLike: LocationLike | undefined = globalThis.window === undefined
     ? undefined
     : globalThis.location
 ): string | undefined {

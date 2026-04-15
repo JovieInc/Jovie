@@ -24,13 +24,13 @@ function TipsHero() {
     <section className='relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero variant='centered' className='items-start text-left'>
-        <p className='marketing-kicker'>Tips</p>
+        <p className='marketing-kicker'>Pay</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
-          Turn every tip into a fan.
+          Turn every payment into a fan.
         </h1>
 
         <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
-          Scan. Tip. Stream. One QR code turns a stranger into a superfan and
+          Scan. Pay. Stream. One QR code turns a stranger into a superfan and
           keeps the relationship going after the show ends.
         </p>
 
@@ -59,9 +59,9 @@ const STEPS = [
   },
   {
     icon: Scan,
-    title: 'Fan scans & tips',
+    title: 'Fan scans & pays',
     description:
-      'A fan scans the code, leaves a tip, and lands on your profile. No app download required. Works with any phone camera.',
+      'A fan scans the code, leaves a payment, and lands on your profile. No app download required. Works with any phone camera.',
   },
   {
     icon: Mail,
@@ -92,7 +92,7 @@ function HowItWorksSection() {
             </div>
             <div className='homepage-section-copy'>
               <p className='marketing-lead-linear text-secondary-token'>
-                Put a QR code where people already tip, capture their contact
+                Put a QR code where people already pay, capture their contact
                 info, and send them directly into your music without another
                 tool in the loop.
               </p>
@@ -133,21 +133,21 @@ function HowItWorksSection() {
 const BENEFITS = [
   {
     icon: Users,
-    title: 'Every tip becomes a fan email',
+    title: 'Every payment becomes a fan email',
     description:
-      'Stop losing fans after the show. Every tip automatically captures their contact info so you can keep the conversation going.',
+      'Stop losing fans after the show. Every payment automatically captures their contact info so you can keep the conversation going.',
   },
   {
     icon: Send,
     title: 'Auto thank-you with your music links',
     description:
-      'The moment they tip, fans receive a personalized thank-you with links to stream your music on Spotify, Apple Music, and more.',
+      'The moment they pay, fans receive a personalized thank-you with links to stream your music on Spotify, Apple Music, and more.',
   },
   {
     icon: MapPin,
-    title: 'See who tipped you and where',
+    title: 'See who paid you and where',
     description:
-      'Track every tip by location and time. Know which venues, events, and cities your biggest fans come from.',
+      'Track every payment by location and time. Know which venues, events, and cities your biggest fans come from.',
   },
 ] as const;
 
@@ -169,7 +169,7 @@ function BenefitsSection() {
             <div>
               <p className='marketing-kicker'>Why it matters</p>
               <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token'>
-                Tips are just the beginning.
+                Payments are just the beginning.
               </h2>
             </div>
             <div className='homepage-section-copy'>
@@ -284,7 +284,7 @@ function TipsFinalCTA() {
           <div className='max-w-[31rem]'>
             <p className='marketing-kicker'>Claim your handle</p>
             <h2 className='marketing-h2-linear mt-6 text-primary-token'>
-              Start turning tips into fans.
+              Start turning payments into fans.
             </h2>
             <p className='mt-4 marketing-lead-linear text-secondary-token'>
               Keep the QR code simple, the follow-up automatic, and the listener
@@ -313,7 +313,7 @@ function TipsFinalCTA() {
 /*  Main Export                                                               */
 /* -------------------------------------------------------------------------- */
 
-export function TipsLanding() {
+export function PayLanding() {
   return (
     <div
       className='relative min-h-screen'

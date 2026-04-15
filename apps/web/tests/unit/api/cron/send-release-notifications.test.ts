@@ -58,6 +58,7 @@ vi.mock('@/lib/db/schema/content', () => ({
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
+    billingVersion: 'users.billingVersion',
     trialNotificationsSent: 'users.trialNotificationsSent',
     updatedAt: 'users.updatedAt',
   },

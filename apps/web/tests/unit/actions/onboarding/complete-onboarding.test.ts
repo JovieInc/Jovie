@@ -346,6 +346,65 @@ describe('completeOnboarding', () => {
     expect(mockLogOnboardingError).toHaveBeenCalled();
   });
 
+  it('claims the exact prebuilt profile for token-backed pending claims', async () => {
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'profile-claim-123',
+      username: 'artist',
+      claimTokenHash: 'hash',
+      leadId: 'lead-123',
+      expectedSpotifyArtistId: 'spotify-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await completeOnboarding({
+      username: 'artist',
+      displayName: 'Artist',
+      redirectToDashboard: false,
+    });
+
+    expect(mockClaimPrebuiltProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'profile-claim-123',
+        displayName: 'Artist',
+        expectedUsername: 'artist',
+        source: 'token_backed_onboarding',
+      })
+    );
+    expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockClearPendingClaimContext).toHaveBeenCalled();
+  });
+
+  it('reserves the prebuilt profile for direct pending claims', async () => {
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile-claim-456',
+      username: 'artist',
+      expectedSpotifyArtistId: 'spotify-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await completeOnboarding({
+      username: 'artist',
+      displayName: 'Artist',
+      redirectToDashboard: false,
+    });
+
+    expect(mockReservePrebuiltProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'profile-claim-456',
+        displayName: 'Artist',
+        expectedUsername: 'artist',
+      })
+    );
+    expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+  });
+
   it('creates a new user profile, caches completion, and keeps side effects non-blocking', async () => {
     mockAttributeLeadSignupFromClerkUserId.mockRejectedValueOnce(
       new Error('lead attribution down')

@@ -2,15 +2,14 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import { ClaimBanner } from '@/components/features/profile/ClaimBanner';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
-import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
-import { JoviePixel } from '@/features/tracking';
+import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { readPendingClaimContext } from '@/lib/claim/context';
@@ -28,15 +27,16 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { logger } from '@/lib/utils/logger';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -379,10 +379,15 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    await captureError('Error fetching creator profile', error, {
-      username,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching creator profile',
+      {
+        error,
+        route: '/[username]',
+        username,
+      },
+      'public-profile'
+    );
     return {
       profile: null,
       links: [],
@@ -499,10 +504,15 @@ async function getPublicTourDates(
   try {
     return await getUpcomingTourDatesForProfile(profileId);
   } catch (error) {
-    await captureError('Error fetching public profile tour dates', error, {
-      profileId,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching public profile tour dates',
+      {
+        error,
+        profileId,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
     return [];
   }
 }

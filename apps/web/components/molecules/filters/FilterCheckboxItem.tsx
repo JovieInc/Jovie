@@ -62,11 +62,11 @@ export function FilterCheckboxItem({
   const trailingVisual =
     count !== undefined || checked ? (
       <span className='flex items-center gap-1'>
-        {count !== undefined ? (
+        {count === undefined ? null : (
           <span className='text-[10px] tabular-nums text-tertiary-token'>
             {count}
           </span>
-        ) : null}
+        )}
         {checked ? <Check className='h-4 w-4 text-primary-token' /> : null}
       </span>
     ) : null;

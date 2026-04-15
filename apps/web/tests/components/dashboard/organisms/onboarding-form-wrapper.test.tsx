@@ -30,33 +30,19 @@ describe('OnboardingFormWrapper', () => {
   beforeEach(() => {
     handleOnlyFormPropsSpy.mockClear();
     v2FormPropsSpy.mockClear();
-    globalThis.sessionStorage.clear();
   });
 
-  it('resolves pending claim handles synchronously on first render', () => {
-    globalThis.sessionStorage.setItem(
-      'pendingClaim',
-      JSON.stringify({ handle: 'claimedhandle', ts: Date.now() })
-    );
-
+  it('passes through an empty handle when the server did not provide one', () => {
     render(<OnboardingFormWrapper userId='user_123' />);
 
-    // The handle is resolved eagerly in the useState initializer to avoid
-    // a key-change remount that would cause visible layout shift.
     expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
-      initialHandle: 'claimedhandle',
+      initialHandle: '',
+      isHydrated: false,
     });
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
-
-    expect(globalThis.sessionStorage.getItem('pendingClaim')).toBeNull();
   });
 
-  it('prefers the server-provided handle and leaves pending claims untouched', () => {
-    globalThis.sessionStorage.setItem(
-      'pendingClaim',
-      JSON.stringify({ handle: 'claimedhandle', ts: Date.now() })
-    );
-
+  it('prefers the server-provided handle', () => {
     render(
       <OnboardingFormWrapper initialHandle='serverhandle' userId='user_123' />
     );
@@ -66,7 +52,6 @@ describe('OnboardingFormWrapper', () => {
       isHydrated: true,
     });
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
-    expect(globalThis.sessionStorage.getItem('pendingClaim')).not.toBeNull();
   });
 
   it('passes through seeded-handle fast-path props to the handle-only form', () => {

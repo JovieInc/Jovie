@@ -99,6 +99,74 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
+interface ChatProfileFallbackProps {
+  readonly needsOnboarding: boolean;
+  readonly dashboardLoadError: unknown;
+  readonly isProfileSetupRace: boolean;
+  readonly canAutoRetry: boolean;
+  readonly autoRetryCount: number;
+  readonly onRetry: () => void;
+}
+
+function ChatProfileFallback({
+  needsOnboarding,
+  dashboardLoadError,
+  isProfileSetupRace,
+  canAutoRetry,
+  autoRetryCount,
+  onRetry,
+}: ChatProfileFallbackProps) {
+  if (needsOnboarding && !dashboardLoadError) {
+    return (
+      <ChatWorkspaceSurface>
+        <div className='flex h-full items-center justify-center p-6'>
+          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+            <LoadingSpinner size='lg' tone='muted' />
+            <p className='text-sm text-secondary-token'>
+              Taking you to onboarding…
+            </p>
+          </ContentSurfaceCard>
+        </div>
+      </ChatWorkspaceSurface>
+    );
+  }
+
+  const profileMessage = isProfileSetupRace
+    ? 'Finishing your dashboard setup…'
+    : 'We hit a problem loading your profile. Please retry in a moment.';
+
+  return (
+    <ChatWorkspaceSurface>
+      <div className='flex h-full items-center justify-center p-6'>
+        <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+          {isProfileSetupRace ? (
+            <LoadingSpinner size='lg' tone='muted' />
+          ) : (
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          )}
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
+          {isProfileSetupRace && canAutoRetry && (
+            <p className='text-xs text-tertiary-token'>
+              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
+            </p>
+          )}
+          {!isProfileSetupRace && (
+            <Button
+              onClick={onRetry}
+              variant='secondary'
+              size='sm'
+              className='gap-2'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </Button>
+          )}
+        </ContentSurfaceCard>
+      </div>
+    </ChatWorkspaceSurface>
+  );
+}
+
 export function ChatPageClient({
   conversationId,
   isFirstSession = false,
@@ -567,54 +635,15 @@ export function ChatPageClient({
   ]);
 
   if (!activeProfile) {
-    if (needsOnboarding && !dashboardLoadError) {
-      return (
-        <ChatWorkspaceSurface>
-          <div className='flex h-full items-center justify-center p-6'>
-            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-              <LoadingSpinner size='lg' tone='muted' />
-              <p className='text-sm text-secondary-token'>
-                Taking you to onboarding…
-              </p>
-            </ContentSurfaceCard>
-          </div>
-        </ChatWorkspaceSurface>
-      );
-    }
-
-    const profileMessage = isProfileSetupRace
-      ? 'Finishing your dashboard setup…'
-      : 'We hit a problem loading your profile. Please retry in a moment.';
-
     return (
-      <ChatWorkspaceSurface>
-        <div className='flex h-full items-center justify-center p-6'>
-          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            {isProfileSetupRace ? (
-              <LoadingSpinner size='lg' tone='muted' />
-            ) : (
-              <AlertCircle className='h-8 w-8 text-tertiary-token' />
-            )}
-            <p className='text-sm text-secondary-token'>{profileMessage}</p>
-            {isProfileSetupRace && canAutoRetry && (
-              <p className='text-xs text-tertiary-token'>
-                Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
-              </p>
-            )}
-            {!isProfileSetupRace && (
-              <Button
-                onClick={() => router.refresh()}
-                variant='secondary'
-                size='sm'
-                className='gap-2'
-              >
-                <RefreshCw className='h-4 w-4' />
-                Retry
-              </Button>
-            )}
-          </ContentSurfaceCard>
-        </div>
-      </ChatWorkspaceSurface>
+      <ChatProfileFallback
+        needsOnboarding={needsOnboarding}
+        dashboardLoadError={dashboardLoadError}
+        isProfileSetupRace={isProfileSetupRace}
+        canAutoRetry={canAutoRetry}
+        autoRetryCount={autoRetryCount}
+        onRetry={() => router.refresh()}
+      />
     );
   }
 
