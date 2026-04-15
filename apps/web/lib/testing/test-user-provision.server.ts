@@ -318,25 +318,39 @@ export async function ensureClerkTestUser({
       throw error;
     }
 
-    let racedUser: { id: string } | undefined;
-    try {
-      const racedUsers = await clerk.users.getUserList({
-        emailAddress: [normalizedEmail],
-      });
-      racedUser = racedUsers.data[0];
-    } catch (raceError) {
-      if (isClerkUnauthorizedError(raceError) && fallbackClerkId) {
-        return fallbackClerkId;
-      }
-      throw raceError;
-    }
-
-    if (!racedUser) {
-      throw error;
-    }
-
-    return racedUser.id;
+    return resolveRacedClerkUser(
+      clerk,
+      normalizedEmail,
+      fallbackClerkId,
+      error
+    );
   }
+}
+
+async function resolveRacedClerkUser(
+  clerk: ReturnType<typeof createClerkClient>,
+  normalizedEmail: string,
+  fallbackClerkId: string | undefined,
+  originalError: unknown
+): Promise<string> {
+  let racedUser: { id: string } | undefined;
+  try {
+    const racedUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+    racedUser = racedUsers.data[0];
+  } catch (raceError) {
+    if (isClerkUnauthorizedError(raceError) && fallbackClerkId) {
+      return fallbackClerkId;
+    }
+    throw raceError;
+  }
+
+  if (!racedUser) {
+    throw originalError;
+  }
+
+  return racedUser.id;
 }
 
 export async function ensureUserRecord(

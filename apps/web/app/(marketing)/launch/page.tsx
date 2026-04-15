@@ -685,9 +685,9 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Sometimes you want a specific action &mdash; a tip jar at shows, a
-              contact page for industry, tour dates in your bio. Deeplinks point
-              directly to any view of your profile.
+              Sometimes you want a specific action &mdash; a pay page at shows,
+              a contact page for industry, tour dates in your bio. Deeplinks
+              point directly to any view of your profile.
             </p>
             <p className='marketing-lead-linear mt-4 max-w-[480px] !text-[0.95rem]'>
               Instagram allows 5 links. With deeplinks, each one goes straight
@@ -695,7 +695,7 @@ export default function LaunchPage() {
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
-                { num: '3.1', title: '/tip' },
+                { num: '3.1', title: '/pay' },
                 { num: '3.2', title: '/tour' },
                 { num: '3.3', title: '/contact' },
                 { num: '3.4', title: '/listen' },
@@ -785,7 +785,7 @@ export default function LaunchPage() {
                 {[
                   { label: 'New Music', url: 'jov.ie/tim' },
                   { label: 'Tour Dates', url: 'jov.ie/tim/tour' },
-                  { label: 'Tip Jar', url: 'jov.ie/tim/tip' },
+                  { label: 'Pay', url: 'jov.ie/tim/pay' },
                   { label: 'Booking', url: 'jov.ie/tim/contact' },
                   { label: 'Merch', url: 'jov.ie/tim/shop' },
                 ].map(link => (
@@ -833,7 +833,7 @@ export default function LaunchPage() {
           className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px rounded-[10px] overflow-hidden'
           style={{ background: 'var(--linear-border-subtle)' }}
         >
-          {/* /tip */}
+          {/* /pay */}
           <div
             style={{
               background: 'var(--linear-bg-surface-0)',
@@ -847,7 +847,7 @@ export default function LaunchPage() {
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
               </span>{' '}
-              /tip
+              /pay
             </div>
             <p
               className='mb-5'
@@ -857,8 +857,8 @@ export default function LaunchPage() {
                 lineHeight: 1.5,
               }}
             >
-              Accept tips from fans with one tap. Print the QR code and put it
-              on your merch table at shows.
+              Accept payments from fans with one tap. Print the QR code and put
+              it on your merch table at shows.
             </p>
             <div
               className='rounded-md p-4'
@@ -869,7 +869,7 @@ export default function LaunchPage() {
               }}
             >
               <div className='flex gap-2 mb-3'>
-                {['$3', '$5', '$10'].map(amt => (
+                {['$5', '$10', '$20'].map(amt => (
                   <div
                     key={amt}
                     className='flex-1 text-center py-2 font-semibold rounded'
@@ -1590,7 +1590,7 @@ export default function LaunchPage() {
                       intent: 'High',
                       status: 'Returning',
                       source: 'Spotify',
-                      action: 'Tipped $5',
+                      action: 'Paid $5',
                     },
                   ].map(row => (
                     <tr key={row.visitor}>
@@ -1825,7 +1825,7 @@ export default function LaunchPage() {
                 'Fan notifications built in',
                 'AI assistant (25 msgs/day)',
                 'Your brand, your domain potential',
-                '/tip, /tour, /contact, /listen deeplinks included',
+                '/pay, /tour, /contact, /listen deeplinks included',
               ].map(item => (
                 <li
                   key={item}

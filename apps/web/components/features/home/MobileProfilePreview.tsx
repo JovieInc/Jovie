@@ -59,7 +59,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       <div className='mt-4 flex items-center gap-3'>
         <PreviewIconButton icon='ig' label='Instagram' />
         <PreviewIconButton icon='tt' label='TikTok' />
-        <PreviewIconButton icon='tip' label='Tip' />
+        <PreviewIconButton icon='pay' label='Pay' />
       </div>
 
       {/* Big CTA — matches TwoStepNotificationsCTA */}
@@ -83,7 +83,7 @@ function PreviewIconButton({
   icon,
   label,
 }: {
-  readonly icon: 'ig' | 'tt' | 'tip';
+  readonly icon: 'ig' | 'tt' | 'pay';
   readonly label: string;
 }) {
   const icons = {
@@ -115,7 +115,7 @@ function PreviewIconButton({
         <path d='M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1 0-5.78c.27 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15.3 6.34 6.34 0 0 0 9.49 21.6a6.34 6.34 0 0 0 6.34-6.34V8.7a8.16 8.16 0 0 0 3.76.92V6.69Z' />
       </svg>
     ),
-    tip: (
+    pay: (
       <svg
         aria-hidden='true'
         width='18'

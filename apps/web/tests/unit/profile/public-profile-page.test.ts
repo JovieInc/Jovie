@@ -110,6 +110,18 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
+  describe('public claim banner handling', () => {
+    it('does not read search params on the server page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        'const resolvedSearchParams = await searchParams;'
+      );
+    });
+
+    it('delegates claim banner query handling to the client wrapper', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+    });
+  });
+
   describe('generateProfileStructuredData', () => {
     // We test the structured data generation logic directly
     // Since it's a private function, we replicate the logic here for testing
@@ -480,7 +492,7 @@ describe('Public Profile Page Logic', () => {
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
-      ['tip', 'Send a tip'],
+      ['pay', 'Support'],
       ['listen', 'Listen now'],
       ['subscribe', 'Get notified'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
@@ -493,7 +505,7 @@ describe('Public Profile Page Logic', () => {
 
     it('passes social links through so compact profile tipping can derive from venmo links', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('showTipButton=');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('showPayButton=');
     });
 
     it('shows back button only for non-profile modes', () => {

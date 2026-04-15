@@ -65,6 +65,13 @@ export const RELEASE_TYPE_STYLES: Record<string, ReleaseTypeStyle> = {
     dot: 'bg-pink-500',
     label: 'Mixtape',
   },
+  music_video: {
+    border: 'border-red-500/15 dark:border-red-400/15',
+    text: 'text-red-700 dark:text-red-300',
+    bg: 'bg-red-500/8 dark:bg-red-400/10',
+    dot: 'bg-red-500',
+    label: 'Music Video',
+  },
   other: {
     border: 'border-black/8 dark:border-white/8',
     text: 'text-gray-600 dark:text-gray-400',

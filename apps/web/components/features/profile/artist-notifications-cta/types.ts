@@ -1,5 +1,7 @@
 import type { Artist } from '@/types/db';
 
+export type NotificationSource = 'profile_inline' | 'tour_drawer';
+
 export interface ArtistNotificationsCTAProps {
   readonly artist: Artist;
   /**
@@ -22,4 +24,9 @@ export interface ArtistNotificationsCTAProps {
    * profile surfaces.
    */
   readonly hideListenFallback?: boolean;
+  /**
+   * Analytics source identifier for tracking where subscriptions originate.
+   * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.
+   */
+  readonly source?: NotificationSource;
 }

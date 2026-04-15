@@ -1,13 +1,13 @@
 import { and, eq } from 'drizzle-orm';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { ReleasePlanUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
+import { APP_ROUTES } from '@/constants/routes';
+import { getCurrentUserProfile } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { canAccessTasksWorkspace } from '@/lib/entitlements/tasks-gate';
-import { requireProfileId } from '../../../requireProfileId';
 
 interface TasksPageProps {
   readonly params: Promise<{ releaseId: string }>;
@@ -30,8 +30,17 @@ export default async function TasksPage({ params }: TasksPageProps) {
 }
 
 async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
-  const profileId = await requireProfileId();
-  const entitlements = await getCurrentUserEntitlements();
+  const profilePromise = getCurrentUserProfile();
+  const entitlementsPromise = getCurrentUserEntitlements();
+  const [profile, entitlements] = await Promise.all([
+    profilePromise,
+    entitlementsPromise,
+  ]);
+  const profileId = profile?.id;
+
+  if (!profileId || !profile.onboardingCompletedAt) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
 
   const [release] = await db
     .select({
@@ -51,7 +60,7 @@ async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
     notFound();
   }
 
-  if (!(await canAccessTasksWorkspace())) {
+  if (!entitlements.canAccessTasksWorkspace) {
     return <ReleasePlanUpgradeInterstitial releaseTitle={release.title} />;
   }
 

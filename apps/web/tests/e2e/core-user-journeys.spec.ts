@@ -67,10 +67,10 @@ test.describe('Core User Journeys', () => {
   });
 
   test('Tip mode works without authentication', async ({ page }) => {
-    await smokeNavigate(page, '/taylorswift?mode=tip');
+    await smokeNavigate(page, '/taylorswift?mode=pay');
 
-    // Should stay on tip mode
-    await expect(page).toHaveURL(/mode=tip/, {
+    // Should stay on pay mode
+    await expect(page).toHaveURL(/mode=pay/, {
       timeout: SMOKE_TIMEOUTS.URL_STABLE,
     });
 
