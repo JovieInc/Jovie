@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Settings } from 'lucide-react';
+import { Settings, Star } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { CommonDropdown } from './common-dropdown';
 import type { CommonDropdownItem } from './common-dropdown-types';
@@ -198,6 +198,105 @@ describe('CommonDropdown', () => {
         .closest('[role="menuitem"]');
       expect(item).toHaveAttribute('data-disabled');
     });
+
+    it('renders selected action state with a trailing check', () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action',
+          id: 'selected',
+          label: 'Selected Item',
+          onClick: vi.fn(),
+          selected: true,
+        },
+      ];
+      render(<CommonDropdown items={items} open={true} />);
+
+      const item = screen
+        .getByText('Selected Item')
+        .closest('[role="menuitem"]');
+
+      expect(item?.className).toContain('bg-(--linear-bg-surface-1)');
+    });
+
+    it('renders danger state as destructive styling', () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action',
+          id: 'danger',
+          label: 'Remove Access',
+          onClick: vi.fn(),
+          state: 'danger',
+        },
+      ];
+      render(<CommonDropdown items={items} open={true} />);
+
+      const item = screen
+        .getByText('Remove Access')
+        .closest('[role="menuitem"]');
+
+      expect(item?.className).toContain('text-(--linear-error)');
+    });
+
+    it('renders trailing custom content and descriptions', () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action',
+          id: 'details',
+          label: 'Detailed Item',
+          description: 'Secondary context',
+          trailing: <span data-testid='custom-trailing'>Live</span>,
+          onClick: vi.fn(),
+        },
+      ];
+      render(<CommonDropdown items={items} open={true} />);
+
+      expect(screen.getByText('Secondary context')).toBeInTheDocument();
+      expect(screen.getByTestId('custom-trailing')).toBeInTheDocument();
+    });
+
+    it('prevents loading action selection', async () => {
+      const onClick = vi.fn();
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action',
+          id: 'loading',
+          label: 'Syncing',
+          loading: true,
+          onClick,
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} />);
+
+      const item = screen.getByRole('menuitem', { name: 'Syncing' });
+      expect(item).toHaveAttribute('data-disabled');
+
+      await user.click(screen.getByText('Syncing'));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('keeps the menu open when closeOnSelect is false', async () => {
+      const onClick = vi.fn();
+      const onOpenChange = vi.fn();
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action',
+          id: 'pin',
+          label: 'Pin',
+          closeOnSelect: false,
+          onClick,
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown items={items} open={true} onOpenChange={onOpenChange} />
+      );
+
+      await user.click(screen.getByText('Pin'));
+
+      expect(onClick).toHaveBeenCalled();
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
   });
 
   describe('Separators', () => {
@@ -278,6 +377,24 @@ describe('CommonDropdown', () => {
 
       await user.click(screen.getByRole('menuitemcheckbox'));
       expect(onCheckedChange).toHaveBeenCalledWith(true);
+    });
+
+    it('renders checkbox description and count', () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'checkbox',
+          id: 'cb-1',
+          label: 'Labels',
+          description: 'Show release labels',
+          checked: false,
+          count: 12,
+          onCheckedChange: vi.fn(),
+        },
+      ];
+      render(<CommonDropdown items={items} open={true} />);
+
+      expect(screen.getByText('Show release labels')).toBeInTheDocument();
+      expect(screen.getByText('12')).toBeInTheDocument();
     });
   });
 
@@ -444,6 +561,171 @@ describe('CommonDropdown', () => {
 
       await waitFor(() => {
         expect(onSearch).toHaveBeenCalled();
+      });
+    });
+
+    it('calls onSearchChange when clearing search', async () => {
+      const onSearchChange = vi.fn();
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={basicItems}
+          open={true}
+          searchable={true}
+          onSearchChange={onSearchChange}
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'edit');
+      await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+      expect(onSearchChange).toHaveBeenLastCalledWith('');
+    });
+
+    it('keeps matching submenu branches during recursive search', async () => {
+      const items: CommonDropdownItem[] = [
+        { type: 'action', id: 'archive', label: 'Archive', onClick: vi.fn() },
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          icon: Star,
+          items: [
+            {
+              type: 'action',
+              id: 'spotify',
+              label: 'Spotify',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown
+          items={items}
+          open={true}
+          searchable={true}
+          searchMode='recursive'
+        />
+      );
+
+      await user.type(screen.getByPlaceholderText('Search...'), 'spotify');
+
+      await waitFor(() => {
+        expect(screen.getByText('Share')).toBeInTheDocument();
+        expect(screen.queryByText('Archive')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Submenus', () => {
+    it('renders nested submenu triggers', () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          items: [
+            {
+              type: 'submenu',
+              id: 'social',
+              label: 'Social',
+              items: [
+                {
+                  type: 'action',
+                  id: 'copy-link',
+                  label: 'Copy Link',
+                  onClick: vi.fn(),
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      render(<CommonDropdown items={items} open={true} />);
+
+      expect(
+        screen.getByRole('menuitem', { name: 'Share' })
+      ).toBeInTheDocument();
+    });
+
+    it('opens a searchable submenu and filters child items', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'platforms',
+          label: 'Platforms',
+          searchable: true,
+          searchPlaceholder: 'Search Platforms',
+          items: [
+            {
+              type: 'action',
+              id: 'spotify',
+              label: 'Spotify',
+              onClick: vi.fn(),
+            },
+            {
+              type: 'action',
+              id: 'apple',
+              label: 'Apple Music',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} />);
+
+      await user.hover(screen.getByText('Platforms'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText('Search Platforms')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Search Platforms'), {
+        target: { value: 'apple' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Apple Music')).toBeInTheDocument();
+        expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders submenu loading and empty states', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'loading',
+          label: 'Loading Group',
+          searchable: true,
+          isLoading: true,
+          items: [],
+        },
+        {
+          type: 'submenu',
+          id: 'empty',
+          label: 'Empty Group',
+          searchable: true,
+          emptyMessage: 'No child items',
+          items: [],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} />);
+
+      await user.hover(screen.getByText('Loading Group'));
+      await waitFor(() => {
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+      });
+
+      await user.hover(screen.getByText('Empty Group'));
+      await waitFor(() => {
+        expect(screen.getByText('No child items')).toBeInTheDocument();
       });
     });
   });

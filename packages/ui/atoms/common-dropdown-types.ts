@@ -48,8 +48,14 @@ export interface CommonDropdownActionItem extends CommonDropdownBaseItem {
   iconAfter?: LucideIcon | ReactNode; // For trailing icons/badges
   onClick: () => void;
   variant?: 'default' | 'destructive';
+  state?: 'default' | 'active' | 'success' | 'warning' | 'danger';
+  selected?: boolean;
+  loading?: boolean;
+  closeOnSelect?: boolean;
   shortcut?: string; // e.g., "⌘K"
   subText?: string; // Secondary text (right-aligned)
+  description?: string;
+  trailing?: ReactNode;
   badge?: {
     text: string;
     color?: string; // Hex color for badge background
@@ -64,7 +70,10 @@ export interface CommonDropdownCheckboxItem extends CommonDropdownBaseItem {
   label: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  icon?: LucideIcon;
+  icon?: LucideIcon | ReactNode;
+  description?: string;
+  count?: number;
+  loading?: boolean;
 }
 
 /**
@@ -75,6 +84,9 @@ export interface CommonDropdownRadioItem extends CommonDropdownBaseItem {
   label: string;
   value: string;
   icon?: LucideIcon | ReactNode;
+  description?: string;
+  count?: number;
+  loading?: boolean;
 }
 
 /**
@@ -95,6 +107,14 @@ export interface CommonDropdownSubmenu extends CommonDropdownBaseItem {
   label: string;
   icon?: LucideIcon | ReactNode;
   items: CommonDropdownItem[];
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  isLoading?: boolean;
+  filterItem?: (item: CommonDropdownItem, query: string) => boolean;
+  onSearchChange?: (query: string) => void;
+  minWidth?: number | string;
+  maxHeight?: number | string;
 }
 
 /**
@@ -235,6 +255,39 @@ export interface CommonDropdownProps {
    * Filter function for searchable dropdowns
    */
   readonly onSearch?: (query: string) => void;
+
+  /**
+   * Callback when the root search query changes. Called for every change,
+   * including clearing back to an empty string.
+   */
+  readonly onSearchChange?: (query: string) => void;
+
+  /**
+   * Search behavior for nested menu trees.
+   * - 'root': filter root-level items only
+   * - 'recursive': keep matching submenu branches and filter descendants
+   */
+  readonly searchMode?: 'root' | 'recursive';
+
+  /**
+   * Custom filter for searchable menu items.
+   */
+  readonly filterItem?: (item: CommonDropdownItem, query: string) => boolean;
+
+  /**
+   * Reset root search state when the dropdown closes.
+   */
+  readonly resetSearchOnClose?: boolean;
+
+  /**
+   * Content min-width override.
+   */
+  readonly minWidth?: number | string;
+
+  /**
+   * Content max-height override.
+   */
+  readonly maxHeight?: number | string;
 
   /**
    * Loading state (shows spinner)
