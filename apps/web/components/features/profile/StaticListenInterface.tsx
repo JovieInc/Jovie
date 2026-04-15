@@ -190,7 +190,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       {/* Help text */}
       <div className='mt-6 text-center'>
         <p className='text-xs text-tertiary-token'>
-          Your preferred app opens first next time.
+          {isPreview
+            ? 'Your preferred app opens first next time.'
+            : 'Your preferred app opens first next time.'}
         </p>
       </div>
     </div>
