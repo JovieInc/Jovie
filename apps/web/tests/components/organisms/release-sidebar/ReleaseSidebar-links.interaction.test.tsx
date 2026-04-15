@@ -326,11 +326,16 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
 
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareContextMenuItems: () => [],
-  getUTMShareDropdownItems: () => [],
-}));
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareContextMenuItems: () => [],
+    getUTMShareDropdownItems: () => [],
+  };
+});
 
 // Import after mocks
 const { ReleaseSidebar } = await import(

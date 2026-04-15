@@ -24,8 +24,8 @@ function ensureSentence(text: string) {
   return /[.!?]$/.test(trimmedText) ? trimmedText : `${trimmedText}.`;
 }
 
-function getTipLabel(tipsSubmitted: number) {
-  return tipsSubmitted === 1 ? 'tip' : 'tips';
+function getPaymentLabel(tipsSubmitted: number) {
+  return tipsSubmitted === 1 ? 'payment' : 'payments';
 }
 
 export function buildGreeting({
@@ -64,7 +64,7 @@ export function buildGreeting({
   if (tippingStats.tipsSubmitted > 0) {
     return {
       label: 'Welcome back',
-      body: `You've received ${tippingStats.tipsSubmitted} ${getTipLabel(tippingStats.tipsSubmitted)} since your last check-in.`,
+      body: `You've received ${tippingStats.tipsSubmitted} ${getPaymentLabel(tippingStats.tipsSubmitted)} since your last check-in.`,
       profileHref: null,
       profileLabel: null,
     };

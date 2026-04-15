@@ -379,3 +379,24 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 **Priority:** P2
 **Noticed on:** itstimwhite/ci-pr-strictness (2026-03-27) — pre-existing, not caused by branch changes.
+
+---
+
+### Video Release Health Check + Artist Observability
+
+**What:** Three-layer system for broken video detection:
+1. **Client-side (shipped):** VideoReleasePage fires a `video_embed_failed` tracking beacon and redirects to the artist's profile on iframe load failure. Never show a dead page.
+2. **Server-side cron (TODO):** Periodic health check pings YouTube Data API for each music_video release. When a video is unavailable: temporarily hide the release, redirect the page server-side (before it even renders), and email the artist.
+3. **Artist notification (TODO):** Email the artist: "Your video [title] is temporarily hidden because [reason]. Update the YouTube link or contact support." Artists don't have dev tools or observability — we need to give it to them.
+
+**Why:** Music artists and marketers don't have observability like developers do. A broken video link is a dead end: fans bounce, the artist loses conversions, and nobody knows. This is the infrastructure gap between dev tooling and creator tooling.
+
+**Design decisions (from user):**
+- Paid-only entitlement (Pro/Max plans) for the server-side cron
+- Redirect whole page, NOT show error message or empty state
+- Redirect destination: artist profile (`/{handle}`)
+- Email the artist so they can actually fix it
+
+**Depends on:** Music video support (itstimwhite/music-video-support)
+**Priority:** P2
+**Noticed on:** itstimwhite/music-video-support (2026-04-12) — /plan-eng-review

@@ -13,9 +13,9 @@ const meta: Meta<typeof AnimatedArtistPage> = {
   argTypes: {
     mode: {
       control: { type: 'select' },
-      options: ['profile', 'listen', 'tip'],
+      options: ['profile', 'listen', 'pay'],
     },
-    showTipButton: {
+    showPayButton: {
       control: { type: 'boolean' },
     },
     showBackButton: {
@@ -77,7 +77,7 @@ export const ProfileMode: Story = {
     artist: mockArtist,
     socialLinks: mockSocialLinks,
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: true,
+    showPayButton: true,
     showBackButton: false,
   },
 };
@@ -88,29 +88,29 @@ export const ListenMode: Story = {
     artist: mockArtist,
     socialLinks: mockSocialLinks,
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: true,
   },
 };
 
-export const TipMode: Story = {
+export const PayMode: Story = {
   args: {
-    mode: 'tip',
+    mode: 'pay',
     artist: mockArtist,
     socialLinks: mockSocialLinks,
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: true,
   },
 };
 
-export const TipModeWithoutVenmo: Story = {
+export const PayModeWithoutVenmo: Story = {
   args: {
-    mode: 'tip',
+    mode: 'pay',
     artist: mockArtist,
     socialLinks: mockSocialLinks.filter(link => link.platform !== 'venmo'),
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: true,
   },
 };
@@ -121,7 +121,7 @@ export const VerifiedArtist: Story = {
     artist: { ...mockArtist, is_verified: true },
     socialLinks: mockSocialLinks,
     subtitle: 'Grammy Winner • Multi-Platinum Artist',
-    showTipButton: true,
+    showPayButton: true,
     showBackButton: false,
   },
 };
@@ -132,7 +132,7 @@ export const UnverifiedArtist: Story = {
     artist: { ...mockArtist, is_verified: false, name: 'Rising Artist' },
     socialLinks: mockSocialLinks.slice(0, 2), // No Venmo
     subtitle: 'New Music Coming Soon',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: false,
   },
 };
@@ -143,7 +143,7 @@ export const MinimalSocials: Story = {
     artist: mockArtist,
     socialLinks: [mockSocialLinks[0]], // Only Instagram
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: false,
   },
 };
@@ -154,7 +154,7 @@ export const NoSocials: Story = {
     artist: mockArtist,
     socialLinks: [],
     subtitle: 'The Eras Tour • Live from London',
-    showTipButton: false,
+    showPayButton: false,
     showBackButton: false,
   },
 };
@@ -170,7 +170,7 @@ export const LongArtistName: Story = {
     },
     socialLinks: mockSocialLinks,
     subtitle: 'Dance Fever World Tour 2024',
-    showTipButton: true,
+    showPayButton: true,
     showBackButton: false,
   },
 };
@@ -185,14 +185,14 @@ export const ShortArtistName: Story = {
     },
     socialLinks: mockSocialLinks,
     subtitle: 'Clarity Tour',
-    showTipButton: true,
+    showPayButton: true,
     showBackButton: false,
   },
 };
 
 export const InteractiveDemo: Story = {
   render: function InteractiveDemoRender() {
-    const [mode, setMode] = React.useState<'profile' | 'listen' | 'tip'>(
+    const [mode, setMode] = React.useState<'profile' | 'listen' | 'pay'>(
       'profile'
     );
 
@@ -223,14 +223,14 @@ export const InteractiveDemo: Story = {
           </button>
           <button
             type='button'
-            onClick={() => setMode('tip')}
+            onClick={() => setMode('pay')}
             className={`px-3 py-1 rounded text-sm ${
-              mode === 'tip'
+              mode === 'pay'
                 ? 'bg-btn-primary text-btn-primary-foreground'
                 : 'bg-surface-0 text-secondary-token border border-subtle'
             }`}
           >
-            Tip
+            Pay
           </button>
         </div>
 
@@ -239,7 +239,7 @@ export const InteractiveDemo: Story = {
           artist={mockArtist}
           socialLinks={mockSocialLinks}
           subtitle='Interactive Demo Mode'
-          showTipButton={mode === 'profile'}
+          showPayButton={mode === 'profile'}
           showBackButton={mode !== 'profile'}
         />
       </div>
