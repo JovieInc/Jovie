@@ -1,4 +1,5 @@
 import type { ProfileMode } from '@/features/profile/contracts';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
@@ -33,6 +34,7 @@ export interface StaticArtistPageProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export function StaticArtistPage({
@@ -57,6 +59,7 @@ export function StaticArtistPage({
   showShopButton = false,
   profileSettings,
   viewerCountryCode,
+  releases,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -79,6 +82,7 @@ export function StaticArtistPage({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
+    releases,
   });
 
   return (
@@ -102,6 +106,7 @@ export function StaticArtistPage({
       }
       profileSettings={viewModel.profileSettings}
       viewerCountryCode={viewerCountryCode}
+      releases={viewModel.releases}
     />
   );
 }
