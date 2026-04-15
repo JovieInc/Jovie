@@ -75,13 +75,6 @@ export function ArtistProfileSocialProof({
         </div>
       ) : null}
 
-      <div className='mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-primary-token/45'>
-        {proofData.logos.map(logo => {
-          const Logo = logo.component;
-          return <Logo key={logo.id} className='h-[15px] w-auto' />;
-        })}
-      </div>
-
       {!proofData.hasRealQuotes ? (
         <p className='mt-6 text-[13px] leading-[1.65] text-tertiary-token'>
           {proofData.founderFallback}

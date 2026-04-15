@@ -120,6 +120,60 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
       publicExportPath: 'release-take-me-over-phone.png',
     },
+    {
+      id: 'artist-profile-mode-release-mobile',
+      title: 'Artist Profile Release Mode Mobile',
+      route: '/demo/showcase/artist-profile-mode-release',
+      waitFor: '[data-testid="demo-showcase-artist-profile-mode-release"]',
+      captureTarget: 'locator',
+      captureSelector:
+        '[data-testid="demo-showcase-artist-profile-mode-release"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-profile-mode-release-phone.png',
+    },
+    {
+      id: 'artist-profile-mode-shows-mobile',
+      title: 'Artist Profile Shows Mode Mobile',
+      route: '/demo/showcase/artist-profile-mode-shows',
+      waitFor: '[data-testid="demo-showcase-artist-profile-mode-shows"]',
+      captureTarget: 'locator',
+      captureSelector:
+        '[data-testid="demo-showcase-artist-profile-mode-shows"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-profile-mode-shows-phone.png',
+    },
+    {
+      id: 'artist-profile-mode-pay-mobile',
+      title: 'Artist Profile Pay Mode Mobile',
+      route: '/demo/showcase/artist-profile-mode-pay',
+      waitFor: '[data-testid="demo-showcase-artist-profile-mode-pay"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-showcase-artist-profile-mode-pay"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-profile-mode-pay-phone.png',
+    },
+    {
+      id: 'artist-profile-mode-subscribe-mobile',
+      title: 'Artist Profile Subscribe Mode Mobile',
+      route: '/demo/showcase/artist-profile-mode-subscribe',
+      waitFor: '[data-testid="demo-showcase-artist-profile-mode-subscribe"]',
+      captureTarget: 'locator',
+      captureSelector:
+        '[data-testid="demo-showcase-artist-profile-mode-subscribe"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-profile-mode-subscribe-phone.png',
+    },
+    {
+      id: 'artist-profile-mode-links-mobile',
+      title: 'Artist Profile Links Mode Mobile',
+      route: '/demo/showcase/artist-profile-mode-links',
+      waitFor: '[data-testid="demo-showcase-artist-profile-mode-links"]',
+      captureTarget: 'locator',
+      captureSelector:
+        '[data-testid="demo-showcase-artist-profile-mode-links"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-profile-mode-links-phone.png',
+    },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {

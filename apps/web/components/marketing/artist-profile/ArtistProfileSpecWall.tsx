@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Link2,
   Moon,
+  Music2,
   PlugZap,
   QrCode,
   Route,
@@ -22,7 +23,7 @@ const SPEC_TILE_ICONS: Partial<
   'qr-ready': QrCode,
   'dark-mode-first': Moon,
   'zero-setup': PlugZap,
-  'polished-by-default': Sparkles,
+  'dedicated-release-pages': Music2,
 };
 
 const SPEC_TILE_POSITIONS: Partial<
@@ -34,7 +35,7 @@ const SPEC_TILE_POSITIONS: Partial<
   'qr-ready': 'lg:bottom-16 lg:right-20',
   'dark-mode-first': 'lg:bottom-16 lg:left-1/2 lg:-translate-x-1/2',
   'zero-setup': 'lg:left-0 lg:top-1/2 lg:-translate-y-1/2',
-  'polished-by-default': 'lg:right-0 lg:top-1/2 lg:-translate-y-1/2',
+  'dedicated-release-pages': 'lg:right-0 lg:top-1/2 lg:-translate-y-1/2',
 };
 
 const SPEC_TILE_ACCENTS: Record<ArtistProfileFeatureTile['accent'], string> = {

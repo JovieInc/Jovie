@@ -6,11 +6,11 @@ import type {
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
+import { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
-import { ArtistProfileLogoBar } from './ArtistProfileLogoBar';
 import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
@@ -38,7 +38,11 @@ export function ArtistProfileLandingPage({
   return (
     <>
       <HomeHero layout='f' />
-      <ArtistProfileLogoBar proofData={socialProof} adaptive={copy.adaptive} />
+      <ArtistProfileAdaptiveSequence
+        adaptive={copy.adaptive}
+        phoneCaption={copy.hero.phoneCaption}
+        phoneSubcaption={copy.hero.phoneSubcaption}
+      />
       <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       <ArtistProfileCaptureSection capture={copy.capture} />
       <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />

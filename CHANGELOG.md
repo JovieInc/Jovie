@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.7] - 2026-04-15
+
+> Artist Profiles now uses real captured product mode shots and a more focused fan-capture story, while keeping production gated to the homepage hero.
+
+### Added
+
+- Added dedicated Artist Profile mode screenshot scenarios and public exports for release, shows, pay, subscribe, and links states.
+- Added generated product screenshots to power the Artist Profiles mode switcher instead of live placeholder mockups.
+- Added regression coverage for profile release drawer gating and UTC release-year rendering.
+
+### Changed
+
+- Reworked the Artist Profiles adaptive section around the “One profile. Adapts to every fan.” thesis with one-line mode pills and captured product shots.
+- Rebuilt the Capture Every Fan section as a restrained audience-intelligence surface with opt-in action and slow audience rails.
+- Updated the Built for artists spec wall with a Dedicated release pages tile.
+- Made the Artist Profiles FAQ keep only one item open at a time.
+
+### Removed
+
+- Removed the duplicated lower logo row from the Artist Profiles proof section.
+
 ## [26.4.153.6] - 2026-04-15
 
 > Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.

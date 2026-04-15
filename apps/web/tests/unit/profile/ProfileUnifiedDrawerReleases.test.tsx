@@ -272,6 +272,27 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     expect(metaEl?.textContent).not.toMatch(/\d{4}/);
   });
 
+  it('uses UTC years for release metadata', async () => {
+    const { ProfileUnifiedDrawer } = await import(
+      '@/features/profile/ProfileUnifiedDrawer'
+    );
+
+    const releases = [
+      makeRelease({
+        id: 'new-year',
+        title: 'New Year Song',
+        slug: 'new-year-song',
+        releaseDate: '2024-01-01T00:00:00.000Z',
+      }),
+    ];
+
+    render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
+
+    const container = screen.getByTestId('profile-mode-drawer-releases');
+    const metaEl = container.querySelector('.text-\\[11px\\]');
+    expect(metaEl?.textContent).toContain('2024');
+  });
+
   it('shows year headers for 15+ releases spanning 2+ years', async () => {
     const { ProfileUnifiedDrawer } = await import(
       '@/features/profile/ProfileUnifiedDrawer'
@@ -335,6 +356,28 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(
       <ProfileUnifiedDrawer {...defaultProps} view='menu' hasReleases={false} />
+    );
+
+    expect(screen.queryByText('Releases')).toBeNull();
+  });
+
+  it('hides Releases menu item when no releases have usable slugs', async () => {
+    const { ProfileUnifiedDrawer } = await import(
+      '@/features/profile/ProfileUnifiedDrawer'
+    );
+
+    const releases = [
+      makeRelease({ id: 'missing-1', title: 'Missing One', slug: '' }),
+      makeRelease({ id: 'missing-2', title: 'Missing Two', slug: '' }),
+    ];
+
+    render(
+      <ProfileUnifiedDrawer
+        {...defaultProps}
+        view='menu'
+        hasReleases={true}
+        releases={releases}
+      />
     );
 
     expect(screen.queryByText('Releases')).toBeNull();

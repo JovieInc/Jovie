@@ -1,13 +1,18 @@
+'use client';
+
+import { useId, useState } from 'react';
+
 interface FaqItem {
-  question: string;
-  answer: string;
+  readonly question: string;
+  readonly answer: string;
 }
 
 interface FaqSectionProps {
-  readonly items: FaqItem[];
+  readonly items: readonly FaqItem[];
   readonly className?: string;
   readonly headingClassName?: string;
   readonly heading?: string;
+  readonly singleOpen?: boolean;
 }
 
 export function FaqSection({
@@ -15,7 +20,11 @@ export function FaqSection({
   className,
   headingClassName,
   heading = 'Frequently asked questions',
+  singleOpen = false,
 }: FaqSectionProps) {
+  const sectionId = useId();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
   return (
     <section
       className={
@@ -30,16 +39,49 @@ export function FaqSection({
         {heading}
       </h2>
       <div className='mt-8 divide-y divide-border-primary'>
-        {items.map(item => (
-          <details key={item.question} className='group py-5'>
-            <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
-              {item.question}
-            </summary>
-            <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-              {item.answer}
-            </p>
-          </details>
-        ))}
+        {items.map((item, index) => {
+          if (!singleOpen) {
+            return (
+              <details key={item.question} className='group py-5'>
+                <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
+                  {item.question}
+                </summary>
+                <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
+                  {item.answer}
+                </p>
+              </details>
+            );
+          }
+
+          const isOpen = openIndex === index;
+          const triggerId = `${sectionId}-faq-trigger-${index}`;
+          const panelId = `${sectionId}-faq-panel-${index}`;
+
+          return (
+            <div key={item.question} className='py-5'>
+              <button
+                id={triggerId}
+                type='button'
+                aria-expanded={isOpen}
+                aria-controls={panelId}
+                className='w-full cursor-pointer text-left text-base font-medium text-primary-token transition-colors hover:text-accent-token'
+                onClick={() => {
+                  setOpenIndex(isOpen ? null : index);
+                }}
+              >
+                {item.question}
+              </button>
+              <section
+                id={panelId}
+                aria-labelledby={triggerId}
+                className='mt-3 text-sm leading-relaxed text-secondary-token'
+                hidden={!isOpen}
+              >
+                {item.answer}
+              </section>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

@@ -6,11 +6,15 @@ import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 interface ArtistProfileLogoBarProps {
   readonly proofData: ArtistProfileSocialProofData;
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
+  readonly phoneCaption: string;
+  readonly phoneSubcaption: string;
 }
 
 export function ArtistProfileLogoBar({
   proofData,
   adaptive,
+  phoneCaption,
+  phoneSubcaption,
 }: Readonly<ArtistProfileLogoBarProps>) {
   return (
     <ArtistProfileSectionShell className='border-t-0 bg-white/[0.012] py-10 sm:py-12 lg:py-16'>
@@ -27,7 +31,11 @@ export function ArtistProfileLogoBar({
             );
           })}
         </div>
-        <ArtistProfileModeSwitcher adaptive={adaptive} />
+        <ArtistProfileModeSwitcher
+          adaptive={adaptive}
+          phoneCaption={phoneCaption}
+          phoneSubcaption={phoneSubcaption}
+        />
       </div>
     </ArtistProfileSectionShell>
   );

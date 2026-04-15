@@ -4,6 +4,10 @@ export interface ArtistProfileMode {
   readonly headline: string;
   readonly description: string;
   readonly pathLabel: string;
+  readonly screenshotSrc: string;
+  readonly screenshotAlt: string;
+  readonly screenshotWidth: number;
+  readonly screenshotHeight: number;
 }
 
 export interface ArtistProfileOutcomeCard {
@@ -26,6 +30,21 @@ export interface ArtistProfileHowItWorksStep {
 export interface ArtistProfileFaqItem {
   readonly question: string;
   readonly answer: string;
+}
+
+export interface ArtistProfileAudiencePill {
+  readonly id: string;
+  readonly icon:
+    | 'spotify'
+    | 'apple'
+    | 'youtube'
+    | 'qr'
+    | 'shows'
+    | 'subscribe'
+    | 'music';
+  readonly identity: string;
+  readonly chips: readonly string[];
+  readonly action: string;
 }
 
 export interface ArtistProfileLandingCopy {
@@ -62,6 +81,13 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly subhead: string;
     readonly body: string;
+    readonly action: {
+      readonly title: string;
+      readonly detail: string;
+      readonly ctaLabel: string;
+      readonly confirmedLabel: string;
+    };
+    readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
   };
   readonly opinionated: {
     readonly eyebrow: string;
@@ -140,6 +166,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Put the newest music or campaign first.',
         description: 'Put the newest music or campaign first.',
         pathLabel: 'jov.ie/you/music',
+        screenshotSrc:
+          '/product-screenshots/artist-profile-mode-release-phone.png',
+        screenshotAlt: 'Jovie artist profile showing a release-first view.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
       },
       {
         id: 'shows',
@@ -147,6 +178,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Surface the right dates and ticket paths.',
         description: 'Surface the right dates and ticket paths.',
         pathLabel: 'jov.ie/you/shows',
+        screenshotSrc:
+          '/product-screenshots/artist-profile-mode-shows-phone.png',
+        screenshotAlt:
+          'Jovie artist profile showing nearby shows and ticket paths.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
       },
       {
         id: 'pay',
@@ -154,6 +191,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Make support one tap away.',
         description: 'Make support one tap away.',
         pathLabel: 'jov.ie/you/pay',
+        screenshotSrc: '/product-screenshots/artist-profile-mode-pay-phone.png',
+        screenshotAlt: 'Jovie artist profile showing direct support options.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
       },
       {
         id: 'subscribe',
@@ -161,6 +202,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Turn a visit into a direct line.',
         description: 'Turn a visit into a direct line.',
         pathLabel: 'jov.ie/you/subscribe',
+        screenshotSrc:
+          '/product-screenshots/artist-profile-mode-subscribe-phone.png',
+        screenshotAlt: 'Jovie artist profile showing fan subscription capture.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
       },
       {
         id: 'links',
@@ -168,6 +214,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Keep every important destination reachable.',
         description: 'Keep every important destination reachable.',
         pathLabel: 'jov.ie/you/links',
+        screenshotSrc:
+          '/product-screenshots/artist-profile-mode-links-phone.png',
+        screenshotAlt:
+          'Jovie artist profile showing important fan destinations.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
       },
     ],
   },
@@ -208,8 +260,106 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   capture: {
     eyebrow: 'Owned audience',
     headline: 'Capture every fan.',
-    subhead: 'Turn profile traffic into people you can reach again.',
+    subhead: 'Turn profile traffic into an identifiable, reachable audience.',
     body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
+    action: {
+      title: 'Get notified',
+      detail: 'Release, show, and drop alerts from jov.ie/you',
+      ctaLabel: 'Subscribe',
+      confirmedLabel: 'Subscribed',
+    },
+    audienceRails: [
+      [
+        {
+          id: 'spotify-jason-la',
+          icon: 'spotify',
+          identity: 'Jason',
+          chips: ['LA', 'Spotify'],
+          action: 'listened',
+        },
+        {
+          id: 'subscribe-brian',
+          icon: 'subscribe',
+          identity: 'Brian M',
+          chips: ['Subscribed'],
+          action: 'joined',
+        },
+        {
+          id: 'shows-london-o2',
+          icon: 'shows',
+          identity: 'London',
+          chips: ['O2 Arena'],
+          action: 'viewed tickets',
+        },
+        {
+          id: 'qr-berlin-flyer',
+          icon: 'qr',
+          identity: 'Berlin',
+          chips: ['QR'],
+          action: 'scanned flyer',
+        },
+      ],
+      [
+        {
+          id: 'apple-tokyo',
+          icon: 'apple',
+          identity: 'Tokyo',
+          chips: ['Apple Music'],
+          action: 'saved',
+        },
+        {
+          id: 'youtube-sao-paulo',
+          icon: 'youtube',
+          identity: 'São Paulo',
+          chips: ['YouTube'],
+          action: 'watched latest',
+        },
+        {
+          id: 'music-maya-release',
+          icon: 'music',
+          identity: 'Maya',
+          chips: ['Release'],
+          action: 'opened',
+        },
+        {
+          id: 'spotify-amelia-london',
+          icon: 'spotify',
+          identity: 'Amelia',
+          chips: ['London', 'Spotify'],
+          action: 'followed',
+        },
+      ],
+      [
+        {
+          id: 'shows-chicago',
+          icon: 'shows',
+          identity: 'Chicago',
+          chips: ['Shows'],
+          action: 'saved date',
+        },
+        {
+          id: 'qr-miami-sticker',
+          icon: 'qr',
+          identity: 'Miami',
+          chips: ['Sticker'],
+          action: 'scanned',
+        },
+        {
+          id: 'subscribe-nina',
+          icon: 'subscribe',
+          identity: 'Nina P',
+          chips: ['Email'],
+          action: 'opted in',
+        },
+        {
+          id: 'apple-seattle-pay',
+          icon: 'apple',
+          identity: 'Seattle',
+          chips: ['Pay'],
+          action: 'supported',
+        },
+      ],
+    ],
   },
   opinionated: {
     eyebrow: 'Product philosophy',
@@ -229,18 +379,18 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   howItWorks: {
     eyebrow: 'Zero setup',
     headline: 'Live in 60 seconds.',
-    body: 'Jovie imports your catalog.',
+    body: 'Claim your artist. Jovie builds the page. Share one link everywhere.',
     steps: [
       {
         id: 'claim',
         title: 'Claim your artist.',
-        description: 'Search for your artist and claim the profile.',
+        description: 'Search once and claim the profile.',
       },
       {
         id: 'connect',
-        title: 'Jovie imports your catalog.',
+        title: 'Jovie builds the page.',
         description:
-          'It matches your music across 27+ providers and keeps the profile up to date.',
+          'It imports your catalog across 27+ providers and keeps the profile current.',
       },
       {
         id: 'share',

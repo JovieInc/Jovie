@@ -164,9 +164,9 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'green',
   },
   {
-    id: 'polished-by-default',
-    title: 'Polished by default',
-    body: 'Premium presentation without theme work.',
+    id: 'dedicated-release-pages',
+    title: 'Dedicated release pages',
+    body: 'Every drop gets its own smart-link page for presave, countdown, and release day.',
     accent: 'teal',
   },
 ] as const;

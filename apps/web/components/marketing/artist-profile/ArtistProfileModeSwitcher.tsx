@@ -1,67 +1,208 @@
 'use client';
 
-import { useState } from 'react';
+import Image from 'next/image';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
-import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
+  readonly phoneCaption: string;
+  readonly phoneSubcaption: string;
 }
 
-const MODE_SHOWCASE_STATE: Record<
-  ArtistProfileLandingCopy['adaptive']['modes'][number]['id'],
-  ProfileShowcaseStateId
-> = {
-  release: 'streams-release-day',
-  shows: 'tour',
-  pay: 'tips-apple-pay',
-  subscribe: 'fans-opt-in',
-  links: 'catalog',
-};
+const CONTEXT_CUES = [
+  'Source-aware',
+  'Location-aware',
+  'Device-aware',
+  'Release-aware',
+] as const;
+
+const DEEP_LINK_PROOF = ['/music', '/shows', '/pay', '/subscribe'] as const;
+
+const BEAT_SWITCH_PROGRESS = 0.52;
+
+function clampProgress(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
 
 export function ArtistProfileModeSwitcher({
   adaptive,
+  phoneCaption,
+  phoneSubcaption,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
+  const sequenceRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
+  const tabsVisible = reducedMotion || progress >= BEAT_SWITCH_PROGRESS;
+  const cueIndex = Math.min(
+    CONTEXT_CUES.length - 1,
+    Math.floor((progress / BEAT_SWITCH_PROGRESS) * CONTEXT_CUES.length)
+  );
+
+  const updateProgress = useCallback(() => {
+    const section = sequenceRef.current;
+    if (!section) return;
+
+    const rect = section.getBoundingClientRect();
+    const scrollable = rect.height - globalThis.innerHeight;
+    const nextProgress =
+      scrollable <= 0 ? 1 : clampProgress(-rect.top / scrollable);
+    setProgress(nextProgress);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setProgress(1);
+      return;
+    }
+
+    let frame = 0;
+    const requestUpdate = () => {
+      globalThis.cancelAnimationFrame(frame);
+      frame = globalThis.requestAnimationFrame(updateProgress);
+    };
+
+    requestUpdate();
+    globalThis.addEventListener('scroll', requestUpdate, { passive: true });
+    globalThis.addEventListener('resize', requestUpdate);
+
+    return () => {
+      globalThis.removeEventListener('scroll', requestUpdate);
+      globalThis.removeEventListener('resize', requestUpdate);
+      globalThis.cancelAnimationFrame(frame);
+    };
+  }, [reducedMotion, updateProgress]);
 
   return (
-    <div className='mx-auto mt-10 w-full max-w-[400px] text-center sm:mt-12'>
-      <HomeProfileShowcase
-        stateId={MODE_SHOWCASE_STATE[activeMode.id]}
-        presentation='full-phone'
-        hideJovieBranding
-        hideMoreMenu
-        className='mx-auto w-full max-w-[330px]'
-      />
-      <div className='mx-auto mt-5 flex max-w-[340px] flex-wrap justify-center gap-1.5 rounded-full bg-white/[0.035] p-1.5'>
-        {adaptive.modes.map((mode, index) => {
-          const isActive = index === activeIndex;
-          return (
-            <button
-              key={mode.id}
-              type='button'
-              aria-pressed={isActive}
-              onClick={() => {
-                setActiveIndex(index);
-              }}
-              className={cn(
-                'rounded-full px-3.5 py-2 text-[12px] font-medium transition-colors',
-                isActive
-                  ? 'bg-white text-black'
-                  : 'text-tertiary-token hover:bg-white/[0.06] hover:text-primary-token'
-              )}
-            >
-              {mode.label}
-            </button>
-          );
-        })}
+    <div
+      ref={sequenceRef}
+      className={cn(
+        'relative',
+        reducedMotion ? 'py-20 sm:py-24 lg:py-28' : 'min-h-[190svh]'
+      )}
+    >
+      <div
+        className={cn(
+          'flex items-center justify-center px-5 sm:px-6',
+          reducedMotion
+            ? 'min-h-0'
+            : 'sticky top-0 min-h-svh py-12 sm:py-14 lg:py-16'
+        )}
+      >
+        <div className='mx-auto w-full max-w-[34rem] text-center'>
+          <div className='mx-auto mb-6 max-w-[34rem] sm:mb-7'>
+            <h2 className='text-[clamp(3.25rem,7vw,6.75rem)] font-semibold leading-[0.86] tracking-[-0.08em] text-primary-token'>
+              {phoneCaption}
+            </h2>
+            <p className='mt-3 text-[clamp(1.05rem,2vw,1.45rem)] font-medium leading-[1.2] tracking-[-0.04em] text-secondary-token'>
+              {phoneSubcaption}
+            </p>
+            <div className='mx-auto mt-4 flex max-w-[31rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:mt-5 sm:gap-x-5'>
+              {CONTEXT_CUES.map((cue, index) => {
+                const isActive = index === cueIndex && !tabsVisible;
+                return (
+                  <span
+                    key={cue}
+                    className={cn(
+                      'relative text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300 sm:text-[13px]',
+                      isActive ? 'text-primary-token' : 'text-tertiary-token'
+                    )}
+                  >
+                    {cue}
+                    <span
+                      aria-hidden='true'
+                      className={cn(
+                        'absolute -bottom-1 left-1/2 h-px w-5 -translate-x-1/2 rounded-full bg-white transition-opacity duration-300',
+                        isActive ? 'opacity-70' : 'opacity-0'
+                      )}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className='mx-auto grid w-[min(100%,23.5rem)] overflow-hidden rounded-[2.15rem] bg-white/[0.03] shadow-[0_28px_82px_rgba(0,0,0,0.48)] ring-1 ring-white/[0.08]'>
+            {adaptive.modes.map((mode, index) => {
+              const isActive = index === activeIndex;
+              return (
+                <Image
+                  key={mode.id}
+                  src={mode.screenshotSrc}
+                  alt={mode.screenshotAlt}
+                  width={mode.screenshotWidth}
+                  height={mode.screenshotHeight}
+                  className={cn(
+                    'col-start-1 row-start-1 h-auto w-full transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]',
+                    isActive
+                      ? 'translate-y-0 scale-100 opacity-100'
+                      : 'pointer-events-none translate-y-2 scale-[0.995] opacity-0'
+                  )}
+                  priority={mode.id === 'release'}
+                />
+              );
+            })}
+          </div>
+
+          <div
+            aria-hidden={!tabsVisible}
+            className={cn(
+              'transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]',
+              tabsVisible
+                ? 'translate-y-0 opacity-100'
+                : 'pointer-events-none translate-y-3 opacity-0'
+            )}
+          >
+            <div className='mx-auto mt-3 flex w-full max-w-[min(100%,30rem)] flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-full bg-white/[0.035] p-1.5 [scrollbar-width:none] sm:justify-center [&::-webkit-scrollbar]:hidden'>
+              {adaptive.modes.map((mode, index) => {
+                const isActive = index === activeIndex;
+                return (
+                  <button
+                    key={mode.id}
+                    type='button'
+                    aria-pressed={isActive}
+                    tabIndex={tabsVisible ? 0 : -1}
+                    onClick={() => {
+                      setActiveIndex(index);
+                    }}
+                    className={cn(
+                      'shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors',
+                      isActive
+                        ? 'bg-white text-black'
+                        : 'text-tertiary-token hover:bg-white/[0.06] hover:text-primary-token'
+                    )}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className='mx-auto mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-mono text-[11px] tracking-[-0.02em] text-tertiary-token'>
+              {DEEP_LINK_PROOF.map(path => (
+                <span
+                  key={path}
+                  className={cn(
+                    'transition-colors duration-200',
+                    activeMode.pathLabel.endsWith(path) &&
+                      'text-secondary-token'
+                  )}
+                >
+                  {path}
+                </span>
+              ))}
+            </div>
+
+            <p className='mx-auto mt-4 max-w-[23rem] text-[15px] font-medium leading-[1.45] tracking-[-0.02em] text-secondary-token'>
+              {activeMode.headline}
+            </p>
+          </div>
+        </div>
       </div>
-      <p className='mx-auto mt-5 max-w-[23rem] text-[15px] font-medium leading-[1.45] tracking-[-0.02em] text-secondary-token'>
-        {activeMode.headline}
-      </p>
     </div>
   );
 }

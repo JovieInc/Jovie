@@ -1,9 +1,9 @@
+export { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 export { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 export { ArtistProfileFaq } from './ArtistProfileFaq';
 export { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 export { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 export { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
-export { ArtistProfileLogoBar } from './ArtistProfileLogoBar';
 export { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 export { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 export { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
