@@ -215,10 +215,10 @@ describe('CommonDropdown', () => {
         .getByText('Selected Item')
         .closest('[role="menuitem"]');
 
-      expect(item?.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(item).toHaveAttribute('data-selected', 'true');
     });
 
-    it('renders danger state as destructive styling', () => {
+    it('renders danger state as a destructive item variant', () => {
       const items: CommonDropdownItem[] = [
         {
           type: 'action',
@@ -234,7 +234,7 @@ describe('CommonDropdown', () => {
         .getByText('Remove Access')
         .closest('[role="menuitem"]');
 
-      expect(item?.className).toContain('text-(--linear-error)');
+      expect(item).toHaveAttribute('data-menu-variant', 'danger');
     });
 
     it('renders trailing custom content and descriptions', () => {
@@ -468,9 +468,11 @@ describe('CommonDropdown', () => {
       render(
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
-      // Loading spinner uses Loader2 with animate-spin
       const menu = screen.getByRole('menu');
       expect(menu).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Loading menu items'
+      );
       // Items should not be rendered
       expect(screen.queryByText('Edit')).not.toBeInTheDocument();
     });
@@ -777,7 +779,7 @@ describe('CommonDropdown', () => {
       });
     });
 
-    it('filters submenu descendants even when the submenu label matches', async () => {
+    it('keeps submenu descendants when the submenu label matches', async () => {
       const items: CommonDropdownItem[] = [
         {
           type: 'submenu',
@@ -807,8 +809,8 @@ describe('CommonDropdown', () => {
       await user.hover(screen.getByText('Share'));
 
       await waitFor(() => {
-        expect(screen.getByText('No items found')).toBeInTheDocument();
-        expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+        expect(screen.getByText('Spotify')).toBeInTheDocument();
+        expect(screen.queryByText('No items found')).not.toBeInTheDocument();
       });
     });
 

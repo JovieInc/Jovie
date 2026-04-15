@@ -161,8 +161,12 @@ export function SearchableContent({
 
 function LoadingState() {
   return (
-    <div className={MENU_LOADING_STATE_BASE}>
-      <Loader2 className='h-4 w-4 animate-spin motion-reduce:animate-none' />
+    <div role='status' aria-live='polite' className={MENU_LOADING_STATE_BASE}>
+      <Loader2
+        aria-hidden='true'
+        className='h-4 w-4 animate-spin motion-reduce:animate-none'
+      />
+      <span className='sr-only'>Loading menu items</span>
     </div>
   );
 }
@@ -342,7 +346,7 @@ function CommonDropdownSubmenuRenderer({
       open={open}
       onOpenChange={nextOpen => {
         setOpen(nextOpen);
-        if (!nextOpen) {
+        if (!nextOpen && query) {
           clearQuery();
         }
       }}

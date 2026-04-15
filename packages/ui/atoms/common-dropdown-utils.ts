@@ -78,10 +78,18 @@ function normalizeVisibleItems(
   const withoutOrphanLabels = items.filter((item, index) => {
     if (!isLabel(item)) return true;
 
-    const nextItem = items[index + 1];
-    if (!nextItem) return false;
+    const remainingItems = items.slice(index + 1);
+    const nextSectionBoundary = remainingItems.findIndex(
+      nextItem => isSeparator(nextItem) || isLabel(nextItem)
+    );
+    const sectionItems =
+      nextSectionBoundary === -1
+        ? remainingItems
+        : remainingItems.slice(0, nextSectionBoundary);
 
-    return !isSeparator(nextItem) && !isLabel(nextItem);
+    return sectionItems.some(
+      nextItem => !(isSeparator(nextItem) || isLabel(nextItem))
+    );
   });
 
   const normalized: CommonDropdownItem[] = [];
@@ -137,16 +145,16 @@ export function filterItems(
         return submenuMatches ? [item] : [];
       }
 
+      if (submenuMatches) {
+        return [{ ...item, items: [...item.items] }];
+      }
+
       const filteredChildren = filterItems(
         item.items,
         trimmedQuery,
         'recursive',
         submenuFilterItem
       );
-
-      if (submenuMatches) {
-        return [{ ...item, items: filteredChildren }];
-      }
 
       return filteredChildren.length > 0
         ? [{ ...item, items: filteredChildren }]

@@ -161,6 +161,8 @@ export function renderActionItem(
     <MenuItem
       key={item.id}
       data-menu-row=''
+      data-menu-variant={isDestructive ? 'danger' : undefined}
+      data-selected={isSelected ? 'true' : undefined}
       disabled={isDisabled}
       onSelect={event => {
         event.stopPropagation();

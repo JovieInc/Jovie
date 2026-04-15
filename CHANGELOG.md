@@ -5,11 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.3] - 2026-04-15
+
+### Changed
+
+- Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
+- Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+
+### Fixed
+
+- Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
+
 ## [26.4.153.2] - 2026-04-15
+
+> Dropdown menus are now more consistent across the app, with better search, keyboard behavior, and loading states. Drawer detail panes also have a cleaner shared layout for compact record details. Theme setup also happens earlier so pages avoid the brief visual mismatch on load.
 
 ### Added
 
 - Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
+- Shared dropdown menus now support consistent loading, selected, active, danger, trailing content, count, and searchable nested states through the common dropdown primitive
+- Recursive dropdown search now supports submenu-local filters, custom radio-item matching, and regression coverage for keyboard search flows
+
+### Changed
+
+- [internal] Common dropdown rendering is split into focused renderer, item renderer, type, and utility modules so future menu variants reuse the same styles and behavior
+- Common dropdown, context menu, and submenu surfaces now draw from the same centralized menu style tokens
+
+### Fixed
+
+- Searchable dropdowns preserve keyboard access: Escape clears search before closing, arrow navigation can leave the search field, Enter can activate the first result, and clear keeps focus in the input
+- Controlled dropdown close no longer emits duplicate empty search callbacks, while the legacy `onSearch` callback remains limited to non-empty queries
+- Theme initialization runs before first paint without reintroducing the local hydration mismatch
 
 ## [26.4.153.1] - 2026-04-13
 
