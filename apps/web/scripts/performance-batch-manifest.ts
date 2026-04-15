@@ -589,20 +589,26 @@ const PERF_BATCHES = [
       {
         id: 'creator-app-home-budget-pass',
         label:
-          'Creator app home passes strict budgets with the ready creator baseline',
+          'Creator dashboard core routes pass strict budgets with the ready creator baseline',
         kind: 'budget-route',
         expectation: 'pass',
         authPersona: 'creator-ready',
-        routeIds: ['creator-app-home'],
+        routeIds: [
+          'creator-app-home',
+          'creator-audience',
+          'creator-earnings',
+          'creator-presence',
+          'creator-release-tasks',
+        ],
       },
     ],
     qaScope: [
-      'Verify `/app` shell parity for the ready-creator persona.',
+      'Verify `/app`, audience, earnings, presence, and release-tasks parity for the ready-creator persona.',
       'Check sidebar navigation and chat shell after the perf changes land.',
     ],
     shipLabels: ['testing'],
     doneRule:
-      '`/app` passes creator-shell budgets with the canonical ready-creator auth baseline.',
+      'Core creator dashboard routes (`/app`, audience, earnings, presence, and release tasks) pass strict budgets with the canonical ready-creator auth baseline.',
   },
   {
     id: 'B3-releases-workspace',
