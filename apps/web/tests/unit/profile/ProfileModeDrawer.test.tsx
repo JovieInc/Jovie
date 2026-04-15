@@ -37,6 +37,24 @@ vi.mock('@/features/profile/StaticListenInterface', () => ({
   ),
 }));
 
+vi.mock(
+  '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
+  () => ({
+    ArtistNotificationsCTA: () => (
+      <div data-testid='artist-notifications'>Subscribe content</div>
+    ),
+  })
+);
+
+vi.mock(
+  '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  () => ({
+    TwoStepNotificationsCTA: () => (
+      <div data-testid='two-step-notifications'>Subscribe content</div>
+    ),
+  })
+);
+
 vi.mock('@/features/profile/artist-notifications-cta', () => ({
   TwoStepNotificationsCTA: () => (
     <div data-testid='two-step-notifications'>Subscribe content</div>

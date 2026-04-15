@@ -82,6 +82,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.152.0] - 2026-04-12
 
+> Claim and onboarding reliability improved, especially for profile claims and release-notification delivery. This release also hardens retry and error handling so successful actions do not surface as failures.
+
 ### Added
 
 - "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
@@ -103,6 +105,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - OTP auto-clears after error so fans get a fresh slate to retype
 - Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
 - `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
+- Keep unclaimed public profiles claimable for signed-in non-owners, and avoid clearing unrelated pending-claim cookies on bad legacy claim links
+- Fail closed on unexpected `/claim/[token]` resolver errors instead of surfacing a 500 page
+- Run post-claim username and Clerk metadata sync after direct-profile Spotify claim finalization
+- Skip stray onboarding handle reservations when a pending claim already provides the target username
+- Prevent delivered release notifications from being downgraded to failed when trial quota bookkeeping errors occur
+- Initialize null trial notification counters correctly and remove redundant entitlements lookups in release notification cron jobs
+- Harden pending-claim cookie parsing and normalize follow-up claim URLs when the base URL has a trailing slash
 
 ## [26.4.151.6] - 2026-04-12
 

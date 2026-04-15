@@ -11,7 +11,6 @@ import {
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -32,6 +31,7 @@ import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConf
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';

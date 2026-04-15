@@ -1,9 +1,7 @@
 'use client';
 
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { Artist } from '@/types/db';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 

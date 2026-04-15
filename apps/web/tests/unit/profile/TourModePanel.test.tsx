@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { TourModePanel } from '@/features/profile/TourModePanel';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
 const { replaceMock, ticketClickMock } = vi.hoisted(() => ({

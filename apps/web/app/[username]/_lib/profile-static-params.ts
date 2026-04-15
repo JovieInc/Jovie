@@ -1,5 +1,5 @@
-import { captureError } from '@/lib/error-tracking';
 import { getTopProfilesForStaticGeneration } from '@/lib/services/profile/queries';
+import { logger } from '@/lib/utils/logger';
 
 export async function getProfileStaticParams(limit = 100): Promise<
   Array<{
@@ -9,12 +9,15 @@ export async function getProfileStaticParams(limit = 100): Promise<
   try {
     return await getTopProfilesForStaticGeneration(limit);
   } catch (error) {
-    void captureError('Failed to load profile static params', error, {
-      route: '/[username]',
-      limit,
-    }).catch(() => {
-      // Ignore telemetry failures so the static param fallback stays resilient.
-    });
+    logger.error(
+      'Failed to load profile static params',
+      {
+        error,
+        limit,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
     // Build-time DB failures should not block deployment.
     return [];
   }
