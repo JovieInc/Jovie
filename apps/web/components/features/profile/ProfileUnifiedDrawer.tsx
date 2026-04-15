@@ -372,7 +372,7 @@ export function ProfileUnifiedDrawer({
     () => releases.filter(r => Boolean(r.slug)),
     [releases]
   );
-  const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 1;
+  const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
 
   const releasesSubtitle = useMemo(() => {
     if (visibleReleases.length === 0) return 'Discography';
