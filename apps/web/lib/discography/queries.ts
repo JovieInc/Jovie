@@ -355,6 +355,7 @@ export async function getReleasesForProfileLite(
         eq(discogReleases.creatorProfileId, creatorProfileId),
         isNull(discogReleases.deletedAt),
         ne(discogReleases.status, 'draft'),
+        // Intentionally includes music videos for the public releases drawer.
         drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
       )
     )

@@ -404,6 +404,8 @@ export function ProfileUnifiedDrawer({
     view === 'releases' && canOpenReleasesDrawer
       ? { title: 'Releases', subtitle: releasesSubtitle }
       : VIEW_META[view === 'releases' ? 'menu' : view];
+  const renderedView =
+    view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -498,13 +500,13 @@ export function ProfileUnifiedDrawer({
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
-          key={view}
+          key={renderedView}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.15, ease: [0.32, 0, 0.67, 1] }}
         >
-          {view === 'menu' && (
+          {renderedView === 'menu' && (
             <div className='flex flex-col gap-0.5' role='menu'>
               <button
                 type='button'
@@ -611,14 +613,14 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'share' && (
+          {renderedView === 'share' && (
             <PublicShareActionList
               context={shareContext}
               onActionComplete={() => handleOpenChange(false)}
             />
           )}
 
-          {view === 'notifications' && (
+          {renderedView === 'notifications' && (
             <div className='flex flex-col gap-1'>
               {NOTIFICATION_CONTENT_TYPES.map(pref => (
                 <div
@@ -659,7 +661,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'listen' && (
+          {renderedView === 'listen' && (
             <div
               className='flex justify-center'
               data-testid='profile-mode-drawer-listen'
@@ -673,7 +675,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'subscribe' && (
+          {renderedView === 'subscribe' && (
             <div data-testid='profile-mode-drawer-subscribe'>
               {subscribeTwoStep ? (
                 <TwoStepNotificationsCTA artist={artist} startExpanded />
@@ -689,7 +691,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'contact' && (
+          {renderedView === 'contact' && (
             <ContactList
               artistHandle={artist.handle}
               contacts={contacts}
@@ -697,7 +699,7 @@ export function ProfileUnifiedDrawer({
             />
           )}
 
-          {view === 'about' && (
+          {renderedView === 'about' && (
             <div data-testid='profile-mode-drawer-about'>
               <AboutSection
                 artist={artist}
@@ -708,13 +710,13 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'tour' && (
+          {renderedView === 'tour' && (
             <div data-testid='profile-mode-drawer-tour'>
               <TourDrawerContent artist={artist} tourDates={tourDates} />
             </div>
           )}
 
-          {view === 'releases' && canOpenReleasesDrawer && (
+          {renderedView === 'releases' && canOpenReleasesDrawer && (
             <ReleasesDrawerContent
               releases={visibleReleases}
               artistHandle={artist.handle}
@@ -722,7 +724,7 @@ export function ProfileUnifiedDrawer({
             />
           )}
 
-          {view === 'pay' && (
+          {renderedView === 'pay' && (
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
                 <PaySelector
