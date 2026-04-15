@@ -6,6 +6,19 @@ import { PublicProfileTemplateV2 } from '@/components/features/profile/templates
 const mockMergedDSPs = [{ key: 'spotify' }];
 const scrollIntoViewMock = vi.fn();
 
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    ProfileNotificationsContext: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
+    },
+  })
+);
+
+vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
+  useProfileShell: () => ({ notificationsContextValue: null }),
+}));
+
 vi.mock('@/components/organisms/profile-shell', () => ({
   ProfileNotificationsContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,

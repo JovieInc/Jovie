@@ -2,7 +2,6 @@
 
 import { CalendarDays, MapPin } from 'lucide-react';
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/features/profile/AboutSection';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
 import {
@@ -13,6 +12,7 @@ import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoPaySelector from '@/features/profile/VenmoPaySelector';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 
 /**
  * Shared hook for tracking tour date ticket link clicks.

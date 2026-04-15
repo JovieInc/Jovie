@@ -3,12 +3,9 @@
 import { Bell, CalendarDays, Info, Mail, Music2, Ticket } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { PaySelector } from '@/components/molecules/PaySelector';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
@@ -18,6 +15,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
