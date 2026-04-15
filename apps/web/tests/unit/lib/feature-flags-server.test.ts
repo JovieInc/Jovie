@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { STATSIG_GATE_KEYS } from '@/lib/feature-flags/shared';
 
 // Mock statsig-node before importing the module under test
 vi.mock('statsig-node', () => ({
@@ -34,9 +34,9 @@ describe('Statsig server initialization', () => {
     const { checkGate } = await import('@/lib/feature-flags/server');
 
     // Call checkGate multiple times — each internally calls initializeStatsig()
-    await checkGate('user-1', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
-    await checkGate('user-2', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
-    await checkGate('user-3', FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGate('user-1', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGate('user-2', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGate('user-3', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
 
     const statsigWarnings = warnSpy.mock.calls.filter(
       args =>

@@ -11,6 +11,7 @@ import {
   type ProfileSaveState,
 } from './contracts';
 import { getProfileMode, getProfileModeDefinition } from './registry';
+import type { PublicRelease } from './releases/types';
 
 interface BuildProfilePublicViewModelInput {
   readonly mode: string | null | undefined;
@@ -38,6 +39,7 @@ interface BuildProfilePublicViewModelInput {
   readonly showTourButton?: boolean;
   readonly showNotificationButton?: boolean;
   readonly subtitle?: string;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export function buildProfilePublicViewModel({
@@ -64,6 +66,7 @@ export function buildProfilePublicViewModel({
   showTourButton,
   showNotificationButton,
   subtitle,
+  releases,
 }: BuildProfilePublicViewModelInput): ProfilePublicViewModel {
   const resolvedMode = getProfileMode(mode);
   const definition = getProfileModeDefinition(resolvedMode);
@@ -95,6 +98,7 @@ export function buildProfilePublicViewModel({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
+    releases,
   };
 }
 

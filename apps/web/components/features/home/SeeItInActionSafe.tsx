@@ -1,5 +1,4 @@
-import { checkGate } from '@/lib/feature-flags/server';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { resolveHomepageFeaturedCreators } from '@/lib/homepage-featured-selection';
 import { FALLBACK_AVATARS, fillToMinimum } from './featured-creators-fallback';
@@ -16,19 +15,13 @@ const Separator = (
 );
 
 /**
- * "See it in action" section gated by Statsig.
- * When the gate is off, the section is hidden entirely.
+ * `SeeItInActionSafe` is gated by `FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION`.
+ * When that code flag is off, the section is hidden entirely.
  * When on, always fetches real profiles: tim pinned first,
  * remaining slots from featured creators.
  */
 export async function SeeItInActionSafe() {
-  const showSection = await checkGate(
-    null,
-    FEATURE_FLAG_KEYS.SHOW_SEE_IT_IN_ACTION,
-    false
-  );
-
-  if (!showSection) return null;
+  if (!FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION) return null;
 
   try {
     const { creators: homepageCreators } =
