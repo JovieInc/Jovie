@@ -1,13 +1,12 @@
-import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
 import { FinalCallToAction } from '@/features/home/HomePageNarrative';
-import { HOME_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
+import { HOMEPAGE_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
-import { getCanonicalSurface } from '@/lib/canonical-surfaces';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { ARTIST_PROFILE_MODES } from './artist-profile-modes';
 
 export const revalidate = false;
@@ -62,63 +61,21 @@ export const metadata: Metadata = {
   },
 };
 
-const PUBLIC_PROFILE_REVIEW_ROUTE =
-  getCanonicalSurface('public-profile').reviewRoute;
-
 export default function ArtistProfilesPage() {
   return (
     <MarketingPageShell>
-      {/* ── Hero (text-only, phone tour is the visual proof) ── */}
-      <section
-        className='relative overflow-hidden pb-8 pt-[5.75rem] md:pb-12 md:pt-[6.25rem]'
-        aria-labelledby='artist-profiles-heading'
-      >
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0'
-          style={{ background: 'var(--linear-hero-backdrop)' }}
+      <HomeHero />
+
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_SECTIONS && (
+        <StickyPhoneTour
+          modes={ARTIST_PROFILE_MODES}
+          introTitle='Your profile adapts to what matters right now.'
+          introBadge='One link. Four modes.'
+          artistHandle='timwhite'
         />
-        <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
+      )}
 
-        <div className='relative mx-auto max-w-[1200px] px-6 sm:px-8 lg:px-10'>
-          <div className='mx-auto max-w-[42rem] text-center'>
-            <h1
-              id='artist-profiles-heading'
-              className='marketing-h1-linear text-primary-token'
-            >
-              One link. Every release.
-            </h1>
-            <p className='mx-auto mt-5 max-w-[36rem] text-[17px] leading-[1.7] text-secondary-token sm:text-[18px]'>
-              Put jov.ie/username in your bio once. Before a drop it becomes a
-              countdown. On release day it becomes the best place to listen.
-              Between campaigns it keeps collecting fans, tickets, tips, and
-              business inquiries.
-            </p>
-
-            <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
-              <Button asChild size='lg'>
-                <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
-              </Button>
-              <Button asChild variant='ghost' size='lg'>
-                <Link href={PUBLIC_PROFILE_REVIEW_ROUTE}>
-                  See a live example
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Phone Tour (the centerpiece) ── */}
-      <StickyPhoneTour
-        modes={ARTIST_PROFILE_MODES}
-        introTitle='Your profile adapts to what matters right now.'
-        introBadge='One link. Four modes.'
-        artistHandle='timwhite'
-      />
-
-      {/* ── Final CTA ── */}
-      <FinalCallToAction content={HOME_FINAL_CTA_CONTENT} />
+      <FinalCallToAction content={HOMEPAGE_FINAL_CTA_CONTENT} />
     </MarketingPageShell>
   );
 }

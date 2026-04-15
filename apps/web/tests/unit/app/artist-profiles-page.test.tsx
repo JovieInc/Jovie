@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import ArtistProfilesPage from '@/app/(marketing)/artist-profiles/page';
-import { getCanonicalSurface } from '@/lib/canonical-surfaces';
 
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();
@@ -19,38 +18,45 @@ vi.mock('@/features/home/StickyPhoneTour', () => ({
 }));
 
 describe('ArtistProfilesPage', () => {
-  it('renders the text-only hero with headline and phone tour', () => {
+  const originalMatchMedia = globalThis.matchMedia;
+
+  beforeAll(() => {
+    // @ts-expect-error test shim
+    globalThis.matchMedia = vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: '(prefers-reduced-motion: reduce)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      onchange: null,
+      dispatchEvent: vi.fn(),
+    }));
+  });
+
+  afterAll(() => {
+    globalThis.matchMedia = originalMatchMedia;
+  });
+
+  it('renders the homepage hero with headline and CTA', () => {
     render(<ArtistProfilesPage />);
 
+    expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'One link. Every release.',
+        name: 'The link your music deserves.',
       })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'Claim your profile.'
+      'Stay in the studio.'
     );
   });
 
-  it('passes artist-profile modes to the phone tour', () => {
+  it('renders the claim form CTA in the hero', () => {
     render(<ArtistProfilesPage />);
 
-    expect(screen.getByTestId('sticky-phone-tour')).toHaveTextContent(
-      'Your profile adapts to what matters right now.'
-    );
-  });
-
-  it('links the profile example CTA to the canonical public-profile review route', () => {
-    render(<ArtistProfilesPage />);
-
-    expect(
-      screen.getByRole('link', { name: 'See a live example' })
-    ).toHaveAttribute(
-      'href',
-      getCanonicalSurface('public-profile').reviewRoute
-    );
+    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
   });
 });

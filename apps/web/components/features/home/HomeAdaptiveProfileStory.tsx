@@ -7,7 +7,7 @@ import { HomeHeroPhoneComposition } from './HomeHeroPhoneComposition';
 import { HomeTrustSection } from './HomeTrustSection';
 import { HOME_HERO_CONTENT } from './home-page-content';
 
-function HomeHero() {
+export function HomeHero() {
   return (
     <section
       className='homepage-hero'
