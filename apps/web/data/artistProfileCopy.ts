@@ -73,8 +73,7 @@ export interface ArtistProfileLandingCopy {
   readonly specWall: {
     readonly eyebrow: string;
     readonly headline: string;
-    readonly lead: string;
-    readonly claimLinkLabel: string;
+    readonly lead?: string;
   };
   readonly howItWorks: {
     readonly eyebrow: string;
@@ -225,14 +224,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   specWall: {
     eyebrow: 'Specs',
-    headline: 'Built for artists. Obsessively specific.',
-    lead: 'Dense product truth for artists, DJs, and teams who care about the mechanics.',
-    claimLinkLabel: 'Claim your profile',
+    headline: 'Built for artists.',
   },
   howItWorks: {
     eyebrow: 'Zero setup',
-    headline: 'Live in minutes.',
-    body: 'Search for artist. Connect. Get a populated profile. Share one link.',
+    headline: 'Live in 60 seconds.',
+    body: 'Jovie imports your catalog.',
     steps: [
       {
         id: 'claim',
@@ -241,9 +238,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'connect',
-        title: 'Jovie builds the page around your identity and content.',
+        title: 'Jovie imports your catalog.',
         description:
-          'Your catalog, images, links, and context become a live profile.',
+          'It matches your music across 27+ providers and keeps the profile up to date.',
       },
       {
         id: 'share',
@@ -254,7 +251,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   socialProof: {
     eyebrow: 'Proof',
-    headline: 'Built for real artist workflows.',
+    headline: 'Real Artists. Real workflows.',
     intro: 'Real artist profiles. Real release moments.',
   },
   faq: {

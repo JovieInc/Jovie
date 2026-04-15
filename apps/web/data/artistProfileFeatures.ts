@@ -14,6 +14,7 @@ export interface ArtistProfileFeatureTile {
     | 'smart-routing'
     | 'deep-link-modes'
     | 'qr-ready'
+    | 'dark-mode-first'
     | 'release-ready'
     | 'show-ready'
     | 'pay-ready'
@@ -24,6 +25,14 @@ export interface ArtistProfileFeatureTile {
     | 'analytics';
   readonly title: string;
   readonly body: string;
+  readonly accent:
+    | 'blue'
+    | 'purple'
+    | 'pink'
+    | 'orange'
+    | 'green'
+    | 'teal'
+    | 'gray';
 }
 
 export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature[] =
@@ -122,50 +131,42 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     id: 'fast-by-design',
     title: 'Fast by design',
     body: 'Built to feel instant on the tap that matters.',
+    accent: 'blue',
   },
   {
     id: 'smart-routing',
     title: 'Intelligent routing',
     body: 'Surfaces the right actions for the fan in front of it.',
+    accent: 'purple',
   },
   {
     id: 'deep-link-modes',
     title: 'Deep-link modes',
     body: 'Send fans straight to /music, /shows, /pay, /subscribe, and more.',
+    accent: 'pink',
   },
   {
     id: 'qr-ready',
-    title: 'QR ready',
-    body: 'One scan from flyer, booth, sticker, or stage screen.',
+    title: 'Trackable QR Codes',
+    body: 'Know which flyer, sticker, etc got you the most fans.',
+    accent: 'orange',
   },
   {
-    id: 'release-ready',
-    title: 'Release ready',
-    body: 'Point the page at the current drop without rebuilding it.',
-  },
-  {
-    id: 'show-ready',
-    title: 'Show ready',
-    body: 'Put dates and ticket paths where fans can act on them.',
-  },
-  {
-    id: 'pay-ready',
-    title: 'Pay ready',
-    body: 'Tips and direct support live in the same profile.',
-  },
-  {
-    id: 'fan-capture-built-in',
-    title: 'Fan capture built in',
-    body: 'Turn one visit into an owned audience.',
+    id: 'dark-mode-first',
+    title: 'Dark Mode First',
+    body: 'Designed for low-light taps in clubs, venues, and late-night scrolls.',
+    accent: 'gray',
   },
   {
     id: 'zero-setup',
     title: 'Zero setup',
     body: 'Claim it, connect once, go live.',
+    accent: 'green',
   },
   {
     id: 'polished-by-default',
     title: 'Polished by default',
     body: 'Premium presentation without theme work.',
+    accent: 'teal',
   },
 ] as const;
