@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import { type BrowserContext, chromium, type Page } from 'playwright';
 import { APP_ROUTES } from '../constants/routes';
 import { getAlternativeSlugs } from '../content/alternatives';
@@ -86,6 +87,35 @@ const ERROR_SELECTORS = [
   '[data-testid="dashboard-error"]',
   '.next-error-h1',
 ];
+
+interface NotFoundSignalInput {
+  readonly responseStatus: number;
+  readonly finalUrl: string;
+  readonly bodyText: string;
+  readonly title: string;
+  readonly hasNotFoundTestId: boolean;
+}
+
+export function isNotFoundLike({
+  responseStatus,
+  finalUrl,
+  bodyText,
+  title,
+  hasNotFoundTestId,
+}: Readonly<NotFoundSignalInput>) {
+  const loweredTitle = title.toLowerCase();
+
+  return (
+    responseStatus === 404 ||
+    finalUrl.includes('/not-found') ||
+    hasNotFoundTestId ||
+    loweredTitle.includes('not found') ||
+    bodyText.includes('page not found') ||
+    bodyText.includes('content not found') ||
+    bodyText.includes("doesn't exist") ||
+    bodyText.includes("couldn't find")
+  );
+}
 
 function toRouteTemplate(filePath: string): string {
   const relativePath = path.relative(APP_DIR, filePath);
@@ -754,6 +784,11 @@ async function runRouteCase(
         .innerText()
         .catch(() => '')
     ).toLowerCase();
+    const hasNotFoundTestId = await page
+      .locator('[data-testid="not-found"]')
+      .first()
+      .isVisible()
+      .catch(() => false);
     pageErrors = await collectPageErrors(page);
 
     const hasMainContent = await page
@@ -762,12 +797,13 @@ async function runRouteCase(
       .isVisible()
       .catch(() => false);
     const responseStatus = response?.status() ?? 0;
-    const notFoundLike =
-      responseStatus === 404 ||
-      finalUrl.includes('/not-found') ||
-      bodyText.includes('page not found') ||
-      bodyText.includes("doesn't exist") ||
-      bodyText.includes("couldn't find");
+    const notFoundLike = isNotFoundLike({
+      responseStatus,
+      finalUrl,
+      bodyText,
+      title,
+      hasNotFoundTestId,
+    });
 
     const unauthorizedLike = await page
       .locator('text=/unauthorized|sign in as an admin|valid kiosk token/i')
@@ -957,4 +993,7 @@ async function main() {
   }
 }
 
-void main();
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  void main();
+}

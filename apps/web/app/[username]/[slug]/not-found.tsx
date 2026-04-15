@@ -2,7 +2,10 @@ import Link from 'next/link';
 
 export default function SmartLinkNotFound() {
   return (
-    <div className='bg-base text-foreground flex min-h-dvh flex-col items-center justify-center px-4'>
+    <div
+      data-testid='not-found'
+      className='bg-base text-foreground flex min-h-dvh flex-col items-center justify-center px-4'
+    >
       <div className='w-full max-w-sm text-center'>
         <div className='mb-6 select-none'>
           <span
