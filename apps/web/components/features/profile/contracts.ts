@@ -1,5 +1,5 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

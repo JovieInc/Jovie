@@ -1,8 +1,8 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

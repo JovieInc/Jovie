@@ -20,7 +20,7 @@ import {
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useUpdateSubscriberNameMutation } from '@/lib/queries';
+import { useUpdateSubscriberNameMutation } from '@/lib/queries/useNotificationStatusQuery';
 import { cn } from '@/lib/utils';
 import type { NotificationSubscriptionState } from '@/types/notifications';
 import type { SubscriptionErrorOrigin } from './useSubscriptionForm';

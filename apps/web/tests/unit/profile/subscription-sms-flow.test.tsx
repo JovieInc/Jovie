@@ -67,7 +67,7 @@ vi.mock('motion/react', async importOriginal => {
   };
 });
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => ({
     mutateAsync: vi.fn(),
   }),

@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { CTAButton } from '@/components/molecules/CTAButton';
-import { useProfileNotifications } from '@/components/organisms/profile-shell';
+import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import {
   profilePrimaryPillClassName,
@@ -29,7 +29,9 @@ const ctaLoadingFallback = (
 
 const ArtistNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
+    ).then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }
@@ -37,7 +39,9 @@ const ArtistNotificationsCTA = dynamic(
 
 const TwoStepNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
+    ).then(mod => ({
       default: mod.TwoStepNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import {
   ProfileNotificationsContext,
@@ -24,7 +23,8 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

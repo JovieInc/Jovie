@@ -2,7 +2,6 @@
 
 import { HandCoins, Mail, MapPin } from 'lucide-react';
 import { type RefObject, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import {
   ArtistNotificationsCTA,
@@ -15,6 +14,7 @@ import {
 import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

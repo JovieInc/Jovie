@@ -1,4 +1,3 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import {
   HOME_RELEASE_DESTINATION_LIVE_MOCK,
   HOME_RELEASE_DESTINATION_PRESAVE_MOCK,
@@ -8,6 +7,7 @@ import type {
   ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 

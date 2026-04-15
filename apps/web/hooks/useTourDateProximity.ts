@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import {
   type Coordinates,
   calculateLocalNearbyRadius,
   isNearUser,
 } from '@/lib/geo';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface TourDateWithProximity {
   readonly date: TourDateViewModel;
