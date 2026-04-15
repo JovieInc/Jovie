@@ -15,8 +15,8 @@ const Separator = (
 );
 
 /**
- * "See it in action" section gated by Statsig.
- * When the gate is off, the section is hidden entirely.
+ * "See it in action" section controlled by the code flag registry.
+ * When the flag is off, the section is hidden entirely.
  * When on, always fetches real profiles: tim pinned first,
  * remaining slots from featured creators.
  */
