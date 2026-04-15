@@ -89,6 +89,7 @@ interface ProfileCompactSurfaceProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
   readonly latestRelease?: ProfileCompactRelease | null;
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
@@ -239,6 +240,7 @@ export function ProfileCompactSurface({
   artist,
   socialLinks,
   contacts,
+  showPayButton = true,
   latestRelease,
   profileSettings,
   enableDynamicEngagement = false,
@@ -314,8 +316,8 @@ export function ProfileCompactSurface({
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
   const hasTip = useMemo(
-    () => socialLinks.some(link => link.platform === 'venmo'),
-    [socialLinks]
+    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
+    [showPayButton, socialLinks]
   );
   const hasAbout = Boolean(
     artist.tagline ||

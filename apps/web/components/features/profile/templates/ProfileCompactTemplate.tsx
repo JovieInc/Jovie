@@ -37,6 +37,7 @@ interface ProfileCompactTemplateProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
   readonly latestRelease?: {
     readonly title: string;
     readonly slug: string;
@@ -125,6 +126,7 @@ export function ProfileCompactTemplate({
   artist,
   socialLinks,
   contacts,
+  showPayButton = false,
   latestRelease,
   profileSettings,
   enableDynamicEngagement = false,
@@ -311,8 +313,8 @@ export function ProfileCompactTemplate({
 
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
   const hasTip = useMemo(
-    () => socialLinks.some(link => link.platform === 'venmo'),
-    [socialLinks]
+    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
+    [showPayButton, socialLinks]
   );
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
@@ -504,6 +506,7 @@ export function ProfileCompactTemplate({
                 artist={artist}
                 socialLinks={socialLinks}
                 contacts={contacts}
+                showPayButton={showPayButton}
                 latestRelease={latestRelease}
                 profileSettings={profileSettings}
                 enableDynamicEngagement={enableDynamicEngagement}

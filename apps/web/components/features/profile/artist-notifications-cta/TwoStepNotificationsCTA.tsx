@@ -559,7 +559,11 @@ export function TwoStepNotificationsCTA({
                       resendCooldownEnd={resendCooldownEnd}
                       isResending={isResending}
                       onResend={() => {
-                        void handleResendOtp().then(() => {
+                        void handleResendOtp().then(didResend => {
+                          if (!didResend) {
+                            return;
+                          }
+
                           setConfirmMessage('Code sent!');
                           if (confirmTimeoutRef.current) {
                             clearTimeout(confirmTimeoutRef.current);

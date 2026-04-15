@@ -144,3 +144,17 @@ BOT REVIEWS
 - DB migrations: run before staging deploy (production DB, additive only)
 - Deploy trigger: automatic on push to `main`
 - Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
+
+## Artist Profiles Landing Page
+
+When building or iterating on the Artist Profiles landing page:
+
+- Keep the page premium and restrained.
+- Prefer real product renders over invented UI.
+- Do not use customization messaging, theme builders, or open-ended template language.
+- Keep one big idea per section.
+- Prefer fewer, stronger sections over more sections.
+- Keep this page distinct from generic bio-link competitors and generic creator-site tools.
+- Keep copy in data files, not inline JSX.
+- Iterate section by section in browser instead of trying to style the whole page in one pass.
+- Do not use fake stats, fake testimonials, or founder-first proof near the top of the page.

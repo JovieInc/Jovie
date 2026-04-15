@@ -62,7 +62,7 @@ interface UseSubscriptionFormReturn {
   handleOtpChange: (value: string) => void;
   handleSubscribe: () => Promise<void>;
   handleVerifyOtp: () => Promise<void>;
-  handleResendOtp: () => Promise<void>;
+  handleResendOtp: () => Promise<boolean>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
   // From profile notifications context
@@ -398,7 +398,9 @@ export function useSubscriptionForm({
   ]);
 
   const handleResendOtp = useCallback(async () => {
-    if (isResending || Date.now() < resendCooldownEnd) return;
+    if (isResending || Date.now() < resendCooldownEnd) {
+      return false;
+    }
 
     setIsResending(true);
     clearError();
@@ -423,6 +425,7 @@ export function useSubscriptionForm({
     }
 
     setIsResending(false);
+    return success;
   }, [
     artist.handle,
     clearError,

@@ -1,14 +1,19 @@
 import { Container } from '@/components/site/Container';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { cn } from '@/lib/utils';
 import { HomeHeroCTA } from './HomeHeroCTA';
 import { HomeHeroPhoneComposition } from './HomeHeroPhoneComposition';
 import { HomeTrustSection } from './HomeTrustSection';
 import { HOME_HERO_CONTENT } from './home-page-content';
 
-export function HomeHero() {
+interface HomeHeroProps {
+  readonly layout?: 'stacked' | 'f';
+}
+
+export function HomeHero({ layout = 'stacked' }: Readonly<HomeHeroProps>) {
   return (
     <section
-      className='homepage-hero'
+      className={cn('homepage-hero', layout === 'f' && 'homepage-hero--f')}
       data-testid='homepage-hero'
       aria-labelledby='home-hero-heading'
     >
