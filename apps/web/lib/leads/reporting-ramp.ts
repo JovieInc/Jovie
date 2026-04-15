@@ -51,6 +51,131 @@ function isTelemetryIncomplete(input: {
   return input.contacted > 0 && input.providerFailureRate === null;
 }
 
+function evaluateRampAction(opts: {
+  contacted: number;
+  claimClickRate: number | null;
+  providerFailureRate: number | null;
+  currentDailyCap: number;
+  thresholds: ReturnType<typeof getDefaultThresholds>;
+  guardrailsEnabled: boolean;
+  rampMode: string;
+}): RampRecommendation {
+  const {
+    contacted,
+    claimClickRate,
+    providerFailureRate,
+    currentDailyCap,
+    thresholds,
+    guardrailsEnabled,
+    rampMode,
+  } = opts;
+
+  if (contacted < thresholds.minimumSampleSize) {
+    return {
+      recommendedAction: 'hold',
+      recommendedNextDailyCap: currentDailyCap,
+      reasons: [
+        `Sample below threshold (${contacted}/${thresholds.minimumSampleSize}).`,
+      ],
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  if (
+    providerFailureRate !== null &&
+    providerFailureRate >= thresholds.maxProviderFailureRate
+  ) {
+    return {
+      recommendedAction: 'pause',
+      recommendedNextDailyCap: 0,
+      reasons: [
+        `Provider failure rate ${Math.round(providerFailureRate * 100)}% exceeds threshold.`,
+      ],
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  if (
+    claimClickRate !== null &&
+    claimClickRate < thresholds.pauseClaimClickRateFloor
+  ) {
+    return {
+      recommendedAction: 'pause',
+      recommendedNextDailyCap: 0,
+      reasons: [
+        `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is below pause threshold.`,
+      ],
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  if (
+    isTelemetryIncomplete({ contacted, providerFailureRate, guardrailsEnabled })
+  ) {
+    return {
+      recommendedAction: 'hold',
+      recommendedNextDailyCap: currentDailyCap,
+      reasons: [
+        'Provider telemetry is incomplete, so the system will not auto-ramp.',
+      ],
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  if (
+    claimClickRate !== null &&
+    claimClickRate < thresholds.holdClaimClickRateFloor
+  ) {
+    return {
+      recommendedAction: 'hold',
+      recommendedNextDailyCap: currentDailyCap,
+      reasons: [
+        `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is inside the hold band.`,
+      ],
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  if (
+    claimClickRate !== null &&
+    claimClickRate >= thresholds.increaseClaimClickRate
+  ) {
+    const reasons = ['Claim click rate supports a controlled increase.'];
+    if (rampMode === 'manual') {
+      reasons.push(
+        'Ramp mode is manual, so this remains an operator recommendation.'
+      );
+    }
+    return {
+      recommendedAction: 'increase',
+      recommendedNextDailyCap: Math.ceil(currentDailyCap * 1.5),
+      reasons,
+      sampleSize: contacted,
+      claimClickRate,
+      providerFailureRate,
+    };
+  }
+
+  return {
+    recommendedAction: 'hold',
+    recommendedNextDailyCap: currentDailyCap,
+    reasons: ['Performance is inside the hold band.'],
+    sampleSize: contacted,
+    claimClickRate,
+    providerFailureRate,
+  };
+}
+
 export async function getRampRecommendation(): Promise<RampRecommendation> {
   try {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -100,122 +225,16 @@ export async function getRampRecommendation(): Promise<RampRecommendation> {
     const providerFailureRate =
       contacted > 0 ? Number(failedRow?.total ?? 0) / contacted : null;
     const claimClickRate = contacted > 0 ? claimClicks / contacted : null;
-    const reasons: string[] = [];
 
-    if (contacted < thresholds.minimumSampleSize) {
-      reasons.push(
-        `Sample below threshold (${contacted}/${thresholds.minimumSampleSize}).`
-      );
-      return {
-        recommendedAction: 'hold',
-        recommendedNextDailyCap: currentDailyCap,
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    if (
-      providerFailureRate !== null &&
-      providerFailureRate >= thresholds.maxProviderFailureRate
-    ) {
-      reasons.push(
-        `Provider failure rate ${Math.round(providerFailureRate * 100)}% exceeds threshold.`
-      );
-      return {
-        recommendedAction: 'pause',
-        recommendedNextDailyCap: 0,
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    if (
-      claimClickRate !== null &&
-      claimClickRate < thresholds.pauseClaimClickRateFloor
-    ) {
-      reasons.push(
-        `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is below pause threshold.`
-      );
-      return {
-        recommendedAction: 'pause',
-        recommendedNextDailyCap: 0,
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    if (
-      isTelemetryIncomplete({
-        contacted,
-        providerFailureRate,
-        guardrailsEnabled,
-      })
-    ) {
-      reasons.push(
-        'Provider telemetry is incomplete, so the system will not auto-ramp.'
-      );
-      return {
-        recommendedAction: 'hold',
-        recommendedNextDailyCap: currentDailyCap,
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    if (
-      claimClickRate !== null &&
-      claimClickRate < thresholds.holdClaimClickRateFloor
-    ) {
-      reasons.push(
-        `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is inside the hold band.`
-      );
-      return {
-        recommendedAction: 'hold',
-        recommendedNextDailyCap: currentDailyCap,
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    if (
-      claimClickRate !== null &&
-      claimClickRate >= thresholds.increaseClaimClickRate
-    ) {
-      reasons.push('Claim click rate supports a controlled increase.');
-      if ((settings?.rampMode ?? 'manual') === 'manual') {
-        reasons.push(
-          'Ramp mode is manual, so this remains an operator recommendation.'
-        );
-      }
-      return {
-        recommendedAction: 'increase',
-        recommendedNextDailyCap: Math.ceil(currentDailyCap * 1.5),
-        reasons,
-        sampleSize: contacted,
-        claimClickRate,
-        providerFailureRate,
-      };
-    }
-
-    reasons.push('Performance is inside the hold band.');
-    return {
-      recommendedAction: 'hold',
-      recommendedNextDailyCap: currentDailyCap,
-      reasons,
-      sampleSize: contacted,
+    return evaluateRampAction({
+      contacted,
       claimClickRate,
       providerFailureRate,
-    };
+      currentDailyCap,
+      thresholds,
+      guardrailsEnabled,
+      rampMode: settings?.rampMode ?? 'manual',
+    });
   } catch (error) {
     if (isMissingLeadReportingSchemaError(error)) {
       await captureWarning(

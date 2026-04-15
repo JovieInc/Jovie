@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import {
   type BandsintownConnectionStatus,
   loadTourDates,
-  type TourDateViewModel,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -15,6 +14,7 @@ import {
   useDisconnectBandsintownMutation,
   useSyncFromBandsintownMutation,
 } from '@/lib/queries';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { TourDateSidebar } from './TourDateSidebar';
 import { TourDatesEmptyState } from './TourDatesEmptyState';

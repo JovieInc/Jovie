@@ -9,7 +9,7 @@ export interface AnimatedArtistPageProps {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton: boolean;
+  readonly showPayButton: boolean;
   readonly showBackButton: boolean;
   readonly enableDynamicEngagement?: boolean;
 }

@@ -64,7 +64,7 @@ export function ArtistContactsButton({
       className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
       asChild
     >
-      <Link href={`/${artistHandle}?mode=contact`}>
+      <Link href={`/${artistHandle}?mode=contact`} prefetch={false}>
         <Mail className='h-4 w-4' aria-hidden='true' />
       </Link>
     </CircleIconButton>

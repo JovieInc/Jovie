@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TipSection } from '@/components/organisms/TipSection';
+import { PaySection } from '@/components/organisms/PaySection';
 
 // Mock Sonner toast with vi.hoisted for proper setup
 const mockToast = vi.hoisted(() => ({
@@ -44,18 +44,18 @@ describe('TipSection', () => {
     mockOnStripePayment.mockResolvedValueOnce(undefined);
 
     render(
-      <TipSection handle='artist123' onStripePayment={mockOnStripePayment} />
+      <PaySection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
-    // Find and click the $2 tip button
-    const tipButton = screen.getByText('$2 Tip');
-    fireEvent.click(tipButton);
+    // Find and click the $5 button
+    const payButton = screen.getByText('$5');
+    fireEvent.click(payButton);
 
     // Wait for the payment to complete and toast to be called
     await waitFor(() => {
-      expect(mockOnStripePayment).toHaveBeenCalledWith(2);
+      expect(mockOnStripePayment).toHaveBeenCalledWith(5);
       expect(mockToast.success).toHaveBeenCalledWith(
-        'Thanks for the $2 tip!',
+        'Thanks for the $5!',
         expect.objectContaining({ duration: 5000 })
       );
     });
@@ -65,16 +65,16 @@ describe('TipSection', () => {
     mockOnStripePayment.mockRejectedValueOnce(new Error('Payment failed'));
 
     render(
-      <TipSection handle='artist123' onStripePayment={mockOnStripePayment} />
+      <PaySection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
-    // Find and click the $2 tip button
-    const tipButton = screen.getByText('$2 Tip');
-    fireEvent.click(tipButton);
+    // Find and click the $5 button
+    const payButton = screen.getByText('$5');
+    fireEvent.click(payButton);
 
     // Wait for the payment to fail and error toast to be called
     await waitFor(() => {
-      expect(mockOnStripePayment).toHaveBeenCalledWith(2);
+      expect(mockOnStripePayment).toHaveBeenCalledWith(5);
       expect(mockToast.error).toHaveBeenCalledWith(
         'Payment failed. Please try again.',
         expect.objectContaining({ duration: 7000 })
@@ -84,7 +84,7 @@ describe('TipSection', () => {
 
   it('renders payment method selection when both Stripe and Venmo are available', () => {
     render(
-      <TipSection
+      <PaySection
         handle='artist123'
         onStripePayment={mockOnStripePayment}
         venmoLink='https://venmo.com/user'
@@ -106,7 +106,7 @@ describe('TipSection', () => {
     const venmoBaseLink = 'https://venmo.com/user';
 
     render(
-      <TipSection
+      <PaySection
         handle={handle}
         onStripePayment={mockOnStripePayment}
         venmoLink={venmoBaseLink}
@@ -120,15 +120,15 @@ describe('TipSection', () => {
     });
     fireEvent.click(venmoMethodButton);
 
-    // Select the $2 tip amount in the TipSelector
+    // Select the $5 amount in the PaySelector
     const amountButton = screen.getByRole('button', {
-      name: 'Select $2 tip amount',
+      name: 'Select $5 tip amount',
     });
     fireEvent.click(amountButton);
 
     // Click the continue button to trigger payment
     const continueButton = screen.getByRole('button', {
-      name: /Continue with Venmo for \$2 tip/i,
+      name: /Continue with Venmo for \$5/i,
     });
     fireEvent.click(continueButton);
 
@@ -137,19 +137,19 @@ describe('TipSection', () => {
 
     // Basic checks on URL construction: base link and amount
     expect(urlArg).toContain(venmoBaseLink);
-    expect(urlArg).toContain('utm_amount=2');
+    expect(urlArg).toContain('utm_amount=5');
   });
 
   it('renders QR code fallback when no Stripe or Venmo payment methods are available', () => {
-    render(<TipSection handle='artist123' />);
+    render(<PaySection handle='artist123' />);
 
-    // QRCodeCard renders with the 'Scan to tip via Apple Pay' title
-    expect(screen.getByText('Scan to tip via Apple Pay')).toBeInTheDocument();
+    // QRCodeCard renders with the 'Scan to pay via Apple Pay' title
+    expect(screen.getByText('Scan to pay via Apple Pay')).toBeInTheDocument();
   });
 
   it('returns to payment method selection when back button is clicked after choosing a payment method', () => {
     render(
-      <TipSection
+      <PaySection
         handle='artist123'
         onStripePayment={mockOnStripePayment}
         venmoLink='https://venmo.com/user'
@@ -182,7 +182,7 @@ describe('TipSection', () => {
 
   it('renders Venmo payment flow directly when only Venmo is available', () => {
     render(
-      <TipSection
+      <PaySection
         handle='artist123'
         venmoLink='https://venmo.com/user'
         onVenmoPayment={mockOnVenmoPayment}
@@ -192,7 +192,7 @@ describe('TipSection', () => {
     // When Stripe is not available, the payment method selection should not be shown
     expect(screen.queryByText('Choose payment method')).toBeNull();
 
-    // Venmo payment flow should be available directly via the TipSelector continue button
+    // Venmo payment flow should be available directly via the PaySelector continue button
     expect(
       screen.getByRole('button', { name: /Continue with Venmo/i })
     ).toBeInTheDocument();
