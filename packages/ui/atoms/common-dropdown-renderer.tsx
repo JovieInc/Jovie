@@ -41,20 +41,20 @@ import { filterItems, getContentStyle } from './common-dropdown-utils';
 
 export type MenuPrimitiveKind = 'dropdown' | 'context';
 
-export type MenuRenderContext = {
+export interface MenuRenderContext {
   readonly kind: MenuPrimitiveKind;
   readonly itemBase: string;
   readonly disablePortal: boolean;
   readonly portalProps?: Record<string, unknown>;
-};
+}
 
-type SearchableContentProps = {
+interface SearchableContentProps {
   readonly query: string;
   readonly placeholder: string;
   readonly onQueryChange: (query: string) => void;
   readonly onClear: () => void;
   readonly inputRef?: React.Ref<HTMLInputElement>;
-};
+}
 
 function focusSiblingMenuItem(
   input: HTMLInputElement | null,
