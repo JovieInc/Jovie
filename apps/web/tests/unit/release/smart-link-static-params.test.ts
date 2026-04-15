@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { captureErrorMock, selectMock } = vi.hoisted(() => ({
-  captureErrorMock: vi.fn().mockResolvedValue(undefined),
+const { loggerErrorMock, selectMock } = vi.hoisted(() => ({
+  loggerErrorMock: vi.fn(),
   selectMock: vi.fn(),
 }));
 
@@ -11,15 +11,17 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: captureErrorMock,
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    error: loggerErrorMock,
+  },
 }));
 
 describe('smart link static params', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
-    captureErrorMock.mockClear();
+    loggerErrorMock.mockClear();
     selectMock.mockReset();
   });
 
@@ -60,13 +62,14 @@ describe('smart link static params', () => {
     );
 
     await expect(getFeaturedSmartLinkStaticParams()).resolves.toEqual([]);
-    expect(captureErrorMock).toHaveBeenCalledWith(
+    expect(loggerErrorMock).toHaveBeenCalledWith(
       'Failed to load smart-link static params',
-      expect.any(Error),
       expect.objectContaining({
+        error: expect.any(Error),
         helper: 'getFeaturedSmartLinkStaticParams',
         route: '/[username]/[slug]',
-      })
+      }),
+      'public-smart-link'
     );
   });
 
@@ -81,13 +84,14 @@ describe('smart link static params', () => {
     );
 
     await expect(getFeaturedTrackStaticParams()).resolves.toEqual([]);
-    expect(captureErrorMock).toHaveBeenCalledWith(
+    expect(loggerErrorMock).toHaveBeenCalledWith(
       'Failed to load track static params',
-      expect.any(Error),
       expect.objectContaining({
+        error: expect.any(Error),
         helper: 'getFeaturedTrackStaticParams',
         route: '/[username]/[slug]/[trackSlug]',
-      })
+      }),
+      'public-smart-link'
     );
   });
 });

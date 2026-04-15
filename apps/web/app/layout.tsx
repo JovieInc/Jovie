@@ -94,6 +94,7 @@ export const metadata: Metadata = {
   },
   other: {
     'application-name': APP_NAME,
+    'apple-mobile-web-app-capable': 'yes',
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',

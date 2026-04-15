@@ -59,7 +59,7 @@ describe('ProfileShell tour navigation', () => {
     expect(push).toHaveBeenCalledWith('/testartist?mode=tour');
   });
 
-  it('navigates to tip mode when the tip button is clicked on desktop', () => {
+  it('navigates to pay mode when the pay button is clicked on desktop', () => {
     renderWithQueryClient(
       <ProfileShell
         artist={makeArtist()}
@@ -77,12 +77,12 @@ describe('ProfileShell tour navigation', () => {
           ] as unknown as LegacySocialLink[]
         }
         contacts={[] as PublicContact[]}
-        showTipButton
+        showPayButton
       />
     );
 
-    fireEvent.click(screen.getByTestId('tip-trigger'));
+    fireEvent.click(screen.getByTestId('pay-trigger'));
 
-    expect(push).toHaveBeenCalledWith('/testartist?mode=tip');
+    expect(push).toHaveBeenCalledWith('/testartist?mode=pay');
   });
 });

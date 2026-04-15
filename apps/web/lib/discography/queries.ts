@@ -52,6 +52,7 @@ export interface UpsertReleaseInput {
     | 'compilation'
     | 'live'
     | 'mixtape'
+    | 'music_video'
     | 'other';
   releaseDate?: Date | null;
   label?: string | null;
@@ -270,6 +271,7 @@ export async function getLatestReleaseByUsername(
         eq(creatorProfiles.usernameNormalized, usernameNormalized),
         isNull(discogReleases.deletedAt),
         ne(discogReleases.status, 'draft'),
+        ne(discogReleases.releaseType, 'music_video'),
         drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
       )
     )

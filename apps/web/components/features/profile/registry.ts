@@ -28,10 +28,10 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
         showFooter: true,
       },
     },
-    tip: {
-      mode: 'tip',
-      subtitle: 'Send a tip',
-      pathSegment: 'tip',
+    pay: {
+      mode: 'pay',
+      subtitle: 'Support',
+      pathSegment: 'pay',
       shell: {
         showBackButton: true,
         showSocialBar: false,
@@ -97,6 +97,7 @@ export function isProfileMode(
 }
 
 export function getProfileMode(value: string | null | undefined): ProfileMode {
+  if (value === 'tip') return 'pay';
   return isProfileMode(value) ? value : 'profile';
 }
 
