@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useCallback, useId, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CollapsibleSectionHeading } from './CollapsibleSectionHeading';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
@@ -23,6 +23,100 @@ export interface DrawerSectionProps {
   readonly lazyMount?: boolean;
 }
 
+interface DrawerSectionHeadingSlotProps {
+  readonly title?: string;
+  readonly isCollapsible: boolean;
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+  readonly contentId: string;
+}
+
+function DrawerSectionHeadingSlot({
+  title,
+  isCollapsible,
+  isOpen,
+  onToggle,
+  contentId,
+}: DrawerSectionHeadingSlotProps) {
+  if (!title) {
+    return null;
+  }
+
+  if (isCollapsible) {
+    return (
+      <CollapsibleSectionHeading
+        isOpen={isOpen}
+        onToggle={onToggle}
+        aria-controls={contentId}
+        className='min-w-0 flex-1'
+      >
+        {title}
+      </CollapsibleSectionHeading>
+    );
+  }
+
+  return (
+    <DrawerSectionHeading className='min-w-0 flex-1'>
+      {title}
+    </DrawerSectionHeading>
+  );
+}
+
+interface DrawerSectionHeaderProps {
+  readonly title?: string;
+  readonly heading: ReactNode;
+  readonly actions?: ReactNode;
+  readonly isCard: boolean;
+  readonly isCollapsible: boolean;
+}
+
+function DrawerSectionHeader({
+  title,
+  heading,
+  actions,
+  isCard,
+  isCollapsible,
+}: DrawerSectionHeaderProps) {
+  if (!title) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2',
+        isCard && 'min-h-8 py-1.5',
+        isCard && (isCollapsible ? 'pr-2.5' : 'px-2.5')
+      )}
+    >
+      {heading}
+      {actions ? <div className='shrink-0'>{actions}</div> : null}
+    </div>
+  );
+}
+
+interface DrawerSectionContentProps {
+  readonly contentId: string;
+  readonly isHidden: boolean;
+  readonly shouldRenderContent: boolean;
+  readonly className?: string;
+  readonly children: ReactNode;
+}
+
+function DrawerSectionContent({
+  contentId,
+  isHidden,
+  shouldRenderContent,
+  className,
+  children,
+}: DrawerSectionContentProps) {
+  return (
+    <div id={contentId} hidden={isHidden} className={className}>
+      {shouldRenderContent ? children : null}
+    </div>
+  );
+}
+
 export function DrawerSection({
   title,
   children,
@@ -42,30 +136,25 @@ export function DrawerSection({
   const contentId = useId();
   const shouldRenderContent = !lazyMount || isOpen || hasOpened;
   const handleToggle = useCallback(() => {
-    setIsOpen(prev => {
-      const nextOpen = !prev;
-      if (nextOpen) {
-        setHasOpened(true);
-      }
-      return nextOpen;
-    });
+    setIsOpen(prev => !prev);
   }, []);
-  const heading = title ? (
-    isCollapsible ? (
-      <CollapsibleSectionHeading
-        isOpen={isOpen}
-        onToggle={handleToggle}
-        aria-controls={contentId}
-        className='min-w-0 flex-1'
-      >
-        {title}
-      </CollapsibleSectionHeading>
-    ) : (
-      <DrawerSectionHeading className='min-w-0 flex-1'>
-        {title}
-      </DrawerSectionHeading>
-    )
-  ) : null;
+
+  useEffect(() => {
+    if (isOpen) {
+      setHasOpened(true);
+    }
+  }, [isOpen]);
+
+  const heading = (
+    <DrawerSectionHeadingSlot
+      title={title}
+      isCollapsible={isCollapsible}
+      isOpen={isOpen}
+      onToggle={handleToggle}
+      contentId={contentId}
+    />
+  );
+  const isContentHidden = isCollapsible && !isOpen;
 
   if (surface === 'card') {
     return (
@@ -75,19 +164,21 @@ export function DrawerSection({
           testId={testId}
           className={cn('overflow-hidden', surfaceClassName)}
         >
-          {title ? (
-            <div className='flex min-h-8 items-center gap-2 px-2.5 py-1.5'>
-              {heading}
-              {actions ? <div className='shrink-0'>{actions}</div> : null}
-            </div>
-          ) : null}
-          <div
-            id={contentId}
-            hidden={isCollapsible && !isOpen}
+          <DrawerSectionHeader
+            title={title}
+            heading={heading}
+            actions={actions}
+            isCard
+            isCollapsible={isCollapsible}
+          />
+          <DrawerSectionContent
+            contentId={contentId}
+            isHidden={isContentHidden}
+            shouldRenderContent={shouldRenderContent}
             className={cn(title ? 'px-2.5 pb-2.5' : 'p-2.5', contentClassName)}
           >
-            {shouldRenderContent ? children : null}
-          </div>
+            {children}
+          </DrawerSectionContent>
         </DrawerSurfaceCard>
       </div>
     );
@@ -95,19 +186,21 @@ export function DrawerSection({
 
   return (
     <div data-testid={testId} className={cn('space-y-2', className)}>
-      {title ? (
-        <div className='flex items-center gap-2'>
-          {heading}
-          {actions ? <div className='shrink-0'>{actions}</div> : null}
-        </div>
-      ) : null}
-      <div
-        id={contentId}
-        hidden={isCollapsible && !isOpen}
+      <DrawerSectionHeader
+        title={title}
+        heading={heading}
+        actions={actions}
+        isCard={false}
+        isCollapsible={isCollapsible}
+      />
+      <DrawerSectionContent
+        contentId={contentId}
+        isHidden={isContentHidden}
+        shouldRenderContent={shouldRenderContent}
         className={contentClassName}
       >
-        {shouldRenderContent ? children : null}
-      </div>
+        {children}
+      </DrawerSectionContent>
     </div>
   );
 }
