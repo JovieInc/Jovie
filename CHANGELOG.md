@@ -10,6 +10,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
+- Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
+- Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+
+### Fixed
+
+- Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
 
 ## [26.4.153.2] - 2026-04-15
 

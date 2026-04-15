@@ -63,12 +63,12 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
-        name: 'Built for artists. Obsessively specific.',
+        name: 'Built for artists.',
       })
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'Claim your profile' }).length
-    ).toBeGreaterThan(1);
+    ).toBeGreaterThan(0);
   });
 
   it('renders the data-driven faq and final cta copy', () => {
