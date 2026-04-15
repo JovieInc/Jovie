@@ -489,7 +489,7 @@ export function useSubscriptionForm({
       event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe());
+          otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe();
         }
       },
       [handleSubscribe, handleVerifyOtp, otpStep]

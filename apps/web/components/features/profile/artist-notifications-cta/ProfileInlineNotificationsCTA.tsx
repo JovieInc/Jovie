@@ -413,8 +413,8 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
-      else if (step === 'name') void handleNameSubmit();
-      else if (step === 'birthday') void handleBirthdaySubmit();
+      else if (step === 'name') handleNameSubmit();
+      else if (step === 'birthday') handleBirthdaySubmit();
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
@@ -615,7 +615,7 @@ export function ProfileInlineNotificationsCTA({
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onSubmit={() => {
-                void handleNameSubmit();
+                handleNameSubmit();
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -649,10 +649,10 @@ export function ProfileInlineNotificationsCTA({
                     if (birthdayHintShown) setBirthdayHintShown(false);
                   }}
                   onComplete={() => {
-                    void handleBirthdaySubmit();
+                    handleBirthdaySubmit();
                   }}
                   onSubmit={() => {
-                    void handleBirthdaySubmit();
+                    handleBirthdaySubmit();
                   }}
                   autoFocus
                   disabled={birthdayMutation.isPending}

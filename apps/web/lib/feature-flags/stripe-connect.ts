@@ -11,8 +11,7 @@ import { FEATURE_FLAGS } from './shared';
  * @returns true if the feature is enabled
  */
 export function isStripeConnectEnabled(
-  userId: string | null
+  _userId: string | null
 ): Promise<boolean> {
-  void userId;
   return Promise.resolve(FEATURE_FLAGS.STRIPE_CONNECT_ENABLED);
 }
