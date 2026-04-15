@@ -105,12 +105,12 @@ describe('Marketing content guardrails', () => {
       const text = container.textContent ?? '';
 
       expect(text).toContain('Built for artists by artists');
-      expect(text).toContain('Zero Setup.');
-      expect(text).toContain('Know Every Fan by Name.');
-      expect(text).toContain('Stupid Fast.');
-      expect(text).toContain('Location-Aware.');
-      expect(text).toContain('Turn attention into action.');
-      expect(text).toContain('Get paid.');
+      expect(text).toContain('Notify every fan. Automatically.');
+      expect(text).toContain('Engage.');
+      expect(text).toContain('Turn action into a relationship.');
+      expect(text).toContain('Stay in the studio.');
+      expect(text).toContain('Smart links that stay current.');
+      expect(text).toContain('Recognize the people who care.');
     });
   });
 });

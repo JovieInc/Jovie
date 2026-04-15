@@ -63,29 +63,21 @@ describe('HomeAdaptiveProfileStory', () => {
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
   });
 
-  it('renders chapter 1 with sandbox card', () => {
+  it('renders the trust logo strip when sections are enabled', () => {
     render(<HomeAdaptiveProfileStory />);
 
-    expect(
-      screen.getByRole('heading', { name: 'Turn attention into action.' })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-sandbox')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
   });
 
-  it('renders chapter 2 with tip bento card', () => {
-    render(<HomeAdaptiveProfileStory />);
-
-    expect(
-      screen.getByRole('heading', {
-        name: 'Get paid.',
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByText("That's it.")).toBeInTheDocument();
-  });
-
-  it('does not render old sections', () => {
+  it('keeps the hero isolated from the deeper middle sections', () => {
     const { container } = render(<HomeAdaptiveProfileStory />);
 
+    expect(
+      screen.queryByRole('heading', { name: 'Turn attention into action.' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Get paid.' })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('homepage-interstitial')
     ).not.toBeInTheDocument();
