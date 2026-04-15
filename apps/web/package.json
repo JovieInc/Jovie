@@ -188,7 +188,7 @@
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "3.6.0",
     "jose": "^6.2.2",
-    "lucide-react": "^1.0.1",
+    "lucide-react": "^1.8.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^12.38.0",
     "next": "16.2.3",
