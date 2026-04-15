@@ -8,7 +8,7 @@
 
 import { isFormElement } from '@/lib/utils/keyboard';
 
-export { isFormElement };
+export { isFormElement } from '@/lib/utils/keyboard';
 
 export type TableNavAction =
   | 'next'

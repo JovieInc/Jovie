@@ -43,7 +43,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     const CHUNK = 8192;
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += CHUNK) {
-      chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
     }
     return `data:${contentType};base64,${btoa(chunks.join(''))}`;
   } catch {

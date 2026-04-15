@@ -79,8 +79,7 @@ export function OnboardingHandleStep({
     isSubmitting || (isPendingSubmit && handleValidation.checking);
   const hasError = Boolean(stateError || handleValidation.error);
 
-  const canSubmit =
-    !Boolean(ctaDisabledReason) && !isTransitioning && !isLoading;
+  const canSubmit = !ctaDisabledReason && !isTransitioning && !isLoading;
 
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
