@@ -243,7 +243,7 @@ export function AddReleaseSidebar({
       footer={
         <DrawerButton
           tone='secondary'
-          className='h-8 w-full justify-center border-white bg-white text-black hover:border-white hover:bg-white hover:text-black disabled:border-white disabled:bg-white disabled:text-black disabled:opacity-100'
+          className='h-8 w-full justify-center border-white bg-white text-black hover:border-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:border-white disabled:bg-white disabled:text-black/55 disabled:opacity-100'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >

@@ -1,11 +1,12 @@
 import type { FeaturedCreator } from '@/lib/featured-creators';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const FALLBACK_CREATOR_DATA = [
   {
-    handle: 'tim-white',
-    name: 'Tim White',
+    handle: TIM_WHITE_PROFILE.handle,
+    name: TIM_WHITE_PROFILE.name,
     tagline: 'Afterglow (Deluxe)',
-    src: '/images/avatars/tim-white.jpg',
+    src: TIM_WHITE_PROFILE.avatarSrc,
   },
   {
     handle: 'david-guetta',
