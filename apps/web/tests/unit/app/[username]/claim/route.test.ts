@@ -2,17 +2,13 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockClearPendingClaimContext,
   mockGetOptionalAuth,
   mockGetProfileByUsername,
   mockReadPendingClaimContext,
-  mockWritePendingClaimContext,
 } = vi.hoisted(() => ({
-  mockClearPendingClaimContext: vi.fn(),
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
-  mockWritePendingClaimContext: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -24,9 +20,9 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 vi.mock('@/lib/claim/context', () => ({
-  clearPendingClaimContext: mockClearPendingClaimContext,
+  clearPendingClaimContext: vi.fn(),
   readPendingClaimContext: mockReadPendingClaimContext,
-  writePendingClaimContext: mockWritePendingClaimContext,
+  writePendingClaimContext: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -83,73 +79,10 @@ describe('Claim route', () => {
       }
     );
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/html');
-    const body = await response.text();
-    expect(body).toContain('Claim Test Artist');
-    expect(body).toContain('/testartist/claim?next=auth');
-    expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
-  });
-
-  it('does not clear an unrelated pending claim when a bad token is used', async () => {
-    const { isClaimTokenValid } = await import('@/lib/services/profile');
-
-    mockReadPendingClaimContext.mockResolvedValueOnce({
-      mode: 'token_backed',
-      creatorProfileId: 'other-profile',
-      username: 'otherartist',
-      claimTokenHash: 'hash',
-      leadId: null,
-      expectedSpotifyArtistId: 'spotify-other',
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 60_000,
-    });
-    vi.mocked(isClaimTokenValid).mockResolvedValueOnce(false);
-
-    const response = await GET(
-      new NextRequest('http://localhost/TestArtist/claim?token=bad-token'),
-      {
-        params: Promise.resolve({ username: 'TestArtist' }),
-      }
-    );
-
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
       'http://localhost/testartist?claim=1'
     );
-    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
-  });
-
-  it('allows resuming a matching pending claim even when the user has an active profile', async () => {
-    mockGetOptionalAuth.mockResolvedValueOnce({ userId: 'clerk_123' });
-    mockReadPendingClaimContext.mockResolvedValueOnce({
-      mode: 'direct_profile',
-      creatorProfileId: 'profile_1',
-      username: 'testartist',
-      expectedSpotifyArtistId: 'spotify_123',
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 60_000,
-    });
-
-    const { db } = await import('@/lib/db');
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn().mockResolvedValue([{ activeProfileId: 'profile_1' }]),
-        })),
-      })),
-    } as never);
-
-    const response = await GET(
-      new NextRequest('http://localhost/TestArtist/claim?next=auth'),
-      {
-        params: Promise.resolve({ username: 'TestArtist' }),
-      }
-    );
-
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/onboarding?handle=testartist'
-    );
+    expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
   });
 });

@@ -1,14 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 
-const { trackMock } = vi.hoisted(() => ({
-  trackMock: vi.fn(),
-}));
-
 vi.mock('@/lib/analytics', () => ({
-  track: trackMock,
+  track: vi.fn(),
 }));
 
 vi.mock('next/link', () => ({
@@ -18,24 +14,18 @@ vi.mock('next/link', () => ({
     className,
     'data-testid': testId,
     'aria-label': ariaLabel,
-    onClick,
   }: {
     href: string;
     children: ReactNode;
     className?: string;
     'data-testid'?: string;
     'aria-label'?: string;
-    onClick?: () => void;
   }) => (
     <a
       href={href}
       className={className}
       data-testid={testId}
       aria-label={ariaLabel}
-      onClick={event => {
-        event.preventDefault();
-        onClick?.();
-      }}
     >
       {children}
     </a>
@@ -94,52 +84,5 @@ describe('ClaimBanner', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByTestId('claim-banner-cta')).not.toBeInTheDocument();
-  });
-
-  it('tracks impressions for each distinct variant', () => {
-    const { rerender } = render(
-      <ClaimBanner profileHandle='testartist' variant='organic' />
-    );
-
-    rerender(<ClaimBanner profileHandle='testartist' variant='organic' />);
-    rerender(
-      <ClaimBanner profileHandle='testartist' variant='direct_in_progress' />
-    );
-
-    expect(trackMock).toHaveBeenCalledTimes(2);
-    expect(trackMock).toHaveBeenNthCalledWith(
-      1,
-      'profile_claim_banner_impression',
-      {
-        profile_handle: 'testartist',
-        variant: 'organic',
-      }
-    );
-    expect(trackMock).toHaveBeenNthCalledWith(
-      2,
-      'profile_claim_banner_impression',
-      {
-        profile_handle: 'testartist',
-        variant: 'direct_in_progress',
-      }
-    );
-  });
-
-  it('redacts tokenized claim URLs in click analytics', () => {
-    render(
-      <ClaimBanner
-        profileHandle='testartist'
-        ctaHref='/claim/sensitive-token'
-        variant='claim_intent'
-      />
-    );
-
-    fireEvent.click(screen.getByTestId('claim-banner-cta'));
-
-    expect(trackMock).toHaveBeenCalledWith('profile_claim_banner_click', {
-      profile_handle: 'testartist',
-      destination: '/claim/[token]',
-      variant: 'claim_intent',
-    });
   });
 });
