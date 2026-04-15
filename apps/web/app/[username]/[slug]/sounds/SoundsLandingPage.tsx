@@ -18,9 +18,10 @@ import {
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
   SmartLinkShell,
-  useSmartLinkShare,
 } from '@/features/release/SmartLinkShell';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import type { VideoProviderKey } from '@/lib/discography/types';
+import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
   appendUTMParamsToUrl,
@@ -64,6 +65,7 @@ export function SoundsLandingPage({
   tracking,
 }: Readonly<SoundsLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const resolvedUtmParams = useMemo(() => {
     if (globalThis.window === undefined) {
       return utmParams;
@@ -124,9 +126,34 @@ export function SoundsLandingPage({
     );
   }, [artist.handle, tracking]);
 
-  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
-    setMenuOpen(false)
-  );
+  const shareContext = useMemo(() => {
+    const slug = smartLinkPath.split('/').at(-1) ?? 'release';
+    return buildReleaseShareContext({
+      username: artist.handle ?? 'r',
+      slug,
+      title: release.title,
+      artistName: artist.name,
+      artworkUrl: release.artworkUrl,
+      pathname: artist.handle
+        ? `/${artist.handle}/${slug}/sounds`
+        : smartLinkPath,
+      storyQueryParams: artist.handle
+        ? undefined
+        : {
+            slug,
+            title: release.title,
+            artistName: artist.name,
+            pathname: smartLinkPath,
+            artworkUrl: release.artworkUrl,
+          },
+    });
+  }, [
+    artist.handle,
+    artist.name,
+    release.artworkUrl,
+    release.title,
+    smartLinkPath,
+  ]);
 
   return (
     <SmartLinkShell
@@ -187,7 +214,8 @@ export function SoundsLandingPage({
             type='button'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
-              handleShare();
+              setMenuOpen(false);
+              setShareOpen(true);
             }}
           >
             <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
@@ -202,6 +230,17 @@ export function SoundsLandingPage({
             Listen
           </Link>
         </div>
+      </ProfileDrawerShell>
+      <ProfileDrawerShell
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title='Share'
+        subtitle='Share this page'
+      >
+        <PublicShareActionList
+          context={shareContext}
+          onActionComplete={() => setShareOpen(false)}
+        />
       </ProfileDrawerShell>
     </SmartLinkShell>
   );
