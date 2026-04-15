@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import { DrawerInspectorGrid } from './DrawerInspectorGrid';
 import { DrawerSection } from './DrawerSection';

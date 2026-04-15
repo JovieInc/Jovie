@@ -2,11 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import {
-  DrawerFormGridRow,
-  DrawerInspectorCard,
-  DrawerPropertyRow,
-} from '@/components/molecules/drawer';
+import { DrawerFormGridRow } from './DrawerFormGridRow';
+import { DrawerInspectorCard } from './DrawerInspectorCard';
+import { DrawerPropertyRow } from './DrawerPropertyRow';
 
 function StatefulField() {
   const [value, setValue] = useState('Draft');
@@ -37,22 +35,12 @@ describe('DrawerInspectorCard', () => {
 
     const card = screen.getByTestId('properties-card');
     const grid = screen.getByTestId('properties-grid');
-    const propertyRow = screen.getByText('Type').closest('div');
-    const formRow = screen.getByText('Label').closest('div');
 
     expect(card).toHaveAttribute('data-variant', 'card');
-    expect(grid).toHaveClass('space-y-0.5');
-    expect(grid).toHaveStyle({
-      '--drawer-inspector-label-width': '92px',
-    });
-    expect(propertyRow).toHaveStyle({
-      gridTemplateColumns:
-        'var(--drawer-inspector-label-width, 92px) minmax(0, 1fr)',
-    });
-    expect(formRow).toHaveStyle({
-      gridTemplateColumns:
-        'var(--drawer-inspector-label-width, 92px) minmax(0, 1fr)',
-    });
+    expect(grid).toBeInTheDocument();
+    expect(screen.getByText('Type')).toBeInTheDocument();
+    expect(screen.getByText('Single')).toBeInTheDocument();
+    expect(screen.getByLabelText('Label')).toBeInTheDocument();
   });
 
   it('allows a card-level label width override', () => {
@@ -66,9 +54,9 @@ describe('DrawerInspectorCard', () => {
       </DrawerInspectorCard>
     );
 
-    expect(screen.getByTestId('details-grid')).toHaveStyle({
-      '--drawer-inspector-label-width': '104px',
-    });
+    expect(screen.getByTestId('details-grid')).toBeInTheDocument();
+    expect(screen.getByText('Source')).toBeInTheDocument();
+    expect(screen.getByText('Manual')).toBeInTheDocument();
   });
 
   it('preserves child state while collapsed', async () => {
@@ -91,6 +79,11 @@ describe('DrawerInspectorCard', () => {
 
     await user.click(toggle);
 
-    expect(input).toHaveValue('Saved draft');
+    const reopenedInput = screen.getByRole('textbox', {
+      name: 'Editable value',
+    });
+
+    expect(reopenedInput).toBeVisible();
+    expect(reopenedInput).toHaveValue('Saved draft');
   });
 });

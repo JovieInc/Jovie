@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.6] - 2026-04-15
+
+> Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
+
+### Fixed
+
+- [internal] Addressed drawer inspector review feedback around collapsible section state updates, card header alignment, client boundaries, and test placement.
+
 ## [26.4.153.5] - 2026-04-15
 
 > The Artist Profiles final call-to-action now has more breathing room, so the closing claim section feels calmer and less cramped.
@@ -46,7 +54,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
+- [internal] Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
 - Shared dropdown menus now support consistent loading, selected, active, danger, trailing content, count, and searchable nested states through the common dropdown primitive
 - Recursive dropdown search now supports submenu-local filters, custom radio-item matching, and regression coverage for keyboard search flows
 
