@@ -221,8 +221,10 @@
   /* ── Trust ───────────────────────────────────────────── */
 
   .homepage-trust-strip {
-    background: var(--linear-surface-base);
-    padding: 2rem 0;
+    width: 100%;
+    overflow: hidden;
+    background: #030507;
+    padding: clamp(4.25rem, 9vw, 7.5rem) 0;
   }
 
   .homepage-trust-logos {
@@ -230,7 +232,9 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 1.75rem 3rem;
+    gap: 2rem 3rem;
+    width: 100%;
+    padding: 0 1.25rem;
   }
 
   /* ── Shared Chapter ──────────────────────────────────── */
@@ -1267,6 +1271,15 @@
 
   .homepage-insight-minis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .homepage-trust-logos {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: clamp(1.75rem, 3vw, 4rem);
+    padding: 0 clamp(2rem, 7.5vw, 9.75rem);
   }
 }
 
