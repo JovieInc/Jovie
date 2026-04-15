@@ -15,19 +15,22 @@ import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
   profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
-  SubscriptionInputFeedbackRail,
-  SubscriptionOtpFeedbackRail,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
   subscriptionHeadingClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
+  subscriptionSuccessTextClassName,
   useSubscriptionErrorFeedback,
-  useTemporaryConfirmationMessage,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
@@ -47,7 +50,7 @@ function getExitVariant(instant: boolean) {
 
 function getEnterVariant(instant: boolean) {
   return {
-    initial: instant ? undefined : ({ opacity: 0, y: 8 } as const),
+    initial: instant ? false : ({ opacity: 0, y: 8 } as const),
     animate: instant
       ? { opacity: 1, y: 0 }
       : {
@@ -346,10 +349,10 @@ export function TwoStepNotificationsCTA({
   const inputId = useId();
   const disclaimerId = useId();
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const { user } = useUserSafe();
-  const { confirmMessage, showConfirmation } =
-    useTemporaryConfirmationMessage();
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showInlineErrorCopy, shouldShowDesktopTooltip } =
     useSubscriptionErrorFeedback({
       error,
@@ -421,6 +424,10 @@ export function TwoStepNotificationsCTA({
     return () => globalThis.clearTimeout(timeoutId);
   }, [step, prefersReducedMotion]);
 
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
+
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms
   );
@@ -464,13 +471,6 @@ export function TwoStepNotificationsCTA({
     channel === 'sms'
       ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
       : emailInput;
-  const handleResend = () => {
-    handleResendOtp()
-      .then(() => {
-        showConfirmation('Code sent!');
-      })
-      .catch(() => {});
-  };
 
   return (
     <div
@@ -528,27 +528,50 @@ export function TwoStepNotificationsCTA({
                 smsEnabled={smsEnabled}
                 error={error}
               />
-              {otpStep === 'verify' ? (
-                <SubscriptionOtpFeedbackRail
-                  error={error}
-                  showInlineErrorCopy={showInlineErrorCopy}
-                  shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-                  disclaimerId={disclaimerId}
-                  confirmMessage={confirmMessage}
-                  resendCooldownEnd={resendCooldownEnd}
-                  isResending={isResending}
-                  onResend={handleResend}
-                />
-              ) : (
-                <SubscriptionInputFeedbackRail
-                  error={error}
-                  showInlineErrorCopy={showInlineErrorCopy}
-                  shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-                  isInputFocused={isInputFocused}
-                  disclaimerId={disclaimerId}
-                  confirmMessage={confirmMessage}
-                />
-              )}
+              <SubscriptionFeedbackRail
+                message={
+                  error && showInlineErrorCopy ? (
+                    <span id={disclaimerId} role='alert'>
+                      {error}
+                    </span>
+                  ) : confirmMessage ? (
+                    <span
+                      id={disclaimerId}
+                      className={subscriptionSuccessTextClassName}
+                    >
+                      {confirmMessage}
+                    </span>
+                  ) : otpStep === 'verify' ? (
+                    <span id={disclaimerId}>
+                      Enter the 6-digit code we sent to your email.
+                    </span>
+                  ) : isInputFocused ? (
+                    <span id={disclaimerId}>No spam. Opt-out anytime.</span>
+                  ) : null
+                }
+                sideAction={
+                  otpStep === 'verify' ? (
+                    <>
+                      {error && shouldShowDesktopTooltip ? (
+                        <SubscriptionDesktopErrorIndicator error={error} />
+                      ) : null}
+                      <SubscriptionOtpResendAction
+                        resendCooldownEnd={resendCooldownEnd}
+                        isResending={isResending}
+                        onResend={() => {
+                          requestOtpResendConfirmation({
+                            handleResendOtp,
+                            confirmTimeoutRef,
+                            setConfirmMessage,
+                          });
+                        }}
+                      />
+                    </>
+                  ) : error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : null
+                }
+              />
             </div>
           </motion.div>
         )}

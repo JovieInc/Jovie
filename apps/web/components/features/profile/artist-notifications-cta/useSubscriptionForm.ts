@@ -62,7 +62,7 @@ interface UseSubscriptionFormReturn {
   handleOtpChange: (value: string) => void;
   handleSubscribe: () => Promise<void>;
   handleVerifyOtp: () => Promise<void>;
-  handleResendOtp: () => Promise<void>;
+  handleResendOtp: () => Promise<boolean>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
   // From profile notifications context
@@ -75,6 +75,8 @@ interface UseSubscriptionFormReturn {
   hydrationStatus: 'idle' | 'checking' | 'done';
   smsEnabled: boolean;
 }
+
+const OTP_RESEND_COOLDOWN_MS = 30_000;
 
 const resolveInlineErrorMessage = (
   error: unknown,
@@ -144,6 +146,7 @@ export function useSubscriptionForm({
       clearError();
       setOtpStep('input');
       setOtpCode('');
+      setResendCooldownEnd(0);
       if (next === 'email') {
         setPhoneInput('');
       } else {
@@ -168,6 +171,7 @@ export function useSubscriptionForm({
       setEmailInput(value);
       if (otpStep !== 'input') setOtpStep('input');
       if (otpCode) setOtpCode('');
+      setResendCooldownEnd(0);
       if (error) clearError();
     },
     [clearError, error, otpCode, otpStep]
@@ -279,6 +283,7 @@ export function useSubscriptionForm({
         // Double opt-in: show pending confirmation state
         setNotificationsState('pending_confirmation');
         setOtpStep('verify');
+        setResendCooldownEnd(Date.now() + OTP_RESEND_COOLDOWN_MS);
         showSuccess('Enter the 6-digit code we sent to your email.');
       } else {
         // Single opt-in: immediate success
@@ -398,7 +403,9 @@ export function useSubscriptionForm({
   ]);
 
   const handleResendOtp = useCallback(async () => {
-    if (isResending || Date.now() < resendCooldownEnd) return;
+    if (isResending || Date.now() < resendCooldownEnd) {
+      return false;
+    }
 
     setIsResending(true);
     clearError();
@@ -417,12 +424,13 @@ export function useSubscriptionForm({
       });
 
       setOtpCode('');
-      setResendCooldownEnd(Date.now() + 30_000);
+      setResendCooldownEnd(Date.now() + OTP_RESEND_COOLDOWN_MS);
     } else {
       updateError('Failed to resend code. Please try again.', 'resend');
     }
 
     setIsResending(false);
+    return success;
   }, [
     artist.handle,
     clearError,
@@ -481,9 +489,7 @@ export function useSubscriptionForm({
       event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          const submitAction =
-            otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
-          submitAction().catch(() => {});
+          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe());
         }
       },
       [handleSubscribe, handleVerifyOtp, otpStep]

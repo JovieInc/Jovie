@@ -14,17 +14,19 @@ import {
 import type { Artist } from '@/types/db';
 import { BirthdayInput } from './BirthdayInput';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
-  SubscriptionInputFeedbackRail,
-  SubscriptionOtpFeedbackRail,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
+  subscriptionSuccessTextClassName,
   useSubscriptionErrorFeedback,
-  useTemporaryConfirmationMessage,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
@@ -43,7 +45,7 @@ function getExitVariant(instant: boolean) {
 
 function getEnterVariant(instant: boolean) {
   return {
-    initial: instant ? undefined : ({ opacity: 0, y: 4 } as const),
+    initial: instant ? false : ({ opacity: 0, y: 4 } as const),
     animate: instant
       ? { opacity: 1, y: 0 }
       : {
@@ -233,8 +235,8 @@ export function ProfileInlineNotificationsCTA({
   const [birthdayInput, setBirthdayInput] = useState('');
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const { confirmMessage, clearConfirmation, showConfirmation } =
-    useTemporaryConfirmationMessage();
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const prefersReducedMotion = useReducedMotion();
@@ -320,6 +322,10 @@ export function ProfileInlineNotificationsCTA({
     };
   }, []);
 
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
+
   const handleReveal = useCallback(() => {
     openSubscription();
     handleChannelChange('email'); // Inline CTA always uses email
@@ -343,7 +349,7 @@ export function ProfileInlineNotificationsCTA({
   }, [onRegisterReveal, handleReveal]);
 
   const handleEmailSubmit = useCallback(() => {
-    handleSubscribe().catch(() => {});
+    void handleSubscribe();
   }, [handleSubscribe]);
 
   const handleNameSubmit = useCallback(async () => {
@@ -407,23 +413,11 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
-      else if (step === 'name') handleNameSubmit().catch(() => {});
-      else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
+      else if (step === 'name') void handleNameSubmit();
+      else if (step === 'birthday') void handleBirthdaySubmit();
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
-
-  const handleOtpSubmit = useCallback(() => {
-    handleVerifyOtp().catch(() => {});
-  }, [handleVerifyOtp]);
-
-  const handleResend = useCallback(() => {
-    handleResendOtp()
-      .then(() => {
-        showConfirmation('Code sent!');
-      })
-      .catch(() => {});
-  }, [handleResendOtp, showConfirmation]);
 
   const handleManageButtonFocus = useCallback(() => {
     if (!lastInteractionWasKeyboardRef.current) return;
@@ -512,11 +506,19 @@ export function ProfileInlineNotificationsCTA({
               autoComplete='email'
               maxLength={254}
             />
-            <SubscriptionInputFeedbackRail
-              error={error}
-              showInlineErrorCopy={showInlineErrorCopy}
-              shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-              isInputFocused={isInputFocused}
+            <SubscriptionFeedbackRail
+              message={
+                error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : isInputFocused ? (
+                  'No spam. Opt-out anytime.'
+                ) : null
+              }
+              sideAction={
+                error && shouldShowDesktopTooltip ? (
+                  <SubscriptionDesktopErrorIndicator error={error} />
+                ) : null
+              }
             />
           </motion.div>
         )}
@@ -534,7 +536,9 @@ export function ProfileInlineNotificationsCTA({
               className='px-3 py-3'
               action={
                 <CircularSubmitButton
-                  onClick={handleOtpSubmit}
+                  onClick={() => {
+                    handleVerifyOtp().catch(() => {});
+                  }}
                   disabled={
                     otpCode.length !== 6 || isSubmitting || Boolean(error)
                   }
@@ -547,11 +551,11 @@ export function ProfileInlineNotificationsCTA({
                   value={otpCode}
                   onChange={value => {
                     handleOtpChange(value);
-                    if (confirmMessage) clearConfirmation();
+                    if (confirmMessage) setConfirmMessage(null);
                   }}
                   onComplete={() => {
                     if (!error) {
-                      handleOtpSubmit();
+                      handleVerifyOtp().catch(() => {});
                     }
                   }}
                   autoFocus
@@ -561,14 +565,36 @@ export function ProfileInlineNotificationsCTA({
                 />
               </div>
             </SubscriptionPearlComposer>
-            <SubscriptionOtpFeedbackRail
-              error={error}
-              showInlineErrorCopy={showInlineErrorCopy}
-              shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-              confirmMessage={error ? null : confirmMessage}
-              resendCooldownEnd={resendCooldownEnd}
-              isResending={isResending}
-              onResend={handleResend}
+            <SubscriptionFeedbackRail
+              message={
+                error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : confirmMessage && !error ? (
+                  <span className={subscriptionSuccessTextClassName}>
+                    {confirmMessage}
+                  </span>
+                ) : (
+                  'Enter the 6-digit code we sent to your email.'
+                )
+              }
+              sideAction={
+                <>
+                  {error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : null}
+                  <SubscriptionOtpResendAction
+                    resendCooldownEnd={resendCooldownEnd}
+                    isResending={isResending}
+                    onResend={() => {
+                      requestOtpResendConfirmation({
+                        handleResendOtp,
+                        confirmTimeoutRef,
+                        setConfirmMessage,
+                      });
+                    }}
+                  />
+                </>
+              }
             />
           </motion.div>
         )}
@@ -589,7 +615,7 @@ export function ProfileInlineNotificationsCTA({
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onSubmit={() => {
-                handleNameSubmit().catch(() => {});
+                void handleNameSubmit();
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -623,10 +649,10 @@ export function ProfileInlineNotificationsCTA({
                     if (birthdayHintShown) setBirthdayHintShown(false);
                   }}
                   onComplete={() => {
-                    handleBirthdaySubmit().catch(() => {});
+                    void handleBirthdaySubmit();
                   }}
                   onSubmit={() => {
-                    handleBirthdaySubmit().catch(() => {});
+                    void handleBirthdaySubmit();
                   }}
                   autoFocus
                   disabled={birthdayMutation.isPending}

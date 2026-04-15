@@ -9,11 +9,14 @@ import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
   profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
-  SubscriptionInputFeedbackRail,
-  SubscriptionOtpFeedbackRail,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
@@ -23,7 +26,6 @@ import {
   subscriptionPrimaryLinkClassName,
   subscriptionSuccessTextClassName,
   useSubscriptionErrorFeedback,
-  useTemporaryConfirmationMessage,
 } from './shared';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
@@ -328,8 +330,8 @@ export function ArtistNotificationsCTA({
   const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const { confirmMessage, showConfirmation } =
-    useTemporaryConfirmationMessage();
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showInlineErrorCopy, shouldShowDesktopTooltip } =
     useSubscriptionErrorFeedback({
       error,
@@ -345,6 +347,9 @@ export function ArtistNotificationsCTA({
     notificationsState,
     openSubscription
   );
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
 
   const showsSubscribeForm = isSubscribeFormVisible(
     notificationsEnabled,
@@ -422,14 +427,6 @@ export function ArtistNotificationsCTA({
 
   const handleFormSubmit =
     otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
-
-  const handleResend = () => {
-    handleResendOtp()
-      .then(() => {
-        showConfirmation('Code sent!');
-      })
-      .catch(() => {});
-  };
 
   let leftSlot: React.ReactNode;
   if (otpStep === 'verify') {
@@ -533,28 +530,50 @@ export function ArtistNotificationsCTA({
         )}
       </SubscriptionPearlComposer>
 
-      {otpStep === 'verify' ? (
-        <SubscriptionOtpFeedbackRail
-          error={error}
-          showInlineErrorCopy={showInlineErrorCopy}
-          shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-          disclaimerId={disclaimerId}
-          confirmMessage={confirmMessage}
-          resendCooldownEnd={resendCooldownEnd}
-          isResending={isResending}
-          onResend={handleResend}
-          instructionClassName={subscriptionSuccessTextClassName}
-        />
-      ) : (
-        <SubscriptionInputFeedbackRail
-          error={error}
-          showInlineErrorCopy={showInlineErrorCopy}
-          shouldShowDesktopTooltip={shouldShowDesktopTooltip}
-          isInputFocused={isInputFocused}
-          disclaimerId={disclaimerId}
-          confirmMessage={confirmMessage}
-        />
-      )}
+      <SubscriptionFeedbackRail
+        message={
+          error && showInlineErrorCopy ? (
+            <span id={disclaimerId} role='alert'>
+              {error}
+            </span>
+          ) : confirmMessage ? (
+            <span
+              id={disclaimerId}
+              className={subscriptionSuccessTextClassName}
+            >
+              {confirmMessage}
+            </span>
+          ) : otpStep === 'verify' ? (
+            <span id={disclaimerId}>
+              Enter the 6-digit code we sent to your email.
+            </span>
+          ) : isInputFocused ? (
+            <span id={disclaimerId}>No spam. Opt-out anytime.</span>
+          ) : null
+        }
+        sideAction={
+          otpStep === 'verify' ? (
+            <>
+              {error && shouldShowDesktopTooltip ? (
+                <SubscriptionDesktopErrorIndicator error={error} />
+              ) : null}
+              <SubscriptionOtpResendAction
+                resendCooldownEnd={resendCooldownEnd}
+                isResending={isResending}
+                onResend={() => {
+                  requestOtpResendConfirmation({
+                    handleResendOtp,
+                    confirmTimeoutRef,
+                    setConfirmMessage,
+                  });
+                }}
+              />
+            </>
+          ) : error && shouldShowDesktopTooltip ? (
+            <SubscriptionDesktopErrorIndicator error={error} />
+          ) : null
+        }
+      />
     </div>
   );
 }

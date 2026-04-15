@@ -104,7 +104,8 @@ describe('Marketing content guardrails', () => {
       const { container } = render(createElement(HomePageNarrative));
       const text = container.textContent ?? '';
 
-      expect(text).toContain('Built for artists by artists');
+      expect(text).toContain('Built for artists');
+      expect(text).not.toContain('Built for artists by artists');
       expect(text).toContain('Notify every fan. Automatically.');
       expect(text).toContain('Engage.');
       expect(text).toContain('Turn action into a relationship.');

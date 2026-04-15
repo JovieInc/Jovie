@@ -1,21 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import ArtistProfilesPage from '@/app/(marketing)/artist-profiles/page';
-
-vi.mock('@/constants/app', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/constants/app')>();
-  return {
-    ...actual,
-    APP_NAME: 'Jovie',
-    BASE_URL: 'https://jov.ie',
-  };
-});
-
-vi.mock('@/features/home/StickyPhoneTour', () => ({
-  StickyPhoneTour: (props: Record<string, unknown>) => (
-    <div data-testid='sticky-phone-tour'>{String(props.introTitle ?? '')}</div>
-  ),
-}));
+import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import {
+  ARTIST_PROFILE_LAUNCH_FEATURES,
+  ARTIST_PROFILE_SPEC_TILES,
+} from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
 describe('ArtistProfilesPage', () => {
   const originalMatchMedia = globalThis.matchMedia;
@@ -38,27 +30,79 @@ describe('ArtistProfilesPage', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the homepage hero and all sections ungated', () => {
+  it('renders the artist profile landing scaffold', () => {
     render(<ArtistProfilesPage />);
 
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
-    expect(screen.getByText('One profile.')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-chapter-1')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-chapter-2')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-chapter-3')).toBeInTheDocument();
-    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-auto-notify')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-engage-bento')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-spec-section')).toBeInTheDocument();
-    expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'The link your music deserves.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Built for every mode.' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'One profile can flex from release push to ticket sales to fan capture.'
+      )
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Release' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Subscribe' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Links' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'One profile. Infinite outcomes.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Capture every fan.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Built for artists. Obsessively specific.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: 'Claim your profile' }).length
+    ).toBeGreaterThan(1);
   });
 
-  it('uses the artist profile CTA copy', () => {
+  it('renders the data-driven faq and final cta copy', () => {
     render(<ArtistProfilesPage />);
 
+    expect(
+      screen.getByRole('heading', { name: 'Frequently asked questions' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
       'Claim your profile.'
     );
+    expect(
+      screen.getByText('Your next release deserves a better link.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders only the hero when full page sections are flagged off', () => {
+    render(
+      <ArtistProfileLandingPage
+        copy={ARTIST_PROFILE_COPY}
+        launchFeatures={ARTIST_PROFILE_LAUNCH_FEATURES}
+        specTiles={ARTIST_PROFILE_SPEC_TILES}
+        socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
+        flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
+      />
+    );
+
+    expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Release' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'One profile. Infinite outcomes.' })
+    ).not.toBeInTheDocument();
   });
 });

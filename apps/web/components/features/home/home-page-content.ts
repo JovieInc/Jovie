@@ -126,7 +126,7 @@ export const HOME_PAGE_ARTIST = {
 /* ── Content ──────────────────────────────────────────── */
 
 export const HOME_HERO_CONTENT: HomeHeroContent = {
-  eyebrow: 'Built for artists by artists',
+  eyebrow: 'Built for artists',
   title: 'The link your music deserves.',
   body: 'Streams, drops, tips, bookings, and fan capture in a single page.',
   vanityUrl: 'jov.ie/you',
@@ -237,7 +237,7 @@ export const HOME_RELATIONSHIP_SECTION_CONTENT: HomeRelationshipSectionContent =
   };
 
 export const HOME_PHILOSOPHY_CONTENT: HomePhilosophyContent = {
-  sectionTitle: 'Built for artists by artists.',
+  sectionTitle: 'Built for artists',
   leadTitle: 'Opinionated.',
   leadBody:
     'Conversion-first by default. No templates to break. No customization rabbit hole. Fans learn what to tap because every profile works the same way.',

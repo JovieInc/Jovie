@@ -90,6 +90,7 @@ interface ProfileCompactSurfaceProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
   readonly latestRelease?: ProfileCompactRelease | null;
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
@@ -103,6 +104,7 @@ interface ProfileCompactSurfaceProps {
   readonly tourDates?: TourDateViewModel[];
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
+  readonly releases?: readonly PublicRelease[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly onDrawerOpenChange: (open: boolean) => void;
@@ -125,8 +127,6 @@ interface ProfileCompactSurfaceProps {
   readonly dataTestId?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly hasReleases?: boolean;
-  readonly releases?: readonly PublicRelease[];
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -242,6 +242,7 @@ export function ProfileCompactSurface({
   artist,
   socialLinks,
   contacts,
+  showPayButton = true,
   latestRelease,
   profileSettings,
   enableDynamicEngagement = false,
@@ -253,6 +254,7 @@ export function ProfileCompactSurface({
   tourDates = [],
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
+  releases = [],
   drawerOpen,
   drawerView,
   onDrawerOpenChange,
@@ -279,8 +281,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideJovieBranding = false,
   hideMoreMenu = false,
-  hasReleases = false,
-  releases,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
     () =>
@@ -319,9 +319,10 @@ export function ProfileCompactSurface({
     return getHeaderSocialLinks(socialLinks, viewerCountryCode, 2);
   }, [socialLinks, viewerCountryCode]);
   const hasTip = useMemo(
-    () => socialLinks.some(link => link.platform === 'venmo'),
-    [socialLinks]
+    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
+    [showPayButton, socialLinks]
   );
+  const hasReleases = releases.length >= 2;
   const hasAbout = Boolean(
     artist.tagline ||
       artist.location ||
@@ -655,11 +656,11 @@ export function ProfileCompactSurface({
           hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasReleases={hasReleases}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
-          hasReleases={hasReleases}
           releases={releases}
           onRevealNotifications={onRevealNotifications}
         />

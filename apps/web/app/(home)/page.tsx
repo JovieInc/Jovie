@@ -148,7 +148,7 @@ export default function HomePage() {
 
       <HomePageNarrative
         proofAvailability={showLiveProof ? 'visible' : 'hidden'}
-        proofSection={showLiveProof ? <SeeItInActionSafe /> : null}
+        proofSection={showLiveProof ? <SeeItInActionSafe enabled /> : null}
       />
     </div>
   );

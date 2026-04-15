@@ -24,7 +24,7 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -38,6 +38,7 @@ interface ProfileCompactTemplateProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
+  readonly showPayButton?: boolean;
   readonly latestRelease?: {
     readonly title: string;
     readonly slug: string;
@@ -131,6 +132,7 @@ export function ProfileCompactTemplate({
   artist,
   socialLinks,
   contacts,
+  showPayButton = false,
   latestRelease,
   profileSettings,
   enableDynamicEngagement = false,
@@ -317,11 +319,11 @@ export function ProfileCompactTemplate({
   ]);
 
   const hasContacts = contacts.some(contact => contact.channels.length > 0);
-  const hasReleases = (releases?.length ?? 0) >= 2;
   const hasTip = useMemo(
-    () => socialLinks.some(link => link.platform === 'venmo'),
-    [socialLinks]
+    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
+    [showPayButton, socialLinks]
   );
+  const hasReleases = (releases?.length ?? 0) >= 2;
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -513,6 +515,7 @@ export function ProfileCompactTemplate({
                 artist={artist}
                 socialLinks={socialLinks}
                 contacts={contacts}
+                showPayButton={showPayButton}
                 latestRelease={latestRelease}
                 profileSettings={profileSettings}
                 enableDynamicEngagement={enableDynamicEngagement}
@@ -547,7 +550,6 @@ export function ProfileCompactTemplate({
                 onRevealNotifications={() => {
                   revealNotificationsRef.current?.();
                 }}
-                hasReleases={hasReleases}
                 releases={releases}
               />
             </div>

@@ -11,7 +11,10 @@ import { AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 import Link from 'next/link';
 import {
   type CSSProperties,
+  type Dispatch,
+  type MutableRefObject,
   type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
@@ -20,7 +23,7 @@ import {
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useUpdateSubscriberNameMutation } from '@/lib/queries';
+import { useUpdateSubscriberNameMutation } from '@/lib/queries/useNotificationStatusQuery';
 import { cn } from '@/lib/utils';
 import type { NotificationSubscriptionState } from '@/types/notifications';
 import type { SubscriptionErrorOrigin } from './useSubscriptionForm';
@@ -104,25 +107,38 @@ interface SubscriptionOtpResendActionProps {
   readonly onResend: () => void;
 }
 
-interface SubscriptionInputFeedbackRailProps {
-  readonly error: string | null;
-  readonly showInlineErrorCopy: boolean;
-  readonly shouldShowDesktopTooltip: boolean;
-  readonly isInputFocused: boolean;
-  readonly disclaimerId?: string;
-  readonly confirmMessage?: string | null;
+interface OtpResendConfirmationOptions {
+  readonly handleResendOtp: () => Promise<boolean>;
+  readonly confirmTimeoutRef: MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>;
+  readonly setConfirmMessage: Dispatch<SetStateAction<string | null>>;
 }
 
-interface SubscriptionOtpFeedbackRailProps {
-  readonly error: string | null;
-  readonly showInlineErrorCopy: boolean;
-  readonly shouldShowDesktopTooltip: boolean;
-  readonly disclaimerId?: string;
-  readonly confirmMessage?: string | null;
-  readonly resendCooldownEnd: number;
-  readonly isResending: boolean;
-  readonly onResend: () => void;
-  readonly instructionClassName?: string;
+export function clearOtpConfirmTimeout(
+  confirmTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
+) {
+  const confirmTimeout = confirmTimeoutRef.current;
+  if (confirmTimeout) {
+    clearTimeout(confirmTimeout);
+    confirmTimeoutRef.current = null;
+  }
+}
+
+export function requestOtpResendConfirmation({
+  handleResendOtp,
+  confirmTimeoutRef,
+  setConfirmMessage,
+}: OtpResendConfirmationOptions) {
+  void handleResendOtp().then(didResend => {
+    if (!didResend) {
+      return;
+    }
+
+    setConfirmMessage('Code sent!');
+    clearOtpConfirmTimeout(confirmTimeoutRef);
+    confirmTimeoutRef.current = setTimeout(() => setConfirmMessage(null), 2000);
+  });
 }
 
 export function SubscriptionPearlComposer({
@@ -196,141 +212,6 @@ export function SubscriptionFeedbackRail({
       {sideAction ? <div className='shrink-0'>{sideAction}</div> : null}
     </div>
   );
-}
-
-export function SubscriptionInputFeedbackRail({
-  error,
-  showInlineErrorCopy,
-  shouldShowDesktopTooltip,
-  isInputFocused,
-  disclaimerId,
-  confirmMessage,
-}: SubscriptionInputFeedbackRailProps) {
-  let message: ReactNode = null;
-
-  if (error && showInlineErrorCopy) {
-    message = (
-      <span id={disclaimerId} role='alert'>
-        {error}
-      </span>
-    );
-  } else if (confirmMessage) {
-    message = (
-      <span id={disclaimerId} className={subscriptionSuccessTextClassName}>
-        {confirmMessage}
-      </span>
-    );
-  } else if (isInputFocused) {
-    message = <span id={disclaimerId}>No spam. Opt-out anytime.</span>;
-  }
-
-  return (
-    <SubscriptionFeedbackRail
-      message={message}
-      sideAction={
-        error && shouldShowDesktopTooltip ? (
-          <SubscriptionDesktopErrorIndicator error={error} />
-        ) : null
-      }
-    />
-  );
-}
-
-export function SubscriptionOtpFeedbackRail({
-  error,
-  showInlineErrorCopy,
-  shouldShowDesktopTooltip,
-  disclaimerId,
-  confirmMessage,
-  resendCooldownEnd,
-  isResending,
-  onResend,
-  instructionClassName,
-}: SubscriptionOtpFeedbackRailProps) {
-  let message: ReactNode;
-
-  if (error && showInlineErrorCopy) {
-    message = (
-      <span id={disclaimerId} role='alert'>
-        {error}
-      </span>
-    );
-  } else if (confirmMessage) {
-    message = (
-      <span id={disclaimerId} className={subscriptionSuccessTextClassName}>
-        {confirmMessage}
-      </span>
-    );
-  } else if (instructionClassName) {
-    message = (
-      <span id={disclaimerId} className={instructionClassName}>
-        Enter the 6-digit code we sent to your email.
-      </span>
-    );
-  } else {
-    message = (
-      <span id={disclaimerId}>
-        Enter the 6-digit code we sent to your email.
-      </span>
-    );
-  }
-
-  return (
-    <SubscriptionFeedbackRail
-      message={message}
-      sideAction={
-        error && shouldShowDesktopTooltip ? (
-          <SubscriptionDesktopErrorIndicator error={error} />
-        ) : (
-          <SubscriptionOtpResendAction
-            resendCooldownEnd={resendCooldownEnd}
-            isResending={isResending}
-            onResend={onResend}
-          />
-        )
-      }
-    />
-  );
-}
-
-export function useTemporaryConfirmationMessage(durationMs = 2000) {
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  const clearConfirmation = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setConfirmMessage(null);
-  }, []);
-
-  const showConfirmation = useCallback(
-    (message: string) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      setConfirmMessage(message);
-      timeoutRef.current = setTimeout(
-        () => setConfirmMessage(null),
-        durationMs
-      );
-    },
-    [durationMs]
-  );
-
-  return {
-    confirmMessage,
-    clearConfirmation,
-    showConfirmation,
-  };
 }
 
 export function useSubscriptionErrorFeedback({
@@ -629,7 +510,7 @@ export function SubscriptionSuccess({
         {handle ? (
           <Link
             href={`/${handle}?mode=listen`}
-            prefetch
+            prefetch={false}
             className={subscriptionPrimaryLinkClassName}
           >
             Listen Now
@@ -654,7 +535,7 @@ export function SubscriptionSuccess({
       {handle ? (
         <Link
           href={`/${handle}?mode=listen`}
-          prefetch
+          prefetch={false}
           className={subscriptionPrimaryLinkClassName}
         >
           Listen Now
