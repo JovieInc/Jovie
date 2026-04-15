@@ -108,6 +108,26 @@ describe('performance route resolvers', () => {
     ).resolves.toBe('/app/chat/conv_123');
   });
 
+  it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for chat routes', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
+    const route = {
+      path: '/app/chat/[id]',
+    } as PerfRouteDefinition;
+    await expect(
+      resolveChatConversationPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: '__e2e_test_user_id',
+            path: '/',
+            value: 'user_cookie_123',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/chat/conv_123');
+  });
+
   it('creates a chat thread via an authenticated app page when no thread exists yet', async () => {
     resolverMocks.sql.mockImplementation(
       async (
@@ -189,12 +209,81 @@ describe('performance route resolvers', () => {
     ).resolves.toBe('/app/dashboard/releases/release_456/tasks');
   });
 
+  it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for release task routes', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
+    const route = {
+      path: '/app/dashboard/releases/[releaseId]/tasks',
+    } as PerfRouteDefinition;
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: '__e2e_test_user_id',
+            path: '/',
+            value: 'user_cookie_123',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/dashboard/releases/release_456/tasks');
+  });
+
+  it('creates a lightweight perf release when the active profile has no releases yet', async () => {
+    resolverMocks.sql.mockImplementation(
+      async (
+        strings: TemplateStringsArray
+      ): Promise<readonly Record<string, string>[]> => {
+        const query = strings.join(' ').replace(/\s+/g, ' ').trim();
+
+        if (query.includes('from users u')) {
+          return [{ id: 'profile_123', username_normalized: 'musicmaker' }];
+        }
+
+        if (
+          query.includes('from discog_releases') ||
+          query.includes('where creator_profile_id')
+        ) {
+          return [];
+        }
+
+        if (query.includes('insert into discog_releases')) {
+          return [{ id: 'release_perf_123' }];
+        }
+
+        return [];
+      }
+    );
+
+    const route = {
+      path: '/app/dashboard/releases/[releaseId]/tasks',
+    } as PerfRouteDefinition;
+
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).resolves.toBe('/app/dashboard/releases/release_perf_123/tasks');
+  });
+
   it('falls back to the authenticated releases UI when DB release lookup is unavailable', async () => {
     vi.unstubAllEnvs();
     vi.stubEnv('DATABASE_URL', ''); // Doppler injects a real DATABASE_URL; explicitly clear to simulate unavailability
 
     const click = vi.fn().mockResolvedValue(undefined);
     const goto = vi.fn().mockResolvedValue(undefined);
+    const getAttribute = vi
+      .fn()
+      .mockResolvedValue('mobile-release-row-release_987');
+    const locator = vi.fn(() => ({
+      first: () => ({
+        getAttribute,
+      }),
+    }));
+    const setViewportSize = vi.fn().mockResolvedValue(undefined);
+    const viewportSize = vi.fn(() => ({ width: 1280, height: 720 }));
+    const waitForLoadState = vi.fn().mockResolvedValue(undefined);
     const waitForSelector = vi.fn().mockResolvedValue(undefined);
     const waitForURL = vi.fn().mockResolvedValue(undefined);
     const addCookies = vi.fn().mockResolvedValue(undefined);
@@ -208,11 +297,16 @@ describe('performance route resolvers', () => {
         close: contextClose,
         newPage: vi.fn().mockResolvedValue({
           click,
+          evaluate: vi.fn().mockResolvedValue(null),
           goto,
+          locator,
+          setViewportSize,
           url: vi.fn(
             () =>
               'http://127.0.0.1:4100/app/dashboard/releases/release_987/tasks'
           ),
+          viewportSize,
+          waitForLoadState,
           waitForSelector,
           waitForURL,
         }),
@@ -244,33 +338,76 @@ describe('performance route resolvers', () => {
         waitUntil: 'domcontentloaded',
       }
     );
-    expect(waitForSelector).toHaveBeenNthCalledWith(
-      1,
-      '[data-testid="release-row"]',
-      {
-        timeout: 15_000,
-      }
-    );
-    expect(waitForSelector).toHaveBeenNthCalledWith(
-      2,
-      '[data-testid="release-sidebar"]',
-      {
-        timeout: 15_000,
-      }
-    );
-    expect(waitForSelector).toHaveBeenNthCalledWith(
-      3,
-      '[data-testid="release-tasks-card"]',
-      {
-        timeout: 15_000,
-      }
-    );
-    expect(click).toHaveBeenNthCalledWith(1, '[data-testid="release-row"]');
-    expect(click).toHaveBeenNthCalledWith(2, 'button:has-text("Tasks")');
-    expect(click).toHaveBeenNthCalledWith(3, 'button:has-text("Open")');
-    expect(waitForURL).toHaveBeenCalledWith('**/tasks', {
-      timeout: 15_000,
+    expect(waitForLoadState).toHaveBeenCalledWith('domcontentloaded', {
+      timeout: 10_000,
     });
+    expect(setViewportSize).toHaveBeenNthCalledWith(1, {
+      width: 390,
+      height: 720,
+    });
+    expect(locator).toHaveBeenCalledWith(
+      '[data-testid^="mobile-release-row-"]'
+    );
+    expect(setViewportSize).toHaveBeenNthCalledWith(2, {
+      width: 1280,
+      height: 720,
+    });
+    expect(click).not.toHaveBeenCalled();
+    expect(waitForSelector).not.toHaveBeenCalled();
+    expect(waitForURL).not.toHaveBeenCalled();
+    expect(contextClose).toHaveBeenCalledOnce();
+    expect(browserClose).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when the app fallback cannot resolve a release tasks route', async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv('DATABASE_URL', '');
+
+    const addCookies = vi.fn().mockResolvedValue(undefined);
+    const contextClose = vi.fn().mockResolvedValue(undefined);
+    const browserClose = vi.fn().mockResolvedValue(undefined);
+
+    resolverMocks.chromiumLaunch.mockResolvedValue({
+      close: browserClose,
+      newContext: vi.fn().mockResolvedValue({
+        addCookies,
+        close: contextClose,
+        newPage: vi.fn().mockResolvedValue({
+          goto: vi.fn().mockResolvedValue(undefined),
+          locator: vi.fn(() => ({
+            first: () => ({
+              getAttribute: vi.fn().mockResolvedValue(null),
+            }),
+          })),
+          setViewportSize: vi.fn().mockResolvedValue(undefined),
+          url: vi.fn(() => 'http://127.0.0.1:4100/app/dashboard/releases'),
+          viewportSize: vi.fn(() => ({ width: 1280, height: 720 })),
+          waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    });
+
+    const route = {
+      path: '/app/dashboard/releases/[releaseId]/tasks',
+    } as PerfRouteDefinition;
+
+    await expect(
+      resolveReleaseTasksPerfPath(route, {
+        authCookies: [
+          {
+            domain: '127.0.0.1',
+            name: 'session',
+            path: '/',
+            value: 'cookie',
+          },
+        ],
+        baseUrl: 'http://127.0.0.1:4100',
+      })
+    ).rejects.toThrow(
+      'Release tasks require either DATABASE_URL with a resolvable active profile or authenticated authCookies for the app fallback.'
+    );
+
+    expect(addCookies).toHaveBeenCalledOnce();
     expect(contextClose).toHaveBeenCalledOnce();
     expect(browserClose).toHaveBeenCalledOnce();
   });
