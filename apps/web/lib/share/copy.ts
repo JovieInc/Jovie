@@ -116,8 +116,8 @@ export function slugifyShareValue(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '');
+    .replaceAll(/[^a-z0-9]+/gu, '-')
+    .replaceAll(/^-+|-+$/gu, '');
 }
 
 export function buildPublicShareFallbackText(context: ShareContext): string {
