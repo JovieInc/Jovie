@@ -350,6 +350,7 @@ function ContentPageBody({
     return (
       <ScheduledReleasePage
         release={{
+          slug: content.slug,
           title: content.title,
           artworkUrl: content.artworkUrl,
           releaseDate: toISOStringOrNull(content.releaseDate)!,
