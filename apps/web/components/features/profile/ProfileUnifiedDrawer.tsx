@@ -26,8 +26,10 @@ import {
   extractVenmoUsername,
   isAllowedVenmoUrl,
 } from '@/features/profile/utils/venmo';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -41,6 +43,7 @@ import { StaticListenInterface } from './StaticListenInterface';
 
 export type DrawerView =
   | 'menu'
+  | 'share'
   | 'notifications'
   | 'about'
   | 'listen'
@@ -57,6 +60,10 @@ interface DrawerMeta {
 
 const VIEW_META: Record<DrawerView, DrawerMeta> = {
   menu: { title: 'Menu' },
+  share: {
+    title: 'Share',
+    subtitle: 'Share this profile',
+  },
   notifications: {
     title: 'Notifications',
     subtitle: 'Choose what you hear about.',
@@ -106,7 +113,7 @@ interface ProfileUnifiedDrawerProps {
   readonly onTogglePref: (key: NotificationContentType) => void;
   readonly onUnsubscribe: () => void;
   readonly isUnsubscribing: boolean;
-  readonly onShare: () => void;
+  readonly shareContext: ShareContext;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly hasAbout: boolean;
@@ -346,7 +353,7 @@ export function ProfileUnifiedDrawer({
   onTogglePref,
   onUnsubscribe,
   isUnsubscribing,
-  onShare,
+  shareContext,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   hasAbout,
@@ -414,11 +421,6 @@ export function ProfileUnifiedDrawer({
     },
     [onViewChange]
   );
-
-  const handleShareAndClose = useCallback(() => {
-    handleOpenChange(false);
-    onShare();
-  }, [handleOpenChange, onShare]);
 
   // Track mode views
   useEffect(() => {
@@ -501,7 +503,7 @@ export function ProfileUnifiedDrawer({
                 type='button'
                 role='menuitem'
                 className={menuItemClass}
-                onClick={handleShareAndClose}
+                onClick={() => navigateTo('share')}
               >
                 <Share2 className={iconClass} />
                 Share Profile
@@ -600,6 +602,13 @@ export function ProfileUnifiedDrawer({
                 </button>
               )}
             </div>
+          )}
+
+          {view === 'share' && (
+            <PublicShareActionList
+              context={shareContext}
+              onActionComplete={() => handleOpenChange(false)}
+            />
           )}
 
           {view === 'notifications' && (

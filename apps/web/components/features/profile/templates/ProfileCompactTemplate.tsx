@@ -29,6 +29,7 @@ import {
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
+import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
@@ -534,23 +535,15 @@ export function ProfileCompactTemplate({
     openDrawerMode('listen');
   }, [mergedDSPs.length, openDrawerMode]);
 
-  const handleShare = useCallback(async () => {
-    const profileUrl = `${BASE_URL}/${artist.handle}`;
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({ title: artist.name, url: profileUrl });
-      } else {
-        await navigator.clipboard.writeText(profileUrl);
-      }
-    } catch {
-      try {
-        await navigator.clipboard.writeText(profileUrl);
-      } catch {
-        // Silent failure
-      }
-    }
-    setRequestedMode('profile');
-  }, [artist.handle, artist.name]);
+  const shareContext = useMemo(
+    () =>
+      buildProfileShareContext({
+        username: artist.handle,
+        artistName: artist.name,
+        avatarUrl: heroImageUrl,
+      }),
+    [artist.handle, artist.name, heroImageUrl]
+  );
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -851,7 +844,7 @@ export function ProfileCompactTemplate({
           onTogglePref={handleTogglePref}
           onUnsubscribe={handleUnsubscribe}
           isUnsubscribing={unsubMutation.isPending}
-          onShare={handleShare}
+          shareContext={shareContext}
           enableDynamicEngagement={enableDynamicEngagement}
           subscribeTwoStep={subscribeTwoStep}
           hasAbout={hasAbout}
