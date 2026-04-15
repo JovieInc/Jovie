@@ -12,7 +12,7 @@ export function ArtistProfileFinalCta({
 }: Readonly<ArtistProfileFinalCtaProps>) {
   return (
     <ArtistProfileSectionShell
-      className='bg-white/[0.012]'
+      className='bg-white/[0.012] py-28 sm:py-36 lg:py-44'
       containerClassName='text-center'
     >
       <h2
