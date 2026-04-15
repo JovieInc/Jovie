@@ -83,10 +83,11 @@ describe('Claim route', () => {
       }
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
-    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    const body = await response.text();
+    expect(body).toContain('Claim Test Artist');
+    expect(body).toContain('/testartist/claim?next=auth');
     expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
   });
 
