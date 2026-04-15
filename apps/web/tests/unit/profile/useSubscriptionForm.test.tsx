@@ -35,7 +35,7 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useSubscribeNotificationsMutation: () => ({
     mutateAsync: mockSubscribeMutateAsync,
   }),
@@ -94,6 +94,32 @@ describe('useSubscriptionForm', () => {
         channel: 'email',
         source: 'profile_inline',
       })
+    );
+  });
+
+  it('starts a resend cooldown when subscription requires OTP verification', async () => {
+    mockSubscribeMutateAsync.mockResolvedValueOnce({
+      pendingConfirmation: true,
+    });
+
+    const { result } = renderHook(() => useSubscriptionForm({ artist }));
+
+    await act(async () => {
+      result.current.handleEmailChange('fan@example.com');
+    });
+
+    const beforeSubmit = Date.now();
+
+    await act(async () => {
+      await result.current.handleSubscribe();
+    });
+
+    expect(result.current.otpStep).toBe('verify');
+    expect(result.current.resendCooldownEnd).toBeGreaterThanOrEqual(
+      beforeSubmit + 30_000
+    );
+    expect(result.current.resendCooldownEnd).toBeLessThanOrEqual(
+      Date.now() + 30_000
     );
   });
 });
