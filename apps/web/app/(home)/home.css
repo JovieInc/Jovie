@@ -1274,7 +1274,7 @@
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .homepage-trust-logos {
     flex-wrap: nowrap;
     justify-content: space-between;
