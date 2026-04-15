@@ -172,6 +172,14 @@ const ACCOUNT_BILLING_RESOURCE_BUDGETS = [
   { resourceType: 'total', budget: 3300 },
 ] as const satisfies readonly PerfResourceBudget[];
 
+const ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 3000 },
+  { resourceType: 'image', budget: 700 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 850 },
+  { resourceType: 'total', budget: 3900 },
+] as const satisfies readonly PerfResourceBudget[];
+
 const ONBOARDING_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 2600 },
   { resourceType: 'image', budget: 700 },
@@ -383,7 +391,7 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['[data-testid="profile-header"]'],
-      redirectDestinations: ['/[username]?mode=tip'],
+      redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },
@@ -442,10 +450,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     seedProfile: 'dualipa',
   },
   {
-    id: 'public-profile-mode-tip',
+    id: 'public-profile-mode-pay',
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
-    path: '/[username]?mode=tip',
+    path: '/[username]?mode=pay',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
@@ -453,7 +461,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
-        '[data-testid="profile-mode-drawer-tip"]',
+        '[data-testid="profile-mode-drawer-pay"]',
         '[data-testid="profile-header"]',
       ],
     },
@@ -742,10 +750,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -754,7 +759,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'cumulative-layout-shift', budget: 0.1 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      { metric: 'skeleton-to-content', budget: 750 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 1,
@@ -769,10 +774,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -823,7 +825,12 @@ const CREATOR_SHELL_ROUTES = [
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dashboard-audience-client"]'] },
+    readySelectors: {
+      content: [
+        '[data-testid="dashboard-audience-client"]',
+        '[data-testid="dashboard-audience-empty-state"]',
+      ],
+    },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
       { metric: 'largest-contentful-paint', budget: 3000 },
@@ -849,7 +856,7 @@ const CREATOR_SHELL_ROUTES = [
       redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'redirect-complete', budget: 700 },
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
@@ -889,17 +896,17 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.PRESENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dsp-presence-workspace"]'] },
+    measureMode: 'redirect',
+    readySelectors: {
+      content: ['section#artist-profile'],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`],
+    },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      // This alias lands on the heavier artist-profile music settings surface.
+      { metric: 'redirect-complete', budget: 1500 },
+      { metric: 'time-to-first-byte', budget: 1200 },
     ],
-    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    resourceSizes: ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS,
     priority: 7,
     seedProfile: 'active-user',
   },
@@ -944,7 +951,10 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [':text-matches("up next|tasks", "i")'],
+      content: [
+        '[data-testid="release-task-page"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },

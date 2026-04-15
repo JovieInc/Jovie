@@ -30,6 +30,115 @@ const confirmRequestSchema = z.object({
 });
 
 // ============================================================================
+// Validation
+// ============================================================================
+
+type MatchData = {
+  id: string;
+  creatorProfileId: string;
+  status: string;
+  providerId: string;
+  externalArtistId: string | null;
+};
+
+async function validateConfirmRequest(
+  matchId: string,
+  body: unknown
+): Promise<{ error: NextResponse } | { profileId: string; match: MatchData }> {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    return {
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    };
+  }
+
+  const parsed = confirmRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      error: NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request',
+          details: parsed.error.flatten(),
+        },
+        { status: 400 }
+      ),
+    };
+  }
+
+  const { profileId } = parsed.data;
+
+  const [profile] = await db
+    .select({ id: creatorProfiles.id, clerkId: users.clerkId })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!profile) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: 'Profile not found' },
+        { status: 404 }
+      ),
+    };
+  }
+
+  if (profile.clerkId !== userId) {
+    return {
+      error: NextResponse.json(
+        {
+          success: false,
+          error: 'You do not have permission to modify this profile',
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  const [match] = await db
+    .select({
+      id: dspArtistMatches.id,
+      creatorProfileId: dspArtistMatches.creatorProfileId,
+      status: dspArtistMatches.status,
+      providerId: dspArtistMatches.providerId,
+      externalArtistId: dspArtistMatches.externalArtistId,
+    })
+    .from(dspArtistMatches)
+    .where(eq(dspArtistMatches.id, matchId))
+    .limit(1);
+
+  if (!match) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: 'Match not found' },
+        { status: 404 }
+      ),
+    };
+  }
+
+  if (match.creatorProfileId !== profileId) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: 'Match does not belong to this profile' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  if (match.status === 'confirmed' || match.status === 'auto_confirmed') {
+    return {
+      error: NextResponse.json(
+        { success: false, error: 'Match is already confirmed' },
+        { status: 400 }
+      ),
+    };
+  }
+
+  return { profileId, match };
+}
+
+// ============================================================================
 // Route Handler
 // ============================================================================
 
@@ -39,88 +148,10 @@ export async function POST(
 ) {
   try {
     const { id: matchId } = await params;
-
-    // Authenticate user
-    const { userId } = await getCachedAuth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Parse request body
     const body = await request.json();
-    const parsed = confirmRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid request',
-          details: parsed.error.flatten(),
-        },
-        { status: 400 }
-      );
-    }
-
-    const { profileId } = parsed.data;
-
-    // Verify user owns this profile (join with users to check clerkId)
-    const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
-      .limit(1);
-
-    if (!profile) {
-      return NextResponse.json(
-        { success: false, error: 'Profile not found' },
-        { status: 404 }
-      );
-    }
-
-    if (profile.clerkId !== userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'You do not have permission to modify this profile',
-        },
-        { status: 403 }
-      );
-    }
-
-    // Verify match exists and belongs to profile
-    const [match] = await db
-      .select({
-        id: dspArtistMatches.id,
-        creatorProfileId: dspArtistMatches.creatorProfileId,
-        status: dspArtistMatches.status,
-        providerId: dspArtistMatches.providerId,
-        externalArtistId: dspArtistMatches.externalArtistId,
-      })
-      .from(dspArtistMatches)
-      .where(eq(dspArtistMatches.id, matchId))
-      .limit(1);
-
-    if (!match) {
-      return NextResponse.json(
-        { success: false, error: 'Match not found' },
-        { status: 404 }
-      );
-    }
-
-    if (match.creatorProfileId !== profileId) {
-      return NextResponse.json(
-        { success: false, error: 'Match does not belong to this profile' },
-        { status: 403 }
-      );
-    }
-
-    if (match.status === 'confirmed' || match.status === 'auto_confirmed') {
-      return NextResponse.json(
-        { success: false, error: 'Match is already confirmed' },
-        { status: 400 }
-      );
-    }
+    const validation = await validateConfirmRequest(matchId, body);
+    if ('error' in validation) return validation.error;
+    const { profileId, match } = validation;
 
     // Update match status to confirmed
     const now = new Date();

@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import { useUserLocation } from '@/hooks/useUserLocation';
-import { calculateDistanceKm, NEAR_YOU_THRESHOLD_KM } from '@/lib/geo';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDateCard } from './TourDateCard';
 
 interface TourDatesListProps {
@@ -11,99 +10,46 @@ interface TourDatesListProps {
   readonly handle: string;
 }
 
-interface TourDateWithDistance extends TourDateViewModel {
-  distanceKm: number | null;
-  isNearYou: boolean;
-}
-
 /**
  * Client component that handles location-based sorting of tour dates.
  *
- * Performance considerations:
- * - Initial render shows dates in chronological order (server-provided)
- * - Location fetch happens in parallel, doesn't block render
- * - Sorting is memoized and only recalculated when location/dates change
- * - Haversine calculation is O(n) with ~microseconds per venue
+ * Uses density-aware proximity algorithm via useTourDateProximity hook.
+ * Nearby dates appear first (sorted by distance), then remaining dates chronologically.
  */
 export function TourDatesList({
   tourDates,
   handle,
 }: Readonly<TourDatesListProps>) {
   const { location, isLoading, error } = useUserLocation();
+  const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
-  const { sortedDates, nearbyCount } = useMemo(() => {
-    // Calculate distances for all dates
-    const datesWithDistance: TourDateWithDistance[] = tourDates.map(
-      tourDate => {
-        let distanceKm: number | null = null;
-        let isNearYou = false;
-
-        if (
-          location &&
-          tourDate.latitude != null &&
-          tourDate.longitude != null
-        ) {
-          distanceKm = calculateDistanceKm(location, {
-            latitude: tourDate.latitude,
-            longitude: tourDate.longitude,
-          });
-          isNearYou = distanceKm <= NEAR_YOU_THRESHOLD_KM;
-        }
-
-        return {
-          ...tourDate,
-          distanceKm,
-          isNearYou,
-        };
-      }
-    );
-
-    // If we don't have user location, keep chronological order
-    if (!location) {
-      return { sortedDates: datesWithDistance, nearbyCount: 0 };
-    }
-
-    // Separate "near you" dates from others
-    const nearbyDates: TourDateWithDistance[] = [];
-    const otherDates: TourDateWithDistance[] = [];
-
-    for (const date of datesWithDistance) {
-      if (date.isNearYou) {
-        nearbyDates.push(date);
-      } else {
-        otherDates.push(date);
-      }
-    }
-
-    // Sort nearby dates by distance (closest first)
-    nearbyDates.sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
-
-    // Other dates remain in chronological order (already sorted by server)
-    return {
-      sortedDates: [...nearbyDates, ...otherDates],
-      nearbyCount: nearbyDates.length,
-    };
-  }, [tourDates, location]);
+  // On the public tour page, nearby dates sort to top (no duplication)
+  const nearbyIds = new Set(nearbyDates.map(item => item.date.id));
+  const remainingDates = allDates.filter(item => !nearbyIds.has(item.date.id));
+  const sortedDates = [...nearbyDates, ...remainingDates];
 
   return (
     <div className='space-y-3'>
-      {nearbyCount > 0 && !isLoading && (
+      {nearbyDates.length > 0 && !isLoading && (
         <p className='text-sm text-secondary-token'>
-          {nearbyCount} {nearbyCount === 1 ? 'show' : 'shows'} near you
+          {nearbyDates.length} {nearbyDates.length === 1 ? 'show' : 'shows'}{' '}
+          near you
         </p>
       )}
-      {error && !isLoading && nearbyCount === 0 && (
+      {error && !isLoading && nearbyDates.length === 0 && (
         <p className='text-sm text-tertiary-token'>
           Location unavailable — showing dates in chronological order
         </p>
       )}
-      {sortedDates.map(tourDate => (
+      {sortedDates.map(item => (
         <TourDateCard
-          key={tourDate.id}
-          tourDate={tourDate}
+          key={item.date.id}
+          tourDate={item.date}
           handle={handle}
-          isNearYou={tourDate.isNearYou}
-          distanceKm={tourDate.distanceKm}
+          isNearYou={item.isNearby}
+          distanceKm={
+            item.distanceMiles != null ? item.distanceMiles / 0.621371 : null
+          }
         />
       ))}
     </div>

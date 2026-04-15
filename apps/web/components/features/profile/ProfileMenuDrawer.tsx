@@ -130,7 +130,7 @@ export function ProfileMenuDrawer({
               onClick={() => handleAction(onOpenTip)}
             >
               <Ticket className={iconClass} />
-              Tip
+              Pay
             </button>
           ) : null}
 
