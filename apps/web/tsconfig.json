@@ -45,6 +45,7 @@
     "app/**/*.tsx",
     "components/**/*.ts",
     "components/**/*.tsx",
+    "data/**/*.ts",
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "types/**/*.ts",

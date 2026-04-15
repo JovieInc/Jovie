@@ -90,6 +90,17 @@ async function submitEmail(page: Page, email: string) {
   await submitBtn.click();
 }
 
+async function expectSubscribeError(page: Page, message: string) {
+  await expect(
+    page
+      .getByRole('alert')
+      .or(page.getByRole('tooltip'))
+      .or(page.locator('[data-testid="profile-inline-cta"]'))
+  ).toContainText(message, {
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -211,14 +222,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     // Type an invalid email and submit
     await submitEmail(page, 'notanemail');
 
-    // Assert validation error text appears (red text containing "valid email")
-    const errorText = page.locator('p.text-red-400, [class*="text-red"]');
-    await expect(errorText.first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    const errorContent = await errorText.first().textContent();
-    expect(errorContent?.toLowerCase()).toContain('valid email');
+    await expectSubscribeError(page, 'Please enter a valid email address');
   });
 
   test('wrong OTP shows error', async ({ page }) => {
@@ -270,11 +274,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await otpSubmitBtn.click();
     }
 
-    // Assert error text visible
-    const errorText = page.locator('p.text-red-400, [class*="text-red"]');
-    await expect(errorText.first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    await expectSubscribeError(page, 'Invalid verification code');
   });
 
   test('OTP rate limited shows rate limit message', async ({ page }) => {
@@ -327,11 +327,10 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await otpSubmitBtn.click();
     }
 
-    // Assert error or rate limit message visible
-    const errorText = page.locator('p.text-red-400, [class*="text-red"]');
-    await expect(errorText.first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    await expectSubscribeError(
+      page,
+      'Too many attempts. Please try again later.'
+    );
   });
 
   test('SMS path: toggle shows phone input', async ({ page }) => {

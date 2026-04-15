@@ -2,47 +2,36 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
+import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: `${APP_NAME} | Drop More Music. Run Every Release.`,
+    absolute: `${APP_NAME} | The Link Your Music Deserves.`,
   };
   const description =
-    'The release operating system for independent artists. Plan, launch, and track every release with artist profiles, smart links, release plans, catalog monitoring, and automated fan notifications.';
+    'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
     'linktree alternative for artists',
-    'music link in bio',
-    'creator profile',
-    'music artist',
-    'spotify link',
-    'apple music link',
-    'youtube music link',
-    'social media links',
-    'music promotion',
     'artist profile',
-    'music marketing',
-    'streaming links',
-    'music links',
-    'artist bio',
-    'music discovery',
+    'music profile link',
+    'artist release page',
+    'music smart link',
+    'pre-save page',
+    'fan notifications for artists',
     'fan engagement',
-    'email subscribers',
-    'sms marketing',
-    'fan conversion',
-    'smart links',
-    'pre-save links',
-    'release management',
-    'release operating system',
+    'music marketing',
+    'artist bio link',
   ];
 
   return {
@@ -84,7 +73,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
+          alt: `${APP_NAME} - The link your music deserves.`,
           type: 'image/png',
         },
       ],
@@ -96,7 +85,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Drop More Music. Run Every Release.`,
+          alt: `${APP_NAME} - The link your music deserves.`,
           width: 1200,
           height: 630,
         },
@@ -132,21 +121,23 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'The release operating system for independent artists. Plan, launch, and track every release in one system.',
+    'Drive more streams automatically, notify every fan every time, and get paid from one profile that updates itself.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'The release operating system for independent musicians. Artist profiles, smart links, release plans, catalog monitoring, and automated fan notifications.'
+  'One profile link that changes with each release, captures fans, shows tour dates, and keeps support in the same place.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie is the release operating system for independent musicians, combining artist profiles, smart links, release plans, monitoring, and task automation.',
+    'Jovie gives artists one profile link for releases, fans, shows, and support.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
 export default function HomePage() {
+  const showLiveProof = FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION;
+
   return (
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
@@ -155,7 +146,10 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HomePageNarrative />
+      <HomePageNarrative
+        proofAvailability={showLiveProof ? 'visible' : 'hidden'}
+        proofSection={showLiveProof ? <SeeItInActionSafe enabled /> : null}
+      />
     </div>
   );
 }

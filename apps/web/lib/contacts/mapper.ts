@@ -65,16 +65,9 @@ export function toPublicContacts(
         channels[0].preferred = true;
       }
 
-      const { summary, count } = summarizeTerritories(
-        contact.territories ?? []
-      );
+      const territories = (contact.territories ?? []).filter(Boolean);
+      const { summary, count } = summarizeTerritories(territories);
       const roleLabel = getContactRoleLabel(contact.role, contact.customLabel);
-
-      const secondary = [contact.personName, contact.companyName]
-        .filter(Boolean)
-        .join(' @ ');
-
-      const primaryContactLabel = contact.email ?? contact.phone ?? undefined;
 
       return {
         id: contact.id,
@@ -82,8 +75,11 @@ export function toPublicContacts(
         roleLabel,
         territorySummary: summary,
         territoryCount: count,
-        secondaryLabel: secondary || undefined,
-        primaryContactLabel,
+        territories,
+        companyLabel: contact.companyName ?? undefined,
+        contactName: contact.personName ?? undefined,
+        secondaryLabel: contact.companyName ?? undefined,
+        primaryContactLabel: contact.personName ?? undefined,
         channels,
       };
     })

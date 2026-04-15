@@ -132,8 +132,8 @@ export function OtpInput({
             ariaLabel={`Digit ${index + 1} of ${OTP_LENGTH}`}
             ariaDescribedBy={errorId}
             ariaInvalid={error || undefined}
-            boxSizeClassName='min-h-[48px] w-11 text-[1.3rem] sm:h-[52px] sm:w-12 sm:text-[1.45rem]'
-            textSizeClassName='text-[1.3rem] sm:text-[1.45rem]'
+            boxSizeClassName='h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]'
+            textSizeClassName='text-[1.22rem] sm:text-[1.3rem]'
           />
         ))}
       </fieldset>

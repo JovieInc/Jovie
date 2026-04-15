@@ -65,17 +65,72 @@ describe('ProfileDrawerShell', () => {
     expect(screen.getByText('Drawer body')).toBeInTheDocument();
   });
 
-  it('wires the close button to onOpenChange(false)', () => {
-    const onOpenChange = vi.fn();
-
+  it('omits the close button and preserves the trailing header slot', () => {
     render(
-      <ProfileDrawerShell open onOpenChange={onOpenChange} title='Menu'>
+      <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>
         <div>Drawer body</div>
       </ProfileDrawerShell>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(
+      screen.getByTestId('profile-drawer-right-placeholder')
+    ).toBeVisible();
+  });
 
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+  it('reserves the back-button slot for root-level drawers', () => {
+    render(
+      <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.getByTestId('profile-drawer-back-placeholder')).toBeVisible();
+    expect(screen.getByTestId('profile-drawer-title-slot')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-drawer-subtitle-placeholder')
+    ).toBeInTheDocument();
+  });
+
+  it('renders the back button only for secondary navigation levels', () => {
+    const onBack = vi.fn();
+
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        onBack={onBack}
+        navigationLevel='secondary'
+        title='Contact'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.getByTestId('profile-drawer-back-button')).toBeVisible();
+    expect(screen.queryByTestId('profile-drawer-back-placeholder')).toBeNull();
+    expect(screen.getByTestId('profile-drawer-title-slot')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('profile-drawer-back-button'));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Contact'
+        presentation='embedded'
+        dataTestId='embedded-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    const dialog = screen.getByTestId('embedded-drawer');
+    expect(dialog.className).toContain('inset-x-0');
+    expect(dialog.className).toContain('bottom-0');
   });
 });
