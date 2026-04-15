@@ -216,7 +216,7 @@ export const PUBLIC_SHARE_DESTINATIONS: readonly PublicShareDestination[] = [
       utm_content: 'story',
     },
     launch: context =>
-      launchInstagramStory(context, PUBLIC_SHARE_DESTINATIONS[1]!),
+      launchInstagramStory(context, PUBLIC_SHARE_DESTINATIONS[1]),
   },
   {
     id: 'twitter',
@@ -230,7 +230,7 @@ export const PUBLIC_SHARE_DESTINATIONS: readonly PublicShareDestination[] = [
       utm_campaign: '{{release_slug}}',
       utm_content: 'post',
     },
-    launch: context => launchTwitter(context, PUBLIC_SHARE_DESTINATIONS[2]!),
+    launch: context => launchTwitter(context, PUBLIC_SHARE_DESTINATIONS[2]),
   },
   {
     id: 'threads',
@@ -244,7 +244,7 @@ export const PUBLIC_SHARE_DESTINATIONS: readonly PublicShareDestination[] = [
       utm_campaign: '{{release_slug}}',
       utm_content: 'post',
     },
-    launch: context => launchThreads(context, PUBLIC_SHARE_DESTINATIONS[3]!),
+    launch: context => launchThreads(context, PUBLIC_SHARE_DESTINATIONS[3]),
   },
   {
     id: 'email',
@@ -258,7 +258,7 @@ export const PUBLIC_SHARE_DESTINATIONS: readonly PublicShareDestination[] = [
       utm_campaign: '{{release_slug}}',
       utm_content: 'friend',
     },
-    launch: context => launchEmail(context, PUBLIC_SHARE_DESTINATIONS[4]!),
+    launch: context => launchEmail(context, PUBLIC_SHARE_DESTINATIONS[4]),
   },
 ] as const;
 
