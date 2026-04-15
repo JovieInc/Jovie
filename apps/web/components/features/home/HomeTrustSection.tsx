@@ -14,7 +14,7 @@ export function HomeTrustSection() {
     <section
       data-testid='homepage-trust'
       className='homepage-trust-strip'
-      aria-label='Trusted by artists on'
+      aria-label='Trusted by artists on major labels'
     >
       <div className='homepage-trust-logos'>
         <AwalLogo className={`${LOGO_CLASS} h-[24px] w-auto`} />
