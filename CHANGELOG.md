@@ -5,24 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.154] - 2026-04-13
-
-### Added
-
-- Releases drawer on public artist profiles: browse full discography without opening a DSP app
-- Each release shows artwork, title, collaborator names, release type, and year
-- Music video releases display a "Video" pill badge
-- Conditional year section headers for large catalogs (15+ releases spanning 2+ years)
-- Deep link support via `/{username}/releases`
-- Dynamic drawer subtitle showing catalog composition (e.g., "12 singles, 3 EPs, 1 album")
-- Improved keyboard and screen reader support for release links
-
-## [26.4.152.2] - 2026-04-13
+## [26.4.153.1] - 2026-04-13
 
 ### Added
 
 - Agent guardrail: "No Redundant Chrome" rule (4d) prevents AI agents from adding duplicate titles, headers, and card wrappers inside containers that already provide them
-- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, and DashboardHeader to the chrome they provide
+- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, DrawerSurfaceCard, and DashboardHeader to the chrome they provide
 - Mechanical 4-step checklist for agents to verify container-aware design before PRs
 
 ### Changed

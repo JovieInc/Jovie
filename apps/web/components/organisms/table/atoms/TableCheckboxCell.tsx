@@ -65,6 +65,7 @@ function TanStackHeaderCheckbox({
   return (
     <div
       className='relative flex h-5 w-5 items-center justify-center'
+      role='presentation'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
@@ -96,6 +97,7 @@ function TanStackRowCheckbox({
   return (
     <div
       className='relative flex h-5 w-5 items-center justify-center'
+      role='presentation'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
