@@ -37,6 +37,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from './AboutSection';
+import type { ProfileSurfacePresentation } from './contracts';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
@@ -126,6 +127,7 @@ interface ProfileUnifiedDrawerProps {
   readonly tourDates?: TourDateViewModel[];
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
+  readonly presentation?: ProfileSurfacePresentation;
   /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
   readonly onRevealNotifications?: () => void;
 }
@@ -366,6 +368,7 @@ export function ProfileUnifiedDrawer({
   tourDates = [],
   hasReleases,
   releases = [],
+  presentation = 'standalone',
   onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
@@ -488,6 +491,7 @@ export function ProfileUnifiedDrawer({
       subtitle={meta.subtitle}
       onBack={isSubView ? () => navigateTo('menu') : undefined}
       dataTestId='profile-menu-drawer'
+      presentation={presentation}
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div

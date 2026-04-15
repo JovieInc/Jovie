@@ -662,6 +662,7 @@ export function ProfileCompactSurface({
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
           releases={releases}
+          presentation={presentation}
           onRevealNotifications={onRevealNotifications}
         />
       )}

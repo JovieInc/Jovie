@@ -417,6 +417,10 @@ describe('ProfileCompactTemplate', () => {
         screen.getByTestId('mock-profile-unified-drawer')
       ).toBeInTheDocument();
     });
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-presentation',
+      'embedded'
+    );
 
     window.matchMedia = previousMatchMedia;
   });
