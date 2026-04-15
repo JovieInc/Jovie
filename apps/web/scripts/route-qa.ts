@@ -205,7 +205,7 @@ function buildDynamicCase(
   };
 }
 
-async function expandDynamicRoute(
+export async function expandDynamicRoute(
   route: string,
   source: string
 ): Promise<RouteCase[]> {
@@ -500,6 +500,28 @@ async function expandDynamicRoute(
       buildDynamicCase(
         `/${MISSING_PUBLIC_USERNAME}/missing-release/sounds`,
         `${source} -> missing release sounds`,
+        route,
+        {
+          expectedState: 'not-found',
+        }
+      ),
+    ];
+  }
+
+  if (route === '/[username]/[slug]/download') {
+    const resolvedPath = await resolveSeededPublicReleasePath({
+      path: '/[username]/[slug]',
+      seedProfile: 'e2e-test-user',
+    } as never);
+    return [
+      buildDynamicCase(
+        `${resolvedPath}/download`,
+        `${source} -> seeded release download`,
+        route
+      ),
+      buildDynamicCase(
+        `/${MISSING_PUBLIC_USERNAME}/missing-release/download`,
+        `${source} -> missing release download`,
         route,
         {
           expectedState: 'not-found',
