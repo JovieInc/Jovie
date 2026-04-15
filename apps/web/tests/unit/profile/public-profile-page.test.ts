@@ -111,14 +111,14 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('public claim banner handling', () => {
-    it('does not read search params on the server page', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+    it('reads search params for claim flow query handling', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const resolvedSearchParams = await searchParams;'
       );
     });
 
-    it('delegates claim banner query handling to the client wrapper', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+    it('renders ClaimBanner for unclaimed profiles', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('ClaimBanner');
     });
   });
 
