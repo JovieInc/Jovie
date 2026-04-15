@@ -7,12 +7,14 @@ interface FaqSectionProps {
   readonly items: FaqItem[];
   readonly className?: string;
   readonly headingClassName?: string;
+  readonly heading?: string;
 }
 
 export function FaqSection({
   items,
   className,
   headingClassName,
+  heading = 'Frequently asked questions',
 }: FaqSectionProps) {
   return (
     <section
@@ -25,7 +27,7 @@ export function FaqSection({
           headingClassName ?? 'text-2xl font-semibold text-primary-token'
         }
       >
-        Frequently asked questions
+        {heading}
       </h2>
       <div className='mt-8 divide-y divide-border-primary'>
         {items.map(item => (

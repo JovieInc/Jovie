@@ -2,7 +2,7 @@
  * ReleasesPageClient Tests
  * @critical — Client-first releases page with TanStack Query cache
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock dashboard context
@@ -104,13 +104,13 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.data = [];
   });
 
-  it('renders ReleasesExperience when data loaded', () => {
+  it('renders ReleasesExperience when data loaded', async () => {
     mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = false;
 
     render(<ReleasesPageClient />);
-    const exp = screen.getByTestId('releases-experience');
+    const exp = await waitFor(() => screen.getByTestId('releases-experience'));
     expect(exp).toBeDefined();
     expect(exp.getAttribute('data-count')).toBe('2');
 

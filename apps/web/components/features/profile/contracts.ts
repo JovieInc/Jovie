@@ -45,6 +45,61 @@ export type ProfileV2OverlayMode =
   | (typeof PROFILE_V2_OVERLAY_MODES)[number]
   | null;
 
+export type ProfileRenderMode = 'interactive' | 'preview';
+
+export type ProfileSurfacePresentation = 'standalone' | 'embedded';
+
+export type ProfileShowcaseStateId =
+  | 'streams-latest'
+  | 'streams-presave'
+  | 'streams-release-day'
+  | 'streams-video'
+  | 'fans-opt-in'
+  | 'fans-confirmed'
+  | 'fans-song-alert'
+  | 'fans-show-alert'
+  | 'tips-open'
+  | 'tips-apple-pay'
+  | 'tips-thank-you'
+  | 'tips-followup'
+  | 'tour'
+  | 'contact'
+  | 'catalog';
+
+export type ProfileShowcaseDrawerView =
+  | 'listen'
+  | 'subscribe'
+  | 'tour'
+  | 'pay'
+  | 'contact'
+  | null;
+
+export interface ProfilePreviewNotificationsState {
+  readonly kind?: 'button' | 'input' | 'status';
+  readonly tone: 'quiet' | 'compose' | 'success';
+  readonly label: string;
+  readonly helper?: string;
+  readonly value?: string;
+  readonly actionLabel?: string;
+}
+
+export interface ProfilePreviewOverlayState {
+  readonly kind: 'email-preview' | 'apple-pay' | 'thank-you';
+  readonly title: string;
+  readonly body: string;
+  readonly accentLabel?: string;
+}
+
+export interface ProfileShowcaseState {
+  readonly id: ProfileShowcaseStateId;
+  readonly drawerView: ProfileShowcaseDrawerView;
+  readonly latestReleaseKey: 'none' | 'presave' | 'live';
+  readonly releaseActionLabel?: string;
+  readonly notifications: ProfilePreviewNotificationsState;
+  readonly showSubscriptionConfirmedBanner: boolean;
+  readonly previewOverlay?: ProfilePreviewOverlayState | null;
+}
+
 export interface ProfileModeShellConfig {
   readonly showBackButton: boolean;
   readonly showSocialBar: boolean;

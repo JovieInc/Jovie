@@ -1,0 +1,92 @@
+import Image from 'next/image';
+import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import type { ArtistProfileSocialProofData } from '@/data/socialProof';
+import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+
+interface ArtistProfileSocialProofProps {
+  readonly socialProof: ArtistProfileLandingCopy['socialProof'];
+  readonly proofData: ArtistProfileSocialProofData;
+}
+
+export function ArtistProfileSocialProof({
+  socialProof,
+  proofData,
+}: Readonly<ArtistProfileSocialProofProps>) {
+  return (
+    <ArtistProfileSectionShell>
+      <div className='max-w-[38rem]'>
+        <h2 className='marketing-h2-linear text-primary-token'>
+          {socialProof.headline}
+        </h2>
+        <p className='mt-5 text-[15px] leading-[1.7] text-secondary-token'>
+          {socialProof.intro}
+        </p>
+      </div>
+
+      <div className='mt-10 grid gap-4 lg:grid-cols-3'>
+        {proofData.profileCards.map(card => (
+          <article
+            key={card.id}
+            className='overflow-hidden rounded-[1.4rem] border border-white/8 bg-white/[0.03]'
+          >
+            <div className='relative aspect-[4/3]'>
+              <Image
+                src={card.src}
+                alt={`${card.name} profile image`}
+                fill
+                sizes='(max-width: 1024px) 100vw, 360px'
+                className='object-cover'
+              />
+              <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,12,0.06),rgba(8,9,12,0.72)_100%)]' />
+              <div className='absolute inset-x-0 bottom-0 z-10 p-5'>
+                <p className='font-mono text-[12px] tracking-[-0.02em] text-white/70'>
+                  jov.ie/{card.handle}
+                </p>
+                <p className='mt-2 text-[20px] font-medium tracking-[-0.02em] text-white'>
+                  {card.name}
+                </p>
+                <p className='mt-2 text-[13px] leading-[1.6] text-white/72'>
+                  {card.supportingLine}
+                </p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {proofData.hasRealQuotes ? (
+        <div className='mt-6 grid gap-4 lg:grid-cols-3'>
+          {proofData.quotes.map(quote => (
+            <article
+              key={quote.id}
+              className='rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-5'
+            >
+              <p className='text-[14px] leading-[1.7] text-primary-token'>
+                {quote.quote}
+              </p>
+              <p className='mt-5 text-[13px] font-medium text-primary-token'>
+                {quote.name}
+              </p>
+              <p className='mt-1 text-[12px] text-tertiary-token'>
+                {quote.role}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      <div className='mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-primary-token/45'>
+        {proofData.logos.map(logo => {
+          const Logo = logo.component;
+          return <Logo key={logo.id} className='h-[15px] w-auto' />;
+        })}
+      </div>
+
+      {!proofData.hasRealQuotes ? (
+        <p className='mt-6 text-[13px] leading-[1.65] text-tertiary-token'>
+          {proofData.founderFallback}
+        </p>
+      ) : null}
+    </ArtistProfileSectionShell>
+  );
+}

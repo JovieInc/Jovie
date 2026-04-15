@@ -1,6 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
 
@@ -17,23 +23,19 @@ const {
 }));
 
 vi.mock('next/dynamic', () => ({
-  default: (() => {
-    let callCount = 0;
+  default: (loader: unknown) => {
+    const source = String(loader);
 
-    return () => {
-      callCount += 1;
+    if (source.includes('ProfileUnifiedDrawer')) {
+      return (props: unknown) => mockProfileUnifiedDrawer(props);
+    }
 
-      if (callCount === 1) {
-        return (props: unknown) => mockProfileUnifiedDrawer(props);
-      }
+    if (source.includes('ProfileInlineNotificationsCTA')) {
+      return (props: unknown) => mockProfileInlineNotificationsCTA(props);
+    }
 
-      if (callCount === 2) {
-        return (props: unknown) => mockProfileInlineNotificationsCTA(props);
-      }
-
-      return () => null;
-    };
-  })(),
+    return () => null;
+  },
 }));
 
 vi.mock('next/link', () => ({
@@ -133,8 +135,17 @@ const mockArtist: Artist = {
   is_verified_flag: false,
 };
 
+let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
+
 describe('ProfileCompactTemplate', () => {
+  beforeAll(async () => {
+    ({ ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    ));
+  }, 10_000);
+
   beforeEach(() => {
+    cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
@@ -154,11 +165,16 @@ describe('ProfileCompactTemplate', () => {
       )
     );
     mockProfileUnifiedDrawer.mockImplementation(
-      (props: { readonly open: boolean; readonly view: string }) => (
+      (props: {
+        readonly open: boolean;
+        readonly view: string;
+        readonly presentation?: string;
+      }) => (
         <div
           data-testid='mock-profile-unified-drawer'
           data-open={String(props.open)}
           data-view={props.view}
+          data-presentation={props.presentation ?? 'standalone'}
         />
       )
     );
@@ -178,10 +194,6 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('links the top-left Jovie mark to the artist profiles landing page', async () => {
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
-
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -197,10 +209,6 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('links the artist name back to the canonical profile route', async () => {
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
-
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -215,14 +223,25 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
+  it('renders a quiet menu trigger in the compact profile header', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: /more options/i });
+    expect(trigger.className).toContain('bg-transparent');
+    expect(trigger.className).toContain('border-transparent');
+  });
+
   it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=listen');
     const pushStateSpy = vi.spyOn(window.history, 'pushState');
-
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
 
     render(
       <ProfileCompactTemplate
@@ -244,13 +263,9 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('redirects subscribe deep links to inline CTA instead of preserving URL', async () => {
+  it('opens subscribe drawer when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
-
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
 
     render(
       <ProfileCompactTemplate
@@ -261,12 +276,11 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    // Subscribe mode now resets requestedMode so the URL cleans up.
-    // The inline CTA reveal is triggered instead of opening a drawer.
+    // Subscribe mode now opens the drawer directly instead of the inline CTA.
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          modeOverride: 'profile',
+          modeOverride: 'subscribe',
         })
       );
     });
@@ -274,10 +288,6 @@ describe('ProfileCompactTemplate', () => {
 
   it('uses the mode prop as the fallback when the URL has no mode param', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
 
     render(
       <ProfileCompactTemplate
@@ -297,10 +307,6 @@ describe('ProfileCompactTemplate', () => {
 
   it('keeps modeOverride in sync when user interactions open a mode drawer', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
 
     render(
       <ProfileCompactTemplate
@@ -339,10 +345,6 @@ describe('ProfileCompactTemplate', () => {
       },
     }));
 
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
-
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -369,10 +371,6 @@ describe('ProfileCompactTemplate', () => {
     window.history.replaceState(null, '', '/test-artist?mode=listen');
     const pushStateSpy = vi.spyOn(window.history, 'pushState');
 
-    const { ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    );
-
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -390,5 +388,36 @@ describe('ProfileCompactTemplate', () => {
     expect(window.location.search).toBe('?mode=listen');
 
     pushStateSpy.mockRestore();
+  });
+
+  it('renders the drawer at desktop widths', async () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(min-width: 768px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as typeof window.matchMedia;
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('mock-profile-unified-drawer')
+      ).toBeInTheDocument();
+    });
+
+    window.matchMedia = previousMatchMedia;
   });
 });

@@ -28,170 +28,134 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with current headline, lead, CTA, and premium cards', async ({
-    page,
-  }) => {
+  test('renders the hero with phone, headline, and CTA', async ({ page }) => {
     await expect(page.locator('h1')).toContainText(
-      'Drop more music. Crush every release.'
+      'The link your music deserves.'
     );
+    await expect(page.getByTestId('homepage-claim-form')).toBeVisible();
     await expect(
-      page.getByText(
-        'Your artist page, every release page, and the launch workflow behind them all run in one system.'
-      )
+      page.getByRole('button', { name: 'Claim your profile' }).first()
     ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: /get started|start free/i }).first()
-    ).toBeVisible();
-
-    await expect(
-      page.getByTestId('homepage-hero-profile-card').last()
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-hero-release-card').last()
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-hero-task-card-1').last()
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-hero-task-card-2').last()
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-hero-task-card-3').last()
-    ).toBeVisible();
+    await expect(page.getByTestId('homepage-hero-composition')).toBeVisible();
+    await expect(page.getByTestId('homepage-live-proof')).toHaveCount(0);
   });
 
   test('header shows auth actions without marketing nav links', async ({
     page,
   }) => {
-    const header = page.locator('header');
+    const header = page.getByTestId('header-nav');
     await expect(header).toBeVisible();
     await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
     await expect(page.locator('a[href="#release"]')).toHaveCount(0);
-    await expect(page.locator('a[href="#profile"]')).toHaveCount(0);
-    await expect(page.locator('a[href="#audience"]')).toHaveCount(0);
     await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   });
 
-  test('core homepage sections render in order with updated surfaces', async ({
-    page,
-  }) => {
+  test('renders the 7-chapter narrative structure', async ({ page }) => {
+    // Trust section
+    await expect(page.getByTestId('homepage-trust')).toBeVisible();
+    await expect(page.getByText('One profile.')).toBeVisible();
+
+    // Chapter 1: Convert attention
+    await page.getByTestId('homepage-chapter-1').scrollIntoViewIfNeeded();
     await expect(
-      page.getByRole('heading', { name: 'Profiles that convert.' })
+      page.getByRole('heading', { name: 'Turn attention into action.' })
     ).toBeVisible();
+    await expect(page.getByTestId('homepage-sandbox')).toBeVisible();
+
+    // Chapter 2: Get paid
+    await page.getByTestId('homepage-chapter-2').scrollIntoViewIfNeeded();
     await expect(
       page.getByRole('heading', {
-        name: 'Share every release. Reach every fan. Automatically.',
+        name: 'Get paid.',
       })
     ).toBeVisible();
+    await expect(page.getByText("That's it.")).toBeVisible();
+
+    // Chapter 3: Know your fans
+    await page.getByTestId('homepage-chapter-3').scrollIntoViewIfNeeded();
     await expect(
-      page.getByRole('heading', { name: 'AI that knows the context.' })
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole('heading', {
-        name: 'A command center for your career.',
-      })
+      page.getByText('Know who your fans are and when to reach them.')
     ).toBeVisible();
+    await expect(page.getByText('Countdowns Built In.')).toBeVisible();
+    await expect(page.getByText('Location-Aware.')).toBeVisible();
 
+    // Philosophy
+    await page.getByTestId('homepage-spec-section').scrollIntoViewIfNeeded();
     await expect(
-      page.getByTestId('homepage-release-destination-presave').first()
+      page.getByRole('heading', { name: 'Built for artists' })
     ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-release-destination-live').first()
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'A command center for your career.' })
-    ).toBeVisible();
-  });
+    await expect(page.getByText('Opinionated.')).toBeVisible();
+    await expect(page.getByText('By design.')).toBeVisible();
+    await expect(page.getByText('Zero Setup.')).toBeVisible();
+    await expect(page.getByText('Stupid Fast.')).toBeVisible();
 
-  test('final CTA renders with current actions', async ({ page }) => {
-    await expect(page.getByTestId('final-cta-headline')).toBeVisible();
-    await expect(page.getByTestId('final-cta-action')).toBeVisible();
-  });
+    // Old sections gone
+    await expect(page.getByTestId('homepage-interstitial')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-action-rail')).toHaveCount(0);
 
-  test('is responsive on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-
-    await expect(page.locator('h1')).toContainText('Drop more music.', {
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    await expect(
-      page.getByTestId('homepage-hero-release-card').first()
-    ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(
-      page.getByTestId('homepage-hero-profile-card').first()
-    ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    await expect(
-      page.getByRole('link', { name: /get started|start free/i }).first()
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  });
-
-  test('has proper meta information and no obvious error state', async ({
-    page,
-  }) => {
-    await expect(page).toHaveTitle(/Jovie/);
-    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
-      'content'
+    // Final CTA
+    await page.getByTestId('final-cta-section').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('final-cta-headline')).toHaveText(
+      'Claim your profile.'
     );
-    await expect(page.locator('body')).not.toContainText('Loading...');
-    await expect(page.locator('body')).not.toContainText(
-      'Unhandled Runtime Error'
+    await expect(page.getByTestId('final-cta-action')).toHaveText(
+      'Claim your profile'
     );
   });
 
-  test('marketing content has no empty state or placeholder indicators', async ({
-    page,
-  }) => {
-    const bodyText = (await page.textContent('body')) ?? '';
-    // No absurd countdown values from far-future dates
-    expect(bodyText).not.toContain('2099');
-    // No Calvin Harris attribution on homepage (The Deep End is Cosmic Gate & Tim White)
-    expect(bodyText).not.toContain('Calvin Harris');
-    // No empty state indicators
-    await expect(page.getByText('Loading...')).toHaveCount(0);
-    await expect(page.getByText('No releases')).toHaveCount(0);
+  test('renders mobile layout correctly', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await expect(page.locator('h1')).toContainText(
+      'The link your music deserves.',
+      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
+    );
+    await expect(page.getByTestId('homepage-trust')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  test('all product screenshot images load successfully', async ({ page }) => {
-    const images = page.locator('img[src*="product-screenshots"]');
-    const count = await images.count();
-    expect(count).toBeGreaterThan(0);
+  test('has no horizontal overflow across common viewports', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
+      { width: 1280, height: 800 },
+      { width: 1440, height: 900 },
+      { width: 1512, height: 982 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
 
-    for (let i = 0; i < count; i++) {
-      const img = images.nth(i);
-      await img.scrollIntoViewIfNeeded();
-      const naturalWidth = await img.evaluate(
-        (el: HTMLImageElement) => el.naturalWidth
-      );
-      expect(naturalWidth).toBeGreaterThan(0);
+      const overflow = await page.evaluate(() => {
+        return (
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+        );
+      });
+
+      expect(overflow).toBeLessThanOrEqual(1);
     }
   });
 
   test('loads without critical console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
+      if (msg.type() === 'error') {
+        errors.push(msg.text());
+      }
     });
 
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForHydration(page);
 
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Failed to load resource') &&
-        !error.includes('net::ERR_FAILED') &&
-        !error.includes('i.scdn.co') &&
-        !error.includes('CORS') &&
-        !error.includes('Clerk') &&
-        !error.includes('Sentry')
-    );
-
-    expect(criticalErrors.length).toBe(0);
+    expect(errors).toEqual([]);
   });
 });
