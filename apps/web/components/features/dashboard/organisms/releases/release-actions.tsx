@@ -111,7 +111,7 @@ function buildShareItems(
       icon: menuIcon('Link2'),
       items: groupTrackedPresetsBySource(ALL_UTM_PRESETS).map(sourceGroup => {
         if (sourceGroup.presets.length === 1) {
-          const preset = sourceGroup.presets[0]!;
+          const preset = sourceGroup.presets[0];
           return {
             id: `tracked-${preset.id}`,
             label: sourceGroup.label,

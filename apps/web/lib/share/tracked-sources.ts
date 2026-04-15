@@ -228,7 +228,7 @@ export function buildTrackedShareDropdownItems(params: {
     previousGroup = sourceGroup.group;
 
     if (sourceGroup.presets.length === 1) {
-      const preset = sourceGroup.presets[0]!;
+      const preset = sourceGroup.presets[0];
       submenuItems.push({
         type: 'action',
         id: `tracked-${preset.id}`,
