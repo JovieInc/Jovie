@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.4] - 2026-04-15
+
+### Fixed
+
+- Fixed Profile navigation on chat routes so sidebar and mobile Profile clicks open the right drawer from preview-panel state without requiring a profile query parameter.
+- Added regression coverage for Profile nav click behavior, state-open drawer hydration, and profile deep-link hydration.
+
 ## [26.4.153.3] - 2026-04-15
 
 ### Changed
