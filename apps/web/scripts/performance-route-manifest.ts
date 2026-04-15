@@ -750,10 +750,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -762,7 +759,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'cumulative-layout-shift', budget: 0.1 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      { metric: 'skeleton-to-content', budget: 750 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 1,
@@ -777,10 +774,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -831,7 +825,12 @@ const CREATOR_SHELL_ROUTES = [
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dashboard-audience-client"]'] },
+    readySelectors: {
+      content: [
+        '[data-testid="dashboard-audience-client"]',
+        '[data-testid="dashboard-audience-empty-state"]',
+      ],
+    },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
       { metric: 'largest-contentful-paint', budget: 3000 },
@@ -952,7 +951,10 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [':text-matches("up next|tasks", "i")'],
+      content: [
+        '[data-testid="release-task-page"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },

@@ -313,6 +313,7 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 | `EntitySidebarShell` | `DrawerHeader` via `title` prop | Card header or heading repeating the drawer title |
 | `Sheet` / `Dialog` | `SheetHeader` / `DialogHeader` + title | Second heading or Card wrapping the body content |
 | `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
+| `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
 | `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name (see §No Duplicate Page Titles) |
 
 **Checklist (run before every UI component PR):**
