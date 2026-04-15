@@ -591,6 +591,7 @@ export function ProfileCompactTemplate({
                 >
                   <Link
                     href={APP_ROUTES.ARTIST_PROFILES}
+                    prefetch={false}
                     aria-label='Create your artist profile on Jovie'
                     className='rounded-full opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                   >
@@ -622,6 +623,7 @@ export function ProfileCompactTemplate({
                     <Link
                       data-testid='profile-identity-link'
                       href={profileHref}
+                      prefetch={false}
                       aria-label={`Go to ${artist.name}'s profile`}
                       className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                     >
