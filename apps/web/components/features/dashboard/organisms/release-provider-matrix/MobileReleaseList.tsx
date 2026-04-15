@@ -42,7 +42,7 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
 
   for (const release of releases) {
     const rawYear = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear()
+      ? new Date(release.releaseDate).getUTCFullYear()
       : null;
     const year =
       rawYear !== null && !Number.isNaN(rawYear)
@@ -147,7 +147,7 @@ const SwipeActions = memo(function SwipeActions({
 
 function getReleaseYear(release: ReleaseViewModel): number | null {
   if (!release.releaseDate) return null;
-  const year = new Date(release.releaseDate).getFullYear();
+  const year = new Date(release.releaseDate).getUTCFullYear();
   return Number.isNaN(year) ? null : year;
 }
 

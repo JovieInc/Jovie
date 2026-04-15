@@ -248,7 +248,7 @@ function ReleasesDrawerContent({
       releases
         .map(r =>
           r.releaseDate
-            ? new Date(r.releaseDate).getFullYear().toString()
+            ? new Date(r.releaseDate).getUTCFullYear().toString()
             : null
         )
         .filter(Boolean)
@@ -260,7 +260,7 @@ function ReleasesDrawerContent({
     let prev: string | null = null;
     for (const release of releases) {
       const year = release.releaseDate
-        ? new Date(release.releaseDate).getFullYear().toString()
+        ? new Date(release.releaseDate).getUTCFullYear().toString()
         : null;
       if (year && year !== prev) {
         headers.add(release.id);
@@ -279,7 +279,7 @@ function ReleasesDrawerContent({
         if (!release.slug) return null;
 
         const year = release.releaseDate
-          ? new Date(release.releaseDate).getFullYear().toString()
+          ? new Date(release.releaseDate).getUTCFullYear().toString()
           : null;
         const showHeader = yearHeaderSet.has(release.id);
 
@@ -372,6 +372,7 @@ export function ProfileUnifiedDrawer({
     () => releases.filter(r => Boolean(r.slug)),
     [releases]
   );
+  const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 1;
 
   const releasesSubtitle = useMemo(() => {
     if (visibleReleases.length === 0) return 'Discography';
@@ -400,9 +401,9 @@ export function ProfileUnifiedDrawer({
   }, [visibleReleases]);
 
   const meta =
-    view === 'releases'
+    view === 'releases' && canOpenReleasesDrawer
       ? { title: 'Releases', subtitle: releasesSubtitle }
-      : VIEW_META[view];
+      : VIEW_META[view === 'releases' ? 'menu' : view];
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -450,6 +451,12 @@ export function ProfileUnifiedDrawer({
         break;
     }
   }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
+
+  useEffect(() => {
+    if (view === 'releases' && !canOpenReleasesDrawer) {
+      onViewChange('menu');
+    }
+  }, [canOpenReleasesDrawer, onViewChange, view]);
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -521,7 +528,7 @@ export function ProfileUnifiedDrawer({
                 </button>
               ) : null}
 
-              {hasReleases ? (
+              {canOpenReleasesDrawer ? (
                 <button
                   type='button'
                   role='menuitem'
@@ -707,7 +714,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'releases' && (
+          {view === 'releases' && canOpenReleasesDrawer && (
             <ReleasesDrawerContent
               releases={visibleReleases}
               artistHandle={artist.handle}

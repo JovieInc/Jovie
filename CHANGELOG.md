@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.4] - 2026-04-15
+
+> Public profile releases now fail safely, show consistent UTC years across timezones, and only open the releases drawer when there are enough navigable items.
+
+### Changed
+
+- Public profile release fetch now uses a fail-safe helper so telemetry/reporting errors do not break page rendering.
+- Release year extraction now uses UTC year semantics across profile and release matrix surfaces.
+- Profile drawer release navigation now gates on visible navigable releases instead of raw release presence flags.
+
+### Fixed
+
+- Public release-lite query now returns an explicit public DTO and serializes release dates as ISO strings before crossing server-client boundaries.
+
 ## [26.4.153.3] - 2026-04-15
 
 ### Changed

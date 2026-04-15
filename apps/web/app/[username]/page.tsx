@@ -524,6 +524,25 @@ async function getPublicTourDates(
   }
 }
 
+async function getPublicReleases(
+  profileId: string
+): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+  try {
+    return await getReleasesForProfileLite(profileId);
+  } catch (error) {
+    try {
+      await captureError('Error fetching public profile releases', error, {
+        profileId,
+        route: '/[username]',
+      });
+    } catch {
+      // Best-effort telemetry only; do not block page rendering.
+    }
+
+    return [];
+  }
+}
+
 export default async function ArtistPage({
   params,
   searchParams,
@@ -609,7 +628,7 @@ export default async function ArtistPage({
   }
 
   const tourDatesPromise = getPublicTourDates(profile.id);
-  const releasesPromise = getReleasesForProfileLite(profile.id);
+  const releasesPromise = getPublicReleases(profile.id);
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
@@ -634,13 +653,7 @@ export default async function ArtistPage({
   // Sort server-side so the client doesn't need a useMemo sort
   const [tourDatesRaw, allReleases] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
-    releasesPromise.catch(async error => {
-      await captureError('Error fetching public profile releases', error, {
-        profileId: profile.id,
-        route: '/[username]',
-      });
-      return [] as Awaited<ReturnType<typeof getReleasesForProfileLite>>;
-    }),
+    releasesPromise,
   ]);
   const tourDates = tourDatesRaw.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -650,9 +663,9 @@ export default async function ArtistPage({
   const releases: PublicRelease[] = allReleases.map(r => ({
     id: r.id,
     title: r.title,
-    slug: r.slug,
+    slug: r.slug ?? '',
     releaseType: r.releaseType,
-    releaseDate: r.releaseDate ? new Date(r.releaseDate).toISOString() : null,
+    releaseDate: r.releaseDate,
     artworkUrl: r.artworkUrl,
     artistNames: r.artistNames,
   }));
