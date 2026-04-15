@@ -15,16 +15,16 @@ import type { Artist } from '@/types/db';
 import { BirthdayInput } from './BirthdayInput';
 import {
   noFontSynthesisStyle,
-  SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
-  SubscriptionOtpResendAction,
+  SubscriptionInputFeedbackRail,
+  SubscriptionOtpFeedbackRail,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
-  subscriptionSuccessTextClassName,
   useSubscriptionErrorFeedback,
+  useTemporaryConfirmationMessage,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
@@ -43,7 +43,7 @@ function getExitVariant(instant: boolean) {
 
 function getEnterVariant(instant: boolean) {
   return {
-    initial: instant ? false : ({ opacity: 0, y: 4 } as const),
+    initial: instant ? undefined : ({ opacity: 0, y: 4 } as const),
     animate: instant
       ? { opacity: 1, y: 0 }
       : {
@@ -233,8 +233,8 @@ export function ProfileInlineNotificationsCTA({
   const [birthdayInput, setBirthdayInput] = useState('');
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { confirmMessage, clearConfirmation, showConfirmation } =
+    useTemporaryConfirmationMessage();
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const prefersReducedMotion = useReducedMotion();
@@ -320,12 +320,6 @@ export function ProfileInlineNotificationsCTA({
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
-    };
-  }, []);
-
   const handleReveal = useCallback(() => {
     openSubscription();
     handleChannelChange('email'); // Inline CTA always uses email
@@ -349,7 +343,7 @@ export function ProfileInlineNotificationsCTA({
   }, [onRegisterReveal, handleReveal]);
 
   const handleEmailSubmit = useCallback(() => {
-    void handleSubscribe();
+    handleSubscribe().catch(() => {});
   }, [handleSubscribe]);
 
   const handleNameSubmit = useCallback(async () => {
@@ -413,11 +407,23 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
-      else if (step === 'name') void handleNameSubmit();
-      else if (step === 'birthday') void handleBirthdaySubmit();
+      else if (step === 'name') handleNameSubmit().catch(() => {});
+      else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
+
+  const handleOtpSubmit = useCallback(() => {
+    handleVerifyOtp().catch(() => {});
+  }, [handleVerifyOtp]);
+
+  const handleResend = useCallback(() => {
+    handleResendOtp()
+      .then(() => {
+        showConfirmation('Code sent!');
+      })
+      .catch(() => {});
+  }, [handleResendOtp, showConfirmation]);
 
   const handleManageButtonFocus = useCallback(() => {
     if (!lastInteractionWasKeyboardRef.current) return;
@@ -506,19 +512,11 @@ export function ProfileInlineNotificationsCTA({
               autoComplete='email'
               maxLength={254}
             />
-            <SubscriptionFeedbackRail
-              message={
-                error && showInlineErrorCopy ? (
-                  <span role='alert'>{error}</span>
-                ) : isInputFocused ? (
-                  'No spam. Opt-out anytime.'
-                ) : null
-              }
-              sideAction={
-                error && shouldShowDesktopTooltip ? (
-                  <SubscriptionDesktopErrorIndicator error={error} />
-                ) : null
-              }
+            <SubscriptionInputFeedbackRail
+              error={error}
+              showInlineErrorCopy={showInlineErrorCopy}
+              shouldShowDesktopTooltip={shouldShowDesktopTooltip}
+              isInputFocused={isInputFocused}
             />
           </motion.div>
         )}
@@ -536,9 +534,7 @@ export function ProfileInlineNotificationsCTA({
               className='px-3 py-3'
               action={
                 <CircularSubmitButton
-                  onClick={() => {
-                    handleVerifyOtp().catch(() => {});
-                  }}
+                  onClick={handleOtpSubmit}
                   disabled={
                     otpCode.length !== 6 || isSubmitting || Boolean(error)
                   }
@@ -551,11 +547,11 @@ export function ProfileInlineNotificationsCTA({
                   value={otpCode}
                   onChange={value => {
                     handleOtpChange(value);
-                    if (confirmMessage) setConfirmMessage(null);
+                    if (confirmMessage) clearConfirmation();
                   }}
                   onComplete={() => {
                     if (!error) {
-                      handleVerifyOtp().catch(() => {});
+                      handleOtpSubmit();
                     }
                   }}
                   autoFocus
@@ -565,40 +561,14 @@ export function ProfileInlineNotificationsCTA({
                 />
               </div>
             </SubscriptionPearlComposer>
-            <SubscriptionFeedbackRail
-              message={
-                error && showInlineErrorCopy ? (
-                  <span role='alert'>{error}</span>
-                ) : confirmMessage && !error ? (
-                  <span className={subscriptionSuccessTextClassName}>
-                    {confirmMessage}
-                  </span>
-                ) : (
-                  'Enter the 6-digit code we sent to your email.'
-                )
-              }
-              sideAction={
-                error && shouldShowDesktopTooltip ? (
-                  <SubscriptionDesktopErrorIndicator error={error} />
-                ) : (
-                  <SubscriptionOtpResendAction
-                    resendCooldownEnd={resendCooldownEnd}
-                    isResending={isResending}
-                    onResend={() => {
-                      void handleResendOtp().then(() => {
-                        setConfirmMessage('Code sent!');
-                        if (confirmTimeoutRef.current) {
-                          clearTimeout(confirmTimeoutRef.current);
-                        }
-                        confirmTimeoutRef.current = setTimeout(
-                          () => setConfirmMessage(null),
-                          2000
-                        );
-                      });
-                    }}
-                  />
-                )
-              }
+            <SubscriptionOtpFeedbackRail
+              error={error}
+              showInlineErrorCopy={showInlineErrorCopy}
+              shouldShowDesktopTooltip={shouldShowDesktopTooltip}
+              confirmMessage={error ? null : confirmMessage}
+              resendCooldownEnd={resendCooldownEnd}
+              isResending={isResending}
+              onResend={handleResend}
             />
           </motion.div>
         )}
@@ -619,7 +589,7 @@ export function ProfileInlineNotificationsCTA({
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onSubmit={() => {
-                void handleNameSubmit();
+                handleNameSubmit().catch(() => {});
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -653,10 +623,10 @@ export function ProfileInlineNotificationsCTA({
                     if (birthdayHintShown) setBirthdayHintShown(false);
                   }}
                   onComplete={() => {
-                    void handleBirthdaySubmit();
+                    handleBirthdaySubmit().catch(() => {});
                   }}
                   onSubmit={() => {
-                    void handleBirthdaySubmit();
+                    handleBirthdaySubmit().catch(() => {});
                   }}
                   autoFocus
                   disabled={birthdayMutation.isPending}

@@ -481,7 +481,9 @@ export function useSubscriptionForm({
       event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe());
+          const submitAction =
+            otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
+          submitAction().catch(() => {});
         }
       },
       [handleSubscribe, handleVerifyOtp, otpStep]
