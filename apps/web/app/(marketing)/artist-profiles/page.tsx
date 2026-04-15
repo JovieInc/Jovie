@@ -1,12 +1,19 @@
 import type { Metadata } from 'next';
 import { MarketingPageShell } from '@/components/marketing';
+import { Container } from '@/components/site/Container';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
+import { HomeAutoNotifySection } from '@/features/home/HomeAutoNotifySection';
+import { HomeChapter1 } from '@/features/home/HomeChapter1';
+import { HomeChapter2 } from '@/features/home/HomeChapter2';
+import { HomeChapter3 } from '@/features/home/HomeChapter3';
+import { HomeEngageBentoSection } from '@/features/home/HomeEngageBentoSection';
 import { FinalCallToAction } from '@/features/home/HomePageNarrative';
+import { HomeSpecChapter } from '@/features/home/HomeSpecChapter';
+import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import { HOMEPAGE_FINAL_CTA_CONTENT } from '@/features/home/home-page-content';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { ARTIST_PROFILE_MODES } from './artist-profile-modes';
 
 export const revalidate = false;
@@ -64,16 +71,33 @@ export const metadata: Metadata = {
 export default function ArtistProfilesPage() {
   return (
     <MarketingPageShell>
+      {/* ── Hero (same as homepage) ── */}
       <HomeHero />
 
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_SECTIONS && (
-        <StickyPhoneTour
-          modes={ARTIST_PROFILE_MODES}
-          introTitle='Your profile adapts to what matters right now.'
-          introBadge='One link. Four modes.'
-          artistHandle='timwhite'
-        />
-      )}
+      {/* ── "One profile." interstitial ── */}
+      <section className='homepage-chapter' style={{ textAlign: 'center' }}>
+        <Container size='homepage'>
+          <h2 className='marketing-h1-linear mx-auto text-primary-token'>
+            One profile.
+          </h2>
+        </Container>
+      </section>
+
+      {/* ── All sections (ungated on artist-profiles) ── */}
+      <HomeChapter1 />
+      <HomeChapter2 />
+      <HomeTrustSection />
+      <HomeAutoNotifySection />
+      <HomeEngageBentoSection />
+      <HomeChapter3 />
+      <HomeSpecChapter />
+
+      <StickyPhoneTour
+        modes={ARTIST_PROFILE_MODES}
+        introTitle='Your profile adapts to what matters right now.'
+        introBadge='One link. Four modes.'
+        artistHandle='timwhite'
+      />
 
       <FinalCallToAction content={HOMEPAGE_FINAL_CTA_CONTENT} />
     </MarketingPageShell>

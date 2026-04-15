@@ -38,25 +38,27 @@ describe('ArtistProfilesPage', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the homepage hero with headline and CTA', () => {
+  it('renders the homepage hero and all sections ungated', () => {
     render(<ArtistProfilesPage />);
 
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: 'The link your music deserves.',
-      })
-    ).toBeInTheDocument();
+    expect(screen.getByText('One profile.')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-chapter-1')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-chapter-2')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-auto-notify')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-engage-bento')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-chapter-3')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-spec-section')).toBeInTheDocument();
+    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
+  });
+
+  it('uses the homepage CTA copy', () => {
+    render(<ArtistProfilesPage />);
+
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
       'Stay in the studio.'
     );
-  });
-
-  it('renders the claim form CTA in the hero', () => {
-    render(<ArtistProfilesPage />);
-
-    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
   });
 });
