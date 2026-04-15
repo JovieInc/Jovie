@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@jovie/ui';
-import { AlertCircle, Mail, Phone } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -22,14 +16,19 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
 import {
   noFontSynthesisStyle,
+  profileQuietIconButtonClassName,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
-  subscriptionDisclaimerClassName,
   subscriptionHeadingClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
+  subscriptionSuccessTextClassName,
+  useSubscriptionErrorFeedback,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
@@ -220,7 +219,7 @@ function ChannelInputRow({
     leftSlot = (
       <button
         type='button'
-        className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
+        className={`flex h-10 w-10 items-center justify-center rounded-full ${profileQuietIconButtonClassName} transition-colors focus-visible:outline-none`}
         aria-label={getChannelToggleLabel(channel)}
         onClick={() => handleChannelChange(channel === 'sms' ? 'email' : 'sms')}
         disabled={isSubmitting}
@@ -296,6 +295,7 @@ function ChannelInputRow({
             }}
             onKeyDown={handleKeyDown}
             disabled={isSubmitting}
+            aria-invalid={error ? true : undefined}
             autoComplete={inputConfig.autoComplete}
             maxLength={inputConfig.maxLength}
             style={noFontSynthesisStyle}
@@ -303,31 +303,6 @@ function ChannelInputRow({
         </div>
       )}
     </SubscriptionPearlComposer>
-  );
-}
-
-function ErrorTooltip({ error }: { readonly error: string }) {
-  return (
-    <TooltipProvider delayDuration={0}>
-      <Tooltip defaultOpen>
-        <TooltipTrigger asChild>
-          <span
-            className='absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
-            role='alert'
-            aria-live='assertive'
-          >
-            <AlertCircle className='h-4 w-4' aria-hidden='true' />
-            <span className='sr-only'>{error}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent
-          side='bottom'
-          className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
-        >
-          {error}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
   );
 }
 
@@ -341,11 +316,14 @@ export function TwoStepNotificationsCTA({
     phoneInput,
     emailInput,
     error,
+    errorOrigin,
     otpCode,
     otpStep,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
+    resendCooldownEnd,
+    isResending,
     channel,
     subscribedChannels,
     handleChannelChange,
@@ -355,6 +333,7 @@ export function TwoStepNotificationsCTA({
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
+    handleResendOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
@@ -368,8 +347,15 @@ export function TwoStepNotificationsCTA({
   const inputId = useId();
   const disclaimerId = useId();
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const { user } = useUserSafe();
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showInlineErrorCopy, shouldShowDesktopTooltip } =
+    useSubscriptionErrorFeedback({
+      error,
+      errorOrigin,
+    });
 
   useImpressionTracking(artist.handle);
 
@@ -435,6 +421,14 @@ export function TwoStepNotificationsCTA({
     );
     return () => globalThis.clearTimeout(timeoutId);
   }, [step, prefersReducedMotion]);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms
@@ -536,21 +530,52 @@ export function TwoStepNotificationsCTA({
                 smsEnabled={smsEnabled}
                 error={error}
               />
-
-              <div className='relative min-h-5'>
-                <p
-                  id={disclaimerId}
-                  className={`${subscriptionDisclaimerClassName} transition-opacity duration-200 ${
-                    isInputFocused && !error ? 'opacity-100' : 'opacity-0'
-                  } text-center`}
-                  style={noFontSynthesisStyle}
-                  aria-hidden={!isInputFocused || Boolean(error)}
-                >
-                  No spam. Opt-out anytime.
-                </p>
-
-                {error && <ErrorTooltip error={error} />}
-              </div>
+              <SubscriptionFeedbackRail
+                message={
+                  error && showInlineErrorCopy ? (
+                    <span id={disclaimerId} role='alert'>
+                      {error}
+                    </span>
+                  ) : confirmMessage ? (
+                    <span
+                      id={disclaimerId}
+                      className={subscriptionSuccessTextClassName}
+                    >
+                      {confirmMessage}
+                    </span>
+                  ) : otpStep === 'verify' ? (
+                    <span id={disclaimerId}>
+                      Enter the 6-digit code we sent to your email.
+                    </span>
+                  ) : isInputFocused ? (
+                    <span id={disclaimerId}>No spam. Opt-out anytime.</span>
+                  ) : null
+                }
+                sideAction={
+                  otpStep === 'verify' && error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : otpStep === 'verify' ? (
+                    <SubscriptionOtpResendAction
+                      resendCooldownEnd={resendCooldownEnd}
+                      isResending={isResending}
+                      onResend={() => {
+                        void handleResendOtp().then(() => {
+                          setConfirmMessage('Code sent!');
+                          if (confirmTimeoutRef.current) {
+                            clearTimeout(confirmTimeoutRef.current);
+                          }
+                          confirmTimeoutRef.current = setTimeout(
+                            () => setConfirmMessage(null),
+                            2000
+                          );
+                        });
+                      }}
+                    />
+                  ) : error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : null
+                }
+              />
             </div>
           </motion.div>
         )}

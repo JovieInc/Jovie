@@ -13,14 +13,15 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
+  profilePrimaryPillClassName,
   SubscriptionPearlComposer,
-  subscriptionPrimaryActionClassName,
 } from '@/features/profile/artist-notifications-cta/shared';
 import type {
   ProfilePreviewNotificationsState,
@@ -152,7 +153,7 @@ function PreviewInlineNotifications({
         <SubscriptionPearlComposer
           action={
             <span
-              className={`${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0`}
+              className={`${profilePrimaryPillClassName} !h-10 !w-10 !px-0`}
             >
               <ArrowRight className='h-4 w-4' />
             </span>
@@ -173,7 +174,7 @@ function PreviewInlineNotifications({
       <div data-testid='profile-inline-notifications-preview'>
         <button
           type='button'
-          className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+          className={`${profilePrimaryPillClassName} h-12 w-full justify-center gap-2 px-6`}
         >
           <CheckCircle2 className='h-4 w-4 shrink-0 text-green-400' />
           {notifications.label || 'Notifications on'}
@@ -186,7 +187,7 @@ function PreviewInlineNotifications({
     <div data-testid='profile-inline-notifications-preview'>
       <button
         type='button'
-        className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+        className={`${profilePrimaryPillClassName} h-12 w-full justify-center gap-2 px-6`}
       >
         <Bell className='h-4 w-4' />
         Turn on notifications
@@ -385,15 +386,16 @@ export function ProfileCompactSurface({
             )}
 
             {!hideMoreMenu && (
-              <button
-                type='button'
+              <CircleIconButton
                 onClick={onOpenMenu}
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${glass.border} bg-black/25 text-white/70 ${glass.blur} transition-colors duration-150 hover:bg-black/40`}
-                aria-label='More options'
+                size='xs'
+                variant='pearlQuiet'
+                className={drawerOpen ? 'bg-white/12 text-white' : undefined}
+                ariaLabel='More options'
                 aria-haspopup='dialog'
               >
                 <MoreHorizontal className='h-[15px] w-[15px]' />
-              </button>
+              </CircleIconButton>
             )}
           </div>
 

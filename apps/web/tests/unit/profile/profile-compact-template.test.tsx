@@ -214,6 +214,25 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
+  it('renders a quiet menu trigger in the compact profile header', async () => {
+    const { ProfileCompactTemplate } = await import(
+      '@/features/profile/templates/ProfileCompactTemplate'
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: /more options/i });
+    expect(trigger.className).toContain('bg-transparent');
+    expect(trigger.className).toContain('border-transparent');
+  });
+
   it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=listen');

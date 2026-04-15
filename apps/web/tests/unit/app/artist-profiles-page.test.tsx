@@ -46,19 +46,19 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByTestId('homepage-chapter-1')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-chapter-2')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-chapter-3')).toBeInTheDocument();
+    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-auto-notify')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-engage-bento')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-chapter-3')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-spec-section')).toBeInTheDocument();
-    expect(screen.getByTestId('sticky-phone-tour')).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-section')).toBeInTheDocument();
   });
 
-  it('uses the homepage CTA copy', () => {
+  it('uses the artist profile CTA copy', () => {
     render(<ArtistProfilesPage />);
 
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'Stay in the studio.'
+      'Claim your profile.'
     );
   });
 });

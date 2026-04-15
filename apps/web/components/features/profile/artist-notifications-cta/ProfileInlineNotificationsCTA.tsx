@@ -15,11 +15,16 @@ import type { Artist } from '@/types/db';
 import { BirthdayInput } from './BirthdayInput';
 import {
   noFontSynthesisStyle,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
+  subscriptionSuccessTextClassName,
+  useSubscriptionErrorFeedback,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
@@ -118,6 +123,7 @@ interface InlineInputStepProps {
   readonly isFocused: boolean;
   readonly autoComplete?: string;
   readonly maxLength?: number;
+  readonly ariaInvalid?: boolean;
 }
 
 function InlineInputStep({
@@ -139,6 +145,7 @@ function InlineInputStep({
   isFocused,
   autoComplete,
   maxLength,
+  ariaInvalid,
 }: InlineInputStepProps) {
   return (
     <SubscriptionPearlComposer
@@ -172,52 +179,13 @@ function InlineInputStep({
           onBlur={onBlur}
           onKeyDown={onKeyDown}
           disabled={disabled}
+          aria-invalid={ariaInvalid}
           autoComplete={autoComplete}
           maxLength={maxLength}
           style={noFontSynthesisStyle}
         />
       </div>
     </SubscriptionPearlComposer>
-  );
-}
-
-function OtpResendLink({
-  resendCooldownEnd,
-  isResending,
-  onResend,
-}: {
-  readonly resendCooldownEnd: number;
-  readonly isResending: boolean;
-  readonly onResend: () => void;
-}) {
-  const [now, setNow] = useState(Date.now());
-  const remaining = Math.max(0, Math.ceil((resendCooldownEnd - now) / 1000));
-  const canResend = remaining === 0 && !isResending;
-
-  useEffect(() => {
-    if (resendCooldownEnd <= Date.now()) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [resendCooldownEnd]);
-
-  return (
-    <div className='mt-1 text-center'>
-      {canResend ? (
-        <button
-          type='button'
-          className='text-[12px] text-primary-token/70 underline underline-offset-2 transition-colors hover:text-primary-token'
-          onClick={onResend}
-        >
-          Resend code
-        </button>
-      ) : isResending ? (
-        <span className='text-[12px] text-secondary-token/50'>Sending...</span>
-      ) : (
-        <span className='text-[12px] text-secondary-token/50'>
-          Resend in 0:{remaining.toString().padStart(2, '0')}
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -236,6 +204,7 @@ export function ProfileInlineNotificationsCTA({
   const {
     emailInput,
     error,
+    errorOrigin,
     otpCode,
     isSubmitting,
     resendCooldownEnd,
@@ -253,6 +222,11 @@ export function ProfileInlineNotificationsCTA({
     hydrationStatus,
     subscribedChannels,
   } = useSubscriptionForm({ artist });
+  const { showInlineErrorCopy, shouldShowDesktopTooltip } =
+    useSubscriptionErrorFeedback({
+      error,
+      errorOrigin,
+    });
 
   const [step, setStep] = useState<Step>('cta');
   const [nameInput, setNameInput] = useState('');
@@ -375,7 +349,7 @@ export function ProfileInlineNotificationsCTA({
   }, [onRegisterReveal, handleReveal]);
 
   const handleEmailSubmit = useCallback(() => {
-    handleSubscribe().catch(() => {});
+    void handleSubscribe();
   }, [handleSubscribe]);
 
   const handleNameSubmit = useCallback(async () => {
@@ -439,8 +413,8 @@ export function ProfileInlineNotificationsCTA({
       if (event.key !== 'Enter') return;
       event.preventDefault();
       if (step === 'email') handleEmailSubmit();
-      else if (step === 'name') handleNameSubmit().catch(() => {});
-      else if (step === 'birthday') handleBirthdaySubmit().catch(() => {});
+      else if (step === 'name') void handleNameSubmit();
+      else if (step === 'birthday') void handleBirthdaySubmit();
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
@@ -485,7 +459,7 @@ export function ProfileInlineNotificationsCTA({
   const enterVariant = getEnterVariant(instant);
 
   return (
-    <div data-testid='profile-inline-cta' className='min-h-[48px]'>
+    <div data-testid='profile-inline-cta' className='min-h-[116px]'>
       <AnimatePresence mode='wait' initial={false}>
         {step === 'cta' && (
           <motion.div key='inline-cta' exit={getExitVariant(instant)}>
@@ -528,14 +502,24 @@ export function ProfileInlineNotificationsCTA({
               disabled={isSubmitting}
               submitting={isSubmitting}
               isFocused={isInputFocused}
+              ariaInvalid={error ? true : undefined}
               autoComplete='email'
               maxLength={254}
             />
-            {error && (
-              <p className='mt-2 text-center text-[12px] text-red-400'>
-                {error}
-              </p>
-            )}
+            <SubscriptionFeedbackRail
+              message={
+                error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : isInputFocused ? (
+                  'No spam. Opt-out anytime.'
+                ) : null
+              }
+              sideAction={
+                error && shouldShowDesktopTooltip ? (
+                  <SubscriptionDesktopErrorIndicator error={error} />
+                ) : null
+              }
+            />
           </motion.div>
         )}
 
@@ -581,32 +565,41 @@ export function ProfileInlineNotificationsCTA({
                 />
               </div>
             </SubscriptionPearlComposer>
-            {error && (
-              <p className='mt-2 text-center text-[12px] text-red-400'>
-                {error}
-              </p>
-            )}
-            {confirmMessage && !error && (
-              <p className='mt-2 text-center text-[12px] text-green-400'>
-                {confirmMessage}
-              </p>
-            )}
-            {error && (
-              <OtpResendLink
-                resendCooldownEnd={resendCooldownEnd}
-                isResending={isResending}
-                onResend={async () => {
-                  await handleResendOtp();
-                  setConfirmMessage('Code sent!');
-                  if (confirmTimeoutRef.current)
-                    clearTimeout(confirmTimeoutRef.current);
-                  confirmTimeoutRef.current = setTimeout(
-                    () => setConfirmMessage(null),
-                    2000
-                  );
-                }}
-              />
-            )}
+            <SubscriptionFeedbackRail
+              message={
+                error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : confirmMessage && !error ? (
+                  <span className={subscriptionSuccessTextClassName}>
+                    {confirmMessage}
+                  </span>
+                ) : (
+                  'Enter the 6-digit code we sent to your email.'
+                )
+              }
+              sideAction={
+                error && shouldShowDesktopTooltip ? (
+                  <SubscriptionDesktopErrorIndicator error={error} />
+                ) : (
+                  <SubscriptionOtpResendAction
+                    resendCooldownEnd={resendCooldownEnd}
+                    isResending={isResending}
+                    onResend={() => {
+                      void handleResendOtp().then(() => {
+                        setConfirmMessage('Code sent!');
+                        if (confirmTimeoutRef.current) {
+                          clearTimeout(confirmTimeoutRef.current);
+                        }
+                        confirmTimeoutRef.current = setTimeout(
+                          () => setConfirmMessage(null),
+                          2000
+                        );
+                      });
+                    }}
+                  />
+                )
+              }
+            />
           </motion.div>
         )}
 
@@ -626,7 +619,7 @@ export function ProfileInlineNotificationsCTA({
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onSubmit={() => {
-                handleNameSubmit().catch(console.error);
+                void handleNameSubmit();
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -636,6 +629,7 @@ export function ProfileInlineNotificationsCTA({
               autoComplete='given-name'
               maxLength={100}
             />
+            <SubscriptionFeedbackRail />
           </motion.div>
         )}
 
@@ -659,21 +653,25 @@ export function ProfileInlineNotificationsCTA({
                     if (birthdayHintShown) setBirthdayHintShown(false);
                   }}
                   onComplete={() => {
-                    handleBirthdaySubmit().catch(console.error);
+                    void handleBirthdaySubmit();
                   }}
                   onSubmit={() => {
-                    handleBirthdaySubmit().catch(console.error);
+                    void handleBirthdaySubmit();
                   }}
                   autoFocus
                   disabled={birthdayMutation.isPending}
                 />
               </div>
             </SubscriptionPearlComposer>
-            {birthdayHintShown && (
-              <p className='mt-2 text-center text-[12px] text-secondary-token/60'>
-                Enter full date to save
-              </p>
-            )}
+            <SubscriptionFeedbackRail
+              message={
+                birthdayHintShown ? (
+                  'Enter full date to save'
+                ) : (
+                  <span aria-hidden='true'>.</span>
+                )
+              }
+            />
           </motion.div>
         )}
 
@@ -703,6 +701,7 @@ export function ProfileInlineNotificationsCTA({
                 Notifications on
               </span>
             </button>
+            <SubscriptionFeedbackRail />
           </motion.div>
         )}
       </AnimatePresence>

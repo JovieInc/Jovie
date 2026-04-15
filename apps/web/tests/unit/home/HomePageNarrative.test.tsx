@@ -32,33 +32,29 @@ describe('HomePageNarrative', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the 7-chapter section order', () => {
+  it('renders the reshaped homepage section order', () => {
     render(<HomePageNarrative />);
 
     const hero = screen.getByTestId('homepage-hero');
     const trust = screen.getByTestId('homepage-trust');
-    const ch1 = screen.getByTestId('homepage-chapter-1');
-    const ch2 = screen.getByTestId('homepage-chapter-2');
-    const ch3 = screen.getByTestId('homepage-chapter-3');
-    const philosophy = screen.getByTestId('homepage-spec-section');
+    const autoNotify = screen.getByTestId('homepage-auto-notify');
+    const engage = screen.getByTestId('homepage-engage-bento');
+    const relationship = screen.getByTestId('homepage-fan-relationship');
     const finalCta = screen.getByTestId('final-cta-headline');
 
-    expect(hero.compareDocumentPosition(ch1)).toBe(
+    expect(hero.compareDocumentPosition(trust)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(ch1.compareDocumentPosition(ch2)).toBe(
+    expect(trust.compareDocumentPosition(autoNotify)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(ch2.compareDocumentPosition(trust)).toBe(
+    expect(autoNotify.compareDocumentPosition(engage)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(trust.compareDocumentPosition(ch3)).toBe(
+    expect(engage.compareDocumentPosition(relationship)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(ch3.compareDocumentPosition(philosophy)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(philosophy.compareDocumentPosition(finalCta)).toBe(
+    expect(relationship.compareDocumentPosition(finalCta)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
   });
@@ -80,8 +76,9 @@ describe('HomePageNarrative', () => {
         name: 'Algorithms reward consistency.',
       })
     ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('homepage-chapter-3')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Built into the link.' })
+      screen.queryByTestId('homepage-spec-section')
     ).not.toBeInTheDocument();
   });
 
@@ -110,5 +107,27 @@ describe('HomePageNarrative', () => {
       />
     );
     expect(screen.getByTestId('mock-proof-section')).toBeInTheDocument();
+  });
+
+  it('renders the render-backed engage and relationship content', () => {
+    render(<HomePageNarrative />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Notify every fan. Automatically.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Engage.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Turn action into a relationship.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Smart links that stay current.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Recognize the people who care.')
+    ).toBeInTheDocument();
   });
 });

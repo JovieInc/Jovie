@@ -7,10 +7,9 @@ import type { FeaturedCreator } from '@/lib/featured-creators';
 import { fillToMinimum } from './featured-creators-fallback';
 import { HomeAdaptiveProfileStory } from './HomeAdaptiveProfileStory';
 import { HomeAutoNotifySection } from './HomeAutoNotifySection';
-import { HomeChapter3 } from './HomeChapter3';
 import { HomeEngageBentoSection } from './HomeEngageBentoSection';
+import { HomeFanRelationshipSection } from './HomeFanRelationshipSection';
 import { HomeLiveProofSection } from './HomeLiveProofSection';
-import { HomeSpecChapter } from './HomeSpecChapter';
 import {
   HOMEPAGE_FINAL_CTA_CONTENT,
   type HomeFinalCtaContent,
@@ -83,8 +82,7 @@ export function HomePageNarrative({
         <>
           <HomeAutoNotifySection />
           <HomeEngageBentoSection />
-          <HomeChapter3 />
-          <HomeSpecChapter />
+          <HomeFanRelationshipSection />
           {proofAvailability === 'visible' ? resolvedProofSection : null}
           <FinalCallToAction />
         </>

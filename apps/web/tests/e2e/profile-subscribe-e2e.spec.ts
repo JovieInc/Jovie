@@ -90,8 +90,13 @@ async function submitEmail(page: Page, email: string) {
   await submitBtn.click();
 }
 
-async function expectTooltipError(page: Page, message: string) {
-  await expect(page.getByRole('tooltip')).toContainText(message, {
+async function expectSubscribeError(page: Page, message: string) {
+  await expect(
+    page
+      .getByRole('alert')
+      .or(page.getByRole('tooltip'))
+      .or(page.locator('[data-testid="profile-inline-cta"]'))
+  ).toContainText(message, {
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
 }
@@ -217,7 +222,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     // Type an invalid email and submit
     await submitEmail(page, 'notanemail');
 
-    await expectTooltipError(page, 'Please enter a valid email address');
+    await expectSubscribeError(page, 'Please enter a valid email address');
   });
 
   test('wrong OTP shows error', async ({ page }) => {
@@ -269,7 +274,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await otpSubmitBtn.click();
     }
 
-    await expectTooltipError(page, 'Invalid verification code');
+    await expectSubscribeError(page, 'Invalid verification code');
   });
 
   test('OTP rate limited shows rate limit message', async ({ page }) => {
@@ -322,7 +327,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       await otpSubmitBtn.click();
     }
 
-    await expectTooltipError(
+    await expectSubscribeError(
       page,
       'Too many attempts. Please try again later.'
     );
