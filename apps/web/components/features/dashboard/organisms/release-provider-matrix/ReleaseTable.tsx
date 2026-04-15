@@ -186,7 +186,7 @@ export function ReleaseTable({
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const year = new Date(release.releaseDate).getFullYear();
+        const year = new Date(release.releaseDate).getUTCFullYear();
         return Number.isNaN(year) ? 'Unknown' : year.toString();
       },
       getGroupLabel: (year: string) => year,

@@ -58,7 +58,7 @@ export function ProfileFeaturedCard({
 
   if (featuredContent.kind === 'release') {
     const releaseYear = featuredContent.release.releaseDate
-      ? new Date(featuredContent.release.releaseDate).getFullYear()
+      ? new Date(featuredContent.release.releaseDate).getUTCFullYear()
       : null;
     const releaseTypeLabel =
       featuredContent.release.releaseType === 'ep'

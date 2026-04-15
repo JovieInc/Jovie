@@ -5,13 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.6] - 2026-04-15
+
+> Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
+
+### Fixed
+
+- [internal] Addressed drawer inspector review feedback around collapsible section state updates, card header alignment, client boundaries, and test placement.
+
+## [26.4.153.5] - 2026-04-15
+
+> The Artist Profiles final call-to-action now has more breathing room, so the closing claim section feels calmer and less cramped.
+
+### Changed
+
+- Increased the final Artist Profiles claim section spacing for a more generous closing layout.
+
 ## [26.4.153.4] - 2026-04-15
 
-> Release drawers now use compact inspector cards instead of tabs, making details easier to scan.
+> Release drawers now use compact inspector cards, and public profile releases now fail safely with timezone-consistent year rendering.
 
 ### Changed
 
 - Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
+- Public profile release fetch now uses a fail-safe helper so telemetry/reporting errors do not break page rendering.
+- Release year extraction now uses UTC year semantics across profile and release matrix surfaces.
+- Profile drawer release navigation now gates on visible navigable releases instead of raw release presence flags.
+
+### Fixed
+
+- Public release-lite query now returns an explicit public DTO and serializes release dates as ISO strings before crossing server-client boundaries.
 
 ## [26.4.153.3] - 2026-04-15
 
@@ -33,7 +56,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
+- [internal] Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
 - Shared dropdown menus now support consistent loading, selected, active, danger, trailing content, count, and searchable nested states through the common dropdown primitive
 - Recursive dropdown search now supports submenu-local filters, custom radio-item matching, and regression coverage for keyboard search flows
 
