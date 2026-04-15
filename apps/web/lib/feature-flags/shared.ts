@@ -40,7 +40,7 @@ export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
 
-/** @deprecated — bootstrap is no longer needed (Statsig removed). */
+/** @deprecated Compatibility alias. Use StatsigFeatureFlagsBootstrap directly. */
 export interface FeatureFlagsBootstrap extends StatsigFeatureFlagsBootstrap {}
 
 /**

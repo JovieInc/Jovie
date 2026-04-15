@@ -15,8 +15,8 @@ const Separator = (
 );
 
 /**
- * "See it in action" section controlled by the code flag registry.
- * When the flag is off, the section is hidden entirely.
+ * `SeeItInActionSafe` is gated by `FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION`.
+ * When that code flag is off, the section is hidden entirely.
  * When on, always fetches real profiles: tim pinned first,
  * remaining slots from featured creators.
  */

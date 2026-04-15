@@ -10,9 +10,9 @@ import { FEATURE_FLAGS } from './shared';
  * @param userId - Clerk user ID (or null for anonymous)
  * @returns true if the feature is enabled
  */
-export async function isStripeConnectEnabled(
+export function isStripeConnectEnabled(
   userId: string | null
 ): Promise<boolean> {
   void userId;
-  return FEATURE_FLAGS.STRIPE_CONNECT_ENABLED;
+  return Promise.resolve(FEATURE_FLAGS.STRIPE_CONNECT_ENABLED);
 }
