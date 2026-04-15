@@ -111,7 +111,7 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('public claim banner handling', () => {
-    it('reads search params for mode query handling', () => {
+    it('reads search params for mode handling', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const resolvedSearchParams = await searchParams;'
       );
