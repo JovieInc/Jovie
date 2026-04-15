@@ -35,11 +35,11 @@ describe('dashboard earnings page', () => {
     getCachedAuthMock.mockResolvedValueOnce({ userId: 'user_123' });
 
     await expect(EarningsPage()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`
+      `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
     );
 
     expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`
+      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
     );
   });
 });

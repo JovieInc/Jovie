@@ -11,3 +11,5 @@ export { SmartLinkArtwork } from './SmartLinkArtwork';
 export { SmartLinkProviderButton } from './SmartLinkProviderButton';
 export { SmartLinkShell } from './SmartLinkShell';
 export { UnreleasedReleaseHero } from './UnreleasedReleaseHero';
+export { VideoReleasePage } from './VideoReleasePage';
+export { YouTubeEmbed } from './YouTubeEmbed';

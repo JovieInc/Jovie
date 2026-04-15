@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { neon } from '@neondatabase/serverless';
 import { chromium } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
@@ -141,6 +142,26 @@ function runAuthSetup(baseUrl: string) {
   );
 }
 
+async function ensureReadyCreatorPerfPlan(
+  persona: DevTestAuthPersona,
+  userId: string | null
+) {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (persona !== 'creator-ready' || !userId || !databaseUrl) {
+    return;
+  }
+
+  const sql = neon(databaseUrl);
+  await sql`
+    update users
+    set
+      plan = 'max',
+      is_pro = true,
+      billing_updated_at = now()
+    where clerk_id = ${userId}
+  `;
+}
+
 async function runBypassAuthSetup(options: PerfAuthCliOptions) {
   const browser = await chromium.launch();
 
@@ -214,6 +235,11 @@ async function main() {
     mkdirSync(dirname(options.outPath), { recursive: true });
     copyFileSync(authSetupOutputPath, options.outPath);
   }
+
+  await ensureReadyCreatorPerfPlan(
+    options.persona,
+    readBypassUserId(options.outPath)
+  );
 
   writeResult(options, {
     authStatePath: options.outPath,
