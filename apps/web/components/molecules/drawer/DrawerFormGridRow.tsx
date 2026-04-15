@@ -1,14 +1,13 @@
 'use client';
 
 import { Label } from '@jovie/ui';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export const DRAWER_FORM_GRID_ROW_CLASSNAME =
-  'grid grid-cols-[88px,minmax(0,1fr)] items-center gap-2.5';
+export const DRAWER_FORM_GRID_ROW_CLASSNAME = 'grid items-center gap-2';
 
 export const DRAWER_FORM_GRID_LABEL_CLASSNAME =
-  'text-[13px] font-[510] tracking-normal text-secondary-token';
+  'text-[11px] font-[500] leading-[15px] tracking-normal text-quaternary-token';
 
 export interface DrawerFormGridRowProps {
   readonly label: ReactNode;
@@ -18,6 +17,11 @@ export interface DrawerFormGridRowProps {
   readonly children: ReactNode;
 }
 
+const DRAWER_FORM_GRID_ROW_STYLE: CSSProperties = {
+  gridTemplateColumns:
+    'var(--drawer-inspector-label-width, 92px) minmax(0, 1fr)',
+};
+
 export function DrawerFormGridRow({
   label,
   htmlFor,
@@ -26,7 +30,10 @@ export function DrawerFormGridRow({
   children,
 }: DrawerFormGridRowProps) {
   return (
-    <div className={cn(DRAWER_FORM_GRID_ROW_CLASSNAME, className)}>
+    <div
+      className={cn(DRAWER_FORM_GRID_ROW_CLASSNAME, className)}
+      style={DRAWER_FORM_GRID_ROW_STYLE}
+    >
       <Label
         htmlFor={htmlFor}
         className={cn(DRAWER_FORM_GRID_LABEL_CLASSNAME, labelClassName)}
