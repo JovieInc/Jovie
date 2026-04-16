@@ -173,56 +173,64 @@ export async function GET(
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry');
 
-    await withSystemIngestionSession(async tx => {
-      await tx
-        .update(audienceSourceLinks)
-        .set({
-          scanCount: drizzleSql`${audienceSourceLinks.scanCount} + 1`,
-          lastScannedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(audienceSourceLinks.id, sourceLink.id));
+    try {
+      await withSystemIngestionSession(async tx => {
+        await tx
+          .update(audienceSourceLinks)
+          .set({
+            scanCount: drizzleSql`${audienceSourceLinks.scanCount} + 1`,
+            lastScannedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(audienceSourceLinks.id, sourceLink.id));
 
-      if (!hasMarketingConsent) return;
+        if (!hasMarketingConsent) return;
 
-      const audienceMemberId = await resolveAudienceMemberId(tx, {
-        creatorProfileId: sourceLink.creatorProfileId,
-        fingerprint: createFingerprint(clientIP, userAgent),
-        isBot: botDetection.isBot,
-        userAgent,
-        geoCity,
-        geoCountry,
+        const audienceMemberId = await resolveAudienceMemberId(tx, {
+          creatorProfileId: sourceLink.creatorProfileId,
+          fingerprint: createFingerprint(clientIP, userAgent),
+          isBot: botDetection.isBot,
+          userAgent,
+          geoCity,
+          geoCountry,
+        });
+
+        await recordAudienceEvent(tx, {
+          creatorProfileId: sourceLink.creatorProfileId,
+          audienceMemberId,
+          eventType: 'source_scanned',
+          verb: 'scanned',
+          confidence: 'observed',
+          sourceKind: sourceLink.sourceType === 'qr' ? 'qr' : 'short_link',
+          sourceLabel: sourceLink.name,
+          sourceLinkId: sourceLink.id,
+          objectType:
+            sourceLink.destinationKind === 'tour_date'
+              ? 'tour_date'
+              : sourceLink.destinationKind === 'release'
+                ? 'release'
+                : sourceLink.destinationKind === 'profile'
+                  ? 'profile'
+                  : 'external_url',
+          objectId: sourceLink.destinationId,
+          objectLabel:
+            typeof sourceLink.metadata?.objectLabel === 'string'
+              ? sourceLink.metadata.objectLabel
+              : null,
+          properties: {
+            code: sourceLink.code,
+            destinationUrl,
+            utmParams: sourceLink.utmParams,
+          },
+        });
       });
-
-      await recordAudienceEvent(tx, {
-        creatorProfileId: sourceLink.creatorProfileId,
-        audienceMemberId,
-        eventType: 'source_scanned',
-        verb: 'scanned',
-        confidence: 'observed',
-        sourceKind: sourceLink.sourceType === 'qr' ? 'qr' : 'short_link',
-        sourceLabel: sourceLink.name,
+    } catch (analyticsError) {
+      await captureError('Source link analytics failed', analyticsError, {
+        route: '/s/[code]',
+        code,
         sourceLinkId: sourceLink.id,
-        objectType:
-          sourceLink.destinationKind === 'tour_date'
-            ? 'tour_date'
-            : sourceLink.destinationKind === 'release'
-              ? 'release'
-              : sourceLink.destinationKind === 'profile'
-                ? 'profile'
-                : 'external_url',
-        objectId: sourceLink.destinationId,
-        objectLabel:
-          typeof sourceLink.metadata?.objectLabel === 'string'
-            ? sourceLink.metadata.objectLabel
-            : null,
-        properties: {
-          code: sourceLink.code,
-          destinationUrl,
-          utmParams: sourceLink.utmParams,
-        },
-      });
-    });
+      }).catch(() => undefined);
+    }
 
     return NextResponse.redirect(destinationUrl, { status: 302 });
   } catch (error) {

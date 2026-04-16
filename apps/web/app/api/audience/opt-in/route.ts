@@ -59,14 +59,25 @@ function htmlResponse(title: string, message: string, status: number) {
 }
 
 async function applyOptIn(email: string, profileId: string, optIn: boolean) {
-  const [updated] = await db
-    .update(tipAudience)
-    .set({ marketingOptIn: optIn, updatedAt: new Date() })
+  const [existing] = await db
+    .select({
+      id: tipAudience.id,
+      marketingOptIn: tipAudience.marketingOptIn,
+    })
+    .from(tipAudience)
     .where(
       and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
     )
+    .limit(1);
+
+  if (!existing) return null;
+
+  const [updated] = await db
+    .update(tipAudience)
+    .set({ marketingOptIn: optIn, updatedAt: new Date() })
+    .where(eq(tipAudience.id, existing.id))
     .returning({ id: tipAudience.id });
-  if (updated && optIn) {
+  if (updated && optIn && !existing.marketingOptIn) {
     const [member] = await db
       .select({ id: audienceMembers.id })
       .from(audienceMembers)
