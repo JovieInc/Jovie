@@ -1,14 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import {
-  Link2,
-  Moon,
-  Music2,
-  PlugZap,
-  QrCode,
-  Route,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
+import { Link2, PlugZap, Sparkles, Zap } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileFeatureTile } from '@/data/artistProfileFeatures';
@@ -18,24 +9,16 @@ const SPEC_TILE_ICONS: Partial<
   Record<ArtistProfileFeatureTile['id'], LucideIcon>
 > = {
   'fast-by-design': Zap,
-  'smart-routing': Route,
   'deep-link-modes': Link2,
-  'qr-ready': QrCode,
-  'dark-mode-first': Moon,
   'zero-setup': PlugZap,
-  'dedicated-release-pages': Music2,
 };
 
 const SPEC_TILE_POSITIONS: Partial<
   Record<ArtistProfileFeatureTile['id'], string>
 > = {
   'fast-by-design': 'lg:left-20 lg:top-20',
-  'smart-routing': 'lg:right-20 lg:top-20',
-  'deep-link-modes': 'lg:bottom-16 lg:left-20',
-  'qr-ready': 'lg:bottom-16 lg:right-20',
-  'dark-mode-first': 'lg:bottom-16 lg:left-1/2 lg:-translate-x-1/2',
-  'zero-setup': 'lg:left-0 lg:top-1/2 lg:-translate-y-1/2',
-  'dedicated-release-pages': 'lg:right-0 lg:top-1/2 lg:-translate-y-1/2',
+  'deep-link-modes': 'lg:right-20 lg:top-20',
+  'zero-setup': 'lg:bottom-16 lg:left-1/2 lg:-translate-x-1/2',
 };
 
 const SPEC_TILE_ACCENTS: Record<ArtistProfileFeatureTile['accent'], string> = {

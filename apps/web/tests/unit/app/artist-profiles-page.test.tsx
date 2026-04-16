@@ -34,6 +34,7 @@ describe('ArtistProfilesPage', () => {
     render(<ArtistProfilesPage />);
 
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'The link your music deserves.' })
@@ -68,24 +69,80 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByText('/shows')).toBeInTheDocument();
     expect(screen.getByText('/pay')).toBeInTheDocument();
     expect(screen.getByText('/subscribe')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Shows' }));
+    expect(screen.getByText('Tour dates')).toBeInTheDocument();
+    expect(screen.getByText('Jun 02 - Brooklyn Mirage')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    expect(screen.getByText('Notifications on')).toBeInTheDocument();
+    expect(screen.getByText('Release and show alerts')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
     expect(screen.getByText('Make support one tap away.')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Venmo')).toBeInTheDocument();
     expect(
       screen.getByAltText(
         'Jovie artist profile showing direct support options.'
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'One profile. Infinite outcomes.' })
+      screen.getAllByRole('heading', { name: 'Built for artists.' }).length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('heading', { name: 'Trackable QR codes' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Dark mode first' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Intelligent routing' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Get paid. Stay close.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Get paid.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Say thanks.' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Support should not end at the transaction.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Tips and direct support live inside the same profile.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Turn a one-time payment into a repeat listen, follow, or save.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText('Thanks for the support - new song inside.').length
+    ).toBeGreaterThan(0);
+    expect(
+      Boolean(
+        screen
+          .getByRole('heading', { name: 'Trackable QR codes' })
+          .compareDocumentPosition(
+            screen.getByRole('heading', {
+              name: 'Get paid. Stay close.',
+            })
+          ) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+    expect(
+      Boolean(
+        screen
+          .getByRole('heading', { name: 'Get paid. Stay close.' })
+          .compareDocumentPosition(
+            screen.getByRole('heading', {
+              name: 'Capture every fan.',
+            })
+          ) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
     expect(
       screen.getByRole('heading', {
         name: 'Capture every fan.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Built for artists.',
       })
     ).toBeInTheDocument();
     expect(
@@ -174,12 +231,16 @@ describe('ArtistProfilesPage', () => {
     );
 
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Release' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'One profile. Infinite outcomes.' })
+      screen.queryByRole('heading', { name: 'Trackable QR codes' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Get paid. Stay close.' })
     ).not.toBeInTheDocument();
   });
 });

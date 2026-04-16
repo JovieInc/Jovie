@@ -62,9 +62,9 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
     {
       feature: 'Intelligent routing',
       benefit: 'Fans reach the right service faster.',
-      uiSurface: 'Release Day mode and routing tile',
+      uiSurface: 'Built for artists card',
       copyCandidate: 'Send each fan where they are most likely to listen.',
-      placement: 'spec tile',
+      placement: 'card',
     },
     {
       feature: 'Deep-link modes',
@@ -113,9 +113,9 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
     {
       feature: 'QR sharing',
       benefit: 'Offline moments can route into the same profile system.',
-      uiSurface: 'Phone surfaces, support mode, and QR tile',
+      uiSurface: 'Built for artists card',
       copyCandidate: 'Put one scan on the table, wall, or flyer.',
-      placement: 'spec tile',
+      placement: 'card',
     },
     {
       feature: 'Zero setup',
@@ -134,39 +134,15 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'blue',
   },
   {
-    id: 'smart-routing',
-    title: 'Intelligent routing',
-    body: 'Surfaces the right actions for the fan in front of it.',
-    accent: 'purple',
-  },
-  {
     id: 'deep-link-modes',
     title: 'Deep-link modes',
     body: 'Send fans straight to /music, /shows, /pay, /subscribe, and more.',
     accent: 'pink',
   },
   {
-    id: 'qr-ready',
-    title: 'Trackable QR codes',
-    body: 'Know which flyer, sticker, etc got you the most fans.',
-    accent: 'orange',
-  },
-  {
-    id: 'dark-mode-first',
-    title: 'Dark mode first',
-    body: 'Designed for low-light taps in clubs, venues, and late-night scrolls.',
-    accent: 'gray',
-  },
-  {
     id: 'zero-setup',
     title: 'Zero setup',
     body: 'Claim it, connect once, go live.',
     accent: 'green',
-  },
-  {
-    id: 'dedicated-release-pages',
-    title: 'Dedicated release pages',
-    body: 'Every drop gets its own smart-link page for presave, countdown, and release day.',
-    accent: 'teal',
   },
 ] as const;

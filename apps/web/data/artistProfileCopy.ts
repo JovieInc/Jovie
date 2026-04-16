@@ -4,19 +4,33 @@ export interface ArtistProfileMode {
   readonly headline: string;
   readonly description: string;
   readonly pathLabel: string;
+  readonly drawer: ArtistProfileModeDrawer;
   readonly screenshotSrc: string;
   readonly screenshotAlt: string;
   readonly screenshotWidth: number;
   readonly screenshotHeight: number;
 }
 
+export interface ArtistProfileModeDrawer {
+  readonly title: string;
+  readonly subtitle: string;
+  readonly ctaLabel: string;
+  readonly items: readonly ArtistProfileModeDrawerItem[];
+}
+
+export interface ArtistProfileModeDrawerItem {
+  readonly id: string;
+  readonly label: string;
+  readonly detail: string;
+  readonly action: string;
+}
+
 export interface ArtistProfileOutcomeCard {
   readonly id:
-    | 'drive-streams'
-    | 'fill-the-room'
-    | 'get-paid'
-    | 'capture-fans'
-    | 'share-anywhere';
+    | 'dedicated-release-pages'
+    | 'trackable-qr-codes'
+    | 'dark-mode-first'
+    | 'intelligent-routing';
   readonly title: string;
   readonly description: string;
 }
@@ -41,7 +55,9 @@ export interface ArtistProfileAudiencePill {
     | 'qr'
     | 'shows'
     | 'subscribe'
-    | 'music';
+    | 'music'
+    | 'email'
+    | 'pay';
   readonly identity: string;
   readonly chips: readonly string[];
   readonly action: string;
@@ -76,6 +92,19 @@ export interface ArtistProfileLandingCopy {
     readonly body: string;
     readonly cards: readonly ArtistProfileOutcomeCard[];
   };
+  readonly monetization: {
+    readonly headline: string;
+    readonly subhead: string;
+    readonly paidCard: {
+      readonly title: string;
+      readonly body: string;
+    };
+    readonly followUpCard: {
+      readonly title: string;
+      readonly body: string;
+      readonly message: string;
+    };
+  };
   readonly capture: {
     readonly eyebrow: string;
     readonly headline: string;
@@ -86,6 +115,12 @@ export interface ArtistProfileLandingCopy {
       readonly detail: string;
       readonly ctaLabel: string;
       readonly confirmedLabel: string;
+      readonly beforeLabel: string;
+      readonly beforeTitle: string;
+      readonly beforeDetail: string;
+      readonly afterLabel: string;
+      readonly afterTitle: string;
+      readonly afterDetail: string;
     };
     readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
   };
@@ -166,6 +201,31 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Put the newest music or campaign first.',
         description: 'Put the newest music or campaign first.',
         pathLabel: 'jov.ie/you/music',
+        drawer: {
+          title: 'Release',
+          subtitle: 'Take Me Over is live now.',
+          ctaLabel: 'Open release page',
+          items: [
+            {
+              id: 'spotify',
+              label: 'Spotify',
+              detail: 'Best for Jason in LA',
+              action: 'Play',
+            },
+            {
+              id: 'apple-music',
+              label: 'Apple Music',
+              detail: 'Saved by returning fans',
+              action: 'Open',
+            },
+            {
+              id: 'youtube',
+              label: 'YouTube',
+              detail: 'Watch the latest video',
+              action: 'Watch',
+            },
+          ],
+        },
         screenshotSrc:
           '/product-screenshots/artist-profile-mode-release-phone.png',
         screenshotAlt: 'Jovie artist profile showing a release-first view.',
@@ -178,6 +238,43 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Surface the right dates and ticket paths.',
         description: 'Surface the right dates and ticket paths.',
         pathLabel: 'jov.ie/you/shows',
+        drawer: {
+          title: 'Tour dates',
+          subtitle: 'Nearby dates rise to the top.',
+          ctaLabel: 'View all dates',
+          items: [
+            {
+              id: 'la',
+              label: 'Los Angeles',
+              detail: 'May 18 - The Novo',
+              action: 'Tickets',
+            },
+            {
+              id: 'chicago',
+              label: 'Chicago',
+              detail: 'May 24 - Radius',
+              action: 'Tickets',
+            },
+            {
+              id: 'new-york',
+              label: 'New York',
+              detail: 'Jun 02 - Brooklyn Mirage',
+              action: 'Tickets',
+            },
+            {
+              id: 'london',
+              label: 'London',
+              detail: 'Jun 14 - O2 Academy',
+              action: 'Tickets',
+            },
+            {
+              id: 'berlin',
+              label: 'Berlin',
+              detail: 'Jun 21 - Astra Kulturhaus',
+              action: 'Tickets',
+            },
+          ],
+        },
         screenshotSrc:
           '/product-screenshots/artist-profile-mode-shows-phone.png',
         screenshotAlt:
@@ -191,6 +288,31 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Make support one tap away.',
         description: 'Make support one tap away.',
         pathLabel: 'jov.ie/you/pay',
+        drawer: {
+          title: 'Support',
+          subtitle: 'Choose an amount.',
+          ctaLabel: 'Continue with Venmo',
+          items: [
+            {
+              id: 'five',
+              label: '$5',
+              detail: 'Quick support',
+              action: 'USD',
+            },
+            {
+              id: 'ten',
+              label: '$10',
+              detail: 'Most common',
+              action: 'USD',
+            },
+            {
+              id: 'twenty',
+              label: '$20',
+              detail: 'Top fan',
+              action: 'USD',
+            },
+          ],
+        },
         screenshotSrc: '/product-screenshots/artist-profile-mode-pay-phone.png',
         screenshotAlt: 'Jovie artist profile showing direct support options.',
         screenshotWidth: 660,
@@ -202,6 +324,31 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Turn a visit into a direct line.',
         description: 'Turn a visit into a direct line.',
         pathLabel: 'jov.ie/you/subscribe',
+        drawer: {
+          title: 'Subscribe',
+          subtitle: 'Get release, show, and drop alerts.',
+          ctaLabel: 'Notifications on',
+          items: [
+            {
+              id: 'email',
+              label: 'Email',
+              detail: 'fan@example.com',
+              action: 'Verified',
+            },
+            {
+              id: 'notifications',
+              label: 'Notifications',
+              detail: 'Release and show alerts',
+              action: 'On',
+            },
+            {
+              id: 'source',
+              label: 'Source',
+              detail: 'Spotify - LA',
+              action: 'Saved',
+            },
+          ],
+        },
         screenshotSrc:
           '/product-screenshots/artist-profile-mode-subscribe-phone.png',
         screenshotAlt: 'Jovie artist profile showing fan subscription capture.',
@@ -214,6 +361,37 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'Keep every important destination reachable.',
         description: 'Keep every important destination reachable.',
         pathLabel: 'jov.ie/you/links',
+        drawer: {
+          title: 'Links',
+          subtitle: 'Every important destination stays reachable.',
+          ctaLabel: 'Open profile',
+          items: [
+            {
+              id: 'spotify',
+              label: 'Spotify',
+              detail: 'Music',
+              action: 'Open',
+            },
+            {
+              id: 'youtube',
+              label: 'YouTube',
+              detail: 'Video',
+              action: 'Watch',
+            },
+            {
+              id: 'instagram',
+              label: 'Instagram',
+              detail: 'Social',
+              action: 'Follow',
+            },
+            {
+              id: 'booking',
+              label: 'Booking',
+              detail: 'Contact',
+              action: 'Send',
+            },
+          ],
+        },
         screenshotSrc:
           '/product-screenshots/artist-profile-mode-links-phone.png',
         screenshotAlt:
@@ -225,48 +403,62 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   outcomes: {
     eyebrow: 'Fan outcomes',
-    headline: 'One profile. Infinite outcomes.',
-    body: 'Five jobs one artist profile can do in seconds.',
+    headline: 'Built for artists.',
+    body: '',
     cards: [
       {
-        id: 'drive-streams',
-        title: 'Drive streams',
-        description: 'Countdown, latest release, and release card behavior.',
-      },
-      {
-        id: 'fill-the-room',
-        title: 'Fill the room',
-        description: 'Nearby shows and ticket paths move to the front.',
-      },
-      {
-        id: 'get-paid',
-        title: 'Get paid',
-        description: 'Tip and support flows live inside the same profile.',
-      },
-      {
-        id: 'capture-fans',
-        title: 'Capture fans',
+        id: 'dedicated-release-pages',
+        title: 'Dedicated release pages',
         description:
-          'Subscribe and notification states turn traffic into reach.',
+          'Every drop gets its own smart-link page for presave, countdown, and release day.',
       },
       {
-        id: 'share-anywhere',
-        title: 'Share anywhere',
+        id: 'trackable-qr-codes',
+        title: 'Trackable QR codes',
+        description: 'Know which flyer, sticker, etc got you the most fans.',
+      },
+      {
+        id: 'dark-mode-first',
+        title: 'Dark mode first',
         description:
-          'QR and short-link behavior for flyers, booths, and screens.',
+          'Designed for low-light taps in clubs, venues, and late-night scrolls.',
+      },
+      {
+        id: 'intelligent-routing',
+        title: 'Intelligent routing',
+        description: 'Surfaces the right actions for the fan in front of it.',
       },
     ],
+  },
+  monetization: {
+    headline: 'Get paid. Stay close.',
+    subhead: 'Support should not end at the transaction.',
+    paidCard: {
+      title: 'Get paid.',
+      body: 'Tips and direct support live inside the same profile.',
+    },
+    followUpCard: {
+      title: 'Say thanks.',
+      body: 'Turn a one-time payment into a repeat listen, follow, or save.',
+      message: 'Thanks for the support - new song inside.',
+    },
   },
   capture: {
     eyebrow: 'Owned audience',
     headline: 'Capture every fan.',
-    subhead: 'Turn profile traffic into an identifiable, reachable audience.',
+    subhead: 'Turn anonymous profile visits into fans you can reach again.',
     body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
     action: {
-      title: 'Get notified',
-      detail: 'Release, show, and drop alerts from jov.ie/you',
+      title: 'Fan capture',
+      detail: 'One visit becomes a direct line.',
       ctaLabel: 'Subscribe',
-      confirmedLabel: 'Subscribed',
+      confirmedLabel: 'Captured',
+      beforeLabel: 'Before',
+      beforeTitle: 'Anonymous visit',
+      beforeDetail: 'jov.ie/you opened from Spotify in LA.',
+      afterLabel: 'After',
+      afterTitle: 'Reachable fan',
+      afterDetail: 'Email verified. Notifications on. Context saved.',
     },
     audienceRails: [
       [
@@ -278,84 +470,84 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           action: 'listened',
         },
         {
-          id: 'subscribe-brian',
-          icon: 'subscribe',
+          id: 'email-brian',
+          icon: 'email',
           identity: 'Brian M',
-          chips: ['Subscribed'],
-          action: 'joined',
+          chips: ['email'],
+          action: 'subscribed',
         },
         {
           id: 'shows-london-o2',
           icon: 'shows',
-          identity: 'London',
-          chips: ['O2 Arena'],
-          action: 'viewed tickets',
+          identity: 'Ava',
+          chips: ['London', 'O2 Arena'],
+          action: 'saved',
         },
         {
           id: 'qr-berlin-flyer',
           icon: 'qr',
-          identity: 'Berlin',
-          chips: ['QR'],
-          action: 'scanned flyer',
+          identity: 'Mika',
+          chips: ['Berlin', 'flyer'],
+          action: 'scanned',
         },
       ],
       [
         {
           id: 'apple-tokyo',
           icon: 'apple',
-          identity: 'Tokyo',
-          chips: ['Apple Music'],
-          action: 'saved',
+          identity: 'Kenji',
+          chips: ['Tokyo', 'latest release'],
+          action: 'opened',
         },
         {
           id: 'youtube-sao-paulo',
           icon: 'youtube',
-          identity: 'São Paulo',
-          chips: ['YouTube'],
-          action: 'watched latest',
+          identity: 'Luana',
+          chips: ['São Paulo', 'YouTube'],
+          action: 'watched',
         },
         {
-          id: 'music-maya-release',
-          icon: 'music',
+          id: 'subscribe-maya-notifications',
+          icon: 'subscribe',
           identity: 'Maya',
-          chips: ['Release'],
-          action: 'opened',
+          chips: ['notifications'],
+          action: 'enabled',
         },
         {
           id: 'spotify-amelia-london',
           icon: 'spotify',
           identity: 'Amelia',
           chips: ['London', 'Spotify'],
-          action: 'followed',
+          action: 'saved',
         },
       ],
       [
         {
           id: 'shows-chicago',
           icon: 'shows',
-          identity: 'Chicago',
-          chips: ['Shows'],
-          action: 'saved date',
+          identity: 'Marcus',
+          chips: ['Chicago', 'shows'],
+          action: 'saved',
         },
         {
           id: 'qr-miami-sticker',
           icon: 'qr',
-          identity: 'Miami',
-          chips: ['Sticker'],
+          identity: 'Sofia',
+          chips: ['Miami', 'sticker'],
           action: 'scanned',
         },
         {
-          id: 'subscribe-nina',
-          icon: 'subscribe',
+          id: 'email-nina',
+          icon: 'email',
           identity: 'Nina P',
-          chips: ['Email'],
-          action: 'opted in',
+          chips: ['email'],
+          action: 'confirmed',
         },
         {
-          id: 'apple-seattle-pay',
-          icon: 'apple',
-          identity: 'Seattle',
-          chips: ['Pay'],
+          id: 'pay-diego-support',
+          icon: 'pay',
+          identity: 'Diego',
+          chips: ['pay', 'support'],
           action: 'supported',
         },
       ],

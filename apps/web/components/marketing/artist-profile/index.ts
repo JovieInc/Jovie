@@ -5,6 +5,7 @@ export { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 export { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 export { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
 export { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
+export { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 export { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 export { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 export { ArtistProfileSocialProof } from './ArtistProfileSocialProof';

@@ -5,12 +5,14 @@ import type {
 } from '@/data/artistProfileFeatures';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
+import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
+import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
@@ -32,18 +34,25 @@ export function ArtistProfileLandingPage({
   flags,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
-    return <HomeHero layout='f' />;
+    return (
+      <>
+        <HomeHero layout='f' />
+        <HomeTrustSection />
+      </>
+    );
   }
 
   return (
     <>
       <HomeHero layout='f' />
+      <HomeTrustSection />
       <ArtistProfileAdaptiveSequence
         adaptive={copy.adaptive}
         phoneCaption={copy.hero.phoneCaption}
         phoneSubcaption={copy.hero.phoneSubcaption}
       />
       <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
+      <ArtistProfileMonetizationSection monetization={copy.monetization} />
       <ArtistProfileCaptureSection capture={copy.capture} />
       <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
       <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />

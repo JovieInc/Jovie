@@ -1,13 +1,17 @@
 import {
+  ArrowRight,
   Bell,
   Check,
+  CreditCard,
   Headphones,
+  Mail,
   MapPin,
   Music2,
   Play,
   QrCode,
   Radio,
 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import type {
   ArtistProfileAudiencePill,
   ArtistProfileLandingCopy,
@@ -27,29 +31,52 @@ const AUDIENCE_ICON = {
   shows: MapPin,
   subscribe: Check,
   music: Music2,
+  email: Mail,
+  pay: CreditCard,
 } as const;
 
+const PILL_ACCENTS = [
+  'var(--color-accent-blue)',
+  'var(--color-accent-purple)',
+  'var(--color-accent-pink)',
+  'var(--color-accent-red)',
+  'var(--color-accent-orange)',
+  'var(--color-accent-green)',
+  'var(--color-accent-teal)',
+  'var(--color-accent-gray)',
+] as const;
+
+type PillAccentStyle = CSSProperties & {
+  readonly '--pill-accent': string;
+};
+
 function AudiencePill({
+  accentIndex,
   pill,
 }: Readonly<{
+  accentIndex: number;
   pill: ArtistProfileAudiencePill;
 }>) {
   const Icon = AUDIENCE_ICON[pill.icon];
+  const style: PillAccentStyle = {
+    '--pill-accent': PILL_ACCENTS[accentIndex % PILL_ACCENTS.length],
+  };
 
   return (
-    <li className='artist-profile-audience-pill group flex h-12 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.045] px-4 text-[13px] font-medium leading-none text-primary-token shadow-[0_0_34px_rgba(91,141,255,0.08)] backdrop-blur-xl transition-colors duration-200 hover:border-white/[0.16] hover:bg-white/[0.07]'>
-      <Icon className='h-4 w-4 shrink-0 text-sky-200/75' strokeWidth={1.9} />
-      <span>{pill.identity}</span>
-      <span className='h-1 w-1 shrink-0 rounded-full bg-white/28' />
-      {pill.chips.map(chip => (
-        <span
-          key={chip}
-          className='rounded-full bg-[linear-gradient(135deg,rgba(116,170,255,0.18),rgba(166,119,255,0.16))] px-2 py-1 text-[11px] font-semibold text-sky-100 ring-1 ring-white/[0.08]'
-        >
-          {chip}
-        </span>
-      ))}
-      <span className='text-secondary-token'>{pill.action}</span>
+    <li className='artist-profile-audience-pill group' style={style}>
+      <span className='relative z-10 flex h-full items-center gap-2.5 px-4'>
+        <Icon
+          className='h-4 w-4 shrink-0 text-[color:var(--pill-accent)]'
+          strokeWidth={1.9}
+        />
+        <span>{pill.identity}</span>
+        {pill.chips.map(chip => (
+          <span key={chip} className='artist-profile-audience-chip'>
+            {chip}
+          </span>
+        ))}
+        <span className='text-secondary-token'>{pill.action}</span>
+      </span>
     </li>
   );
 }
@@ -74,8 +101,12 @@ function AudienceRail({
           direction === 'right' && 'artist-profile-audience-rail-reverse'
         )}
       >
-        {repeatedPills.map(({ pill, repeat }) => (
-          <AudiencePill key={`${repeat}-${pill.id}`} pill={pill} />
+        {repeatedPills.map(({ pill, repeat }, index) => (
+          <AudiencePill
+            key={`${repeat}-${pill.id}`}
+            accentIndex={index}
+            pill={pill}
+          />
         ))}
       </ul>
     </div>
@@ -92,6 +123,99 @@ export function ArtistProfileCaptureSection({
           mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
         }
 
+        .artist-profile-audience-pill {
+          position: relative;
+          isolation: isolate;
+          display: flex;
+          height: 3rem;
+          flex-shrink: 0;
+          align-items: center;
+          overflow: hidden;
+          white-space: nowrap;
+          border-radius: 9999px;
+          border: 1px solid color-mix(in srgb, var(--pill-accent) 24%, rgba(255, 255, 255, 0.12));
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.026)),
+            color-mix(in srgb, var(--pill-accent) 5%, rgba(0, 0, 0, 0.72));
+          color: rgba(255, 255, 255, 0.94);
+          font-size: 13px;
+          font-weight: 500;
+          line-height: 1;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.06),
+            0 14px 34px rgba(0, 0, 0, 0.24);
+          backdrop-filter: blur(18px);
+          transition:
+            border-color 200ms ease,
+            background 200ms ease,
+            box-shadow 200ms ease;
+        }
+
+        .artist-profile-audience-pill::before {
+          position: absolute;
+          inset: -1px;
+          z-index: 0;
+          padding: 1px;
+          border-radius: inherit;
+          background:
+            conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 58deg,
+              color-mix(in srgb, var(--pill-accent) 18%, transparent) 74deg,
+              color-mix(in srgb, var(--pill-accent) 88%, white 12%) 92deg,
+              rgba(255, 255, 255, 0.86) 104deg,
+              color-mix(in srgb, var(--pill-accent) 86%, white 14%) 116deg,
+              transparent 138deg,
+              transparent 360deg
+            );
+          content: '';
+          opacity: 0.72;
+          -webkit-mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+          mask-composite: exclude;
+          animation: artist-profile-electric-border 5.4s linear infinite;
+        }
+
+        .artist-profile-audience-pill::after {
+          position: absolute;
+          inset: 1px;
+          z-index: 0;
+          border-radius: inherit;
+          background:
+            radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--pill-accent) 12%, transparent), transparent 50%),
+            rgba(0, 0, 0, 0.32);
+          content: '';
+        }
+
+        .artist-profile-audience-pill:hover {
+          border-color: color-mix(in srgb, var(--pill-accent) 42%, rgba(255, 255, 255, 0.18));
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            0 16px 38px rgba(0, 0, 0, 0.28),
+            0 0 24px color-mix(in srgb, var(--pill-accent) 12%, transparent);
+        }
+
+        .artist-profile-audience-pill:hover::before {
+          opacity: 0.95;
+          animation-duration: 3.8s;
+        }
+
+        .artist-profile-audience-chip {
+          border-radius: 9999px;
+          border: 1px solid color-mix(in srgb, var(--pill-accent) 22%, rgba(255, 255, 255, 0.11));
+          background: color-mix(in srgb, var(--pill-accent) 10%, rgba(255, 255, 255, 0.045));
+          padding: 0.25rem 0.5rem;
+          color: color-mix(in srgb, var(--pill-accent) 72%, white 28%);
+          font-size: 11px;
+          font-weight: 650;
+        }
+
         .artist-profile-audience-rail {
           animation: artist-profile-audience-drift 48s linear infinite;
         }
@@ -105,7 +229,7 @@ export function ArtistProfileCaptureSection({
           animation-play-state: paused;
         }
 
-        .artist-profile-capture-confirmed {
+        .artist-profile-capture-after {
           animation: artist-profile-capture-confirm 5.8s ease-in-out infinite;
         }
 
@@ -119,28 +243,34 @@ export function ArtistProfileCaptureSection({
           }
         }
 
-        @keyframes artist-profile-capture-confirm {
-          0%,
-          28% {
-            opacity: 0;
-            transform: translateY(8px) scale(0.98);
+        @keyframes artist-profile-electric-border {
+          from {
+            transform: rotate(0deg);
           }
 
-          42%,
-          82% {
-            opacity: 1;
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes artist-profile-capture-confirm {
+          0% {
             transform: translateY(0) scale(1);
           }
 
+          50% {
+            transform: translateY(-2px) scale(1.006);
+          }
+
           100% {
-            opacity: 0;
-            transform: translateY(-4px) scale(0.995);
+            transform: translateY(0) scale(1);
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .artist-profile-audience-rail,
-          .artist-profile-capture-confirmed {
+          .artist-profile-audience-pill::before,
+          .artist-profile-capture-after {
             animation: none;
           }
         }
@@ -156,36 +286,68 @@ export function ArtistProfileCaptureSection({
           </p>
         </div>
 
-        <div className='relative mx-auto mt-14 max-w-[820px] overflow-hidden rounded-[2rem] border border-white/[0.07] bg-[radial-gradient(circle_at_50%_0%,rgba(86,130,255,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.018))] p-4 shadow-[0_32px_120px_rgba(0,0,0,0.46)] sm:p-5'>
+        <div className='relative mx-auto mt-14 max-w-[820px] overflow-hidden rounded-[2rem] border border-white/[0.09] bg-[radial-gradient(circle_at_50%_0%,rgba(86,130,255,0.085),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.052),rgba(255,255,255,0.018))] p-4 shadow-[0_32px_90px_rgba(0,0,0,0.38)] sm:p-5'>
           <div
-            className='pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/40 to-transparent'
+            className='pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/28 to-transparent'
             aria-hidden='true'
           />
-          <div className='rounded-[1.55rem] bg-black/48 p-4 ring-1 ring-white/[0.06] sm:p-5'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex items-center gap-3'>
-                <span
-                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-sky-100 ring-1 ring-white/[0.08]'
-                  aria-hidden='true'
-                >
-                  <Bell className='h-4 w-4' strokeWidth={1.9} />
-                </span>
-                <div>
-                  <p className='text-[15px] font-semibold tracking-[-0.02em] text-primary-token'>
-                    {capture.action.title}
-                  </p>
-                  <p className='mt-1 text-[12px] leading-none text-tertiary-token'>
-                    {capture.action.detail}
-                  </p>
+          <div className='rounded-[1.55rem] bg-black/52 p-4 ring-1 ring-white/[0.08] sm:p-5'>
+            <div className='grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-stretch'>
+              <div className='rounded-[1.2rem] border border-white/[0.09] bg-white/[0.035] p-4'>
+                <p className='text-[12px] font-semibold tracking-[-0.01em] text-tertiary-token'>
+                  {capture.action.beforeLabel}
+                </p>
+                <div className='mt-4 flex items-center gap-3'>
+                  <span
+                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.045] text-white/55 ring-1 ring-white/[0.08]'
+                    aria-hidden='true'
+                  >
+                    <Music2 className='h-4 w-4' strokeWidth={1.9} />
+                  </span>
+                  <div className='min-w-0'>
+                    <p className='truncate text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
+                      {capture.action.beforeTitle}
+                    </p>
+                    <p className='mt-1 text-[12px] leading-snug text-tertiary-token'>
+                      {capture.action.beforeDetail}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className='relative h-10 w-full sm:w-36'>
-                <div className='absolute inset-0 rounded-full bg-white px-5 py-3 text-center text-[12px] font-semibold leading-none text-black'>
-                  {capture.action.ctaLabel}
+
+              <div className='hidden items-center justify-center px-1 md:flex'>
+                <span
+                  className='flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.045] text-sky-100/72'
+                  aria-hidden='true'
+                >
+                  <ArrowRight className='h-4 w-4' strokeWidth={1.9} />
+                </span>
+              </div>
+
+              <div className='artist-profile-capture-after rounded-[1.2rem] border border-sky-100/[0.2] bg-[linear-gradient(135deg,rgba(111,162,255,0.1),rgba(180,137,255,0.085))] p-4 shadow-[0_0_38px_rgba(97,135,255,0.12)]'>
+                <div className='flex items-center justify-between gap-3'>
+                  <p className='text-[12px] font-semibold tracking-[-0.01em] text-sky-100/72'>
+                    {capture.action.afterLabel}
+                  </p>
+                  <span className='rounded-full bg-sky-100/12 px-2 py-1 text-[10px] font-semibold text-sky-100/82 ring-1 ring-sky-100/14'>
+                    {capture.action.confirmedLabel}
+                  </span>
                 </div>
-                <div className='artist-profile-capture-confirmed absolute inset-0 flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,rgba(143,189,255,1),rgba(190,150,255,1))] px-5 text-[12px] font-semibold leading-none text-black shadow-[0_0_40px_rgba(121,154,255,0.3)]'>
-                  <Check className='h-3.5 w-3.5' strokeWidth={2.2} />
-                  {capture.action.confirmedLabel}
+                <div className='mt-4 flex items-center gap-3'>
+                  <span
+                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100/12 text-sky-100 ring-1 ring-sky-100/16'
+                    aria-hidden='true'
+                  >
+                    <Bell className='h-4 w-4' strokeWidth={1.9} />
+                  </span>
+                  <div className='min-w-0'>
+                    <p className='truncate text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
+                      {capture.action.afterTitle}
+                    </p>
+                    <p className='mt-1 text-[12px] leading-snug text-secondary-token'>
+                      {capture.action.afterDetail}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -33,28 +33,37 @@ describe('HomePageNarrative', () => {
   });
 
   it('renders the reshaped homepage section order', () => {
-    render(<HomePageNarrative />);
+    render(
+      <HomePageNarrative
+        proofAvailability='visible'
+        proofSection={<section data-testid='mock-proof-section'>proof</section>}
+      />
+    );
 
     const hero = screen.getByTestId('homepage-hero');
     const trust = screen.getByTestId('homepage-trust');
     const autoNotify = screen.getByTestId('homepage-auto-notify');
     const engage = screen.getByTestId('homepage-engage-bento');
     const relationship = screen.getByTestId('homepage-fan-relationship');
+    const proof = screen.getByTestId('mock-proof-section');
     const finalCta = screen.getByTestId('final-cta-headline');
 
     expect(hero.compareDocumentPosition(trust)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(trust.compareDocumentPosition(autoNotify)).toBe(
+    expect(trust.compareDocumentPosition(engage)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(autoNotify.compareDocumentPosition(engage)).toBe(
+    expect(engage.compareDocumentPosition(autoNotify)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(engage.compareDocumentPosition(relationship)).toBe(
+    expect(autoNotify.compareDocumentPosition(relationship)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(relationship.compareDocumentPosition(finalCta)).toBe(
+    expect(relationship.compareDocumentPosition(proof)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(proof.compareDocumentPosition(finalCta)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
   });

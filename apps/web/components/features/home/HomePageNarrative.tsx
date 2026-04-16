@@ -80,8 +80,8 @@ export function HomePageNarrative({
       <HomeAdaptiveProfileStory />
       {showSections && (
         <>
-          <HomeAutoNotifySection />
           <HomeEngageBentoSection />
+          <HomeAutoNotifySection />
           <HomeFanRelationshipSection />
           {proofAvailability === 'visible' ? resolvedProofSection : null}
           <FinalCallToAction />
