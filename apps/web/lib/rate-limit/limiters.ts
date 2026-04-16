@@ -36,12 +36,14 @@ export const artworkUploadLimiter = createRateLimiter(
  * A single generation produces three images, so this is separate from chat quota.
  */
 export const albumArtGenerationLimiter = createRateLimiter(
-  RATE_LIMITERS.albumArtGeneration
+  RATE_LIMITERS.albumArtGeneration,
+  { requireRedis: RATE_LIMITERS.albumArtGeneration.requireRedis }
 );
 
 /** Burst limiter for rapid repeated album art generations. */
 export const albumArtGenerationBurstLimiter = createRateLimiter(
-  RATE_LIMITERS.albumArtGenerationBurst
+  RATE_LIMITERS.albumArtGenerationBurst,
+  { requireRedis: RATE_LIMITERS.albumArtGenerationBurst.requireRedis }
 );
 
 /**

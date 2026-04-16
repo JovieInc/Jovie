@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
+import { del } from '@vercel/blob';
 import { eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { processArtworkBufferToSizes } from '@/app/api/images/artwork/upload/process';
@@ -93,6 +94,16 @@ async function uploadProcessedReleaseArtwork(params: {
   }
 
   return sizes;
+}
+
+async function deleteProcessedReleaseArtwork(
+  sizes: Record<string, string>
+): Promise<void> {
+  const urls = Object.values(sizes).filter(Boolean);
+  if (urls.length === 0) return;
+  const token = env.BLOB_READ_WRITE_TOKEN;
+  if (!token) return;
+  await del(urls, { token });
 }
 
 async function prepareGeneratedArtwork(params: {
@@ -239,29 +250,35 @@ export async function createReleaseAndApplyGeneratedAlbumArt(params: {
     candidateId: params.candidateId,
   });
   const now = new Date();
-  const [release] = await db
-    .insert(discogReleases)
-    .values({
-      id: releaseId,
-      creatorProfileId: params.profileId,
-      title: params.title,
-      slug,
-      releaseType: params.releaseType,
-      releaseDate:
-        parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
-      artworkUrl: prepared.artworkUrl,
-      sourceType: 'manual',
-      metadata: {
-        artworkSizes: prepared.sizes,
-        generatedArtwork: buildGeneratedArtworkMetadata({
-          candidate: prepared.candidate,
-          generationId: params.generationId,
-        }),
-      },
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
+  let release;
+  try {
+    [release] = await db
+      .insert(discogReleases)
+      .values({
+        id: releaseId,
+        creatorProfileId: params.profileId,
+        title: params.title,
+        slug,
+        releaseType: params.releaseType,
+        releaseDate:
+          parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+        artworkUrl: prepared.artworkUrl,
+        sourceType: 'manual',
+        metadata: {
+          artworkSizes: prepared.sizes,
+          generatedArtwork: buildGeneratedArtworkMetadata({
+            candidate: prepared.candidate,
+            generationId: params.generationId,
+          }),
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+  } catch (error) {
+    await deleteProcessedReleaseArtwork(prepared.sizes).catch(() => undefined);
+    throw error;
+  }
 
   revalidateTag(`releases:${params.clerkUserId}:${profile.id}`, 'max');
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
