@@ -14,14 +14,16 @@ export function addAvatarCacheBust(
 ) {
   const responseProfile = { ...updatedProfile };
   if (responseProfile.avatarUrl) {
+    const cacheBustValue = Date.now().toString();
     if (responseProfile.avatarUrl.startsWith('/')) {
-      const separator = responseProfile.avatarUrl.includes('?') ? '&' : '?';
-      responseProfile.avatarUrl = `${responseProfile.avatarUrl}${separator}v=${Date.now().toString()}`;
+      const relativeUrl = new URL(responseProfile.avatarUrl, 'https://jov.ie');
+      relativeUrl.searchParams.set('v', cacheBustValue);
+      responseProfile.avatarUrl = `${relativeUrl.pathname}${relativeUrl.search}${relativeUrl.hash}`;
       return responseProfile;
     }
 
     const url = new URL(responseProfile.avatarUrl);
-    url.searchParams.set('v', Date.now().toString());
+    url.searchParams.set('v', cacheBustValue);
     responseProfile.avatarUrl = url.toString();
   }
   return responseProfile;
