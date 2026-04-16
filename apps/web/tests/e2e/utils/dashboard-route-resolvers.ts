@@ -60,29 +60,54 @@ interface ConversationsListResponse {
   }>;
 }
 
+interface BrowserFetchInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+  readonly body?: string;
+}
+
 async function fetchJsonFromPage<T>(
   page: Page,
   input: string,
-  init?: RequestInit
+  init?: BrowserFetchInit
 ): Promise<{
   readonly ok: boolean;
   readonly status: number;
   readonly data: T;
 }> {
-  const response = await page.request.fetch(input, {
-    failOnStatusCode: false,
-    headers: init?.headers
-      ? Object.fromEntries(new Headers(init.headers).entries())
-      : undefined,
-    method: init?.method,
-    data: init?.body,
-  });
-  const data = (await response.json().catch(() => ({}))) as T;
-  return {
-    ok: response.ok(),
-    status: response.status(),
-    data,
-  };
+  return page.evaluate(
+    async ({ target, requestInit }) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
+      try {
+        const response = await fetch(target, {
+          method: requestInit?.method,
+          headers: requestInit?.headers,
+          body: requestInit?.body,
+          signal: controller.signal,
+        });
+        const rawBody = await response.text().catch(() => '');
+        let data = {} as T;
+        if (rawBody.trim().length > 0) {
+          try {
+            data = JSON.parse(rawBody) as T;
+          } catch {
+            data = {} as T;
+          }
+        }
+
+        return {
+          ok: response.ok,
+          status: response.status,
+          data,
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    },
+    { target: input, requestInit: init }
+  );
 }
 
 export async function resolveChatConversationPath(page: Page): Promise<string> {
