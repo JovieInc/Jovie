@@ -268,6 +268,36 @@ describe('onboarding page', () => {
     expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
+  it('treats the legacy username query as a continuation signal and prefilled handle', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({ username: 'legacy-artist' }),
+    });
+    render(page);
+
+    expect(page).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialHandle: 'legacy-artist',
+      })
+    );
+  });
+
   it('redirects active users with only a pending claim cookie back to the app shell', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
 
