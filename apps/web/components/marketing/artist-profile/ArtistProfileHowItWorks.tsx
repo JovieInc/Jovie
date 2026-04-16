@@ -15,13 +15,13 @@ interface ArtistProfileHowItWorksProps {
 
 const STEP_NUMBER_STYLES = [
   'from-[#f6f9ff] via-[#9cb9ff] to-[#6577ff]',
-  'from-[#fbf7ff] via-[#b8a2ff] to-[#6f8dff]',
+  'from-[#fbfdff] via-[#b7c7ff] to-[#7896ff]',
   'from-[#f2fffb] via-[#92e6cf] to-[#5fa8ff]',
 ];
 
 function ClaimMoment() {
   return (
-    <div className='mt-6 w-full max-w-[17rem] text-left'>
+    <div className='mt-5 w-full max-w-[17rem] text-left'>
       <div className='flex h-10 items-center gap-2 rounded-full bg-white/[0.055] px-3 text-[12px] text-secondary-token ring-1 ring-white/[0.08]'>
         <Search
           className='h-3.5 w-3.5 text-primary-token/72'
@@ -52,7 +52,7 @@ function ClaimMoment() {
 
 function BuildMoment() {
   return (
-    <div className='mt-6 w-full max-w-[17rem]'>
+    <div className='mt-5 w-full max-w-[17rem]'>
       <div className='flex flex-wrap justify-center gap-1.5'>
         {['Spotify', 'Apple', 'YouTube', 'Deezer'].map(provider => (
           <span
@@ -83,7 +83,7 @@ function BuildMoment() {
 
 function ShareMoment() {
   return (
-    <div className='mt-6 w-full max-w-[17rem]'>
+    <div className='mt-5 w-full max-w-[17rem]'>
       <div className='flex items-center justify-between gap-3 rounded-full bg-white/[0.055] px-3 py-2.5 ring-1 ring-white/[0.08]'>
         <span className='font-mono text-[11px] text-secondary-token'>
           jov.ie/timwhite
@@ -129,29 +129,16 @@ export function ArtistProfileHowItWorks({
       className='bg-black py-12 sm:py-16 lg:py-20'
     >
       <div className='relative overflow-hidden rounded-[2.25rem] border border-white/[0.06] bg-[radial-gradient(circle_at_20%_18%,rgba(101,119,255,0.16),transparent_24%),radial-gradient(circle_at_76%_22%,rgba(146,230,207,0.1),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(95,168,255,0.08),transparent_30%),#050505] px-5 py-10 sm:px-8 sm:py-12 lg:px-12 lg:py-14'>
-        <div
-          className='pointer-events-none absolute left-[7%] top-[18%] h-1.5 w-1.5 rounded-full bg-white/60 shadow-[0_0_18px_rgba(255,255,255,0.65)]'
-          aria-hidden='true'
-        />
-        <div
-          className='pointer-events-none absolute right-[13%] top-[16%] h-12 w-px rotate-45 bg-gradient-to-b from-transparent via-white/30 to-transparent'
-          aria-hidden='true'
-        />
-        <div
-          className='pointer-events-none absolute bottom-[18%] left-[48%] h-10 w-px -rotate-45 bg-gradient-to-b from-transparent via-white/20 to-transparent'
-          aria-hidden='true'
-        />
-
         <div className='relative z-10 mx-auto max-w-[38rem] text-center'>
           <h2 className='text-[clamp(2.4rem,7vw,5.5rem)] font-semibold leading-[0.92] tracking-[-0.075em] text-primary-token'>
             {howItWorks.headline}
           </h2>
-          <p className='mx-auto mt-4 max-w-[36rem] text-[15px] leading-[1.55] text-secondary-token sm:text-base'>
+          <p className='mx-auto mt-3 max-w-[36rem] text-[15px] font-medium leading-[1.5] text-[rgba(255,255,255,0.76)] sm:text-base'>
             {howItWorks.body}
           </p>
         </div>
 
-        <div className='relative z-10 mt-10 grid gap-9 lg:mt-14 lg:grid-cols-3 lg:gap-7'>
+        <div className='relative z-10 mt-8 grid gap-8 lg:mt-10 lg:grid-cols-3 lg:gap-7'>
           {howItWorks.steps.map((step, index) => {
             const numberGradient =
               STEP_NUMBER_STYLES[index] ?? STEP_NUMBER_STYLES[0];
