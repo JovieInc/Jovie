@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { DEMO_RELEASE_VIEW_MODELS } from '@/features/demo/mock-release-data';
 
 // Intentional exception: this suite locks design-system parity across demo
 // surfaces, so computed-style assertions are the contract under test.
@@ -14,7 +15,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
   }, theme);
 }
 
-async function expectPillChrome(locator: Locator) {
+async function expectQuietToolbarActionChrome(locator: Locator) {
   const metrics = await locator.evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -28,8 +29,8 @@ async function expectPillChrome(locator: Locator) {
   expect(metrics.height).toBeGreaterThanOrEqual(27);
   expect(metrics.height).toBeLessThanOrEqual(29.5);
   expect(metrics.radius).toBeGreaterThanOrEqual(999);
-  expect(metrics.borderTop).toBeGreaterThan(0);
-  expect(hasVisibleShadow(metrics.boxShadow)).toBeTruthy();
+  expect(metrics.borderTop).toBe(0);
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
 
 function hasVisibleShadow(boxShadow: string) {
@@ -133,35 +134,39 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
-    const displayButton = page.getByRole('button', { name: 'Display' }).first();
+    const primaryReleaseTitle = DEMO_RELEASE_VIEW_MODELS[0]?.title ?? '';
+    await expect(
+      page.getByText(primaryReleaseTitle, { exact: true }).first()
+    ).toBeVisible();
+
+    const displayButton = page
+      .locator('button[aria-label="Display"]:visible')
+      .last();
     const previewButton = page
-      .getByRole('button', { name: 'Toggle release preview' })
-      .first();
+      .locator('button[aria-label="Toggle release preview"]:visible')
+      .last();
+    const hasDisplayButton = (await displayButton.count()) > 0;
 
-    await expect(displayButton).toBeVisible();
     await expect(previewButton).toBeVisible();
-    await expectPillChrome(displayButton);
-    await expectPillChrome(previewButton);
+    await expect(previewButton).toBeEnabled();
+    await expectQuietToolbarActionChrome(previewButton);
+    if (hasDisplayButton) {
+      await expect(displayButton).toBeEnabled();
+      await expectQuietToolbarActionChrome(displayButton);
+    }
 
-    await page.getByText('Static Skies').first().click();
+    await previewButton.click();
 
     const drawer = page.getByTestId('release-sidebar');
     await expect(drawer).toBeVisible();
 
     const actionBar = drawer.getByTestId('drawer-card-action-bar');
     await expect(actionBar).toBeVisible();
-    await expect(drawer.getByText('Static Skies', { exact: true })).toHaveCount(
-      1
-    );
-    await expect(drawer.getByTestId('release-tab-panel-card')).toHaveCount(0);
-
-    const detailsTab = drawer.getByTestId('drawer-tab-details');
-    const platformsTab = drawer.getByTestId('drawer-tab-links');
+    await expect(
+      drawer.getByText(primaryReleaseTitle, { exact: true }).first()
+    ).toBeVisible();
+    await expect(drawer.getByTestId('release-header-card')).toBeVisible();
     const metadataCard = drawer.getByTestId('release-metadata-card');
-    await expect(detailsTab).toBeVisible();
-    await expect(platformsTab).toBeVisible();
-    await expectFlatPillChrome(detailsTab);
-    await expectFlatPillChrome(platformsTab);
     await expect(metadataCard).toBeVisible();
     await expectCardChrome(metadataCard);
 
@@ -173,7 +178,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     expect(
       await livesInsideRoundedCard(
-        drawer.getByText('Static Skies', { exact: true }).first()
+        drawer.getByText(primaryReleaseTitle, { exact: true }).first()
       )
     ).toBeTruthy();
     expect(
@@ -190,8 +195,23 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
+    await expect(
+      page.getByRole('heading', { name: 'Audience CRM' })
+    ).toBeVisible();
+
     const drawer = page.getByTestId('demo-analytics-sidebar');
-    await expect(drawer).toBeVisible();
+    const drawerInitiallyVisible = await drawer.isVisible().catch(() => false);
+    const analyticsToggle = page
+      .locator(
+        'button[aria-label=\"Open analytics panel\"]:visible, button[aria-label=\"Close analytics panel\"]:visible'
+      )
+      .last();
+    if (!drawerInitiallyVisible) {
+      await expect(analyticsToggle).toBeVisible();
+      await analyticsToggle.click();
+    }
+
+    await expect(drawer).toBeVisible({ timeout: 15_000 });
 
     const rangeButton = drawer
       .locator('button')

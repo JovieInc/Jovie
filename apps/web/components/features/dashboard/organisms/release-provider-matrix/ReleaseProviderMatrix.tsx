@@ -821,6 +821,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           readOnly={experienceMode === 'demo' ? false : !canEditSmartLinks}
           analyticsOverride={selectedSidebarData?.analytics ?? null}
           tracksOverride={selectedSidebarData?.tracks}
+          showCredits={experienceMode === 'live'}
           onCanvasStatusUpdate={
             experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
           }

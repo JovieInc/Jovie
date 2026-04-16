@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { DEMO_RELEASE_VIEW_MODELS } from '@/features/demo/mock-release-data';
 
 /**
  * Demo Page QA Harness
@@ -14,6 +15,8 @@ import { expect, test } from '@playwright/test';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+const PRIMARY_RELEASE_TITLE = DEMO_RELEASE_VIEW_MODELS[0]?.title ?? '';
 
 test.describe('Demo page — structural QA', () => {
   test.beforeEach(async ({ page }) => {
@@ -78,12 +81,12 @@ test.describe('Demo page — structural QA', () => {
     await releasesNav.click();
 
     // Fixture release titles should appear
-    await expect(page.getByText('Night Drive')).toBeVisible({
+    await expect(page.getByText(PRIMARY_RELEASE_TITLE)).toBeVisible({
       timeout: 15_000,
     });
   });
 
-  test('release drawer opens on row click', async ({ page }) => {
+  test('release drawer opens from the preview toggle', async ({ page }) => {
     test.setTimeout(90_000);
 
     await page.goto('/demo', {
@@ -95,12 +98,11 @@ test.describe('Demo page — structural QA', () => {
     await expect(releasesNav).toBeVisible({ timeout: 30_000 });
     await releasesNav.click();
 
-    // Wait for release list to render
-    const releaseRow = page.getByText('Static Skies');
-    await expect(releaseRow).toBeVisible({ timeout: 15_000 });
-
-    // Click a release to open the detail drawer
-    await releaseRow.click();
+    const previewToggle = page.getByRole('button', {
+      name: 'Toggle release preview',
+    });
+    await expect(previewToggle).toBeVisible({ timeout: 15_000 });
+    await previewToggle.click();
 
     await expect(page.getByTestId('release-sidebar')).toBeVisible({
       timeout: 10_000,
@@ -126,7 +128,7 @@ test.describe('Demo page — structural QA', () => {
       timeout: 15_000,
     });
     await expect(
-      page.getByRole('button', { name: 'Toggle analytics panel' })
+      page.getByRole('button', { name: /analytics panel/i })
     ).toBeVisible();
 
     const fatalErrors = consoleErrors.filter(

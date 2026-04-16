@@ -1,6 +1,7 @@
 import type { AudienceMode } from '@/features/dashboard/audience/table/types';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
+import type { DashboardAnalyticsResponse } from '@/types/analytics';
 
 export type { AudienceMode };
 
@@ -49,10 +50,30 @@ export interface DashboardAudienceTableProps {
   readonly onLoadMore?: () => void;
   /** Upcoming tour dates for touring city flagging */
   readonly tourDates?: TourDateForMatching[];
+  /** Overrides side effects for non-live mirrors like /demo. */
+  readonly actionAdapter?: AudienceActionAdapter;
+  /** Chooses which analytics drawer implementation to register. */
+  readonly analyticsMode?: 'live' | 'static';
+  /** Static analytics data for demo / mirrored surfaces. */
+  readonly analyticsData?: DashboardAnalyticsResponse;
+  /** Allows mirror routes to keep stable test ids without forking UI. */
+  readonly analyticsSidebarTestId?: string;
+  readonly analyticsTabbedCardTestId?: string;
+  readonly testId?: string;
 }
 
 export interface BulkAction {
   label: string;
   onClick: () => void;
   disabled: boolean;
+}
+
+export interface AudienceActionAdapter {
+  readonly onExportMember?: (member: AudienceMember) => void;
+  readonly onBlockMember?: (member: AudienceMember) => void;
+  readonly onViewProfile?: (member: AudienceMember) => void;
+  readonly onSendNotification?: (member: AudienceMember) => void;
+  readonly onSourceLinkAction?: (
+    action: 'copy' | 'open' | 'download'
+  ) => Promise<void> | void;
 }

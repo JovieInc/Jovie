@@ -48,6 +48,20 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('keeps canonical screenshot scenarios backed by declared demo mirrors', () => {
+    for (const surface of CANONICAL_SURFACES) {
+      expect(surface.sourceComponent.length).toBeGreaterThan(0);
+
+      for (const screenshotId of surface.screenshotIds) {
+        const scenario = SCREENSHOT_SCENARIOS.find(
+          currentScenario => currentScenario.id === screenshotId
+        );
+
+        expect(scenario?.route).toBe(surface.demoRoute);
+      }
+    }
+  });
+
   it('leaves non-canonical captures unassigned', () => {
     const nonCanonicalScenarios = SCREENSHOT_SCENARIOS.filter(
       scenario => scenario.canonicalSurfaceId === undefined

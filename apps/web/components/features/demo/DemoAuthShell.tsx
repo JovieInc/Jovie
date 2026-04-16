@@ -39,7 +39,16 @@ import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
  * - Releases query is populated so DashboardNav shows the badge count.
  * - All queries are configured to never retry or refetch (static demo data).
  */
-function createDemoQueryClient(profileId: string): QueryClient {
+type DemoQuerySeeder = (
+  client: QueryClient,
+  dashboardData: DashboardData
+) => void;
+
+function createDemoQueryClient(
+  profileId: string,
+  dashboardData: DashboardData,
+  seedQueryClient?: DemoQuerySeeder
+): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -74,6 +83,7 @@ function createDemoQueryClient(profileId: string): QueryClient {
     warningThreshold: 5,
     isNearLimit: false,
   });
+  seedQueryClient?.(client, dashboardData);
 
   return client;
 }
@@ -85,16 +95,21 @@ interface DemoAuthShellProps {
   readonly children: React.ReactNode;
   /** Pre-built DashboardData from a DB-fetched FeaturedCreator. Falls back to the internal demo persona. */
   readonly dashboardData?: DashboardData;
+  readonly seedQueryClient?: DemoQuerySeeder;
 }
 
-export function DemoAuthShell({ children, dashboardData }: DemoAuthShellProps) {
+export function DemoAuthShell({
+  children,
+  dashboardData,
+  seedQueryClient,
+}: DemoAuthShellProps) {
   const data = dashboardData ?? DEMO_DASHBOARD_DATA;
   const profileId = data.selectedProfile?.id ?? '';
 
   // Stable QueryClient instance per component mount
   const demoQueryClient = useMemo(
-    () => createDemoQueryClient(profileId),
-    [profileId]
+    () => createDemoQueryClient(profileId, data, seedQueryClient),
+    [data, profileId, seedQueryClient]
   );
 
   return (

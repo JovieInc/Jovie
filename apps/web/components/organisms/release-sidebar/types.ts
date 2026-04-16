@@ -150,4 +150,6 @@ export interface ReleaseSidebarProps {
   readonly tracksOverride?: ReleaseSidebarTrack[];
   /** Optional static analytics data used instead of the live sidebar API */
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
+  /** Disable live credits fetching for auth-free mirrors like /demo. */
+  readonly showCredits?: boolean;
 }

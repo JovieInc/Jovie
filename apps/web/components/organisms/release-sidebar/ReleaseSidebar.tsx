@@ -294,6 +294,7 @@ export function ReleaseSidebar({
   readOnly = false,
   tracksOverride,
   analyticsOverride,
+  showCredits = true,
   onCanvasStatusUpdate,
 }: ReleaseSidebarProps) {
   const {
@@ -677,7 +678,9 @@ export function ReleaseSidebar({
             </DrawerInspectorCard>
           ) : null}
 
-          <ReleaseCreditsSection releaseId={release.id} />
+          {showCredits ? (
+            <ReleaseCreditsSection releaseId={release.id} />
+          ) : null}
 
           {shouldRenderTasks ? (
             <DrawerInspectorCard
