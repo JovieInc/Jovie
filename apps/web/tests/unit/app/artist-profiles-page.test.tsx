@@ -76,7 +76,11 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
       'homepage-hero--f'
     );
+    expect(screen.getByTestId('homepage-hero')).toHaveClass(
+      'homepage-hero--artist-profile'
+    );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'The link your music deserves.' })
@@ -94,19 +98,16 @@ describe('ArtistProfilesPage', () => {
     );
 
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Release' })
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('button', { name: 'Shows' })
+      adaptiveSequence.getByRole('button', { name: 'Listen' })
     ).toBeInTheDocument();
     expect(
       adaptiveSequence.getByRole('button', { name: 'Pay' })
     ).toBeInTheDocument();
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Subscribe' })
+      adaptiveSequence.getByRole('button', { name: 'Tour' })
     ).toBeInTheDocument();
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Links' })
+      adaptiveSequence.getByRole('button', { name: 'Contact' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'One profile.' })
@@ -118,11 +119,11 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByText('Source-aware')).toBeInTheDocument();
     expect(screen.getByText('Location-aware')).toBeInTheDocument();
     expect(screen.getByText('Device-aware')).toBeInTheDocument();
-    expect(screen.getByText('Release-aware')).toBeInTheDocument();
-    expect(screen.getByText('/music')).toBeInTheDocument();
-    expect(screen.getByText('/shows')).toBeInTheDocument();
+    expect(screen.getByText('Intent-aware')).toBeInTheDocument();
+    expect(screen.getByText('/listen')).toBeInTheDocument();
+    expect(screen.getByText('/tour')).toBeInTheDocument();
     expect(screen.getByText('/pay')).toBeInTheDocument();
-    expect(screen.getByText('/subscribe')).toBeInTheDocument();
+    expect(screen.getByText('/contact')).toBeInTheDocument();
     fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Pay' }));
     expect(
       adaptiveSequence.getByText('Make support one tap away.')
@@ -155,10 +156,27 @@ describe('ArtistProfilesPage', () => {
     expect(
       outcomesSection.getByRole('heading', { name: 'Share anywhere' })
     ).toBeInTheDocument();
+    expect(outcomesSection.getByText('Latest release')).toBeInTheDocument();
+    expect(outcomesSection.getByText('The Deep End')).toBeInTheDocument();
     expect(outcomesSection.getByText('Pre-save live')).toBeInTheDocument();
-    expect(outcomesSection.getByText('O2 Arena saved')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Tip drawer ready')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Follow-up')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Nearby date')).toBeInTheDocument();
+    expect(outcomesSection.getByText('May 18')).toBeInTheDocument();
+    expect(outcomesSection.getAllByText('The Novo').length).toBeGreaterThan(0);
+    expect(outcomesSection.getByText('Tour Dates')).toBeInTheDocument();
+    expect(
+      outcomesSection.getAllByText('Continue with Venmo').length
+    ).toBeGreaterThan(0);
+    expect(outcomesSection.getByText('Activity feed')).toBeInTheDocument();
+    expect(
+      outcomesSection.getByText('One support moment keeps moving.')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByText('Scanned at merch table')
+    ).toBeInTheDocument();
+    expect(outcomesSection.getByText('Supported')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Subscribed')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Opened new single')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Saved next show')).toBeInTheDocument();
     expect(outcomesSection.getByText('Share-ready')).toBeInTheDocument();
     const monetizationSection = within(
       screen.getByTestId('artist-profile-section-monetization')
@@ -241,57 +259,93 @@ describe('ArtistProfilesPage', () => {
     const captureSection = within(
       screen.getByTestId('artist-profile-section-capture')
     );
-    expect(captureSection.getByText('Get updates')).toBeInTheDocument();
-    expect(
-      captureSection.getByText('Release and show alerts.')
-    ).toBeInTheDocument();
+    const howItWorksSection = within(
+      screen.getByTestId('artist-profile-section-how-it-works')
+    );
     expect(captureSection.getByText('ava@icloud.com')).toBeInTheDocument();
     expect(captureSection.getAllByText('Subscribed').length).toBeGreaterThan(0);
     expect(
-      captureSection.getByText('Spotify / LA / Release page')
+      captureSection.getByText('Clicked through to Spotify')
     ).toBeInTheDocument();
     expect(
       captureSection.getByText('Email saved / Notifications on')
     ).toBeInTheDocument();
-    expect(captureSection.getAllByText('Jason').length).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('Spotify').length).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('Brian M').length).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('Email').length).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('Berlin').length).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('O2 Arena').length).toBeGreaterThan(0);
     expect(
-      captureSection.getAllByText('Latest Release').length
+      captureSection.getAllByText('Jason in LA clicked through to Spotify.')
+        .length
     ).toBeGreaterThan(0);
-    expect(captureSection.getAllByText('Notifications').length).toBeGreaterThan(
-      0
-    );
-    expect(captureSection.getAllByText('Apple Pay').length).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Brian M subscribed by email.').length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Mika in Berlin scanned the flyer.').length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Kenji in Tokyo opened the release page.')
+        .length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Amelia in London checked out your Spotify.')
+        .length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Maya enabled notifications.').length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Diego paid with Apple Pay.').length
+    ).toBeGreaterThan(0);
+    expect(captureSection.queryByText('Get updates')).not.toBeInTheDocument();
+    expect(
+      captureSection.queryByText('Release and show alerts.')
+    ).not.toBeInTheDocument();
+    expect(captureSection.queryByText('Jason')).not.toBeInTheDocument();
+    expect(captureSection.queryByText('Spotify')).not.toBeInTheDocument();
     expect(
       screen.getAllByRole('heading', { name: 'Live in 60 seconds.' })
     ).toHaveLength(1);
+    expect(screen.getByText('Claim. Sync. Share.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Claim' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sync' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Share' })).toBeInTheDocument();
+    expect(screen.getByText('Spotify artist')).toBeInTheDocument();
+    expect(screen.getByText('Importing')).toBeInTheDocument();
+    expect(screen.getByText('86%')).toBeInTheDocument();
+    expect(screen.getByText('27+ providers')).toBeInTheDocument();
     expect(
-      screen.getByText(
+      howItWorksSection.getAllByText('jov.ie/timwhite').length
+    ).toBeGreaterThan(0);
+    expect(howItWorksSection.getByText('Copy')).toBeInTheDocument();
+    expect(howItWorksSection.getByText('Bio')).toBeInTheDocument();
+    expect(howItWorksSection.getByText('Stories')).toBeInTheDocument();
+    expect(howItWorksSection.getByText('QR')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
         'Claim your artist. Jovie builds the page. Share one link everywhere.'
       )
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText('Search once and claim the profile.')
-    ).toBeInTheDocument();
+      screen.queryByText('Spotify / LA / Release page')
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText(
+      screen.queryByText('Jason in LA listened on Spotify.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Kenji in Tokyo opened the latest release.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Search once and claim the profile.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
         'It imports your catalog across 27+ providers and keeps the profile current.'
       )
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText('Use it in bio, stories, QR, release posts, and shows.')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Spotify artist verified')).toBeInTheDocument();
-    expect(screen.getByText('Importing catalog')).toBeInTheDocument();
-    expect(screen.getByText('Profile photo')).toBeInTheDocument();
-    expect(screen.getByText('Top tracks')).toBeInTheDocument();
-    expect(screen.getAllByText('Latest release').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('jov.ie/timwhite').length).toBeGreaterThan(0);
-    expect(screen.getByText('Share-ready profile')).toBeInTheDocument();
+      screen.queryByText(
+        'Use it in bio, stories, QR, release posts, and shows.'
+      )
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Share-ready profile')).not.toBeInTheDocument();
     expect(
       outcomesSection.getByText(
         'Use one clean profile link across bio, QR, posts, stories, and shows.'
@@ -372,10 +426,13 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
       'homepage-hero--f'
     );
+    expect(screen.getByTestId('homepage-hero')).toHaveClass(
+      'homepage-hero--artist-profile'
+    );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Release' })
+      screen.queryByRole('button', { name: 'Listen' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Drive streams' })
