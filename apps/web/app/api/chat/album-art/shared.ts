@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export async function requireAlbumArtUser() {
-  let userId: string | null = null;
-  try {
-    userId = (await getCachedAuth()).userId;
-  } catch {
-    userId = null;
-  }
+  const { userId } = await getOptionalAuth();
 
   if (!userId) {
     return {

@@ -10,8 +10,8 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
-  type ChatAlbumArtToolResult,
   type ChatInsightsToolResult,
+  isChatAlbumArtToolResult,
   isToolInvocationPart,
   type MessagePart,
   type SocialLinkRemovalToolResult,
@@ -54,19 +54,6 @@ function isSocialLinkRemovalResult(
     'linkId' in result &&
     'platform' in result &&
     'url' in result
-  );
-}
-
-function isAlbumArtResult(result: unknown): result is ChatAlbumArtToolResult {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'success' in result &&
-    typeof (result as Record<string, unknown>).success === 'boolean' &&
-    (('state' in result &&
-      typeof (result as Record<string, unknown>).state === 'string') ||
-      ('error' in result &&
-        typeof (result as Record<string, unknown>).error === 'string'))
   );
 }
 
@@ -127,7 +114,7 @@ function renderToolCard(
   if (
     toolInvocation.toolName === 'generateAlbumArt' &&
     toolInvocation.state === 'result' &&
-    isAlbumArtResult(toolInvocation.result) &&
+    isChatAlbumArtToolResult(toolInvocation.result) &&
     profileId
   ) {
     return (

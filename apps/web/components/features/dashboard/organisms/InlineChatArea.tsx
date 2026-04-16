@@ -38,8 +38,8 @@ import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLink
 import { useJovieChat } from '@/components/jovie/hooks';
 import {
   type ArtistContext,
-  type ChatAlbumArtToolResult,
   type ChatInsightsToolResult,
+  isChatAlbumArtToolResult,
   isToolInvocationPart,
   type SocialLinkToolResult,
   type ToolInvocationPart,
@@ -75,19 +75,6 @@ function getToolInvocations(
   parts: Array<{ type: string }>
 ): ToolInvocationPart[] {
   return parts.filter(isToolInvocationPart);
-}
-
-function isAlbumArtResult(result: unknown): result is ChatAlbumArtToolResult {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'success' in result &&
-    typeof (result as Record<string, unknown>).success === 'boolean' &&
-    (('state' in result &&
-      typeof (result as Record<string, unknown>).state === 'string') ||
-      ('error' in result &&
-        typeof (result as Record<string, unknown>).error === 'string'))
-  );
 }
 
 /** Memoized per-message renderer to avoid reprocessing tool invocations on every render. */
@@ -189,7 +176,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
         if (
           toolInvocation.toolName === 'generateAlbumArt' &&
           toolInvocation.state === 'result' &&
-          isAlbumArtResult(toolInvocation.result)
+          isChatAlbumArtToolResult(toolInvocation.result)
         ) {
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>

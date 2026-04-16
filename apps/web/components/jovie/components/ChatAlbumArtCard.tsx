@@ -51,7 +51,9 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
       ? (result.candidates[0]?.id ?? null)
       : null
   );
-  const [applied, setApplied] = useState(false);
+  const [appliedCandidateId, setAppliedCandidateId] = useState<string | null>(
+    null
+  );
   const applyMutation = useApplyGeneratedAlbumArtMutation();
   const createMutation = useCreateReleaseWithGeneratedAlbumArtMutation();
 
@@ -63,6 +65,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
       ) ?? null
     );
   }, [result, selectedCandidateId]);
+
+  const hasAppliedSelectedCandidate =
+    appliedCandidateId !== null &&
+    selectedCandidateId !== null &&
+    appliedCandidateId === selectedCandidateId;
 
   const handleApply = useCallback(() => {
     if (!result.success || result.state !== 'generated' || !selectedCandidate) {
@@ -78,7 +85,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
           candidateId: selectedCandidate.id,
         },
         {
-          onSuccess: () => setApplied(true),
+          onSuccess: () => setAppliedCandidateId(selectedCandidate.id),
         }
       );
       return;
@@ -93,7 +100,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         candidateId: selectedCandidate.id,
       },
       {
-        onSuccess: () => setApplied(true),
+        onSuccess: () => setAppliedCandidateId(selectedCandidate.id),
       }
     );
   }, [applyMutation, createMutation, profileId, result, selectedCandidate]);
@@ -160,7 +167,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             {result.releaseTitle}
           </div>
           <div className='truncate text-[12px] text-secondary-token'>
-            {applied ? 'Artwork Applied' : 'Select Artwork'}
+            {hasAppliedSelectedCandidate ? 'Artwork Applied' : 'Select Artwork'}
           </div>
         </div>
       </div>
@@ -205,10 +212,10 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             !selectedCandidate ||
             applyMutation.isPending ||
             createMutation.isPending ||
-            applied
+            hasAppliedSelectedCandidate
           }
         >
-          {applied
+          {hasAppliedSelectedCandidate
             ? 'Applied'
             : !result.releaseId
               ? 'Create Release With Art'

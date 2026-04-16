@@ -4,9 +4,9 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const PENDING_CHAT_PROMPT_KEY = 'jovie.pendingChatPrompt';
 
-type AppRouter = {
-  push: (path: string) => void;
-};
+interface AppRouter {
+  push(path: string): void;
+}
 
 export function openChatWithPrompt(prompt: string, router: AppRouter): void {
   if (typeof globalThis.window !== 'undefined') {
