@@ -12,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
   })),
   verifyProfileOwnership: vi.fn().mockResolvedValue({ id: 'profile_123' }),
   createUniqueSourceLinkCode: vi.fn().mockResolvedValue('tour-london-1234'),
+  isSafeAudienceSourceDestinationUrl: vi.fn().mockReturnValue(true),
   captureError: vi.fn().mockResolvedValue(undefined),
   withDbSessionTx: vi.fn(),
   insertValuesMock: vi.fn(),
@@ -27,6 +28,8 @@ vi.mock('@/lib/db/queries/shared', () => ({
 
 vi.mock('@/lib/audience/source-links', () => ({
   createUniqueSourceLinkCode: hoisted.createUniqueSourceLinkCode,
+  isSafeAudienceSourceDestinationUrl:
+    hoisted.isSafeAudienceSourceDestinationUrl,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

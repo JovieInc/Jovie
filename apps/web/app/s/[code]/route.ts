@@ -5,7 +5,10 @@ import {
   mergeAudienceTags,
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
-import { appendSourceUtmParams } from '@/lib/audience/source-links';
+import {
+  appendSourceUtmParams,
+  isSafeAudienceSourceDestinationUrl,
+} from '@/lib/audience/source-links';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -167,6 +170,10 @@ export async function GET(
 
     if (!sourceLink || sourceLink.archivedAt) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (!isSafeAudienceSourceDestinationUrl(sourceLink.destinationUrl)) {
+      throw new Error('Unsafe source link destination URL');
     }
 
     const destinationUrl = appendSourceUtmParams(

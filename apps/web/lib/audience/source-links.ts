@@ -5,6 +5,7 @@ import {
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { slugify } from '@/lib/utm/build-url';
 
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -89,6 +90,10 @@ export function appendSourceUtmParams(
   }
 
   return url.toString();
+}
+
+export function isSafeAudienceSourceDestinationUrl(url: string): boolean {
+  return validateSocialLinkUrl(url).valid;
 }
 
 export async function isRecentSourceScanDuplicate(

@@ -1,7 +1,10 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createUniqueSourceLinkCode } from '@/lib/audience/source-links';
+import {
+  createUniqueSourceLinkCode,
+  isSafeAudienceSourceDestinationUrl,
+} from '@/lib/audience/source-links';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import {
@@ -31,7 +34,14 @@ const createSourceLinkSchema = z.object({
   sourceType: z.string().trim().min(1).max(40).default('qr'),
   destinationKind: z.string().trim().min(1).max(40).default('profile'),
   destinationId: z.string().trim().max(200).optional(),
-  destinationUrl: z.string().url().optional(),
+  destinationUrl: z
+    .string()
+    .url()
+    .refine(
+      isSafeAudienceSourceDestinationUrl,
+      'Invalid source destination URL'
+    )
+    .optional(),
 });
 
 export async function GET(request: NextRequest) {

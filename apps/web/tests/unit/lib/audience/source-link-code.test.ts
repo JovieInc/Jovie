@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendSourceUtmParams,
   buildSourceLinkCode,
+  isSafeAudienceSourceDestinationUrl,
 } from '@/lib/audience/source-links';
 
 describe('audience source link codes', () => {
@@ -48,5 +49,28 @@ describe('audience source link codes', () => {
     expect(url).toBe(
       'https://example.com/profile?utm_source=qr_code&other=true&utm_medium=print&utm_campaign=tour-flyers&utm_content=london-o2-arena'
     );
+  });
+
+  it('accepts http and https destination URLs', () => {
+    expect(
+      isSafeAudienceSourceDestinationUrl(
+        'https://example.com/profile?existing=true'
+      )
+    ).toBe(true);
+    expect(isSafeAudienceSourceDestinationUrl('http://example.com/show')).toBe(
+      true
+    );
+  });
+
+  it('rejects unsafe destination URLs', () => {
+    expect(
+      isSafeAudienceSourceDestinationUrl('javascript:alert(document.domain)')
+    ).toBe(false);
+    expect(isSafeAudienceSourceDestinationUrl('data:text/html,hello')).toBe(
+      false
+    );
+    expect(
+      isSafeAudienceSourceDestinationUrl('https://127.0.0.1/internal')
+    ).toBe(false);
   });
 });
