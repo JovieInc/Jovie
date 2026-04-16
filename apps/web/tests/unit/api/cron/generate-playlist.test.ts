@@ -2,23 +2,29 @@ import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  mockAcquirePlaylistGenerationLease,
   mockGeneratePlaylist,
   mockGetPlaylistEngineSettings,
   mockGetPlaylistSpotifyStatus,
   mockMarkPlaylistGeneratedAt,
+  mockReleasePlaylistGenerationLease,
   mockVerifyCronRequest,
 } = vi.hoisted(() => ({
+  mockAcquirePlaylistGenerationLease: vi.fn(),
   mockGeneratePlaylist: vi.fn(),
   mockGetPlaylistEngineSettings: vi.fn(),
   mockGetPlaylistSpotifyStatus: vi.fn(),
   mockMarkPlaylistGeneratedAt: vi.fn(),
+  mockReleasePlaylistGenerationLease: vi.fn(),
   mockVerifyCronRequest: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/platform-connections', () => ({
+  acquirePlaylistGenerationLease: mockAcquirePlaylistGenerationLease,
   getPlaylistEngineSettings: mockGetPlaylistEngineSettings,
   getPlaylistSpotifyStatus: mockGetPlaylistSpotifyStatus,
   markPlaylistGeneratedAt: mockMarkPlaylistGeneratedAt,
+  releasePlaylistGenerationLease: mockReleasePlaylistGenerationLease,
 }));
 
 vi.mock('@/lib/cron/auth', () => ({
@@ -53,6 +59,11 @@ describe('GET /api/cron/generate-playlist', () => {
       healthy: true,
       source: 'database',
       error: null,
+    });
+    mockAcquirePlaylistGenerationLease.mockResolvedValue({
+      claimed: true,
+      claimedAt: new Date('2026-04-15T00:00:00.000Z'),
+      leaseExpiresAt: new Date('2026-04-15T00:15:00.000Z'),
     });
     mockGeneratePlaylist.mockResolvedValue({
       success: true,
@@ -135,6 +146,25 @@ describe('GET /api/cron/generate-playlist', () => {
     expect(mockGeneratePlaylist).not.toHaveBeenCalled();
   });
 
+  it('skips when another worker already holds the generation lease', async () => {
+    mockAcquirePlaylistGenerationLease.mockResolvedValueOnce({
+      claimed: false,
+      claimedAt: new Date('2026-04-15T00:00:00.000Z'),
+      leaseExpiresAt: new Date('2026-04-15T00:15:00.000Z'),
+    });
+
+    const { GET } = await import('@/app/api/cron/generate-playlist/route');
+    const response = await GET(request());
+    const payload = await response.json();
+
+    expect(payload).toMatchObject({
+      success: true,
+      skipped: true,
+      reason: 'Playlist generation is already in progress or not eligible',
+    });
+    expect(mockGeneratePlaylist).not.toHaveBeenCalled();
+  });
+
   it('runs generation and updates eligibility on success', async () => {
     const { GET } = await import('@/app/api/cron/generate-playlist/route');
     const response = await GET(request());
@@ -151,5 +181,27 @@ describe('GET /api/cron/generate-playlist', () => {
       skipComplianceCheck: true,
     });
     expect(mockMarkPlaylistGeneratedAt).toHaveBeenCalledWith(expect.any(Date));
+    expect(mockReleasePlaylistGenerationLease).not.toHaveBeenCalled();
+  });
+
+  it('releases the lease when generation fails', async () => {
+    mockGeneratePlaylist.mockResolvedValueOnce({
+      success: false,
+      error: 'Generation failed',
+      durationMs: 100,
+    });
+
+    const { GET } = await import('@/app/api/cron/generate-playlist/route');
+    const response = await GET(request());
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload).toMatchObject({
+      success: false,
+      error: 'Generation failed',
+    });
+    expect(mockReleasePlaylistGenerationLease).toHaveBeenCalledWith(
+      expect.objectContaining({ claimed: true })
+    );
   });
 });

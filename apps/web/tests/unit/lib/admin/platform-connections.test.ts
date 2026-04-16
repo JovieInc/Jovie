@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDbInsert, mockDbSelect, mockClerkClient, mockFetch } = vi.hoisted(
-  () => ({
+const { mockDbInsert, mockDbSelect, mockDbUpdate, mockClerkClient, mockFetch } =
+  vi.hoisted(() => ({
     mockDbInsert: vi.fn(),
     mockDbSelect: vi.fn(),
+    mockDbUpdate: vi.fn(),
     mockClerkClient: vi.fn(),
     mockFetch: vi.fn(),
-  })
-);
+  }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     insert: mockDbInsert,
     select: mockDbSelect,
+    update: mockDbUpdate,
   },
 }));
 
@@ -34,7 +35,11 @@ vi.mock('@/lib/db/schema/auth', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...args: unknown[]) => ({ type: 'and', args })),
   eq: vi.fn((column, value) => ({ column, value })),
+  isNull: vi.fn((column: unknown) => ({ type: 'isNull', column })),
+  lte: vi.fn((column, value) => ({ type: 'lte', column, value })),
+  or: vi.fn((...args: unknown[]) => ({ type: 'or', args })),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -60,6 +65,13 @@ function mockInsertReturning(row: Record<string, unknown>) {
   const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
   const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
   mockDbInsert.mockReturnValue({ values });
+}
+
+function mockUpdateReturning(rows: Record<string, unknown>[]) {
+  const returning = vi.fn().mockResolvedValue(rows);
+  const where = vi.fn().mockReturnValue({ returning });
+  const set = vi.fn().mockReturnValue({ where });
+  mockDbUpdate.mockReturnValue({ set });
 }
 
 describe('platform connections settings', () => {
@@ -178,6 +190,20 @@ describe('platform connections settings', () => {
       source: 'database',
       accountLabel: 'jovie',
       missingScopes: ['playlist-modify-public', 'ugc-image-upload'],
+    });
+  });
+
+  it('claims a playlist generation lease only when eligible', async () => {
+    mockUpdateReturning([{ id: 1 }]);
+
+    const { acquirePlaylistGenerationLease } = await import(
+      '@/lib/admin/platform-connections'
+    );
+
+    await expect(
+      acquirePlaylistGenerationLease(new Date('2026-04-15T00:00:00.000Z'))
+    ).resolves.toMatchObject({
+      claimed: true,
     });
   });
 });
