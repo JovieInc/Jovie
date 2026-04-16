@@ -364,8 +364,8 @@ export async function POST(request: NextRequest) {
         eventType: resolveAudienceClickEventType(linkType, metadata),
         verb: resolveAudienceClickVerb(linkType),
         confidence: 'observed',
-        sourceKind: 'short_link',
-        sourceLabel: referrer ?? undefined,
+        sourceKind: null,
+        sourceLabel: undefined,
         objectType: resolveAudienceClickObjectType(linkType, metadata),
         objectId:
           typeof metadataWithTipValue.contentId === 'string'

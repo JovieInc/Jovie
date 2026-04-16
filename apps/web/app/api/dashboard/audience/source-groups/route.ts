@@ -9,6 +9,7 @@ import {
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import {
   AUDIENCE_SOURCE_PAGE_SIZE,
   buildAudienceSourceErrorResponse,
@@ -18,6 +19,10 @@ import {
   resolveAudienceSourceDestinationUrl,
   withAudienceSourceShortLink,
 } from '../source-route-helpers';
+
+const getSourceGroupsQuerySchema = z.object({
+  profileId: z.string().uuid(),
+});
 
 const createSourceGroupSchema = z.object({
   profileId: z.string().uuid(),
@@ -36,10 +41,13 @@ export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { searchParams } = new URL(request.url);
-      const profileId = searchParams.get('profileId');
-      if (!profileId) {
-        return buildAudienceSourceErrorResponse('Missing profileId', 400);
+      const parsedQuery = getSourceGroupsQuerySchema.safeParse({
+        profileId: searchParams.get('profileId'),
+      });
+      if (!parsedQuery.success) {
+        return buildAudienceSourceErrorResponse('Invalid profileId', 400);
       }
+      const { profileId } = parsedQuery.data;
 
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
@@ -52,13 +60,23 @@ export async function GET(request: NextRequest) {
       const groups = await tx
         .select()
         .from(audienceSourceGroups)
-        .where(eq(audienceSourceGroups.creatorProfileId, profileId))
+        .where(
+          and(
+            eq(audienceSourceGroups.creatorProfileId, profileId),
+            isNull(audienceSourceGroups.archivedAt)
+          )
+        )
         .orderBy(desc(audienceSourceGroups.createdAt))
         .limit(AUDIENCE_SOURCE_PAGE_SIZE);
 
       return NextResponse.json({ groups }, { headers: NO_STORE_HEADERS });
     });
   } catch (error) {
+    logger.error('Audience source groups fetch failed', {
+      route: '/api/dashboard/audience/source-groups',
+      method: 'GET',
+      error,
+    });
     await captureError('Audience source groups fetch failed', error, {
       route: '/api/dashboard/audience/source-groups',
       method: 'GET',
@@ -148,7 +166,10 @@ export async function POST(request: NextRequest) {
           destinationKind,
           destinationId: destinationId ?? null,
           destinationUrl: resolvedDestinationUrl,
-          utmParams: buildAudienceSourceUtmParams(name, name),
+          utmParams: buildAudienceSourceUtmParams(name, name, {
+            source: sourceType === 'qr' ? 'qr_code' : sourceType,
+            medium: sourceType === 'qr' ? 'print' : sourceType,
+          }),
           metadata: {},
           createdAt: now,
           updatedAt: now,
@@ -174,15 +195,21 @@ export async function POST(request: NextRequest) {
             destinationKind,
             destinationId: destinationId ?? null,
             destinationUrl: resolvedDestinationUrl,
-            utmParams: buildAudienceSourceUtmParams(name, linkName),
+            utmParams: buildAudienceSourceUtmParams(name, linkName, {
+              source: sourceType === 'qr' ? 'qr_code' : sourceType,
+              medium: sourceType === 'qr' ? 'print' : sourceType,
+            }),
             metadata: { groupName: name },
             createdAt: now,
             updatedAt: now,
           })
           .returning();
-        if (link) {
-          links.push(withAudienceSourceShortLink(link));
+        if (!link) {
+          throw new Error(
+            `Source link insert returned no row for "${linkName}"`
+          );
         }
+        links.push(withAudienceSourceShortLink(link));
       }
 
       return NextResponse.json(
@@ -191,6 +218,11 @@ export async function POST(request: NextRequest) {
       );
     });
   } catch (error) {
+    logger.error('Audience source group create failed', {
+      route: '/api/dashboard/audience/source-groups',
+      method: 'POST',
+      error,
+    });
     await captureError('Audience source group create failed', error, {
       route: '/api/dashboard/audience/source-groups',
       method: 'POST',

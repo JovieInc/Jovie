@@ -153,11 +153,15 @@ export function withAudienceSourceShortLink<
 
 export function buildAudienceSourceUtmParams(
   groupName: string,
-  linkName: string
+  linkName: string,
+  options?: {
+    readonly source?: string;
+    readonly medium?: string;
+  }
 ) {
   return {
-    source: 'qr_code',
-    medium: 'print',
+    source: options?.source ?? 'qr_code',
+    medium: options?.medium ?? 'print',
     campaign: slugify(groupName),
     content: slugify(linkName),
   };
