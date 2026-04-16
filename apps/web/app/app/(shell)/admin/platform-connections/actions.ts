@@ -150,7 +150,7 @@ export async function generateTestPlaylist(): Promise<ActionState> {
 
     const result = await generatePlaylist({
       skipComplianceCheck: true,
-      recordCadenceOnSuccess: true,
+      recordCadenceOnSuccess: false,
     });
     if (!result.success || !result.playlistId) {
       return {
