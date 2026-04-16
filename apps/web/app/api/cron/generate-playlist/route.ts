@@ -89,15 +89,18 @@ export async function GET(request: Request) {
   let result: Awaited<ReturnType<typeof generatePlaylist>>;
   try {
     // Run the pipeline. The admin DB eligibility gate is the cadence control.
-    result = await generatePlaylist({ skipComplianceCheck: true });
+    result = await generatePlaylist({
+      skipComplianceCheck: true,
+      onSuccessfulPersist: async generatedAt => {
+        await markPlaylistGeneratedAt(generatedAt);
+      },
+    });
   } catch (error) {
     await releasePlaylistGenerationLease(lease);
     throw error;
   }
 
-  if (result.success && !result.skipped) {
-    await markPlaylistGeneratedAt(new Date());
-  } else {
+  if (!result.success || result.skipped) {
     await releasePlaylistGenerationLease(lease);
   }
 

@@ -149,7 +149,12 @@ export async function generateTestPlaylist(): Promise<ActionState> {
       };
     }
 
-    const result = await generatePlaylist({ skipComplianceCheck: true });
+    const result = await generatePlaylist({
+      skipComplianceCheck: true,
+      onSuccessfulPersist: async generatedAt => {
+        await markPlaylistGeneratedAt(generatedAt);
+      },
+    });
     if (!result.success || !result.playlistId) {
       return {
         success: false,
@@ -158,8 +163,6 @@ export async function generateTestPlaylist(): Promise<ActionState> {
       };
     }
 
-    const generatedAt = new Date();
-    await markPlaylistGeneratedAt(generatedAt);
     await writeAuditLog(clerkUserId, 'playlist_test_generated', {
       playlistId: result.playlistId,
       title: result.title,
