@@ -5,10 +5,7 @@ import {
   mergeAudienceTags,
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
-import {
-  appendSourceUtmParams,
-  isSafeAudienceSourceDestinationUrl,
-} from '@/lib/audience/source-links';
+import { appendSourceUtmParams } from '@/lib/audience/source-links';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -19,6 +16,7 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
 export const runtime = 'nodejs';
 
@@ -52,6 +50,24 @@ function inferDeviceType(
     return 'mobile';
   }
   return 'desktop';
+}
+
+function isSafeRedirectDestination(url: string): boolean {
+  const validation = validateSocialLinkUrl(url);
+  if (!validation.valid) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    return !url.toLowerCase().includes('javascript:');
+  } catch {
+    return false;
+  }
 }
 
 function resolveObjectType(
@@ -172,7 +188,7 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    if (!isSafeAudienceSourceDestinationUrl(sourceLink.destinationUrl)) {
+    if (!isSafeRedirectDestination(sourceLink.destinationUrl)) {
       throw new Error('Unsafe source link destination URL');
     }
 
