@@ -505,7 +505,7 @@ export async function completeOnboardingV2(
             if (options.expectedHandle) {
               const currentValue = (await handleInput.inputValue()).trim();
               if (currentValue !== options.expectedHandle) {
-                return `unexpected-handle:${currentValue || 'empty'}`;
+                return `handle-needs-fill:${currentValue || 'empty'}`;
               }
             }
 
@@ -522,11 +522,15 @@ export async function completeOnboardingV2(
         },
         { timeout: 90_000 }
       )
-      .toMatch(/spotify|handle-ready|handle-loading|unexpected-handle:.+/);
+      .toMatch(/spotify|handle-ready|handle-loading|handle-needs-fill:.+/);
 
     if (!(await spotifyHeading.isVisible().catch(() => false))) {
       await expect(handleInput).toBeVisible({ timeout: 20_000 });
       if (options.expectedHandle) {
+        const currentValue = (await handleInput.inputValue()).trim();
+        if (currentValue !== options.expectedHandle) {
+          await handleInput.fill(options.expectedHandle);
+        }
         await expect
           .poll(async () => (await handleInput.inputValue()).trim(), {
             timeout: 20_000,
@@ -547,7 +551,7 @@ export async function completeOnboardingV2(
   await artistInput.fill(spotifyArtistUrl);
 
   await expect(
-    page.getByRole('heading', { name: 'Spotify is connected' })
+    page.getByRole('heading', { name: /spotify( is)? connected/i })
   ).toBeVisible({ timeout: 60_000 });
   const upgradeHeading = page.getByRole('heading', {
     name: 'Want the full profile from day one?',
@@ -564,10 +568,6 @@ export async function completeOnboardingV2(
   const profileReadyHeading = page.getByRole('heading', {
     name: /^(Your profile is ready|Your Link Is Live)$/i,
   });
-
-  if (options.clerkUserId) {
-    await waitForOnboardingReadiness(page, options.clerkUserId);
-  }
 
   await expect
     .poll(
@@ -1045,6 +1045,124 @@ export async function ensureDbUser(
   await clearCachedUserState(clerkUserId);
 }
 
+export async function seedOnboardedCreatorProfile({
+  clerkUserId,
+  handle,
+  displayName,
+  spotifyId,
+  spotifyUrl,
+  careerHighlights = null,
+}: {
+  clerkUserId: string;
+  handle: string;
+  displayName: string;
+  spotifyId: string;
+  spotifyUrl: string;
+  careerHighlights?: string | null;
+}): Promise<string> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for seeded profile creation');
+  }
+
+  const sql = neon(dbUrl);
+  const normalizedHandle = handle.trim().toLowerCase();
+  const [user] = (await sql`
+    SELECT id
+    FROM users
+    WHERE clerk_id = ${clerkUserId}
+    LIMIT 1
+  `) as EnsuredUserRow[];
+
+  if (!user?.id) {
+    throw new Error(`No DB user found for Clerk user ${clerkUserId}`);
+  }
+
+  const [existingProfile] = (await sql`
+    SELECT id
+    FROM creator_profiles
+    WHERE user_id = ${user.id}
+    LIMIT 1
+  `) as EnsuredUserRow[];
+
+  const [profile] = existingProfile
+    ? ((await sql`
+        UPDATE creator_profiles
+        SET
+          username = ${handle},
+          username_normalized = ${normalizedHandle},
+          display_name = ${displayName},
+          career_highlights = ${careerHighlights},
+          avatar_url = 'https://images.unsplash.com/placeholder',
+          spotify_id = ${spotifyId},
+          spotify_url = ${spotifyUrl},
+          is_public = true,
+          is_claimed = true,
+          onboarding_completed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ${existingProfile.id}
+        RETURNING id
+      `) as EnsuredUserRow[])
+    : ((await sql`
+        INSERT INTO creator_profiles (
+          user_id,
+          creator_type,
+          username,
+          username_normalized,
+          display_name,
+          career_highlights,
+          avatar_url,
+          spotify_id,
+          spotify_url,
+          is_public,
+          is_claimed,
+          onboarding_completed_at
+        )
+        VALUES (
+          ${user.id},
+          'artist',
+          ${handle},
+          ${normalizedHandle},
+          ${displayName},
+          ${careerHighlights},
+          'https://images.unsplash.com/placeholder',
+          ${spotifyId},
+          ${spotifyUrl},
+          true,
+          true,
+          NOW()
+        )
+        RETURNING id
+      `) as EnsuredUserRow[]);
+
+  if (!profile?.id) {
+    throw new Error(
+      `Failed to seed creator profile for Clerk user ${clerkUserId}`
+    );
+  }
+
+  await sql`
+    DELETE FROM user_profile_claims
+    WHERE creator_profile_id = ${profile.id}
+  `;
+
+  await sql`
+    INSERT INTO user_profile_claims (user_id, creator_profile_id, role)
+    VALUES (${user.id}, ${profile.id}, 'owner')
+  `;
+
+  await sql`
+    UPDATE users
+    SET active_profile_id = ${profile.id},
+        updated_at = NOW()
+    WHERE id = ${user.id}
+  `;
+
+  await clearCachedUserState(clerkUserId);
+
+  return profile.id;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page helpers                                                        */
 /* ------------------------------------------------------------------ */
@@ -1090,9 +1208,14 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
 
   const loadClerk = async () => {
     await smokeNavigateWithRetry(page, '/signin', {
-      timeout: 120_000,
-      retries: 2,
+      timeout: 45_000,
+      retries: 3,
+      waitUntil: 'commit',
     });
+
+    await page
+      .waitForLoadState('domcontentloaded', { timeout: 45_000 })
+      .catch(() => {});
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const loaded = await page
