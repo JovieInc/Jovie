@@ -52,6 +52,8 @@ export interface PlanGateEntitlements {
   canAccessTasksWorkspace: boolean;
   /** Pro: can generate release plans */
   canGenerateReleasePlans: boolean;
+  /** Pro: can generate album art from chat */
+  canGenerateAlbumArt: boolean;
   /** Pro: can access metadata submission workflows */
   canAccessMetadataSubmissionAgent: boolean;
   /** Pro: can access future/unreleased release smartlinks */

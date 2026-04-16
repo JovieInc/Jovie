@@ -33,6 +33,16 @@ const TRACKING_VISITS_PER_HOUR = parseIntEnv(
   50000
 );
 
+const ALBUM_ART_GENERATION_DAILY_LIMIT = parseIntEnv(
+  env.ALBUM_ART_GENERATION_DAILY_LIMIT,
+  6
+);
+
+const ALBUM_ART_GENERATION_BURST_LIMIT = parseIntEnv(
+  env.ALBUM_ART_GENERATION_BURST_LIMIT,
+  2
+);
+
 // ============================================================================
 // Rate Limiter Configurations
 // ============================================================================
@@ -61,6 +71,26 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'artwork_upload',
     analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Album art generation: expensive image model calls, per user */
+  albumArtGeneration: {
+    name: 'Album Art Generation',
+    limit: ALBUM_ART_GENERATION_DAILY_LIMIT,
+    window: '1 d',
+    prefix: 'album_art_generation',
+    analytics: true,
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Album art generation burst: prevents rapid repeated image fanout */
+  albumArtGenerationBurst: {
+    name: 'Album Art Generation Burst',
+    limit: ALBUM_ART_GENERATION_BURST_LIMIT,
+    window: '1 m',
+    prefix: 'album_art_generation_burst',
+    analytics: true,
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** General API: 100 requests per minute per IP */

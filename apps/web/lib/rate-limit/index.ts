@@ -46,6 +46,8 @@ export {
   aiChatDailyPlanAwareLimiter,
   aiChatDailyProLimiter,
   aiChatLimiter,
+  albumArtGenerationBurstLimiter,
+  albumArtGenerationLimiter,
   apiLimiter,
   appleMusicRescanFreeLimiter,
   appleMusicRescanPaidLimiter,
