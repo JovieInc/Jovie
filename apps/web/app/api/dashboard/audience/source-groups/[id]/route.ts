@@ -5,10 +5,10 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceSourceGroups } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
-
-export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import {
+  NO_STORE_HEADERS,
+  parseSourceRequestJson,
+} from '../../source-route-helpers';
 
 const updateSourceGroupSchema = z.object({
   profileId: z.string().uuid(),
@@ -19,14 +19,6 @@ const updateSourceGroupSchema = z.object({
 const routeParamsSchema = z.object({
   id: z.string().uuid(),
 });
-
-async function parseJsonBody(request: NextRequest): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error('Malformed JSON');
-  }
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -44,7 +36,7 @@ export async function PATCH(
 
       let body: unknown;
       try {
-        body = await parseJsonBody(request);
+        body = await parseSourceRequestJson(request);
       } catch {
         return NextResponse.json(
           { error: 'Malformed JSON' },

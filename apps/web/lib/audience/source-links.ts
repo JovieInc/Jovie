@@ -13,11 +13,18 @@ const CODE_LENGTH = 8;
 function randomCodeSegment(length: number): string {
   let result = '';
   const cryptoObject = globalThis.crypto;
-  const randomValues = new Uint8Array(length);
-  cryptoObject.getRandomValues(randomValues);
+  const alphabetLength = CODE_ALPHABET.length;
+  const maxValidByte = 256 - (256 % alphabetLength);
 
-  for (const value of randomValues) {
-    result += CODE_ALPHABET[value % CODE_ALPHABET.length];
+  while (result.length < length) {
+    const randomValues = new Uint8Array(length);
+    cryptoObject.getRandomValues(randomValues);
+
+    for (const value of randomValues) {
+      if (value >= maxValidByte) continue;
+      result += CODE_ALPHABET[value % alphabetLength];
+      if (result.length === length) break;
+    }
   }
 
   return result;

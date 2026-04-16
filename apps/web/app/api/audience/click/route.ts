@@ -9,6 +9,11 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import {
+  resolveAudienceClickEventType,
+  resolveAudienceClickObjectType,
+  resolveAudienceClickVerb,
+} from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -105,39 +110,6 @@ function resolveTipAmountCents(
   if (typeof metadata?.tipAmount === 'number')
     return Math.round(metadata.tipAmount * 100);
   return defaultCents;
-}
-
-function resolveClickEventType(linkType: string, metadata: unknown) {
-  const record =
-    metadata && typeof metadata === 'object'
-      ? (metadata as Record<string, unknown>)
-      : {};
-  if (linkType === 'tip') return 'tip_link_opened' as const;
-  if (record.contentType === 'tour_date') return 'tour_date_checked_out';
-  if (linkType === 'listen' || record.contentType === 'release') {
-    return 'content_checked_out' as const;
-  }
-  if (linkType === 'social') return 'social_opened' as const;
-  return 'link_clicked' as const;
-}
-
-function resolveClickObjectType(linkType: string, metadata: unknown) {
-  const record =
-    metadata && typeof metadata === 'object'
-      ? (metadata as Record<string, unknown>)
-      : {};
-  if (record.contentType === 'tour_date') return 'tour_date' as const;
-  if (record.contentType === 'release') return 'release' as const;
-  if (record.contentType === 'track') return 'track' as const;
-  if (linkType === 'tip') return 'payment_link' as const;
-  if (linkType === 'social') return 'social_link' as const;
-  return 'external_url' as const;
-}
-
-function resolveClickVerb(linkType: string): string {
-  if (linkType === 'tip' || linkType === 'social') return 'opened';
-  if (linkType === 'listen') return 'checked_out';
-  return 'clicked';
 }
 
 export async function POST(request: NextRequest) {
@@ -389,12 +361,12 @@ export async function POST(request: NextRequest) {
       await recordAudienceEvent(tx, {
         creatorProfileId: profileId,
         audienceMemberId: member.id,
-        eventType: resolveClickEventType(linkType, metadata),
-        verb: resolveClickVerb(linkType),
+        eventType: resolveAudienceClickEventType(linkType, metadata),
+        verb: resolveAudienceClickVerb(linkType),
         confidence: 'observed',
         sourceKind: 'short_link',
         sourceLabel: referrer ?? undefined,
-        objectType: resolveClickObjectType(linkType, metadata),
+        objectType: resolveAudienceClickObjectType(linkType, metadata),
         objectId:
           typeof metadataWithTipValue.contentId === 'string'
             ? metadataWithTipValue.contentId

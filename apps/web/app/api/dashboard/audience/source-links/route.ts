@@ -1,7 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { BASE_URL, getProfileUrl } from '@/constants/domains';
 import { createUniqueSourceLinkCode } from '@/lib/audience/source-links';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -9,14 +8,15 @@ import {
   audienceSourceGroups,
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { slugify } from '@/lib/utm/build-url';
-
-export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const AUDIENCE_SOURCE_PAGE_SIZE = 100;
+import {
+  AUDIENCE_SOURCE_PAGE_SIZE,
+  buildAudienceSourceUtmParams,
+  NO_STORE_HEADERS,
+  parseSourceRequestJson,
+  resolveAudienceSourceDestinationUrl,
+  withAudienceSourceShortLink,
+} from '../source-route-helpers';
 
 const createSourceLinkSchema = z.object({
   profileId: z.string().uuid(),
@@ -27,27 +27,6 @@ const createSourceLinkSchema = z.object({
   destinationId: z.string().trim().max(200).optional(),
   destinationUrl: z.string().url().optional(),
 });
-
-function buildDefaultUtmParams(name: string) {
-  return {
-    source: 'qr_code',
-    medium: 'print',
-    campaign: slugify(name),
-    content: slugify(name),
-  };
-}
-
-function buildShortLinkUrl(code: string): string {
-  return new URL(`/s/${code}`, BASE_URL).toString();
-}
-
-async function parseJsonBody(request: NextRequest): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error('Malformed JSON');
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,10 +57,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          links: links.map(link => ({
-            ...link,
-            shortUrl: buildShortLinkUrl(link.code),
-          })),
+          links: links.map(withAudienceSourceShortLink),
         },
         { headers: NO_STORE_HEADERS }
       );
@@ -103,7 +79,7 @@ export async function POST(request: NextRequest) {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       let body: unknown;
       try {
-        body = await parseJsonBody(request);
+        body = await parseSourceRequestJson(request);
       } catch {
         return NextResponse.json(
           { error: 'Malformed JSON' },
@@ -157,15 +133,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const [profileRow] = await tx
-        .select({ username: creatorProfiles.username })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .limit(1);
-
       const resolvedDestinationUrl =
         destinationUrl ??
-        (profileRow?.username ? getProfileUrl(profileRow.username) : BASE_URL);
+        (await resolveAudienceSourceDestinationUrl(tx, profileId));
       const code = await createUniqueSourceLinkCode(tx, name);
       const now = new Date();
       const [link] = await tx
@@ -179,7 +149,7 @@ export async function POST(request: NextRequest) {
           destinationKind,
           destinationId: destinationId ?? null,
           destinationUrl: resolvedDestinationUrl,
-          utmParams: buildDefaultUtmParams(name),
+          utmParams: buildAudienceSourceUtmParams(name, name),
           metadata: {},
           createdAt: now,
           updatedAt: now,
@@ -191,7 +161,7 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { link: { ...link, shortUrl: buildShortLinkUrl(link.code) } },
+        { link: withAudienceSourceShortLink(link) },
         { status: 201, headers: NO_STORE_HEADERS }
       );
     });
