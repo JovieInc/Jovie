@@ -69,10 +69,18 @@ export function AudienceMemberReferrers({
 }: AudienceMemberReferrersProps) {
   const actionSources = member.latestActions
     .filter(action => action.sourceLabel)
-    .map(action => {
+    .map((action, index) => {
       const code = getSourceCode(action);
       return {
-        key: `action-${action.sourceKind ?? 'source'}-${action.sourceLabel}`,
+        key: [
+          'action',
+          action.sourceKind ?? 'source',
+          action.sourceLabel,
+          action.sourceLinkId ??
+            action.sourceLinkCode ??
+            action.timestamp ??
+            index,
+        ].join('-'),
         label: action.sourceLabel as string,
         detail: action.sourceKind
           ? action.sourceKind.replaceAll('_', ' ')
