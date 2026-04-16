@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.7] - 2026-04-15
+
+> Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
+
+### Added
+
+- Added the Admin Platform Connections page with Spotify Publisher and Playlist Engine controls.
+- Added admin system settings for playlist publisher and engine eligibility state.
+- Added focused unit coverage for platform connection helpers, Spotify token lookup, cron gating, and the admin UI smoke path.
+
+### Changed
+
+- Playlist generation cron now uses the admin database toggle and eligibility interval instead of the playlist feature flag.
+- Jovie Spotify token resolution now prefers the configured admin publisher and falls back to the legacy env system account when present.
+
 ## [26.4.153.6] - 2026-04-15
 
 > Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.

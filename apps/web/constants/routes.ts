@@ -87,6 +87,7 @@ export const APP_ROUTES = {
   ADMIN_USERS_UNBAN: '/app/admin/users/unban',
   ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
   ADMIN_PLAYLISTS: '/app/admin/playlists',
+  ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
 
   // System
   UNAVAILABLE: '/unavailable',

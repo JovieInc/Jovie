@@ -8,14 +8,19 @@
 // Admin
 export {
   type AdminAuditLog,
+  type AdminSystemSettings,
   adminAuditLog,
+  adminSystemSettings,
   type CampaignSettings,
   campaignSettings,
   insertAdminAuditLogSchema,
+  insertAdminSystemSettingsSchema,
   insertCampaignSettingsSchema,
   type NewAdminAuditLog,
+  type NewAdminSystemSettings,
   type NewCampaignSettings,
   selectAdminAuditLogSchema,
+  selectAdminSystemSettingsSchema,
   selectCampaignSettingsSchema,
 } from './admin';
 
