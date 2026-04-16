@@ -26,7 +26,15 @@ const hoisted = vi.hoisted(() => {
 
   const withSystemIngestionSession = vi
     .fn()
-    .mockResolvedValue([{ id: 'click_event_123' }]);
+    .mockImplementation(async callback =>
+      callback({
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+          }),
+        }),
+      })
+    );
 
   return {
     selectMock,
@@ -94,6 +102,7 @@ describe('POST /api/track', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Cookie: 'jv_cc={"essential":true,"analytics":false,"marketing":false}',
       },
       body: JSON.stringify({
         handle: 'artist123',
