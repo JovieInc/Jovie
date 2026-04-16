@@ -39,6 +39,20 @@ describe('clerkAvailability', () => {
     ).toBe(true);
   });
 
+  it('keeps Clerk enabled for local real-auth E2E runs', () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+
+    expect(
+      shouldBypassClerk(
+        'pk_test_example',
+        '0',
+        new URL('http://localhost:3100')
+      )
+    ).toBe(false);
+
+    vi.unstubAllEnvs();
+  });
+
   it('keeps Clerk enabled for real keys on secure public origins', () => {
     expect(
       shouldBypassClerk(
