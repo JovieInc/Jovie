@@ -21,6 +21,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Increased the final Artist Profiles claim section spacing for a more generous closing layout.
 
+### Fixed
+
+- Fixed Profile navigation on chat routes so sidebar and mobile Profile clicks open the right drawer from preview-panel state without requiring a profile query parameter.
+- Cleared stale chat preview data while profile drawer hydration is inactive so reopened drawers do not briefly show the previous profile.
+- Added regression coverage for Profile nav click behavior, state-open drawer hydration, profile deep-link hydration, and inactive preview-data cleanup.
+
 ## [26.4.153.4] - 2026-04-15
 
 > Release drawers now use compact inspector cards, and public profile releases now fail safely with timezone-consistent year rendering.
