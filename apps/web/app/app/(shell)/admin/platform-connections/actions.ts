@@ -68,7 +68,14 @@ async function writeAuditLog(
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
   const appUserId = await getAppUserId(clerkUserId);
-  if (!appUserId) return;
+  if (!appUserId) {
+    captureError('[Admin Audit] User mapping not found', null, {
+      clerkUserId,
+      action,
+      metadata,
+    });
+    return;
+  }
 
   await db.insert(adminAuditLog).values({
     adminUserId: appUserId,

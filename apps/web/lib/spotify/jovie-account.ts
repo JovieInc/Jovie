@@ -19,6 +19,7 @@ import 'server-only';
 import { clerkClient } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { getPlaylistSpotifyClerkUserId } from '@/lib/admin/platform-connections';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { SPOTIFY_API_BASE, SPOTIFY_DEFAULT_TIMEOUT_MS } from './env';
 import { SPOTIFY_OAUTH_TOKEN_STRATEGY } from './system-account';
@@ -32,8 +33,7 @@ import { SPOTIFY_OAUTH_TOKEN_STRATEGY } from './system-account';
  * Set in Doppler as JOVIE_SYSTEM_CLERK_USER_ID.
  */
 function getJovieSystemUserId(): string | null {
-  const userId = process.env.JOVIE_SYSTEM_CLERK_USER_ID;
-  return userId?.trim() || null;
+  return env.JOVIE_SYSTEM_CLERK_USER_ID?.trim() || null;
 }
 
 // ============================================================================
