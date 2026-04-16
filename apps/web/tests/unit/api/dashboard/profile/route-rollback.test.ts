@@ -14,6 +14,7 @@ const mockUpdateProfileRecords = vi.hoisted(() => vi.fn());
 const mockFinalizeProfileResponse = vi.hoisted(() => vi.fn());
 const mockAddAvatarCacheBust = vi.hoisted(() => vi.fn());
 const mockHandleTestProfileUpdate = vi.hoisted(() => vi.fn());
+const mockGetProfileByClerkId = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
@@ -60,7 +61,7 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
   finalizeProfileResponse: mockFinalizeProfileResponse,
   addAvatarCacheBust: mockAddAvatarCacheBust,
   handleTestProfileUpdate: mockHandleTestProfileUpdate,
-  getProfileByClerkId: vi.fn(),
+  getProfileByClerkId: mockGetProfileByClerkId,
 }));
 
 describe('PUT /api/dashboard/profile rollback behavior', () => {
@@ -81,6 +82,13 @@ describe('PUT /api/dashboard/profile rollback behavior', () => {
       displayNameForUserUpdate: undefined,
       avatarUrl: undefined,
       usernameUpdate: undefined,
+    });
+    mockGetProfileByClerkId.mockResolvedValue({
+      profile: {
+        username: 'existing-user',
+        displayName: 'Existing User',
+        avatarUrl: '/avatars/existing.png',
+      },
     });
     mockGuardUsernameUpdate.mockResolvedValue(null);
     mockBuildClerkUpdates.mockReturnValue({ firstName: 'New' });
@@ -148,5 +156,79 @@ describe('PUT /api/dashboard/profile rollback behavior', () => {
       expect.any(Error),
       expect.objectContaining({ method: 'PUT' })
     );
+  });
+
+  it('skips Clerk sync for no-op identity updates', async () => {
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        updates: {
+          username: 'existing-user',
+          displayName: 'Existing User',
+          careerHighlights: 'Updated highlights',
+        },
+      },
+    });
+    mockValidateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: {
+        username: 'existing-user',
+        displayName: 'Existing User',
+        careerHighlights: 'Updated highlights',
+      },
+    });
+    mockParseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: {
+        username: 'existing-user',
+        displayName: 'Existing User',
+        careerHighlights: 'Updated highlights',
+      },
+    });
+    mockBuildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { careerHighlights: 'Updated highlights' },
+      displayNameForUserUpdate: 'Existing User',
+      avatarUrl: undefined,
+      usernameUpdate: 'existing-user',
+    });
+    mockBuildClerkUpdates.mockImplementation(displayName =>
+      displayName ? { firstName: 'New' } : {}
+    );
+    mockSyncClerkProfile.mockResolvedValue({ clerkSyncFailed: false });
+    mockUpdateProfileRecords.mockResolvedValue({
+      updatedProfile: { id: 'profile-1', usernameNormalized: 'existing-user' },
+      oldUsernameNormalized: 'existing-user',
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          updates: {
+            username: 'existing-user',
+            displayName: 'Existing User',
+            careerHighlights: 'Updated highlights',
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockGuardUsernameUpdate).toHaveBeenCalledWith(
+      'clerk_123',
+      undefined
+    );
+    expect(mockBuildClerkUpdates).toHaveBeenCalledWith(undefined);
+    expect(mockSyncClerkProfile).toHaveBeenCalledWith({
+      clerkUserId: 'clerk_123',
+      clerkUpdates: {},
+      avatarUrl: undefined,
+    });
+    expect(mockUpdateProfileRecords).toHaveBeenCalledWith({
+      clerkUserId: 'clerk_123',
+      dbProfileUpdates: { careerHighlights: 'Updated highlights' },
+      displayNameForUserUpdate: undefined,
+    });
   });
 });

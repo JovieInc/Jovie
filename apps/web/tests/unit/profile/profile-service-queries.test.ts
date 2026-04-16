@@ -20,6 +20,7 @@ const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockRedisGet = vi.hoisted(() => vi.fn());
 const mockRedisSet = vi.hoisted(() => vi.fn().mockResolvedValue('OK'));
 const mockRedisDel = vi.hoisted(() => vi.fn());
+const mockGetRedis = vi.hoisted(() => vi.fn());
 const mockGetLatestRelease = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
@@ -32,11 +33,11 @@ vi.mock('@/lib/db', () => ({
 
 // Mock Redis
 vi.mock('@/lib/redis', () => ({
-  getRedis: () => ({
+  getRedis: mockGetRedis.mockImplementation(() => ({
     get: mockRedisGet,
     set: mockRedisSet,
     del: mockRedisDel,
-  }),
+  })),
 }));
 
 // Mock discography queries
@@ -133,6 +134,11 @@ const mockContact = {
 describe('Profile Service Queries', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRedis.mockImplementation(() => ({
+      get: mockRedisGet,
+      set: mockRedisSet,
+      del: mockRedisDel,
+    }));
   });
 
   afterEach(() => {
@@ -585,6 +591,9 @@ describe('Profile Service Queries', () => {
       );
       await invalidateProfileEdgeCache('testartist');
 
+      expect(mockGetRedis).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
+      });
       expect(mockRedisDel).toHaveBeenCalledWith('profile:data:testartist');
     });
 

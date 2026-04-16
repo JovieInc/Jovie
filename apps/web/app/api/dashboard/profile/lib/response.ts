@@ -14,6 +14,12 @@ export function addAvatarCacheBust(
 ) {
   const responseProfile = { ...updatedProfile };
   if (responseProfile.avatarUrl) {
+    if (responseProfile.avatarUrl.startsWith('/')) {
+      const separator = responseProfile.avatarUrl.includes('?') ? '&' : '?';
+      responseProfile.avatarUrl = `${responseProfile.avatarUrl}${separator}v=${Date.now().toString()}`;
+      return responseProfile;
+    }
+
     const url = new URL(responseProfile.avatarUrl);
     url.searchParams.set('v', Date.now().toString());
     responseProfile.avatarUrl = url.toString();
