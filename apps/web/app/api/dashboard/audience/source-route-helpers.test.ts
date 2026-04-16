@@ -16,8 +16,8 @@ describe('buildAudienceSourceUtmParams', () => {
   it('falls back to deterministic non-empty values when slugify returns empty', () => {
     const result = buildAudienceSourceUtmParams('🎉🎉🎉', '🔥🔥🔥');
 
-    expect(result.campaign).toMatch(/^campaign-[a-z0-9]+$/);
-    expect(result.content).toMatch(/^content-[a-z0-9]+$/);
+    expect(result.campaign).toMatch(/^campaign-[a-z0-9-]+$/);
+    expect(result.content).toMatch(/^content-[a-z0-9-]+$/);
     expect(result.campaign).not.toBe(result.content);
   });
 });

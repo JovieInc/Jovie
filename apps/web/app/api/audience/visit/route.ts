@@ -9,7 +9,10 @@ import {
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
 import { isVisitorBlocked } from '@/lib/audience/block-check';
-import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import {
+  type RecordAudienceEventInput,
+  recordAudienceEventBestEffort,
+} from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { unwrapPgError } from '@/lib/db/errors';
 import {
@@ -380,6 +383,7 @@ export async function POST(request: NextRequest) {
         'daily_profile_views'
       );
 
+      let audienceEventInput: RecordAudienceEventInput | null = null;
       await withSystemIngestionSession(async tx => {
         const viewDate = now.toISOString().slice(0, 10);
 
@@ -537,7 +541,7 @@ export async function POST(request: NextRequest) {
               }
             }
           }
-          await recordAudienceEvent(tx, {
+          audienceEventInput = {
             creatorProfileId: profileId,
             audienceMemberId: existing.id,
             eventType: 'profile_visited',
@@ -553,7 +557,7 @@ export async function POST(request: NextRequest) {
               utmParams: resolvedUtmParams,
             },
             timestamp: now,
-          });
+          };
           return;
         }
 
@@ -611,7 +615,7 @@ export async function POST(request: NextRequest) {
           }
         }
         if (inserted) {
-          await recordAudienceEvent(tx, {
+          audienceEventInput = {
             creatorProfileId: profileId,
             audienceMemberId: inserted.id,
             eventType: 'profile_visited',
@@ -627,9 +631,21 @@ export async function POST(request: NextRequest) {
               utmParams: resolvedUtmParams,
             },
             timestamp: now,
-          });
+          };
         }
       });
+
+      if (audienceEventInput) {
+        await recordAudienceEventBestEffort(audienceEventInput, {
+          message: 'visit audience event failed',
+          context: {
+            route: '/api/audience/visit',
+            method: 'POST',
+            profileId,
+            fingerprint,
+          },
+        });
+      }
 
       return NextResponse.json(
         { success: true, fingerprint },

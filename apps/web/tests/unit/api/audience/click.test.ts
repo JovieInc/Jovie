@@ -5,6 +5,7 @@ const mockPublicClickLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicClickLimiterLimit = vi.hoisted(() => vi.fn());
 const capturedInsertValues = vi.hoisted(() => [] as unknown[]);
 const mockDetectBot = vi.hoisted(() => vi.fn());
+const mockRecordAudienceEventBestEffort = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicClickLimiter: {
@@ -112,6 +113,10 @@ vi.mock('@/lib/ingestion/session', () => ({
       }),
     });
   }),
+}));
+
+vi.mock('@/lib/audience/record-audience-event', () => ({
+  recordAudienceEventBestEffort: mockRecordAudienceEventBestEffort,
 }));
 
 vi.mock('@/lib/analytics/tracking-rate-limit', () => ({

@@ -1,6 +1,8 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
-import type { DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceActions, audienceMembers } from '@/lib/db/schema/analytics';
+import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import { getAudienceEventSentenceText } from './activity-grammar';
 import type {
   AudienceEventConfidence,
@@ -139,4 +141,22 @@ export async function recordAudienceEvent(
       updatedAt: now,
     })
     .where(eq(audienceMembers.id, input.audienceMemberId));
+}
+
+export async function recordAudienceEventBestEffort(
+  input: RecordAudienceEventInput,
+  options: {
+    readonly message: string;
+    readonly context: Record<string, unknown>;
+  }
+): Promise<void> {
+  try {
+    await recordAudienceEvent(db, input);
+  } catch (error) {
+    logger.error(options.message, {
+      ...options.context,
+      error,
+    });
+    await captureError(options.message, error, options.context);
+  }
 }

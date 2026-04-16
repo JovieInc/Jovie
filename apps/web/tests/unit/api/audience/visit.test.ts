@@ -12,6 +12,7 @@ const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockRecordAudienceEventBestEffort = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -39,6 +40,10 @@ vi.mock('@/lib/db/schema', () => ({
 
 vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: mockWithSystemIngestionSession,
+}));
+
+vi.mock('@/lib/audience/record-audience-event', () => ({
+  recordAudienceEventBestEffort: mockRecordAudienceEventBestEffort,
 }));
 
 vi.mock('@/lib/analytics/tracking-rate-limit', () => ({

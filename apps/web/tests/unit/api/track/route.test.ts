@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/track/route';
-import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import { recordAudienceEventBestEffort } from '@/lib/audience/record-audience-event';
 import { captureError } from '@/lib/error-tracking';
 
 const hoisted = vi.hoisted(() => {
@@ -47,7 +47,7 @@ const hoisted = vi.hoisted(() => {
     updateWhereMock,
     updateError,
     withSystemIngestionSession,
-    recordAudienceEvent: vi.fn().mockResolvedValue(undefined),
+    recordAudienceEventBestEffort: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -76,7 +76,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 vi.mock('@/lib/audience/record-audience-event', () => ({
-  recordAudienceEvent: hoisted.recordAudienceEvent,
+  recordAudienceEventBestEffort: hoisted.recordAudienceEventBestEffort,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -208,11 +208,11 @@ describe('POST /api/track', () => {
     const response = await POST(request as unknown as NextRequest);
 
     expect(response.status).toBe(200);
-    expect(recordAudienceEvent).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(recordAudienceEventBestEffort).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceLabel: 'QR Code',
-      })
+      }),
+      expect.anything()
     );
   });
 });

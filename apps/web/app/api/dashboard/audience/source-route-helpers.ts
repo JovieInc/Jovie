@@ -155,11 +155,10 @@ function buildAudienceSourceSlugFallback(
   value: string,
   prefix: string
 ): string {
-  const normalized = value
+  const sanitized = value
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-  const sanitized = normalized
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
@@ -167,12 +166,13 @@ function buildAudienceSourceSlugFallback(
     return sanitized;
   }
 
-  let hash = 0;
-  for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  }
+  const encoded = Array.from(value.normalize('NFKD'))
+    .map(char => char.codePointAt(0)?.toString(36) ?? '')
+    .filter(Boolean)
+    .join('-')
+    .slice(0, 48);
 
-  return `${prefix}-${hash.toString(36)}`;
+  return encoded ? `${prefix}-${encoded}` : `${prefix}-value`;
 }
 
 function resolveAudienceSourceSlug(value: string, prefix: string): string {

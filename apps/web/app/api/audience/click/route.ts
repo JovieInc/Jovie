@@ -14,7 +14,10 @@ import {
   resolveAudienceClickObjectType,
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
-import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import {
+  type RecordAudienceEventInput,
+  recordAudienceEventBestEffort,
+} from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -243,6 +246,7 @@ export async function POST(request: NextRequest) {
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);
 
+    let audienceEventInput: RecordAudienceEventInput | null = null;
     await withSystemIngestionSession(async tx => {
       let member = await findAudienceMember(
         tx,
@@ -358,7 +362,7 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(audienceMembers.id, member.id));
 
-      await recordAudienceEvent(tx, {
+      audienceEventInput = {
         creatorProfileId: profileId,
         audienceMemberId: member.id,
         eventType: resolveAudienceClickEventType(linkType, metadata),
@@ -378,8 +382,20 @@ export async function POST(request: NextRequest) {
             : platform),
         platform,
         properties: metadataWithTipValue,
-      });
+      };
     });
+
+    if (audienceEventInput) {
+      await recordAudienceEventBestEffort(audienceEventInput, {
+        message: 'click audience event failed',
+        context: {
+          route: '/api/audience/click',
+          method: 'POST',
+          profileId,
+          linkType,
+        },
+      });
+    }
 
     return NextResponse.json(
       { success: true, fingerprint },

@@ -6,7 +6,10 @@ import {
   resolveAudienceClickObjectType,
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
-import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import {
+  type RecordAudienceEventInput,
+  recordAudienceEventBestEffort,
+} from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -421,6 +424,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let audienceEventInput: RecordAudienceEventInput | null = null;
     const trackingResult = await withSystemIngestionSession(async tx => {
       // Only create/update audience member records when marketing consent is given
       const audienceMemberId = hasMarketingConsent
@@ -467,7 +471,7 @@ export async function POST(request: NextRequest) {
         .returning({ id: clickEvents.id });
 
       if (insertedClickEvent && audienceMemberId) {
-        await recordAudienceEvent(tx, {
+        audienceEventInput = {
           creatorProfileId: profile.id,
           audienceMemberId,
           eventType: resolveAudienceClickEventType(linkType, context),
@@ -481,7 +485,7 @@ export async function POST(request: NextRequest) {
           clickEventId: insertedClickEvent.id,
           platform: context?.provider ?? target,
           properties: metadata,
-        });
+        };
       }
 
       return { clickEvent: insertedClickEvent, audienceMemberId };
@@ -501,6 +505,19 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to log click event' },
         { status: 500, headers: NO_STORE_HEADERS }
       );
+    }
+
+    if (audienceEventInput) {
+      await recordAudienceEventBestEffort(audienceEventInput, {
+        message: 'track audience event failed',
+        context: {
+          route: '/api/track',
+          method: 'POST',
+          creatorProfileId: profile.id,
+          handle,
+          linkType,
+        },
+      });
     }
 
     // Update social link click count in the background
