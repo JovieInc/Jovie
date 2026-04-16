@@ -45,6 +45,8 @@ export function ReleaseTableWithTracks({
   artistName,
   onCopy,
   onEdit,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -74,11 +76,21 @@ export function ReleaseTableWithTracks({
         release,
         onEdit,
         onCopy,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
       }),
-    [onEdit, onCopy, artistName, isSmartLinkLocked, getSmartLinkLockReason]
+    [
+      onEdit,
+      onCopy,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
+      artistName,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    ]
   );
 
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);

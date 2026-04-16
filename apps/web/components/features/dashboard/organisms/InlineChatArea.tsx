@@ -31,12 +31,14 @@ import {
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ChatAlbumArtCard } from '@/components/jovie/components/ChatAlbumArtCard';
 import { ChatAnalyticsCard } from '@/components/jovie/components/ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
 import {
   type ArtistContext,
+  type ChatAlbumArtToolResult,
   type ChatInsightsToolResult,
   isToolInvocationPart,
   type SocialLinkToolResult,
@@ -73,6 +75,15 @@ function getToolInvocations(
   parts: Array<{ type: string }>
 ): ToolInvocationPart[] {
   return parts.filter(isToolInvocationPart);
+}
+
+function isAlbumArtResult(result: unknown): result is ChatAlbumArtToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'success' in result &&
+    ('state' in result || 'error' in result)
+  );
 }
 
 /** Memoized per-message renderer to avoid reprocessing tool invocations on every render. */
@@ -124,16 +135,19 @@ const InlineChatMessage = memo(function InlineChatMessage({
       )}
 
       {toolInvocations.map(toolInvocation => {
+        const result = toolInvocation.result as
+          | Record<string, unknown>
+          | undefined;
         if (
           toolInvocation.toolName === 'proposeProfileEdit' &&
           toolInvocation.state === 'result' &&
-          toolInvocation.result?.success &&
-          toolInvocation.result.preview
+          result?.success &&
+          result.preview
         ) {
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ProfileEditPreviewCard
-                preview={toolInvocation.result.preview as ProfileEditPreview}
+                preview={result.preview as ProfileEditPreview}
                 profileId={profileId}
               />
             </div>
@@ -163,6 +177,21 @@ const InlineChatMessage = memo(function InlineChatMessage({
                 result={
                   toolInvocation.result as unknown as ChatInsightsToolResult
                 }
+              />
+            </div>
+          );
+        }
+
+        if (
+          toolInvocation.toolName === 'generateAlbumArt' &&
+          toolInvocation.state === 'result' &&
+          isAlbumArtResult(toolInvocation.result)
+        ) {
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatAlbumArtCard
+                result={toolInvocation.result}
+                profileId={profileId}
               />
             </div>
           );

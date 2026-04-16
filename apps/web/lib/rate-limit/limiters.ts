@@ -32,6 +32,19 @@ export const artworkUploadLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for album art generation.
+ * A single generation produces three images, so this is separate from chat quota.
+ */
+export const albumArtGenerationLimiter = createRateLimiter(
+  RATE_LIMITERS.albumArtGeneration
+);
+
+/** Burst limiter for rapid repeated album art generations. */
+export const albumArtGenerationBurstLimiter = createRateLimiter(
+  RATE_LIMITERS.albumArtGenerationBurst
+);
+
+/**
  * General API rate limiter
  * Limit: 100 requests per minute per IP
  */

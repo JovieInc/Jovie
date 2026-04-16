@@ -34,8 +34,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
@@ -307,6 +309,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     smartLinksLimit,
     isPro,
     canCreateManualReleases,
+    canGenerateAlbumArt,
     canGenerateReleasePlans,
     canEditSmartLinks,
     canAccessFutureReleases,
@@ -317,6 +320,19 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const isReleasePlanGateLoading =
     (planGate.isLoading || planGate.isError) &&
     releasePlanEntitlementOverride === undefined;
+
+  const handleGenerateAlbumArt = useCallback(
+    (release: ReleaseViewModel) => {
+      openChatWithPrompt(
+        `Generate album art for release "${release.title}" and attach it to release ID ${release.id}. Show three options.`,
+        router
+      );
+    },
+    [router]
+  );
+
+  const showGenerateAlbumArtAction =
+    FEATURE_FLAGS.ALBUM_ART_GENERATION && Boolean(canGenerateAlbumArt);
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -766,6 +782,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           width={RELEASE_DETAIL_PANEL_WIDTH}
           providerConfig={providerConfig}
           artistName={artistName}
+          canGenerateAlbumArt={showGenerateAlbumArtAction}
+          onGenerateAlbumArt={handleGenerateAlbumArt}
           onClose={closeEditor}
           onRefresh={releaseSidebarHandlers.refresh}
           isRefreshing={refreshingReleaseId === editingRelease?.id}
@@ -810,6 +828,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingTrack,
     providerConfig,
     artistName,
+    showGenerateAlbumArtAction,
+    handleGenerateAlbumArt,
     closeEditor,
     closeTrackDrawer,
     experienceAdapter,
@@ -940,6 +960,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onCopy={copyHandler}
                 onEdit={handleOpenEditor}
                 onDelete={handleDeleteRequest}
+                canGenerateAlbumArt={showGenerateAlbumArtAction}
+                onGenerateAlbumArt={handleGenerateAlbumArt}
                 columnVisibility={columnVisibility}
                 rowHeight={rowHeight}
                 showTracks={showTracks}
