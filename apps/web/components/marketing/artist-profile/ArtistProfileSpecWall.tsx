@@ -457,13 +457,13 @@ export function ArtistProfileSpecWall({
       className='py-20 sm:py-24 lg:py-28'
       containerClassName='lg:max-w-none'
     >
-      <div className='overflow-hidden rounded-[2.25rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(107,177,255,0.09),transparent_22%),radial-gradient(circle_at_78%_18%,rgba(77,209,191,0.08),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)),#020304] px-5 py-8 shadow-[0_32px_120px_rgba(0,0,0,0.4)] sm:px-8 sm:py-10 lg:px-10 lg:py-12'>
-        <div className='grid gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(22rem,0.62fr)] lg:items-start lg:gap-10'>
+      <div className='mx-auto max-w-[1260px] px-5 sm:px-8 lg:px-10'>
+        <div className='grid gap-8 border-y border-white/8 py-8 lg:grid-cols-[minmax(0,0.94fr)_minmax(20rem,0.74fr)] lg:items-start lg:gap-12 lg:py-10'>
           <div className='max-w-[42rem]'>
-            <p className='text-[12px] font-medium tracking-[-0.02em] text-tertiary-token'>
+            <p className='text-[13px] font-medium tracking-[-0.02em] text-tertiary-token'>
               {specWall.eyebrow}
             </p>
-            <h2 className='marketing-h2-linear mt-4 max-w-[11ch] text-primary-token lg:!text-[clamp(3rem,5.1vw,4.8rem)] lg:!leading-[0.93] lg:!tracking-[-0.06em]'>
+            <h2 className='marketing-h2-linear mt-4 max-w-[11ch] text-primary-token lg:!text-[clamp(3rem,5.1vw,4.7rem)] lg:!leading-[0.93] lg:!tracking-[-0.06em]'>
               {specWall.headline}
             </h2>
             <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.7] text-secondary-token'>
@@ -471,23 +471,18 @@ export function ArtistProfileSpecWall({
             </p>
           </div>
 
-          <div className='rounded-[1.6rem] border border-white/8 bg-white/[0.03] p-4 shadow-[0_18px_54px_rgba(0,0,0,0.22)] sm:p-5'>
-            <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-white/38'>
+          <div className='lg:border-l lg:border-white/8 lg:pl-8'>
+            <p className='text-[12px] font-medium tracking-[-0.02em] text-tertiary-token'>
               {opinionated.eyebrow}
             </p>
-            <p className='mt-3 text-[14px] leading-[1.6] text-secondary-token'>
+            <p className='mt-3 max-w-[29rem] text-[14px] leading-[1.65] text-secondary-token'>
               {opinionated.body}
             </p>
-            <div className='mt-4 flex flex-wrap gap-2'>
-              {opinionated.principles.map(principle => (
-                <ProofChip key={principle}>{principle}</ProofChip>
-              ))}
-            </div>
-            <div className='mt-5 space-y-2'>
+            <div className='mt-6 divide-y divide-white/8 rounded-[1.35rem] border border-white/8 bg-white/[0.02]'>
               {opinionated.rules.map(rule => (
                 <div
                   key={rule.id}
-                  className='grid items-center gap-2 rounded-[1rem] bg-white/[0.035] px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'
+                  className='grid items-center gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:px-5'
                 >
                   <span className='text-[12px] font-medium tracking-[-0.02em] text-secondary-token'>
                     {rule.context}
@@ -499,10 +494,20 @@ export function ArtistProfileSpecWall({
                 </div>
               ))}
             </div>
+            <div className='mt-4 flex flex-wrap gap-2'>
+              {opinionated.principles.map(principle => (
+                <span
+                  key={principle}
+                  className='inline-flex items-center rounded-full border border-white/8 px-3 py-1 text-[11px] font-medium tracking-[-0.02em] text-secondary-token'
+                >
+                  {principle}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className='mt-10 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
+        <div className='mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
           {tiles.map(tile => (
             <ArtistProfilePowerFeatureTile key={tile.id} tile={tile} />
           ))}

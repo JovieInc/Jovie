@@ -309,7 +309,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     modes: [
       {
         id: 'listen',
-        label: 'Listen',
+        label: 'Drive Streams',
         headline: 'Keep the latest music one tap away.',
         description: 'Keep the latest music one tap away.',
         pathLabel: 'jov.ie/you/listen',
@@ -346,7 +346,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'tour',
-        label: 'Tour',
+        label: 'Sell Out',
         headline: 'Surface the right dates and ticket paths.',
         description: 'Surface the right dates and ticket paths.',
         pathLabel: 'jov.ie/you/tour',
@@ -395,7 +395,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'pay',
-        label: 'Pay',
+        label: 'Get Paid',
         headline: 'Make support one tap away.',
         description: 'Make support one tap away.',
         pathLabel: 'jov.ie/you/pay',
@@ -431,7 +431,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'contact',
-        label: 'Contact',
+        label: 'Stay Booked',
         headline: 'Make booking, management, and press easy to reach.',
         description: 'Make booking, management, and press easy to reach.',
         pathLabel: 'jov.ie/you/contact',
@@ -866,7 +866,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   finalCta: {
-    headline: "Don't lose the next fan.",
+    headline: "Don't lose your next fan.",
     subhead: 'Turn every visit into a stream, save, signup, or support.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',

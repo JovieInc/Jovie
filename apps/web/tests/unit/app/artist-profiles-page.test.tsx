@@ -98,16 +98,16 @@ describe('ArtistProfilesPage', () => {
     );
 
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Listen' })
+      adaptiveSequence.getByRole('button', { name: 'Drive Streams' })
     ).toBeInTheDocument();
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Pay' })
+      adaptiveSequence.getByRole('button', { name: 'Get Paid' })
     ).toBeInTheDocument();
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Tour' })
+      adaptiveSequence.getByRole('button', { name: 'Sell Out' })
     ).toBeInTheDocument();
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Contact' })
+      adaptiveSequence.getByRole('button', { name: 'Stay Booked' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'One profile.' })
@@ -124,7 +124,7 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByText('/tour')).toBeInTheDocument();
     expect(screen.getByText('/pay')).toBeInTheDocument();
     expect(screen.getByText('/contact')).toBeInTheDocument();
-    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Pay' }));
+    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
     expect(
       adaptiveSequence.getByText('Make support one tap away.')
     ).toBeInTheDocument();
@@ -455,7 +455,7 @@ describe('ArtistProfilesPage', () => {
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      "Don't lose the next fan."
+      "Don't lose your next fan."
     );
     expect(
       screen.getByText(

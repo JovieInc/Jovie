@@ -168,7 +168,7 @@ export function ArtistProfileModeSwitcher({
                 : 'pointer-events-none translate-y-3 opacity-0'
             )}
           >
-            <div className='mx-auto mt-4 flex w-fit max-w-full flex-nowrap items-center justify-start gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+            <div className='mx-auto mt-4 flex w-fit max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-full border border-white/10 bg-white/[0.035] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.18)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
               {adaptive.modes.map((mode, index) => {
                 const isActive = index === activeIndex;
                 return (
@@ -181,10 +181,10 @@ export function ArtistProfileModeSwitcher({
                       setActiveIndex(index);
                     }}
                     className={cn(
-                      'inline-flex h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[14px] font-medium tracking-[-0.02em] transition-colors',
+                      'inline-flex h-10 shrink-0 items-center justify-center rounded-full px-4 text-[13px] font-medium tracking-[-0.02em] transition-colors',
                       isActive
-                        ? 'border-white bg-white text-black hover:bg-white/90'
-                        : 'border-white/10 bg-white/[0.035] text-secondary-token hover:border-white/18 hover:bg-white/[0.06] hover:text-primary-token'
+                        ? 'bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.16)] hover:bg-white/90'
+                        : 'text-secondary-token hover:bg-white/[0.06] hover:text-primary-token'
                     )}
                   >
                     {mode.label}
