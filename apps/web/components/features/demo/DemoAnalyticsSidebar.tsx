@@ -269,29 +269,31 @@ export function DemoAnalyticsSidebar({
         </DrawerSurfaceCard>
       }
     >
-      <div className='space-y-2'>
-        {/* Engagement metrics */}
-        <div className='grid grid-cols-3 gap-2'>
-          <EngagementMetric
-            label='Total Clicks'
-            value={numberFormatter.format(
-              MOCK_ANALYTICS.engagement.totalClicks
-            )}
-          />
-          <EngagementMetric
-            label='Listen Clicks'
-            value={numberFormatter.format(
-              MOCK_ANALYTICS.engagement.listenClicks
-            )}
-          />
-          <EngagementMetric
-            label='Capture Rate'
-            value={MOCK_ANALYTICS.engagement.captureRate}
-          />
-        </div>
+      <div className='flex min-h-0 flex-1 flex-col space-y-2'>
+        <div className='shrink-0 space-y-2'>
+          {/* Engagement metrics */}
+          <div className='grid grid-cols-3 gap-2'>
+            <EngagementMetric
+              label='Total Clicks'
+              value={numberFormatter.format(
+                MOCK_ANALYTICS.engagement.totalClicks
+              )}
+            />
+            <EngagementMetric
+              label='Listen Clicks'
+              value={numberFormatter.format(
+                MOCK_ANALYTICS.engagement.listenClicks
+              )}
+            />
+            <EngagementMetric
+              label='Capture Rate'
+              value={MOCK_ANALYTICS.engagement.captureRate}
+            />
+          </div>
 
-        {/* Funnel */}
-        <FunnelSection />
+          {/* Funnel */}
+          <FunnelSection />
+        </div>
 
         {/* Ranked lists */}
         <DrawerTabbedCard
@@ -319,7 +321,7 @@ export function DemoAnalyticsSidebar({
         </DrawerTabbedCard>
 
         {/* Extra engagement stats */}
-        <DrawerSurfaceCard className='border-0 shadow-none p-2.5'>
+        <DrawerSurfaceCard className='shrink-0 border-0 p-2.5 shadow-none'>
           <p className='mb-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
             Engagement
           </p>

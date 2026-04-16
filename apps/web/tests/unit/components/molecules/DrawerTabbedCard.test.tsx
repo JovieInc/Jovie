@@ -27,9 +27,19 @@ describe('DrawerTabbedCard', () => {
     const card = screen.getByTestId('drawer-tabbed-card');
     const tablist = screen.getByRole('tablist', { name: 'Drawer card tabs' });
     const content = screen.getByText('Details content');
+    const scrollRegion = screen.getByTestId('drawer-tabbed-card-scroll-region');
 
     expect(card).toBeInTheDocument();
     expect(card).toContainElement(tablist);
     expect(card).toContainElement(content);
+    expect(card).toHaveClass('flex-1', 'min-h-0', 'flex', 'flex-col');
+    expect(card).not.toHaveClass('h-full');
+    expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
+    expect(scrollRegion).toHaveClass(
+      'min-h-0',
+      'flex-1',
+      'overflow-y-auto',
+      'overscroll-contain'
+    );
   });
 });
