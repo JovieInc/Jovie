@@ -12,14 +12,7 @@ interface ArtistProfileModeSwitcherProps {
   readonly phoneSubcaption: string;
 }
 
-const CONTEXT_CUES = [
-  'Source-aware',
-  'Location-aware',
-  'Device-aware',
-  'Release-aware',
-] as const;
-
-const DEEP_LINK_PROOF = ['/music', '/shows', '/pay', '/subscribe'] as const;
+const DEEP_LINK_PROOF = ['/listen', '/pay', '/tour', '/contact'] as const;
 
 const INTRO_REVEAL_PROGRESS = 0.16;
 const MODE_CONTROLS_PROGRESS = 0.52;
@@ -41,8 +34,10 @@ export function ArtistProfileModeSwitcher({
   const introVisible = reducedMotion || progress >= INTRO_REVEAL_PROGRESS;
   const tabsVisible = reducedMotion || progress >= MODE_CONTROLS_PROGRESS;
   const cueIndex = Math.min(
-    CONTEXT_CUES.length - 1,
-    Math.floor((progress / MODE_CONTROLS_PROGRESS) * CONTEXT_CUES.length)
+    adaptive.contextCues.length - 1,
+    Math.floor(
+      (progress / MODE_CONTROLS_PROGRESS) * adaptive.contextCues.length
+    )
   );
 
   const updateProgress = useCallback(() => {
@@ -84,21 +79,23 @@ export function ArtistProfileModeSwitcher({
       ref={sequenceRef}
       className={cn(
         'relative',
-        reducedMotion ? 'py-20 sm:py-24 lg:py-28' : 'min-h-[190svh]'
+        reducedMotion ? 'py-10 sm:py-12 lg:py-14' : 'min-h-[138svh]'
       )}
     >
       <div
         className={cn(
-          'flex items-center justify-center px-5 sm:px-6',
-          reducedMotion ? 'min-h-0' : 'sticky top-0 min-h-svh py-8 sm:py-10'
+          'flex justify-center px-5 sm:px-6',
+          reducedMotion
+            ? 'min-h-0 items-start'
+            : 'sticky top-0 min-h-[78svh] items-start pt-5 sm:pt-7'
         )}
       >
-        <div className='mx-auto w-full max-w-[34rem] text-center'>
+        <div className='mx-auto w-full max-w-[31rem] text-center'>
           <div
             className={cn(
               'mx-auto max-w-[34rem] overflow-hidden transition-[max-height,margin,opacity,transform] duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]',
               introVisible
-                ? 'mb-6 max-h-60 translate-y-0 opacity-100 sm:mb-7'
+                ? 'mb-5 max-h-60 translate-y-0 opacity-100 sm:mb-6'
                 : 'mb-0 max-h-0 translate-y-5 opacity-0'
             )}
           >
@@ -108,8 +105,8 @@ export function ArtistProfileModeSwitcher({
             <p className='mt-3 text-[clamp(1.05rem,2vw,1.45rem)] font-medium leading-[1.2] tracking-[-0.04em] text-secondary-token'>
               {phoneSubcaption}
             </p>
-            <div className='mx-auto mt-4 flex max-w-[31rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:mt-5 sm:gap-x-5'>
-              {CONTEXT_CUES.map((cue, index) => {
+            <div className='mx-auto mt-3 flex max-w-[31rem] flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:mt-4 sm:gap-x-5'>
+              {adaptive.contextCues.map((cue, index) => {
                 const isActive = index === cueIndex && !tabsVisible;
                 return (
                   <span
@@ -126,21 +123,22 @@ export function ArtistProfileModeSwitcher({
             </div>
           </div>
 
-          <div className='relative mx-auto aspect-[660/1368] w-[min(100%,23.5rem,36svh)]'>
+          <div className='relative mx-auto aspect-[660/1368] w-[min(100%,21.25rem,32svh)]'>
             {adaptive.modes.map((mode, index) => {
               const isActive = index === activeIndex;
               return (
                 <Image
                   key={mode.id}
                   src={mode.screenshotSrc}
-                  alt={mode.screenshotAlt}
+                  alt={isActive ? mode.screenshotAlt : ''}
+                  aria-hidden={!isActive}
                   fill
                   sizes='(max-width: 640px) 100vw, 376px'
                   className={cn(
                     'object-contain object-center drop-shadow-[0_28px_82px_rgba(0,0,0,0.48)] transition-opacity duration-300 ease-out',
                     isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
                   )}
-                  priority={mode.id === 'release'}
+                  priority={mode.id === 'listen'}
                 />
               );
             })}
@@ -151,11 +149,11 @@ export function ArtistProfileModeSwitcher({
             className={cn(
               'transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]',
               tabsVisible
-                ? 'translate-y-0 opacity-100'
+                ? '-translate-y-2 opacity-100 sm:-translate-y-3'
                 : 'pointer-events-none translate-y-3 opacity-0'
             )}
           >
-            <div className='mx-auto mt-3 flex w-full max-w-[min(100%,30rem)] flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-full bg-white/[0.035] p-1.5 [scrollbar-width:none] sm:justify-center [&::-webkit-scrollbar]:hidden'>
+            <div className='mx-auto flex w-fit max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-full bg-white/[0.035] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
               {adaptive.modes.map((mode, index) => {
                 const isActive = index === activeIndex;
                 return (
@@ -180,7 +178,7 @@ export function ArtistProfileModeSwitcher({
               })}
             </div>
 
-            <div className='mx-auto mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-mono text-[11px] tracking-[-0.02em] text-tertiary-token'>
+            <div className='mx-auto mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[-0.02em] text-tertiary-token sm:gap-x-4 sm:text-[11px]'>
               {DEEP_LINK_PROOF.map(path => (
                 <span
                   key={path}
@@ -195,7 +193,7 @@ export function ArtistProfileModeSwitcher({
               ))}
             </div>
 
-            <p className='mx-auto mt-4 max-w-[23rem] text-[15px] font-medium leading-[1.45] tracking-[-0.02em] text-secondary-token'>
+            <p className='mx-auto mt-2.5 max-w-[22rem] text-[16px] font-medium leading-[1.35] tracking-[-0.03em] text-primary-token/88'>
               {activeMode.headline}
             </p>
           </div>

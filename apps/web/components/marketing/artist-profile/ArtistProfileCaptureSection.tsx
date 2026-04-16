@@ -1,5 +1,4 @@
 import {
-  Bell,
   Check,
   CreditCard,
   Dot,
@@ -37,12 +36,12 @@ const AUDIENCE_ICON = {
 
 const PILL_ACCENTS = [
   'var(--color-accent-blue)',
-  'var(--color-accent-purple)',
-  'var(--color-accent-pink)',
-  'var(--color-accent-red)',
-  'var(--color-accent-orange)',
-  'var(--color-accent-green)',
   'var(--color-accent-teal)',
+  'var(--color-accent-orange)',
+  'var(--color-accent-gray)',
+  'var(--color-accent-blue)',
+  'var(--color-accent-teal)',
+  'var(--color-accent-orange)',
   'var(--color-accent-gray)',
 ] as const;
 
@@ -82,18 +81,14 @@ function AudiencePill({
 
   return (
     <li className='artist-profile-audience-pill group' style={style}>
-      <span className='relative z-10 flex h-full items-center gap-2.5 px-4'>
+      <span className='relative z-10 flex items-center gap-2.5 px-4 py-3'>
         <Icon
           className='h-4 w-4 shrink-0 text-[color:var(--pill-accent)]'
           strokeWidth={1.9}
         />
-        <span>{pill.identity}</span>
-        {pill.chips.map(chip => (
-          <span key={chip} className='artist-profile-audience-chip'>
-            {chip}
-          </span>
-        ))}
-        <span className='text-secondary-token'>{pill.action}</span>
+        <span className='leading-[1.35] text-primary-token'>
+          {pill.sentence}
+        </span>
       </span>
     </li>
   );
@@ -153,41 +148,32 @@ export function ArtistProfileCaptureSection({
           position: relative;
           isolation: isolate;
           display: flex;
-          height: 3rem;
+          min-height: 3rem;
+          max-width: min(20rem, calc(100vw - 4rem));
           flex-shrink: 0;
           align-items: center;
           overflow: hidden;
-          white-space: nowrap;
           border-radius: 9999px;
           background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.024)),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
             rgba(5, 6, 8, 0.86);
-          color: rgba(255, 255, 255, 0.94);
-          font-size: 13px;
+          color: rgba(255, 255, 255, 0.92);
+          font-size: 12.5px;
           font-weight: 500;
-          line-height: 1;
+          line-height: 1.3;
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.06),
             inset 0 -1px 0 rgba(255, 255, 255, 0.03),
-            0 12px 28px rgba(0, 0, 0, 0.2);
+            0 10px 24px rgba(0, 0, 0, 0.18);
           backdrop-filter: blur(14px);
-          transition: background 200ms ease, box-shadow 200ms ease;
+          transition: background 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
         }
 
         .artist-profile-audience-pill:hover {
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
             inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-            0 14px 30px rgba(0, 0, 0, 0.24);
-        }
-
-        .artist-profile-audience-chip {
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.045);
-          padding: 0.23rem 0.5rem;
-          color: rgba(255, 255, 255, 0.7);
-          font-size: 11px;
-          font-weight: 600;
+            0 12px 28px rgba(0, 0, 0, 0.2);
         }
 
         .artist-profile-audience-rail {
@@ -331,7 +317,7 @@ export function ArtistProfileCaptureSection({
       `}</style>
 
       <div className='artist-profile-capture-shell mx-auto max-w-[1120px]'>
-        <div className='mx-auto max-w-[43rem] text-center'>
+        <div className='mx-auto max-w-[34rem] text-center'>
           <h2 className='text-[clamp(3.5rem,8vw,7.25rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
             {capture.headline}
           </h2>
@@ -340,65 +326,50 @@ export function ArtistProfileCaptureSection({
           </p>
         </div>
 
-        <div className='relative mx-auto mt-14 max-w-[720px] rounded-[1.55rem] bg-white/[0.03] px-5 py-5 shadow-[0_18px_56px_rgba(0,0,0,0.24)] ring-1 ring-white/5 sm:px-6 sm:py-6'>
-          <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='flex min-w-0 items-center gap-3'>
-              <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-primary-token'>
-                <Bell className='h-[17px] w-[17px]' strokeWidth={1.9} />
+        <div className='mx-auto mt-10 max-w-[34rem]'>
+          <div className='relative mx-auto h-12 w-full max-w-[20rem] sm:h-12'>
+            <div
+              className='artist-profile-subscribe-flow-input absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
+              aria-hidden='true'
+            >
+              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-primary-token'>
+                <Mail className='h-4 w-4' strokeWidth={1.9} />
               </span>
-              <div className='min-w-0 text-left'>
-                <p className='text-[15px] font-semibold leading-tight tracking-[-0.025em] text-primary-token'>
-                  {capture.action.title}
-                </p>
-                <p className='mt-1 text-[12px] leading-snug tracking-[-0.01em] text-secondary-token'>
-                  {capture.action.detail}
-                </p>
-              </div>
+              <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/22 px-3 py-2'>
+                <span className='artist-profile-subscribe-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
+                  {DEMO_SUBSCRIBE_EMAIL}
+                </span>
+                <span
+                  className='artist-profile-subscribe-caret ml-0.5 inline-block h-3.5 w-px bg-white/58'
+                  aria-hidden='true'
+                />
+              </span>
+              <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black'>
+                {capture.action.ctaLabel}
+              </span>
             </div>
-            <div className='relative h-12 w-full max-w-[23rem] shrink-0 sm:h-12'>
-              <div
-                className='artist-profile-subscribe-flow-input absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
-                aria-hidden='true'
-              >
-                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-primary-token'>
-                  <Mail className='h-4 w-4' strokeWidth={1.9} />
+            <div
+              className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
+              aria-hidden='true'
+            >
+              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
+                <Check className='h-4 w-4' strokeWidth={2.1} />
+              </span>
+              <span className='min-w-0 flex-1'>
+                <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
+                  Subscribed
                 </span>
-                <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/22 px-3 py-2'>
-                  <span className='artist-profile-subscribe-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
-                    {DEMO_SUBSCRIBE_EMAIL}
-                  </span>
-                  <span
-                    className='artist-profile-subscribe-caret ml-0.5 inline-block h-3.5 w-px bg-white/58'
-                    aria-hidden='true'
-                  />
+                <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
+                  Email saved
                 </span>
-                <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black'>
-                  {capture.action.ctaLabel}
-                </span>
-              </div>
-              <div
-                className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
-                aria-hidden='true'
-              >
-                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
-                  <Check className='h-4 w-4' strokeWidth={2.1} />
-                </span>
-                <span className='min-w-0 flex-1'>
-                  <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
-                    Subscribed
-                  </span>
-                  <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
-                    Email saved
-                  </span>
-                </span>
-              </div>
-              <p className='sr-only'>
-                A demo email is typed into the subscribe input, then the UI
-                switches to a subscribed state with notifications enabled.
-              </p>
+              </span>
             </div>
+            <p className='sr-only'>
+              A demo email is typed into the subscribe input, then the UI
+              switches to a subscribed state with notifications enabled.
+            </p>
           </div>
-          <div className='artist-profile-subscribe-metadata mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
+          <div className='artist-profile-subscribe-metadata mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
             <span className='text-secondary-token'>
               {capture.action.beforeDetail}
             </span>
@@ -413,7 +384,7 @@ export function ArtistProfileCaptureSection({
           </div>
         </div>
 
-        <div className='mt-9 space-y-3'>
+        <div className='mt-8 space-y-2.5'>
           {capture.audienceRails.map((rail, index) => (
             <AudienceRail
               key={rail.map(pill => pill.id).join('-')}

@@ -10,6 +10,7 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
 import type { ProfileMode } from '@/features/profile/contracts';
+import { isProfileMode } from '@/features/profile/registry';
 import {
   StaticArtistPage,
   type StaticArtistPageProps,
@@ -90,21 +91,6 @@ function makeDemoRelease(base: DemoReleaseVariant): DemoRelease {
   } as DemoRelease;
 }
 
-const VALID_MODES: readonly ProfileMode[] = [
-  'profile',
-  'tour',
-  'pay',
-  'subscribe',
-  'listen',
-  'contact',
-  'about',
-  'releases',
-];
-
-function isValidMode(value: string | null): value is ProfileMode {
-  return VALID_MODES.includes(value as ProfileMode);
-}
-
 function isValidRelease(value: string | null): value is ReleaseVariant {
   return RELEASE_VARIANT_KEYS.includes(value as ReleaseVariant);
 }
@@ -114,7 +100,7 @@ export function DemoTimWhiteProfileSurface() {
   const modeParam = searchParams.get('mode');
   const releaseParam = searchParams.get('release');
 
-  const mode: ProfileMode = isValidMode(modeParam) ? modeParam : 'profile';
+  const mode: ProfileMode = isProfileMode(modeParam) ? modeParam : 'profile';
   const releaseKey: ReleaseVariant = isValidRelease(releaseParam)
     ? releaseParam
     : 'live';

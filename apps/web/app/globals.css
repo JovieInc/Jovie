@@ -1014,6 +1014,13 @@ body {
     background-color: transparent;
     border-color: transparent;
     box-shadow: none;
+    &:hover,
+    &:focus-visible,
+    &:active {
+      background-color: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
   }
 
   /* Linear Nav Signup Button - filled inverted style matching Linear header */

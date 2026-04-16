@@ -14,7 +14,7 @@ export function ArtistProfileSocialProof({
 }: Readonly<ArtistProfileSocialProofProps>) {
   return (
     <ArtistProfileSectionShell>
-      <div className='max-w-[38rem]'>
+      <div className='mx-auto max-w-[34rem] text-center'>
         <h2 className='marketing-h2-linear text-primary-token'>
           {socialProof.headline}
         </h2>
@@ -23,7 +23,7 @@ export function ArtistProfileSocialProof({
         </p>
       </div>
 
-      <div className='mt-10 grid gap-4 lg:grid-cols-3'>
+      <div className='mx-auto mt-10 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
         {proofData.profileCards.map(card => (
           <article
             key={card.id}

@@ -42,7 +42,7 @@ export function ArtistProfileLandingPage({
     return (
       <>
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-          <HomeHero />
+          <HomeHero showPhoneComposition={false} variant='artist-profile' />
         </div>
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
           <HomeTrustSection />
@@ -54,7 +54,7 @@ export function ArtistProfileLandingPage({
   return (
     <>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-        <HomeHero />
+        <HomeHero showPhoneComposition={false} variant='artist-profile' />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}>
         <ArtistProfileAdaptiveSequence

@@ -1,18 +1,6 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Heart,
-  Mail,
-  Music2,
-  QrCode,
-  Ticket,
-  WalletCards,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useRef } from 'react';
@@ -25,55 +13,12 @@ interface ArtistProfileOutcomesCarouselProps {
 
 type OutcomeId = ArtistProfileLandingCopy['outcomes']['cards'][number]['id'];
 
-const OUTCOME_CARD_ICONS: Record<OutcomeId, LucideIcon> = {
-  'drive-streams': Music2,
-  'sell-out': Ticket,
-  'get-paid': WalletCards,
-  'say-thanks': Heart,
-  'share-anywhere': QrCode,
-};
-
 const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
   'drive-streams': 'var(--color-accent-teal)',
   'sell-out': 'var(--color-accent-blue)',
   'get-paid': 'var(--color-accent-green)',
-  'say-thanks': 'var(--color-accent-purple)',
+  'say-thanks': 'var(--color-accent-orange)',
   'share-anywhere': 'var(--color-accent-orange)',
-};
-
-const PRODUCT_CROPS: Partial<
-  Record<
-    OutcomeId,
-    {
-      readonly src: string;
-      readonly alt: string;
-      readonly label: string;
-      readonly meta: string;
-      readonly imageClassName: string;
-    }
-  >
-> = {
-  'drive-streams': {
-    src: '/product-screenshots/tim-white-profile-presave-phone.png',
-    alt: 'Jovie profile release countdown crop.',
-    label: 'Latest release',
-    meta: 'Pre-save live',
-    imageClassName: 'top-[-5.75rem] w-[13.5rem] sm:w-[15rem]',
-  },
-  'sell-out': {
-    src: '/product-screenshots/tim-white-profile-tour-phone.png',
-    alt: 'Jovie profile shows drawer crop.',
-    label: 'Shows',
-    meta: 'O2 Arena saved',
-    imageClassName: 'top-[-6.5rem] w-[13.5rem] sm:w-[15rem]',
-  },
-  'get-paid': {
-    src: '/product-screenshots/tim-white-profile-pay-phone.png',
-    alt: 'Jovie profile support drawer crop.',
-    label: 'Support',
-    meta: 'Tip drawer ready',
-    imageClassName: 'top-[-7.25rem] w-[13.5rem] sm:w-[15rem]',
-  },
 };
 
 type OutcomeAccentStyle = CSSProperties & {
@@ -99,49 +44,51 @@ export function ArtistProfileOutcomesCarousel({
   };
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.01]' width='landing'>
-      <div className='flex items-end justify-between gap-6'>
-        <div>
-          <h2 className='marketing-h2-linear max-w-[13ch] text-primary-token'>
-            {outcomes.headline}
-          </h2>
-          {outcomes.body ? (
-            <p className='mt-5 max-w-[32rem] text-[15px] leading-[1.7] text-secondary-token'>
-              {outcomes.body}
-            </p>
-          ) : null}
+    <ArtistProfileSectionShell className='bg-white/[0.01]' width='page'>
+      <div className='mx-auto max-w-[1120px]'>
+        <div className='flex items-end justify-between gap-6'>
+          <div>
+            <h2 className='max-w-[9ch] text-[clamp(3.35rem,7vw,6.9rem)] font-semibold leading-[0.88] tracking-[-0.08em] text-primary-token'>
+              {outcomes.headline}
+            </h2>
+            {outcomes.body ? (
+              <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.7] text-secondary-token'>
+                {outcomes.body}
+              </p>
+            ) : null}
+          </div>
+          <div className='hidden items-center gap-2 lg:flex'>
+            <button
+              type='button'
+              onClick={() => {
+                scrollByAmount('prev');
+              }}
+              className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
+              aria-label='Scroll outcomes left'
+            >
+              <ChevronLeft className='h-4 w-4' />
+            </button>
+            <button
+              type='button'
+              onClick={() => {
+                scrollByAmount('next');
+              }}
+              className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
+              aria-label='Scroll outcomes right'
+            >
+              <ChevronRight className='h-4 w-4' />
+            </button>
+          </div>
         </div>
-        <div className='hidden items-center gap-2 lg:flex'>
-          <button
-            type='button'
-            onClick={() => {
-              scrollByAmount('prev');
-            }}
-            className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
-            aria-label='Scroll outcomes left'
-          >
-            <ChevronLeft className='h-4 w-4' />
-          </button>
-          <button
-            type='button'
-            onClick={() => {
-              scrollByAmount('next');
-            }}
-            className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
-            aria-label='Scroll outcomes right'
-          >
-            <ChevronRight className='h-4 w-4' />
-          </button>
-        </div>
-      </div>
 
-      <div
-        ref={scrollerRef}
-        className='mt-10 flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-[12vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pr-[18vw] lg:pr-[22vw] [&::-webkit-scrollbar]:hidden'
-      >
-        {outcomes.cards.map((card, index) => (
-          <OutcomeCard key={card.id} card={card} index={index} />
-        ))}
+        <div
+          ref={scrollerRef}
+          className='mt-10 flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-[12vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pr-[18vw] lg:pr-[22vw] [&::-webkit-scrollbar]:hidden'
+        >
+          {outcomes.cards.map(card => (
+            <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
+          ))}
+        </div>
       </div>
     </ArtistProfileSectionShell>
   );
@@ -149,156 +96,288 @@ export function ArtistProfileOutcomesCarousel({
 
 function OutcomeCard({
   card,
-  index,
-}: {
-  readonly card: ArtistProfileLandingCopy['outcomes']['cards'][number];
-  readonly index: number;
-}) {
-  const Icon = OUTCOME_CARD_ICONS[card.id];
+  outcomes,
+}: Readonly<{
+  card: ArtistProfileLandingCopy['outcomes']['cards'][number];
+  outcomes: ArtistProfileLandingCopy['outcomes'];
+}>) {
   const style: OutcomeAccentStyle = {
     '--outcome-accent': OUTCOME_CARD_ACCENTS[card.id],
     flex: '0 0 min(84vw, 62rem)',
   };
-  const productCrop = PRODUCT_CROPS[card.id];
+  const proof = outcomes.syntheticProofs;
 
   return (
     <article
-      className='group relative flex min-h-[30rem] snap-start flex-col overflow-hidden rounded-[1.7rem] bg-[#050505]'
+      className='group relative flex min-h-[34rem] snap-start flex-col overflow-hidden rounded-[1.9rem] bg-[#050505]'
       style={style}
     >
       <div
         className='absolute inset-0 opacity-80'
         style={{
           background:
-            'radial-gradient(circle at 72% 82%, color-mix(in srgb, var(--outcome-accent) 14%, transparent), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014) 44%, rgba(0,0,0,0.42))',
+            'radial-gradient(circle at 72% 78%, color-mix(in srgb, var(--outcome-accent) 14%, transparent), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.014) 44%, rgba(0,0,0,0.42))',
         }}
         aria-hidden='true'
       />
-      <div className='relative flex h-full flex-col p-5 sm:p-6'>
+
+      <div className='relative flex h-full flex-col p-6 sm:p-7'>
         <div className='min-w-0'>
-          <p className='font-mono text-[12px] tracking-[-0.02em] text-tertiary-token'>
-            0{index + 1}
-          </p>
-          <div className='mt-4 flex items-start justify-between gap-4'>
-            <h3 className='max-w-[11ch] text-[32px] font-semibold leading-[0.98] tracking-[-0.055em] text-primary-token sm:text-[40px]'>
-              {card.title}
-            </h3>
-            <span
-              className='mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.045] text-[color:var(--outcome-accent)]'
-              aria-hidden='true'
-            >
-              <Icon className='h-[18px] w-[18px]' strokeWidth={1.8} />
-            </span>
-          </div>
-          <p className='mt-4 max-w-[24rem] text-[14px] leading-[1.55] text-secondary-token'>
+          <h3 className='max-w-[10ch] text-[clamp(2.85rem,5vw,4.9rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
+            {card.title}
+          </h3>
+          <p className='mt-4 max-w-[25rem] text-[15px] leading-[1.55] text-secondary-token'>
             {card.description}
           </p>
         </div>
 
-        <div className='mt-auto pt-7'>
-          {productCrop ? (
-            <ProductCrop crop={productCrop} />
-          ) : card.id === 'say-thanks' ? (
-            <ThanksProof />
-          ) : (
-            <ShareProof />
-          )}
+        <div className='mt-auto pt-10'>
+          {card.id === 'drive-streams' ? (
+            <DriveStreamsProof proof={proof.visualProofs.driveStreams} />
+          ) : null}
+          {card.id === 'sell-out' ? (
+            <SellOutProof proof={proof.visualProofs.sellOut} />
+          ) : null}
+          {card.id === 'get-paid' ? (
+            <GetPaidProof proof={proof.visualProofs.getPaid} />
+          ) : null}
+          {card.id === 'say-thanks' ? (
+            <ActivityFeedProof proof={proof.activityFeed} />
+          ) : null}
+          {card.id === 'share-anywhere' ? (
+            <ShareProof proof={proof.shareAnywhere} />
+          ) : null}
         </div>
       </div>
     </article>
   );
 }
 
-function ProductCrop({
-  crop,
+function DriveStreamsProof({
+  proof,
 }: Readonly<{
-  crop: NonNullable<(typeof PRODUCT_CROPS)[keyof typeof PRODUCT_CROPS]>;
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['driveStreams'];
 }>) {
   return (
-    <div className='relative h-[16rem] overflow-hidden rounded-[1.35rem] bg-black/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div
-        className='absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/42 px-3 py-2.5 backdrop-blur-md'
-        aria-hidden='true'
-      >
-        <span className='text-[11px] font-semibold tracking-[-0.01em] text-primary-token'>
-          {crop.label}
-        </span>
-        <span className='rounded-full bg-white/[0.065] px-2 py-1 text-[10px] font-semibold text-secondary-token'>
-          {crop.meta}
-        </span>
+    <div className='relative h-[20.5rem] overflow-hidden rounded-[1.45rem] bg-black/32 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+      <div className='absolute left-5 top-5 z-20 w-[15rem] rounded-[1.35rem] border border-white/8 bg-[#0d0d0d]/92 p-4 text-left shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-md'>
+        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-white/48'>
+          {proof.floatingCardLabel}
+        </p>
+        <p className='mt-3 text-[1.35rem] font-semibold leading-[1.02] tracking-[-0.05em] text-white'>
+          {proof.floatingCardTitle}
+        </p>
+        <p className='mt-1 text-[12px] font-medium text-white/64'>
+          {proof.artistName}
+        </p>
+        <div className='mt-4 flex items-center justify-between gap-3'>
+          <span className='rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold text-white/84'>
+            {proof.floatingCardMeta}
+          </span>
+          <span className='rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
+            {proof.primaryCtaLabel}
+          </span>
+        </div>
       </div>
+
       <Image
-        src={crop.src}
-        alt={crop.alt}
+        src={proof.screenshotSrc}
+        alt={proof.screenshotAlt}
         width={660}
         height={1368}
-        loading='eager'
         sizes='240px'
-        className={`absolute left-1/2 max-w-none -translate-x-1/2 rounded-[2rem] shadow-[0_24px_60px_rgba(0,0,0,0.4)] ${crop.imageClassName}`}
+        className='absolute bottom-[-6.4rem] right-4 w-[14rem] max-w-none rounded-[2.25rem] shadow-[0_28px_70px_rgba(0,0,0,0.42)] sm:right-6 sm:w-[15.5rem]'
       />
     </div>
   );
 }
 
-function ThanksProof() {
+function SellOutProof({
+  proof,
+}: Readonly<{
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['sellOut'];
+}>) {
   return (
-    <div className='rounded-[1.35rem] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div className='flex items-center justify-between gap-3'>
-        <span className='text-[11px] font-semibold text-primary-token'>
-          Follow-up
-        </span>
-        <span className='flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-secondary-token'>
-          <Check className='h-3 w-3 text-[color:var(--outcome-accent)]' />
-          Sent
+    <div className='relative h-[21rem] overflow-hidden rounded-[1.45rem] bg-black/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+      <div className='absolute left-5 top-5 z-20 w-[13rem] rounded-[1.3rem] bg-[#f7f6f1] p-4 text-black shadow-[0_18px_45px_rgba(0,0,0,0.24)]'>
+        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-black/42'>
+          {proof.nearbyCardLabel}
+        </p>
+        <p className='mt-3 text-[1.8rem] font-semibold leading-none tracking-[-0.07em]'>
+          {proof.nearbyDate}
+        </p>
+        <p className='mt-3 text-[1rem] font-semibold leading-[1.1] tracking-[-0.03em]'>
+          {proof.nearbyVenue}
+        </p>
+        <p className='mt-1 text-[12px] leading-[1.35] text-black/56'>
+          {proof.nearbyLocation}
+        </p>
+        <span className='mt-4 inline-flex rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white'>
+          {proof.nearbyCtaLabel}
         </span>
       </div>
-      <div className='mt-3 rounded-[1.1rem] bg-white/[0.035] p-3'>
-        <p className='text-[12px] font-semibold text-primary-token'>
-          Tim White
+
+      <div className='absolute inset-x-5 bottom-5 z-20 max-w-[23rem] rounded-[1.3rem] border border-white/8 bg-[#0f0f0f]/94 p-4 text-left shadow-[0_18px_45px_rgba(0,0,0,0.26)] backdrop-blur-md'>
+        <p className='text-[14px] font-semibold tracking-[-0.03em] text-white'>
+          {proof.drawerTitle}
         </p>
-        <p className='mt-2 text-[13px] leading-[1.45] text-secondary-token'>
-          Thanks for the support. New song inside.
-        </p>
+        <p className='mt-1 text-[12px] text-white/48'>{proof.drawerSubtitle}</p>
+        <div className='mt-4 space-y-2.5'>
+          {proof.drawerRows.map(row => (
+            <div
+              key={row.id}
+              className='grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-[1rem] bg-white/[0.04] px-3 py-3'
+            >
+              <span className='rounded-[0.85rem] bg-white/[0.06] px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-white/64'>
+                {row.month}
+                <span className='mt-0.5 block text-[18px] leading-none tracking-[-0.05em] text-white'>
+                  {row.day}
+                </span>
+              </span>
+              <span className='min-w-0'>
+                <span className='block truncate text-[13px] font-semibold text-white'>
+                  {row.venue}
+                </span>
+                <span className='block truncate text-[11px] text-white/48'>
+                  {row.location}
+                </span>
+              </span>
+              <span className='rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/84'>
+                {row.ctaLabel}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className='mt-3 flex items-center gap-2 text-[11px] text-tertiary-token'>
-        <Mail className='h-3.5 w-3.5 text-[color:var(--outcome-accent)]' />
-        Email captured after $10 support
+
+      <Image
+        src={proof.screenshotSrc}
+        alt={proof.screenshotAlt}
+        width={660}
+        height={1368}
+        sizes='220px'
+        className='absolute right-[-1rem] top-3 w-[11.5rem] max-w-none rounded-[2rem] opacity-90 shadow-[0_24px_60px_rgba(0,0,0,0.4)] sm:right-0 sm:w-[12.5rem]'
+      />
+    </div>
+  );
+}
+
+function GetPaidProof({
+  proof,
+}: Readonly<{
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['getPaid'];
+}>) {
+  return (
+    <div className='relative h-[21rem] overflow-hidden rounded-[1.45rem] bg-black/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+      <Image
+        src={proof.screenshotSrc}
+        alt={proof.screenshotAlt}
+        width={660}
+        height={1368}
+        sizes='240px'
+        className='absolute right-1 top-1 w-[13rem] max-w-none rounded-[2rem] opacity-78 shadow-[0_24px_60px_rgba(0,0,0,0.36)] sm:right-3 sm:w-[14.25rem]'
+      />
+
+      <div className='absolute inset-x-5 bottom-5 z-20 rounded-[1.45rem] border border-white/8 bg-[#111]/96 px-4 pb-4 pt-3 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md'>
+        <div className='mx-auto mb-4 h-1 w-10 rounded-full bg-white/18' />
+        <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
+          {proof.drawerTitle}
+        </p>
+        <p className='mt-1 text-[12px] text-white/48'>{proof.drawerSubtitle}</p>
+        <p className='mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/42'>
+          {proof.chooseAmountLabel}
+        </p>
+        <div className='mt-3 grid grid-cols-3 gap-2.5'>
+          {proof.amountRows.map(row => (
+            <div
+              key={row.id}
+              className='rounded-[1rem] border px-2.5 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              style={{
+                background: row.featured
+                  ? 'rgba(255,255,255,0.95)'
+                  : 'rgba(255,255,255,0.06)',
+                borderColor: row.featured
+                  ? 'rgba(255,255,255,0.7)'
+                  : 'rgba(255,255,255,0.08)',
+                color: row.featured ? '#111' : 'rgba(255,255,255,0.92)',
+              }}
+            >
+              <p className='text-[10px] font-semibold uppercase tracking-[0.08em] opacity-64'>
+                {row.currency}
+              </p>
+              <p className='mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.07em]'>
+                {row.amount}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className='mt-4 rounded-full bg-white px-4 py-3 text-center text-[13px] font-semibold tracking-[-0.02em] text-black'>
+          {proof.ctaLabel}
+        </div>
       </div>
     </div>
   );
 }
 
-function ShareProof() {
+function ActivityFeedProof({
+  proof,
+}: Readonly<{
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['activityFeed'];
+}>) {
   return (
-    <div className='rounded-[1.35rem] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div className='flex items-center justify-between gap-3 rounded-full bg-white/[0.045] px-3 py-2.5'>
-        <span className='font-mono text-[11px] text-secondary-token'>
-          jov.ie/timwhite
+    <div className='mx-auto flex min-h-[20rem] w-full max-w-[22rem] flex-col justify-center rounded-[1.6rem] bg-[#fbfaf6] px-6 py-7 text-left text-black shadow-[0_24px_60px_rgba(0,0,0,0.24)]'>
+      <div className='text-center'>
+        <span className='text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42'>
+          {proof.label}
         </span>
-        <span className='flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-black'>
-          <Copy className='h-3 w-3' strokeWidth={2} />
-          Copied
+        <p className='mt-2 text-[16px] font-semibold leading-[1.2] tracking-[-0.03em] text-black'>
+          {proof.title}
+        </p>
+      </div>
+
+      <div className='mx-auto mt-6 w-full max-w-[17rem] space-y-2.5'>
+        {proof.steps.map(step => (
+          <div
+            key={step}
+            className='grid grid-cols-[0.5rem_minmax(0,1fr)] items-center gap-3 rounded-[1rem] border border-black/[0.06] bg-white px-4 py-3.5 text-[12px] font-medium tracking-[-0.02em] text-black/72 shadow-[0_1px_0_rgba(0,0,0,0.03)]'
+          >
+            <span className='h-2.5 w-2.5 rounded-full bg-black/16' />
+            <span>{step}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ShareProof({
+  proof,
+}: Readonly<{
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['shareAnywhere'];
+}>) {
+  return (
+    <div className='mx-auto w-full max-w-[21rem] rounded-[1.45rem] border border-white/7 bg-black/34 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+      <p className='text-[12px] font-semibold tracking-[0.02em] text-primary-token'>
+        {proof.title}
+      </p>
+      <div className='mt-3 flex items-center justify-between gap-3 rounded-full bg-white/[0.055] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
+        <span className='font-mono text-[12px] text-secondary-token'>
+          {proof.url}
+        </span>
+        <span className='flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black'>
+          <Copy className='h-3.5 w-3.5' strokeWidth={2} />
+          {proof.copiedLabel}
         </span>
       </div>
-      <div className='mt-3 grid grid-cols-[auto_1fr] gap-3 rounded-[1.1rem] bg-white/[0.035] p-3'>
-        <span className='flex h-12 w-12 items-center justify-center rounded-[0.9rem] bg-white text-black'>
-          <QrCode className='h-6 w-6' strokeWidth={1.8} />
-        </span>
-        <div className='min-w-0'>
-          <p className='text-[12px] font-semibold text-primary-token'>
-            Share-ready
-          </p>
-          <div className='mt-2 flex flex-wrap gap-1.5'>
-            {['Bio', 'QR', 'Stories'].map(channel => (
-              <span
-                key={channel}
-                className='rounded-full bg-white/[0.055] px-2 py-1 text-[10px] font-semibold text-tertiary-token'
-              >
-                {channel}
-              </span>
-            ))}
-          </div>
-        </div>
+      <div className='mt-3 flex flex-wrap gap-2'>
+        {proof.channels.map(channel => (
+          <span
+            key={channel}
+            className='rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-secondary-token'
+          >
+            {channel}
+          </span>
+        ))}
       </div>
     </div>
   );

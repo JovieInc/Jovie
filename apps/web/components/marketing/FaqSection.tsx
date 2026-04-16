@@ -1,6 +1,4 @@
-'use client';
-
-import { useId, useState } from 'react';
+import { ClientFaqAccordion } from './ClientFaqAccordion';
 
 interface FaqItem {
   readonly question: string;
@@ -22,9 +20,6 @@ export function FaqSection({
   heading = 'Frequently asked questions',
   singleOpen = false,
 }: FaqSectionProps) {
-  const sectionId = useId();
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
   return (
     <section
       className={
@@ -38,51 +33,22 @@ export function FaqSection({
       >
         {heading}
       </h2>
-      <div className='mt-8 space-y-2'>
-        {items.map((item, index) => {
-          if (!singleOpen) {
-            return (
-              <details key={item.question} className='group py-3'>
-                <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
-                  {item.question}
-                </summary>
-                <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                  {item.answer}
-                </p>
-              </details>
-            );
-          }
-
-          const isOpen = openIndex === index;
-          const triggerId = `${sectionId}-faq-trigger-${index}`;
-          const panelId = `${sectionId}-faq-panel-${index}`;
-
-          return (
-            <div key={item.question} className='py-3'>
-              <button
-                id={triggerId}
-                type='button'
-                aria-expanded={isOpen}
-                aria-controls={panelId}
-                className='w-full cursor-pointer text-left text-base font-medium text-primary-token transition-colors hover:text-accent-token'
-                onClick={() => {
-                  setOpenIndex(isOpen ? null : index);
-                }}
-              >
+      {singleOpen ? (
+        <ClientFaqAccordion items={items} />
+      ) : (
+        <div className='mt-8 space-y-2'>
+          {items.map(item => (
+            <details key={item.question} className='group py-3'>
+              <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
                 {item.question}
-              </button>
-              <section
-                id={panelId}
-                aria-labelledby={triggerId}
-                className='mt-3 text-sm leading-relaxed text-secondary-token'
-                hidden={!isOpen}
-              >
+              </summary>
+              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                 {item.answer}
-              </section>
-            </div>
-          );
-        })}
-      </div>
+              </p>
+            </details>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

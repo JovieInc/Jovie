@@ -100,6 +100,14 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     const tasksCard = sidebar.getByTestId('release-tasks-card');
     await expect(tasksCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
     await tasksCard.getByRole('button', { name: 'Tasks' }).click();
+    await expect(
+      tasksCard.locator(
+        '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
+      )
+    ).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
+    await expect(
+      tasksCard.getByTestId('release-tasks-loading-state')
+    ).toHaveCount(0);
     await waitForSettle(page);
     await tasksCard.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-tasks.png`,

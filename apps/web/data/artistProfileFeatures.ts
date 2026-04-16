@@ -142,7 +142,7 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
     id: 'share-ready',
     title: 'Share-ready',
-    body: 'A clean profile link for bio, QR, posts, and shows.',
+    body: 'One profile link that shifts fans toward music, shows, support, or subscribe based on the moment.',
     accent: 'green',
   },
 ] as const;

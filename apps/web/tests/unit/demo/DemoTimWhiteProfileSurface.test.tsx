@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 const { mockSearchParams, mockStaticArtistPage } = vi.hoisted(() => ({
   mockSearchParams: vi.fn(() => new URLSearchParams()),
@@ -50,6 +51,11 @@ describe('DemoTimWhiteProfileSurface', () => {
 
     expect(props).toMatchObject({
       mode: 'profile',
+      artist: expect.objectContaining({
+        spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
+        name: TIM_WHITE_PROFILE.name,
+        image_url: TIM_WHITE_PROFILE.avatarSrc,
+      }),
       hideJovieBranding: true,
       hideMoreMenu: true,
       showFooter: true,

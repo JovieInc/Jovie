@@ -218,6 +218,19 @@
     width: min(100%, 15rem);
   }
 
+  .homepage-hero--artist-profile {
+    border-bottom-color: rgba(255, 255, 255, 0.03);
+  }
+
+  .homepage-hero--artist-profile .homepage-hero-stacked {
+    padding: calc(var(--linear-header-height) + 2.75rem) 0 1.25rem;
+    gap: 2rem;
+  }
+
+  .homepage-hero--artist-profile .homepage-hero-copy {
+    max-width: 40rem;
+  }
+
   /* ── Trust ───────────────────────────────────────────── */
 
   .homepage-trust-strip {
@@ -1210,6 +1223,10 @@
     width: min(100%, 17rem);
   }
 
+  .homepage-hero--artist-profile .homepage-hero-stacked {
+    padding: calc(var(--linear-header-height) + 2.5rem) 0 0.75rem;
+  }
+
   .homepage-claim-form {
     width: 100%;
     justify-content: center;
@@ -1293,6 +1310,11 @@
 
   .homepage-hero-comp-flank {
     display: block;
+  }
+
+  .homepage-hero--artist-profile .homepage-hero-stacked {
+    padding: calc(var(--linear-header-height) + 4rem) 0 1.25rem;
+    gap: 2.5rem;
   }
 
   .homepage-hero--f .homepage-hero-stacked {

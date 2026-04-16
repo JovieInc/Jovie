@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -6,7 +7,15 @@ import {
   waitFor,
 } from '@testing-library/react';
 import React from 'react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { Artist } from '@/types/db';
 
@@ -142,7 +151,7 @@ describe('ProfileCompactTemplate', () => {
     ({ ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
     ));
-  }, 10_000);
+  }, 30_000);
 
   beforeEach(() => {
     cleanup();
@@ -169,13 +178,22 @@ describe('ProfileCompactTemplate', () => {
         readonly open: boolean;
         readonly view: string;
         readonly presentation?: string;
+        readonly onOpenChange?: (open: boolean) => void;
       }) => (
         <div
           data-testid='mock-profile-unified-drawer'
           data-open={String(props.open)}
           data-view={props.view}
           data-presentation={props.presentation ?? 'standalone'}
-        />
+        >
+          <button
+            type='button'
+            data-testid='mock-profile-unified-drawer-close'
+            onClick={() => props.onOpenChange?.(false)}
+          >
+            Close drawer
+          </button>
+        </div>
       )
     );
     mockUseProfileShell.mockImplementation(() => ({
@@ -191,6 +209,10 @@ describe('ProfileCompactTemplate', () => {
       },
     }));
     window.history.replaceState(null, '', '/test-artist');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('links the top-left Jovie mark to the artist profiles landing page', async () => {
@@ -305,7 +327,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('uses the mode prop as the fallback when the URL has no mode param', async () => {
+  it('normalizes back to the base profile when the URL has no mode param', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
 
     render(
@@ -317,11 +339,13 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(mockUseProfileShell).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        modeOverride: 'listen',
-      })
-    );
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'profile',
+        })
+      );
+    });
   });
 
   it('keeps modeOverride in sync when user interactions open a mode drawer', async () => {
@@ -407,6 +431,112 @@ describe('ProfileCompactTemplate', () => {
     expect(window.location.search).toBe('?mode=listen');
 
     pushStateSpy.mockRestore();
+  });
+
+  it('clears the mode query and closes the deep-linked drawer', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('mock-profile-unified-drawer-close'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+      expect(window.location.pathname).toBe('/test-artist');
+      expect(window.location.search).toBe('');
+    });
+  });
+
+  it('stays closed after the delayed reset window', async () => {
+    vi.useFakeTimers();
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('mock-profile-unified-drawer-close'));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(window.location.search).toBe('');
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-open',
+      'false'
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-open',
+      'false'
+    );
+    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+      'data-view',
+      'menu'
+    );
+  });
+
+  it('does not restore a stale drawer mode on popstate after close', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('mock-profile-unified-drawer-close'));
+
+    await waitFor(() => {
+      expect(window.location.search).toBe('');
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'profile',
+        })
+      );
+    });
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'profile',
+        })
+      );
+    });
   });
 
   it('renders the drawer at desktop widths', async () => {

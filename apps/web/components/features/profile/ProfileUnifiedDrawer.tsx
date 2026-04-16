@@ -409,13 +409,9 @@ export function ProfileUnifiedDrawer({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      if (!next) {
-        // Reset to menu when drawer closes
-        setTimeout(() => onViewChange('menu'), 200);
-      }
       onOpenChange(next);
     },
-    [onOpenChange, onViewChange]
+    [onOpenChange]
   );
 
   const navigateTo = useCallback(

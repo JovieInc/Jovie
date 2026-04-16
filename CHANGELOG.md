@@ -11,9 +11,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
-- Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
-- Added regression coverage for profile release drawer gating and UTC release-year rendering.
+- [internal] Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
+- [internal] Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
+- [internal] Added regression coverage for profile release drawer gating and UTC release-year rendering.
 
 ### Changed
 
@@ -26,7 +26,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Removed
 
-- Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
+- [internal] Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
 - Removed the duplicated lower logo row from the Artist Profiles proof section.
 
 ## [26.4.153.6] - 2026-04-15

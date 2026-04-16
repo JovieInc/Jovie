@@ -1,5 +1,5 @@
 export interface ArtistProfileMode {
-  readonly id: 'release' | 'shows' | 'pay' | 'subscribe' | 'links';
+  readonly id: 'listen' | 'pay' | 'tour' | 'contact';
   readonly label: string;
   readonly headline: string;
   readonly description: string;
@@ -36,20 +36,55 @@ export interface ArtistProfileOutcomeCard {
   readonly description: string;
 }
 
-export interface ArtistProfileOutcomeCrop {
-  readonly src: string;
-  readonly alt: string;
-  readonly label: string;
-  readonly meta: string;
-}
-
 export interface ArtistProfileOutcomeProof {
-  readonly sayThanks: {
+  readonly visualProofs: {
+    readonly driveStreams: {
+      readonly screenshotSrc: string;
+      readonly screenshotAlt: string;
+      readonly floatingCardLabel: string;
+      readonly floatingCardTitle: string;
+      readonly artistName: string;
+      readonly floatingCardMeta: string;
+      readonly primaryCtaLabel: string;
+    };
+    readonly sellOut: {
+      readonly screenshotSrc: string;
+      readonly screenshotAlt: string;
+      readonly nearbyCardLabel: string;
+      readonly nearbyDate: string;
+      readonly nearbyVenue: string;
+      readonly nearbyLocation: string;
+      readonly nearbyCtaLabel: string;
+      readonly drawerTitle: string;
+      readonly drawerSubtitle: string;
+      readonly drawerRows: readonly {
+        readonly id: string;
+        readonly month: string;
+        readonly day: string;
+        readonly venue: string;
+        readonly location: string;
+        readonly ctaLabel: string;
+      }[];
+    };
+    readonly getPaid: {
+      readonly screenshotSrc: string;
+      readonly screenshotAlt: string;
+      readonly drawerTitle: string;
+      readonly drawerSubtitle: string;
+      readonly chooseAmountLabel: string;
+      readonly amountRows: readonly {
+        readonly id: string;
+        readonly amount: string;
+        readonly currency: string;
+        readonly featured?: boolean;
+      }[];
+      readonly ctaLabel: string;
+    };
+  };
+  readonly activityFeed: {
     readonly label: string;
-    readonly status: string;
     readonly title: string;
-    readonly body: string;
-    readonly meta: string;
+    readonly steps: readonly string[];
   };
   readonly shareAnywhere: {
     readonly url: string;
@@ -82,9 +117,7 @@ export interface ArtistProfileAudiencePill {
     | 'music'
     | 'email'
     | 'pay';
-  readonly identity: string;
-  readonly chips: readonly string[];
-  readonly action: string;
+  readonly sentence: string;
 }
 
 export interface ArtistProfileLandingCopy {
@@ -116,9 +149,6 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly body: string;
     readonly cards: readonly ArtistProfileOutcomeCard[];
-    readonly productCrops: Partial<
-      Record<ArtistProfileOutcomeCard['id'], ArtistProfileOutcomeCrop>
-    >;
     readonly syntheticProofs: ArtistProfileOutcomeProof;
   };
   readonly monetization: {
@@ -248,18 +278,18 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       'Source-aware',
       'Location-aware',
       'Device-aware',
-      'Release-aware',
+      'Intent-aware',
     ],
     modes: [
       {
-        id: 'release',
-        label: 'Release',
-        headline: 'Put the newest music or campaign first.',
-        description: 'Put the newest music or campaign first.',
-        pathLabel: 'jov.ie/you/music',
+        id: 'listen',
+        label: 'Listen',
+        headline: 'Keep the latest music one tap away.',
+        description: 'Keep the latest music one tap away.',
+        pathLabel: 'jov.ie/you/listen',
         drawer: {
-          title: 'Release',
-          subtitle: 'Take Me Over is live now.',
+          title: 'Listen',
+          subtitle: 'The latest release stays front and center.',
           ctaLabel: 'Open release page',
           items: [
             {
@@ -283,16 +313,16 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ],
         },
         screenshotSrc: '/product-screenshots/tim-white-profile-live-phone.png',
-        screenshotAlt: 'Jovie artist profile showing a release-first view.',
+        screenshotAlt: 'Jovie artist profile showing a listen-first view.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
       {
-        id: 'shows',
-        label: 'Shows',
+        id: 'tour',
+        label: 'Tour',
         headline: 'Surface the right dates and ticket paths.',
         description: 'Surface the right dates and ticket paths.',
-        pathLabel: 'jov.ie/you/shows',
+        pathLabel: 'jov.ie/you/tour',
         drawer: {
           title: 'Tour dates',
           subtitle: 'Nearby dates rise to the top.',
@@ -373,83 +403,45 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         screenshotHeight: 1368,
       },
       {
-        id: 'subscribe',
-        label: 'Subscribe',
-        headline: 'Turn a visit into a direct line.',
-        description: 'Turn a visit into a direct line.',
-        pathLabel: 'jov.ie/you/subscribe',
+        id: 'contact',
+        label: 'Contact',
+        headline: 'Make booking, management, and press easy to reach.',
+        description: 'Make booking, management, and press easy to reach.',
+        pathLabel: 'jov.ie/you/contact',
         drawer: {
-          title: 'Subscribe',
-          subtitle: 'Get release, show, and drop alerts.',
-          ctaLabel: 'Notifications on',
+          title: 'Contact',
+          subtitle: 'Booking, management, and press in one place.',
+          ctaLabel: 'Email team',
           items: [
-            {
-              id: 'email',
-              label: 'Email',
-              detail: 'fan@example.com',
-              action: 'Verified',
-            },
-            {
-              id: 'notifications',
-              label: 'Notifications',
-              detail: 'Release and show alerts',
-              action: 'On',
-            },
-            {
-              id: 'source',
-              label: 'Source',
-              detail: 'Spotify - LA',
-              action: 'Saved',
-            },
-          ],
-        },
-        screenshotSrc:
-          '/product-screenshots/tim-white-profile-subscribe-phone.png',
-        screenshotAlt: 'Jovie artist profile showing fan subscription capture.',
-        screenshotWidth: 660,
-        screenshotHeight: 1368,
-      },
-      {
-        id: 'links',
-        label: 'Links',
-        headline: 'Keep every important destination reachable.',
-        description: 'Keep every important destination reachable.',
-        pathLabel: 'jov.ie/you/links',
-        drawer: {
-          title: 'Links',
-          subtitle: 'Every important destination stays reachable.',
-          ctaLabel: 'Open profile',
-          items: [
-            {
-              id: 'spotify',
-              label: 'Spotify',
-              detail: 'Music',
-              action: 'Open',
-            },
-            {
-              id: 'youtube',
-              label: 'YouTube',
-              detail: 'Video',
-              action: 'Watch',
-            },
-            {
-              id: 'instagram',
-              label: 'Instagram',
-              detail: 'Social',
-              action: 'Follow',
-            },
             {
               id: 'booking',
               label: 'Booking',
-              detail: 'Contact',
-              action: 'Send',
+              detail: 'North America + Europe',
+              action: 'Email',
+            },
+            {
+              id: 'management',
+              label: 'Management',
+              detail: 'Worldwide',
+              action: 'Email',
+            },
+            {
+              id: 'press',
+              label: 'Press',
+              detail: 'US + UK',
+              action: 'Email',
+            },
+            {
+              id: 'brands',
+              label: 'Brands',
+              detail: 'Partnerships',
+              action: 'Email',
             },
           ],
         },
-        screenshotSrc:
-          '/product-screenshots/tim-white-profile-listen-phone.png',
+        screenshotSrc: '/product-screenshots/tim-white-profile-video-phone.png',
         screenshotAlt:
-          'Jovie artist profile showing important fan destinations.',
+          'Jovie artist profile showing contact access for booking and press.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
@@ -490,33 +482,88 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'Use one clean profile link across bio, QR, posts, stories, and shows.',
       },
     ],
-    productCrops: {
-      'drive-streams': {
-        src: '/product-screenshots/tim-white-profile-presave-phone.png',
-        alt: 'Jovie profile release countdown crop.',
-        label: 'Latest release',
-        meta: 'Pre-save live',
-      },
-      'sell-out': {
-        src: '/product-screenshots/tim-white-profile-tour-phone.png',
-        alt: 'Jovie profile shows drawer crop.',
-        label: 'Shows',
-        meta: 'O2 Arena saved',
-      },
-      'get-paid': {
-        src: '/product-screenshots/tim-white-profile-pay-phone.png',
-        alt: 'Jovie profile support drawer crop.',
-        label: 'Support',
-        meta: 'Tip drawer ready',
-      },
-    },
     syntheticProofs: {
-      sayThanks: {
-        label: 'Follow-up',
-        status: 'Sent',
-        title: 'Tim White',
-        body: 'Thanks for the support. New song inside.',
-        meta: 'Email captured after $10 support',
+      visualProofs: {
+        driveStreams: {
+          screenshotSrc:
+            '/product-screenshots/tim-white-profile-presave-phone.png',
+          screenshotAlt:
+            'Jovie profile showing the latest release and a pre-save state.',
+          floatingCardLabel: 'Latest release',
+          floatingCardTitle: 'The Deep End',
+          artistName: 'Tim White',
+          floatingCardMeta: 'Pre-save live',
+          primaryCtaLabel: 'Turn on notifications',
+        },
+        sellOut: {
+          screenshotSrc:
+            '/product-screenshots/tim-white-profile-tour-phone.png',
+          screenshotAlt:
+            'Jovie profile showing an open tour drawer with upcoming ticket dates.',
+          nearbyCardLabel: 'Nearby date',
+          nearbyDate: 'May 18',
+          nearbyVenue: 'The Novo',
+          nearbyLocation: 'Los Angeles, CA, US',
+          nearbyCtaLabel: 'Tickets',
+          drawerTitle: 'Tour Dates',
+          drawerSubtitle: 'Upcoming shows and ticket links.',
+          drawerRows: [
+            {
+              id: 'los-angeles',
+              month: 'May',
+              day: '18',
+              venue: 'The Novo',
+              location: 'Los Angeles, CA, US',
+              ctaLabel: 'Tickets',
+            },
+            {
+              id: 'chicago',
+              month: 'May',
+              day: '24',
+              venue: 'Radius',
+              location: 'Chicago, IL, US',
+              ctaLabel: 'Tickets',
+            },
+          ],
+        },
+        getPaid: {
+          screenshotSrc: '/product-screenshots/tim-white-profile-pay-phone.png',
+          screenshotAlt:
+            'Jovie profile showing an open support drawer with payment amounts.',
+          drawerTitle: 'Pay',
+          drawerSubtitle: 'Send support instantly with Venmo.',
+          chooseAmountLabel: 'Choose amount',
+          amountRows: [
+            {
+              id: 'five',
+              amount: '$5',
+              currency: 'USD',
+            },
+            {
+              id: 'ten',
+              amount: '$10',
+              currency: 'USD',
+              featured: true,
+            },
+            {
+              id: 'twenty',
+              amount: '$20',
+              currency: 'USD',
+            },
+          ],
+          ctaLabel: 'Continue with Venmo',
+        },
+      },
+      activityFeed: {
+        label: 'Activity feed',
+        title: 'One support moment keeps moving.',
+        steps: [
+          'Scanned at merch table',
+          'Supported',
+          'Subscribed',
+          'Opened new single',
+          'Saved next show',
+        ],
       },
       shareAnywhere: {
         url: 'jov.ie/timwhite',
@@ -582,8 +629,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       ctaLabel: 'Subscribe',
       confirmedLabel: 'Subscribed',
       beforeLabel: 'Before',
-      beforeTitle: 'Anonymous visit',
-      beforeDetail: 'Spotify / LA / Release page',
+      beforeTitle: 'Anonymous fan action',
+      beforeDetail: 'Clicked through to Spotify',
       afterLabel: 'After',
       afterTitle: 'Reachable fan',
       afterDetail: 'Email saved / Notifications on',
@@ -593,90 +640,66 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         {
           id: 'spotify-jason-la',
           icon: 'spotify',
-          identity: 'Jason',
-          chips: ['LA', 'Spotify'],
-          action: 'Listened',
+          sentence: 'Jason in LA clicked through to Spotify.',
         },
         {
           id: 'email-brian',
           icon: 'email',
-          identity: 'Brian M',
-          chips: ['Email'],
-          action: 'Subscribed',
+          sentence: 'Brian M subscribed by email.',
         },
         {
           id: 'shows-london-o2',
           icon: 'shows',
-          identity: 'Ava',
-          chips: ['London', 'O2 Arena'],
-          action: 'Saved',
+          sentence: 'Ava in London saved O2 Arena.',
         },
         {
           id: 'qr-berlin-flyer',
           icon: 'qr',
-          identity: 'Mika',
-          chips: ['Berlin', 'Flyer'],
-          action: 'Scanned',
+          sentence: 'Mika in Berlin scanned the flyer.',
         },
       ],
       [
         {
           id: 'apple-tokyo',
           icon: 'apple',
-          identity: 'Kenji',
-          chips: ['Tokyo', 'Latest Release'],
-          action: 'Opened',
+          sentence: 'Kenji in Tokyo opened the release page.',
         },
         {
           id: 'youtube-sao-paulo',
           icon: 'youtube',
-          identity: 'Luana',
-          chips: ['São Paulo', 'YouTube'],
-          action: 'Watched',
+          sentence: 'Luana in Sao Paulo watched on YouTube.',
         },
         {
           id: 'subscribe-maya-notifications',
           icon: 'subscribe',
-          identity: 'Maya',
-          chips: ['Notifications'],
-          action: 'Enabled',
+          sentence: 'Maya enabled notifications.',
         },
         {
           id: 'spotify-amelia-london',
           icon: 'spotify',
-          identity: 'Amelia',
-          chips: ['London', 'Spotify'],
-          action: 'Saved',
+          sentence: 'Amelia in London checked out your Spotify.',
         },
       ],
       [
         {
           id: 'shows-chicago',
           icon: 'shows',
-          identity: 'Marcus',
-          chips: ['Chicago', 'Shows'],
-          action: 'Saved',
+          sentence: 'Marcus in Chicago saved the show.',
         },
         {
           id: 'qr-miami-sticker',
           icon: 'qr',
-          identity: 'Sofia',
-          chips: ['Miami', 'Sticker'],
-          action: 'Scanned',
+          sentence: 'Sofia in Miami scanned the sticker.',
         },
         {
           id: 'email-nina',
           icon: 'email',
-          identity: 'Nina P',
-          chips: ['Email Opt-In'],
-          action: 'Confirmed',
+          sentence: 'Nina P confirmed the email opt-in.',
         },
         {
           id: 'pay-diego-support',
           icon: 'pay',
-          identity: 'Diego',
-          chips: ['Support', 'Apple Pay'],
-          action: 'Paid',
+          sentence: 'Diego paid with Apple Pay.',
         },
       ],
     ],
@@ -716,22 +739,22 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   howItWorks: {
     eyebrow: 'Zero setup',
     headline: 'Live in 60 seconds.',
-    body: 'Claim your artist. Jovie builds the page. Share one link everywhere.',
+    body: 'Claim. Sync. Share.',
     steps: [
       {
         id: 'claim',
-        title: 'Claim your artist.',
+        title: 'Claim',
         description: 'Search once and claim the profile.',
       },
       {
         id: 'connect',
-        title: 'Jovie builds the page.',
+        title: 'Sync',
         description:
           'It imports your catalog across 27+ providers and keeps the profile current.',
       },
       {
         id: 'share',
-        title: 'Share one link everywhere.',
+        title: 'Share',
         description: 'Use it in bio, stories, QR, release posts, and shows.',
       },
     ],

@@ -1,22 +1,42 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { Artist } from '@/types/db';
 
 vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
+    open,
+    onOpenChange,
     title,
     subtitle,
     children,
     dataTestId,
   }: {
+    readonly open: boolean;
+    readonly onOpenChange: (open: boolean) => void;
     readonly title: string;
     readonly subtitle?: string;
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
   }) => (
     <div data-testid={dataTestId ?? 'profile-drawer-shell'}>
+      {open ? (
+        <button
+          type='button'
+          data-testid='profile-drawer-shell-close'
+          onClick={() => onOpenChange(false)}
+        >
+          Close drawer
+        </button>
+      ) : null}
       <div data-testid='drawer-title'>{title}</div>
       {subtitle ? <div data-testid='drawer-subtitle'>{subtitle}</div> : null}
       {children}
@@ -137,19 +157,50 @@ const defaultProps = {
   ],
 };
 
+let ProfileUnifiedDrawer: typeof import('@/features/profile/ProfileUnifiedDrawer').ProfileUnifiedDrawer;
+
 describe('ProfileUnifiedDrawer — Releases', () => {
+  beforeAll(async () => {
+    ({ ProfileUnifiedDrawer } = await import(
+      '@/features/profile/ProfileUnifiedDrawer'
+    ));
+  }, 10_000);
+
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('renders releases list when view is releases', async () => {
-    const { ProfileUnifiedDrawer } = await import(
-      '@/features/profile/ProfileUnifiedDrawer'
-    );
-
     render(<ProfileUnifiedDrawer {...defaultProps} />);
 
     expect(screen.getByTestId('profile-mode-drawer-releases')).toBeDefined();
+  });
+
+  it('does not reopen the menu when the drawer closes', async () => {
+    vi.useFakeTimers();
+    const onOpenChange = vi.fn();
+    const onViewChange = vi.fn();
+
+    const view = render(
+      <ProfileUnifiedDrawer
+        {...defaultProps}
+        view='listen'
+        onOpenChange={onOpenChange}
+        onViewChange={onViewChange}
+      />
+    );
+
+    fireEvent.click(
+      within(view.container).getByTestId('profile-drawer-shell-close')
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 
   it('renders release rows with title and artwork', async () => {
