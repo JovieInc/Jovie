@@ -445,10 +445,13 @@ export async function assertValidPageState(
 export async function smokeNavigate(
   page: Page,
   url: string,
-  options?: { timeout?: number }
+  options?: {
+    timeout?: number;
+    waitUntil?: 'commit' | 'domcontentloaded' | 'load' | 'networkidle';
+  }
 ): Promise<ReturnType<Page['goto']>> {
   return page.goto(url, {
-    waitUntil: 'domcontentloaded',
+    waitUntil: options?.waitUntil ?? 'domcontentloaded',
     timeout: options?.timeout ?? SMOKE_TIMEOUTS.NAVIGATION,
   });
 }
@@ -726,12 +729,20 @@ export async function checkElementVisibility(
 export async function smokeNavigateWithRetry(
   page: Page,
   url: string,
-  options?: { timeout?: number; retries?: number }
+  options?: {
+    timeout?: number;
+    retries?: number;
+    waitUntil?: 'commit' | 'domcontentloaded' | 'load' | 'networkidle';
+  }
 ): Promise<ReturnType<Page['goto']>> {
   const retries = options?.retries ?? 2;
 
   return withRetry(
-    () => smokeNavigate(page, url, { timeout: options?.timeout }),
+    () =>
+      smokeNavigate(page, url, {
+        timeout: options?.timeout,
+        waitUntil: options?.waitUntil,
+      }),
     {
       retries,
       onRetry: attempt => {
