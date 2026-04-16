@@ -1,27 +1,37 @@
 'use client';
 
-import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { APP_ROUTES } from '@/constants/routes';
 
 export const PENDING_CHAT_PROMPT_KEY = 'jovie.pendingChatPrompt';
 
-export function openChatWithPrompt(
-  prompt: string,
-  router: Pick<AppRouterInstance, 'push'>
-): void {
-  if (typeof window !== 'undefined') {
-    window.sessionStorage.setItem(PENDING_CHAT_PROMPT_KEY, prompt);
+type AppRouter = {
+  push: (path: string) => void;
+};
+
+export function openChatWithPrompt(prompt: string, router: AppRouter): void {
+  if (typeof globalThis.window !== 'undefined') {
+    try {
+      globalThis.window.sessionStorage.setItem(PENDING_CHAT_PROMPT_KEY, prompt);
+    } catch {
+      // Best-effort prompt handoff. Navigation should still proceed.
+    }
   }
 
   router.push(APP_ROUTES.CHAT);
 }
 
 export function consumePendingChatPrompt(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof globalThis.window === 'undefined') return null;
 
-  const prompt = window.sessionStorage.getItem(PENDING_CHAT_PROMPT_KEY);
-  if (!prompt) return null;
+  try {
+    const prompt = globalThis.window.sessionStorage.getItem(
+      PENDING_CHAT_PROMPT_KEY
+    );
+    if (!prompt) return null;
 
-  window.sessionStorage.removeItem(PENDING_CHAT_PROMPT_KEY);
-  return prompt;
+    globalThis.window.sessionStorage.removeItem(PENDING_CHAT_PROMPT_KEY);
+    return prompt;
+  } catch {
+    return null;
+  }
 }

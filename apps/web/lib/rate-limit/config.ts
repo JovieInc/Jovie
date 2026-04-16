@@ -80,6 +80,7 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'album_art_generation',
     analytics: true,
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Album art generation burst: prevents rapid repeated image fanout */
@@ -89,6 +90,7 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'album_art_generation_burst',
     analytics: true,
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** General API: 100 requests per minute per IP */

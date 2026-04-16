@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { captureError } from '@/lib/error-tracking';
 import { applyGeneratedAlbumArt } from '@/lib/services/album-art/apply';
+import { logger } from '@/lib/utils/logger';
 import { parseAlbumArtRequestBody, requireAlbumArtUser } from '../shared';
 
 export const runtime = 'nodejs';
@@ -40,10 +41,21 @@ export async function POST(req: Request) {
       releaseId: parsed.data.releaseId,
       generationId: parsed.data.generationId,
     });
-    const message =
-      error instanceof Error && error.message.includes('not found')
-        ? error.message
-        : 'Failed to apply generated album art';
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error('[album-art] Failed to apply generated artwork', {
+      userId: auth.userId,
+      releaseId: parsed.data.releaseId,
+      generationId: parsed.data.generationId,
+      error,
+    });
+    const isNotFound =
+      error instanceof Error &&
+      error.message.toLowerCase().includes('not found');
+    const message = isNotFound
+      ? error.message
+      : 'Failed to apply generated album art';
+    return NextResponse.json(
+      { error: message },
+      { status: isNotFound ? 404 : 500 }
+    );
   }
 }

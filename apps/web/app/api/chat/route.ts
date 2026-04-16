@@ -22,6 +22,7 @@ import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -801,21 +802,6 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      const [dailyLimit, burstLimit] = await Promise.all([
-        albumArtGenerationLimiter.limit(params.clerkUserId),
-        albumArtGenerationBurstLimiter.limit(params.clerkUserId),
-      ]);
-      const limited = !dailyLimit.success ? dailyLimit : burstLimit;
-      if (!limited.success) {
-        return {
-          success: false as const,
-          retryable: true,
-          error:
-            limited.reason ??
-            'Album art generation limit reached. Please try again later.',
-        };
-      }
-
       const releases = await fetchReleasesForChat(params.profileId);
       const target = resolveAlbumArtReleaseTarget(releases, {
         releaseId,
@@ -829,6 +815,43 @@ function createGenerateAlbumArtTool(params: {
           releaseTitle: releaseTitle ?? null,
           artistName: params.artistName,
           suggestedReleases: target.suggestedReleases,
+        };
+      }
+
+      if (createRelease && !releaseTitle?.trim()) {
+        return {
+          success: true as const,
+          state: 'needs_release_target' as const,
+          releaseTitle: null,
+          artistName: params.artistName,
+          suggestedReleases:
+            target.status === 'needs_target' ? target.suggestedReleases : [],
+        };
+      }
+
+      const burstLimit = await albumArtGenerationBurstLimiter.limit(
+        params.clerkUserId
+      );
+      if (!burstLimit.success) {
+        return {
+          success: false as const,
+          retryable: true,
+          error:
+            burstLimit.reason ??
+            'Album art generation limit reached. Please try again later.',
+        };
+      }
+
+      const dailyLimit = await albumArtGenerationLimiter.limit(
+        params.clerkUserId
+      );
+      if (!dailyLimit.success) {
+        return {
+          success: false as const,
+          retryable: true,
+          error:
+            dailyLimit.reason ??
+            'Album art generation limit reached. Please try again later.',
         };
       }
 
@@ -1472,7 +1495,8 @@ function buildChatTools(
   resolvedProfileId: string | null,
   insightsEnabled: boolean,
   clerkUserId: string,
-  canGenerateAlbumArt: boolean
+  canGenerateAlbumArt: boolean,
+  albumArtEnabled: boolean
 ) {
   return {
     ...(insightsEnabled
@@ -1486,7 +1510,7 @@ function buildChatTools(
       resolvedProfileId
     ),
     generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
-    ...(canGenerateAlbumArt
+    ...(albumArtEnabled && canGenerateAlbumArt
       ? {
           generateAlbumArt: createGenerateAlbumArtTool({
             profileId: resolvedProfileId,
@@ -1803,6 +1827,7 @@ export async function POST(req: Request) {
 
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
+    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);
@@ -1815,7 +1840,8 @@ export async function POST(req: Request) {
             resolvedProfileId,
             insightsEnabled,
             userId,
-            currentUserEntitlements?.canGenerateAlbumArt ?? false
+            currentUserEntitlements?.canGenerateAlbumArt ?? false,
+            albumArtEnabled
           ),
         }
       : freeTools;

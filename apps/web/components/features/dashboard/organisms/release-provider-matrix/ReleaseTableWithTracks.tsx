@@ -273,6 +273,8 @@ export function ReleaseTableWithTracks({
         artistName={artistName}
         onEdit={onEdit}
         onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
         isSmartLinkLocked={isSmartLinkLocked}
         getSmartLinkLockReason={getSmartLinkLockReason}
         groupByYear={groupByYear}

@@ -876,6 +876,8 @@ export function getAllLimiters(): Record<string, RateLimiter> {
   return {
     avatarUpload: avatarUploadLimiter,
     artworkUpload: artworkUploadLimiter,
+    albumArtGeneration: albumArtGenerationLimiter,
+    albumArtGenerationBurst: albumArtGenerationBurstLimiter,
     api: apiLimiter,
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,

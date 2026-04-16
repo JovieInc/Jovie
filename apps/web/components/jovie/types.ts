@@ -97,7 +97,7 @@ export type ChatAlbumArtToolResult =
   | {
       readonly success: true;
       readonly state: 'needs_release_target';
-      readonly releaseTitle: string;
+      readonly releaseTitle: string | null;
       readonly artistName: string;
       readonly suggestedReleases: ReadonlyArray<{
         readonly id: string;

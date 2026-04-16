@@ -2,10 +2,19 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { captureError } from '@/lib/error-tracking';
 import { createReleaseAndApplyGeneratedAlbumArt } from '@/lib/services/album-art/apply';
+import { logger } from '@/lib/utils/logger';
 import { parseAlbumArtRequestBody, requireAlbumArtUser } from '../shared';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
+}
 
 const createReleaseAndApplySchema = z.object({
   profileId: z.string().uuid(),
@@ -15,7 +24,7 @@ const createReleaseAndApplySchema = z.object({
     .default('single'),
   releaseDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine(isValidIsoDate, { message: 'Invalid releaseDate' })
     .optional(),
   generationId: z.string().uuid(),
   candidateId: z.string().uuid(),
@@ -45,6 +54,11 @@ export async function POST(req: Request) {
     captureError('[album-art] Failed to create release with artwork', error, {
       userId: auth.userId,
       generationId: parsed.data.generationId,
+    });
+    logger.error('[album-art] Failed to create release with artwork', {
+      userId: auth.userId,
+      generationId: parsed.data.generationId,
+      error,
     });
     return NextResponse.json(
       { error: 'Failed to create release with generated album art' },

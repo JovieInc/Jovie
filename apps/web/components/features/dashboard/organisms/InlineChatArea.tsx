@@ -82,7 +82,11 @@ function isAlbumArtResult(result: unknown): result is ChatAlbumArtToolResult {
     typeof result === 'object' &&
     result !== null &&
     'success' in result &&
-    ('state' in result || 'error' in result)
+    typeof (result as Record<string, unknown>).success === 'boolean' &&
+    (('state' in result &&
+      typeof (result as Record<string, unknown>).state === 'string') ||
+      ('error' in result &&
+        typeof (result as Record<string, unknown>).error === 'string'))
   );
 }
 

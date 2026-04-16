@@ -37,7 +37,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
@@ -152,6 +152,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     useState(false);
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
+  const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
 
   const {
     rows,
@@ -324,7 +325,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const handleGenerateAlbumArt = useCallback(
     (release: ReleaseViewModel) => {
       openChatWithPrompt(
-        `Generate album art for release "${release.title}" and attach it to release ID ${release.id}. Show three options.`,
+        `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
+          {
+            releaseId: release.id,
+            releaseTitle: release.title,
+            instruction: 'Show three options.',
+          }
+        )}`,
         router
       );
     },
@@ -332,7 +339,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   const showGenerateAlbumArtAction =
-    FEATURE_FLAGS.ALBUM_ART_GENERATION && Boolean(canGenerateAlbumArt);
+    albumArtFlagEnabled && Boolean(canGenerateAlbumArt);
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;

@@ -37,7 +37,7 @@ export interface AlbumArtCandidate {
   readonly model: string;
   readonly releaseTitle: string;
   readonly artistName: string;
-  readonly prompt: string;
+  readonly prompt: string | null;
 }
 
 export interface SuggestedReleaseTarget {
@@ -86,7 +86,7 @@ export interface AlbumArtManifest {
   readonly provider: 'xai';
   readonly model: string;
   readonly styleId: AlbumArtStyleId;
-  readonly prompt: string;
+  readonly prompt: string | null;
   readonly candidates: readonly AlbumArtCandidate[];
   readonly createdAt: string;
 }

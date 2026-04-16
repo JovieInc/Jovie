@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export async function requireAlbumArtUser() {
   let userId: string | null = null;
@@ -15,6 +16,16 @@ export async function requireAlbumArtUser() {
     return {
       ok: false as const,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    };
+  }
+
+  if (!FEATURE_FLAGS.ALBUM_ART_GENERATION) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: 'Album art generation is currently unavailable.' },
+        { status: 404 }
+      ),
     };
   }
 

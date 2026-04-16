@@ -15,6 +15,30 @@ interface ChatAlbumArtCardProps {
   readonly profileId: string;
 }
 
+function buildExistingReleasePrompt(title: string, releaseId: string): string {
+  return `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
+    {
+      releaseId,
+      releaseTitle: title,
+      instruction: 'Show three options.',
+    }
+  )}`;
+}
+
+function buildCreateReleasePrompt(title: string | null): string {
+  if (!title?.trim()) {
+    return 'Help me create a new release and generate album art for it. Ask me for the release title first.';
+  }
+
+  return `Generate album art for a new release and create the release after I pick one option.\n${JSON.stringify(
+    {
+      createRelease: true,
+      releaseTitle: title,
+      instruction: 'Show three options.',
+    }
+  )}`;
+}
+
 function submitChatPrompt(prompt: string): void {
   window.dispatchEvent(
     new CustomEvent('jovie-chat-submit-prompt', { detail: { prompt } })
@@ -106,7 +130,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
               size='sm'
               onClick={() =>
                 submitChatPrompt(
-                  `Generate album art for release "${release.title}" and attach it to release ID ${release.id}. Show three options.`
+                  buildExistingReleasePrompt(release.title, release.id)
                 )
               }
             >
@@ -118,9 +142,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             variant='secondary'
             size='sm'
             onClick={() =>
-              submitChatPrompt(
-                `Generate album art for a new release titled "${result.releaseTitle}". Use createRelease true and create the release after I pick one option.`
-              )
+              submitChatPrompt(buildCreateReleasePrompt(result.releaseTitle))
             }
           >
             Create Release With Art
@@ -202,8 +224,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
           onClick={() =>
             submitChatPrompt(
               result.releaseId
-                ? `Regenerate album art for release "${result.releaseTitle}" and attach it to release ID ${result.releaseId}. Show three options.`
-                : `Generate album art for a new release titled "${result.releaseTitle}". Use createRelease true and create the release after I pick one option. Show three options.`
+                ? buildExistingReleasePrompt(
+                    result.releaseTitle,
+                    result.releaseId
+                  )
+                : buildCreateReleasePrompt(result.releaseTitle)
             )
           }
         >

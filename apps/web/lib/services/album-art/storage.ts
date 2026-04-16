@@ -9,6 +9,19 @@ function fallbackBlobUrl(path: string): string {
   return `https://blob.vercel-storage.com/${path}`;
 }
 
+function sanitizeManifestForUpload(
+  manifest: AlbumArtManifest
+): AlbumArtManifest {
+  return {
+    ...manifest,
+    prompt: null,
+    candidates: manifest.candidates.map(candidate => ({
+      ...candidate,
+      prompt: null,
+    })),
+  };
+}
+
 async function uploadPublicBuffer(params: {
   readonly path: string;
   readonly buffer: Buffer;
@@ -69,7 +82,10 @@ export async function uploadAlbumArtManifest(
   const path = `artwork/generated/${manifest.profileId}/${manifest.generationId}/manifest.json`;
   return uploadPublicBuffer({
     path,
-    buffer: Buffer.from(JSON.stringify(manifest), 'utf8'),
+    buffer: Buffer.from(
+      JSON.stringify(sanitizeManifestForUpload(manifest)),
+      'utf8'
+    ),
     contentType: 'application/json',
   });
 }
@@ -79,12 +95,15 @@ export async function fetchAlbumArtManifest(params: {
   readonly generationId: string;
 }): Promise<AlbumArtManifest> {
   const pathname = `artwork/generated/${params.profileId}/${params.generationId}/manifest.json`;
-  const listed = await list({
-    prefix: pathname,
-    token: env.BLOB_READ_WRITE_TOKEN,
-    limit: 1,
-  });
-  const url = listed.blobs[0]?.url ?? fallbackBlobUrl(pathname);
+  const url = env.BLOB_READ_WRITE_TOKEN
+    ? ((
+        await list({
+          prefix: pathname,
+          token: env.BLOB_READ_WRITE_TOKEN,
+          limit: 1,
+        })
+      ).blobs[0]?.url ?? fallbackBlobUrl(pathname))
+    : fallbackBlobUrl(pathname);
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error('Generated artwork manifest not found');

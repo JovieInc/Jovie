@@ -10,6 +10,7 @@ import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { env } from '@/lib/env-server';
 import {
   fetchAlbumArtManifest,
   fetchCandidateBuffer,
@@ -61,13 +62,13 @@ async function uploadProcessedReleaseArtwork(params: {
     '@/app/api/images/upload/lib'
   );
   const put = await getVercelBlobUploader();
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN;
   const sizes: Record<string, string> = {};
 
   for (const [sizeKey, buffer] of Object.entries(processed)) {
     const blobPath = `artwork/releases/${params.releaseId}/${sizeKey}.avif`;
     if (!put || !token) {
-      if (process.env.NODE_ENV === 'production') {
+      if (env.NODE_ENV === 'production') {
         throw new TypeError('Blob storage not configured');
       }
       sizes[sizeKey] = `https://blob.vercel-storage.com/${blobPath}`;
