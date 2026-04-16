@@ -59,12 +59,19 @@ export function useHandleValidation({
   normalizedInitialHandle,
   fullName,
 }: UseHandleValidationOptions): UseHandleValidationReturn {
+  const isTrustedSeededHandle = useCallback(
+    (value: string) =>
+      assumeInitialHandleAvailable &&
+      Boolean(normalizedInitialHandle) &&
+      value === normalizedInitialHandle,
+    [assumeInitialHandleAvailable, normalizedInitialHandle]
+  );
+
   const [handle, setHandle] = useState(normalizedInitialHandle);
   const handleRef = useRef(normalizedInitialHandle);
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
-      available:
-        assumeInitialHandleAvailable && Boolean(normalizedInitialHandle),
+      available: isTrustedSeededHandle(normalizedInitialHandle),
       checking: false,
       error: null,
       clientValid: Boolean(normalizedInitialHandle),
@@ -113,6 +120,17 @@ export function useHandleValidation({
 
       abortRetryCountRef.current.delete(input);
 
+      if (isTrustedSeededHandle(input)) {
+        setHandleValidation({
+          available: true,
+          checking: false,
+          error: null,
+          clientValid: true,
+          suggestions: [],
+        });
+        return;
+      }
+
       if (result.available) {
         setHandleValidation({
           available: true,
@@ -143,6 +161,19 @@ export function useHandleValidation({
 
       if (isAbortError(error) || isNetworkError(error)) {
         const currentHandle = latestRequestedHandleRef.current;
+
+        if (isTrustedSeededHandle(currentHandle)) {
+          abortRetryCountRef.current.delete(currentHandle);
+          setHandleValidation({
+            available: true,
+            checking: false,
+            clientValid: true,
+            error: null,
+            suggestions: [],
+          });
+          return;
+        }
+
         const currentRetryCount =
           abortRetryCountRef.current.get(currentHandle) ?? 0;
 
@@ -216,6 +247,17 @@ export function useHandleValidation({
     if (combinedChecking) {
       safetyTimerRef.current = setTimeout(() => {
         setHandleValidation(prev => {
+          if (isTrustedSeededHandle(handleRef.current)) {
+            return {
+              ...prev,
+              available: true,
+              checking: false,
+              error: null,
+              clientValid: true,
+              suggestions: [],
+            };
+          }
+
           if (prev.checking) {
             return {
               ...prev,
@@ -237,7 +279,7 @@ export function useHandleValidation({
         safetyTimerRef.current = null;
       }
     };
-  }, [combinedChecking]);
+  }, [combinedChecking, isTrustedSeededHandle]);
 
   const validateHandle = useCallback(
     (input: string) => {
@@ -247,11 +289,7 @@ export function useHandleValidation({
       abortRetryCountRef.current.delete(normalizedInput);
 
       // Fast path: if input matches initial handle, mark as valid immediately
-      if (
-        assumeInitialHandleAvailable &&
-        normalizedInitialHandle &&
-        normalizedInput === normalizedInitialHandle
-      ) {
+      if (isTrustedSeededHandle(normalizedInput)) {
         cancelValidation();
         setHandle(normalizedInput);
         setHandleValidation({
@@ -291,13 +329,11 @@ export function useHandleValidation({
       // Trigger API validation via Pacer (debounced, cached)
       validateApiRef.current(normalizedInput);
     },
-    [assumeInitialHandleAvailable, cancelValidation, normalizedInitialHandle]
+    [cancelValidation, isTrustedSeededHandle]
   );
 
   const isSeededInitialHandleReady =
-    assumeInitialHandleAvailable &&
-    Boolean(normalizedInitialHandle) &&
-    handle === normalizedInitialHandle &&
+    isTrustedSeededHandle(handle) &&
     handleValidation.available &&
     handleValidation.clientValid &&
     !handleValidation.error;

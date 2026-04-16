@@ -19,7 +19,10 @@ vi.mock('@/features/dashboard/organisms/OnboardingHandleOnlyForm', () => ({
 vi.mock(
   '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form',
   () => ({
-    OnboardingV2Form: (props: { initialHandle?: string }) => {
+    OnboardingV2Form: (props: {
+      assumeInitialHandleAvailable?: boolean;
+      initialHandle?: string;
+    }) => {
       v2FormPropsSpy(props);
       return <div data-testid='mock-onboarding-v2-form' />;
     },
@@ -81,5 +84,23 @@ describe('OnboardingFormWrapper', () => {
     expect(handleOnlyFormPropsSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId('onboarding-loading-shell')).toBeTruthy();
     expect(await screen.findByTestId('mock-onboarding-v2-form')).toBeTruthy();
+  });
+
+  it('passes seeded-handle fast-path props to the full onboarding form', async () => {
+    render(
+      <OnboardingFormWrapper
+        assumeInitialHandleAvailable
+        initialHandle='existing-handle'
+        initialProfileId='profile_123'
+        userId='user_123'
+      />
+    );
+
+    await screen.findByTestId('mock-onboarding-v2-form');
+
+    expect(v2FormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+      assumeInitialHandleAvailable: true,
+      initialHandle: 'existing-handle',
+    });
   });
 });
