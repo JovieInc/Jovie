@@ -9,6 +9,7 @@ import {
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import {
   AUDIENCE_SOURCE_PAGE_SIZE,
   buildAudienceSourceErrorResponse,
@@ -73,6 +74,11 @@ export async function GET(request: NextRequest) {
       );
     });
   } catch (error) {
+    logger.error('Audience source links fetch failed', {
+      route: '/api/dashboard/audience/source-links',
+      method: 'GET',
+      error,
+    });
     await captureError('Audience source links fetch failed', error, {
       route: '/api/dashboard/audience/source-links',
       method: 'GET',
@@ -122,7 +128,8 @@ export async function POST(request: NextRequest) {
           .where(
             and(
               eq(audienceSourceGroups.id, sourceGroupId),
-              eq(audienceSourceGroups.creatorProfileId, profileId)
+              eq(audienceSourceGroups.creatorProfileId, profileId),
+              isNull(audienceSourceGroups.archivedAt)
             )
           )
           .limit(1);
@@ -173,6 +180,11 @@ export async function POST(request: NextRequest) {
       );
     });
   } catch (error) {
+    logger.error('Audience source link create failed', {
+      route: '/api/dashboard/audience/source-links',
+      method: 'POST',
+      error,
+    });
     await captureError('Audience source link create failed', error, {
       route: '/api/dashboard/audience/source-links',
       method: 'POST',

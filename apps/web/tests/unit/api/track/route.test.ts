@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/track/route';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { captureError } from '@/lib/error-tracking';
 
 const hoisted = vi.hoisted(() => {
@@ -46,6 +47,7 @@ const hoisted = vi.hoisted(() => {
     updateWhereMock,
     updateError,
     withSystemIngestionSession,
+    recordAudienceEvent: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -73,6 +75,10 @@ vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: hoisted.withSystemIngestionSession,
 }));
 
+vi.mock('@/lib/audience/record-audience-event', () => ({
+  recordAudienceEvent: hoisted.recordAudienceEvent,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
 }));
@@ -89,6 +95,14 @@ vi.mock('../../../../app/api/audience/lib/audience-utils', () => ({
   createFingerprint: vi.fn().mockReturnValue('fingerprint'),
   deriveIntentLevel: vi.fn().mockReturnValue('medium'),
   getActionWeight: vi.fn().mockReturnValue(1),
+  mergeAudienceTags: vi
+    .fn()
+    .mockImplementation(
+      (
+        existingTags: string[] | null | undefined,
+        nextTags: string[] | null | undefined
+      ) => [...(existingTags ?? []), ...(nextTags ?? [])]
+    ),
   trimHistory: vi.fn().mockReturnValue([]),
 }));
 
@@ -128,6 +142,76 @@ describe('POST /api/track', () => {
         handle: 'artist123',
         linkId: 'link_abc123',
         linkType: 'social',
+      })
+    );
+  });
+
+  it('records a human-readable source label for tracked audience events', async () => {
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({
+        insert: vi
+          .fn()
+          .mockReturnValueOnce({
+            values: vi.fn().mockReturnValue({
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([
+                  {
+                    id: 'audience_member_123',
+                    visits: 0,
+                    engagementScore: 0,
+                    latestActions: [],
+                    geoCity: null,
+                    geoCountry: null,
+                    deviceType: 'mobile',
+                    spotifyConnected: false,
+                    attributionSource: null,
+                    tags: [],
+                  },
+                ]),
+              }),
+            }),
+          })
+          .mockReturnValueOnce({
+            values: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+            }),
+          }),
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      })
+    );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'jv_cc={"essential":true,"analytics":true,"marketing":true}',
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+        source: 'qr',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+
+    expect(response.status).toBe(200);
+    expect(recordAudienceEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sourceLabel: 'QR Code',
       })
     );
   });

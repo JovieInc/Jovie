@@ -307,6 +307,32 @@ function resolveTrackSourceKind(
   return null;
 }
 
+function formatTrackSourceLabel(source: string): string {
+  return source
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map(segment =>
+      segment.length <= 3
+        ? segment.toUpperCase()
+        : `${segment[0]?.toUpperCase() ?? ''}${segment.slice(1)}`
+    )
+    .join(' ');
+}
+
+function resolveTrackSourceLabel(
+  resolvedSource: string | undefined
+): string | undefined {
+  if (!resolvedSource) return undefined;
+  if (resolvedSource === 'qr') return 'QR Code';
+  if (resolvedSource === 'short_link') return 'Short Link';
+  if (resolvedSource === 'utm') return 'UTM Campaign';
+  if (resolvedSource === 'preferred_dsp') return 'Preferred DSP';
+  if (resolvedSource === 'sounds') return 'Sounds Page';
+  if (resolvedSource === 'link') return 'Short Link';
+  if (resolvedSource === 'redirect') return 'Redirect';
+  return formatTrackSourceLabel(resolvedSource);
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting: Check IP-based rate limit for track events
@@ -448,7 +474,7 @@ export async function POST(request: NextRequest) {
           verb: resolveAudienceClickVerb(linkType),
           confidence: 'observed',
           sourceKind: resolveTrackSourceKind(resolvedSource),
-          sourceLabel: resolvedSource ?? undefined,
+          sourceLabel: resolveTrackSourceLabel(resolvedSource),
           objectType: resolveAudienceClickObjectType(linkType, context),
           objectId: context?.contentId ?? linkId ?? null,
           objectLabel: context?.smartLinkSlug ?? target,
