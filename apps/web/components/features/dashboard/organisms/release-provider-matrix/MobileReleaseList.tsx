@@ -24,6 +24,8 @@ interface MobileReleaseListProps {
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
@@ -35,7 +37,7 @@ interface YearGroup {
 }
 
 /** Width of the revealed swipe action buttons (px) */
-const SWIPE_ACTIONS_WIDTH = 128;
+const SWIPE_ACTIONS_WIDTH = 192;
 
 function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
@@ -75,6 +77,8 @@ const SwipeActions = memo(function SwipeActions({
   release,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isLocked,
   lockReason,
 }: {
@@ -85,6 +89,8 @@ const SwipeActions = memo(function SwipeActions({
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isLocked: boolean;
   readonly lockReason?: SmartLinkLockReason;
 }) {
@@ -118,6 +124,20 @@ const SwipeActions = memo(function SwipeActions({
         <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
         <span className={mobileReleaseTokens.swipeActions.label}>Edit</span>
       </button>
+      {canGenerateAlbumArt && onGenerateAlbumArt ? (
+        <button
+          type='button'
+          onClick={() => onGenerateAlbumArt(release)}
+          className={cn(
+            mobileReleaseTokens.swipeActions.button,
+            mobileReleaseTokens.swipeActions.edit
+          )}
+          aria-label={`Generate Album Art For ${release.title}`}
+        >
+          <Icon name='Sparkles' className='h-4 w-4' aria-hidden='true' />
+          <span className={mobileReleaseTokens.swipeActions.label}>Art</span>
+        </button>
+      ) : null}
       <button
         type='button'
         onClick={handleCopy}
@@ -157,6 +177,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   artistName,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isSmartLinkLocked,
   getSmartLinkLockReason,
 }: {
@@ -168,6 +190,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
@@ -191,6 +215,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           release={release}
           onEdit={onEdit}
           onCopy={onCopy}
+          canGenerateAlbumArt={canGenerateAlbumArt}
+          onGenerateAlbumArt={onGenerateAlbumArt}
           isLocked={isLocked}
           lockReason={lockReason}
         />
@@ -274,6 +300,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   artistName,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isSmartLinkLocked,
   getSmartLinkLockReason,
   groupByYear = false,
@@ -303,6 +331,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
                   artistName={artistName}
                   onEdit={onEdit}
                   onCopy={onCopy}
+                  canGenerateAlbumArt={canGenerateAlbumArt}
+                  onGenerateAlbumArt={onGenerateAlbumArt}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
                 />
@@ -327,6 +357,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
             artistName={artistName}
             onEdit={onEdit}
             onCopy={onCopy}
+            canGenerateAlbumArt={canGenerateAlbumArt}
+            onGenerateAlbumArt={onGenerateAlbumArt}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
           />

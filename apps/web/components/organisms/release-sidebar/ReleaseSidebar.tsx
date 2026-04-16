@@ -271,6 +271,8 @@ export function ReleaseSidebar({
   width,
   providerConfig,
   artistName,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   onClose,
   onRefresh,
   isRefreshing = false,
@@ -443,6 +445,8 @@ export function ReleaseSidebar({
         },
         onCopy: (path, label) => handleCopyReleasePath(path, label),
         artistName,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
       })
     );
 
@@ -472,6 +476,8 @@ export function ReleaseSidebar({
     release,
     handleCopyReleasePath,
     artistName,
+    canGenerateAlbumArt,
+    onGenerateAlbumArt,
     isRefreshing,
     onRefresh,
     setIsAddingLink,

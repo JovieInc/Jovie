@@ -7,6 +7,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
+import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   FetchError,
@@ -702,6 +703,27 @@ export function useJovieChat({
     },
     [rateLimitedSubmitter]
   );
+
+  useEffect(() => {
+    const pendingPrompt = consumePendingChatPrompt();
+    if (!pendingPrompt) return;
+
+    rateLimitedSubmitter.maybeExecute({ text: pendingPrompt });
+  }, [rateLimitedSubmitter]);
+
+  useEffect(() => {
+    const handlePromptEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+      if (!detail?.prompt) return;
+
+      rateLimitedSubmitter.maybeExecute({ text: detail.prompt });
+    };
+
+    window.addEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+    return () => {
+      window.removeEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+    };
+  }, [rateLimitedSubmitter]);
 
   return {
     // State

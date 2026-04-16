@@ -329,6 +329,12 @@ export {
 } from './useEnvHealthQuery';
 // Feedback mutation
 export { useFeedbackMutation } from './useFeedbackMutation';
+export {
+  type ApplyGeneratedAlbumArtInput,
+  type CreateReleaseWithGeneratedAlbumArtInput,
+  useApplyGeneratedAlbumArtMutation,
+  useCreateReleaseWithGeneratedAlbumArtMutation,
+} from './useGeneratedAlbumArtMutations';
 // Growth plan early access request
 export {
   type GrowthAccessRequestInput,
