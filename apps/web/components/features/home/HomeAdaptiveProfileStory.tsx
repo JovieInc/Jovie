@@ -8,12 +8,25 @@ import { HOME_HERO_CONTENT } from './home-page-content';
 
 interface HomeHeroProps {
   readonly layout?: 'stacked' | 'f';
+  readonly showPhoneComposition?: boolean;
+  readonly variant?: 'default' | 'artist-profile';
 }
 
-export function HomeHero({ layout = 'stacked' }: Readonly<HomeHeroProps>) {
+export function HomeHero({
+  layout = 'stacked',
+  showPhoneComposition = true,
+  variant = 'default',
+}: Readonly<HomeHeroProps>) {
+  const eyebrow =
+    variant === 'artist-profile' ? null : HOME_HERO_CONTENT.eyebrow;
+
   return (
     <section
-      className={cn('homepage-hero', layout === 'f' && 'homepage-hero--f')}
+      className={cn(
+        'homepage-hero',
+        layout === 'f' && 'homepage-hero--f',
+        variant === 'artist-profile' && 'homepage-hero--artist-profile'
+      )}
       data-testid='homepage-hero'
       aria-labelledby='home-hero-heading'
     >
@@ -27,7 +40,9 @@ export function HomeHero({ layout = 'stacked' }: Readonly<HomeHeroProps>) {
       <Container size='homepage'>
         <div className='homepage-hero-stacked mx-auto max-w-[1200px]'>
           <div className='homepage-hero-copy'>
-            <p className='homepage-hero-eyebrow'>{HOME_HERO_CONTENT.eyebrow}</p>
+            {eyebrow ? (
+              <p className='homepage-hero-eyebrow'>{eyebrow}</p>
+            ) : null}
             <h1
               id='home-hero-heading'
               className='marketing-h1-linear text-primary-token'
@@ -43,7 +58,7 @@ export function HomeHero({ layout = 'stacked' }: Readonly<HomeHeroProps>) {
             </div>
           </div>
 
-          <HomeHeroPhoneComposition />
+          {showPhoneComposition ? <HomeHeroPhoneComposition /> : null}
         </div>
       </Container>
     </section>

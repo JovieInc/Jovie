@@ -61,6 +61,8 @@ interface ProfileCompactTemplateProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
 }
 
 function resolveDrawerView(
@@ -103,13 +105,24 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function getModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
+const DRAWER_CLOSE_RESET_DELAY_MS = 200;
+
+function getInitialModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
   if (globalThis.window === undefined) {
     return fallbackMode;
   }
 
   const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
+}
+
+function getModeFromUrl(): ProfileMode {
+  if (globalThis.window === undefined) {
+    return 'profile';
+  }
+
+  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
+  return modeParam === null ? 'profile' : getProfileMode(modeParam);
 }
 
 function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
@@ -146,17 +159,34 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
   releases,
+  hideJovieBranding = false,
+  hideMoreMenu = false,
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [drawerPresentation, setDrawerPresentation] =
     useState<ProfileSurfacePresentation>('standalone');
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
-    getModeFromLocation(mode)
+    getInitialModeFromLocation(mode)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
+  const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawerOpenRef = useRef(false);
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
+
+  const clearCloseResetTimer = useCallback(() => {
+    if (closeResetTimerRef.current !== null) {
+      clearTimeout(closeResetTimerRef.current);
+      closeResetTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    drawerOpenRef.current = drawerOpen;
+  }, [drawerOpen]);
+
+  useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
 
   useEffect(() => {
     const orientation = screen?.orientation as
@@ -345,7 +375,7 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(() => {
     setRequestedMode(currentMode => {
-      const nextMode = getModeFromLocation(mode);
+      const nextMode = getInitialModeFromLocation(mode);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;
@@ -359,21 +389,24 @@ export function ProfileCompactTemplate({
   }, [mode, syncRequestedModeFromLocation]);
 
   useEffect(() => {
-    if (requestedMode === getModeFromLocation(mode)) {
+    if (requestedMode === getModeFromUrl()) {
       initialLocationModeAlignedRef.current = true;
     }
-  }, [mode, requestedMode]);
+  }, [requestedMode]);
 
   useEffect(() => {
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
+      clearCloseResetTimer();
       setDrawerView(resolved);
+      drawerOpenRef.current = true;
       setDrawerOpen(true);
-    } else {
-      setDrawerView('menu');
-      setDrawerOpen(false);
+      return;
     }
-  }, [requestedMode, resolveInitialView]);
+
+    drawerOpenRef.current = false;
+    setDrawerOpen(false);
+  }, [clearCloseResetTimer, requestedMode, resolveInitialView]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -424,40 +457,62 @@ export function ProfileCompactTemplate({
     [artist.handle, searchSuffix]
   );
 
-  const openDrawerMode = useCallback((nextView: DrawerView) => {
-    const nextMode = getModeFromDrawerView(nextView);
-    if (nextMode) {
-      setRequestedMode(nextMode);
-      return;
-    }
+  const openDrawerMode = useCallback(
+    (nextView: DrawerView) => {
+      clearCloseResetTimer();
+      const nextMode = getModeFromDrawerView(nextView);
+      if (nextMode) {
+        setRequestedMode(nextMode);
+        return;
+      }
 
-    suppressNextHistorySyncRef.current = true;
-    setDrawerView(nextView);
-    setDrawerOpen(true);
-  }, []);
-
-  const handleDrawerOpenChange = useCallback((nextOpen: boolean) => {
-    if (!nextOpen) {
       suppressNextHistorySyncRef.current = true;
-      setRequestedMode('profile');
-      setDrawerOpen(false);
-      return;
-    }
+      drawerOpenRef.current = true;
+      setDrawerView(nextView);
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer]
+  );
 
-    setDrawerOpen(true);
-  }, []);
+  const handleDrawerOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        clearCloseResetTimer();
+        drawerOpenRef.current = false;
+        setRequestedMode('profile');
+        setDrawerOpen(false);
+        closeResetTimerRef.current = setTimeout(() => {
+          closeResetTimerRef.current = null;
+          if (!drawerOpenRef.current) {
+            setDrawerView('menu');
+          }
+        }, DRAWER_CLOSE_RESET_DELAY_MS);
+        return;
+      }
 
-  const handleDrawerViewChange = useCallback((nextView: DrawerView) => {
-    const nextMode = getModeFromDrawerView(nextView);
-    if (nextMode) {
-      setRequestedMode(nextMode);
-      return;
-    }
+      clearCloseResetTimer();
+      drawerOpenRef.current = true;
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer]
+  );
 
-    suppressNextHistorySyncRef.current = true;
-    setDrawerView(nextView);
-    setDrawerOpen(true);
-  }, []);
+  const handleDrawerViewChange = useCallback(
+    (nextView: DrawerView) => {
+      clearCloseResetTimer();
+      const nextMode = getModeFromDrawerView(nextView);
+      if (nextMode) {
+        setRequestedMode(nextMode);
+        return;
+      }
+
+      suppressNextHistorySyncRef.current = true;
+      drawerOpenRef.current = true;
+      setDrawerView(nextView);
+      setDrawerOpen(true);
+    },
+    [clearCloseResetTimer]
+  );
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
@@ -529,6 +584,8 @@ export function ProfileCompactTemplate({
                   showSubscriptionConfirmedBanner
                 }
                 viewerCountryCode={viewerCountryCode}
+                hideJovieBranding={hideJovieBranding}
+                hideMoreMenu={hideMoreMenu}
                 drawerOpen={drawerOpen}
                 drawerView={drawerView}
                 onDrawerOpenChange={handleDrawerOpenChange}

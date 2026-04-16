@@ -72,6 +72,8 @@ export function HomeHeroPhoneComposition() {
         <HomeProfileShowcase
           stateId='streams-presave'
           presentation='full-phone'
+          hideJovieBranding
+          hideMoreMenu
           className='homepage-hero-comp-phone-small'
         />
       </div>
@@ -80,6 +82,8 @@ export function HomeHeroPhoneComposition() {
         <HomeProfileShowcase
           stateId='catalog'
           presentation='full-phone'
+          hideJovieBranding
+          hideMoreMenu
           className='homepage-hero-comp-phone-main'
         />
       </div>
@@ -91,6 +95,8 @@ export function HomeHeroPhoneComposition() {
         <HomeProfileShowcase
           stateId='tour'
           presentation='full-phone'
+          hideJovieBranding
+          hideMoreMenu
           className='homepage-hero-comp-phone-small'
         />
       </div>

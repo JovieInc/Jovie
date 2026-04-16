@@ -6,14 +6,18 @@ import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 interface ArtistProfileLogoBarProps {
   readonly proofData: ArtistProfileSocialProofData;
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
+  readonly phoneCaption: string;
+  readonly phoneSubcaption: string;
 }
 
 export function ArtistProfileLogoBar({
   proofData,
   adaptive,
+  phoneCaption,
+  phoneSubcaption,
 }: Readonly<ArtistProfileLogoBarProps>) {
   return (
-    <ArtistProfileSectionShell className='border-t-0 bg-white/[0.012] py-10 sm:py-12 lg:py-16'>
+    <ArtistProfileSectionShell className='bg-white/[0.012] py-10 sm:py-12 lg:py-16'>
       <div className='flex flex-col items-center text-center'>
         <div className='flex w-full flex-wrap items-center justify-center gap-x-11 gap-y-6 text-primary-token/72'>
           {proofData.logos.map(logo => {
@@ -27,7 +31,11 @@ export function ArtistProfileLogoBar({
             );
           })}
         </div>
-        <ArtistProfileModeSwitcher adaptive={adaptive} />
+        <ArtistProfileModeSwitcher
+          adaptive={adaptive}
+          phoneCaption={phoneCaption}
+          phoneSubcaption={phoneSubcaption}
+        />
       </div>
     </ArtistProfileSectionShell>
   );

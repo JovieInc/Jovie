@@ -16,6 +16,9 @@ export function HomeTrustSection() {
       className='homepage-trust-strip'
       aria-label='Trusted by artists on major labels'
     >
+      <p className='mb-4 text-center text-[12px] font-medium tracking-[-0.01em] text-tertiary-token sm:mb-5'>
+        Trusted by artists on
+      </p>
       <div className='homepage-trust-logos'>
         <AwalLogo className={`${LOGO_CLASS} h-[24px] w-auto`} />
         <TheOrchardLogo className={`${LOGO_CLASS} h-[34px] w-auto`} />

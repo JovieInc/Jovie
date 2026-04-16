@@ -61,6 +61,7 @@ describe('HomeAdaptiveProfileStory', () => {
     render(<HomeAdaptiveProfileStory />);
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
+    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
   });
 
   it('renders the trust logo strip when sections are enabled', () => {

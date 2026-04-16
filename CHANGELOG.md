@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.7] - 2026-04-16
+
+> Artist Profiles now uses real Tim White profile screenshots for proof, with cleaner demo chrome and a more focused fan-capture story.
+
+### Added
+
+- [internal] Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
+- [internal] Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
+- [internal] Added regression coverage for profile release drawer gating and UTC release-year rendering.
+
+### Changed
+
+- Reworked the Artist Profiles adaptive section around the “One profile. Adapts to every fan.” thesis with one-line mode pills and captured product shots.
+- Rebuilt the Capture Every Fan section as a restrained audience-intelligence surface with opt-in action and slow audience rails.
+- Updated the Built for artists spec wall with a Dedicated release pages tile.
+- Updated the outcomes headline to “Built for artists.”
+- Made the Artist Profiles FAQ keep only one item open at a time.
+- Hid demo-only profile chrome from the Tim White marketing screenshots while keeping live public profile behavior unchanged.
+
+### Removed
+
+- [internal] Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
+- Removed the duplicated lower logo row from the Artist Profiles proof section.
+
 ## [26.4.153.6] - 2026-04-15
 
 > Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
@@ -44,14 +68,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.153.3] - 2026-04-15
 
+> Homepage demo proof now uses canonical featured artists, and the add-release CTA remains clearly visible on dark surfaces.
+
 ### Changed
 
 - Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
 - Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
 - Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+- Updated homepage demo proof fallbacks to use Tim White, David Guetta, and Kaskade.
 
 ### Fixed
 
+- Increased contrast on the add-release sidebar footer CTA so the Create Release button stays visible on dark surfaces.
 - Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
 
 ## [26.4.153.2] - 2026-04-15

@@ -21,6 +21,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       'data-show-subscription-confirmed-banner': String(
         props.showSubscriptionConfirmedBanner
       ),
+      'data-hide-more-menu': String(props.hideMoreMenu),
       'data-mount-id': mountIdRef.current,
     });
   },
@@ -149,6 +150,30 @@ describe('StaticArtistPage', () => {
     expect(
       template.getAttribute('data-show-subscription-confirmed-banner')
     ).toBe('true');
+  });
+
+  it('forwards demo chrome controls to the compact presentation', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+        hideMoreMenu
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-hide-more-menu',
+      'true'
+    );
   });
 
   it('remounts the active renderer when artist identity changes', async () => {

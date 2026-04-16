@@ -101,6 +101,12 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
       contentStillVisible,
       'Drawer content should be hidden after close'
     ).toBe(false);
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
+    await expect(
+      page.getByRole('button', { name: /close/i }).first()
+    ).toBeHidden();
+    await expect(drawerContent).toBeHidden();
 
     await assertProfileRestored(page);
   });

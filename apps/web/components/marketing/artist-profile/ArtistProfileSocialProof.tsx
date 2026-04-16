@@ -14,7 +14,7 @@ export function ArtistProfileSocialProof({
 }: Readonly<ArtistProfileSocialProofProps>) {
   return (
     <ArtistProfileSectionShell>
-      <div className='max-w-[38rem]'>
+      <div className='mx-auto max-w-[34rem] text-center'>
         <h2 className='marketing-h2-linear text-primary-token'>
           {socialProof.headline}
         </h2>
@@ -23,11 +23,11 @@ export function ArtistProfileSocialProof({
         </p>
       </div>
 
-      <div className='mt-10 grid gap-4 lg:grid-cols-3'>
+      <div className='mx-auto mt-10 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
         {proofData.profileCards.map(card => (
           <article
             key={card.id}
-            className='overflow-hidden rounded-[1.4rem] border border-white/8 bg-white/[0.03]'
+            className='overflow-hidden rounded-[1.4rem] bg-white/[0.03]'
           >
             <div className='relative aspect-[4/3]'>
               <Image
@@ -59,7 +59,7 @@ export function ArtistProfileSocialProof({
           {proofData.quotes.map(quote => (
             <article
               key={quote.id}
-              className='rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-5'
+              className='rounded-[1.3rem] bg-white/[0.03] p-5'
             >
               <p className='text-[14px] leading-[1.7] text-primary-token'>
                 {quote.quote}
@@ -74,13 +74,6 @@ export function ArtistProfileSocialProof({
           ))}
         </div>
       ) : null}
-
-      <div className='mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 text-primary-token/45'>
-        {proofData.logos.map(logo => {
-          const Logo = logo.component;
-          return <Logo key={logo.id} className='h-[15px] w-auto' />;
-        })}
-      </div>
 
       {!proofData.hasRealQuotes ? (
         <p className='mt-6 text-[13px] leading-[1.65] text-tertiary-token'>

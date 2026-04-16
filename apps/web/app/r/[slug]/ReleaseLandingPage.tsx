@@ -373,21 +373,6 @@ export function ReleaseLandingPage({
             />
           )}
 
-          {shouldShowPreview && (
-            <div className='mt-3'>
-              <SmartLinkAudioPreview
-                contentId={tracking?.contentId ?? release.title}
-                title={release.title}
-                artistName={artist.name}
-                artworkUrl={release.artworkUrl}
-                previewUrl={release.previewUrl ?? null}
-                isrc={release.isrc}
-                previewVerification={release.previewVerification}
-                previewSource={release.previewSource}
-              />
-            </div>
-          )}
-
           <div className='space-y-2'>
             {clickableProviders.map(provider => {
               const logoConfig = DSP_LOGO_CONFIG[provider.key];

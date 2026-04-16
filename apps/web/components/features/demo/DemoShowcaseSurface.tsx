@@ -25,6 +25,7 @@ import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
+import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
@@ -234,6 +235,8 @@ export function DemoShowcaseSurface({
       return <DemoReleasePresaveSurface />;
     case 'release-tasks':
       return <DemoReleaseTasksSurface />;
+    case 'tim-white-profile':
+      return <DemoTimWhiteProfileSurface />;
     case 'onboarding-handle':
       return (
         <DemoOnboardingShowcase

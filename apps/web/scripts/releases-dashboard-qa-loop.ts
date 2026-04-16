@@ -170,8 +170,10 @@ const confirmationEvals: readonly EvalDefinition[] = [
       'exec',
       'playwright',
       'test',
-      'tests/product-screenshots/releases.spec.ts',
+      'tests/product-screenshots/catalog.spec.ts',
       '--config=playwright.config.screenshots.ts',
+      '-g',
+      'dashboard-releases',
     ],
   },
 ];
