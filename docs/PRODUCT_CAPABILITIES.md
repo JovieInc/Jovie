@@ -210,11 +210,11 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 ## Analytics & Insights
 
 ### Click & Visit Tracking
-- **One-line:** Every profile view, link click, and fan interaction tracked with device, location, and referrer data.
+- **One-line:** Every profile view, source scan, link click, and fan interaction tracked with evidence-safe activity language.
 - **Plan:** Free+
 - **Problem it solves:** Artists have no visibility into who visits their link pages or what they do there.
-- **How it works:** All interactions are tracked server-side: profile views, smart link clicks (by platform), subscribe form submissions, tip events. Each event captures device type, OS, browser, IP-based location (city/country), referrer, and UTM parameters. Bot detection filters noise.
-- **Key benefits:** Complete visibility into fan behavior, referrer attribution, clean data (bot-filtered)
+- **How it works:** All interactions are tracked server-side as structured audience actions: profile views, QR or short-link source scans, smart link clicks by platform, subscribe form submissions, and tip events. Each event captures device type, IP-based location (city/country), referrer, UTM parameters, source group/link identity, and an evidence-safe verb such as "Checked Out" instead of overclaiming a listen or watch. Bot detection filters noise.
+- **Key benefits:** Complete visibility into fan behavior, source attribution, clean data (bot-filtered), and activity sentences creators can understand quickly
 - **Dashboard route:** /app/dashboard/analytics
 - **Docs page:** /docs/features/analytics
 
