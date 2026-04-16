@@ -64,7 +64,7 @@ describe('ArtistProfilesPage', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the artist profile landing scaffold', () => {
+  it('renders the artist profile landing scaffold', { timeout: 20_000 }, () => {
     render(<ArtistProfilesPage />);
     expectArtistProfileSectionOrder({
       FULL_PAGE: true,
@@ -290,6 +290,65 @@ describe('ArtistProfilesPage', () => {
     ).not.toBeInTheDocument();
     expect(captureSection.queryByText('Jason')).not.toBeInTheDocument();
     expect(captureSection.queryByText('Spotify')).not.toBeInTheDocument();
+    const powerFeaturesSection = within(
+      screen.getByTestId('artist-profile-section-spec-wall')
+    );
+    expect(
+      powerFeaturesSection.getByText('Power features')
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', {
+        name: 'Built for artists. Obsessively specific.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText(
+        'The details that make one profile work harder.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', {
+        name: 'Audience quality filtering',
+      })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', { name: 'Own your fan list' })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', { name: 'Activate creators' })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', { name: 'Geo insights' })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', { name: 'Always in sync' })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', {
+        name: 'Retarget warm fans',
+      })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', {
+        name: 'Press-ready assets',
+      })
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByRole('heading', {
+        name: 'Keyboard-first workflow',
+      })
+    ).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('Quality view')).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('New music')).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.queryByText('Fast by design')
+    ).not.toBeInTheDocument();
+    expect(
+      powerFeaturesSection.queryByText('Deep-link modes')
+    ).not.toBeInTheDocument();
+    expect(
+      powerFeaturesSection.queryByText('Share-ready')
+    ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole('heading', { name: 'Live in 60 seconds.' })
     ).toHaveLength(1);

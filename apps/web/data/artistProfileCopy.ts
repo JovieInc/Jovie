@@ -186,6 +186,37 @@ export interface ArtistProfileLandingCopy {
     };
     readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
   };
+  readonly reactivation: {
+    readonly eyebrow: string;
+    readonly headline: string;
+    readonly subhead: string;
+    readonly workflow: {
+      readonly columns: readonly [
+        'Trigger',
+        'Audience',
+        'Message',
+        'Destination',
+      ];
+      readonly rows: readonly {
+        readonly id:
+          | 'release'
+          | 'tour'
+          | 'video'
+          | 'support-follow-up';
+        readonly trigger: string;
+        readonly audience: string;
+        readonly message: string;
+        readonly destination: string;
+      }[];
+    };
+    readonly outputs: readonly {
+      readonly id: 'release-alerts' | 'nearby-show-alerts' | 'thank-you';
+      readonly label: string;
+      readonly title: string;
+      readonly detail: string;
+      readonly destination: string;
+    }[];
+  };
   readonly opinionated: {
     readonly eyebrow: string;
     readonly headline: string;
@@ -197,7 +228,7 @@ export interface ArtistProfileLandingCopy {
   readonly specWall: {
     readonly eyebrow: string;
     readonly headline: string;
-    readonly lead?: string;
+    readonly subhead: string;
   };
   readonly howItWorks: {
     readonly eyebrow: string;
@@ -676,6 +707,68 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       ],
     ],
   },
+  reactivation: {
+    eyebrow: 'Automatic reactivation',
+    headline: 'Bring them back automatically.',
+    subhead:
+      'When the next moment matters, Jovie brings the right fans back to the right place.',
+    workflow: {
+      columns: ['Trigger', 'Audience', 'Message', 'Destination'],
+      rows: [
+        {
+          id: 'release',
+          trigger: 'New release',
+          audience: 'Subscribers',
+          message: 'Email sent',
+          destination: '/music',
+        },
+        {
+          id: 'tour',
+          trigger: 'Tour announced',
+          audience: 'Fans nearby',
+          message: 'Alert sent',
+          destination: '/shows',
+        },
+        {
+          id: 'video',
+          trigger: 'Video live',
+          audience: 'Recent listeners',
+          message: 'Notification sent',
+          destination: '/music',
+        },
+        {
+          id: 'support-follow-up',
+          trigger: 'Support received',
+          audience: 'Supporter',
+          message: 'Thank-you sent',
+          destination: '/music',
+        },
+      ],
+    },
+    outputs: [
+      {
+        id: 'release-alerts',
+        label: 'Release alerts',
+        title: 'Subscribers hear first.',
+        detail: 'New release live now',
+        destination: 'Email -> /music',
+      },
+      {
+        id: 'nearby-show-alerts',
+        label: 'Nearby show alerts',
+        title: 'Fans in the right city get the date.',
+        detail: 'Los Angeles added · The Novo',
+        destination: 'Alert -> /shows',
+      },
+      {
+        id: 'thank-you',
+        label: 'Thank-you follow-ups',
+        title: 'Support becomes the next listen.',
+        detail: 'Thanks for the support tonight',
+        destination: 'Message -> /music',
+      },
+    ],
+  },
   opinionated: {
     eyebrow: 'Product philosophy',
     headline: 'Opinionated. By design.',
@@ -705,8 +798,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   specWall: {
-    eyebrow: 'Specs',
-    headline: 'Built for artists.',
+    eyebrow: 'Power features',
+    headline: 'Built for artists. Obsessively specific.',
+    subhead: 'The details that make one profile work harder.',
   },
   howItWorks: {
     eyebrow: 'Zero setup',

@@ -7,6 +7,7 @@ export type ArtistProfileSectionId =
   | 'outcomes'
   | 'monetization'
   | 'capture'
+  | 'reactivation'
   | 'opinionated'
   | 'specWall'
   | 'howItWorks'
@@ -67,6 +68,11 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-capture-section-desktop',
     },
     {
+      id: 'reactivation',
+      label: 'Bring Them Back Automatically',
+      testId: 'artist-profile-section-reactivation',
+    },
+    {
       id: 'opinionated',
       label: 'Opinionated',
       testId: 'artist-profile-section-opinionated',
@@ -74,8 +80,9 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
     },
     {
       id: 'specWall',
-      label: 'Spec Wall',
+      label: 'Power Features',
       testId: 'artist-profile-section-spec-wall',
+      screenshotScenarioId: 'artist-profile-power-features-section-desktop',
     },
     {
       id: 'howItWorks',

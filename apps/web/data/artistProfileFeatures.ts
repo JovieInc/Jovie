@@ -10,29 +10,34 @@ export interface ArtistProfileLaunchFeature {
 
 export interface ArtistProfileFeatureTile {
   readonly id:
-    | 'fast-by-design'
-    | 'smart-routing'
-    | 'deep-link-modes'
-    | 'qr-ready'
-    | 'dark-mode-first'
-    | 'release-ready'
-    | 'show-ready'
-    | 'pay-ready'
-    | 'fan-capture-built-in'
-    | 'share-ready'
-    | 'polished-by-default'
-    | 'dedicated-release-pages'
-    | 'analytics';
+    | 'audience-quality-filtering'
+    | 'own-your-fan-list'
+    | 'activate-creators'
+    | 'geo-insights'
+    | 'always-in-sync'
+    | 'retarget-warm-fans'
+    | 'press-ready-assets'
+    | 'keyboard-first-workflow';
   readonly title: string;
   readonly body: string;
-  readonly accent:
-    | 'blue'
-    | 'purple'
-    | 'pink'
-    | 'orange'
-    | 'green'
-    | 'teal'
-    | 'gray';
+  readonly size: 'large' | 'small';
+  readonly accent: 'blue' | 'teal' | 'green' | 'orange' | 'rose' | 'gray';
+  readonly kicker: string;
+  readonly proofMeta: readonly string[];
+  readonly proofVariant:
+    | 'audience-quality'
+    | 'fan-list'
+    | 'creator-activation'
+    | 'geo-insights'
+    | 'always-in-sync'
+    | 'retarget-warm-fans'
+    | 'press-ready-assets'
+    | 'keyboard-first-workflow';
+  readonly screenshotSrc?: string;
+  readonly screenshotAlt?: string;
+  readonly screenshotWidth?: number;
+  readonly screenshotHeight?: number;
+  readonly objectPosition?: string;
 }
 
 export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature[] =
@@ -128,21 +133,109 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
 
 export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
-    id: 'fast-by-design',
-    title: 'Fast by design',
-    body: 'Built to feel instant on the tap that matters.',
+    id: 'audience-quality-filtering',
+    title: 'Audience quality filtering',
+    body: 'Filters junk traffic, self-visits, and low-signal clicks so your audience view stays real.',
+    size: 'large',
     accent: 'blue',
+    kicker: 'Signal clarity',
+    proofMeta: ['Quality view', 'Low-signal removed', 'Self-visits hidden'],
+    proofVariant: 'audience-quality',
+    screenshotSrc: '/product-screenshots/audience-crm.png',
+    screenshotAlt: 'Jovie audience CRM view showing clean audience rows.',
+    screenshotWidth: 2880,
+    screenshotHeight: 1800,
+    objectPosition: '74% 28%',
   },
   {
-    id: 'deep-link-modes',
-    title: 'Deep-link modes',
-    body: 'Send fans straight to /music, /shows, /pay, /subscribe, and more.',
-    accent: 'pink',
+    id: 'own-your-fan-list',
+    title: 'Own your fan list',
+    body: 'Fan CRM with exportable data, so the audience you build stays yours.',
+    size: 'large',
+    accent: 'teal',
+    kicker: 'Audience ownership',
+    proofMeta: ['Segments', 'Notes', 'Export-ready'],
+    proofVariant: 'fan-list',
+    screenshotSrc: '/product-screenshots/audience-crm.png',
+    screenshotAlt: 'Jovie audience CRM showing saved fan data and segments.',
+    screenshotWidth: 2880,
+    screenshotHeight: 1800,
+    objectPosition: '58% 42%',
   },
   {
-    id: 'share-ready',
-    title: 'Share-ready',
-    body: 'One profile link that shifts fans toward music, shows, support, or subscribe based on the moment.',
+    id: 'activate-creators',
+    title: 'Activate creators',
+    body: 'Give fans and influencers a direct path to use the sound and spread the release.',
     accent: 'green',
+    size: 'large',
+    kicker: 'Creator velocity',
+    proofMeta: ['Use this sound', 'Add to story', 'Creator share path'],
+    proofVariant: 'creator-activation',
+    screenshotSrc: '/product-screenshots/release-landing-desktop.png',
+    screenshotAlt: 'Jovie release landing page showing creator-share surfaces.',
+    screenshotWidth: 2880,
+    screenshotHeight: 1800,
+    objectPosition: '50% 16%',
+  },
+  {
+    id: 'geo-insights',
+    title: 'Geo insights',
+    body: 'See where attention is building before you book, announce, or spend.',
+    size: 'large',
+    accent: 'orange',
+    kicker: 'Tour planning',
+    proofMeta: ['Los Angeles +24%', 'Mexico City +18%', 'London +11%'],
+    proofVariant: 'geo-insights',
+  },
+  {
+    id: 'always-in-sync',
+    title: 'Always in sync',
+    body: 'New music, top tracks, and profile surfaces update automatically.',
+    size: 'small',
+    accent: 'rose',
+    kicker: 'Live updates',
+    proofMeta: ['New music', 'Top tracks', 'Profile refresh'],
+    proofVariant: 'always-in-sync',
+    screenshotSrc: '/product-screenshots/tim-white-profile-live-phone.png',
+    screenshotAlt: 'Jovie artist profile showing the latest release view.',
+    screenshotWidth: 780,
+    screenshotHeight: 1688,
+    objectPosition: '50% 0%',
+  },
+  {
+    id: 'retarget-warm-fans',
+    title: 'Retarget warm fans',
+    body: 'Reconnect with visitors who showed intent and bring them back to the next release.',
+    size: 'small',
+    accent: 'blue',
+    kicker: 'Return paths',
+    proofMeta: ['Warm audience', 'Next release', 'Brought back'],
+    proofVariant: 'retarget-warm-fans',
+  },
+  {
+    id: 'press-ready-assets',
+    title: 'Press-ready assets',
+    body: 'Photos and key assets ready for promoters, media, and partners.',
+    size: 'small',
+    accent: 'gray',
+    kicker: 'Partner handoff',
+    proofMeta: ['Portrait', 'Square', 'Press'],
+    proofVariant: 'press-ready-assets',
+    screenshotSrc: '/product-screenshots/profile-desktop.png',
+    screenshotAlt:
+      'Jovie artist profile showing artist media and profile assets.',
+    screenshotWidth: 2880,
+    screenshotHeight: 1800,
+    objectPosition: '50% 18%',
+  },
+  {
+    id: 'keyboard-first-workflow',
+    title: 'Keyboard-first workflow',
+    body: 'Fast shortcuts and a quick admin interface for teams moving at speed.',
+    size: 'small',
+    accent: 'teal',
+    kicker: 'Ops speed',
+    proofMeta: ['Open profile', 'Copy link', 'Find fan'],
+    proofVariant: 'keyboard-first-workflow',
   },
 ] as const;

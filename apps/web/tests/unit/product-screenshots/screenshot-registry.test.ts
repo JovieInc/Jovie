@@ -86,6 +86,19 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('registers the power features section screenshot scenario', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario =>
+        currentScenario.id === 'artist-profile-power-features-section-desktop'
+    );
+
+    expect(scenario?.title).toBe('Artist Profile Power Features Section');
+    expect(scenario?.route).toBe('/artist-profiles');
+    expect(scenario?.captureSelector).toBe(
+      '[data-testid="artist-profile-section-spec-wall"]'
+    );
+  });
+
   it('uses Tim White profile screenshots as the artist mode source of truth', () => {
     const scenarioIds = new Set(
       SCREENSHOT_SCENARIOS.map(scenario => scenario.id)
