@@ -6,7 +6,6 @@ const {
   mockGeneratePlaylist,
   mockGetPlaylistEngineSettings,
   mockGetPlaylistSpotifyStatus,
-  mockMarkPlaylistGeneratedAt,
   mockReleasePlaylistGenerationLease,
   mockVerifyCronRequest,
 } = vi.hoisted(() => ({
@@ -14,7 +13,6 @@ const {
   mockGeneratePlaylist: vi.fn(),
   mockGetPlaylistEngineSettings: vi.fn(),
   mockGetPlaylistSpotifyStatus: vi.fn(),
-  mockMarkPlaylistGeneratedAt: vi.fn(),
   mockReleasePlaylistGenerationLease: vi.fn(),
   mockVerifyCronRequest: vi.fn(),
 }));
@@ -23,7 +21,6 @@ vi.mock('@/lib/admin/platform-connections', () => ({
   acquirePlaylistGenerationLease: mockAcquirePlaylistGenerationLease,
   getPlaylistEngineSettings: mockGetPlaylistEngineSettings,
   getPlaylistSpotifyStatus: mockGetPlaylistSpotifyStatus,
-  markPlaylistGeneratedAt: mockMarkPlaylistGeneratedAt,
   releasePlaylistGenerationLease: mockReleasePlaylistGenerationLease,
 }));
 
@@ -180,15 +177,8 @@ describe('GET /api/cron/generate-playlist', () => {
     expect(mockGeneratePlaylist).toHaveBeenCalledWith(
       expect.objectContaining({
         skipComplianceCheck: true,
-        onSuccessfulPersist: expect.any(Function),
+        recordCadenceOnSuccess: true,
       })
-    );
-    const { onSuccessfulPersist } = mockGeneratePlaylist.mock.calls[0][0] as {
-      onSuccessfulPersist: (generatedAt: Date) => Promise<void>;
-    };
-    await onSuccessfulPersist(new Date('2026-04-15T00:00:00.000Z'));
-    expect(mockMarkPlaylistGeneratedAt).toHaveBeenCalledWith(
-      new Date('2026-04-15T00:00:00.000Z')
     );
     expect(mockReleasePlaylistGenerationLease).not.toHaveBeenCalled();
   });

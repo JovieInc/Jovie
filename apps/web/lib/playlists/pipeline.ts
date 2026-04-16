@@ -13,8 +13,14 @@
  * Publishing to Spotify happens separately after admin approval.
  */
 
+import { randomUUID } from 'node:crypto';
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
+import { sql as drizzleSql } from 'drizzle-orm';
+import {
+  calculateNextEligibleAt,
+  getPlaylistEngineSettings,
+} from '@/lib/admin/platform-connections';
 import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
@@ -53,7 +59,7 @@ export interface PipelineResult {
  */
 interface GeneratePlaylistOptions {
   readonly skipComplianceCheck?: boolean;
-  readonly onSuccessfulPersist?: (generatedAt: Date) => Promise<void>;
+  readonly recordCadenceOnSuccess?: boolean;
 }
 
 export async function generatePlaylist(
@@ -132,34 +138,100 @@ export async function generatePlaylist(
     // For now, we'll store the cover art URL after Spotify upload
     const coverImageUrl = null;
 
-    const [playlist] = await db
-      .insert(joviePlaylists)
-      .values({
-        title: concept.title,
-        description: concept.description,
-        slug,
-        theme: concept.title,
-        genreTags: concept.genreTags,
-        moodTags: concept.moodTags,
-        trackCount: curated.trackCount,
-        coverImageUrl,
-        editorialNote: concept.editorialNote,
-        llmPrompt: JSON.stringify({
-          concept: concept.title,
-          genreTags: concept.genreTags,
-          candidateCount: candidates.length,
-          jovieArtistCount: jovieArtistTracks.length,
-          unsplashQuery: concept.unsplashQuery,
-          coverTextWords: concept.coverTextWords,
-        }),
-        llmModel: 'haiku+sonnet',
-        status: 'pending',
-        statusChangedAt: new Date(),
-      })
-      .returning({ id: joviePlaylists.id });
+    const playlistId = randomUUID();
+    const generatedAt = new Date();
+    const llmPrompt = JSON.stringify({
+      concept: concept.title,
+      genreTags: concept.genreTags,
+      candidateCount: candidates.length,
+      jovieArtistCount: jovieArtistTracks.length,
+      unsplashQuery: concept.unsplashQuery,
+      coverTextWords: concept.coverTextWords,
+    });
 
-    if (!playlist) {
-      throw new Error('Failed to insert playlist into database');
+    if (options.recordCadenceOnSuccess) {
+      const settings = await getPlaylistEngineSettings();
+      const nextEligibleAt = calculateNextEligibleAt(
+        generatedAt,
+        settings.intervalValue,
+        settings.intervalUnit
+      );
+
+      await db.execute(drizzleSql`
+        WITH inserted_playlist AS (
+          INSERT INTO "jovie_playlists" (
+            "id",
+            "title",
+            "description",
+            "slug",
+            "theme",
+            "genre_tags",
+            "mood_tags",
+            "track_count",
+            "cover_image_url",
+            "editorial_note",
+            "llm_prompt",
+            "llm_model",
+            "status",
+            "status_changed_at"
+          ) VALUES (
+            ${playlistId},
+            ${concept.title},
+            ${concept.description},
+            ${slug},
+            ${concept.title},
+            ${concept.genreTags},
+            ${concept.moodTags},
+            ${curated.trackCount},
+            ${coverImageUrl},
+            ${concept.editorialNote},
+            ${llmPrompt},
+            ${'haiku+sonnet'},
+            ${'pending'},
+            ${generatedAt}
+          )
+          RETURNING "id"
+        )
+        INSERT INTO "admin_system_settings" (
+          "id",
+          "playlist_last_generated_at",
+          "playlist_next_eligible_at",
+          "updated_at"
+        ) VALUES (
+          ${1},
+          ${generatedAt},
+          ${nextEligibleAt},
+          ${generatedAt}
+        )
+        ON CONFLICT ("id") DO UPDATE SET
+          "playlist_last_generated_at" = EXCLUDED."playlist_last_generated_at",
+          "playlist_next_eligible_at" = EXCLUDED."playlist_next_eligible_at",
+          "updated_at" = EXCLUDED."updated_at"
+      `);
+    } else {
+      const [playlist] = await db
+        .insert(joviePlaylists)
+        .values({
+          id: playlistId,
+          title: concept.title,
+          description: concept.description,
+          slug,
+          theme: concept.title,
+          genreTags: concept.genreTags,
+          moodTags: concept.moodTags,
+          trackCount: curated.trackCount,
+          coverImageUrl,
+          editorialNote: concept.editorialNote,
+          llmPrompt,
+          llmModel: 'haiku+sonnet',
+          status: 'pending',
+          statusChangedAt: generatedAt,
+        })
+        .returning({ id: joviePlaylists.id });
+
+      if (!playlist) {
+        throw new Error('Failed to insert playlist into database');
+      }
     }
 
     // Insert tracks
@@ -168,7 +240,7 @@ export async function generatePlaylist(
       const jovieTrack = jovieTrackLookup.get(trackId);
 
       return {
-        playlistId: playlist.id,
+        playlistId,
         spotifyTrackId: trackId,
         position: index + 1,
         artistName: jovieTrack?.artist ?? candidate?.artist ?? 'Unknown Artist',
@@ -183,17 +255,13 @@ export async function generatePlaylist(
       await db.insert(joviePlaylistTracks).values(trackInserts);
     }
 
-    if (options.onSuccessfulPersist) {
-      await options.onSuccessfulPersist(new Date());
-    }
-
     // Store cover art base64 temporarily for publish step
     // In production, this would go to a CDN/blob store
     // For now, we'll regenerate at publish time
 
     return {
       success: true,
-      playlistId: playlist.id,
+      playlistId,
       title: concept.title,
       trackCount: curated.trackCount,
       durationMs: Date.now() - startTime,
