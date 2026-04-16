@@ -358,10 +358,12 @@ describe('ArtistProfilesPage', () => {
       screen.getByRole('heading', { name: 'Frequently asked questions' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'Claim your profile.'
+      "Don't lose the next fan."
     );
     expect(
-      screen.getByText('Your next release deserves a better link.')
+      screen.getByText(
+        'Turn every visit into a stream, save, signup, or support.'
+      )
     ).toBeInTheDocument();
   });
 

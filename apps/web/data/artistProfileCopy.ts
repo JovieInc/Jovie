@@ -772,8 +772,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   finalCta: {
-    headline: 'Claim your profile.',
-    subhead: 'Your next release deserves a better link.',
+    headline: "Don't lose the next fan.",
+    subhead: 'Turn every visit into a stream, save, signup, or support.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
   },
