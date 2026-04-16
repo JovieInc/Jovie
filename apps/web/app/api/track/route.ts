@@ -1,6 +1,11 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { AudienceSourceType } from '@/lib/audience/activity-types';
+import {
+  resolveAudienceClickEventType,
+  resolveAudienceClickObjectType,
+  resolveAudienceClickVerb,
+} from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -22,7 +27,7 @@ import {
   getActionWeight,
   mergeAudienceTags,
 } from '../audience/lib/audience-utils';
-import { type TrackClickContext, validateTrackRequest } from './validation';
+import { validateTrackRequest } from './validation';
 
 // ---------------------------------------------------------------------------
 // Consent helpers
@@ -287,39 +292,6 @@ function buildClickMetadata(
   return metadata;
 }
 
-function resolveAudienceEventType(
-  linkType: string,
-  context: TrackClickContext | undefined
-) {
-  if (linkType === 'tip') return 'tip_link_opened' as const;
-  if (context?.contentType === 'tour_date') {
-    return 'tour_date_checked_out' as const;
-  }
-  if (linkType === 'listen' || context?.contentType === 'release') {
-    return 'content_checked_out' as const;
-  }
-  if (linkType === 'social') return 'social_opened' as const;
-  return 'link_clicked' as const;
-}
-
-function resolveAudienceObjectType(
-  linkType: string,
-  context: TrackClickContext | undefined
-) {
-  if (context?.contentType === 'tour_date') return 'tour_date' as const;
-  if (context?.contentType === 'release') return 'release' as const;
-  if (context?.contentType === 'track') return 'track' as const;
-  if (linkType === 'social') return 'social_link' as const;
-  if (linkType === 'tip') return 'payment_link' as const;
-  return 'external_url' as const;
-}
-
-function resolveAudienceEventVerb(linkType: string): string {
-  if (linkType === 'tip' || linkType === 'social') return 'opened';
-  if (linkType === 'listen') return 'checked_out';
-  return 'clicked';
-}
-
 function resolveTrackSourceKind(
   resolvedSource: string | undefined
 ): AudienceSourceType | null {
@@ -472,12 +444,12 @@ export async function POST(request: NextRequest) {
         await recordAudienceEvent(tx, {
           creatorProfileId: profile.id,
           audienceMemberId,
-          eventType: resolveAudienceEventType(linkType, context),
-          verb: resolveAudienceEventVerb(linkType),
+          eventType: resolveAudienceClickEventType(linkType, context),
+          verb: resolveAudienceClickVerb(linkType),
           confidence: 'observed',
           sourceKind: resolveTrackSourceKind(resolvedSource),
           sourceLabel: resolvedSource ?? undefined,
-          objectType: resolveAudienceObjectType(linkType, context),
+          objectType: resolveAudienceClickObjectType(linkType, context),
           objectId: context?.contentId ?? linkId ?? null,
           objectLabel: context?.smartLinkSlug ?? target,
           clickEventId: insertedClickEvent.id,

@@ -83,14 +83,16 @@ export function ArtistProfileOutcomesCarousel({
       <section
         ref={scrollerRef}
         aria-label='Artist profile outcome cards'
-        className='mt-12 flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='relative mt-12 flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
       >
-        <div className='sr-only'>
+        <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:right-3 focus-within:top-3 focus-within:z-10 focus-within:flex focus-within:gap-2'>
           <button
             type='button'
             onClick={() => {
               scrollByAmount('prev');
             }}
+            aria-label='Scroll to previous outcome card'
+            className='rounded-full border border-white/10 bg-black/80 px-3 py-2 text-[13px] text-primary-token shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/60'
           >
             Scroll to previous outcome card
           </button>
@@ -99,6 +101,8 @@ export function ArtistProfileOutcomesCarousel({
             onClick={() => {
               scrollByAmount('next');
             }}
+            aria-label='Scroll to next outcome card'
+            className='rounded-full border border-white/10 bg-black/80 px-3 py-2 text-[13px] text-primary-token shadow-[0_0_0_1px_rgba(255,255,255,0.08)] transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/60'
           >
             Scroll to next outcome card
           </button>

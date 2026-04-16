@@ -1,7 +1,6 @@
-import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { BASE_URL, getProfileUrl } from '@/constants/domains';
 import { createUniqueSourceLinkCode } from '@/lib/audience/source-links';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -9,14 +8,15 @@ import {
   audienceSourceGroups,
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { slugify } from '@/lib/utm/build-url';
-
-export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const AUDIENCE_SOURCE_PAGE_SIZE = 100;
+import {
+  AUDIENCE_SOURCE_PAGE_SIZE,
+  buildAudienceSourceUtmParams,
+  NO_STORE_HEADERS,
+  parseSourceRequestJson,
+  resolveAudienceSourceDestinationUrl,
+  withAudienceSourceShortLink,
+} from '../source-route-helpers';
 
 const createSourceGroupSchema = z.object({
   profileId: z.string().uuid(),
@@ -25,30 +25,11 @@ const createSourceGroupSchema = z.object({
   destinationKind: z.string().trim().min(1).max(40).default('profile'),
   destinationId: z.string().trim().max(200).optional(),
   destinationUrl: z.string().url().optional(),
-  linkNames: z.array(z.string().trim().min(1).max(120)).optional(),
+  linkNames: z
+    .array(z.string().trim().min(1).max(120))
+    .max(AUDIENCE_SOURCE_PAGE_SIZE)
+    .optional(),
 });
-
-function buildDefaultUtmParams(groupName: string, linkName: string) {
-  return {
-    source: 'qr_code',
-    medium: 'print',
-    campaign: slugify(groupName),
-    content: slugify(linkName),
-  };
-}
-
-function buildShortLinkUrl(code: string): string {
-  const url = new URL(`/s/${code}`, BASE_URL);
-  return url.toString();
-}
-
-async function parseJsonBody(request: NextRequest): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error('Malformed JSON');
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,7 +77,7 @@ export async function POST(request: NextRequest) {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       let body: unknown;
       try {
-        body = await parseJsonBody(request);
+        body = await parseSourceRequestJson(request);
       } catch {
         return NextResponse.json(
           { error: 'Malformed JSON' },
@@ -130,8 +111,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const normalizedName = name.trim().toLowerCase();
+      const lockKey = `${sourceType}:${normalizedName}`;
       await tx.execute(
-        drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${profileId}), hashtext(${`${sourceType}:${name.trim().toLowerCase()}`}))`
+        drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${profileId}), hashtext(${lockKey}))`
       );
 
       const [existingGroup] = await tx
@@ -140,13 +123,15 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(audienceSourceGroups.creatorProfileId, profileId),
-            eq(audienceSourceGroups.name, name),
-            eq(audienceSourceGroups.sourceType, sourceType)
+            eq(audienceSourceGroups.sourceType, sourceType),
+            drizzleSql`lower(${audienceSourceGroups.name}) = ${normalizedName}`,
+            isNull(audienceSourceGroups.archivedAt)
           )
         )
+        .orderBy(desc(audienceSourceGroups.createdAt))
         .limit(1);
 
-      if (existingGroup && !existingGroup.archivedAt) {
+      if (existingGroup) {
         const existingLinks = await tx
           .select()
           .from(audienceSourceLinks)
@@ -157,24 +142,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             group: existingGroup,
-            links: existingLinks.map(link => ({
-              ...link,
-              shortUrl: buildShortLinkUrl(link.code),
-            })),
+            links: existingLinks.map(withAudienceSourceShortLink),
           },
           { headers: NO_STORE_HEADERS }
         );
       }
 
-      const [profileRow] = await tx
-        .select({ username: creatorProfiles.username })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profileId))
-        .limit(1);
-
       const resolvedDestinationUrl =
         destinationUrl ??
-        (profileRow?.username ? getProfileUrl(profileRow.username) : BASE_URL);
+        (await resolveAudienceSourceDestinationUrl(tx, profileId));
 
       const now = new Date();
       const [group] = await tx
@@ -186,7 +162,7 @@ export async function POST(request: NextRequest) {
           destinationKind,
           destinationId: destinationId ?? null,
           destinationUrl: resolvedDestinationUrl,
-          utmParams: buildDefaultUtmParams(name, name),
+          utmParams: buildAudienceSourceUtmParams(name, name),
           metadata: {},
           createdAt: now,
           updatedAt: now,
@@ -212,14 +188,14 @@ export async function POST(request: NextRequest) {
             destinationKind,
             destinationId: destinationId ?? null,
             destinationUrl: resolvedDestinationUrl,
-            utmParams: buildDefaultUtmParams(name, linkName),
+            utmParams: buildAudienceSourceUtmParams(name, linkName),
             metadata: { groupName: name },
             createdAt: now,
             updatedAt: now,
           })
           .returning();
         if (link) {
-          links.push({ ...link, shortUrl: buildShortLinkUrl(link.code) });
+          links.push(withAudienceSourceShortLink(link));
         }
       }
 
