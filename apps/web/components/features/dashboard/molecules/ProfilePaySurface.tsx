@@ -26,7 +26,11 @@ import {
 } from '@/lib/profile-monetization';
 import { cn } from '@/lib/utils';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
-import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
+import {
+  generateQrCodeDataUrl,
+  generateQrCodeSvg,
+  qrCodeDataUrlToBlob,
+} from '@/lib/utils/qr-code';
 
 const QR_DISPLAY_SIZE = 224;
 const QR_DOWNLOAD_SIZE = 1024;
@@ -156,8 +160,7 @@ export function ProfilePaySurface({
         summary.tipUrl,
         QR_DOWNLOAD_SIZE
       );
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
+      const blob = qrCodeDataUrlToBlob(dataUrl);
       const username = summary.tipUrl.split('/').at(-2) ?? 'pay-link';
       downloadBlob(blob, `jovie-pay-${username}.png`);
       setStatusMessage('QR code downloaded as PNG.');

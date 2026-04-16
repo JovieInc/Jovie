@@ -21,7 +21,10 @@ import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import { downloadBlob } from '@/lib/utils/download';
-import { generateQrCodeDataUrl } from '@/lib/utils/qr-code';
+import {
+  generateQrCodeDataUrl,
+  qrCodeDataUrlToBlob,
+} from '@/lib/utils/qr-code';
 import type { AudienceMember } from '@/types';
 
 const QR_DOWNLOAD_SIZE = 1024;
@@ -52,8 +55,7 @@ function sanitizeFilename(value: string): string {
 
 async function downloadSourceQrCode(url: string, label: string) {
   const dataUrl = await generateQrCodeDataUrl(url, QR_DOWNLOAD_SIZE);
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
+  const blob = qrCodeDataUrlToBlob(dataUrl);
   downloadBlob(blob, `${sanitizeFilename(label)}-qr.png`);
 }
 

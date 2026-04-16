@@ -24,7 +24,10 @@ import {
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import {
+  DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
+  DashboardHeaderActionButton,
+} from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { AnalyticsSidebar } from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
@@ -34,7 +37,10 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/utils/download';
-import { generateQrCodeDataUrl } from '@/lib/utils/qr-code';
+import {
+  generateQrCodeDataUrl,
+  qrCodeDataUrlToBlob,
+} from '@/lib/utils/qr-code';
 import {
   buildTouringCityMap,
   matchTouringCity,
@@ -563,8 +569,7 @@ export const DashboardAudienceTableUnified = memo(
             sourceLink.shortUrl,
             QR_DOWNLOAD_SIZE
           );
-          const response = await fetch(dataUrl);
-          const blob = await response.blob();
+          const blob = qrCodeDataUrlToBlob(dataUrl);
           const filename =
             sanitizeQrFilename(sourceLink.name) || 'audience-source';
           downloadBlob(blob, `${filename}-qr.png`);
@@ -805,14 +810,16 @@ export const DashboardAudienceTableUnified = memo(
             align='end'
             items={sourceShareItems}
             trigger={
-              <DashboardHeaderActionButton
-                ariaLabel='Source link actions'
-                icon={
-                  <Icon name='QrCode' className='h-4 w-4' strokeWidth={1.9} />
-                }
-                iconOnly
-                tooltipLabel='Source link'
-              />
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon'
+                aria-label='Source link actions'
+                title='Source link'
+                className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
+              >
+                <Icon name='QrCode' className='h-4 w-4' strokeWidth={1.9} />
+              </Button>
             }
           />
           <DashboardHeaderActionButton
