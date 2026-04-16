@@ -117,7 +117,7 @@ export function ArtistProfileOutcomesCarousel({
             onClick={() => {
               scrollByAmount('prev');
             }}
-            className='rounded-full border border-white/10 bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
+            className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
             aria-label='Scroll outcomes left'
           >
             <ChevronLeft className='h-4 w-4' />
@@ -127,7 +127,7 @@ export function ArtistProfileOutcomesCarousel({
             onClick={() => {
               scrollByAmount('next');
             }}
-            className='rounded-full border border-white/10 bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
+            className='rounded-full bg-white/[0.03] p-2 text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token'
             aria-label='Scroll outcomes right'
           >
             <ChevronRight className='h-4 w-4' />
@@ -163,7 +163,7 @@ function OutcomeCard({
 
   return (
     <article
-      className='group relative flex min-h-[30rem] snap-start flex-col overflow-hidden rounded-[1.7rem] border border-white/[0.085] bg-[#050505]'
+      className='group relative flex min-h-[30rem] snap-start flex-col overflow-hidden rounded-[1.7rem] bg-[#050505]'
       style={style}
     >
       <div
@@ -184,7 +184,7 @@ function OutcomeCard({
               {card.title}
             </h3>
             <span
-              className='mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.045] text-[color:var(--outcome-accent)] ring-1 ring-white/[0.08]'
+              className='mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.045] text-[color:var(--outcome-accent)]'
               aria-hidden='true'
             >
               <Icon className='h-[18px] w-[18px]' strokeWidth={1.8} />
@@ -215,15 +215,15 @@ function ProductCrop({
   crop: NonNullable<(typeof PRODUCT_CROPS)[keyof typeof PRODUCT_CROPS]>;
 }>) {
   return (
-    <div className='relative h-[16rem] overflow-hidden rounded-[1.35rem] border border-white/[0.08] bg-black/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+    <div className='relative h-[16rem] overflow-hidden rounded-[1.35rem] bg-black/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
       <div
-        className='absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b border-white/[0.07] bg-black/42 px-3 py-2.5 backdrop-blur-md'
+        className='absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/42 px-3 py-2.5 backdrop-blur-md'
         aria-hidden='true'
       >
         <span className='text-[11px] font-semibold tracking-[-0.01em] text-primary-token'>
           {crop.label}
         </span>
-        <span className='rounded-full bg-white/[0.065] px-2 py-1 text-[10px] font-semibold text-secondary-token ring-1 ring-white/[0.07]'>
+        <span className='rounded-full bg-white/[0.065] px-2 py-1 text-[10px] font-semibold text-secondary-token'>
           {crop.meta}
         </span>
       </div>
@@ -242,17 +242,17 @@ function ProductCrop({
 
 function ThanksProof() {
   return (
-    <div className='rounded-[1.35rem] border border-white/[0.08] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+    <div className='rounded-[1.35rem] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
       <div className='flex items-center justify-between gap-3'>
         <span className='text-[11px] font-semibold text-primary-token'>
           Follow-up
         </span>
-        <span className='flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-secondary-token ring-1 ring-white/[0.07]'>
+        <span className='flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-secondary-token'>
           <Check className='h-3 w-3 text-[color:var(--outcome-accent)]' />
           Sent
         </span>
       </div>
-      <div className='mt-3 rounded-[1.1rem] border border-white/[0.075] bg-white/[0.035] p-3'>
+      <div className='mt-3 rounded-[1.1rem] bg-white/[0.035] p-3'>
         <p className='text-[12px] font-semibold text-primary-token'>
           Tim White
         </p>
@@ -270,8 +270,8 @@ function ThanksProof() {
 
 function ShareProof() {
   return (
-    <div className='rounded-[1.35rem] border border-white/[0.08] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div className='flex items-center justify-between gap-3 rounded-full border border-white/[0.1] bg-white/[0.045] px-3 py-2.5'>
+    <div className='rounded-[1.35rem] bg-black/38 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+      <div className='flex items-center justify-between gap-3 rounded-full bg-white/[0.045] px-3 py-2.5'>
         <span className='font-mono text-[11px] text-secondary-token'>
           jov.ie/timwhite
         </span>
@@ -280,7 +280,7 @@ function ShareProof() {
           Copied
         </span>
       </div>
-      <div className='mt-3 grid grid-cols-[auto_1fr] gap-3 rounded-[1.1rem] border border-white/[0.075] bg-white/[0.035] p-3'>
+      <div className='mt-3 grid grid-cols-[auto_1fr] gap-3 rounded-[1.1rem] bg-white/[0.035] p-3'>
         <span className='flex h-12 w-12 items-center justify-center rounded-[0.9rem] bg-white text-black'>
           <QrCode className='h-6 w-6' strokeWidth={1.8} />
         </span>
@@ -292,7 +292,7 @@ function ShareProof() {
             {['Bio', 'QR', 'Stories'].map(channel => (
               <span
                 key={channel}
-                className='rounded-full bg-white/[0.055] px-2 py-1 text-[10px] font-semibold text-tertiary-token ring-1 ring-white/[0.06]'
+                className='rounded-full bg-white/[0.055] px-2 py-1 text-[10px] font-semibold text-tertiary-token'
               >
                 {channel}
               </span>

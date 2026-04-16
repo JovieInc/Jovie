@@ -41,7 +41,7 @@ function GetPaidCard({
   card: ArtistProfileLandingCopy['monetization']['paidCard'];
 }>) {
   return (
-    <article className='relative isolate flex min-h-[520px] flex-col overflow-hidden rounded-[1.75rem] bg-[#f7f7f2] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/16 sm:p-8'>
+    <article className='relative isolate flex min-h-[520px] flex-col overflow-hidden rounded-[1.75rem] bg-[#f7f7f2] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8'>
       <div
         className='absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
         aria-hidden='true'
@@ -56,7 +56,7 @@ function GetPaidCard({
         {card.body}
       </p>
 
-      <div className='relative z-10 mt-auto rounded-t-[1.65rem] border border-black/10 bg-[#111] p-4 text-white shadow-[0_-18px_44px_rgba(0,0,0,0.22)] sm:p-5'>
+      <div className='relative z-10 mt-auto rounded-t-[1.65rem] bg-[#111] p-4 text-white shadow-[0_-18px_44px_rgba(0,0,0,0.22)] sm:p-5'>
         <div className='mx-auto mb-4 h-1 w-10 rounded-full bg-white/18' />
         <div className='flex items-center justify-between gap-3'>
           <div>
@@ -67,7 +67,7 @@ function GetPaidCard({
               Choose an amount
             </p>
           </div>
-          <span className='flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white/72 ring-1 ring-white/10'>
+          <span className='flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white/72'>
             <CreditCard className='h-4 w-4' strokeWidth={1.9} />
           </span>
         </div>
@@ -76,14 +76,14 @@ function GetPaidCard({
           {TIP_AMOUNTS.map(amount => (
             <span
               key={amount}
-              className='rounded-full bg-white/[0.08] px-3 py-2 text-center text-[13px] font-semibold tracking-[-0.02em] text-white/88 ring-1 ring-white/10'
+              className='rounded-full bg-white/[0.08] px-3 py-2 text-center text-[13px] font-semibold tracking-[-0.02em] text-white/88'
             >
               {amount}
             </span>
           ))}
         </div>
 
-        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/[0.06] px-4 py-3 ring-1 ring-white/10'>
+        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/[0.06] px-4 py-3'>
           <span className='text-[13px] font-medium tracking-[-0.02em] text-white/72'>
             Support
           </span>
@@ -100,13 +100,13 @@ function SayThanksCard({
   card: ArtistProfileLandingCopy['monetization']['followUpCard'];
 }>) {
   return (
-    <article className='relative isolate min-h-[520px] overflow-hidden rounded-[1.75rem] bg-[#fbfbf7] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] ring-1 ring-white/16 sm:p-8'>
+    <article className='relative isolate min-h-[520px] overflow-hidden rounded-[1.75rem] bg-[#fbfbf7] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8'>
       <div
         className='absolute inset-x-0 top-0 h-[62%] bg-[linear-gradient(180deg,rgba(0,0,0,0.055),rgba(255,255,255,0))]'
         aria-hidden='true'
       />
 
-      <div className='relative z-20 mx-auto max-w-[21.5rem] rounded-[1.35rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.12)] sm:p-5'>
+      <div className='relative z-20 mx-auto max-w-[21.5rem] rounded-[1.35rem] bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.12)] sm:p-5'>
         <div className='flex items-center justify-between gap-3'>
           <div className='flex min-w-0 items-center gap-3'>
             <span

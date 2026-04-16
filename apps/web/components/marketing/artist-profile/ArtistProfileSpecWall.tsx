@@ -54,7 +54,7 @@ function ArtistProfileSpecNode({
 
   return (
     <article
-      className={`group relative rounded-[1.35rem] border border-white/[0.08] bg-black/55 p-4 backdrop-blur-xl transition-colors duration-200 hover:border-[color:var(--spec-accent)] sm:p-5 lg:!absolute lg:w-[19.5rem] lg:p-4 ${position}`}
+      className={`group relative rounded-[1.35rem] bg-black/55 p-4 backdrop-blur-xl sm:p-5 lg:!absolute lg:w-[19.5rem] lg:p-4 ${position}`}
       style={style}
     >
       <div
@@ -96,26 +96,7 @@ export function ArtistProfileSpecWall({
       className='pt-40 pb-12 sm:py-16 lg:py-16'
       containerClassName='lg:max-w-none'
     >
-      <div className='relative overflow-hidden rounded-[2rem] border border-white/[0.06] bg-[radial-gradient(circle_at_50%_47%,rgba(155,77,255,0.11),transparent_23%),radial-gradient(circle_at_50%_47%,rgba(255,255,255,0.04),transparent_43%),#000] px-5 py-8 sm:px-8 sm:py-10 lg:min-h-[640px] lg:px-8 lg:py-8'>
-        <div
-          className='pointer-events-none absolute inset-x-[13%] top-[19%] hidden h-[62%] rounded-full border border-white/[0.08] lg:block'
-          aria-hidden='true'
-        />
-        <div
-          className='pointer-events-none absolute inset-x-[24%] top-[28%] hidden h-[44%] rounded-full border border-white/[0.06] lg:block'
-          aria-hidden='true'
-        />
-        {[0, 60, 120].map(rotation => (
-          <span
-            key={rotation}
-            className='pointer-events-none absolute left-1/2 top-1/2 hidden h-px w-[min(72vw,70rem)] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-white/[0.14] to-transparent lg:block'
-            style={{
-              transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-            }}
-            aria-hidden='true'
-          />
-        ))}
-
+      <div className='relative overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_50%_47%,rgba(155,77,255,0.11),transparent_23%),radial-gradient(circle_at_50%_47%,rgba(255,255,255,0.04),transparent_43%),#000] px-5 py-8 sm:px-8 sm:py-10 lg:min-h-[640px] lg:px-8 lg:py-8'>
         <div className='relative z-10 mb-8 lg:!absolute lg:inset-0 lg:mb-0 lg:flex lg:items-center lg:justify-center lg:px-20'>
           <div>
             <h2 className='marketing-h2-linear text-primary-token lg:max-w-none lg:whitespace-nowrap lg:text-center lg:!text-[clamp(3.4rem,5.7vw,5.25rem)] lg:!font-semibold lg:!leading-[0.9] lg:!tracking-[-0.06em]'>

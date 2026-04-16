@@ -23,10 +23,7 @@ export function ArtistProfileSectionShell({
     <section
       ref={sectionRef}
       id={id}
-      className={cn(
-        'relative border-t border-white/8 py-20 sm:py-24 lg:py-28',
-        className
-      )}
+      className={cn('relative py-20 sm:py-24 lg:py-28', className)}
     >
       <MarketingContainer width={width} className={containerClassName}>
         {children}

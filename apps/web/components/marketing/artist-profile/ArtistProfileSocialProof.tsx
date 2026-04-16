@@ -27,7 +27,7 @@ export function ArtistProfileSocialProof({
         {proofData.profileCards.map(card => (
           <article
             key={card.id}
-            className='overflow-hidden rounded-[1.4rem] border border-white/8 bg-white/[0.03]'
+            className='overflow-hidden rounded-[1.4rem] bg-white/[0.03]'
           >
             <div className='relative aspect-[4/3]'>
               <Image
@@ -59,7 +59,7 @@ export function ArtistProfileSocialProof({
           {proofData.quotes.map(quote => (
             <article
               key={quote.id}
-              className='rounded-[1.3rem] border border-white/8 bg-white/[0.03] p-5'
+              className='rounded-[1.3rem] bg-white/[0.03] p-5'
             >
               <p className='text-[14px] leading-[1.7] text-primary-token'>
                 {quote.quote}

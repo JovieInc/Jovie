@@ -38,11 +38,11 @@ export function FaqSection({
       >
         {heading}
       </h2>
-      <div className='mt-8 divide-y divide-border-primary'>
+      <div className='mt-8 space-y-2'>
         {items.map((item, index) => {
           if (!singleOpen) {
             return (
-              <details key={item.question} className='group py-5'>
+              <details key={item.question} className='group py-3'>
                 <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
                   {item.question}
                 </summary>
@@ -58,7 +58,7 @@ export function FaqSection({
           const panelId = `${sectionId}-faq-panel-${index}`;
 
           return (
-            <div key={item.question} className='py-5'>
+            <div key={item.question} className='py-3'>
               <button
                 id={triggerId}
                 type='button'

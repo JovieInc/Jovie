@@ -15,7 +15,7 @@ export function ArtistProfileAdaptiveSequence({
 }: Readonly<ArtistProfileAdaptiveSequenceProps>) {
   return (
     <ArtistProfileSectionShell
-      className='border-t-0 bg-white/[0.012] py-0'
+      className='bg-white/[0.012] py-0'
       containerClassName='max-w-none px-0'
     >
       <div data-testid='artist-profile-adaptive-sequence'>

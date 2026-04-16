@@ -115,18 +115,11 @@ export function ArtistProfileModeSwitcher({
                   <span
                     key={cue}
                     className={cn(
-                      'relative text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300 sm:text-[13px]',
+                      'text-[12px] font-medium tracking-[-0.01em] transition-colors duration-300 sm:text-[13px]',
                       isActive ? 'text-primary-token' : 'text-tertiary-token'
                     )}
                   >
                     {cue}
-                    <span
-                      aria-hidden='true'
-                      className={cn(
-                        'absolute -bottom-1 left-1/2 h-px w-5 -translate-x-1/2 rounded-full bg-white transition-opacity duration-300',
-                        isActive ? 'opacity-70' : 'opacity-0'
-                      )}
-                    />
                   </span>
                 );
               })}

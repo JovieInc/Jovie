@@ -21,16 +21,16 @@ const STEP_NUMBER_STYLES = [
 
 function ClaimMoment() {
   return (
-    <div className='mt-3 w-full max-w-[18rem] rounded-[1.05rem] border border-white/[0.09] bg-black/46 p-2.5 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
+    <div className='mt-3 w-full max-w-[18rem] rounded-[1.05rem] bg-black/46 p-2.5 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
       <div className='mb-2 flex items-center justify-between gap-3 px-1'>
         <span className='text-[11px] font-semibold text-primary-token'>
           Artist Search
         </span>
-        <span className='rounded-full bg-white/[0.055] px-2 py-1 text-[10px] font-medium text-secondary-token ring-1 ring-white/[0.065]'>
+        <span className='rounded-full bg-white/[0.055] px-2 py-1 text-[10px] font-medium text-secondary-token'>
           Verified
         </span>
       </div>
-      <div className='flex h-10 items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.055] px-3 text-[12px] text-secondary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
+      <div className='flex h-10 items-center gap-2 rounded-full bg-white/[0.055] px-3 text-[12px] text-secondary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
         <Search
           className='h-3.5 w-3.5 text-primary-token/76'
           strokeWidth={1.8}
@@ -38,9 +38,9 @@ function ClaimMoment() {
         <span className='text-tertiary-token'>Search</span>
         <span className='font-medium text-primary-token'>Tim White</span>
       </div>
-      <div className='mt-2 flex items-center gap-3 rounded-[0.9rem] bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.06]'>
+      <div className='mt-2 flex items-center gap-3 rounded-[0.9rem] bg-white/[0.04] px-2.5 py-2'>
         <div
-          className='h-8 w-8 rounded-full bg-[linear-gradient(135deg,#f6f9ff,#7fa3ff)] ring-1 ring-white/20'
+          className='h-8 w-8 rounded-full bg-[linear-gradient(135deg,#f6f9ff,#7fa3ff)]'
           aria-hidden='true'
         />
         <div className='min-w-0 flex-1'>
@@ -62,12 +62,12 @@ function ClaimMoment() {
 function BuildMoment() {
   return (
     <div className='mt-3 w-full max-w-[18rem]'>
-      <div className='rounded-[1.05rem] border border-white/[0.09] bg-black/46 p-3 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
+      <div className='rounded-[1.05rem] bg-black/46 p-3 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
         <div className='flex items-center justify-between gap-3'>
           <span className='text-[11px] font-semibold text-primary-token'>
             Importing catalog
           </span>
-          <span className='flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-sky-100 ring-1 ring-white/[0.07]'>
+          <span className='flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-sky-100'>
             <Check className='h-3 w-3' strokeWidth={2} />
             27+ providers
           </span>
@@ -83,7 +83,7 @@ function BuildMoment() {
           ].map(([item, status]) => (
             <div
               key={item}
-              className='flex items-center justify-between gap-3 rounded-full bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-medium text-secondary-token ring-1 ring-white/[0.06]'
+              className='flex items-center justify-between gap-3 rounded-full bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-medium text-secondary-token'
             >
               <span>{item}</span>
               <span className='flex items-center gap-1.5 text-primary-token/82'>
@@ -100,14 +100,14 @@ function BuildMoment() {
 
 function ShareMoment() {
   return (
-    <div className='mt-3 w-full max-w-[18rem] rounded-[1.05rem] border border-white/[0.09] bg-black/46 p-2.5 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
+    <div className='mt-3 w-full max-w-[18rem] rounded-[1.05rem] bg-black/46 p-2.5 text-left shadow-[0_12px_28px_rgba(0,0,0,0.22)]'>
       <div className='mb-2 flex items-center justify-between gap-3 px-1'>
         <span className='text-[11px] font-semibold text-primary-token'>
           Profile Link
         </span>
         <Check className='h-3.5 w-3.5 text-sky-100/78' strokeWidth={2} />
       </div>
-      <div className='flex items-center justify-between gap-3 rounded-full border border-white/[0.12] bg-white/[0.055] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
+      <div className='flex items-center justify-between gap-3 rounded-full bg-white/[0.055] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
         <span className='font-mono text-[11px] text-secondary-token'>
           jov.ie/timwhite
         </span>
@@ -116,8 +116,8 @@ function ShareMoment() {
           Copied
         </span>
       </div>
-      <div className='mt-2 flex items-center gap-2.5 rounded-[0.9rem] bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.06]'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.7rem] bg-white/[0.06] text-primary-token ring-1 ring-white/[0.09]'>
+      <div className='mt-2 flex items-center gap-2.5 rounded-[0.9rem] bg-white/[0.04] px-2.5 py-2'>
+        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.7rem] bg-white/[0.06] text-primary-token'>
           <QrCode className='h-4 w-4' strokeWidth={1.8} />
         </span>
         <div className='min-w-0 flex-1'>
@@ -131,7 +131,7 @@ function ShareMoment() {
         {['Bio', 'Stories', 'QR'].map(channel => (
           <span
             key={channel}
-            className='rounded-full bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-secondary-token ring-1 ring-white/[0.06]'
+            className='rounded-full bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-secondary-token'
           >
             {channel}
           </span>
@@ -159,12 +159,12 @@ export function ArtistProfileHowItWorks({
       width='landing'
       className='bg-black py-8 sm:py-10 lg:py-12'
     >
-      <div className='relative overflow-hidden rounded-[1.6rem] border border-white/[0.08] bg-[radial-gradient(circle_at_18%_10%,rgba(101,119,255,0.09),transparent_22%),radial-gradient(circle_at_80%_18%,rgba(146,230,207,0.06),transparent_23%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.012)),#050505] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.26)] sm:px-8 sm:py-7 lg:px-9 lg:py-8'>
+      <div className='relative overflow-hidden rounded-[1.6rem] bg-[radial-gradient(circle_at_18%_10%,rgba(101,119,255,0.09),transparent_22%),radial-gradient(circle_at_80%_18%,rgba(146,230,207,0.06),transparent_23%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.012)),#050505] px-5 py-6 shadow-[0_22px_60px_rgba(0,0,0,0.26)] sm:px-8 sm:py-7 lg:px-9 lg:py-8'>
         <div className='relative z-10 mx-auto max-w-[38rem] text-center'>
           <h2 className='text-[clamp(2.35rem,6.1vw,4.85rem)] font-semibold leading-[0.92] tracking-[-0.075em] text-primary-token'>
             {howItWorks.headline}
           </h2>
-          <p className='mx-auto mt-2.5 max-w-[37rem] rounded-full border border-white/[0.105] bg-white/[0.065] px-4 py-2 text-[15px] font-medium leading-[1.35] text-[rgba(255,255,255,0.94)] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] sm:text-base'>
+          <p className='mx-auto mt-2.5 max-w-[37rem] rounded-full bg-white/[0.065] px-4 py-2 text-[15px] font-medium leading-[1.35] text-[rgba(255,255,255,0.94)] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] sm:text-base'>
             {howItWorks.body}
           </p>
         </div>
@@ -180,17 +180,11 @@ export function ArtistProfileHowItWorks({
                 className='relative flex flex-col items-center text-center'
               >
                 {index < howItWorks.steps.length - 1 ? (
-                  <>
-                    <div
-                      className='pointer-events-none absolute left-1/2 top-[3.55rem] hidden h-px w-[calc(100%-2rem)] translate-x-1/2 bg-gradient-to-r from-white/22 via-white/12 to-transparent lg:block'
-                      aria-hidden='true'
-                    />
-                    <ArrowRight
-                      className='absolute right-[-1.1rem] top-[2.78rem] hidden h-6 w-6 text-white/55 lg:block'
-                      strokeWidth={1.4}
-                      aria-hidden='true'
-                    />
-                  </>
+                  <ArrowRight
+                    className='absolute right-[-1.1rem] top-[2.78rem] hidden h-6 w-6 text-white/55 lg:block'
+                    strokeWidth={1.4}
+                    aria-hidden='true'
+                  />
                 ) : null}
                 {index > 0 ? (
                   <ArrowDown

@@ -99,7 +99,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T01:57:55.277Z",
+    "capturedAt": "2026-04-16T02:39:10.251Z",
     "gitSha": null,
     "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
@@ -112,7 +112,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T01:58:19.628Z",
+    "capturedAt": "2026-04-16T02:39:35.687Z",
     "gitSha": null,
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
@@ -125,7 +125,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T02:24:37.940Z",
+    "capturedAt": "2026-04-16T02:40:00.931Z",
     "gitSha": null,
     "imagePath": "artist-profile-capture-section-desktop.png"
   },
@@ -138,7 +138,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T01:59:08.601Z",
+    "capturedAt": "2026-04-16T02:40:25.355Z",
     "gitSha": null,
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
@@ -151,7 +151,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T01:59:32.813Z",
+    "capturedAt": "2026-04-16T02:40:49.698Z",
     "gitSha": null,
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
