@@ -38,7 +38,7 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
 }));
 
-vi.mock('@/app/api/dashboard/audience/source-route-helpers', () => ({
+vi.mock('../source-route-helpers', () => ({
   AUDIENCE_SOURCE_PAGE_SIZE: 100,
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
   buildAudienceSourceErrorResponse: (error: string, status: number) =>
@@ -55,12 +55,14 @@ vi.mock('@/lib/db/schema/analytics', () => ({
     id: 'id',
     creatorProfileId: 'creator_profile_id',
     name: 'name',
+    archivedAt: 'archived_at',
   },
   audienceSourceLinks: {
     id: 'id',
     creatorProfileId: 'creator_profile_id',
     code: 'code',
     createdAt: 'created_at',
+    archivedAt: 'archived_at',
   },
 }));
 
@@ -68,11 +70,10 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   desc: vi.fn(),
   eq: vi.fn(),
+  isNull: vi.fn(),
 }));
 
-const { POST } = await import(
-  '@/app/api/dashboard/audience/source-links/route'
-);
+const { POST } = await import('./route');
 
 describe('POST /api/dashboard/audience/source-links', () => {
   beforeEach(() => {
@@ -134,7 +135,11 @@ describe('POST /api/dashboard/audience/source-links', () => {
     expect(data.link.shortUrl).toBe('https://jov.ie/s/tour-london-1234');
     expect(hoisted.buildAudienceSourceUtmParams).toHaveBeenCalledWith(
       'Tour Flyers',
-      'London O2 Arena'
+      'London O2 Arena',
+      {
+        source: 'qr_code',
+        medium: 'print',
+      }
     );
   });
 });

@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createUniqueSourceLinkCode } from '@/lib/audience/source-links';
@@ -19,6 +19,10 @@ import {
   withAudienceSourceShortLink,
 } from '../source-route-helpers';
 
+const getSourceLinksQuerySchema = z.object({
+  profileId: z.string().uuid(),
+});
+
 const createSourceLinkSchema = z.object({
   profileId: z.string().uuid(),
   sourceGroupId: z.string().uuid().optional(),
@@ -33,10 +37,13 @@ export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const { searchParams } = new URL(request.url);
-      const profileId = searchParams.get('profileId');
-      if (!profileId) {
-        return buildAudienceSourceErrorResponse('Missing profileId', 400);
+      const parsedQuery = getSourceLinksQuerySchema.safeParse({
+        profileId: searchParams.get('profileId'),
+      });
+      if (!parsedQuery.success) {
+        return buildAudienceSourceErrorResponse('Invalid profileId', 400);
       }
+      const { profileId } = parsedQuery.data;
 
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
@@ -49,7 +56,12 @@ export async function GET(request: NextRequest) {
       const links = await tx
         .select()
         .from(audienceSourceLinks)
-        .where(eq(audienceSourceLinks.creatorProfileId, profileId))
+        .where(
+          and(
+            eq(audienceSourceLinks.creatorProfileId, profileId),
+            isNull(audienceSourceLinks.archivedAt)
+          )
+        )
         .orderBy(desc(audienceSourceLinks.createdAt))
         .limit(AUDIENCE_SOURCE_PAGE_SIZE);
 
@@ -141,7 +153,10 @@ export async function POST(request: NextRequest) {
           destinationKind,
           destinationId: destinationId ?? null,
           destinationUrl: resolvedDestinationUrl,
-          utmParams: buildAudienceSourceUtmParams(sourceGroupName, name),
+          utmParams: buildAudienceSourceUtmParams(sourceGroupName, name, {
+            source: sourceType === 'qr' ? 'qr_code' : sourceType,
+            medium: sourceType === 'qr' ? 'print' : sourceType,
+          }),
           metadata: {},
           createdAt: now,
           updatedAt: now,

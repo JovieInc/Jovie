@@ -3,9 +3,9 @@ import type {
   AudienceObjectType,
 } from '@/lib/audience/activity-types';
 
-type AudienceClickMetadata = {
+interface AudienceClickMetadata {
   readonly contentType?: string;
-};
+}
 
 function asAudienceClickMetadata(metadata: unknown): AudienceClickMetadata {
   if (metadata && typeof metadata === 'object') {
