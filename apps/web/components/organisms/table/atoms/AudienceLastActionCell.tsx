@@ -27,6 +27,29 @@ function resolveActionIcon(label: string | null | undefined): string {
   return 'Sparkles';
 }
 
+function deriveActionLabel(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string | null {
+  if (renderedAction.kind === 'sentence') return renderedAction.text;
+  if (lastAction)
+    return capitalizeFirst(lastAction.label?.trim()) || 'Unknown action';
+  return null;
+}
+
+function deriveActionIcon(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string {
+  if (renderedAction.kind === 'sentence') return renderedAction.icon;
+  if (lastAction) return resolveActionIcon(lastAction.label);
+  return 'Clock';
+}
+
 export function AudienceLastActionCell({
   actions,
   lastSeenAt,
@@ -42,18 +65,8 @@ export function AudienceLastActionCell({
   const renderedAction = lastAction
     ? renderAudienceEventSentence(lastAction)
     : { kind: 'empty' as const };
-  const actionLabel =
-    renderedAction.kind === 'sentence'
-      ? renderedAction.text
-      : lastAction
-        ? capitalizeFirst(lastAction.label?.trim()) || 'Unknown action'
-        : null;
-  const iconName =
-    renderedAction.kind === 'sentence'
-      ? renderedAction.icon
-      : lastAction
-        ? resolveActionIcon(lastAction.label)
-        : 'Clock';
+  const actionLabel = deriveActionLabel(renderedAction, lastAction);
+  const iconName = deriveActionIcon(renderedAction, lastAction);
 
   return (
     <div

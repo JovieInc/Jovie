@@ -134,6 +134,12 @@ function resolveClickObjectType(linkType: string, metadata: unknown) {
   return 'external_url' as const;
 }
 
+function resolveClickVerb(linkType: string): string {
+  if (linkType === 'tip' || linkType === 'social') return 'opened';
+  if (linkType === 'listen') return 'checked_out';
+  return 'clicked';
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Extract client IP for rate limiting
@@ -384,14 +390,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: profileId,
         audienceMemberId: member.id,
         eventType: resolveClickEventType(linkType, metadata),
-        verb:
-          linkType === 'tip'
-            ? 'opened'
-            : linkType === 'social'
-              ? 'opened'
-              : linkType === 'listen'
-                ? 'checked_out'
-                : 'clicked',
+        verb: resolveClickVerb(linkType),
         confidence: 'observed',
         sourceKind: 'short_link',
         sourceLabel: referrer ?? undefined,

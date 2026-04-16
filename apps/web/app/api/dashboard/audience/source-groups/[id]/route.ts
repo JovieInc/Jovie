@@ -16,14 +16,44 @@ const updateSourceGroupSchema = z.object({
   archived: z.boolean().optional(),
 });
 
+const routeParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
+async function parseJsonBody(request: NextRequest): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new Error('Malformed JSON');
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { readonly params: Promise<{ readonly id: string }> }
 ) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
-      const { id } = await params;
-      const parsed = updateSourceGroupSchema.safeParse(await request.json());
+      const parsedParams = routeParamsSchema.safeParse(await params);
+      if (!parsedParams.success) {
+        return NextResponse.json(
+          { error: 'Invalid source group ID' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      let body: unknown;
+      try {
+        body = await parseJsonBody(request);
+      } catch {
+        return NextResponse.json(
+          { error: 'Malformed JSON' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const { id } = parsedParams.data;
+      const parsed = updateSourceGroupSchema.safeParse(body);
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid source group payload' },

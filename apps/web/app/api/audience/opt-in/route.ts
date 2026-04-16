@@ -90,19 +90,31 @@ async function applyOptIn(email: string, profileId: string, optIn: boolean) {
       .limit(1);
 
     if (member) {
-      await recordAudienceEvent(db, {
-        creatorProfileId: profileId,
-        audienceMemberId: member.id,
-        eventType: 'subscription_created',
-        verb: 'subscribed',
-        confidence: 'verified',
-        sourceKind: 'email',
-        sourceLabel: 'Email',
-        objectType: 'profile',
-        objectId: profileId,
-        objectLabel: 'Profile',
-        properties: { email },
-      });
+      try {
+        await recordAudienceEvent(db, {
+          creatorProfileId: profileId,
+          audienceMemberId: member.id,
+          eventType: 'subscription_created',
+          verb: 'subscribed',
+          confidence: 'verified',
+          sourceKind: 'email',
+          sourceLabel: 'Email',
+          objectType: 'profile',
+          objectId: profileId,
+          objectLabel: 'Profile',
+          properties: { email },
+        });
+      } catch (error) {
+        logger.error('[audience] Failed to record subscription_created event', {
+          email,
+          profileId,
+          error,
+        });
+        void captureError('opt-in audience event failed', error, {
+          profileId,
+          email,
+        });
+      }
     }
   }
   return updated ?? null;

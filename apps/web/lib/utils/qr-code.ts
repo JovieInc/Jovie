@@ -59,7 +59,7 @@ export function qrCodeDataUrlToBlob(dataUrl: string): Blob {
     throw new Error('Invalid QR code data URL');
   }
 
-  const mimeType = metadata.match(/^data:([^;]+)/)?.[1] ?? 'image/png';
+  const mimeType = /^data:([^;]+)/.exec(metadata)?.[1] ?? 'image/png';
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
 

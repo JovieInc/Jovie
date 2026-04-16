@@ -91,7 +91,7 @@ function resolveSource(
   utmParams?: AudienceUtmParams,
   actions?: AudienceAction[]
 ): string {
-  const actionSource = actions?.find(action => action.sourceLabel)?.sourceLabel;
+  const actionSource = actions?.[0]?.sourceLabel;
   if (actionSource) return actionSource;
 
   const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;

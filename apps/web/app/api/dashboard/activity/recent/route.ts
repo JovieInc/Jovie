@@ -101,6 +101,24 @@ function getClickPhrase(linkType: string, target: string | null): string {
   return 'clicked a link';
 }
 
+function getActivityIcon(eventType: string): DashboardActivityIcon {
+  switch (eventType) {
+    case 'profile_visited':
+      return 'visit';
+    case 'subscription_created':
+      return 'email';
+    case 'tip_sent':
+    case 'tip_link_opened':
+      return 'tip';
+    case 'social_opened':
+      return 'social';
+    case 'content_checked_out':
+      return 'listen';
+    default:
+      return 'link';
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     return await withDbSession(async clerkUserId => {
@@ -238,32 +256,22 @@ export async function GET(request: NextRequest) {
             .limit(perSourceLimit),
         ]);
 
-      const structuredActivities: ActivityRow[] = actionRows
-        .filter(row => row.timestamp)
-        .map(row => {
-          const rendered = renderAudienceEventSentence(row);
-          return {
-            id: row.id,
-            type: 'click' as const,
-            description:
-              rendered.kind === 'sentence' ? `${rendered.text}.` : row.label,
-            icon:
-              row.eventType === 'profile_visited'
-                ? 'visit'
-                : row.eventType === 'subscription_created'
-                  ? 'email'
-                  : row.eventType === 'tip_sent' ||
-                      row.eventType === 'tip_link_opened'
-                    ? 'tip'
-                    : row.eventType === 'social_opened'
-                      ? 'social'
-                      : row.eventType === 'content_checked_out'
-                        ? 'listen'
-                        : 'link',
-            timestamp: toISOStringSafe(row.timestamp!),
-            href: APP_ROUTES.AUDIENCE,
-          };
-        });
+      const structuredActivities: ActivityRow[] = actionRows.flatMap(row => {
+        if (!row.timestamp) {
+          return [];
+        }
+
+        const rendered = renderAudienceEventSentence(row);
+        return {
+          id: row.id,
+          type: 'click' as const,
+          description:
+            rendered.kind === 'sentence' ? `${rendered.text}.` : row.label,
+          icon: getActivityIcon(row.eventType),
+          timestamp: toISOStringSafe(row.timestamp),
+          href: APP_ROUTES.AUDIENCE,
+        };
+      });
 
       const structuredClickIds = new Set(
         actionRows

@@ -4,6 +4,7 @@ import {
   audienceActions,
   audienceSourceLinks,
 } from '@/lib/db/schema/analytics';
+import { logger } from '@/lib/utils/logger';
 import { slugify } from '@/lib/utm/build-url';
 
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -43,7 +44,28 @@ export async function createUniqueSourceLinkCode(
     if (!existing) return code;
   }
 
-  return buildSourceLinkCode(null);
+  logger.warn(
+    '[source-links] Seeded code generation exhausted, trying seedless fallback',
+    {
+      seed,
+      attempts: 5,
+    }
+  );
+
+  const fallbackCode = buildSourceLinkCode(null);
+  const [existingFallback] = await tx
+    .select({ id: audienceSourceLinks.id })
+    .from(audienceSourceLinks)
+    .where(eq(audienceSourceLinks.code, fallbackCode))
+    .limit(1);
+
+  if (!existingFallback) {
+    return fallbackCode;
+  }
+
+  throw new Error(
+    'Unable to generate a unique source link code after 6 attempts'
+  );
 }
 
 export function appendSourceUtmParams(

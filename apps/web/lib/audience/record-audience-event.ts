@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { audienceActions, audienceMembers } from '@/lib/db/schema/analytics';
 import { getAudienceEventSentenceText } from './activity-grammar';
@@ -11,10 +11,6 @@ import type {
 import { isRecentSourceScanDuplicate } from './source-links';
 
 const DEFAULT_DUPLICATE_WINDOW_MS = 10_000;
-
-function trimHistory<T>(items: T[], maxItems = 3) {
-  return items.slice(0, maxItems);
-}
 
 export interface RecordAudienceEventInput {
   readonly creatorProfileId: string;
@@ -70,6 +66,10 @@ export async function recordAudienceEvent(
 ): Promise<void> {
   const now = input.timestamp ?? new Date();
   if (input.eventType === 'source_scanned' && input.sourceLinkId) {
+    await tx.execute(
+      drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${input.audienceMemberId}), hashtext(${input.sourceLinkId}))`
+    );
+
     const duplicateWindowMs =
       input.duplicateWindowMs ?? DEFAULT_DUPLICATE_WINDOW_MS;
     const isDuplicate = await isRecentSourceScanDuplicate(tx, {
@@ -115,25 +115,25 @@ export async function recordAudienceEvent(
     context: input.context ?? {},
     timestamp: now,
   });
-
-  const [member] = await tx
-    .select({ latestActions: audienceMembers.latestActions })
-    .from(audienceMembers)
-    .where(eq(audienceMembers.id, input.audienceMemberId))
-    .limit(1);
-
-  const existingActions = Array.isArray(member?.latestActions)
-    ? member.latestActions
-    : [];
-  const latestActions = trimHistory(
-    [compactActionProjection(input, label), ...existingActions],
-    5
+  const compactActionJson = JSON.stringify(
+    compactActionProjection(input, label)
   );
 
   await tx
     .update(audienceMembers)
     .set({
-      latestActions,
+      latestActions: drizzleSql`(
+        SELECT COALESCE(jsonb_agg(entry.value ORDER BY entry.ordinality), '[]'::jsonb)
+        FROM (
+          SELECT value, ordinality
+          FROM jsonb_array_elements(
+            jsonb_build_array(${drizzleSql`${compactActionJson}::jsonb`}) ||
+            COALESCE(${audienceMembers.latestActions}, '[]'::jsonb)
+          ) WITH ORDINALITY AS item(value, ordinality)
+          ORDER BY ordinality
+          LIMIT 5
+        ) AS entry
+      )`,
       latestActionLabel: label,
       lastSeenAt: now,
       updatedAt: now,
