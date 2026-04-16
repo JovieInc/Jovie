@@ -310,7 +310,7 @@ export function ArtistProfileModeSwitcher({
                       setDrawerNonce(nonce => nonce + 1);
                     }}
                     className={cn(
-                      'shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors',
+                      'min-h-11 shrink-0 rounded-full px-3 py-2 text-[12px] font-medium transition-colors',
                       isActive
                         ? 'bg-white text-black'
                         : 'text-tertiary-token hover:bg-white/[0.06] hover:text-primary-token'
