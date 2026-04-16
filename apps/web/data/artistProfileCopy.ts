@@ -198,11 +198,7 @@ export interface ArtistProfileLandingCopy {
         'Destination',
       ];
       readonly rows: readonly {
-        readonly id:
-          | 'release'
-          | 'tour'
-          | 'video'
-          | 'support-follow-up';
+        readonly id: 'release' | 'tour' | 'video' | 'support-follow-up';
         readonly trigger: string;
         readonly audience: string;
         readonly message: string;
