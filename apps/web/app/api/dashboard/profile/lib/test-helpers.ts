@@ -15,6 +15,7 @@ import { NO_STORE_HEADERS } from './constants';
 
 export interface TestProfileUpdateParams {
   clerkUserId: string;
+  dbProfileUpdates?: Record<string, unknown>;
   usernameUpdate?: string;
   displayNameForUserUpdate?: string;
   avatarUrl?: string;
@@ -22,6 +23,7 @@ export interface TestProfileUpdateParams {
 
 export async function handleTestProfileUpdate({
   clerkUserId,
+  dbProfileUpdates: _dbProfileUpdates,
   usernameUpdate,
   displayNameForUserUpdate,
   avatarUrl,
