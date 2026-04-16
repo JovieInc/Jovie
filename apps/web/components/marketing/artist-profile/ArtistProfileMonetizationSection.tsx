@@ -19,7 +19,7 @@ export function ArtistProfileMonetizationSection({
       className='bg-[#050505] py-24 sm:py-28 lg:py-36'
       width='page'
     >
-      <div className='mx-auto max-w-[1280px]'>
+      <div className='mx-auto max-w-[1380px]'>
         <div className='mx-auto max-w-[48rem] text-center'>
           <h2 className='text-[clamp(3.35rem,7vw,6.9rem)] font-semibold leading-[0.88] tracking-[-0.08em] text-primary-token'>
             {monetization.headline}
@@ -29,10 +29,9 @@ export function ArtistProfileMonetizationSection({
           </p>
         </div>
 
-        <div className='mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(260px,0.86fr)_minmax(0,1.12fr)] lg:items-stretch lg:gap-6'>
+        <div className='mt-12 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch'>
           <GetPaidCard card={monetization.paidCard} payMode={payMode} />
-          <CaptureBridgeCard card={monetization.bridgeCard} />
-          <SayThanksCard card={monetization.followUpCard} />
+          <RelationshipCard card={monetization.relationshipCard} />
         </div>
       </div>
     </ArtistProfileSectionShell>
@@ -47,13 +46,12 @@ function GetPaidCard({
   payMode: ArtistProfileMode;
 }>) {
   return (
-    <article className='relative isolate flex min-h-[560px] flex-col text-black lg:min-h-[620px]'>
-      <div className='absolute inset-0 rounded-[1.9rem] bg-[#f7f7f2] shadow-[0_30px_90px_rgba(0,0,0,0.34)]' />
+    <article className='relative isolate flex min-h-[560px] flex-col rounded-[1.9rem] bg-[#f7f7f2] px-7 pt-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:px-8 sm:pt-8 lg:min-h-[640px] lg:px-10 lg:pt-10'>
       <div
-        className='absolute inset-x-0 bottom-0 h-[58%] rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-[62%] rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
         aria-hidden='true'
       />
-      <div className='relative z-10 px-7 pt-7 sm:px-8 sm:pt-8 lg:px-9 lg:pt-9'>
+      <div className='relative z-10'>
         <h3 className='max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
@@ -77,8 +75,8 @@ function GetPaidCard({
         </div>
       </div>
 
-      <div className='relative z-10 mt-auto -mb-10 px-0 pt-20 sm:-mb-12 sm:pt-24 lg:-mb-14 lg:pt-28'>
-        <div className='rounded-t-[2.2rem] rounded-b-none border border-white/4 border-b-0 bg-[#101010] px-5 pb-5 pt-4 text-white shadow-[0_-18px_55px_rgba(0,0,0,0.16)] sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7'>
+      <div className='relative z-10 mt-auto -mx-7 -mb-7 px-0 pt-20 sm:-mx-8 sm:-mb-8 sm:pt-24 lg:-mx-10 lg:-mb-10 lg:pt-28'>
+        <div className='rounded-t-[2.25rem] rounded-b-none border-x border-t border-white/4 bg-[#101010] px-5 pb-6 pt-4 text-white shadow-[0_-18px_55px_rgba(0,0,0,0.16)] sm:px-6 sm:pb-7 sm:pt-5 lg:px-7 lg:pb-8'>
           <div className='mx-auto mb-5 h-1 w-10 rounded-full bg-white/18' />
           <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
             {payMode.drawer.title}
@@ -118,82 +116,48 @@ function GetPaidCard({
   );
 }
 
-function CaptureBridgeCard({
+function RelationshipCard({
   card,
 }: Readonly<{
-  card: ArtistProfileLandingCopy['monetization']['bridgeCard'];
+  card: ArtistProfileLandingCopy['monetization']['relationshipCard'];
 }>) {
   return (
-    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#121212] px-7 py-7 text-white shadow-[0_24px_64px_rgba(0,0,0,0.28)] sm:px-8 sm:py-8 lg:min-h-[620px] lg:px-8 lg:py-9'>
-      <div>
-        <h3 className='max-w-[9ch] text-[clamp(2.4rem,4.5vw,3.8rem)] font-semibold leading-[0.92] tracking-[-0.07em] text-white'>
-          {card.title}
-        </h3>
-        <p className='mt-4 max-w-[16rem] text-[14px] leading-[1.55] tracking-[-0.02em] text-white/62'>
-          {card.body}
-        </p>
-      </div>
-
-      <div className='mt-auto mx-auto w-full max-w-[20rem] space-y-3 pt-20 lg:max-w-none lg:pt-24'>
-        {card.states.map(state => (
-          <div
-            key={state.id}
-            className='flex items-center justify-between gap-3 rounded-[1.1rem] border border-white/8 bg-white/[0.03] px-4 py-4'
-          >
-            <span className='text-[12px] font-medium tracking-[-0.02em] text-white/68'>
-              {state.label}
-            </span>
-            <span className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
-              {state.status}
-            </span>
-          </div>
-        ))}
-      </div>
-    </article>
-  );
-}
-
-function SayThanksCard({
-  card,
-}: Readonly<{
-  card: ArtistProfileLandingCopy['monetization']['followUpCard'];
-}>) {
-  return (
-    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#fbfbf7] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[620px] lg:p-9'>
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#fbfbf7] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[640px] lg:p-10'>
       <div
         className='absolute inset-x-0 top-0 h-[62%] bg-[linear-gradient(180deg,rgba(0,0,0,0.055),rgba(255,255,255,0))]'
         aria-hidden='true'
       />
 
-      <div className='relative z-20 mx-auto w-full max-w-[24rem] pt-2'>
-        <div className='rounded-[1.5rem] bg-black/[0.045] px-4 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:px-5'>
-          <div className='flex items-center justify-between gap-3'>
-            <p className='truncate text-[12px] font-semibold tracking-[-0.02em] text-black/88'>
-              {card.senderLabel}
-            </p>
-            <p className='text-[11px] font-medium text-black/38'>
-              {card.timestampLabel}
-            </p>
-          </div>
-
-          <p className='mt-3 text-[14px] font-semibold leading-snug tracking-[-0.03em] text-black/92'>
-            {card.message}
-          </p>
-
-          <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white px-3.5 py-3'>
-            <span className='min-w-0 truncate text-[12px] font-medium text-black/66'>
-              {card.ctaLabel}
-            </span>
-            <ArrowRight
-              className='h-3.5 w-3.5 text-black/35'
-              strokeWidth={1.9}
-            />
-          </div>
+      <div className='relative z-20 mx-auto w-full max-w-[20rem] pt-3 sm:max-w-[21rem]'>
+        <div
+          aria-hidden='true'
+          className='absolute bottom-6 left-1/2 top-8 w-px -translate-x-1/2 bg-black/10'
+        />
+        <div className='relative grid gap-3.5'>
+          {card.timeline.map(step => (
+            <div
+              key={step.id}
+              className='mx-auto w-full max-w-[18.75rem] rounded-[1.35rem] bg-[#111111] px-4 py-4 text-white shadow-[0_14px_32px_rgba(0,0,0,0.14)] sm:px-5'
+            >
+              <p className='text-center text-[10px] font-semibold tracking-[0.06em] text-white/38'>
+                {step.label}
+              </p>
+              <p className='mt-2 text-center text-[14px] font-semibold leading-snug tracking-[-0.03em] text-white/96'>
+                {step.title}
+              </p>
+              <p className='mt-2.5 text-center text-[12px] leading-[1.45] text-white/54'>
+                {step.detail}
+              </p>
+              <p className='mt-1 text-center text-[11px] font-medium text-white/68'>
+                {step.meta}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className='relative z-10 mt-auto max-w-[26rem] pt-24 sm:pt-28'>
-        <h3 className='max-w-[11ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
+      <div className='relative z-10 mt-auto max-w-[29rem] pt-16 sm:pt-20'>
+        <h3 className='max-w-[8ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
         <p className='mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>

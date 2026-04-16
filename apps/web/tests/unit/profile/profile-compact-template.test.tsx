@@ -327,7 +327,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('normalizes back to the base profile when the URL has no mode param', async () => {
+  it('falls back to the mode prop when the URL has no mode param', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
 
     render(
@@ -342,7 +342,45 @@ describe('ProfileCompactTemplate', () => {
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
+          modeOverride: 'listen',
+        })
+      );
+    });
+  });
+
+  it('updates requested mode when the fallback mode prop changes', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+
+    const { rerender } = render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
           modeOverride: 'profile',
+        })
+      );
+    });
+
+    rerender(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
         })
       );
     });

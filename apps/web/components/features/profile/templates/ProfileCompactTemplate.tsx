@@ -375,14 +375,14 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(() => {
     setRequestedMode(currentMode => {
-      const nextMode = getModeFromUrl();
+      const nextMode = getInitialModeFromLocation(mode);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;
       }
       return nextMode;
     });
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     syncRequestedModeFromLocation();

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import { HomeCountdownObject } from './HomeCountdownObject';
 import { HomeNotificationCard } from './HomeNotificationCard';
-import { HomeProfileShowcase } from './HomeProfileShowcase';
+import {
+  HomeProfileShowcase,
+  type HomeProfileShowcasePresentation,
+} from './HomeProfileShowcase';
 import { HomeRelationshipPanel } from './HomeRelationshipPanel';
 
 export const MARKETING_RENDER_ROUTE_SURFACES = [
@@ -57,14 +59,43 @@ function RenderShell({
 }>) {
   return (
     <div
-      className={`relative flex min-h-[13rem] items-center justify-center overflow-hidden rounded-[1.5rem] border border-white/10 ${
+      className={`relative flex min-h-[13.25rem] items-center justify-center overflow-hidden rounded-[1.4rem] ${
         emphasize
-          ? 'bg-[radial-gradient(circle_at_top,rgba(138,180,255,0.18),transparent_52%),linear-gradient(180deg,rgba(16,19,26,0.98),rgba(6,8,12,1))]'
-          : 'bg-[linear-gradient(180deg,rgba(14,16,22,0.98),rgba(7,9,13,1))]'
-      } p-4 shadow-[0_22px_56px_rgba(0,0,0,0.22)]`}
+          ? 'bg-[radial-gradient(circle_at_top,rgba(138,180,255,0.14),transparent_50%),linear-gradient(180deg,rgba(13,15,20,0.96),rgba(8,10,14,0.98))]'
+          : 'bg-[linear-gradient(180deg,rgba(13,15,20,0.98),rgba(8,10,14,1))]'
+      } p-3`}
     >
       {children}
     </div>
+  );
+}
+
+function ShowcaseCrop({
+  stateId,
+  presentation = 'featured-card-crop',
+  cropAnchor = 'center',
+  hideChrome,
+}: Readonly<{
+  stateId:
+    | 'catalog'
+    | 'streams-latest'
+    | 'streams-presave'
+    | 'tour'
+    | 'tips-open';
+  presentation?: HomeProfileShowcasePresentation;
+  cropAnchor?: 'center' | 'left' | 'right' | 'bottom';
+  hideChrome: boolean;
+}>) {
+  return (
+    <HomeProfileShowcase
+      stateId={stateId}
+      presentation={presentation}
+      cropAnchor={cropAnchor}
+      overlayMode='hidden'
+      hideJovieBranding={hideChrome}
+      hideMoreMenu={hideChrome}
+      className='w-full'
+    />
   );
 }
 
@@ -76,14 +107,9 @@ export function MarketingRenderSurface({
     case 'profile':
       return (
         <RenderShell emphasize>
-          <HomeProfileShowcase
-            stateId='catalog'
-            presentation='beauty-shot'
-            overlayMode='hidden'
-            hideJovieBranding={hideChrome}
-            hideMoreMenu={hideChrome}
-            className='w-full max-w-[16.25rem]'
-          />
+          <div className='w-full max-w-[24rem]'>
+            <ShowcaseCrop stateId='streams-latest' hideChrome={hideChrome} />
+          </div>
         </RenderShell>
       );
     case 'notification':
@@ -97,24 +123,11 @@ export function MarketingRenderSurface({
     case 'tips':
       return (
         <RenderShell>
-          <HomeProfileShowcase
-            stateId='tips-apple-pay'
-            presentation='drawer-crop'
-            cropAnchor='bottom'
-            hideJovieBranding={hideChrome}
-            hideMoreMenu={hideChrome}
-            className='w-full'
-          />
-        </RenderShell>
-      );
-    case 'countdown':
-      return (
-        <RenderShell>
-          <div className='flex w-full flex-col items-center gap-4'>
-            <HomeCountdownObject />
+          <div className='w-full max-w-[24rem]'>
             <HomeProfileShowcase
-              stateId='streams-presave'
-              presentation='featured-card-crop'
+              stateId='tips-apple-pay'
+              presentation='drawer-crop'
+              cropAnchor='bottom'
               overlayMode='hidden'
               hideJovieBranding={hideChrome}
               hideMoreMenu={hideChrome}
@@ -123,10 +136,19 @@ export function MarketingRenderSurface({
           </div>
         </RenderShell>
       );
+    case 'countdown':
+      return (
+        <RenderShell>
+          <div className='grid w-full max-w-[24rem] gap-3'>
+            <ShowcaseCrop stateId='streams-presave' hideChrome={hideChrome} />
+            <ShowcaseCrop stateId='streams-latest' hideChrome={hideChrome} />
+          </div>
+        </RenderShell>
+      );
     case 'fans':
       return (
         <RenderShell>
-          <div className='w-full max-w-[24rem] rounded-[1.25rem] border border-white/8 bg-white/[0.04] p-3'>
+          <div className='w-full max-w-[24rem] rounded-[1.25rem] bg-white/[0.03] p-3'>
             <HomeRelationshipPanel />
           </div>
         </RenderShell>
@@ -134,14 +156,9 @@ export function MarketingRenderSurface({
     case 'tour':
       return (
         <RenderShell>
-          <HomeProfileShowcase
-            stateId='tour'
-            presentation='featured-card-crop'
-            overlayMode='hidden'
-            hideJovieBranding={hideChrome}
-            hideMoreMenu={hideChrome}
-            className='w-full'
-          />
+          <div className='w-full max-w-[24rem]'>
+            <ShowcaseCrop stateId='tour' hideChrome={hideChrome} />
+          </div>
         </RenderShell>
       );
   }

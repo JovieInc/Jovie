@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
+import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 
 interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
@@ -123,25 +124,39 @@ export function ArtistProfileModeSwitcher({
             </div>
           </div>
 
-          <div className='relative mx-auto aspect-[660/1368] w-[min(100%,21.25rem,32svh)]'>
-            {adaptive.modes.map((mode, index) => {
-              const isActive = index === activeIndex;
-              return (
-                <Image
-                  key={mode.id}
-                  src={mode.screenshotSrc}
-                  alt={isActive ? mode.screenshotAlt : ''}
-                  aria-hidden={!isActive}
-                  fill
-                  sizes='(max-width: 640px) 100vw, 376px'
-                  className={cn(
-                    'object-contain object-center drop-shadow-[0_28px_82px_rgba(0,0,0,0.48)] transition-opacity duration-300 ease-out',
-                    isActive ? 'opacity-100' : 'pointer-events-none opacity-0'
-                  )}
-                  priority={mode.id === 'listen'}
+          <div className='relative mx-auto w-[min(100%,23rem,34svh)]'>
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-x-8 top-4 h-24 rounded-full bg-white/8 blur-3xl'
+            />
+            <ArtistProfilePhoneFrame className='relative z-10 max-w-none'>
+              <div className='relative h-full w-full'>
+                {adaptive.modes.map((mode, index) => {
+                  const isActive = index === activeIndex;
+                  return (
+                    <Image
+                      key={mode.id}
+                      src={mode.screenshotSrc}
+                      alt={isActive ? mode.screenshotAlt : ''}
+                      aria-hidden={!isActive}
+                      fill
+                      sizes='(max-width: 640px) 100vw, 376px'
+                      className={cn(
+                        'object-cover object-top transition-opacity duration-300 ease-out',
+                        isActive
+                          ? 'opacity-100'
+                          : 'pointer-events-none opacity-0'
+                      )}
+                      priority={mode.id === 'listen'}
+                    />
+                  );
+                })}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),transparent_22%,transparent_78%,rgba(0,0,0,0.2))]'
                 />
-              );
-            })}
+              </div>
+            </ArtistProfilePhoneFrame>
           </div>
 
           <div
@@ -153,7 +168,7 @@ export function ArtistProfileModeSwitcher({
                 : 'pointer-events-none translate-y-3 opacity-0'
             )}
           >
-            <div className='mx-auto flex w-fit max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-full bg-white/[0.035] p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+            <div className='mx-auto mt-4 flex w-fit max-w-full flex-nowrap items-center justify-start gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
               {adaptive.modes.map((mode, index) => {
                 const isActive = index === activeIndex;
                 return (
@@ -166,10 +181,10 @@ export function ArtistProfileModeSwitcher({
                       setActiveIndex(index);
                     }}
                     className={cn(
-                      'min-h-11 shrink-0 rounded-full px-3 py-2 text-[12px] font-medium transition-colors',
+                      'inline-flex h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[14px] font-medium tracking-[-0.02em] transition-colors',
                       isActive
-                        ? 'bg-white text-black'
-                        : 'text-tertiary-token hover:bg-white/[0.06] hover:text-primary-token'
+                        ? 'border-white bg-white text-black hover:bg-white/90'
+                        : 'border-white/10 bg-white/[0.035] text-secondary-token hover:border-white/18 hover:bg-white/[0.06] hover:text-primary-token'
                     )}
                   >
                     {mode.label}

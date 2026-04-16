@@ -17,7 +17,7 @@ export interface ArtistProfileFeatureTile {
     | 'always-in-sync'
     | 'retarget-warm-fans'
     | 'press-ready-assets'
-    | 'keyboard-first-workflow';
+    | 'utm-builder';
   readonly title: string;
   readonly body: string;
   readonly size: 'large' | 'small';
@@ -32,7 +32,7 @@ export interface ArtistProfileFeatureTile {
     | 'always-in-sync'
     | 'retarget-warm-fans'
     | 'press-ready-assets'
-    | 'keyboard-first-workflow';
+    | 'utm-builder';
   readonly screenshotSrc?: string;
   readonly screenshotAlt?: string;
   readonly screenshotWidth?: number;
@@ -229,13 +229,13 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     objectPosition: '50% 18%',
   },
   {
-    id: 'keyboard-first-workflow',
-    title: 'Keyboard-first workflow',
-    body: 'Fast shortcuts and a quick admin interface for teams moving at speed.',
+    id: 'utm-builder',
+    title: 'Track every campaign',
+    body: 'Build tagged links fast so every post, ad, and partner placement stays measurable.',
     size: 'small',
     accent: 'teal',
-    kicker: 'Ops speed',
-    proofMeta: ['Open profile', 'Copy link', 'Find fan'],
-    proofVariant: 'keyboard-first-workflow',
+    kicker: 'UTM Builder',
+    proofMeta: ['Source tags', 'Campaign links', 'Saved presets'],
+    proofVariant: 'utm-builder',
   },
 ] as const;

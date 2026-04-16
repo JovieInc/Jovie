@@ -8,7 +8,6 @@ export type ArtistProfileSectionId =
   | 'monetization'
   | 'capture'
   | 'reactivation'
-  | 'opinionated'
   | 'specWall'
   | 'howItWorks'
   | 'socialProof'
@@ -71,12 +70,6 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       id: 'reactivation',
       label: 'Bring Them Back Automatically',
       testId: 'artist-profile-section-reactivation',
-    },
-    {
-      id: 'opinionated',
-      label: 'Opinionated',
-      testId: 'artist-profile-section-opinionated',
-      screenshotScenarioId: 'artist-profile-opinionated-section-desktop',
     },
     {
       id: 'specWall',

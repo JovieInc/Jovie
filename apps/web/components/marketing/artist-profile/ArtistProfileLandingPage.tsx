@@ -14,7 +14,7 @@ import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
-import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
+import { ArtistProfileReactivationSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from './ArtistProfileSpecWall';
@@ -78,11 +78,15 @@ export function ArtistProfileLandingPage({
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection capture={copy.capture} />
       </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.opinionated}>
-        <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.reactivation}>
+        <ArtistProfileReactivationSection reactivation={copy.reactivation} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
-        <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />
+        <ArtistProfileSpecWall
+          opinionated={copy.opinionated}
+          specWall={copy.specWall}
+          tiles={specTiles}
+        />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />

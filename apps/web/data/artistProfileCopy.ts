@@ -149,22 +149,32 @@ export interface ArtistProfileLandingCopy {
       readonly contextLabel: string;
       readonly contextDetail: string;
     };
-    readonly bridgeCard: {
+    readonly relationshipCard: {
       readonly title: string;
       readonly body: string;
-      readonly states: readonly {
-        readonly id: 'paid' | 'email' | 'notifications' | 'saved-show';
-        readonly label: string;
-        readonly status: string;
-      }[];
-    };
-    readonly followUpCard: {
-      readonly title: string;
-      readonly body: string;
-      readonly senderLabel: string;
-      readonly timestampLabel: string;
-      readonly message: string;
-      readonly ctaLabel: string;
+      readonly timeline: readonly [
+        {
+          readonly id: 'payment';
+          readonly label: string;
+          readonly title: string;
+          readonly detail: string;
+          readonly meta: string;
+        },
+        {
+          readonly id: 'follow-up-sent';
+          readonly label: string;
+          readonly title: string;
+          readonly detail: string;
+          readonly meta: string;
+        },
+        {
+          readonly id: 'fan-reached';
+          readonly label: string;
+          readonly title: string;
+          readonly detail: string;
+          readonly meta: string;
+        },
+      ];
     };
   };
   readonly capture: {
@@ -271,7 +281,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   hero: {
-    eyebrow: 'Built for artists',
+    eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
       'Streams, drops, support, bookings, and fan capture in a single page.',
@@ -456,7 +466,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc: '/product-screenshots/tim-white-profile-video-phone.png',
+        screenshotSrc:
+          '/product-screenshots/tim-white-profile-contact-phone.png',
         screenshotAlt:
           'Jovie artist profile showing contact access for booking and press.',
         screenshotWidth: 660,
@@ -573,7 +584,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   monetization: {
-    headline: 'Get paid. Keep the fan.',
+    headline: 'Convert a one-time tip into a lifelong fan.',
     subhead:
       'Turn merch-table and QR support into a relationship you can reach again.',
     paidCard: {
@@ -582,39 +593,32 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       contextLabel: 'Merch Table QR',
       contextDetail: 'Scan to support',
     },
-    bridgeCard: {
-      title: 'Capture the fan.',
-      body: 'Collect permission while the moment is still warm.',
-      states: [
+    relationshipCard: {
+      title: 'Keep the fan.',
+      body: 'Turn real-world support into a fan you can reach again.',
+      timeline: [
         {
-          id: 'paid',
-          label: '$10',
-          status: 'Paid',
+          id: 'payment',
+          label: 'Activity',
+          title: '$10 support received',
+          detail: 'Merch Table QR · Venmo',
+          meta: 'Email confirmed',
         },
         {
-          id: 'email',
-          label: 'Email',
-          status: 'Confirmed',
+          id: 'follow-up-sent',
+          label: 'Follow-up sent',
+          title: "Thanks for the support tonight - here's the new song.",
+          detail: 'Release alert delivered',
+          meta: 'Open new single',
         },
         {
-          id: 'notifications',
-          label: 'Notifications',
-          status: 'On',
-        },
-        {
-          id: 'saved-show',
-          label: 'Show',
-          status: 'Saved',
+          id: 'fan-reached',
+          label: 'Fan reached',
+          title: 'New single opened',
+          detail: 'Notifications on',
+          meta: 'Ready for next show',
         },
       ],
-    },
-    followUpCard: {
-      title: 'Say thanks.',
-      body: 'Turn one payment into the next listen, save, or show.',
-      senderLabel: 'Tim White',
-      timestampLabel: 'now',
-      message: "Thanks for the support tonight - here's the new song.",
-      ctaLabel: 'Open new single',
     },
   },
   capture: {
@@ -827,7 +831,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     intro: 'Real artist profiles. Real release moments.',
   },
   faq: {
-    headline: 'Frequently asked questions',
+    headline: 'Frequently Asked Questions',
     items: [
       {
         question: 'How is Jovie different from Linktree?',

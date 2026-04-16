@@ -28,8 +28,7 @@ const SPEC_TILE_LAYOUT: Record<ArtistProfileFeatureTile['id'], string> = {
     'xl:col-start-10 xl:row-start-2 xl:col-span-3 xl:row-span-1',
   'press-ready-assets':
     'xl:col-start-1 xl:row-start-3 xl:col-span-3 xl:row-span-1',
-  'keyboard-first-workflow':
-    'xl:col-start-1 xl:row-start-4 xl:col-span-3 xl:row-span-1',
+  'utm-builder': 'xl:col-start-1 xl:row-start-4 xl:col-span-3 xl:row-span-1',
 };
 
 type AccentStyle = CSSProperties & {
@@ -38,6 +37,7 @@ type AccentStyle = CSSProperties & {
 
 interface ArtistProfileSpecWallProps {
   readonly specWall: ArtistProfileLandingCopy['specWall'];
+  readonly opinionated: ArtistProfileLandingCopy['opinionated'];
   readonly tiles: readonly ArtistProfileFeatureTile[];
 }
 
@@ -259,9 +259,14 @@ function renderPowerFeatureProof(tile: ArtistProfileFeatureTile) {
     case 'always-in-sync':
       return (
         <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
-          <div className='flex items-center gap-2 text-[11px] font-medium text-secondary-token'>
-            <span className='h-2 w-2 rounded-full bg-[color:var(--tile-accent)] shadow-[0_0_20px_var(--tile-accent)]' />
-            Updated across profile surfaces
+          <div className='flex items-center justify-between gap-3 rounded-[0.95rem] border border-white/8 bg-white/[0.035] px-3 py-2'>
+            <div className='flex items-center gap-2 text-[11px] font-medium text-secondary-token'>
+              <span className='h-2 w-2 rounded-full bg-[color:var(--tile-accent)] shadow-[0_0_20px_var(--tile-accent)]' />
+              Updated across profile surfaces
+            </div>
+            <span className='text-[11px] font-semibold text-[color:var(--tile-accent)]'>
+              Static TTFB &lt;100ms
+            </span>
           </div>
           <div className='mt-4 grid flex-1 grid-cols-2 gap-3'>
             <ScreenshotCrop
@@ -338,37 +343,44 @@ function renderPowerFeatureProof(tile: ArtistProfileFeatureTile) {
           </div>
         </div>
       );
-    case 'keyboard-first-workflow':
+    case 'utm-builder':
       return (
         <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
           <div className='rounded-[1rem] border border-white/8 bg-white/[0.035] p-3'>
             <div className='flex items-center justify-between gap-3 rounded-[0.85rem] border border-white/8 bg-black/32 px-3 py-2'>
               <span className='text-[12px] text-secondary-token'>
-                Jump to action
+                UTM Builder
               </span>
-              <div className='flex items-center gap-1.5'>
-                {['/', 'G', 'K'].map(keycap => (
-                  <span
-                    key={keycap}
-                    className='rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[10px] font-semibold text-primary-token'
-                  >
-                    {keycap}
-                  </span>
-                ))}
+              <div className='flex items-center gap-1.5 text-[10px] font-semibold text-primary-token'>
+                <span className='rounded-md border border-white/10 bg-white/[0.06] px-2 py-1'>
+                  release
+                </span>
+                <span className='rounded-md border border-white/10 bg-white/[0.06] px-2 py-1'>
+                  tour
+                </span>
               </div>
             </div>
             <div className='mt-3 space-y-2'>
-              {tile.proofMeta.map(item => (
+              {[
+                ['source', 'instagram-story'],
+                ['campaign', 'spring-tour'],
+                ['medium', 'creator-share'],
+              ].map(([label, value]) => (
                 <div
-                  key={item}
+                  key={label}
                   className='flex items-center justify-between rounded-[0.85rem] bg-white/[0.05] px-3 py-2'
                 >
-                  <span className='text-[12px] font-medium text-primary-token'>
-                    {item}
+                  <span className='text-[11px] uppercase tracking-[0.14em] text-secondary-token'>
+                    {label}
                   </span>
-                  <span className='text-[11px] text-secondary-token'>Key</span>
+                  <span className='text-[12px] font-medium text-primary-token'>
+                    {value}
+                  </span>
                 </div>
               ))}
+            </div>
+            <div className='mt-3 rounded-[0.85rem] border border-dashed border-white/10 bg-black/24 px-3 py-2 text-[11px] text-secondary-token'>
+              jov.ie/timwhite?utm_source=instagram-story&utm_campaign=spring-tour
             </div>
           </div>
         </div>
@@ -436,6 +448,7 @@ function ArtistProfilePowerFeatureTile({
 
 export function ArtistProfileSpecWall({
   specWall,
+  opinionated,
   tiles,
 }: Readonly<ArtistProfileSpecWallProps>) {
   return (
@@ -445,16 +458,48 @@ export function ArtistProfileSpecWall({
       containerClassName='lg:max-w-none'
     >
       <div className='overflow-hidden rounded-[2.25rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(107,177,255,0.09),transparent_22%),radial-gradient(circle_at_78%_18%,rgba(77,209,191,0.08),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)),#020304] px-5 py-8 shadow-[0_32px_120px_rgba(0,0,0,0.4)] sm:px-8 sm:py-10 lg:px-10 lg:py-12'>
-        <div className='max-w-[42rem]'>
-          <p className='text-[12px] font-medium tracking-[-0.02em] text-tertiary-token'>
-            {specWall.eyebrow}
-          </p>
-          <h2 className='marketing-h2-linear mt-4 max-w-[11ch] text-primary-token lg:!text-[clamp(3rem,5.1vw,4.8rem)] lg:!leading-[0.93] lg:!tracking-[-0.06em]'>
-            {specWall.headline}
-          </h2>
-          <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.7] text-secondary-token'>
-            {specWall.subhead}
-          </p>
+        <div className='grid gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(22rem,0.62fr)] lg:items-start lg:gap-10'>
+          <div className='max-w-[42rem]'>
+            <p className='text-[12px] font-medium tracking-[-0.02em] text-tertiary-token'>
+              {specWall.eyebrow}
+            </p>
+            <h2 className='marketing-h2-linear mt-4 max-w-[11ch] text-primary-token lg:!text-[clamp(3rem,5.1vw,4.8rem)] lg:!leading-[0.93] lg:!tracking-[-0.06em]'>
+              {specWall.headline}
+            </h2>
+            <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.7] text-secondary-token'>
+              {specWall.subhead}
+            </p>
+          </div>
+
+          <div className='rounded-[1.6rem] border border-white/8 bg-white/[0.03] p-4 shadow-[0_18px_54px_rgba(0,0,0,0.22)] sm:p-5'>
+            <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-white/38'>
+              {opinionated.eyebrow}
+            </p>
+            <p className='mt-3 text-[14px] leading-[1.6] text-secondary-token'>
+              {opinionated.body}
+            </p>
+            <div className='mt-4 flex flex-wrap gap-2'>
+              {opinionated.principles.map(principle => (
+                <ProofChip key={principle}>{principle}</ProofChip>
+              ))}
+            </div>
+            <div className='mt-5 space-y-2'>
+              {opinionated.rules.map(rule => (
+                <div
+                  key={rule.id}
+                  className='grid items-center gap-2 rounded-[1rem] bg-white/[0.035] px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'
+                >
+                  <span className='text-[12px] font-medium tracking-[-0.02em] text-secondary-token'>
+                    {rule.context}
+                  </span>
+                  <span className='hidden text-white/24 sm:block'>→</span>
+                  <span className='text-[12px] font-semibold tracking-[-0.02em] text-primary-token sm:text-right'>
+                    {rule.result}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className='mt-10 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>

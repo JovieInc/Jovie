@@ -17,6 +17,9 @@ export function HomeHero({
   showPhoneComposition = true,
   variant = 'default',
 }: Readonly<HomeHeroProps>) {
+  const eyebrow =
+    variant === 'artist-profile' ? null : HOME_HERO_CONTENT.eyebrow;
+
   return (
     <section
       className={cn(
@@ -37,7 +40,9 @@ export function HomeHero({
       <Container size='homepage'>
         <div className='homepage-hero-stacked mx-auto max-w-[1200px]'>
           <div className='homepage-hero-copy'>
-            <p className='homepage-hero-eyebrow'>{HOME_HERO_CONTENT.eyebrow}</p>
+            {eyebrow ? (
+              <p className='homepage-hero-eyebrow'>{eyebrow}</p>
+            ) : null}
             <h1
               id='home-hero-heading'
               className='marketing-h1-linear text-primary-token'

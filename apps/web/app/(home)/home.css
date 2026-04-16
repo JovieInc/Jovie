@@ -1049,11 +1049,10 @@
 
   .homepage-bento-card {
     flex-shrink: 0;
-    width: 20rem;
+    width: 21.75rem;
     min-height: 14rem;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
     overflow: hidden;
     border-radius: 1.6rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1069,6 +1068,14 @@
       0 22px 56px rgba(0, 0, 0, 0.22);
     padding: 1.5rem;
     scroll-snap-align: start;
+  }
+
+  .homepage-bento-card-visual {
+    min-height: 14rem;
+  }
+
+  .homepage-bento-card-copy {
+    margin-top: 1rem;
   }
 
   .homepage-bento-card-title {
@@ -1251,7 +1258,7 @@
 
   .homepage-bento-card {
     width: calc(100vw - 3rem);
-    max-width: 20rem;
+    max-width: 21.75rem;
   }
 
   .homepage-philosophy-card {

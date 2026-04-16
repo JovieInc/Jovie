@@ -172,68 +172,82 @@ describe('ArtistProfilesPage', () => {
       screen.getByTestId('artist-profile-section-monetization')
     );
     expect(
-      screen.getByRole('heading', { name: 'Get paid. Keep the fan.' })
+      screen.getByRole('heading', {
+        name: 'Convert a one-time tip into a lifelong fan.',
+      })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Get paid.' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Capture the fan.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Say thanks.' })
+      screen.getByRole('heading', { name: 'Keep the fan.' })
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Turn merch-table and QR support into a relationship you can reach again.'
+        'Turn real-world support into a fan you can reach again.'
       )
     ).toBeInTheDocument();
     expect(
       screen.getByText('QR-ready support for shows, merch tables, and bios.')
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Collect permission while the moment is still warm.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Turn one payment into the next listen, save, or show.')
+      screen.getByText(
+        'Turn real-world support into a fan you can reach again.'
+      )
     ).toBeInTheDocument();
     expect(monetizationSection.getByText('Merch Table QR')).toBeInTheDocument();
     expect(
       monetizationSection.getByText('Scan to support')
     ).toBeInTheDocument();
-    expect(monetizationSection.getAllByText('$10').length).toBeGreaterThan(0);
-    expect(monetizationSection.getAllByText('Paid').length).toBeGreaterThan(0);
-    expect(monetizationSection.getAllByText('Email').length).toBeGreaterThan(0);
+    expect(monetizationSection.getByText('Activity')).toBeInTheDocument();
     expect(
-      monetizationSection.getAllByText('Confirmed').length
+      monetizationSection.getAllByText('$10 support received').length
     ).toBeGreaterThan(0);
     expect(
-      monetizationSection.getAllByText('Notifications').length
-    ).toBeGreaterThan(0);
-    expect(monetizationSection.getAllByText('On').length).toBeGreaterThan(0);
-    expect(monetizationSection.getAllByText('Show').length).toBeGreaterThan(0);
-    expect(monetizationSection.getAllByText('Saved').length).toBeGreaterThan(0);
+      monetizationSection.getByText('Merch Table QR · Venmo')
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Email confirmed')
+    ).toBeInTheDocument();
+    expect(monetizationSection.getByText('Follow-up sent')).toBeInTheDocument();
     expect(
       monetizationSection.getAllByText(
         "Thanks for the support tonight - here's the new song."
       ).length
     ).toBeGreaterThan(0);
     expect(
+      monetizationSection.getByText('Release alert delivered')
+    ).toBeInTheDocument();
+    expect(
       monetizationSection.getByText('Open new single')
+    ).toBeInTheDocument();
+    expect(monetizationSection.getByText('Fan reached')).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('New single opened')
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Notifications on')
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Ready for next show')
     ).toBeInTheDocument();
     expect(
       Boolean(
         screen
           .getByRole('heading', { name: 'Drive streams' })
           .compareDocumentPosition(
-            screen.getByRole('heading', { name: 'Get paid. Keep the fan.' })
+            screen.getByRole('heading', {
+              name: 'Convert a one-time tip into a lifelong fan.',
+            })
           ) & Node.DOCUMENT_POSITION_FOLLOWING
       )
     ).toBe(true);
     expect(
       Boolean(
         screen
-          .getByRole('heading', { name: 'Get paid. Keep the fan.' })
+          .getByRole('heading', {
+            name: 'Convert a one-time tip into a lifelong fan.',
+          })
           .compareDocumentPosition(
             screen.getByRole('heading', {
               name: 'Capture every fan.',
@@ -307,6 +321,28 @@ describe('ArtistProfilesPage', () => {
       )
     ).toBeInTheDocument();
     expect(
+      powerFeaturesSection.getByText('Product philosophy')
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText('No theme builder')
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText('No template maze')
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText('Built to convert')
+    ).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText('Release moment')
+    ).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('Music first')).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('Nearby show')).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('Tickets first')).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getByText('Support intent')
+    ).toBeInTheDocument();
+    expect(powerFeaturesSection.getByText('Pay first')).toBeInTheDocument();
+    expect(
       powerFeaturesSection.getByRole('heading', {
         name: 'Audience quality filtering',
       })
@@ -335,11 +371,17 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
     expect(
       powerFeaturesSection.getByRole('heading', {
-        name: 'Keyboard-first workflow',
+        name: 'Track every campaign',
       })
     ).toBeInTheDocument();
     expect(powerFeaturesSection.getByText('Quality view')).toBeInTheDocument();
     expect(powerFeaturesSection.getByText('New music')).toBeInTheDocument();
+    expect(
+      powerFeaturesSection.getAllByText('UTM Builder').length
+    ).toBeGreaterThan(0);
+    expect(
+      powerFeaturesSection.getByText('Static TTFB <100ms')
+    ).toBeInTheDocument();
     expect(
       powerFeaturesSection.queryByText('Fast by design')
     ).not.toBeInTheDocument();
@@ -400,10 +442,6 @@ describe('ArtistProfilesPage', () => {
         'Use one clean profile link across bio, QR, posts, stories, and shows.'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Release moment')).toBeInTheDocument();
-    expect(screen.getByText('Music first')).toBeInTheDocument();
-    expect(screen.getByText('Nearby show')).toBeInTheDocument();
-    expect(screen.getByText('Tickets first')).toBeInTheDocument();
     expect(screen.queryByText('Polished by default')).not.toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'Claim your profile' }).length
@@ -414,7 +452,7 @@ describe('ArtistProfilesPage', () => {
     render(<ArtistProfilesPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Frequently asked questions' })
+      screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
       "Don't lose the next fan."

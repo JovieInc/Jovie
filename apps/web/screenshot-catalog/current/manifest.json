@@ -112,7 +112,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T05:07:48.201Z",
+    "capturedAt": "2026-04-16T06:11:56.358Z",
     "gitSha": null,
     "imagePath": "artist-profile-monetization-section-desktop.png"
   },
@@ -128,19 +128,6 @@
     "capturedAt": "2026-04-16T03:08:03.279Z",
     "gitSha": null,
     "imagePath": "artist-profile-capture-section-desktop.png"
-  },
-  {
-    "id": "artist-profile-opinionated-section-desktop",
-    "title": "Artist Profile Opinionated Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T02:40:25.355Z",
-    "gitSha": null,
-    "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
     "id": "artist-profile-how-it-works-section-desktop",

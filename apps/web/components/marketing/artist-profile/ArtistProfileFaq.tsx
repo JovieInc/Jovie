@@ -14,7 +14,6 @@ export function ArtistProfileFaq({ faq }: Readonly<ArtistProfileFaqProps>) {
         heading={faq.headline}
         className='px-0 pb-0'
         headingClassName='marketing-h2-linear text-primary-token'
-        singleOpen
       />
     </ArtistProfileSectionShell>
   );
