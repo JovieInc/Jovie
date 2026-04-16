@@ -159,12 +159,11 @@ function buildAudienceSourceSlugFallback(
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-  const sanitized = normalized
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const sanitized = normalized.replace(/[^a-z0-9]+/g, '-');
+  const trimmed = trimEdgeDashes(sanitized);
 
-  if (sanitized) {
-    return sanitized;
+  if (trimmed) {
+    return trimmed;
   }
 
   let hash = 0;
@@ -173,6 +172,19 @@ function buildAudienceSourceSlugFallback(
   }
 
   return `${prefix}-${hash.toString(36)}`;
+}
+
+function trimEdgeDashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '-') {
+    start += 1;
+  }
+  while (end > 0 && value[end - 1] === '-') {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 function resolveAudienceSourceSlug(value: string, prefix: string): string {
