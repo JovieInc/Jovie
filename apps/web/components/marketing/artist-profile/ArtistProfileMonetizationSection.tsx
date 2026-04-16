@@ -19,7 +19,7 @@ export function ArtistProfileMonetizationSection({
       className='bg-[#050505] py-24 sm:py-28 lg:py-36'
       width='page'
     >
-      <div className='mx-auto max-w-[1120px]'>
+      <div className='mx-auto max-w-[1280px]'>
         <div className='mx-auto max-w-[48rem] text-center'>
           <h2 className='text-[clamp(3.35rem,7vw,6.9rem)] font-semibold leading-[0.88] tracking-[-0.08em] text-primary-token'>
             {monetization.headline}
@@ -29,7 +29,7 @@ export function ArtistProfileMonetizationSection({
           </p>
         </div>
 
-        <div className='mt-12 grid gap-5 lg:grid-cols-3 lg:items-stretch'>
+        <div className='mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.12fr)_minmax(260px,0.86fr)_minmax(0,1.12fr)] lg:items-stretch lg:gap-6'>
           <GetPaidCard card={monetization.paidCard} payMode={payMode} />
           <CaptureBridgeCard card={monetization.bridgeCard} />
           <SayThanksCard card={monetization.followUpCard} />
@@ -47,37 +47,38 @@ function GetPaidCard({
   payMode: ArtistProfileMode;
 }>) {
   return (
-    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#f7f7f2] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[620px] lg:p-9'>
+    <article className='relative isolate flex min-h-[560px] flex-col text-black lg:min-h-[620px]'>
+      <div className='absolute inset-0 rounded-[1.9rem] bg-[#f7f7f2] shadow-[0_30px_90px_rgba(0,0,0,0.34)]' />
       <div
-        className='absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
+        className='absolute inset-x-0 bottom-0 h-[58%] rounded-[1.9rem] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
         aria-hidden='true'
       />
-      <div className='relative z-10'>
+      <div className='relative z-10 px-7 pt-7 sm:px-8 sm:pt-8 lg:px-9 lg:pt-9'>
         <h3 className='max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
-      </div>
 
-      <p className='relative z-10 mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>
-        {card.body}
-      </p>
+        <p className='mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>
+          {card.body}
+        </p>
 
-      <div className='relative z-10 mt-7 flex w-fit items-center gap-3 rounded-full bg-black/[0.045] px-4 py-3 text-black/72'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white'>
-          <QrCode className='h-4 w-4' strokeWidth={1.9} />
-        </span>
-        <div className='min-w-0'>
-          <p className='text-[12px] font-semibold tracking-[-0.02em] text-black/86'>
-            {card.contextLabel}
-          </p>
-          <p className='mt-0.5 text-[11px] tracking-[-0.01em] text-black/52'>
-            {card.contextDetail}
-          </p>
+        <div className='mt-7 flex w-fit items-center gap-3 rounded-full bg-black/[0.045] px-4 py-3 text-black/72'>
+          <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white'>
+            <QrCode className='h-4 w-4' strokeWidth={1.9} />
+          </span>
+          <div className='min-w-0'>
+            <p className='text-[12px] font-semibold tracking-[-0.02em] text-black/86'>
+              {card.contextLabel}
+            </p>
+            <p className='mt-0.5 text-[11px] tracking-[-0.01em] text-black/52'>
+              {card.contextDetail}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className='relative z-10 mt-auto -mx-7 -mb-7 pt-20 sm:-mx-8 sm:-mb-8 sm:pt-24 lg:-mx-9 lg:-mb-9 lg:pt-28'>
-        <div className='rounded-t-[2.2rem] border border-white/4 border-b-0 bg-[#101010] px-5 pb-5 pt-4 text-white shadow-[0_-18px_55px_rgba(0,0,0,0.16)] sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7'>
+      <div className='relative z-10 mt-auto -mb-10 px-0 pt-20 sm:-mb-12 sm:pt-24 lg:-mb-14 lg:pt-28'>
+        <div className='rounded-t-[2.2rem] rounded-b-none border border-white/4 border-b-0 bg-[#101010] px-5 pb-5 pt-4 text-white shadow-[0_-18px_55px_rgba(0,0,0,0.16)] sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7'>
           <div className='mx-auto mb-5 h-1 w-10 rounded-full bg-white/18' />
           <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
             {payMode.drawer.title}
@@ -123,7 +124,7 @@ function CaptureBridgeCard({
   card: ArtistProfileLandingCopy['monetization']['bridgeCard'];
 }>) {
   return (
-    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#121212] px-7 py-7 text-white shadow-[0_24px_64px_rgba(0,0,0,0.28)] sm:px-8 sm:py-8 lg:min-h-[620px] lg:p-9'>
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#121212] px-7 py-7 text-white shadow-[0_24px_64px_rgba(0,0,0,0.28)] sm:px-8 sm:py-8 lg:min-h-[620px] lg:px-8 lg:py-9'>
       <div>
         <h3 className='max-w-[9ch] text-[clamp(2.4rem,4.5vw,3.8rem)] font-semibold leading-[0.92] tracking-[-0.07em] text-white'>
           {card.title}
@@ -133,7 +134,7 @@ function CaptureBridgeCard({
         </p>
       </div>
 
-      <div className='mt-auto mx-auto w-full max-w-[18rem] space-y-3 pt-20 lg:pt-24'>
+      <div className='mt-auto mx-auto w-full max-w-[20rem] space-y-3 pt-20 lg:max-w-none lg:pt-24'>
         {card.states.map(state => (
           <div
             key={state.id}
@@ -164,7 +165,7 @@ function SayThanksCard({
         aria-hidden='true'
       />
 
-      <div className='relative z-20 mx-auto w-full max-w-[22rem] pt-2 sm:max-w-[23rem]'>
+      <div className='relative z-20 mx-auto w-full max-w-[24rem] pt-2'>
         <div className='rounded-[1.5rem] bg-black/[0.045] px-4 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:px-5'>
           <div className='flex items-center justify-between gap-3'>
             <p className='truncate text-[12px] font-semibold tracking-[-0.02em] text-black/88'>
@@ -191,7 +192,7 @@ function SayThanksCard({
         </div>
       </div>
 
-      <div className='relative z-10 mt-auto pt-24 sm:pt-28'>
+      <div className='relative z-10 mt-auto max-w-[26rem] pt-24 sm:pt-28'>
         <h3 className='max-w-[11ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
