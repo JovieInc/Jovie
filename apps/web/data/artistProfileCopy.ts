@@ -127,16 +127,24 @@ export interface ArtistProfileLandingCopy {
     readonly paidCard: {
       readonly title: string;
       readonly body: string;
+      readonly contextLabel: string;
+      readonly contextDetail: string;
+    };
+    readonly bridgeCard: {
+      readonly title: string;
+      readonly body: string;
+      readonly states: readonly {
+        readonly id: 'paid' | 'email' | 'notifications' | 'saved-show';
+        readonly label: string;
+        readonly status: string;
+      }[];
     };
     readonly followUpCard: {
       readonly title: string;
       readonly body: string;
       readonly senderLabel: string;
       readonly timestampLabel: string;
-      readonly notificationLabel: string;
-      readonly badgeLabel: string;
       readonly message: string;
-      readonly detail: string;
       readonly ctaLabel: string;
     };
   };
@@ -519,23 +527,48 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   monetization: {
-    headline: 'Get paid. Stay close.',
-    subhead: 'Support should not end at the transaction.',
+    headline: 'Get paid. Keep the fan.',
+    subhead:
+      'Turn merch-table and QR support into a relationship you can reach again.',
     paidCard: {
       title: 'Get paid.',
-      body: 'Tips and direct support live inside the same profile.',
+      body: 'QR-ready support for shows, merch tables, and bios.',
+      contextLabel: 'Merch Table QR',
+      contextDetail: 'Scan to support',
+    },
+    bridgeCard: {
+      title: 'Capture the fan.',
+      body: 'Collect permission while the moment is still warm.',
+      states: [
+        {
+          id: 'paid',
+          label: '$10',
+          status: 'Paid',
+        },
+        {
+          id: 'email',
+          label: 'Email',
+          status: 'Confirmed',
+        },
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          status: 'On',
+        },
+        {
+          id: 'saved-show',
+          label: 'Show',
+          status: 'Saved',
+        },
+      ],
     },
     followUpCard: {
       title: 'Say thanks.',
-      body: 'Turn a one-time payment into a repeat listen, follow, or save.',
-      senderLabel: 'Jovie',
+      body: 'Turn one payment into the next listen, save, or show.',
+      senderLabel: 'Tim White',
       timestampLabel: 'now',
-      notificationLabel: 'Mail notification',
-      badgeLabel: 'Mail',
-      message: 'Thanks for the support - new song inside.',
-      detail:
-        'New support came in. Send them straight to the next release while the moment is still warm.',
-      ctaLabel: 'Listen now',
+      message: "Thanks for the support tonight - here's the new song.",
+      ctaLabel: 'Open new single',
     },
   },
   capture: {

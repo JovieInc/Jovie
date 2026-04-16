@@ -1,33 +1,37 @@
-import { ArrowRight, CreditCard, Mail, Music2 } from 'lucide-react';
-import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { ArrowRight, QrCode } from 'lucide-react';
+import type {
+  ArtistProfileLandingCopy,
+  ArtistProfileMode,
+} from '@/data/artistProfileCopy';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileMonetizationSectionProps {
   readonly monetization: ArtistProfileLandingCopy['monetization'];
+  readonly payMode: ArtistProfileMode;
 }
-
-const TIP_AMOUNTS = ['$5', '$10', '$25'] as const;
 
 export function ArtistProfileMonetizationSection({
   monetization,
+  payMode,
 }: Readonly<ArtistProfileMonetizationSectionProps>) {
   return (
     <ArtistProfileSectionShell
       className='bg-[#050505] py-24 sm:py-28 lg:py-36'
-      width='landing'
+      width='page'
     >
       <div className='mx-auto max-w-[1120px]'>
-        <div className='mx-auto max-w-[44rem] text-center'>
+        <div className='mx-auto max-w-[48rem] text-center'>
           <h2 className='text-[clamp(3.35rem,7vw,6.9rem)] font-semibold leading-[0.88] tracking-[-0.08em] text-primary-token'>
             {monetization.headline}
           </h2>
-          <p className='mx-auto mt-5 max-w-[29rem] text-[clamp(1.05rem,2vw,1.45rem)] font-medium leading-[1.25] tracking-[-0.04em] text-secondary-token'>
+          <p className='mx-auto mt-5 max-w-[35rem] text-[clamp(1.05rem,2vw,1.45rem)] font-medium leading-[1.25] tracking-[-0.04em] text-secondary-token'>
             {monetization.subhead}
           </p>
         </div>
 
-        <div className='mt-12 grid gap-5 lg:grid-cols-2 lg:items-stretch'>
-          <GetPaidCard card={monetization.paidCard} />
+        <div className='mt-12 grid gap-5 lg:grid-cols-3 lg:items-stretch'>
+          <GetPaidCard card={monetization.paidCard} payMode={payMode} />
+          <CaptureBridgeCard card={monetization.bridgeCard} />
           <SayThanksCard card={monetization.followUpCard} />
         </div>
       </div>
@@ -37,11 +41,13 @@ export function ArtistProfileMonetizationSection({
 
 function GetPaidCard({
   card,
+  payMode,
 }: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['paidCard'];
+  payMode: ArtistProfileMode;
 }>) {
   return (
-    <article className='relative isolate flex min-h-[520px] flex-col overflow-hidden rounded-[1.75rem] bg-[#f7f7f2] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8'>
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#f7f7f2] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[620px] lg:p-9'>
       <div
         className='absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(0,0,0,0.06))]'
         aria-hidden='true'
@@ -56,39 +62,91 @@ function GetPaidCard({
         {card.body}
       </p>
 
-      <div className='relative z-10 mt-auto rounded-t-[1.65rem] bg-[#111] p-4 text-white shadow-[0_-18px_44px_rgba(0,0,0,0.22)] sm:p-5'>
-        <div className='mx-auto mb-4 h-1 w-10 rounded-full bg-white/18' />
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
-              Pay
-            </p>
-            <p className='mt-1 text-[12px] leading-snug text-white/48'>
-              Choose an amount
-            </p>
+      <div className='relative z-10 mt-7 flex w-fit items-center gap-3 rounded-full bg-black/[0.045] px-4 py-3 text-black/72'>
+        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white'>
+          <QrCode className='h-4 w-4' strokeWidth={1.9} />
+        </span>
+        <div className='min-w-0'>
+          <p className='text-[12px] font-semibold tracking-[-0.02em] text-black/86'>
+            {card.contextLabel}
+          </p>
+          <p className='mt-0.5 text-[11px] tracking-[-0.01em] text-black/52'>
+            {card.contextDetail}
+          </p>
+        </div>
+      </div>
+
+      <div className='relative z-10 mt-auto -mx-7 -mb-7 pt-20 sm:-mx-8 sm:-mb-8 sm:pt-24 lg:-mx-9 lg:-mb-9 lg:pt-28'>
+        <div className='rounded-t-[2.2rem] border border-white/4 border-b-0 bg-[#101010] px-5 pb-5 pt-4 text-white shadow-[0_-18px_55px_rgba(0,0,0,0.16)] sm:px-6 sm:pb-6 sm:pt-5 lg:px-7 lg:pb-7'>
+          <div className='mx-auto mb-5 h-1 w-10 rounded-full bg-white/18' />
+          <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
+            {payMode.drawer.title}
+          </p>
+          <p className='mt-1 text-[12px] leading-snug text-white/48'>
+            {payMode.drawer.subtitle}
+          </p>
+
+          <div className='mt-5 grid grid-cols-3 gap-2.5'>
+            {payMode.drawer.items.map(item => (
+              <div
+                key={item.id}
+                className='rounded-[1rem] bg-white/[0.08] px-2.5 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+              >
+                <p className='text-[17px] font-semibold leading-none tracking-[-0.04em] text-white'>
+                  {item.label}
+                </p>
+                <p className='mt-1 truncate text-[10px] font-medium tracking-[-0.02em] text-white/48'>
+                  {item.detail}
+                </p>
+                <p className='mt-1 text-[10px] font-semibold leading-none tracking-[-0.02em] text-white/72'>
+                  {item.action}
+                </p>
+              </div>
+            ))}
           </div>
-          <span className='flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white/72'>
-            <CreditCard className='h-4 w-4' strokeWidth={1.9} />
-          </span>
-        </div>
 
-        <div className='mt-5 grid grid-cols-3 gap-2'>
-          {TIP_AMOUNTS.map(amount => (
-            <span
-              key={amount}
-              className='rounded-full bg-white/[0.08] px-3 py-2 text-center text-[13px] font-semibold tracking-[-0.02em] text-white/88'
-            >
-              {amount}
+          <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white px-4 py-3 text-black'>
+            <span className='text-[13px] font-medium tracking-[-0.02em] text-black/84'>
+              {payMode.drawer.ctaLabel}
             </span>
-          ))}
+            <ArrowRight className='h-4 w-4 text-black/45' strokeWidth={1.9} />
+          </div>
         </div>
+      </div>
+    </article>
+  );
+}
 
-        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/[0.06] px-4 py-3'>
-          <span className='text-[13px] font-medium tracking-[-0.02em] text-white/72'>
-            Support
-          </span>
-          <ArrowRight className='h-4 w-4 text-white/42' strokeWidth={1.9} />
-        </div>
+function CaptureBridgeCard({
+  card,
+}: Readonly<{
+  card: ArtistProfileLandingCopy['monetization']['bridgeCard'];
+}>) {
+  return (
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] border border-white/10 bg-[#121212] px-7 py-7 text-white shadow-[0_24px_64px_rgba(0,0,0,0.28)] sm:px-8 sm:py-8 lg:min-h-[620px] lg:p-9'>
+      <div>
+        <h3 className='max-w-[9ch] text-[clamp(2.4rem,4.5vw,3.8rem)] font-semibold leading-[0.92] tracking-[-0.07em] text-white'>
+          {card.title}
+        </h3>
+        <p className='mt-4 max-w-[16rem] text-[14px] leading-[1.55] tracking-[-0.02em] text-white/62'>
+          {card.body}
+        </p>
+      </div>
+
+      <div className='mt-auto mx-auto w-full max-w-[18rem] space-y-3 pt-20 lg:pt-24'>
+        {card.states.map(state => (
+          <div
+            key={state.id}
+            className='flex items-center justify-between gap-3 rounded-[1.1rem] border border-white/8 bg-white/[0.03] px-4 py-4'
+          >
+            <span className='text-[12px] font-medium tracking-[-0.02em] text-white/68'>
+              {state.label}
+            </span>
+            <span className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
+              {state.status}
+            </span>
+          </div>
+        ))}
       </div>
     </article>
   );
@@ -100,50 +158,41 @@ function SayThanksCard({
   card: ArtistProfileLandingCopy['monetization']['followUpCard'];
 }>) {
   return (
-    <article className='relative isolate min-h-[520px] overflow-hidden rounded-[1.75rem] bg-[#fbfbf7] p-6 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8'>
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#fbfbf7] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[620px] lg:p-9'>
       <div
         className='absolute inset-x-0 top-0 h-[62%] bg-[linear-gradient(180deg,rgba(0,0,0,0.055),rgba(255,255,255,0))]'
         aria-hidden='true'
       />
 
-      <div className='relative z-20 mx-auto max-w-[21.5rem] rounded-[1.35rem] bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.12)] sm:p-5'>
-        <div className='flex items-center justify-between gap-3'>
-          <div className='flex min-w-0 items-center gap-3'>
-            <span
-              className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white'
-              aria-hidden='true'
-            >
-              <Mail className='h-4 w-4' strokeWidth={1.9} />
-            </span>
-            <div className='min-w-0'>
-              <p className='truncate text-[13px] font-semibold tracking-[-0.02em]'>
-                Jovie
-              </p>
-              <p className='truncate text-[11px] text-black/42'>
-                Sent on behalf of the artist
-              </p>
-            </div>
+      <div className='relative z-20 mx-auto w-full max-w-[22rem] pt-2 sm:max-w-[23rem]'>
+        <div className='rounded-[1.5rem] bg-black/[0.045] px-4 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:px-5'>
+          <div className='flex items-center justify-between gap-3'>
+            <p className='truncate text-[12px] font-semibold tracking-[-0.02em] text-black/88'>
+              {card.senderLabel}
+            </p>
+            <p className='text-[11px] font-medium text-black/38'>
+              {card.timestampLabel}
+            </p>
           </div>
-          <span className='rounded-full bg-black/[0.055] px-2.5 py-1 text-[11px] font-medium text-black/56'>
-            Email
-          </span>
-        </div>
 
-        <p className='mt-4 text-[14px] font-semibold leading-snug tracking-[-0.035em]'>
-          {card.message}
-        </p>
+          <p className='mt-3 text-[14px] font-semibold leading-snug tracking-[-0.03em] text-black/92'>
+            {card.message}
+          </p>
 
-        <div className='mt-4 flex items-center justify-between rounded-[0.95rem] bg-black/[0.045] px-3 py-2.5'>
-          <span className='flex min-w-0 items-center gap-2 text-[12px] font-medium text-black/64'>
-            <Music2 className='h-3.5 w-3.5 shrink-0' strokeWidth={1.9} />
-            <span className='truncate'>Listen now</span>
-          </span>
-          <ArrowRight className='h-3.5 w-3.5 text-black/35' strokeWidth={1.9} />
+          <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white px-3.5 py-3'>
+            <span className='min-w-0 truncate text-[12px] font-medium text-black/66'>
+              {card.ctaLabel}
+            </span>
+            <ArrowRight
+              className='h-3.5 w-3.5 text-black/35'
+              strokeWidth={1.9}
+            />
+          </div>
         </div>
       </div>
 
-      <div className='relative z-10 mt-12 sm:mt-14'>
-        <h3 className='max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
+      <div className='relative z-10 mt-auto pt-24 sm:pt-28'>
+        <h3 className='max-w-[11ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
         <p className='mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>

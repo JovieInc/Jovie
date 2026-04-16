@@ -160,44 +160,72 @@ describe('ArtistProfilesPage', () => {
     expect(outcomesSection.getByText('Tip drawer ready')).toBeInTheDocument();
     expect(outcomesSection.getByText('Follow-up')).toBeInTheDocument();
     expect(outcomesSection.getByText('Share-ready')).toBeInTheDocument();
+    const monetizationSection = within(
+      screen.getByTestId('artist-profile-section-monetization')
+    );
     expect(
-      screen.getByRole('heading', { name: 'Get paid. Stay close.' })
+      screen.getByRole('heading', { name: 'Get paid. Keep the fan.' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Get paid.' })
     ).toBeInTheDocument();
     expect(
+      screen.getByRole('heading', { name: 'Capture the fan.' })
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('heading', { name: 'Say thanks.' })
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Support should not end at the transaction.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Tips and direct support live inside the same profile.')
-    ).toBeInTheDocument();
-    expect(
       screen.getByText(
-        'Turn a one-time payment into a repeat listen, follow, or save.'
+        'Turn merch-table and QR support into a relationship you can reach again.'
       )
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText('Thanks for the support - new song inside.').length
+      screen.getByText('QR-ready support for shows, merch tables, and bios.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Collect permission while the moment is still warm.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Turn one payment into the next listen, save, or show.')
+    ).toBeInTheDocument();
+    expect(monetizationSection.getByText('Merch Table QR')).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Scan to support')
+    ).toBeInTheDocument();
+    expect(monetizationSection.getAllByText('$10').length).toBeGreaterThan(0);
+    expect(monetizationSection.getAllByText('Paid').length).toBeGreaterThan(0);
+    expect(monetizationSection.getAllByText('Email').length).toBeGreaterThan(0);
+    expect(
+      monetizationSection.getAllByText('Confirmed').length
     ).toBeGreaterThan(0);
+    expect(
+      monetizationSection.getAllByText('Notifications').length
+    ).toBeGreaterThan(0);
+    expect(monetizationSection.getAllByText('On').length).toBeGreaterThan(0);
+    expect(monetizationSection.getAllByText('Show').length).toBeGreaterThan(0);
+    expect(monetizationSection.getAllByText('Saved').length).toBeGreaterThan(0);
+    expect(
+      monetizationSection.getAllByText(
+        "Thanks for the support tonight - here's the new song."
+      ).length
+    ).toBeGreaterThan(0);
+    expect(
+      monetizationSection.getByText('Open new single')
+    ).toBeInTheDocument();
     expect(
       Boolean(
         screen
           .getByRole('heading', { name: 'Drive streams' })
           .compareDocumentPosition(
-            screen.getByRole('heading', {
-              name: 'Get paid. Stay close.',
-            })
+            screen.getByRole('heading', { name: 'Get paid. Keep the fan.' })
           ) & Node.DOCUMENT_POSITION_FOLLOWING
       )
     ).toBe(true);
     expect(
       Boolean(
         screen
-          .getByRole('heading', { name: 'Get paid. Stay close.' })
+          .getByRole('heading', { name: 'Get paid. Keep the fan.' })
           .compareDocumentPosition(
             screen.getByRole('heading', {
               name: 'Capture every fan.',
@@ -353,7 +381,7 @@ describe('ArtistProfilesPage', () => {
       screen.queryByRole('heading', { name: 'Drive streams' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Get paid. Stay close.' })
+      screen.queryByRole('heading', { name: 'Get paid. Keep the fan.' })
     ).not.toBeInTheDocument();
   });
 

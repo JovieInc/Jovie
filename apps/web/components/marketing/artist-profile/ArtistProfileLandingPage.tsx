@@ -34,6 +34,10 @@ export function ArtistProfileLandingPage({
   socialProof,
   flags,
 }: Readonly<ArtistProfileLandingPageProps>) {
+  const payMode =
+    copy.adaptive.modes.find(mode => mode.id === 'pay') ??
+    copy.adaptive.modes[0];
+
   if (!flags.FULL_PAGE) {
     return (
       <>
@@ -66,7 +70,10 @@ export function ArtistProfileLandingPage({
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
-        <ArtistProfileMonetizationSection monetization={copy.monetization} />
+        <ArtistProfileMonetizationSection
+          monetization={copy.monetization}
+          payMode={payMode}
+        />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection capture={copy.capture} />
