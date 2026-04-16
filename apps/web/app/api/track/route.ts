@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -19,9 +20,8 @@ import {
   deriveIntentLevel,
   getActionWeight,
   mergeAudienceTags,
-  trimHistory,
 } from '../audience/lib/audience-utils';
-import { validateTrackRequest } from './validation';
+import { type TrackClickContext, validateTrackRequest } from './validation';
 
 // ---------------------------------------------------------------------------
 // Consent helpers
@@ -211,17 +211,10 @@ async function upsertAudienceMember(
   }
 
   const now = new Date();
-  const existingActions = Array.isArray(resolvedMember.latestActions)
-    ? resolvedMember.latestActions
-    : [];
-  const actionEntry = {
-    label: ACTION_LABELS[opts.linkType] ?? 'interacted',
-    type: opts.linkType,
-    platform: opts.target,
-    emoji: ACTION_ICONS[opts.linkType] ?? '⭐',
-    timestamp: now.toISOString(),
-  };
-  const latestActions = trimHistory([actionEntry, ...existingActions], 5);
+  const existingActionCount = Array.isArray(resolvedMember.latestActions)
+    ? resolvedMember.latestActions.length
+    : 0;
+  const actionCount = Math.min(existingActionCount + 1, 5);
   const weight = getActionWeight(opts.linkType);
   const tags = mergeAudienceTags(resolvedMember.tags, audienceTags);
   const isBotMember = tags.includes('bot');
@@ -230,7 +223,7 @@ async function upsertAudienceMember(
     : (resolvedMember.engagementScore ?? 0) + weight;
   const intentLevel = isBotMember
     ? 'low'
-    : deriveIntentLevel(resolvedMember.visits ?? 0, latestActions.length);
+    : deriveIntentLevel(resolvedMember.visits ?? 0, actionCount);
 
   await tx
     .update(audienceMembers)
@@ -239,7 +232,6 @@ async function upsertAudienceMember(
       updatedAt: now,
       engagementScore: updatedScore,
       intentLevel,
-      latestActions,
       deviceType: opts.audienceDeviceType,
       geoCity: opts.geoCity ?? resolvedMember.geoCity ?? null,
       geoCountry: opts.geoCountry ?? resolvedMember.geoCountry ?? null,
@@ -254,20 +246,6 @@ async function upsertAudienceMember(
 
   return resolvedMember.id;
 }
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 function getRawTipAmount(
   context: Record<string, unknown> | undefined
@@ -306,6 +284,33 @@ function buildClickMetadata(
     metadata.tipAmountCents = rawTipAmount;
   }
   return metadata;
+}
+
+function resolveAudienceEventType(
+  linkType: string,
+  context: TrackClickContext | undefined
+) {
+  if (linkType === 'tip') return 'tip_link_opened' as const;
+  if (context?.contentType === 'tour_date') {
+    return 'tour_date_checked_out' as const;
+  }
+  if (linkType === 'listen' || context?.contentType === 'release') {
+    return 'content_checked_out' as const;
+  }
+  if (linkType === 'social') return 'social_opened' as const;
+  return 'link_clicked' as const;
+}
+
+function resolveAudienceObjectType(
+  linkType: string,
+  context: TrackClickContext | undefined
+) {
+  if (context?.contentType === 'tour_date') return 'tour_date' as const;
+  if (context?.contentType === 'release') return 'release' as const;
+  if (context?.contentType === 'track') return 'track' as const;
+  if (linkType === 'social') return 'social_link' as const;
+  if (linkType === 'tip') return 'payment_link' as const;
+  return 'external_url' as const;
 }
 
 export async function POST(request: NextRequest) {
@@ -396,7 +401,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const [clickEvent] = await withSystemIngestionSession(async tx => {
+    const trackingResult = await withSystemIngestionSession(async tx => {
       // Only create/update audience member records when marketing consent is given
       const audienceMemberId = hasMarketingConsent
         ? await upsertAudienceMember(tx, {
@@ -441,10 +446,35 @@ export async function POST(request: NextRequest) {
         })
         .returning({ id: clickEvents.id });
 
-      return insertedClickEvent ? [insertedClickEvent] : [];
+      if (insertedClickEvent && audienceMemberId) {
+        await recordAudienceEvent(tx, {
+          creatorProfileId: profile.id,
+          audienceMemberId,
+          eventType: resolveAudienceEventType(linkType, context),
+          verb:
+            linkType === 'tip'
+              ? 'opened'
+              : linkType === 'social'
+                ? 'opened'
+                : linkType === 'listen'
+                  ? 'checked_out'
+                  : 'clicked',
+          confidence: 'observed',
+          sourceKind: resolvedSource === 'qr' ? 'qr' : 'short_link',
+          sourceLabel: resolvedSource ?? undefined,
+          objectType: resolveAudienceObjectType(linkType, context),
+          objectId: context?.contentId ?? linkId ?? null,
+          objectLabel: context?.smartLinkSlug ?? target,
+          clickEventId: insertedClickEvent.id,
+          platform: context?.provider ?? target,
+          properties: metadata,
+        });
+      }
+
+      return { clickEvent: insertedClickEvent, audienceMemberId };
     });
 
-    if (!clickEvent) {
+    if (!trackingResult.clickEvent) {
       await captureError(
         'Failed to insert click event',
         new Error('Database insert returned no data'),
@@ -482,7 +512,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, id: clickEvent.id },
+      { success: true, id: trackingResult.clickEvent.id },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

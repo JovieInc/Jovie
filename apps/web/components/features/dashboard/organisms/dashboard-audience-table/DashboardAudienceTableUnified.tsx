@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -9,7 +9,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { Users } from 'lucide-react';
+import { Copy, Download, ExternalLink, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -33,6 +33,8 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { downloadBlob } from '@/lib/utils/download';
+import { generateQrCodeDataUrl } from '@/lib/utils/qr-code';
 import {
   buildTouringCityMap,
   matchTouringCity,
@@ -52,6 +54,7 @@ import {
   renderLastSeenActionCell,
   renderLocationCellFromRow,
   renderLtvCell,
+  renderSourceCell,
   SelectCell,
   UserCellWithTouring,
 } from './utils/column-renderers';
@@ -83,6 +86,27 @@ const SORT_FIELD_TO_COLUMN: Record<string, string> = {
   lastSeen: 'lastSeen',
 };
 
+const PROFILE_QR_SOURCE_NAME = 'Profile QR';
+const QR_DOWNLOAD_SIZE = 1024;
+
+type SourceLinkPayload = {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly sourceType: string;
+  readonly destinationKind: string;
+  readonly shortUrl: string;
+  readonly archivedAt?: string | null;
+};
+
+function sanitizeQrFilename(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-|-$/g, '');
+}
+
 /**
  * Consolidated column layout — fewer, denser columns.
  *
@@ -111,6 +135,13 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     size: 140,
     enableSorting: false,
   }),
+  memberColumnHelper.accessor('referrerHistory', {
+    id: 'source',
+    header: 'Source',
+    cell: renderSourceCell,
+    size: 76,
+    enableSorting: false,
+  }),
   memberColumnHelper.accessor('visits', {
     id: 'engagement',
     header: 'Engagement',
@@ -127,7 +158,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
   memberColumnHelper.accessor('latestActions', {
     id: 'lastSeen',
-    header: 'Last Seen',
+    header: 'Last Activity',
     cell: renderLastSeenActionCell,
     size: 180,
     enableSorting: true,
@@ -157,6 +188,7 @@ function getColumnVisibility(width: number): VisibilityState {
     case 'narrow':
       return {
         location: false,
+        source: false,
         value: false,
         engagement: false,
         lastSeen: false,
@@ -320,6 +352,7 @@ export const DashboardAudienceTableUnified = memo(
     const hiddenMetadataColumns = React.useMemo(
       () => ({
         location: columnVisibility.location === false,
+        source: columnVisibility.source === false,
         engagement: columnVisibility.engagement === false,
         lastSeen: columnVisibility.lastSeen === false,
       }),
@@ -328,6 +361,7 @@ export const DashboardAudienceTableUnified = memo(
 
     const hasMetadataSubtitle =
       hiddenMetadataColumns.location ||
+      hiddenMetadataColumns.source ||
       hiddenMetadataColumns.engagement ||
       hiddenMetadataColumns.lastSeen;
 
@@ -439,6 +473,140 @@ export const DashboardAudienceTableUnified = memo(
         });
       },
       []
+    );
+
+    const ensureProfileQrSource =
+      React.useCallback(async (): Promise<SourceLinkPayload> => {
+        if (!profileId) {
+          throw new Error('Missing profile');
+        }
+
+        const existingResponse = await fetch(
+          `/api/dashboard/audience/source-links?profileId=${encodeURIComponent(profileId)}`,
+          { cache: 'no-store' }
+        );
+        if (existingResponse.ok) {
+          const existingPayload = (await existingResponse.json()) as {
+            links?: SourceLinkPayload[];
+          };
+          const existingLink = existingPayload.links?.find(
+            link =>
+              link.name === PROFILE_QR_SOURCE_NAME &&
+              link.sourceType === 'qr' &&
+              link.destinationKind === 'profile' &&
+              !link.archivedAt &&
+              Boolean(link.shortUrl)
+          );
+          if (existingLink) return existingLink;
+        }
+
+        const createResponse = await fetch(
+          '/api/dashboard/audience/source-groups',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profileId,
+              name: PROFILE_QR_SOURCE_NAME,
+              sourceType: 'qr',
+              destinationKind: 'profile',
+              destinationUrl: profileUrl,
+            }),
+          }
+        );
+
+        if (!createResponse.ok) {
+          throw new Error('Failed to create QR source');
+        }
+
+        const createdPayload = (await createResponse.json()) as {
+          links?: SourceLinkPayload[];
+        };
+        const link = createdPayload.links?.[0];
+        if (!link?.shortUrl) {
+          throw new Error('Source link create returned no link');
+        }
+
+        return link;
+      }, [profileId, profileUrl]);
+
+    const handleSourceLinkAction = React.useCallback(
+      async (action: 'copy' | 'open' | 'download') => {
+        if (!profileId) {
+          toast.error('Profile is still loading');
+          return;
+        }
+
+        try {
+          const sourceLink = await ensureProfileQrSource();
+
+          if (action === 'copy') {
+            const copied = await copyTextToClipboard(sourceLink.shortUrl);
+            if (!copied) {
+              toast.error('Unable to copy source link');
+              return;
+            }
+            toast.success('Source link copied');
+            return;
+          }
+
+          if (action === 'open') {
+            globalThis.open(
+              sourceLink.shortUrl,
+              '_blank',
+              'noopener,noreferrer'
+            );
+            return;
+          }
+
+          const dataUrl = await generateQrCodeDataUrl(
+            sourceLink.shortUrl,
+            QR_DOWNLOAD_SIZE
+          );
+          const response = await fetch(dataUrl);
+          const blob = await response.blob();
+          const filename =
+            sanitizeQrFilename(sourceLink.name) || 'audience-source';
+          downloadBlob(blob, `${filename}-qr.png`);
+          toast.success('QR code downloaded');
+        } catch {
+          toast.error('Unable to load source link');
+        }
+      },
+      [ensureProfileQrSource, profileId]
+    );
+
+    const sourceShareItems = React.useMemo<CommonDropdownItem[]>(
+      () => [
+        {
+          type: 'action',
+          id: 'copy-source-link',
+          label: 'Copy Link',
+          icon: Copy,
+          onClick: () => {
+            void handleSourceLinkAction('copy');
+          },
+        },
+        {
+          type: 'action',
+          id: 'open-source-link',
+          label: 'Open Link',
+          icon: ExternalLink,
+          onClick: () => {
+            void handleSourceLinkAction('open');
+          },
+        },
+        {
+          type: 'action',
+          id: 'download-source-qr',
+          label: 'Download QR Code',
+          icon: Download,
+          onClick: () => {
+            void handleSourceLinkAction('download');
+          },
+        },
+      ],
+      [handleSourceLinkAction]
     );
 
     // Build touring city map for O(1) lookup per member
@@ -631,6 +799,22 @@ export const DashboardAudienceTableUnified = memo(
             />
           }
         >
+          <CommonDropdown
+            variant='dropdown'
+            size='compact'
+            align='end'
+            items={sourceShareItems}
+            trigger={
+              <DashboardHeaderActionButton
+                ariaLabel='Source link actions'
+                icon={
+                  <Icon name='QrCode' className='h-4 w-4' strokeWidth={1.9} />
+                }
+                iconOnly
+                tooltipLabel='Source link'
+              />
+            }
+          />
           <DashboardHeaderActionButton
             ariaLabel={
               panelMode === 'analytics'
@@ -647,7 +831,7 @@ export const DashboardAudienceTableUnified = memo(
           />
         </DashboardHeaderActionGroup>
       ),
-      [panelMode, toggle]
+      [panelMode, sourceShareItems, toggle]
     );
 
     React.useEffect(() => {

@@ -21,10 +21,16 @@ export {
 
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
+  type AudienceAction,
   type AudienceBlock,
   type AudienceMember,
+  type AudienceSourceGroup,
+  type AudienceSourceLink,
+  audienceActions,
   audienceBlocks,
   audienceMembers,
+  audienceSourceGroups,
+  audienceSourceLinks,
   type ClickEvent,
   clickEvents,
   type DailyProfileView,
@@ -36,8 +42,11 @@ export {
   insertClickEventSchema,
   insertNotificationSubscriptionSchema,
   insertTipSchema,
+  type NewAudienceAction,
   type NewAudienceBlock,
   type NewAudienceMember,
+  type NewAudienceSourceGroup,
+  type NewAudienceSourceLink,
   type NewClickEvent,
   type NewDailyProfileView,
   type NewNotificationSubscription,

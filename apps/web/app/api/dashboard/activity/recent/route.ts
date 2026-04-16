@@ -2,10 +2,12 @@ import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DashboardActivityIcon } from '@/lib/activity/dashboard-feed';
+import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import {
+  audienceActions,
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
@@ -138,71 +140,126 @@ export async function GET(request: NextRequest) {
 
       const perSourceLimit = Math.min(20, Math.max(5, limit * 2));
 
-      const [clickRows, visitRows, subscribeRows] = await Promise.all([
-        db
-          .select({
-            id: clickEvents.id,
-            linkType: clickEvents.linkType,
-            createdAt: clickEvents.createdAt,
-            memberType: audienceMembers.type,
-            memberCity: audienceMembers.geoCity,
-            memberCountry: audienceMembers.geoCountry,
-            clickCity: clickEvents.city,
-            clickCountry: clickEvents.country,
-            target: drizzleSql<
-              string | null
-            >`(${clickEvents.metadata} ->> 'target')`,
-          })
-          .from(clickEvents)
-          .leftJoin(
-            audienceMembers,
-            eq(clickEvents.audienceMemberId, audienceMembers.id)
-          )
-          .where(
-            and(
-              eq(clickEvents.creatorProfileId, profile.id),
-              gte(clickEvents.createdAt, since)
+      const [actionRows, clickRows, visitRows, subscribeRows] =
+        await Promise.all([
+          db
+            .select({
+              id: audienceActions.id,
+              label: audienceActions.label,
+              eventType: audienceActions.eventType,
+              verb: audienceActions.verb,
+              confidence: audienceActions.confidence,
+              sourceKind: audienceActions.sourceKind,
+              sourceLabel: audienceActions.sourceLabel,
+              objectType: audienceActions.objectType,
+              objectId: audienceActions.objectId,
+              objectLabel: audienceActions.objectLabel,
+              platform: audienceActions.platform,
+              properties: audienceActions.properties,
+              context: audienceActions.context,
+              timestamp: audienceActions.timestamp,
+            })
+            .from(audienceActions)
+            .where(
+              and(
+                eq(audienceActions.creatorProfileId, profile.id),
+                gte(audienceActions.timestamp, since)
+              )
             )
-          )
-          .orderBy(desc(clickEvents.createdAt))
-          .limit(perSourceLimit),
+            .orderBy(desc(audienceActions.timestamp))
+            .limit(perSourceLimit),
 
-        db
-          .select({
-            id: audienceMembers.id,
-            memberType: audienceMembers.type,
-            city: audienceMembers.geoCity,
-            country: audienceMembers.geoCountry,
-            lastSeenAt: audienceMembers.lastSeenAt,
-          })
-          .from(audienceMembers)
-          .where(
-            and(
-              eq(audienceMembers.creatorProfileId, profile.id),
-              gte(audienceMembers.lastSeenAt, since)
+          db
+            .select({
+              id: clickEvents.id,
+              linkType: clickEvents.linkType,
+              createdAt: clickEvents.createdAt,
+              memberType: audienceMembers.type,
+              memberCity: audienceMembers.geoCity,
+              memberCountry: audienceMembers.geoCountry,
+              clickCity: clickEvents.city,
+              clickCountry: clickEvents.country,
+              target: drizzleSql<
+                string | null
+              >`(${clickEvents.metadata} ->> 'target')`,
+            })
+            .from(clickEvents)
+            .leftJoin(
+              audienceMembers,
+              eq(clickEvents.audienceMemberId, audienceMembers.id)
             )
-          )
-          .orderBy(desc(audienceMembers.lastSeenAt))
-          .limit(perSourceLimit),
+            .where(
+              and(
+                eq(clickEvents.creatorProfileId, profile.id),
+                gte(clickEvents.createdAt, since)
+              )
+            )
+            .orderBy(desc(clickEvents.createdAt))
+            .limit(perSourceLimit),
 
-        db
-          .select({
-            id: notificationSubscriptions.id,
-            createdAt: notificationSubscriptions.createdAt,
-            countryCode: notificationSubscriptions.countryCode,
-            city: notificationSubscriptions.city,
-            channel: notificationSubscriptions.channel,
-          })
-          .from(notificationSubscriptions)
-          .where(
-            and(
-              eq(notificationSubscriptions.creatorProfileId, profile.id),
-              gte(notificationSubscriptions.createdAt, since)
+          db
+            .select({
+              id: audienceMembers.id,
+              memberType: audienceMembers.type,
+              city: audienceMembers.geoCity,
+              country: audienceMembers.geoCountry,
+              lastSeenAt: audienceMembers.lastSeenAt,
+            })
+            .from(audienceMembers)
+            .where(
+              and(
+                eq(audienceMembers.creatorProfileId, profile.id),
+                gte(audienceMembers.lastSeenAt, since)
+              )
             )
-          )
-          .orderBy(desc(notificationSubscriptions.createdAt))
-          .limit(perSourceLimit),
-      ]);
+            .orderBy(desc(audienceMembers.lastSeenAt))
+            .limit(perSourceLimit),
+
+          db
+            .select({
+              id: notificationSubscriptions.id,
+              createdAt: notificationSubscriptions.createdAt,
+              countryCode: notificationSubscriptions.countryCode,
+              city: notificationSubscriptions.city,
+              channel: notificationSubscriptions.channel,
+            })
+            .from(notificationSubscriptions)
+            .where(
+              and(
+                eq(notificationSubscriptions.creatorProfileId, profile.id),
+                gte(notificationSubscriptions.createdAt, since)
+              )
+            )
+            .orderBy(desc(notificationSubscriptions.createdAt))
+            .limit(perSourceLimit),
+        ]);
+
+      const structuredActivities: ActivityRow[] = actionRows
+        .filter(row => row.timestamp)
+        .map(row => {
+          const rendered = renderAudienceEventSentence(row);
+          return {
+            id: row.id,
+            type: 'click' as const,
+            description:
+              rendered.kind === 'sentence' ? `${rendered.text}.` : row.label,
+            icon:
+              row.eventType === 'profile_visited'
+                ? 'visit'
+                : row.eventType === 'subscription_created'
+                  ? 'email'
+                  : row.eventType === 'tip_sent' ||
+                      row.eventType === 'tip_link_opened'
+                    ? 'tip'
+                    : row.eventType === 'social_opened'
+                      ? 'social'
+                      : row.eventType === 'content_checked_out'
+                        ? 'listen'
+                        : 'link',
+            timestamp: toISOStringSafe(row.timestamp!),
+            href: APP_ROUTES.AUDIENCE,
+          };
+        });
 
       const clickActivities: ActivityRow[] = clickRows.map(row => {
         const actor = getActorKind(row.memberType ?? null);
@@ -259,6 +316,7 @@ export async function GET(request: NextRequest) {
       });
 
       const merged = [
+        ...structuredActivities,
         ...subscribeActivities,
         ...visitActivities,
         ...clickActivities,
