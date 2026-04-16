@@ -102,4 +102,13 @@ describe('screenshot registry', () => {
       ).toBe(false);
     }
   });
+
+  it('freezes the capture section screenshot on the subscribed state', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario =>
+        currentScenario.id === 'artist-profile-capture-section-desktop'
+    );
+
+    expect(scenario?.reducedMotion).toBe(true);
+  });
 });

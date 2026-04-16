@@ -42,6 +42,7 @@ export interface ScreenshotScenario {
   readonly interaction?: ScreenshotInteraction;
   readonly publicExportPath?: string;
   readonly fixedNow?: string;
+  readonly reducedMotion?: boolean;
 }
 
 export interface ScreenshotScenario

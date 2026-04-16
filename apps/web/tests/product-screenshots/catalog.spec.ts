@@ -200,6 +200,9 @@ async function prepareScenario(
   await page.clock.setFixedTime(
     new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
   );
+  await page.emulateMedia({
+    reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
+  });
   await page.setViewportSize(viewport);
   await page.goto(scenario.route, {
     waitUntil: 'domcontentloaded',

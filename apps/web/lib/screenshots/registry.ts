@@ -41,6 +41,9 @@ const ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS =
       waitFor: selector,
       captureTarget: 'locator' as const,
       captureSelector: selector,
+      reducedMotion:
+        section.screenshotScenarioId ===
+        'artist-profile-capture-section-desktop',
     };
   });
 

@@ -36,6 +36,29 @@ export interface ArtistProfileOutcomeCard {
   readonly description: string;
 }
 
+export interface ArtistProfileOutcomeCrop {
+  readonly src: string;
+  readonly alt: string;
+  readonly label: string;
+  readonly meta: string;
+}
+
+export interface ArtistProfileOutcomeProof {
+  readonly sayThanks: {
+    readonly label: string;
+    readonly status: string;
+    readonly title: string;
+    readonly body: string;
+    readonly meta: string;
+  };
+  readonly shareAnywhere: {
+    readonly url: string;
+    readonly copiedLabel: string;
+    readonly title: string;
+    readonly channels: readonly string[];
+  };
+}
+
 export interface ArtistProfileHowItWorksStep {
   readonly id: 'claim' | 'connect' | 'share';
   readonly title: string;
@@ -85,6 +108,7 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly alternateHeadlines: readonly string[];
     readonly body: string;
+    readonly contextCues: readonly [string, string, string, string];
     readonly modes: readonly ArtistProfileMode[];
   };
   readonly outcomes: {
@@ -92,6 +116,10 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly body: string;
     readonly cards: readonly ArtistProfileOutcomeCard[];
+    readonly productCrops: Partial<
+      Record<ArtistProfileOutcomeCard['id'], ArtistProfileOutcomeCrop>
+    >;
+    readonly syntheticProofs: ArtistProfileOutcomeProof;
   };
   readonly monetization: {
     readonly headline: string;
@@ -103,7 +131,13 @@ export interface ArtistProfileLandingCopy {
     readonly followUpCard: {
       readonly title: string;
       readonly body: string;
+      readonly senderLabel: string;
+      readonly timestampLabel: string;
+      readonly notificationLabel: string;
+      readonly badgeLabel: string;
       readonly message: string;
+      readonly detail: string;
+      readonly ctaLabel: string;
     };
   };
   readonly capture: {
@@ -202,6 +236,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       'The same link, different job.',
     ],
     body: 'One profile can flex from release push to ticket sales to fan capture.',
+    contextCues: [
+      'Source-aware',
+      'Location-aware',
+      'Device-aware',
+      'Release-aware',
+    ],
     modes: [
       {
         id: 'release',
@@ -442,6 +482,41 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'Use one clean profile link across bio, QR, posts, stories, and shows.',
       },
     ],
+    productCrops: {
+      'drive-streams': {
+        src: '/product-screenshots/tim-white-profile-presave-phone.png',
+        alt: 'Jovie profile release countdown crop.',
+        label: 'Latest release',
+        meta: 'Pre-save live',
+      },
+      'sell-out': {
+        src: '/product-screenshots/tim-white-profile-tour-phone.png',
+        alt: 'Jovie profile shows drawer crop.',
+        label: 'Shows',
+        meta: 'O2 Arena saved',
+      },
+      'get-paid': {
+        src: '/product-screenshots/tim-white-profile-pay-phone.png',
+        alt: 'Jovie profile support drawer crop.',
+        label: 'Support',
+        meta: 'Tip drawer ready',
+      },
+    },
+    syntheticProofs: {
+      sayThanks: {
+        label: 'Follow-up',
+        status: 'Sent',
+        title: 'Tim White',
+        body: 'Thanks for the support. New song inside.',
+        meta: 'Email captured after $10 support',
+      },
+      shareAnywhere: {
+        url: 'jov.ie/timwhite',
+        copiedLabel: 'Copied',
+        title: 'Share-ready',
+        channels: ['Bio', 'QR', 'Stories'],
+      },
+    },
   },
   monetization: {
     headline: 'Get paid. Stay close.',
@@ -453,7 +528,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     followUpCard: {
       title: 'Say thanks.',
       body: 'Turn a one-time payment into a repeat listen, follow, or save.',
+      senderLabel: 'Jovie',
+      timestampLabel: 'now',
+      notificationLabel: 'Mail notification',
+      badgeLabel: 'Mail',
       message: 'Thanks for the support - new song inside.',
+      detail:
+        'New support came in. Send them straight to the next release while the moment is still warm.',
+      ctaLabel: 'Listen now',
     },
   },
   capture: {
@@ -462,16 +544,16 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     subhead: 'Turn anonymous profile visits into fans you can reach again.',
     body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
     action: {
-      title: 'Subscribe',
-      detail: 'Get release and show alerts from Tim White.',
+      title: 'Get updates',
+      detail: 'Release and show alerts.',
       ctaLabel: 'Subscribe',
-      confirmedLabel: 'Captured',
+      confirmedLabel: 'Subscribed',
       beforeLabel: 'Before',
       beforeTitle: 'Anonymous visit',
       beforeDetail: 'Spotify / LA / Release page',
       afterLabel: 'After',
       afterTitle: 'Reachable fan',
-      afterDetail: 'Email verified / Notifications on / Source saved',
+      afterDetail: 'Email saved / Notifications on',
     },
     audienceRails: [
       [

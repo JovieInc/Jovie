@@ -222,6 +222,15 @@ export function ArtistProfileCaptureSection({
             artist-profile-subscribe-caret-hide 5.6s linear infinite;
         }
 
+        .artist-profile-subscribe-metadata {
+          opacity: 0.72;
+          transition: opacity 200ms ease;
+        }
+
+        .artist-profile-capture-shell:hover .artist-profile-subscribe-metadata {
+          opacity: 0.92;
+        }
+
         @keyframes artist-profile-audience-drift {
           from {
             transform: translate3d(0, 0, 0);
@@ -331,86 +340,76 @@ export function ArtistProfileCaptureSection({
           </p>
         </div>
 
-        <div className='relative mx-auto mt-14 max-w-[720px] overflow-hidden rounded-[1.7rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3 shadow-[0_24px_64px_rgba(0,0,0,0.3)] sm:p-4'>
-          <div className='rounded-[1.35rem] bg-black/48 p-4 sm:p-5'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex min-w-0 items-center gap-3.5'>
-                <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-primary-token'>
-                  <Bell className='h-[18px] w-[18px]' strokeWidth={1.9} />
-                </span>
-                <div className='min-w-0 text-left'>
-                  <p className='text-[15px] font-semibold leading-tight tracking-[-0.025em] text-primary-token'>
-                    {capture.action.title}
-                  </p>
-                  <p className='mt-1 text-[12px] leading-snug tracking-[-0.01em] text-secondary-token'>
-                    {capture.action.detail}
-                  </p>
-                </div>
-              </div>
-              <div className='relative h-12 w-full max-w-[23rem] shrink-0 sm:h-12'>
-                <div
-                  className='artist-profile-subscribe-flow-input absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.045] p-1.5 pl-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'
-                  aria-hidden='true'
-                >
-                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-primary-token'>
-                    <Mail className='h-4 w-4' strokeWidth={1.9} />
-                  </span>
-                  <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/28 px-3 py-2'>
-                    <span className='artist-profile-subscribe-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
-                      {DEMO_SUBSCRIBE_EMAIL}
-                    </span>
-                    <span
-                      className='artist-profile-subscribe-caret ml-0.5 inline-block h-3.5 w-px bg-white/58'
-                      aria-hidden='true'
-                    />
-                  </span>
-                  <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black'>
-                    {capture.action.ctaLabel}
-                  </span>
-                </div>
-                <div
-                  className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.05] p-1.5 pl-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'
-                  aria-hidden='true'
-                >
-                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
-                    <Check className='h-4 w-4' strokeWidth={2.1} />
-                  </span>
-                  <span className='min-w-0 flex-1'>
-                    <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
-                      Subscribed
-                    </span>
-                    <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
-                      Notifications on
-                    </span>
-                  </span>
-                  <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-semibold tracking-[-0.02em] text-black'>
-                    Live
-                  </span>
-                </div>
-                <p className='sr-only'>
-                  A demo email is typed into the subscribe input, then the UI
-                  switches to a subscribed state with notifications enabled.
+        <div className='relative mx-auto mt-14 max-w-[720px] rounded-[1.55rem] bg-white/[0.03] px-5 py-5 shadow-[0_18px_56px_rgba(0,0,0,0.24)] ring-1 ring-white/5 sm:px-6 sm:py-6'>
+          <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex min-w-0 items-center gap-3'>
+              <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-primary-token'>
+                <Bell className='h-[17px] w-[17px]' strokeWidth={1.9} />
+              </span>
+              <div className='min-w-0 text-left'>
+                <p className='text-[15px] font-semibold leading-tight tracking-[-0.025em] text-primary-token'>
+                  {capture.action.title}
+                </p>
+                <p className='mt-1 text-[12px] leading-snug tracking-[-0.01em] text-secondary-token'>
+                  {capture.action.detail}
                 </p>
               </div>
             </div>
-            <div className='mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 pt-2 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
-              <span className='inline-flex items-center gap-1.5 rounded-full bg-white/[0.035] px-2.5 py-1'>
-                <Check className='h-3 w-3 text-primary-token' strokeWidth={2} />
-                {capture.action.confirmedLabel}
-              </span>
-              <span className='inline-flex items-center gap-1 text-secondary-token'>
-                <Dot className='h-4 w-4 text-white/36' strokeWidth={3} />
-                {capture.action.afterDetail}
-              </span>
-              <span className='inline-flex items-center gap-1 text-tertiary-token'>
-                <Dot className='h-4 w-4 text-white/28' strokeWidth={3} />
-                {capture.action.beforeDetail}
-              </span>
+            <div className='relative h-12 w-full max-w-[23rem] shrink-0 sm:h-12'>
+              <div
+                className='artist-profile-subscribe-flow-input absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
+                aria-hidden='true'
+              >
+                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.05] text-primary-token'>
+                  <Mail className='h-4 w-4' strokeWidth={1.9} />
+                </span>
+                <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/22 px-3 py-2'>
+                  <span className='artist-profile-subscribe-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
+                    {DEMO_SUBSCRIBE_EMAIL}
+                  </span>
+                  <span
+                    className='artist-profile-subscribe-caret ml-0.5 inline-block h-3.5 w-px bg-white/58'
+                    aria-hidden='true'
+                  />
+                </span>
+                <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black'>
+                  {capture.action.ctaLabel}
+                </span>
+              </div>
+              <div
+                className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
+                aria-hidden='true'
+              >
+                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
+                  <Check className='h-4 w-4' strokeWidth={2.1} />
+                </span>
+                <span className='min-w-0 flex-1'>
+                  <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
+                    Subscribed
+                  </span>
+                  <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
+                    Email saved
+                  </span>
+                </span>
+              </div>
               <p className='sr-only'>
-                {capture.action.beforeLabel}: {capture.action.beforeTitle}.{' '}
-                {capture.action.afterLabel}: {capture.action.afterTitle}.
+                A demo email is typed into the subscribe input, then the UI
+                switches to a subscribed state with notifications enabled.
               </p>
             </div>
+          </div>
+          <div className='artist-profile-subscribe-metadata mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
+            <span className='text-secondary-token'>
+              {capture.action.beforeDetail}
+            </span>
+            <Dot className='h-4 w-4 text-white/24' strokeWidth={3} />
+            <span className='text-secondary-token'>
+              {capture.action.afterDetail}
+            </span>
+            <p className='sr-only'>
+              {capture.action.beforeLabel}: {capture.action.beforeTitle}.{' '}
+              {capture.action.afterLabel}: {capture.action.afterTitle}.
+            </p>
           </div>
         </div>
 
