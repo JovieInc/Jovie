@@ -151,6 +151,35 @@ export function withAudienceSourceShortLink<
   };
 }
 
+function buildAudienceSourceSlugFallback(
+  value: string,
+  prefix: string
+): string {
+  const normalized = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const sanitized = normalized
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (sanitized) {
+    return sanitized;
+  }
+
+  let hash = 0;
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  return `${prefix}-${hash.toString(36)}`;
+}
+
+function resolveAudienceSourceSlug(value: string, prefix: string): string {
+  const slug = slugify(value);
+  return slug || buildAudienceSourceSlugFallback(value, prefix);
+}
+
 export function buildAudienceSourceUtmParams(
   groupName: string,
   linkName: string,
@@ -162,8 +191,8 @@ export function buildAudienceSourceUtmParams(
   return {
     source: options?.source ?? 'qr_code',
     medium: options?.medium ?? 'print',
-    campaign: slugify(groupName),
-    content: slugify(linkName),
+    campaign: resolveAudienceSourceSlug(groupName, 'campaign'),
+    content: resolveAudienceSourceSlug(linkName, 'content'),
   };
 }
 

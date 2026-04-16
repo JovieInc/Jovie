@@ -139,7 +139,12 @@ export async function POST(request: NextRequest) {
         const existingLinks = await tx
           .select()
           .from(audienceSourceLinks)
-          .where(eq(audienceSourceLinks.sourceGroupId, existingGroup.id))
+          .where(
+            and(
+              eq(audienceSourceLinks.sourceGroupId, existingGroup.id),
+              isNull(audienceSourceLinks.archivedAt)
+            )
+          )
           .orderBy(desc(audienceSourceLinks.createdAt))
           .limit(AUDIENCE_SOURCE_PAGE_SIZE);
 

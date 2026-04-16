@@ -2,12 +2,6 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  buildAudienceSourceUtmParams: vi.fn().mockReturnValue({
-    source: 'qr_code',
-    medium: 'print',
-    campaign: 'tour-flyers',
-    content: 'london-o2-arena',
-  }),
   parseAudienceSourcePayload: vi.fn(),
   resolveAudienceSourceDestinationUrl: vi
     .fn()
@@ -20,6 +14,7 @@ const hoisted = vi.hoisted(() => ({
   createUniqueSourceLinkCode: vi.fn().mockResolvedValue('tour-london-1234'),
   captureError: vi.fn().mockResolvedValue(undefined),
   withDbSessionTx: vi.fn(),
+  insertValuesMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -38,17 +33,17 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
 }));
 
-vi.mock('../source-route-helpers', () => ({
-  AUDIENCE_SOURCE_PAGE_SIZE: 100,
-  NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
-  buildAudienceSourceErrorResponse: (error: string, status: number) =>
-    Response.json({ error }, { status }),
-  buildAudienceSourceUtmParams: hoisted.buildAudienceSourceUtmParams,
-  parseAudienceSourcePayload: hoisted.parseAudienceSourcePayload,
-  resolveAudienceSourceDestinationUrl:
-    hoisted.resolveAudienceSourceDestinationUrl,
-  withAudienceSourceShortLink: hoisted.withAudienceSourceShortLink,
-}));
+vi.mock('../source-route-helpers', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('../source-route-helpers')>();
+  return {
+    ...actual,
+    parseAudienceSourcePayload: hoisted.parseAudienceSourcePayload,
+    resolveAudienceSourceDestinationUrl:
+      hoisted.resolveAudienceSourceDestinationUrl,
+    withAudienceSourceShortLink: hoisted.withAudienceSourceShortLink,
+  };
+});
 
 vi.mock('@/lib/db/schema/analytics', () => ({
   audienceSourceGroups: {
@@ -90,6 +85,16 @@ describe('POST /api/dashboard/audience/source-links', () => {
       },
     });
 
+    hoisted.insertValuesMock.mockReturnValue({
+      returning: vi.fn().mockResolvedValue([
+        {
+          id: 'link_123',
+          code: 'tour-london-1234',
+          name: 'London O2 Arena',
+        },
+      ]),
+    });
+
     hoisted.withDbSessionTx.mockImplementation(async callback =>
       callback(
         {
@@ -106,15 +111,7 @@ describe('POST /api/dashboard/audience/source-links', () => {
             }),
           }),
           insert: vi.fn().mockReturnValue({
-            values: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([
-                {
-                  id: 'link_123',
-                  code: 'tour-london-1234',
-                  name: 'London O2 Arena',
-                },
-              ]),
-            }),
+            values: hoisted.insertValuesMock,
           }),
         },
         'clerk_123'
@@ -122,7 +119,7 @@ describe('POST /api/dashboard/audience/source-links', () => {
     );
   });
 
-  it('uses the source group name for campaign UTM params', async () => {
+  it('persists UTM params derived from the source group name', async () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/audience/source-links',
       { method: 'POST' }
@@ -133,13 +130,15 @@ describe('POST /api/dashboard/audience/source-links', () => {
 
     expect(response.status).toBe(201);
     expect(data.link.shortUrl).toBe('https://jov.ie/s/tour-london-1234');
-    expect(hoisted.buildAudienceSourceUtmParams).toHaveBeenCalledWith(
-      'Tour Flyers',
-      'London O2 Arena',
-      {
-        source: 'qr_code',
-        medium: 'print',
-      }
+    expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        utmParams: {
+          source: 'qr_code',
+          medium: 'print',
+          campaign: 'tour-flyers',
+          content: 'london-o2-arena',
+        },
+      })
     );
   });
 });
