@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.154.0] - 2026-04-15
+
+> Audience now explains fan activity with verified, source-aware language and trackable QR links.
+
+### Added
+
+- Added structured audience actions with evidence-safe sentence rendering, so Spotify, Apple, and YouTube clicks render as checked-out or opened activity instead of overclaiming listens or watches.
+- Added creator-owned source groups and source links for QR and short-link attribution, including `/s/[code]` redirects with UTM appending, scan counts, and missing-code handling.
+- Added audience source creation and share actions from the existing dashboard share pattern: Copy Link, Open Link, and Download QR Code.
+- Added tests for audience activity grammar, source-link code generation, audience table rendering, redirect behavior, and structured tracking expectations.
+
+### Changed
+
+- Updated audience click, visit, track, subscription, and activity-feed paths to write structured audience events while preserving legacy latest-action projections.
+- Updated the audience table and member sidebar to show Source, Last Activity, tokenized activity language, and combined QR/UTM/referrer source rows.
+
+### Fixed
+
+- Fixed Source menu triggering in the Audience header by using a Radix-compatible header action button.
+- Fixed QR PNG downloads by converting generated data URLs locally instead of fetching `data:` URLs blocked by CSP.
+
 ## [26.4.153.7] - 2026-04-16
 
 > Artist Profiles now uses real Tim White profile screenshots for proof, with cleaner demo chrome and a more focused fan-capture story.
