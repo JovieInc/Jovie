@@ -53,6 +53,7 @@ export interface PipelineResult {
  */
 interface GeneratePlaylistOptions {
   readonly skipComplianceCheck?: boolean;
+  readonly onSuccessfulPersist?: (generatedAt: Date) => Promise<void>;
 }
 
 export async function generatePlaylist(
@@ -180,6 +181,10 @@ export async function generatePlaylist(
 
     if (trackInserts.length > 0) {
       await db.insert(joviePlaylistTracks).values(trackInserts);
+    }
+
+    if (options.onSuccessfulPersist) {
+      await options.onSuccessfulPersist(new Date());
     }
 
     // Store cover art base64 temporarily for publish step

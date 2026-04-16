@@ -177,10 +177,19 @@ describe('GET /api/cron/generate-playlist', () => {
       title: 'Test Playlist',
       trackCount: 24,
     });
-    expect(mockGeneratePlaylist).toHaveBeenCalledWith({
-      skipComplianceCheck: true,
-    });
-    expect(mockMarkPlaylistGeneratedAt).toHaveBeenCalledWith(expect.any(Date));
+    expect(mockGeneratePlaylist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skipComplianceCheck: true,
+        onSuccessfulPersist: expect.any(Function),
+      })
+    );
+    const { onSuccessfulPersist } = mockGeneratePlaylist.mock.calls[0][0] as {
+      onSuccessfulPersist: (generatedAt: Date) => Promise<void>;
+    };
+    await onSuccessfulPersist(new Date('2026-04-15T00:00:00.000Z'));
+    expect(mockMarkPlaylistGeneratedAt).toHaveBeenCalledWith(
+      new Date('2026-04-15T00:00:00.000Z')
+    );
     expect(mockReleasePlaylistGenerationLease).not.toHaveBeenCalled();
   });
 
