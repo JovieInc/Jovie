@@ -182,7 +182,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "0.45.2",
     "flags": "^4.0.6",
