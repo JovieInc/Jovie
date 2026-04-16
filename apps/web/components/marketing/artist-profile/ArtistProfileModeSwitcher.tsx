@@ -166,6 +166,7 @@ export function ArtistProfileModeSwitcher({
   const [progress, setProgress] = useState(0);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
   const tabsVisible = reducedMotion || progress >= BEAT_SWITCH_PROGRESS;
+  const tabBeatActive = !reducedMotion && tabsVisible;
   const cueIndex = Math.min(
     CONTEXT_CUES.length - 1,
     Math.floor((progress / BEAT_SWITCH_PROGRESS) * CONTEXT_CUES.length)
@@ -216,13 +217,18 @@ export function ArtistProfileModeSwitcher({
       <div
         className={cn(
           'flex items-center justify-center px-5 sm:px-6',
-          reducedMotion
-            ? 'min-h-0'
-            : 'sticky top-0 min-h-svh py-12 sm:py-14 lg:py-16'
+          reducedMotion ? 'min-h-0' : 'sticky top-0 min-h-svh py-8 sm:py-10'
         )}
       >
         <div className='mx-auto w-full max-w-[34rem] text-center'>
-          <div className='mx-auto mb-6 max-w-[34rem] sm:mb-7'>
+          <div
+            className={cn(
+              'mx-auto max-w-[34rem] overflow-hidden transition-[max-height,margin,opacity,transform] duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]',
+              tabBeatActive
+                ? 'mb-0 max-h-0 -translate-y-6 opacity-0'
+                : 'mb-6 max-h-60 translate-y-0 opacity-100 sm:mb-7'
+            )}
+          >
             <h2 className='text-[clamp(3.25rem,7vw,6.75rem)] font-semibold leading-[0.86] tracking-[-0.08em] text-primary-token'>
               {phoneCaption}
             </h2>
@@ -254,7 +260,7 @@ export function ArtistProfileModeSwitcher({
             </div>
           </div>
 
-          <div className='relative mx-auto aspect-[660/1368] w-[min(100%,23.5rem)]'>
+          <div className='relative mx-auto aspect-[660/1368] w-[min(100%,23.5rem,36svh)]'>
             {adaptive.modes.map((mode, index) => {
               const isActive = index === activeIndex;
               return (
