@@ -28,6 +28,7 @@ export type BooleanEntitlement =
   | 'canAccessAdPixels'
   | 'canBeVerified'
   | 'aiCanUseTools'
+  | 'canGenerateAlbumArt'
   | 'canCreateManualReleases'
   | 'canAccessTasksWorkspace'
   | 'canGenerateReleasePlans'
@@ -87,6 +88,7 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessAdPixels: true,
   canBeVerified: true,
   aiCanUseTools: true,
+  canGenerateAlbumArt: true,
   canCreateManualReleases: true,
   canAccessTasksWorkspace: true,
   canGenerateReleasePlans: false,
@@ -151,6 +153,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: false,
       canBeVerified: false,
       aiCanUseTools: true,
+      canGenerateAlbumArt: false,
       canCreateManualReleases: true,
       canAccessTasksWorkspace: false,
       canGenerateReleasePlans: false,
@@ -228,6 +231,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: true,
       canBeVerified: true,
       aiCanUseTools: true,
+      canGenerateAlbumArt: true,
       canCreateManualReleases: true,
       canAccessTasksWorkspace: true,
       canGenerateReleasePlans: true,

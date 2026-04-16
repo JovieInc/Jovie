@@ -20,6 +20,7 @@ const menuIcon = (
     | 'Lock'
     | 'Clock'
     | 'Music'
+    | 'Sparkles'
     | 'Trash2'
     | 'Copy'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
@@ -44,6 +45,8 @@ export interface BuildReleaseActionsOptions {
   readonly onCopyQrCode?: () => void;
   /** Custom icon for QR code action (lucide-react QrCode is not in the Icon atom) */
   readonly qrCodeIcon?: ReactNode;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
 }
 
 function buildShareItems(
@@ -214,6 +217,8 @@ export function buildReleaseActions({
   onDelete,
   onCopyQrCode,
   qrCodeIcon,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
@@ -247,6 +252,16 @@ export function buildReleaseActions({
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
+    ...(canGenerateAlbumArt && onGenerateAlbumArt
+      ? [
+          {
+            id: 'generate-album-art',
+            label: 'Generate Album Art',
+            icon: menuIcon('Sparkles'),
+            onClick: () => onGenerateAlbumArt(release),
+          } satisfies ContextMenuItemType,
+        ]
+      : []),
     {
       type: 'separator',
     },

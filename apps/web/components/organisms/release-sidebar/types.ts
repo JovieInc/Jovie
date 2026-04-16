@@ -61,6 +61,8 @@ export interface ReleaseSidebarProps {
   >;
   /** Artist name to display in the sidebar header */
   readonly artistName?: string | null;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: Release) => void;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   /** Whether a release refresh operation is currently in progress */

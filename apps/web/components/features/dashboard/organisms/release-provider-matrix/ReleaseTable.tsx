@@ -45,6 +45,8 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   onDelete,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -72,6 +74,8 @@ export function ReleaseTable({
         onEdit,
         onCopy,
         onDelete,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
@@ -80,6 +84,8 @@ export function ReleaseTable({
       onEdit,
       onCopy,
       onDelete,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
       artistName,
       isSmartLinkLocked,
       getSmartLinkLockReason,
@@ -208,6 +214,8 @@ export function ReleaseTable({
           artistName={artistName}
           onCopy={onCopy}
           onEdit={onEdit}
+          canGenerateAlbumArt={canGenerateAlbumArt}
+          onGenerateAlbumArt={onGenerateAlbumArt}
           columnVisibility={columnVisibility}
           rowHeight={rowHeight}
           onFocusedRowChange={onFocusedRowChange}
@@ -244,6 +252,8 @@ export function ReleaseTable({
         artistName={artistName}
         onEdit={onEdit}
         onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
         isSmartLinkLocked={isSmartLinkLocked}
         getSmartLinkLockReason={getSmartLinkLockReason}
         groupByYear={groupByYear}
