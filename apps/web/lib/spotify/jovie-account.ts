@@ -18,8 +18,11 @@
 import 'server-only';
 import { clerkClient } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
+import { getPlaylistSpotifyClerkUserId } from '@/lib/admin/platform-connections';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { SPOTIFY_API_BASE, SPOTIFY_DEFAULT_TIMEOUT_MS } from './env';
+import { SPOTIFY_OAUTH_TOKEN_STRATEGY } from './system-account';
 
 // ============================================================================
 // Configuration
@@ -29,15 +32,8 @@ import { SPOTIFY_API_BASE, SPOTIFY_DEFAULT_TIMEOUT_MS } from './env';
  * Clerk user ID for the Jovie system account.
  * Set in Doppler as JOVIE_SYSTEM_CLERK_USER_ID.
  */
-function getJovieSystemUserId(): string {
-  const userId = process.env.JOVIE_SYSTEM_CLERK_USER_ID;
-  if (!userId) {
-    throw new Error(
-      'JOVIE_SYSTEM_CLERK_USER_ID is not configured. ' +
-        'Create a Clerk user for the Jovie system account and set this env var.'
-    );
-  }
-  return userId;
+function getJovieSystemUserId(): string | null {
+  return env.JOVIE_SYSTEM_CLERK_USER_ID?.trim() || null;
 }
 
 // ============================================================================
@@ -69,18 +65,14 @@ export class SpotifyApiError extends Error {
 // Token Retrieval
 // ============================================================================
 
-/**
- * Get a valid Spotify access token for the Jovie system account via Clerk.
- * Throws SpotifyAuthError if the account is not linked or token retrieval fails.
- */
-export async function getJovieSpotifyToken(): Promise<string> {
-  const userId = getJovieSystemUserId();
-
+export async function getSpotifyTokenForClerkUser(
+  clerkUserId: string
+): Promise<string> {
   try {
     const clerk = await clerkClient();
     const tokens = await clerk.users.getUserOauthAccessToken(
-      userId,
-      'oauth_spotify'
+      clerkUserId,
+      SPOTIFY_OAUTH_TOKEN_STRATEGY
     );
 
     if (!tokens.data || tokens.data.length === 0) {
@@ -102,14 +94,38 @@ export async function getJovieSpotifyToken(): Promise<string> {
     if (error instanceof SpotifyAuthError) throw error;
 
     const msg = error instanceof Error ? error.message : 'Unknown error';
-    captureError('[Jovie Spotify] Token retrieval failed', error, { userId });
+    captureError('[Jovie Spotify] Token retrieval failed', error, {
+      userId: clerkUserId,
+    });
     Sentry.captureException(error, {
       tags: { component: 'jovie-spotify-account' },
-      extra: { userId },
+      extra: { userId: clerkUserId },
     });
 
     throw new SpotifyAuthError(`Failed to retrieve Spotify token: ${msg}`);
   }
+}
+
+/**
+ * Get a valid Spotify access token for the configured Jovie publisher account.
+ * Throws SpotifyAuthError if the account is not linked or token retrieval fails.
+ */
+export async function getJovieSpotifyToken(): Promise<string> {
+  let configuredUserId: string | null = null;
+  try {
+    configuredUserId = await getPlaylistSpotifyClerkUserId();
+  } catch (error) {
+    captureError('[Jovie Spotify] Failed to read configured publisher', error);
+  }
+  const userId = configuredUserId ?? getJovieSystemUserId();
+
+  if (!userId) {
+    throw new SpotifyAuthError(
+      'Playlist Spotify publisher is not configured. Connect Spotify in Admin → Platform Connections.'
+    );
+  }
+
+  return getSpotifyTokenForClerkUser(userId);
 }
 
 // ============================================================================

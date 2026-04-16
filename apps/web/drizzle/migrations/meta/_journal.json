@@ -246,6 +246,13 @@
       "when": 1776300136185,
       "tag": "0034_youthful_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1776300243139,
+      "tag": "0035_tranquil_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

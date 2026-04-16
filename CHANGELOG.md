@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.154.1] - 2026-04-16
+
+> Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
+
+### Added
+
+- Added the Admin Platform Connections page with Spotify Publisher and Playlist Engine controls.
+- Added admin system settings for playlist publisher and engine eligibility state.
+- [internal] Added focused unit coverage for platform connection helpers, Spotify token lookup, cron gating, and the admin UI smoke path.
+
+### Changed
+
+- [internal] Playlist generation cron now uses the admin database toggle and eligibility interval instead of the playlist feature flag.
+- [internal] Jovie Spotify token resolution now prefers the configured admin publisher and falls back to the legacy env system account when present.
+### Fixed
+
+- [internal] Moved playlist cadence persistence into the durable generation path so cron lease retries cannot create duplicate pending playlists after a partial success.
+- [internal] Split the Admin Platform Connections client into smaller Spotify and engine tab components and resolved follow-up review comments around control labels and button state logic.
+- [internal] Reduced hidden homepage hero rendering work to improve the public Lighthouse margin on the landing page.
+
 ## [26.4.154.0] - 2026-04-15
 
 > Audience now explains fan activity with verified, source-aware language and trackable QR links.
@@ -50,7 +70,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
 - Removed the duplicated lower logo row from the Artist Profiles proof section.
-
 ## [26.4.153.6] - 2026-04-15
 
 > Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
