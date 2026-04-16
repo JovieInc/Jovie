@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.154] - 2026-04-16
+
+> Internal CI hardening fixed the standalone server packaging path so public checks boot reliably, and playlist generation persistence now writes arrays and nullable cover URLs explicitly.
+
+### Fixed
+
+- [internal] Materialized the standalone Sentry interception modules inside the built artifact so public Lighthouse and axe runs no longer crash on missing runtime shims.
+- [internal] Serialized playlist `genreTags` and `moodTags` as explicit Postgres text arrays in the raw SQL persistence path.
+- [internal] Made nullable playlist cover image persistence explicit in both raw SQL insert branches.
+
 ## [26.4.153.8] - 2026-04-15
 
 > Internal follow-up fixes tightened playlist generation durability, cleaned up the admin controls surface, and trimmed homepage hero work to stabilize CI.
