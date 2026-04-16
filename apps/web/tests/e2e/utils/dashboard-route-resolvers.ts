@@ -69,21 +69,20 @@ async function fetchJsonFromPage<T>(
   readonly status: number;
   readonly data: T;
 }> {
-  return page.evaluate(
-    async ({ requestInput, requestInit }) => {
-      const response = await fetch(requestInput, {
-        credentials: 'same-origin',
-        ...requestInit,
-      });
-      const data = (await response.json().catch(() => ({}))) as T;
-      return {
-        ok: response.ok,
-        status: response.status,
-        data,
-      };
-    },
-    { requestInput: input, requestInit: init }
-  );
+  const response = await page.request.fetch(input, {
+    failOnStatusCode: false,
+    headers: init?.headers
+      ? Object.fromEntries(new Headers(init.headers).entries())
+      : undefined,
+    method: init?.method,
+    data: init?.body,
+  });
+  const data = (await response.json().catch(() => ({}))) as T;
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    data,
+  };
 }
 
 export async function resolveChatConversationPath(page: Page): Promise<string> {
