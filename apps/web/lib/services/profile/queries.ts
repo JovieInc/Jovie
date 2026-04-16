@@ -96,6 +96,7 @@ const MAX_CONTACTS = 50;
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
+const PROFILE_EDGE_CACHE_TIMEOUT_MS = 1500;
 const KNOWN_PROBE_USERNAMES = new Set([
   '.env',
   'phpmyadmin',
@@ -618,7 +619,9 @@ async function fetchProfileFromDatabase(
 export async function invalidateProfileEdgeCache(
   usernameNormalized: string
 ): Promise<void> {
-  const redis = getRedis();
+  const redis = getRedis({
+    signal: AbortSignal.timeout(PROFILE_EDGE_CACHE_TIMEOUT_MS),
+  });
   if (!redis) return;
 
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${usernameNormalized.toLowerCase()}`;

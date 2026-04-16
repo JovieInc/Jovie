@@ -83,7 +83,14 @@ export interface ProfileUpdateResponse {
 const updateProfileApi = createMutationFn<
   ProfileUpdateInput,
   ProfileUpdateResponse
->('/api/dashboard/profile', 'PUT');
+>(
+  '/api/dashboard/profile',
+  'PUT',
+  // Profile saves may fan out through Clerk sync and cache invalidation,
+  // so the default 10s mutation timeout can abort valid requests and cause
+  // autosave retries with duplicate writes during local/dev runs.
+  { timeout: 30_000 }
+);
 // ============================================================================
 // Profile Update Mutation
 // ============================================================================

@@ -137,7 +137,15 @@ async function globalSetup() {
   const warmupRoutes = [
     '/',
     '/signin',
+    '/api/handle/check?handle=e2e-warmup-handle',
+    '/api/dashboard/profile',
+    '/api/stripe/checkout',
+    '/api/stripe/pricing-options',
     APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
+    APP_ROUTES.DASHBOARD_RELEASES,
+    APP_ROUTES.DASHBOARD_AUDIENCE,
+    APP_ROUTES.PRESENCE,
+    APP_ROUTES.EARNINGS,
     APP_ROUTES.DASHBOARD_PROFILE,
     `/${testProfile}`,
     `/${testProfile}?mode=listen`,
@@ -146,21 +154,19 @@ async function globalSetup() {
     APP_ROUTES.ADMIN_CREATORS,
     APP_ROUTES.ADMIN_USERS,
   ];
-  await Promise.all(
-    warmupRoutes.map(async route => {
-      try {
-        const res = await fetch(`${baseURL}${route}`, {
-          signal: AbortSignal.timeout(120_000),
-          redirect: 'follow',
-        });
-        console.log(`  ✓ ${route} (${res.status}) warmed up`);
-      } catch {
-        console.log(
-          `  ⚠ ${route} warmup failed (will compile on first test visit)`
-        );
-      }
-    })
-  );
+  for (const route of warmupRoutes) {
+    try {
+      const res = await fetch(`${baseURL}${route}`, {
+        signal: AbortSignal.timeout(120_000),
+        redirect: 'follow',
+      });
+      console.log(`  ✓ ${route} (${res.status}) warmed up`);
+    } catch {
+      console.log(
+        `  ⚠ ${route} warmup failed (will compile on first test visit)`
+      );
+    }
+  }
 
   const elapsed = Date.now() - startTime;
   console.log(`✅ E2E global setup complete in ${elapsed}ms`);
