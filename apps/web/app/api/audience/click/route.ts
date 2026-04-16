@@ -9,6 +9,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -25,26 +26,11 @@ import {
   deriveIntentLevel,
   getActionWeight,
   mergeAudienceTags,
-  trimHistory,
 } from '../lib/audience-utils';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 type AudienceMemberRecord = {
   id: string;
@@ -119,6 +105,33 @@ function resolveTipAmountCents(
   if (typeof metadata?.tipAmount === 'number')
     return Math.round(metadata.tipAmount * 100);
   return defaultCents;
+}
+
+function resolveClickEventType(linkType: string, metadata: unknown) {
+  const record =
+    metadata && typeof metadata === 'object'
+      ? (metadata as Record<string, unknown>)
+      : {};
+  if (linkType === 'tip') return 'tip_link_opened' as const;
+  if (record.contentType === 'tour_date') return 'tour_date_checked_out';
+  if (linkType === 'listen' || record.contentType === 'release') {
+    return 'content_checked_out' as const;
+  }
+  if (linkType === 'social') return 'social_opened' as const;
+  return 'link_clicked' as const;
+}
+
+function resolveClickObjectType(linkType: string, metadata: unknown) {
+  const record =
+    metadata && typeof metadata === 'object'
+      ? (metadata as Record<string, unknown>)
+      : {};
+  if (record.contentType === 'tour_date') return 'tour_date' as const;
+  if (record.contentType === 'release') return 'release' as const;
+  if (record.contentType === 'track') return 'track' as const;
+  if (linkType === 'tip') return 'payment_link' as const;
+  if (linkType === 'social') return 'social_link' as const;
+  return 'external_url' as const;
 }
 
 export async function POST(request: NextRequest) {
@@ -310,18 +323,10 @@ export async function POST(request: NextRequest) {
         throw new Error('Unable to resolve audience member');
       }
 
-      const existingActions = Array.isArray(member.latestActions)
-        ? member.latestActions
-        : [];
-      const actionEntry = {
-        label: actionLabel ?? ACTION_LABELS[linkType] ?? 'interacted',
-        type: linkType,
-        platform: platform ?? linkType,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
-        timestamp: now.toISOString(),
-      };
-      const latestActions = trimHistory([actionEntry, ...existingActions], 5);
-      const actionCount = latestActions.length;
+      const existingActionCount = Array.isArray(member.latestActions)
+        ? member.latestActions.length
+        : 0;
+      const actionCount = Math.min(existingActionCount + 1, 5);
       const weight = getActionWeight(linkType);
       const tags = mergeAudienceTags(member.tags, audienceTags);
       const isBotMember = tags.includes('bot');
@@ -366,7 +371,6 @@ export async function POST(request: NextRequest) {
           updatedAt: now,
           engagementScore: updatedScore,
           intentLevel,
-          latestActions,
           deviceType: normalizedDevice,
           geoCity: city ?? member.geoCity ?? null,
           geoCountry: country ?? member.geoCountry ?? null,
@@ -375,6 +379,35 @@ export async function POST(request: NextRequest) {
             (member.spotifyConnected ?? false) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, member.id));
+
+      await recordAudienceEvent(tx, {
+        creatorProfileId: profileId,
+        audienceMemberId: member.id,
+        eventType: resolveClickEventType(linkType, metadata),
+        verb:
+          linkType === 'tip'
+            ? 'opened'
+            : linkType === 'social'
+              ? 'opened'
+              : linkType === 'listen'
+                ? 'checked_out'
+                : 'clicked',
+        confidence: 'observed',
+        sourceKind: 'short_link',
+        sourceLabel: referrer ?? undefined,
+        objectType: resolveClickObjectType(linkType, metadata),
+        objectId:
+          typeof metadataWithTipValue.contentId === 'string'
+            ? metadataWithTipValue.contentId
+            : linkId,
+        objectLabel:
+          actionLabel ??
+          (typeof metadataWithTipValue.target === 'string'
+            ? metadataWithTipValue.target
+            : platform),
+        platform,
+        properties: metadataWithTipValue,
+      });
     });
 
     return NextResponse.json(

@@ -40,6 +40,7 @@ export default function DemoAudienceSection() {
       getTouringCity,
       hiddenMetadataColumns: {
         location: false,
+        source: false,
         engagement: false,
         lastSeen: false,
       },

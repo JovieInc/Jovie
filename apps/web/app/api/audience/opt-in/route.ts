@@ -14,7 +14,9 @@ import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
+import { audienceMembers } from '@/lib/db/schema/analytics';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { verifyOptInToken } from '@/lib/email/opt-in-token';
 import { captureError } from '@/lib/error-tracking';
@@ -64,6 +66,34 @@ async function applyOptIn(email: string, profileId: string, optIn: boolean) {
       and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
     )
     .returning({ id: tipAudience.id });
+  if (updated && optIn) {
+    const [member] = await db
+      .select({ id: audienceMembers.id })
+      .from(audienceMembers)
+      .where(
+        and(
+          eq(audienceMembers.creatorProfileId, profileId),
+          eq(audienceMembers.email, email)
+        )
+      )
+      .limit(1);
+
+    if (member) {
+      await recordAudienceEvent(db, {
+        creatorProfileId: profileId,
+        audienceMemberId: member.id,
+        eventType: 'subscription_created',
+        verb: 'subscribed',
+        confidence: 'verified',
+        sourceKind: 'email',
+        sourceLabel: 'Email',
+        objectType: 'profile',
+        objectId: profileId,
+        objectLabel: 'Profile',
+        properties: { email },
+      });
+    }
+  }
   return updated ?? null;
 }
 

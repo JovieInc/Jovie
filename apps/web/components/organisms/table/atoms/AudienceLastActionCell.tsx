@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -38,10 +39,21 @@ export function AudienceLastActionCell({
   }
 
   const lastAction = actions[0];
-  const actionLabel = lastAction
-    ? capitalizeFirst(lastAction.label?.trim()) || 'Unknown action'
-    : null;
-  const iconName = lastAction ? resolveActionIcon(lastAction.label) : 'Clock';
+  const renderedAction = lastAction
+    ? renderAudienceEventSentence(lastAction)
+    : { kind: 'empty' as const };
+  const actionLabel =
+    renderedAction.kind === 'sentence'
+      ? renderedAction.text
+      : lastAction
+        ? capitalizeFirst(lastAction.label?.trim()) || 'Unknown action'
+        : null;
+  const iconName =
+    renderedAction.kind === 'sentence'
+      ? renderedAction.icon
+      : lastAction
+        ? resolveActionIcon(lastAction.label)
+        : 'Clock';
 
   return (
     <div

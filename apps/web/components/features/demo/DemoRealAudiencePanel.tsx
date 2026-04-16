@@ -36,6 +36,7 @@ export function DemoRealAudiencePanel() {
       getTouringCity,
       hiddenMetadataColumns: {
         location: false,
+        source: false,
         engagement: false,
         lastSeen: false,
       },

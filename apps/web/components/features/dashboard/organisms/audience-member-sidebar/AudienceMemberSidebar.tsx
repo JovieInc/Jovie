@@ -23,12 +23,12 @@ import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 import type { AudienceMemberSidebarProps } from './types';
 
-type AudienceTab = 'details' | 'activity' | 'referrers';
+type AudienceTab = 'details' | 'activity' | 'sources';
 
 const AUDIENCE_TAB_OPTIONS = [
   { value: 'details' as const, label: 'Details' },
   { value: 'activity' as const, label: 'Activity' },
-  { value: 'referrers' as const, label: 'Referrers' },
+  { value: 'sources' as const, label: 'Sources' },
 ];
 
 function AudienceMemberEntityHeader({
@@ -147,8 +147,8 @@ export function AudienceMemberSidebar({
                   <AudienceMemberActivityFeed member={member} />
                 </div>
               )}
-              {activeTab === 'referrers' && (
-                <div data-testid='audience-referrers-card'>
+              {activeTab === 'sources' && (
+                <div data-testid='audience-sources-card'>
                   <AudienceMemberReferrers member={member} />
                 </div>
               )}
