@@ -214,9 +214,11 @@ describe('ArtistProfilesPage', () => {
       screen.getByTestId('artist-profile-section-capture')
     );
     expect(
-      captureSection.getByRole('button', { name: 'Subscribe' })
+      captureSection.getByText('Get release and show alerts from Tim White.')
     ).toBeInTheDocument();
-    expect(captureSection.getByText('Email + Push')).toBeInTheDocument();
+    expect(captureSection.getAllByText('Subscribe').length).toBeGreaterThan(0);
+    expect(captureSection.getByText('ava@icloud.com')).toBeInTheDocument();
+    expect(captureSection.getAllByText('Subscribed').length).toBeGreaterThan(0);
     expect(
       captureSection.getByText('Spotify / LA / Release page')
     ).toBeInTheDocument();

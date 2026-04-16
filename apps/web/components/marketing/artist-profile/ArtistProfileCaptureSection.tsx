@@ -137,6 +137,8 @@ function AudienceRail({
   );
 }
 
+const DEMO_SUBSCRIBE_EMAIL = 'ava@icloud.com';
+
 export function ArtistProfileCaptureSection({
   capture,
 }: Readonly<ArtistProfileCaptureSectionProps>) {
@@ -201,6 +203,25 @@ export function ArtistProfileCaptureSection({
           animation-play-state: paused;
         }
 
+        .artist-profile-subscribe-flow-input {
+          animation: artist-profile-subscribe-flow-out 5.6s ease-in-out infinite;
+        }
+
+        .artist-profile-subscribe-flow-success {
+          animation: artist-profile-subscribe-flow-in 5.6s ease-in-out infinite;
+        }
+
+        .artist-profile-subscribe-typed {
+          width: 0ch;
+          animation: artist-profile-subscribe-type 5.6s steps(15, end) infinite;
+        }
+
+        .artist-profile-subscribe-caret {
+          animation:
+            artist-profile-subscribe-caret-blink 0.9s steps(1, end) infinite,
+            artist-profile-subscribe-caret-hide 5.6s linear infinite;
+        }
+
         @keyframes artist-profile-audience-drift {
           from {
             transform: translate3d(0, 0, 0);
@@ -211,9 +232,91 @@ export function ArtistProfileCaptureSection({
           }
         }
 
+        @keyframes artist-profile-subscribe-type {
+          0%,
+          10% {
+            width: 0ch;
+          }
+
+          34%,
+          100% {
+            width: 15ch;
+          }
+        }
+
+        @keyframes artist-profile-subscribe-flow-out {
+          0%,
+          38% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          50%,
+          100% {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes artist-profile-subscribe-flow-in {
+          0%,
+          40% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+
+          52%,
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes artist-profile-subscribe-caret-blink {
+          0%,
+          45%,
+          100% {
+            opacity: 1;
+          }
+
+          50% {
+            opacity: 0;
+          }
+        }
+
+        @keyframes artist-profile-subscribe-caret-hide {
+          0%,
+          40% {
+            opacity: 1;
+          }
+
+          50%,
+          100% {
+            opacity: 0;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .artist-profile-audience-rail {
+          .artist-profile-audience-rail,
+          .artist-profile-subscribe-flow-input,
+          .artist-profile-subscribe-flow-success,
+          .artist-profile-subscribe-typed,
+          .artist-profile-subscribe-caret {
             animation: none;
+          }
+
+          .artist-profile-subscribe-flow-input {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+
+          .artist-profile-subscribe-flow-success {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          .artist-profile-subscribe-typed {
+            width: 15ch;
           }
         }
       `}</style>
@@ -244,16 +347,50 @@ export function ArtistProfileCaptureSection({
                   </p>
                 </div>
               </div>
-              <div className='flex shrink-0 items-center gap-2 rounded-full bg-white/[0.045] p-1.5 pl-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-                <span className='hidden text-[12px] font-medium tracking-[-0.01em] text-tertiary-token sm:inline'>
-                  Email + Push
-                </span>
-                <button
-                  type='button'
-                  className='inline-flex h-9 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
+              <div className='relative h-12 w-full max-w-[23rem] shrink-0 sm:h-12'>
+                <div
+                  className='artist-profile-subscribe-flow-input absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.045] p-1.5 pl-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'
+                  aria-hidden='true'
                 >
-                  {capture.action.ctaLabel}
-                </button>
+                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-primary-token'>
+                    <Mail className='h-4 w-4' strokeWidth={1.9} />
+                  </span>
+                  <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/28 px-3 py-2'>
+                    <span className='artist-profile-subscribe-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>
+                      {DEMO_SUBSCRIBE_EMAIL}
+                    </span>
+                    <span
+                      className='artist-profile-subscribe-caret ml-0.5 inline-block h-3.5 w-px bg-white/58'
+                      aria-hidden='true'
+                    />
+                  </span>
+                  <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black'>
+                    {capture.action.ctaLabel}
+                  </span>
+                </div>
+                <div
+                  className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.05] p-1.5 pl-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'
+                  aria-hidden='true'
+                >
+                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
+                    <Check className='h-4 w-4' strokeWidth={2.1} />
+                  </span>
+                  <span className='min-w-0 flex-1'>
+                    <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
+                      Subscribed
+                    </span>
+                    <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
+                      Notifications on
+                    </span>
+                  </span>
+                  <span className='inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-semibold tracking-[-0.02em] text-black'>
+                    Live
+                  </span>
+                </div>
+                <p className='sr-only'>
+                  A demo email is typed into the subscribe input, then the UI
+                  switches to a subscribed state with notifications enabled.
+                </p>
               </div>
             </div>
             <div className='mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 pt-2 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
