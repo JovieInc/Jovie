@@ -298,7 +298,7 @@ export function AnalyticsSidebarView({
               </div>
               <AppSegmentControl
                 value={range}
-                onValueChange={value => onRangeChange(value as AnalyticsRange)}
+                onValueChange={onRangeChange}
                 options={RANGE_OPTIONS}
                 size='sm'
                 className='shrink-0'
@@ -346,7 +346,7 @@ export function AnalyticsSidebarView({
           tabs={
             <DrawerTabs
               value={activeTab}
-              onValueChange={value => onActiveTabChange(value as AnalyticsTab)}
+              onValueChange={onActiveTabChange}
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'

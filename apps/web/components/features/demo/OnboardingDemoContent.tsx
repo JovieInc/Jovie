@@ -21,6 +21,18 @@ const STEP_LABELS: Record<DemoOnboardingStepId, string> = {
   'profile-review': 'Profile',
 };
 
+function getStepIndicatorClassName(index: number, currentIndex: number) {
+  if (index === currentIndex) {
+    return 'w-6 bg-primary-token';
+  }
+
+  if (index < currentIndex) {
+    return 'w-1.5 bg-primary-token/40';
+  }
+
+  return 'w-1.5 bg-primary-token/15';
+}
+
 interface OnboardingDemoContentProps {
   readonly currentStep: DemoOnboardingStepId;
   readonly onStepChange: (step: DemoOnboardingStepId) => void;
@@ -77,11 +89,7 @@ export function OnboardingDemoContent({
             aria-label={`Step ${index + 1}`}
             className={cn(
               'h-1.5 rounded-full transition-all duration-300',
-              index === currentIndex
-                ? 'w-6 bg-primary-token'
-                : index < currentIndex
-                  ? 'w-1.5 bg-primary-token/40'
-                  : 'w-1.5 bg-primary-token/15'
+              getStepIndicatorClassName(index, currentIndex)
             )}
           />
         ))}
