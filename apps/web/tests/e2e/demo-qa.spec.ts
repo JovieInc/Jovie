@@ -16,7 +16,16 @@ import { DEMO_RELEASE_VIEW_MODELS } from '@/features/demo/mock-release-data';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const PRIMARY_RELEASE_TITLE = DEMO_RELEASE_VIEW_MODELS[0]?.title ?? '';
+function getPrimaryReleaseTitle() {
+  const primaryReleaseTitle = DEMO_RELEASE_VIEW_MODELS[0]?.title;
+
+  expect(
+    primaryReleaseTitle,
+    'Expected at least one demo release fixture'
+  ).toBeTruthy();
+
+  return primaryReleaseTitle!;
+}
 
 test.describe('Demo page — structural QA', () => {
   test.beforeEach(async ({ page }) => {
@@ -80,8 +89,11 @@ test.describe('Demo page — structural QA', () => {
     // Click Releases tab
     await releasesNav.click();
 
-    // Fixture release titles should appear
-    await expect(page.getByText(PRIMARY_RELEASE_TITLE)).toBeVisible({
+    const primaryReleaseTitle = getPrimaryReleaseTitle();
+    const firstReleaseRow = page.getByTestId('release-row');
+
+    await expect(firstReleaseRow).toBeVisible({ timeout: 15_000 });
+    await expect(firstReleaseRow.getByText(primaryReleaseTitle)).toBeVisible({
       timeout: 15_000,
     });
   });

@@ -15,13 +15,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- `/demo/audience`, analytics, settings, links, earnings, and onboarding demo flows now render shared app surfaces with fixture-backed data instead of separate demo-only panels.
-- Homepage smart-link proof now uses a generated product screenshot instead of mounting a live demo widget.
+- [internal] `/demo/audience`, analytics, settings, links, earnings, and onboarding demo flows now render shared app surfaces with fixture-backed data instead of separate demo-only panels.
+- [internal] Homepage smart-link proof now uses a generated product screenshot instead of mounting a live demo widget.
 
 ### Fixed
 
-- Demo releases no longer request live-auth-only release credits on the public route.
-- Demo audience fixtures are now deterministic, which removes hydration drift while keeping hot-reload parity stable.
+- [internal] Demo releases no longer request live-auth-only release credits on the public route.
+- [internal] Demo audience fixtures are now deterministic, which removes hydration drift while keeping hot-reload parity stable.
 
 ## [26.4.154.1] - 2026-04-16
 

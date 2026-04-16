@@ -49,9 +49,13 @@ const DEMO_AUDIENCE_ACTION_ADAPTER: AudienceActionAdapter = {
       return;
     }
 
-    const dataUrl = await generateQrCodeDataUrl(DEMO_SOURCE_LINK_URL, 1024);
-    downloadBlob(qrCodeDataUrlToBlob(dataUrl), 'demo-source-link-qr.png');
-    toast.success('QR code downloaded');
+    try {
+      const dataUrl = await generateQrCodeDataUrl(DEMO_SOURCE_LINK_URL, 1024);
+      downloadBlob(qrCodeDataUrlToBlob(dataUrl), 'demo-source-link-qr.png');
+      toast.success('QR code downloaded');
+    } catch {
+      toast.error('Unable to download QR code');
+    }
   },
 };
 

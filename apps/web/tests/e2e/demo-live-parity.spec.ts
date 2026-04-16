@@ -147,6 +147,28 @@ async function collectAudienceShape(
   };
 }
 
+async function collectUnauthenticatedShape<T>(
+  page: Page,
+  collect: (demoPage: Page) => Promise<T>
+) {
+  const browser = page.context().browser();
+  expect(
+    browser,
+    'Expected browser instance for demo parity capture'
+  ).toBeTruthy();
+
+  const demoContext = await browser!.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  const demoPage = await demoContext.newPage();
+
+  try {
+    return await collect(demoPage);
+  } finally {
+    await demoContext.close();
+  }
+}
+
 test.describe
   .serial('Demo/live route parity', () => {
     test.skip(!USE_TEST_AUTH_BYPASS, 'Requires E2E_USE_TEST_AUTH_BYPASS=1');
@@ -159,7 +181,9 @@ test.describe
         APP_ROUTES.DASHBOARD_RELEASES,
         true
       );
-      const demoShape = await collectReleasesShape(page, '/demo', false);
+      const demoShape = await collectUnauthenticatedShape(page, demoPage =>
+        collectReleasesShape(demoPage, '/demo', false)
+      );
 
       expect(demoShape).toEqual(liveShape);
     });
@@ -172,16 +196,15 @@ test.describe
         APP_ROUTES.DASHBOARD_AUDIENCE,
         true
       );
-      const demoShape = await collectAudienceShape(
-        page,
-        '/demo/audience',
-        false
+      const demoShape = await collectUnauthenticatedShape(page, demoPage =>
+        collectAudienceShape(demoPage, '/demo/audience', false)
       );
 
       expect(demoShape.hasToggleAnalytics).toBe(liveShape.hasToggleAnalytics);
       expect(demoShape.funnelVisible).toBe(liveShape.funnelVisible);
       expect(demoShape.audienceTabs).toEqual(liveShape.audienceTabs);
       expect(demoShape.toolbarButtons).toEqual(liveShape.toolbarButtons);
+      expect(demoShape.contentSurface).toBe(liveShape.contentSurface);
 
       if (
         demoShape.contentSurface === 'table' &&

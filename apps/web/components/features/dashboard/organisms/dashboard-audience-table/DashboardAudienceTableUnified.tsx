@@ -603,17 +603,17 @@ export const DashboardAudienceTableUnified = memo(
 
     const handleSourceLinkAction = React.useCallback(
       async (action: 'copy' | 'open' | 'download') => {
-        if (actionAdapter?.onSourceLinkAction) {
-          await actionAdapter.onSourceLinkAction(action);
-          return;
-        }
-
         if (!profileId) {
           toast.error('Profile is still loading');
           return;
         }
 
         try {
+          if (actionAdapter?.onSourceLinkAction) {
+            await actionAdapter.onSourceLinkAction(action);
+            return;
+          }
+
           const sourceLink = await ensureProfileQrSource();
 
           if (action === 'copy') {
@@ -846,7 +846,11 @@ export const DashboardAudienceTableUnified = memo(
         );
       }
       if (panelMode === 'analytics') {
-        if (analyticsMode === 'static' && analyticsData) {
+        if (analyticsMode === 'static') {
+          if (!analyticsData) {
+            return null;
+          }
+
           return (
             <StaticAnalyticsSidebar
               isOpen

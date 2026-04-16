@@ -244,6 +244,7 @@ export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
   readonly isFetching?: boolean;
   readonly range: AnalyticsRange;
   readonly onRangeChange: (range: AnalyticsRange) => void;
+  readonly showRangeControl?: boolean;
   readonly activeTab: AnalyticsTab;
   readonly onActiveTabChange: (tab: AnalyticsTab) => void;
   readonly testId?: string;
@@ -258,6 +259,7 @@ export function AnalyticsSidebarView({
   isFetching = false,
   range,
   onRangeChange,
+  showRangeControl = true,
   activeTab,
   onActiveTabChange,
   testId = 'analytics-sidebar',
@@ -296,14 +298,16 @@ export function AnalyticsSidebarView({
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              <AppSegmentControl
-                value={range}
-                onValueChange={onRangeChange}
-                options={RANGE_OPTIONS}
-                size='sm'
-                className='shrink-0'
-                aria-label='Analytics time range'
-              />
+              {showRangeControl ? (
+                <AppSegmentControl
+                  value={range}
+                  onValueChange={onRangeChange}
+                  options={RANGE_OPTIONS}
+                  size='sm'
+                  className='shrink-0'
+                  aria-label='Analytics time range'
+                />
+              ) : null}
             </div>
           </div>
         </DrawerSurfaceCard>
@@ -445,7 +449,6 @@ export function StaticAnalyticsSidebar({
   readonly testId?: string;
   readonly tabbedCardTestId?: string;
 }) {
-  const [range, setRange] = useState<AnalyticsRange>('30d');
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
 
   return (
@@ -454,8 +457,9 @@ export function StaticAnalyticsSidebar({
       onClose={onClose}
       data={data}
       loading={false}
-      range={range}
-      onRangeChange={setRange}
+      range='30d'
+      onRangeChange={() => {}}
+      showRangeControl={false}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       testId={testId}

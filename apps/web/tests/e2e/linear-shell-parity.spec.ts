@@ -126,6 +126,17 @@ async function livesInsideRoundedCard(locator: Locator) {
   });
 }
 
+function getPrimaryReleaseTitle() {
+  const primaryReleaseTitle = DEMO_RELEASE_VIEW_MODELS[0]?.title;
+
+  expect(
+    primaryReleaseTitle,
+    'Expected at least one demo release fixture'
+  ).toBeTruthy();
+
+  return primaryReleaseTitle!;
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`${theme}: /demo toolbar pills and release drawer follow parity invariants`, async ({
     page,
@@ -134,9 +145,11 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
-    const primaryReleaseTitle = DEMO_RELEASE_VIEW_MODELS[0]?.title ?? '';
+    const primaryReleaseTitle = getPrimaryReleaseTitle();
+    const firstReleaseRow = page.getByTestId('release-row');
+    await expect(firstReleaseRow).toBeVisible();
     await expect(
-      page.getByText(primaryReleaseTitle, { exact: true }).first()
+      firstReleaseRow.getByText(primaryReleaseTitle, { exact: true })
     ).toBeVisible();
 
     const displayButton = page
@@ -195,9 +208,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
-    await expect(
-      page.getByRole('heading', { name: 'Audience CRM' })
-    ).toBeVisible();
+    await expect(page.getByTestId('demo-audience-shell')).toBeVisible();
 
     const drawer = page.getByTestId('demo-analytics-sidebar');
     const drawerInitiallyVisible = await drawer.isVisible().catch(() => false);
@@ -213,13 +224,6 @@ for (const theme of ['light', 'dark'] as const) {
 
     await expect(drawer).toBeVisible({ timeout: 15_000 });
 
-    const rangeButton = drawer
-      .locator('button')
-      .filter({ hasText: '30d' })
-      .first();
-    await expect(rangeButton).toBeVisible();
-    await expectFlatPillChrome(rangeButton);
-
     const tabbedCard = drawer.getByTestId('demo-analytics-tabbed-card');
     await expect(tabbedCard).toBeVisible();
     await expectCardChrome(tabbedCard);
@@ -229,7 +233,6 @@ for (const theme of ['light', 'dark'] as const) {
     expect(
       await livesInsideRoundedCard(drawer.getByText('Audience funnel'))
     ).toBeTruthy();
-    expect(await livesInsideRoundedCard(rangeButton)).toBeTruthy();
     expect(
       await livesInsideRoundedCard(tabbedCard.getByText('Los Angeles'))
     ).toBeTruthy();
