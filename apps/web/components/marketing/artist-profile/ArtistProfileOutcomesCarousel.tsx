@@ -86,6 +86,7 @@ export function ArtistProfileOutcomesCarousel({
 
         <div
           ref={scrollerRef}
+          data-testid='artist-profile-outcomes-scroller'
           className='relative left-1/2 mt-10 flex w-screen -translate-x-1/2 gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-1120px)/2+1.25rem))] pr-[10vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pl-[max(1.5rem,calc((100vw-1120px)/2+1.5rem))] sm:pr-[12vw] lg:pl-[max(2rem,calc((100vw-1120px)/2+2rem))] lg:pr-[14vw] [&::-webkit-scrollbar]:hidden'
         >
           <button
@@ -121,6 +122,7 @@ function OutcomeCard({
 
   return (
     <article
+      data-testid='artist-profile-outcome-card'
       className='group relative flex min-h-[32rem] snap-start flex-col overflow-hidden rounded-[1.9rem] bg-[#050505] sm:min-h-[33rem] lg:min-h-[34rem] xl:min-h-[35rem]'
       style={style}
     >

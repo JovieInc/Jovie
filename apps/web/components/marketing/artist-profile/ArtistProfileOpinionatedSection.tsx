@@ -130,24 +130,22 @@ export function ArtistProfileReactivationSection({
             {reactivation.workflow.rows.map(row => (
               <article
                 key={row.id}
+                data-testid='artist-profile-reactivation-row'
                 className='rounded-[1.4rem] border border-white/7 bg-white/[0.018] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:px-5 sm:py-5'
               >
-                <div className='flex flex-wrap items-center gap-2.5 lg:gap-3'>
+                <div className='flex flex-col items-start gap-2.5 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3'>
                   <WorkflowBeat value={row.trigger} />
-                  <WorkflowArrow />
-                  <WorkflowBeat
+                  <WorkflowTransition
                     label={reactivation.workflow.columns[1]}
                     tone='audience'
                     value={row.audience}
                   />
-                  <WorkflowArrow />
-                  <WorkflowBeat
+                  <WorkflowTransition
                     label={reactivation.workflow.columns[2]}
                     tone='message'
                     value={row.message}
                   />
-                  <WorkflowArrow />
-                  <WorkflowBeat
+                  <WorkflowTransition
                     label={reactivation.workflow.columns[3]}
                     tone='destination'
                     value={row.destination}
@@ -165,6 +163,7 @@ export function ArtistProfileReactivationSection({
                 return (
                   <article
                     key={output.id}
+                    data-testid='artist-profile-reactivation-output'
                     className='px-5 py-5 sm:px-6 lg:px-7 lg:py-6'
                   >
                     <div className='flex items-center justify-between gap-3'>
@@ -253,9 +252,26 @@ function WorkflowArrow() {
   return (
     <span
       aria-hidden='true'
-      className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/35'
+      className='hidden h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/35 lg:inline-flex'
     >
       <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.85} />
     </span>
+  );
+}
+
+function WorkflowTransition({
+  label,
+  tone,
+  value,
+}: Readonly<{
+  label: string;
+  tone?: 'audience' | 'default' | 'destination' | 'message';
+  value: string;
+}>) {
+  return (
+    <div className='flex items-center gap-2.5 lg:gap-3'>
+      <WorkflowArrow />
+      <WorkflowBeat label={label} tone={tone} value={value} />
+    </div>
   );
 }
