@@ -64,7 +64,6 @@ export function HomeHeroPhoneComposition() {
       className='homepage-hero-composition'
       data-testid='homepage-hero-composition'
     >
-<<<<<<< HEAD
       {showFlanks ? (
         <div
           className='homepage-hero-comp-flank homepage-hero-comp-left'
@@ -79,20 +78,6 @@ export function HomeHeroPhoneComposition() {
           />
         </div>
       ) : null}
-=======
-      {showFlanks ? (
-        <div
-          className='homepage-hero-comp-flank homepage-hero-comp-left'
-          style={leftStyle}
-        >
-          <HomeProfileShowcase
-            stateId='streams-presave'
-            presentation='full-phone'
-            className='homepage-hero-comp-phone-small'
-          />
-        </div>
-      ) : null}
->>>>>>> 4867533b8 (fix(ci): tighten playlist cadence and home lcp)
 
       <div className='homepage-hero-comp-center'>
         <HomeProfileShowcase
@@ -104,7 +89,6 @@ export function HomeHeroPhoneComposition() {
         />
       </div>
 
-<<<<<<< HEAD
       {showFlanks ? (
         <div
           className='homepage-hero-comp-flank homepage-hero-comp-right'
@@ -119,20 +103,6 @@ export function HomeHeroPhoneComposition() {
           />
         </div>
       ) : null}
-=======
-      {showFlanks ? (
-        <div
-          className='homepage-hero-comp-flank homepage-hero-comp-right'
-          style={rightStyle}
-        >
-          <HomeProfileShowcase
-            stateId='tour'
-            presentation='full-phone'
-            className='homepage-hero-comp-phone-small'
-          />
-        </div>
-      ) : null}
->>>>>>> 4867533b8 (fix(ci): tighten playlist cadence and home lcp)
     </div>
   );
 }
