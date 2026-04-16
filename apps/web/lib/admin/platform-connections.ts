@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminSystemSettings } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   SPOTIFY_API_BASE,
@@ -61,6 +62,17 @@ export interface SetPlaylistSpotifyInput {
   readonly updatedByClerkUserId: string;
 }
 
+export interface SpotifyExternalAccount {
+  readonly provider?: unknown;
+  readonly approvedScopes?: unknown;
+  readonly scope?: unknown;
+  readonly scopes?: unknown;
+  readonly emailAddress?: unknown;
+  readonly username?: unknown;
+  readonly name?: unknown;
+  readonly firstName?: unknown;
+}
+
 function isIntervalUnit(value: string): value is PlaylistIntervalUnit {
   return PLAYLIST_INTERVAL_UNITS.includes(value as PlaylistIntervalUnit);
 }
@@ -75,7 +87,7 @@ function normalizeIntervalValue(value: number | null): number {
 }
 
 function getEnvFallbackClerkUserId(): string | null {
-  return process.env.JOVIE_SYSTEM_CLERK_USER_ID?.trim() || null;
+  return env.JOVIE_SYSTEM_CLERK_USER_ID?.trim() || null;
 }
 
 async function readSettingsRow(): Promise<SettingsRow | null> {
@@ -193,7 +205,7 @@ function listScopes(value: unknown): string[] {
   return [];
 }
 
-function readExternalAccountScopes(account: unknown): string[] {
+export function readExternalAccountScopes(account: unknown): string[] {
   if (!account || typeof account !== 'object') return [];
   const record = account as Record<string, unknown>;
   return [
@@ -203,7 +215,7 @@ function readExternalAccountScopes(account: unknown): string[] {
   ];
 }
 
-function readAccountLabel(account: unknown): string | null {
+export function readAccountLabel(account: unknown): string | null {
   if (!account || typeof account !== 'object') return null;
   const record = account as Record<string, unknown>;
   for (const key of ['emailAddress', 'username', 'name', 'firstName']) {
@@ -213,15 +225,20 @@ function readAccountLabel(account: unknown): string | null {
   return null;
 }
 
-function isSpotifyAccount(account: unknown): boolean {
+export function isSpotifyAccount(
+  account: unknown
+): account is SpotifyExternalAccount {
   if (!account || typeof account !== 'object') return false;
-  const provider = String((account as Record<string, unknown>).provider ?? '');
-  return SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS.some(alias => provider === alias);
+  const provider = (account as Record<string, unknown>).provider;
+  if (typeof provider !== 'string') return false;
+  return (SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS as readonly string[]).includes(
+    provider
+  );
 }
 
 async function getSpotifyExternalAccount(
   clerkUserId: string
-): Promise<unknown | null> {
+): Promise<SpotifyExternalAccount | null> {
   const clerk = await clerkClient();
   const user = await clerk.users.getUser(clerkUserId);
   return user.externalAccounts.find(isSpotifyAccount) ?? null;
@@ -266,7 +283,7 @@ export async function validatePlaylistSpotifyAccount(
     return {
       connected: true,
       healthy: false,
-      source: 'missing',
+      source: 'database',
       clerkUserId,
       accountLabel: readAccountLabel(account),
       approvedScopes,
@@ -359,16 +376,21 @@ export async function setPlaylistSpotifyClerkUserId(
   invalidatePlatformConnectionsCache();
 }
 
+function determinePlaylistSpotifySource(
+  dbClerkUserId: string | null,
+  envClerkUserId: string | null
+): PlaylistSpotifyStatus['source'] {
+  if (dbClerkUserId) return 'database';
+  if (envClerkUserId) return 'env fallback';
+  return 'missing';
+}
+
 export async function getPlaylistSpotifyStatus(): Promise<PlaylistSpotifyStatus> {
   const settings = await readSettingsRow();
   const dbClerkUserId = settings?.playlistSpotifyClerkUserId?.trim() || null;
   const envClerkUserId = getEnvFallbackClerkUserId();
   const clerkUserId = dbClerkUserId ?? envClerkUserId;
-  const source = dbClerkUserId
-    ? 'database'
-    : envClerkUserId
-      ? 'env fallback'
-      : 'missing';
+  const source = determinePlaylistSpotifySource(dbClerkUserId, envClerkUserId);
 
   if (!clerkUserId) {
     return {

@@ -83,6 +83,24 @@ describe('jovie Spotify account', () => {
     expect(getToken).toHaveBeenCalledWith('db_user', 'oauth_spotify');
   });
 
+  it('falls back to env when DB has no publisher configured', async () => {
+    mockGetPlaylistSpotifyClerkUserId.mockResolvedValue(null);
+    const getToken = vi
+      .fn()
+      .mockResolvedValue({ data: [{ token: 'env-token' }] });
+    mockClerkClient.mockResolvedValue({
+      users: { getUserOauthAccessToken: getToken },
+    });
+    vi.stubEnv('JOVIE_SYSTEM_CLERK_USER_ID', 'env_user');
+
+    const { getJovieSpotifyToken } = await import(
+      '@/lib/spotify/jovie-account'
+    );
+
+    await expect(getJovieSpotifyToken()).resolves.toBe('env-token');
+    expect(getToken).toHaveBeenCalledWith('env_user', 'oauth_spotify');
+  });
+
   it('throws a clear error when no publisher is configured', async () => {
     mockGetPlaylistSpotifyClerkUserId.mockResolvedValue(null);
 

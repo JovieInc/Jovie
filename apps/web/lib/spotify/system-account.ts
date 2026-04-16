@@ -1,5 +1,3 @@
-import 'server-only';
-
 export const SPOTIFY_OAUTH_TOKEN_STRATEGY = 'oauth_spotify' as const;
 
 export const SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS = [

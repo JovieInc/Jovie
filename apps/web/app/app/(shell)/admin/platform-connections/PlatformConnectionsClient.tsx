@@ -8,17 +8,15 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import {
+  REQUIRED_PLAYLIST_SPOTIFY_SCOPES,
+  SPOTIFY_OAUTH_TOKEN_STRATEGY,
+} from '@/lib/spotify/system-account';
+import {
   generateTestPlaylist,
   setCurrentAdminAsPlaylistSpotifyPublisher,
   updatePlaylistEngineSettings,
 } from './actions';
 
-const SPOTIFY_OAUTH_TOKEN_STRATEGY = 'oauth_spotify';
-const REQUIRED_SPOTIFY_SCOPES = [
-  'playlist-modify-public',
-  'playlist-read-private',
-  'ugc-image-upload',
-] as const;
 const INTERVAL_UNITS = ['hours', 'days', 'weeks'] as const;
 
 type IntervalUnit = (typeof INTERVAL_UNITS)[number];
@@ -97,6 +95,8 @@ export function PlatformConnectionsClient({
   const router = useRouter();
   const { user } = useUserSafe();
   const [isPending, startTransition] = useTransition();
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
@@ -116,12 +116,24 @@ export function PlatformConnectionsClient({
 
   async function connectSpotify() {
     if (!user) return;
-    const redirectUrl = `${window.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
-    await user.createExternalAccount({
-      strategy: SPOTIFY_OAUTH_TOKEN_STRATEGY,
-      additionalScopes: [...REQUIRED_SPOTIFY_SCOPES],
-      redirectUrl,
-    });
+    setResult(null);
+    setIsConnecting(true);
+    try {
+      const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
+      await user.createExternalAccount({
+        strategy: SPOTIFY_OAUTH_TOKEN_STRATEGY,
+        additionalScopes: [...REQUIRED_PLAYLIST_SPOTIFY_SCOPES],
+        redirectUrl,
+      });
+    } catch (error) {
+      setResult({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to connect Spotify.',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   }
 
   async function handleUseAccount() {
@@ -146,12 +158,32 @@ export function PlatformConnectionsClient({
     });
   }
 
-  async function handleGenerate() {
+  function handleGenerate() {
     setResult(null);
-    const response = await generateTestPlaylist();
-    setResult(response);
-    if (response.success) refresh();
+    setIsGenerating(true);
+    startTransition(async () => {
+      try {
+        const response = await generateTestPlaylist();
+        setResult(response);
+        if (response.success) refresh();
+      } catch (error) {
+        setResult({
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Test playlist generation failed.',
+        });
+      } finally {
+        setIsGenerating(false);
+      }
+    });
   }
+
+  const isBusy = isPending || isConnecting || isGenerating;
+  const publisherNote = spotifyStatus.accountLabel
+    ? ` Publisher: ${spotifyStatus.accountLabel}.`
+    : '';
 
   if (currentTab === 'spotify') {
     return (
@@ -225,8 +257,13 @@ export function PlatformConnectionsClient({
             onClick={() => {
               void connectSpotify();
             }}
+            disabled={isBusy}
           >
-            {currentUser.hasSpotify ? 'Reconnect Spotify' : 'Connect Spotify'}
+            {isConnecting
+              ? 'Connecting'
+              : currentUser.hasSpotify
+                ? 'Reconnect Spotify'
+                : 'Connect Spotify'}
           </Button>
           <Button
             type='button'
@@ -235,11 +272,11 @@ export function PlatformConnectionsClient({
             disabled={
               !currentUser.hasSpotify ||
               currentUser.missingScopes.length > 0 ||
-              isPending
+              isBusy
             }
             className='gap-2'
           >
-            {isPending ? (
+            {isBusy ? (
               <Loader2 className='size-4 animate-spin' aria-hidden />
             ) : (
               <ShieldCheck className='size-4' aria-hidden />
@@ -321,7 +358,7 @@ export function PlatformConnectionsClient({
             type='button'
             size='sm'
             onClick={handleSaveEngine}
-            disabled={isPending}
+            disabled={isBusy}
           >
             Save Settings
           </Button>
@@ -330,9 +367,9 @@ export function PlatformConnectionsClient({
             size='sm'
             variant='secondary'
             onClick={() => setConfirmOpen(true)}
-            disabled={!spotifyStatus.healthy || isPending}
+            disabled={!spotifyStatus.healthy || isBusy}
           >
-            Generate Test Playlist
+            {isGenerating ? 'Generating' : 'Generate Test Playlist'}
           </Button>
           <ResultMessage result={result} />
         </div>
@@ -342,7 +379,7 @@ export function PlatformConnectionsClient({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title='Generate Test Playlist?'
-        description={`This runs playlist discovery now and creates a pending playlist for review. It will not publish to Spotify.${spotifyStatus.accountLabel ? ` Publisher: ${spotifyStatus.accountLabel}.` : ''}`}
+        description={`This runs playlist discovery now and creates a pending playlist for review. It will not publish to Spotify.${publisherNote}`}
         confirmLabel='Generate'
         cancelLabel='Cancel'
         onConfirm={handleGenerate}

@@ -40,8 +40,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const now = new Date();
-  if (settings.nextEligibleAt && settings.nextEligibleAt > now) {
+  const eligibilityCheckAt = new Date();
+  if (settings.nextEligibleAt && settings.nextEligibleAt > eligibilityCheckAt) {
     return NextResponse.json(
       {
         success: true,
@@ -72,12 +72,11 @@ export async function GET(request: Request) {
     );
   }
 
-  // Run the pipeline
-  const result = await generatePlaylist();
+  const reservedAt = new Date();
+  await markPlaylistGeneratedAt(reservedAt);
 
-  if (result.success && !result.skipped) {
-    await markPlaylistGeneratedAt(now);
-  }
+  // Run the pipeline. The admin DB eligibility gate is the cadence control.
+  const result = await generatePlaylist({ skipComplianceCheck: true });
 
   return NextResponse.json(
     {

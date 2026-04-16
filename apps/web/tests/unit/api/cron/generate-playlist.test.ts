@@ -147,6 +147,9 @@ describe('GET /api/cron/generate-playlist', () => {
       title: 'Test Playlist',
       trackCount: 24,
     });
+    expect(mockGeneratePlaylist).toHaveBeenCalledWith({
+      skipComplianceCheck: true,
+    });
     expect(mockMarkPlaylistGeneratedAt).toHaveBeenCalledWith(expect.any(Date));
   });
 });

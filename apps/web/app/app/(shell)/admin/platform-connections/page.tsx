@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
 import {
   getPlaylistEngineSettings,
   getPlaylistSpotifyStatus,
+  isSpotifyAccount,
+  readAccountLabel,
+  readExternalAccountScopes,
 } from '@/lib/admin/platform-connections';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
-import {
-  REQUIRED_PLAYLIST_SPOTIFY_SCOPES,
-  SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS,
-} from '@/lib/spotify/system-account';
+import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 import { PlatformConnectionsClient } from './PlatformConnectionsClient';
 
 export const metadata: Metadata = { title: 'Platform Connections — Admin' };
@@ -23,39 +24,10 @@ const TAB_OPTIONS = [
   { value: 'engine' as const, label: 'Playlist Engine' },
 ] as const;
 
-function readScopes(account: unknown): string[] {
-  if (!account || typeof account !== 'object') return [];
-  const record = account as Record<string, unknown>;
-  const values = [record.approvedScopes, record.scope, record.scopes];
-  return values.flatMap(value => {
-    if (Array.isArray(value)) {
-      return value.filter((item): item is string => typeof item === 'string');
-    }
-    if (typeof value === 'string') return value.split(/[,\s]+/).filter(Boolean);
-    return [];
-  });
-}
-
-function readAccountLabel(account: unknown): string | null {
-  if (!account || typeof account !== 'object') return null;
-  const record = account as Record<string, unknown>;
-  for (const key of ['emailAddress', 'username', 'firstName']) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return null;
-}
-
-function isSpotifyAccount(account: unknown): boolean {
-  if (!account || typeof account !== 'object') return false;
-  const provider = String((account as Record<string, unknown>).provider ?? '');
-  return SPOTIFY_EXTERNAL_ACCOUNT_PROVIDERS.some(alias => provider === alias);
-}
-
 async function requireAdmin(): Promise<void> {
   const { userId } = await getCachedAuth();
   if (!userId || !(await checkAdminRole(userId))) {
-    throw new Error('Unauthorized');
+    notFound();
   }
 }
 
@@ -78,7 +50,7 @@ export default async function AdminPlatformConnectionsPage({
 
   const currentSpotifyAccount =
     user?.externalAccounts.find(isSpotifyAccount) ?? null;
-  const approvedScopes = readScopes(currentSpotifyAccount);
+  const approvedScopes = readExternalAccountScopes(currentSpotifyAccount);
   const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
     scope => !approvedScopes.includes(scope)
   );
