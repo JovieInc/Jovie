@@ -19,6 +19,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Playlist generation cron now uses the admin database toggle and eligibility interval instead of the playlist feature flag.
 - [internal] Jovie Spotify token resolution now prefers the configured admin publisher and falls back to the legacy env system account when present.
+### Fixed
+
+- [internal] Moved playlist cadence persistence into the durable generation path so cron lease retries cannot create duplicate pending playlists after a partial success.
+- [internal] Split the Admin Platform Connections client into smaller Spotify and engine tab components and resolved follow-up review comments around control labels and button state logic.
+- [internal] Reduced hidden homepage hero rendering work to improve the public Lighthouse margin on the landing page.
 
 ## [26.4.154.0] - 2026-04-15
 
