@@ -82,8 +82,17 @@ export function ArtistProfileOutcomesCarousel({
 
         <div
           ref={scrollerRef}
-          className='mt-10 flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-[12vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pr-[18vw] lg:pr-[22vw] [&::-webkit-scrollbar]:hidden'
+          className='relative mt-10 flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-[12vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pr-[18vw] lg:pr-[22vw] [&::-webkit-scrollbar]:hidden'
         >
+          <button
+            type='button'
+            onClick={() => {
+              scrollByAmount('next');
+            }}
+            className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-10 focus:rounded-full focus:bg-white focus:px-3 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-black'
+          >
+            Scroll outcomes
+          </button>
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
           ))}
@@ -196,7 +205,7 @@ function SellOutProof({
   return (
     <div className='relative h-[21rem] overflow-hidden rounded-[1.45rem] bg-black/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
       <div className='absolute left-5 top-5 z-20 w-[13rem] rounded-[1.3rem] bg-[#f7f6f1] p-4 text-black shadow-[0_18px_45px_rgba(0,0,0,0.24)]'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-black/42'>
+        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-black/62'>
           {proof.nearbyCardLabel}
         </p>
         <p className='mt-3 text-[1.8rem] font-semibold leading-none tracking-[-0.07em]'>
@@ -280,7 +289,7 @@ function GetPaidProof({
           {proof.drawerTitle}
         </p>
         <p className='mt-1 text-[12px] text-white/48'>{proof.drawerSubtitle}</p>
-        <p className='mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/42'>
+        <p className='mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/64'>
           {proof.chooseAmountLabel}
         </p>
         <div className='mt-3 grid grid-cols-3 gap-2.5'>
@@ -344,7 +353,7 @@ function ShareProof({
       <p className='mt-5 font-mono text-[13px] font-semibold tracking-[-0.02em] text-black'>
         {proof.url}
       </p>
-      <p className='mt-2 text-[12px] font-medium text-black/52'>
+      <p className='mt-2 text-[12px] font-medium text-black/64'>
         {proof.subtitle}
       </p>
     </div>
