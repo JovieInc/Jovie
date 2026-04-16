@@ -315,36 +315,38 @@ export function AnalyticsSidebarView({
     >
       <div
         className={cn(
-          'space-y-2 transition-opacity duration-150',
+          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
-        {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-        <FunnelCard stages={stages} loading={loading} />
+        <div className='shrink-0 space-y-2'>
+          {/* Funnel waterfall — vertical bars show dropoff at a glance */}
+          <FunnelCard stages={stages} loading={loading} />
 
-        {/* Engagement — compact 2-col, secondary to the funnel */}
-        <DrawerStatGrid variant='card'>
-          <div className='px-3 py-2'>
-            <StatTile
-              label='Link Clicks'
-              value={formatMetricValue(loading, data?.total_clicks)}
-            />
-          </div>
-          <div className='px-3 py-2'>
-            <StatTile
-              label='Listen Clicks'
-              value={formatMetricValue(loading, data?.listen_clicks)}
-            />
-          </div>
-          {showTipLinkVisits ? (
+          {/* Engagement — compact 2-col, secondary to the funnel */}
+          <DrawerStatGrid variant='card'>
             <div className='px-3 py-2'>
               <StatTile
-                label='Tip Link Visits'
-                value={formatMetricValue(loading, data?.tip_link_visits)}
+                label='Link Clicks'
+                value={formatMetricValue(loading, data?.total_clicks)}
               />
             </div>
-          ) : null}
-        </DrawerStatGrid>
+            <div className='px-3 py-2'>
+              <StatTile
+                label='Listen Clicks'
+                value={formatMetricValue(loading, data?.listen_clicks)}
+              />
+            </div>
+            {showTipLinkVisits ? (
+              <div className='px-3 py-2'>
+                <StatTile
+                  label='Tip Link Visits'
+                  value={formatMetricValue(loading, data?.tip_link_visits)}
+                />
+              </div>
+            ) : null}
+          </DrawerStatGrid>
+        </div>
         <DrawerTabbedCard
           testId={tabbedCardTestId}
           tabs={
