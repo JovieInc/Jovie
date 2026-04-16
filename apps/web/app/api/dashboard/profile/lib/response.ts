@@ -22,9 +22,16 @@ export function addAvatarCacheBust(
       return responseProfile;
     }
 
-    const url = new URL(responseProfile.avatarUrl);
-    url.searchParams.set('v', cacheBustValue);
-    responseProfile.avatarUrl = url.toString();
+    try {
+      const url = new URL(responseProfile.avatarUrl);
+      url.searchParams.set('v', cacheBustValue);
+      responseProfile.avatarUrl = url.toString();
+    } catch (error) {
+      logger.warn('Failed to parse avatar URL for cache busting', {
+        avatarUrl: responseProfile.avatarUrl,
+        error,
+      });
+    }
   }
   return responseProfile;
 }

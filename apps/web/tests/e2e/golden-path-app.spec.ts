@@ -287,7 +287,10 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     });
   });
 
-  test('user can send a message and receive a response', async ({ page }) => {
+  test('user can send a message and receive a response', async ({
+    page,
+    context,
+  }) => {
     test.setTimeout(60_000);
 
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
@@ -309,6 +312,7 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     await expect(sendButton).toBeEnabled({ timeout: 5_000 });
     const assistantMessages = page.locator('[data-role="assistant"]');
     const previousAssistantCount = await assistantMessages.count();
+    const popupPromise = context.waitForEvent('page', { timeout: 15_000 });
     await sendButton.click();
 
     await expect
@@ -317,11 +321,15 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     await expect(assistantMessages.nth(previousAssistantCount)).toBeVisible({
       timeout: 15_000,
     });
-    await expect(
-      assistantMessages
-        .nth(previousAssistantCount)
-        .filter({ hasText: 'Opening your profile in a new tab.' })
-    ).toBeVisible({ timeout: 15_000 });
+
+    const previewPage = await popupPromise;
+    await previewPage.waitForLoadState('domcontentloaded');
+    await expect(previewPage).toHaveURL(/\/[^/?#]+$/, { timeout: 15_000 });
+    await previewPage.close();
+
+    await expect(assistantMessages.nth(previousAssistantCount)).toContainText(
+      /profile/i
+    );
   });
 
   test('audio dictation toggle is present', async ({ page }) => {
