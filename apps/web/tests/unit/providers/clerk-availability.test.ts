@@ -8,6 +8,10 @@ import {
 } from '@/components/providers/clerkAvailability';
 
 describe('clerkAvailability', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('bypasses Clerk for whitespace-only publishable keys', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
@@ -49,8 +53,6 @@ describe('clerkAvailability', () => {
         new URL('http://localhost:3100')
       )
     ).toBe(false);
-
-    vi.unstubAllEnvs();
   });
 
   it('keeps Clerk enabled for real keys on secure public origins', () => {
