@@ -151,6 +151,12 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // xAI / Grok image generation
+  XAI_API_KEY: z.string().optional(),
+  ALBUM_ART_IMAGE_MODEL: z.string().optional(),
+  ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
+  ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -256,6 +262,10 @@ export const ENV_KEYS = [
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'XAI_API_KEY',
+  'ALBUM_ART_IMAGE_MODEL',
+  'ALBUM_ART_GENERATION_DAILY_LIMIT',
+  'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',

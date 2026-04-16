@@ -11,6 +11,7 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
   type ChatInsightsToolResult,
+  isChatAlbumArtToolResult,
   isToolInvocationPart,
   type MessagePart,
   type SocialLinkRemovalToolResult,
@@ -18,6 +19,7 @@ import {
   type ToolInvocationPart,
 } from '../types';
 import { getMessageText } from '../utils';
+import { ChatAlbumArtCard } from './ChatAlbumArtCard';
 import { ChatAnalyticsCard } from './ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
@@ -106,6 +108,17 @@ function renderToolCard(
         platform={result.platform}
         url={result.url}
       />
+    );
+  }
+
+  if (
+    toolInvocation.toolName === 'generateAlbumArt' &&
+    toolInvocation.state === 'result' &&
+    isChatAlbumArtToolResult(toolInvocation.result) &&
+    profileId
+  ) {
+    return (
+      <ChatAlbumArtCard result={toolInvocation.result} profileId={profileId} />
     );
   }
 
