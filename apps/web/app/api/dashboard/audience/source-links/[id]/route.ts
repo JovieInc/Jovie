@@ -2,12 +2,13 @@ import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceSourceLinks } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import {
+  buildAudienceSourceErrorResponse,
   NO_STORE_HEADERS,
-  parseSourceRequestJson,
+  parseAudienceSourcePatchRequest,
+  verifyAudienceSourceProfileOrResponse,
 } from '../../source-route-helpers';
 
 const updateSourceLinkSchema = z.object({
@@ -27,71 +28,56 @@ export async function PATCH(
 ) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
-      const parsedParams = routeParamsSchema.safeParse(await params);
-      if (!parsedParams.success) {
-        return NextResponse.json(
-          { error: 'Invalid source link ID' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
+      const parsedRequest = await parseAudienceSourcePatchRequest(
+        request,
+        await params,
+        routeParamsSchema,
+        'Invalid source link ID',
+        updateSourceLinkSchema,
+        'Invalid source link payload'
+      );
+      if (parsedRequest.response) {
+        return parsedRequest.response;
       }
 
-      let body: unknown;
-      try {
-        body = await parseSourceRequestJson(request);
-      } catch {
-        return NextResponse.json(
-          { error: 'Malformed JSON' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const { id } = parsedParams.data;
-      const parsed = updateSourceLinkSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: 'Invalid source link payload' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const profile = await verifyProfileOwnership(
+      const { id } = parsedRequest.params;
+      const verification = await verifyAudienceSourceProfileOrResponse(
         tx,
-        parsed.data.profileId,
+        parsedRequest.payload.profileId,
         clerkUserId
       );
-      if (!profile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+      if (verification.response) {
+        return verification.response;
       }
 
       const now = new Date();
       const [link] = await tx
         .update(audienceSourceLinks)
         .set({
-          ...(parsed.data.name ? { name: parsed.data.name } : {}),
-          ...(parsed.data.destinationUrl
-            ? { destinationUrl: parsed.data.destinationUrl }
+          ...(parsedRequest.payload.name
+            ? { name: parsedRequest.payload.name }
             : {}),
-          ...(typeof parsed.data.archived === 'boolean'
-            ? { archivedAt: parsed.data.archived ? now : null }
+          ...(parsedRequest.payload.destinationUrl
+            ? { destinationUrl: parsedRequest.payload.destinationUrl }
+            : {}),
+          ...(typeof parsedRequest.payload.archived === 'boolean'
+            ? { archivedAt: parsedRequest.payload.archived ? now : null }
             : {}),
           updatedAt: now,
         })
         .where(
           and(
             eq(audienceSourceLinks.id, id),
-            eq(audienceSourceLinks.creatorProfileId, parsed.data.profileId)
+            eq(
+              audienceSourceLinks.creatorProfileId,
+              parsedRequest.payload.profileId
+            )
           )
         )
         .returning();
 
       if (!link) {
-        return NextResponse.json(
-          { error: 'Source link not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+        return buildAudienceSourceErrorResponse('Source link not found', 404);
       }
 
       return NextResponse.json({ link }, { headers: NO_STORE_HEADERS });

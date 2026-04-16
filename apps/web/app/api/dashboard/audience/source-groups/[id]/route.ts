@@ -2,12 +2,13 @@ import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceSourceGroups } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import {
+  buildAudienceSourceErrorResponse,
   NO_STORE_HEADERS,
-  parseSourceRequestJson,
+  parseAudienceSourcePatchRequest,
+  verifyAudienceSourceProfileOrResponse,
 } from '../../source-route-helpers';
 
 const updateSourceGroupSchema = z.object({
@@ -26,68 +27,53 @@ export async function PATCH(
 ) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
-      const parsedParams = routeParamsSchema.safeParse(await params);
-      if (!parsedParams.success) {
-        return NextResponse.json(
-          { error: 'Invalid source group ID' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
+      const parsedRequest = await parseAudienceSourcePatchRequest(
+        request,
+        await params,
+        routeParamsSchema,
+        'Invalid source group ID',
+        updateSourceGroupSchema,
+        'Invalid source group payload'
+      );
+      if (parsedRequest.response) {
+        return parsedRequest.response;
       }
 
-      let body: unknown;
-      try {
-        body = await parseSourceRequestJson(request);
-      } catch {
-        return NextResponse.json(
-          { error: 'Malformed JSON' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const { id } = parsedParams.data;
-      const parsed = updateSourceGroupSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: 'Invalid source group payload' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const profile = await verifyProfileOwnership(
+      const { id } = parsedRequest.params;
+      const verification = await verifyAudienceSourceProfileOrResponse(
         tx,
-        parsed.data.profileId,
+        parsedRequest.payload.profileId,
         clerkUserId
       );
-      if (!profile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+      if (verification.response) {
+        return verification.response;
       }
 
       const now = new Date();
       const [group] = await tx
         .update(audienceSourceGroups)
         .set({
-          ...(parsed.data.name ? { name: parsed.data.name } : {}),
-          ...(typeof parsed.data.archived === 'boolean'
-            ? { archivedAt: parsed.data.archived ? now : null }
+          ...(parsedRequest.payload.name
+            ? { name: parsedRequest.payload.name }
+            : {}),
+          ...(typeof parsedRequest.payload.archived === 'boolean'
+            ? { archivedAt: parsedRequest.payload.archived ? now : null }
             : {}),
           updatedAt: now,
         })
         .where(
           and(
             eq(audienceSourceGroups.id, id),
-            eq(audienceSourceGroups.creatorProfileId, parsed.data.profileId)
+            eq(
+              audienceSourceGroups.creatorProfileId,
+              parsedRequest.payload.profileId
+            )
           )
         )
         .returning();
 
       if (!group) {
-        return NextResponse.json(
-          { error: 'Source group not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+        return buildAudienceSourceErrorResponse('Source group not found', 404);
       }
 
       return NextResponse.json({ group }, { headers: NO_STORE_HEADERS });

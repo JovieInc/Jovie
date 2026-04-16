@@ -11,9 +11,10 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import {
   AUDIENCE_SOURCE_PAGE_SIZE,
+  buildAudienceSourceErrorResponse,
   buildAudienceSourceUtmParams,
   NO_STORE_HEADERS,
-  parseSourceRequestJson,
+  parseAudienceSourcePayload,
   resolveAudienceSourceDestinationUrl,
   withAudienceSourceShortLink,
 } from '../source-route-helpers';
@@ -37,10 +38,7 @@ export async function GET(request: NextRequest) {
       const { searchParams } = new URL(request.url);
       const profileId = searchParams.get('profileId');
       if (!profileId) {
-        return NextResponse.json(
-          { error: 'Missing profileId' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
+        return buildAudienceSourceErrorResponse('Missing profileId', 400);
       }
 
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
@@ -75,22 +73,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
-      let body: unknown;
-      try {
-        body = await parseSourceRequestJson(request);
-      } catch {
-        return NextResponse.json(
-          { error: 'Malformed JSON' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      const parsed = createSourceGroupSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: 'Invalid source group payload' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
+      const parsed = await parseAudienceSourcePayload(
+        request,
+        createSourceGroupSchema,
+        'Invalid source group payload'
+      );
+      if (parsed.response) {
+        return parsed.response;
       }
 
       const {
@@ -105,10 +94,7 @@ export async function POST(request: NextRequest) {
 
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+        return buildAudienceSourceErrorResponse('Profile not found', 404);
       }
 
       const normalizedName = name.trim().toLowerCase();
