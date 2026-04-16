@@ -39,6 +39,8 @@ export interface StaticArtistPageProps {
   readonly viewerCountryCode?: string | null;
   readonly presentation?: StaticArtistPagePresentation;
   readonly releases?: readonly PublicRelease[];
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
 }
 
 export function StaticArtistPage({
@@ -66,6 +68,8 @@ export function StaticArtistPage({
   viewerCountryCode,
   presentation = 'full-public',
   releases,
+  hideJovieBranding = false,
+  hideMoreMenu = false,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -117,6 +121,8 @@ export function StaticArtistPage({
       profileSettings={viewModel.profileSettings}
       viewerCountryCode={viewerCountryCode}
       releases={releases}
+      hideJovieBranding={hideJovieBranding}
+      hideMoreMenu={hideMoreMenu}
     />
   );
 }

@@ -17,8 +17,6 @@ import { ReleasesExperience } from '@/features/dashboard/organisms/release-provi
 import { DashboardAnalyticsDemo } from '@/features/home/demo/DashboardAnalyticsDemo';
 import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDemo';
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
-import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
-import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
@@ -27,6 +25,7 @@ import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
+import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
@@ -34,12 +33,6 @@ import {
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
-type DemoArtistProfileModeSurface =
-  | 'artist-profile-mode-release'
-  | 'artist-profile-mode-shows'
-  | 'artist-profile-mode-pay'
-  | 'artist-profile-mode-subscribe'
-  | 'artist-profile-mode-links';
 
 const RELEASE_SHOWCASE_STATES = [
   'populated',
@@ -99,23 +92,6 @@ const DEMO_RELEASE_EXPERIENCE_ADAPTER = {
   sidebarDataByReleaseId: DEMO_RELEASE_SIDEBAR_FIXTURES,
 } as const;
 
-const ARTIST_PROFILE_MODE_STATES: Record<
-  DemoArtistProfileModeSurface,
-  ProfileShowcaseStateId
-> = {
-  'artist-profile-mode-release': 'streams-release-day',
-  'artist-profile-mode-shows': 'tour',
-  'artist-profile-mode-pay': 'tips-apple-pay',
-  'artist-profile-mode-subscribe': 'fans-opt-in',
-  'artist-profile-mode-links': 'catalog',
-};
-
-function isArtistProfileModeSurface(
-  surface: DemoRenderableSurfaceId
-): surface is DemoArtistProfileModeSurface {
-  return surface in ARTIST_PROFILE_MODE_STATES;
-}
-
 function DemoShowcasePanel({
   testId,
   children,
@@ -161,30 +137,6 @@ function DemoOnboardingShowcase({
         </OnboardingExperienceShell>
       </DemoClientProviders>
     </div>
-  );
-}
-
-function DemoArtistProfileModePhoneSurface({
-  surface,
-}: Readonly<{
-  surface: DemoArtistProfileModeSurface;
-}>) {
-  return (
-    <main className='min-h-screen bg-black px-6 py-10'>
-      <div
-        className='mx-auto w-[330px]'
-        data-testid={`demo-showcase-${surface}`}
-      >
-        <HomeProfileShowcase
-          stateId={ARTIST_PROFILE_MODE_STATES[surface]}
-          presentation='full-phone'
-          overlayMode='hidden'
-          hideJovieBranding
-          hideMoreMenu
-          className='w-full'
-        />
-      </div>
-    </main>
   );
 }
 
@@ -244,10 +196,6 @@ export function DemoShowcaseSurface({
   const noop = useCallback(() => {}, []);
   const searchParams = useSearchParams();
 
-  if (isArtistProfileModeSurface(surface)) {
-    return <DemoArtistProfileModePhoneSurface surface={surface} />;
-  }
-
   switch (surface) {
     case 'analytics':
       return (
@@ -287,6 +235,8 @@ export function DemoShowcaseSurface({
       return <DemoReleasePresaveSurface />;
     case 'release-tasks':
       return <DemoReleaseTasksSurface />;
+    case 'tim-white-profile':
+      return <DemoTimWhiteProfileSurface />;
     case 'onboarding-handle':
       return (
         <DemoOnboardingShowcase

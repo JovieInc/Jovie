@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
@@ -289,8 +289,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
     const container = screen.getByTestId('profile-mode-drawer-releases');
-    const metaEl = container.querySelector('.text-\\[11px\\]');
-    expect(metaEl?.textContent).toContain('2024');
+    expect(within(container).getByText(/2024/)).toBeInTheDocument();
   });
 
   it('shows year headers for 15+ releases spanning 2+ years', async () => {

@@ -1,13 +1,47 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import ArtistProfilesPage from '@/app/(marketing)/artist-profiles/page';
 import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile';
+import { getAudienceRailAccentIndex } from '@/components/marketing/artist-profile/ArtistProfileCaptureSection';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_LAUNCH_FEATURES,
   ARTIST_PROFILE_SPEC_TILES,
 } from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_SECTION_ORDER } from '@/data/artistProfilePageOrder';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
+import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
+
+function getEnabledSectionTestIds(flags: ArtistProfileSectionFlags) {
+  if (!flags.FULL_PAGE) {
+    return ARTIST_PROFILE_SECTION_ORDER.filter(section =>
+      ['hero', 'trust'].includes(section.id)
+    ).map(section => section.testId);
+  }
+
+  return ARTIST_PROFILE_SECTION_ORDER.filter(
+    section => !section.enabledByFlag || flags[section.enabledByFlag]
+  ).map(section => section.testId);
+}
+
+function expectArtistProfileSectionOrder(flags: ArtistProfileSectionFlags) {
+  const sectionTestIds = getEnabledSectionTestIds(flags);
+
+  for (const testId of sectionTestIds) {
+    expect(screen.getByTestId(testId)).toBeInTheDocument();
+  }
+
+  for (let index = 0; index < sectionTestIds.length - 1; index += 1) {
+    const current = screen.getByTestId(sectionTestIds[index]);
+    const next = screen.getByTestId(sectionTestIds[index + 1]);
+
+    expect(
+      Boolean(
+        current.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+  }
+}
 
 describe('ArtistProfilesPage', () => {
   const originalMatchMedia = globalThis.matchMedia;
@@ -32,8 +66,16 @@ describe('ArtistProfilesPage', () => {
 
   it('renders the artist profile landing scaffold', () => {
     render(<ArtistProfilesPage />);
+    expectArtistProfileSectionOrder({
+      FULL_PAGE: true,
+      SOCIAL_PROOF: true,
+      FAQ: true,
+    });
 
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
+      'homepage-hero--f'
+    );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
@@ -47,13 +89,25 @@ describe('ArtistProfilesPage', () => {
         'One profile can flex from release push to ticket sales to fan capture.'
       )
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Release' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Shows' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pay' })).toBeInTheDocument();
+    const adaptiveSequence = within(
+      screen.getByTestId('artist-profile-adaptive-sequence')
+    );
+
     expect(
-      screen.getByRole('button', { name: 'Subscribe' })
+      adaptiveSequence.getByRole('button', { name: 'Release' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Links' })).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('button', { name: 'Shows' })
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('button', { name: 'Pay' })
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('button', { name: 'Subscribe' })
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('button', { name: 'Links' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'One profile.' })
     ).toBeInTheDocument();
@@ -69,32 +123,43 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByText('/shows')).toBeInTheDocument();
     expect(screen.getByText('/pay')).toBeInTheDocument();
     expect(screen.getByText('/subscribe')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Shows' }));
-    expect(screen.getByText('Tour dates')).toBeInTheDocument();
-    expect(screen.getByText('Jun 02 - Brooklyn Mirage')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-    expect(screen.getByText('Notifications on')).toBeInTheDocument();
-    expect(screen.getByText('Release and show alerts')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
-    expect(screen.getByText('Make support one tap away.')).toBeInTheDocument();
-    expect(screen.getByText('Continue with Venmo')).toBeInTheDocument();
+    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Pay' }));
+    expect(
+      adaptiveSequence.getByText('Make support one tap away.')
+    ).toBeInTheDocument();
     expect(
       screen.getByAltText(
         'Jovie artist profile showing direct support options.'
       )
     ).toBeInTheDocument();
+    const outcomesSection = within(
+      screen.getByTestId('artist-profile-section-outcomes')
+    );
     expect(
-      screen.getAllByRole('heading', { name: 'Built for artists.' }).length
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('heading', { name: 'Trackable QR codes' })
+      outcomesSection.getByRole('heading', {
+        name: 'Built for artists.',
+      })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Dark mode first' })
+      outcomesSection.getByRole('heading', { name: 'Drive streams' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Intelligent routing' })
+      outcomesSection.getByRole('heading', { name: 'Sell out' })
     ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByRole('heading', { name: 'Get paid' })
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByRole('heading', { name: 'Say thanks' })
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByRole('heading', { name: 'Share anywhere' })
+    ).toBeInTheDocument();
+    expect(outcomesSection.getByText('Pre-save live')).toBeInTheDocument();
+    expect(outcomesSection.getByText('O2 Arena saved')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Tip drawer ready')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Follow-up')).toBeInTheDocument();
+    expect(outcomesSection.getByText('Share-ready')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Get paid. Stay close.' })
     ).toBeInTheDocument();
@@ -121,7 +186,7 @@ describe('ArtistProfilesPage', () => {
     expect(
       Boolean(
         screen
-          .getByRole('heading', { name: 'Trackable QR codes' })
+          .getByRole('heading', { name: 'Drive streams' })
           .compareDocumentPosition(
             screen.getByRole('heading', {
               name: 'Get paid. Stay close.',
@@ -145,6 +210,29 @@ describe('ArtistProfilesPage', () => {
         name: 'Capture every fan.',
       })
     ).toBeInTheDocument();
+    const captureSection = within(
+      screen.getByTestId('artist-profile-section-capture')
+    );
+    expect(
+      captureSection.getByRole('button', { name: 'Subscribe' })
+    ).toBeInTheDocument();
+    expect(captureSection.getByText('Email + Push')).toBeInTheDocument();
+    expect(
+      captureSection.getByText('Spotify / LA / Release page')
+    ).toBeInTheDocument();
+    expect(captureSection.getAllByText('Jason').length).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('Spotify').length).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('Brian M').length).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('Email').length).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('Berlin').length).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('O2 Arena').length).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Latest Release').length
+    ).toBeGreaterThan(0);
+    expect(captureSection.getAllByText('Notifications').length).toBeGreaterThan(
+      0
+    );
+    expect(captureSection.getAllByText('Apple Pay').length).toBeGreaterThan(0);
     expect(
       screen.getAllByRole('heading', { name: 'Live in 60 seconds.' })
     ).toHaveLength(1);
@@ -164,10 +252,22 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getByText('Use it in bio, stories, QR, release posts, and shows.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Artist profile found')).toBeInTheDocument();
+    expect(screen.getByText('Spotify artist verified')).toBeInTheDocument();
     expect(screen.getByText('Importing catalog')).toBeInTheDocument();
+    expect(screen.getByText('Profile photo')).toBeInTheDocument();
+    expect(screen.getByText('Top tracks')).toBeInTheDocument();
+    expect(screen.getAllByText('Latest release').length).toBeGreaterThan(0);
     expect(screen.getAllByText('jov.ie/timwhite').length).toBeGreaterThan(0);
-    expect(screen.getByText('Dedicated release pages')).toBeInTheDocument();
+    expect(screen.getByText('Share-ready profile')).toBeInTheDocument();
+    expect(
+      outcomesSection.getByText(
+        'Use one clean profile link across bio, QR, posts, stories, and shows.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Release moment')).toBeInTheDocument();
+    expect(screen.getByText('Music first')).toBeInTheDocument();
+    expect(screen.getByText('Nearby show')).toBeInTheDocument();
+    expect(screen.getByText('Tickets first')).toBeInTheDocument();
     expect(screen.queryByText('Polished by default')).not.toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'Claim your profile' }).length
@@ -230,17 +330,37 @@ describe('ArtistProfilesPage', () => {
       />
     );
 
+    expectArtistProfileSectionOrder({
+      FULL_PAGE: false,
+      SOCIAL_PROOF: false,
+      FAQ: false,
+    });
     expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
+      'homepage-hero--f'
+    );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Release' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Trackable QR codes' })
+      screen.queryByRole('heading', { name: 'Drive streams' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Get paid. Stay close.' })
     ).not.toBeInTheDocument();
+  });
+
+  it('staggers capture rail accent colors across visible rows', () => {
+    for (let pillIndex = 0; pillIndex < 8; pillIndex += 1) {
+      const columnAccentIndexes = [0, 1, 2].map(railIndex =>
+        getAudienceRailAccentIndex(railIndex, pillIndex)
+      );
+
+      expect(new Set(columnAccentIndexes).size).toBe(
+        columnAccentIndexes.length
+      );
+    }
   });
 });

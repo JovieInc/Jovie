@@ -1,8 +1,8 @@
 import {
-  ArrowRight,
   Bell,
   Check,
   CreditCard,
+  Dot,
   Headphones,
   Mail,
   MapPin,
@@ -46,6 +46,24 @@ const PILL_ACCENTS = [
   'var(--color-accent-gray)',
 ] as const;
 
+export const AUDIENCE_RAIL_ACCENT_SEQUENCES = [
+  [0, 1, 2, 3, 4, 5, 6, 7],
+  [3, 6, 1, 4, 7, 2, 5, 0],
+  [5, 0, 4, 1, 6, 3, 7, 2],
+] as const;
+
+export function getAudienceRailAccentIndex(
+  railIndex: number,
+  pillIndex: number
+): number {
+  const sequence =
+    AUDIENCE_RAIL_ACCENT_SEQUENCES[
+      railIndex % AUDIENCE_RAIL_ACCENT_SEQUENCES.length
+    ] ?? AUDIENCE_RAIL_ACCENT_SEQUENCES[0];
+
+  return sequence[pillIndex % sequence.length] ?? 0;
+}
+
 type PillAccentStyle = CSSProperties & {
   readonly '--pill-accent': string;
 };
@@ -84,9 +102,11 @@ function AudiencePill({
 function AudienceRail({
   direction,
   pills,
+  railIndex,
 }: Readonly<{
   direction: 'left' | 'right';
   pills: readonly ArtistProfileAudiencePill[];
+  railIndex: number;
 }>) {
   const repeatedPills = [
     ...pills.map(pill => ({ pill, repeat: 'first' as const })),
@@ -94,8 +114,12 @@ function AudienceRail({
   ];
 
   return (
-    <div className='artist-profile-audience-mask overflow-hidden py-1'>
+    <div
+      className='artist-profile-audience-mask overflow-hidden py-1'
+      aria-hidden='true'
+    >
       <ul
+        role='presentation'
         className={cn(
           'artist-profile-audience-rail flex w-max gap-3',
           direction === 'right' && 'artist-profile-audience-rail-reverse'
@@ -104,7 +128,7 @@ function AudienceRail({
         {repeatedPills.map(({ pill, repeat }, index) => (
           <AudiencePill
             key={`${repeat}-${pill.id}`}
-            accentIndex={index}
+            accentIndex={getAudienceRailAccentIndex(railIndex, index)}
             pill={pill}
           />
         ))}
@@ -120,7 +144,7 @@ export function ArtistProfileCaptureSection({
     <ArtistProfileSectionShell className='bg-white/[0.008] py-24 sm:py-28 lg:py-36'>
       <style>{`
         .artist-profile-audience-mask {
-          mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent);
+          mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);
         }
 
         .artist-profile-audience-pill {
@@ -133,18 +157,19 @@ export function ArtistProfileCaptureSection({
           overflow: hidden;
           white-space: nowrap;
           border-radius: 9999px;
-          border: 1px solid color-mix(in srgb, var(--pill-accent) 24%, rgba(255, 255, 255, 0.12));
+          border: 1px solid color-mix(in srgb, var(--pill-accent) 9%, rgba(255, 255, 255, 0.16));
           background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.026)),
-            color-mix(in srgb, var(--pill-accent) 5%, rgba(0, 0, 0, 0.72));
+            linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.024)),
+            rgba(5, 6, 8, 0.86);
           color: rgba(255, 255, 255, 0.94);
           font-size: 13px;
           font-weight: 500;
           line-height: 1;
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.06),
-            0 14px 34px rgba(0, 0, 0, 0.24);
-          backdrop-filter: blur(18px);
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+            0 12px 28px rgba(0, 0, 0, 0.2);
+          backdrop-filter: blur(14px);
           transition:
             border-color 200ms ease,
             background 200ms ease,
@@ -162,15 +187,15 @@ export function ArtistProfileCaptureSection({
               from 0deg,
               transparent 0deg,
               transparent 58deg,
-              color-mix(in srgb, var(--pill-accent) 18%, transparent) 74deg,
-              color-mix(in srgb, var(--pill-accent) 88%, white 12%) 92deg,
-              rgba(255, 255, 255, 0.86) 104deg,
-              color-mix(in srgb, var(--pill-accent) 86%, white 14%) 116deg,
+              color-mix(in srgb, var(--pill-accent) 8%, transparent) 74deg,
+              color-mix(in srgb, var(--pill-accent) 48%, white 10%) 92deg,
+              rgba(255, 255, 255, 0.52) 104deg,
+              color-mix(in srgb, var(--pill-accent) 44%, white 10%) 116deg,
               transparent 138deg,
               transparent 360deg
             );
           content: '';
-          opacity: 0.72;
+          opacity: 0.28;
           -webkit-mask:
             linear-gradient(#000 0 0) content-box,
             linear-gradient(#000 0 0);
@@ -182,55 +207,40 @@ export function ArtistProfileCaptureSection({
           animation: artist-profile-electric-border 5.4s linear infinite;
         }
 
-        .artist-profile-audience-pill::after {
-          position: absolute;
-          inset: 1px;
-          z-index: 0;
-          border-radius: inherit;
-          background:
-            radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--pill-accent) 12%, transparent), transparent 50%),
-            rgba(0, 0, 0, 0.32);
-          content: '';
-        }
-
         .artist-profile-audience-pill:hover {
-          border-color: color-mix(in srgb, var(--pill-accent) 42%, rgba(255, 255, 255, 0.18));
+          border-color: color-mix(in srgb, var(--pill-accent) 24%, rgba(255, 255, 255, 0.24));
           box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.08),
-            0 16px 38px rgba(0, 0, 0, 0.28),
-            0 0 24px color-mix(in srgb, var(--pill-accent) 12%, transparent);
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+            0 14px 30px rgba(0, 0, 0, 0.24);
         }
 
         .artist-profile-audience-pill:hover::before {
-          opacity: 0.95;
+          opacity: 0.48;
           animation-duration: 3.8s;
         }
 
         .artist-profile-audience-chip {
           border-radius: 9999px;
-          border: 1px solid color-mix(in srgb, var(--pill-accent) 22%, rgba(255, 255, 255, 0.11));
-          background: color-mix(in srgb, var(--pill-accent) 10%, rgba(255, 255, 255, 0.045));
-          padding: 0.25rem 0.5rem;
-          color: color-mix(in srgb, var(--pill-accent) 72%, white 28%);
+          border: 1px solid color-mix(in srgb, var(--pill-accent) 12%, rgba(255, 255, 255, 0.14));
+          background: rgba(255, 255, 255, 0.045);
+          padding: 0.23rem 0.5rem;
+          color: rgba(255, 255, 255, 0.7);
           font-size: 11px;
-          font-weight: 650;
+          font-weight: 600;
         }
 
         .artist-profile-audience-rail {
-          animation: artist-profile-audience-drift 48s linear infinite;
+          animation: artist-profile-audience-drift 64s linear infinite;
         }
 
         .artist-profile-audience-rail-reverse {
           animation-direction: reverse;
-          animation-duration: 56s;
+          animation-duration: 72s;
         }
 
         .artist-profile-capture-shell:hover .artist-profile-audience-rail {
           animation-play-state: paused;
-        }
-
-        .artist-profile-capture-after {
-          animation: artist-profile-capture-confirm 5.8s ease-in-out infinite;
         }
 
         @keyframes artist-profile-audience-drift {
@@ -253,24 +263,9 @@ export function ArtistProfileCaptureSection({
           }
         }
 
-        @keyframes artist-profile-capture-confirm {
-          0% {
-            transform: translateY(0) scale(1);
-          }
-
-          50% {
-            transform: translateY(-2px) scale(1.006);
-          }
-
-          100% {
-            transform: translateY(0) scale(1);
-          }
-        }
-
         @media (prefers-reduced-motion: reduce) {
           .artist-profile-audience-rail,
-          .artist-profile-audience-pill::before,
-          .artist-profile-capture-after {
+          .artist-profile-audience-pill::before {
             animation: none;
           }
         }
@@ -286,70 +281,55 @@ export function ArtistProfileCaptureSection({
           </p>
         </div>
 
-        <div className='relative mx-auto mt-14 max-w-[820px] overflow-hidden rounded-[2rem] border border-white/[0.09] bg-[radial-gradient(circle_at_50%_0%,rgba(86,130,255,0.085),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.052),rgba(255,255,255,0.018))] p-4 shadow-[0_32px_90px_rgba(0,0,0,0.38)] sm:p-5'>
+        <div className='relative mx-auto mt-14 max-w-[720px] overflow-hidden rounded-[1.7rem] border border-white/[0.095] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-3 shadow-[0_24px_64px_rgba(0,0,0,0.3)] sm:p-4'>
           <div
-            className='pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/28 to-transparent'
+            className='pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent'
             aria-hidden='true'
           />
-          <div className='rounded-[1.55rem] bg-black/52 p-4 ring-1 ring-white/[0.08] sm:p-5'>
-            <div className='grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-stretch'>
-              <div className='rounded-[1.2rem] border border-white/[0.09] bg-white/[0.035] p-4'>
-                <p className='text-[12px] font-semibold tracking-[-0.01em] text-tertiary-token'>
-                  {capture.action.beforeLabel}
-                </p>
-                <div className='mt-4 flex items-center gap-3'>
-                  <span
-                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.045] text-white/55 ring-1 ring-white/[0.08]'
-                    aria-hidden='true'
-                  >
-                    <Music2 className='h-4 w-4' strokeWidth={1.9} />
-                  </span>
-                  <div className='min-w-0'>
-                    <p className='truncate text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
-                      {capture.action.beforeTitle}
-                    </p>
-                    <p className='mt-1 text-[12px] leading-snug text-tertiary-token'>
-                      {capture.action.beforeDetail}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className='hidden items-center justify-center px-1 md:flex'>
-                <span
-                  className='flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.045] text-sky-100/72'
-                  aria-hidden='true'
-                >
-                  <ArrowRight className='h-4 w-4' strokeWidth={1.9} />
+          <div className='rounded-[1.35rem] bg-black/48 p-4 ring-1 ring-white/[0.07] sm:p-5'>
+            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex min-w-0 items-center gap-3.5'>
+                <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.055] text-primary-token ring-1 ring-white/[0.11]'>
+                  <Bell className='h-[18px] w-[18px]' strokeWidth={1.9} />
                 </span>
-              </div>
-
-              <div className='artist-profile-capture-after rounded-[1.2rem] border border-sky-100/[0.2] bg-[linear-gradient(135deg,rgba(111,162,255,0.1),rgba(180,137,255,0.085))] p-4 shadow-[0_0_38px_rgba(97,135,255,0.12)]'>
-                <div className='flex items-center justify-between gap-3'>
-                  <p className='text-[12px] font-semibold tracking-[-0.01em] text-sky-100/72'>
-                    {capture.action.afterLabel}
+                <div className='min-w-0 text-left'>
+                  <p className='text-[15px] font-semibold leading-tight tracking-[-0.025em] text-primary-token'>
+                    {capture.action.title}
                   </p>
-                  <span className='rounded-full bg-sky-100/12 px-2 py-1 text-[10px] font-semibold text-sky-100/82 ring-1 ring-sky-100/14'>
-                    {capture.action.confirmedLabel}
-                  </span>
-                </div>
-                <div className='mt-4 flex items-center gap-3'>
-                  <span
-                    className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100/12 text-sky-100 ring-1 ring-sky-100/16'
-                    aria-hidden='true'
-                  >
-                    <Bell className='h-4 w-4' strokeWidth={1.9} />
-                  </span>
-                  <div className='min-w-0'>
-                    <p className='truncate text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
-                      {capture.action.afterTitle}
-                    </p>
-                    <p className='mt-1 text-[12px] leading-snug text-secondary-token'>
-                      {capture.action.afterDetail}
-                    </p>
-                  </div>
+                  <p className='mt-1 text-[12px] leading-snug tracking-[-0.01em] text-secondary-token'>
+                    {capture.action.detail}
+                  </p>
                 </div>
               </div>
+              <div className='flex shrink-0 items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.045] p-1.5 pl-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
+                <span className='hidden text-[12px] font-medium tracking-[-0.01em] text-tertiary-token sm:inline'>
+                  Email + Push
+                </span>
+                <button
+                  type='button'
+                  className='inline-flex h-9 items-center rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.02em] text-black transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
+                >
+                  {capture.action.ctaLabel}
+                </button>
+              </div>
+            </div>
+            <div className='mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-white/[0.07] pt-4 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1'>
+                <Check className='h-3 w-3 text-primary-token' strokeWidth={2} />
+                {capture.action.confirmedLabel}
+              </span>
+              <span className='inline-flex items-center gap-1 text-secondary-token'>
+                <Dot className='h-4 w-4 text-white/36' strokeWidth={3} />
+                {capture.action.afterDetail}
+              </span>
+              <span className='inline-flex items-center gap-1 text-tertiary-token'>
+                <Dot className='h-4 w-4 text-white/28' strokeWidth={3} />
+                {capture.action.beforeDetail}
+              </span>
+              <p className='sr-only'>
+                {capture.action.beforeLabel}: {capture.action.beforeTitle}.{' '}
+                {capture.action.afterLabel}: {capture.action.afterTitle}.
+              </p>
             </div>
           </div>
         </div>
@@ -359,6 +339,7 @@ export function ArtistProfileCaptureSection({
             <AudienceRail
               key={rail.map(pill => pill.id).join('-')}
               pills={rail}
+              railIndex={index}
               direction={index % 2 === 0 ? 'left' : 'right'}
             />
           ))}

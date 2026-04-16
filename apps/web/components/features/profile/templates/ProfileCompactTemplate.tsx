@@ -61,6 +61,8 @@ interface ProfileCompactTemplateProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly hideJovieBranding?: boolean;
+  readonly hideMoreMenu?: boolean;
 }
 
 function resolveDrawerView(
@@ -146,6 +148,8 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
   releases,
+  hideJovieBranding = false,
+  hideMoreMenu = false,
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
@@ -529,6 +533,8 @@ export function ProfileCompactTemplate({
                   showSubscriptionConfirmedBanner
                 }
                 viewerCountryCode={viewerCountryCode}
+                hideJovieBranding={hideJovieBranding}
+                hideMoreMenu={hideMoreMenu}
                 drawerOpen={drawerOpen}
                 drawerView={drawerView}
                 onDrawerOpenChange={handleDrawerOpenChange}

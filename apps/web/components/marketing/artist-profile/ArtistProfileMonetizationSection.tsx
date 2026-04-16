@@ -1,10 +1,4 @@
-import {
-  ArrowRight,
-  CreditCard,
-  HeartHandshake,
-  Mail,
-  Music2,
-} from 'lucide-react';
+import { ArrowRight, CreditCard, Mail, Music2 } from 'lucide-react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -53,13 +47,7 @@ function GetPaidCard({
         aria-hidden='true'
       />
       <div className='relative z-10'>
-        <span
-          className='flex h-11 w-11 items-center justify-center rounded-full bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.16)]'
-          aria-hidden='true'
-        >
-          <HeartHandshake className='h-5 w-5' strokeWidth={1.9} />
-        </span>
-        <h3 className='mt-7 max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
+        <h3 className='max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
       </div>
@@ -118,36 +106,7 @@ function SayThanksCard({
         aria-hidden='true'
       />
 
-      <div className='relative z-30 mx-auto max-w-[23rem] rounded-[1.15rem] border border-white/70 bg-white/82 p-3 shadow-[0_18px_48px_rgba(0,0,0,0.16)] ring-1 ring-black/[0.035] backdrop-blur-xl'>
-        <div className='flex items-center justify-between gap-3'>
-          <div className='flex min-w-0 items-center gap-3'>
-            <span
-              className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.72rem] bg-[#2675ff] text-white shadow-[0_10px_22px_rgba(38,117,255,0.24)]'
-              aria-hidden='true'
-            >
-              <Mail className='h-4 w-4' strokeWidth={1.9} />
-            </span>
-            <div className='min-w-0'>
-              <div className='flex min-w-0 items-center gap-2'>
-                <p className='truncate text-[12px] font-semibold tracking-[-0.02em]'>
-                  Mail
-                </p>
-                <span className='text-[11px] text-black/38'>now</span>
-              </div>
-              <p className='truncate text-[12px] font-semibold tracking-[-0.02em]'>
-                Jovie
-              </p>
-            </div>
-          </div>
-          <ArrowRight className='h-3.5 w-3.5 text-black/30' strokeWidth={1.9} />
-        </div>
-
-        <p className='mt-3 line-clamp-2 text-[13px] font-medium leading-snug tracking-[-0.025em] text-black/74'>
-          {card.message}
-        </p>
-      </div>
-
-      <div className='relative z-20 mx-auto mt-3 max-w-[21.5rem] rounded-[1.35rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.12)] sm:p-5'>
+      <div className='relative z-20 mx-auto max-w-[21.5rem] rounded-[1.35rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.12)] sm:p-5'>
         <div className='flex items-center justify-between gap-3'>
           <div className='flex min-w-0 items-center gap-3'>
             <span
@@ -184,13 +143,7 @@ function SayThanksCard({
       </div>
 
       <div className='relative z-10 mt-12 sm:mt-14'>
-        <span
-          className='flex h-11 w-11 items-center justify-center rounded-full bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.14)]'
-          aria-hidden='true'
-        >
-          <Mail className='h-5 w-5' strokeWidth={1.9} />
-        </span>
-        <h3 className='mt-7 max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
+        <h3 className='max-w-[10ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
           {card.title}
         </h3>
         <p className='mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>

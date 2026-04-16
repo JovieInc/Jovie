@@ -1,3 +1,4 @@
+import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
 import type {
   ScreenshotConsumer,
@@ -28,6 +29,20 @@ const ADMIN_MARKETING_AND_INVESTOR = [
   'marketing-export',
   'investor-ready',
 ] as const satisfies readonly ScreenshotConsumer[];
+
+const ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS =
+  ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER.map(section => {
+    const selector = `[data-testid="${section.testId}"]`;
+
+    return {
+      id: section.screenshotScenarioId,
+      title: `Artist Profile ${section.label} Section`,
+      route: '/artist-profiles',
+      waitFor: selector,
+      captureTarget: 'locator' as const,
+      captureSelector: selector,
+    };
+  });
 
 interface ScreenshotScenarioInput
   extends Omit<
@@ -120,59 +135,63 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
       publicExportPath: 'release-take-me-over-phone.png',
     },
+    ...ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS,
     {
-      id: 'artist-profile-mode-release-mobile',
-      title: 'Artist Profile Release Mode Mobile',
-      route: '/demo/showcase/artist-profile-mode-release',
-      waitFor: '[data-testid="demo-showcase-artist-profile-mode-release"]',
-      captureTarget: 'locator',
-      captureSelector:
-        '[data-testid="demo-showcase-artist-profile-mode-release"]',
+      id: 'tim-white-profile-tour-mobile',
+      title: 'Tim White Profile — Tour',
+      route: '/demo/showcase/tim-white-profile?mode=tour',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'artist-profile-mode-release-phone.png',
+      publicExportPath: 'tim-white-profile-tour-phone.png',
     },
     {
-      id: 'artist-profile-mode-shows-mobile',
-      title: 'Artist Profile Shows Mode Mobile',
-      route: '/demo/showcase/artist-profile-mode-shows',
-      waitFor: '[data-testid="demo-showcase-artist-profile-mode-shows"]',
-      captureTarget: 'locator',
-      captureSelector:
-        '[data-testid="demo-showcase-artist-profile-mode-shows"]',
+      id: 'tim-white-profile-pay-mobile',
+      title: 'Tim White Profile — Pay',
+      route: '/demo/showcase/tim-white-profile?mode=pay',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'artist-profile-mode-shows-phone.png',
+      publicExportPath: 'tim-white-profile-pay-phone.png',
     },
     {
-      id: 'artist-profile-mode-pay-mobile',
-      title: 'Artist Profile Pay Mode Mobile',
-      route: '/demo/showcase/artist-profile-mode-pay',
-      waitFor: '[data-testid="demo-showcase-artist-profile-mode-pay"]',
-      captureTarget: 'locator',
-      captureSelector: '[data-testid="demo-showcase-artist-profile-mode-pay"]',
+      id: 'tim-white-profile-presave-mobile',
+      title: 'Tim White Profile — Presave Countdown',
+      route: '/demo/showcase/tim-white-profile?release=presave',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'artist-profile-mode-pay-phone.png',
+      publicExportPath: 'tim-white-profile-presave-phone.png',
+      fixedNow: '2026-04-15T12:00:00.000Z',
     },
     {
-      id: 'artist-profile-mode-subscribe-mobile',
-      title: 'Artist Profile Subscribe Mode Mobile',
-      route: '/demo/showcase/artist-profile-mode-subscribe',
-      waitFor: '[data-testid="demo-showcase-artist-profile-mode-subscribe"]',
-      captureTarget: 'locator',
-      captureSelector:
-        '[data-testid="demo-showcase-artist-profile-mode-subscribe"]',
+      id: 'tim-white-profile-live-mobile',
+      title: 'Tim White Profile — Latest Release',
+      route: '/demo/showcase/tim-white-profile?release=live',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'artist-profile-mode-subscribe-phone.png',
+      publicExportPath: 'tim-white-profile-live-phone.png',
     },
     {
-      id: 'artist-profile-mode-links-mobile',
-      title: 'Artist Profile Links Mode Mobile',
-      route: '/demo/showcase/artist-profile-mode-links',
-      waitFor: '[data-testid="demo-showcase-artist-profile-mode-links"]',
-      captureTarget: 'locator',
-      captureSelector:
-        '[data-testid="demo-showcase-artist-profile-mode-links"]',
+      id: 'tim-white-profile-video-mobile',
+      title: 'Tim White Profile — Music Video',
+      route: '/demo/showcase/tim-white-profile?release=video',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'artist-profile-mode-links-phone.png',
+      publicExportPath: 'tim-white-profile-video-phone.png',
+    },
+    {
+      id: 'tim-white-profile-subscribe-mobile',
+      title: 'Tim White Profile — Subscribe',
+      route: '/demo/showcase/tim-white-profile?mode=subscribe',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-subscribe-phone.png',
+    },
+    {
+      id: 'tim-white-profile-listen-mobile',
+      title: 'Tim White Profile — Listen',
+      route: '/demo/showcase/tim-white-profile?mode=listen',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-listen-phone.png',
     },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
@@ -200,6 +219,16 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       captureSelector: '[data-testid="release-sidebar"]',
       interaction: 'open-first-release',
       publicExportPath: 'release-sidebar-detail.png',
+    },
+    {
+      id: 'dashboard-release-sidebar-platforms-desktop',
+      title: 'Release Sidebar Platforms',
+      route: '/demo',
+      waitFor: '[data-testid="release-platforms-card"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="release-platforms-card"]',
+      interaction: 'open-first-release',
+      publicExportPath: 'release-sidebar-platforms.png',
     },
     {
       id: 'dashboard-audience-desktop',

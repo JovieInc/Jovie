@@ -14,6 +14,7 @@ export const TIMEOUTS = {
 export const CATALOG_OUTPUT_DIR = 'screenshot-catalog/current';
 export const PUBLIC_EXPORT_DIR = 'public/product-screenshots';
 export const OUTPUT_DIR = PUBLIC_EXPORT_DIR;
+export const SCREENSHOT_CLOCK_ISO = '2026-04-15T16:00:00.000Z';
 
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.

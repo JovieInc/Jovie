@@ -1,9 +1,73 @@
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { ArtistProfilePlaceholderShot } from './ArtistProfilePlaceholderShot';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileOpinionatedSectionProps {
   readonly opinionated: ArtistProfileLandingCopy['opinionated'];
+}
+
+function OpinionatedRulesSurface({
+  opinionated,
+}: Readonly<ArtistProfileOpinionatedSectionProps>) {
+  return (
+    <div className='relative overflow-hidden rounded-[1.85rem] border border-white/[0.075] bg-[linear-gradient(180deg,rgba(255,255,255,0.048),rgba(255,255,255,0.018)),#050505] p-5 shadow-[0_28px_80px_rgba(0,0,0,0.32)]'>
+      <div
+        className='pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent'
+        aria-hidden='true'
+      />
+      <div className='rounded-[1.35rem] border border-white/[0.065] bg-black/28 p-4 sm:p-5'>
+        <div className='flex items-center justify-between gap-4'>
+          <div>
+            <p className='text-[12px] font-semibold tracking-[-0.01em] text-primary-token'>
+              Fan context
+            </p>
+            <p className='mt-1 text-[12px] leading-snug text-tertiary-token'>
+              Jovie chooses the obvious next action.
+            </p>
+          </div>
+          <div
+            className='hidden h-2 w-2 rounded-full bg-white/70 shadow-[0_0_18px_rgba(255,255,255,0.5)] sm:block'
+            aria-hidden='true'
+          />
+        </div>
+
+        <div className='mt-6 space-y-3'>
+          {opinionated.rules.map(rule => (
+            <div
+              key={rule.id}
+              className='grid items-center gap-3 rounded-[1rem] border border-white/[0.055] bg-white/[0.026] px-3 py-3 sm:grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)]'
+            >
+              <span className='truncate text-[13px] font-medium tracking-[-0.02em] text-secondary-token'>
+                {rule.context}
+              </span>
+              <span
+                className='hidden h-px bg-gradient-to-r from-white/10 via-white/34 to-white/10 sm:block'
+                aria-hidden='true'
+              />
+              <span className='truncate text-[13px] font-semibold tracking-[-0.02em] text-primary-token sm:text-right'>
+                {rule.result}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className='mt-5 rounded-[1.1rem] border border-white/[0.075] bg-white/[0.035] p-4'>
+          <div className='flex items-center justify-between gap-4'>
+            <span className='text-[13px] font-semibold tracking-[-0.02em] text-primary-token'>
+              Polished profile
+            </span>
+            <span className='rounded-full bg-white px-3 py-1 text-[11px] font-semibold tracking-[-0.02em] text-black'>
+              Default
+            </span>
+          </div>
+          <div className='mt-4 grid grid-cols-3 gap-2'>
+            <span className='h-14 rounded-[0.85rem] bg-white/[0.075]' />
+            <span className='h-14 rounded-[0.85rem] bg-white/[0.052]' />
+            <span className='h-14 rounded-[0.85rem] bg-white/[0.038]' />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ArtistProfileOpinionatedSection({
@@ -31,11 +95,7 @@ export function ArtistProfileOpinionatedSection({
           </div>
         </div>
 
-        <div className='rounded-[1.75rem] border border-white/8 bg-white/[0.03] p-4'>
-          <div className='overflow-hidden rounded-[1.3rem] border border-white/8 bg-white/[0.02]'>
-            <ArtistProfilePlaceholderShot variant='opinionated' />
-          </div>
-        </div>
+        <OpinionatedRulesSurface opinionated={opinionated} />
       </div>
     </ArtistProfileSectionShell>
   );

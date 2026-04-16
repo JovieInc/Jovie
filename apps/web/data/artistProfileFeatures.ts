@@ -19,7 +19,7 @@ export interface ArtistProfileFeatureTile {
     | 'show-ready'
     | 'pay-ready'
     | 'fan-capture-built-in'
-    | 'zero-setup'
+    | 'share-ready'
     | 'polished-by-default'
     | 'dedicated-release-pages'
     | 'analytics';
@@ -118,8 +118,8 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
       placement: 'card',
     },
     {
-      feature: 'Zero setup',
-      benefit: 'Artists do not need a builder workflow to get live.',
+      feature: 'Fast launch',
+      benefit: 'Artists do not need a builder workflow to publish.',
       uiSurface: 'How It Works strip',
       copyCandidate: 'Claim it, connect it, share it.',
       placement: 'section',
@@ -140,9 +140,9 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'pink',
   },
   {
-    id: 'zero-setup',
-    title: 'Zero setup',
-    body: 'Claim it, connect once, go live.',
+    id: 'share-ready',
+    title: 'Share-ready',
+    body: 'A clean profile link for bio, QR, posts, and shows.',
     accent: 'green',
   },
 ] as const;

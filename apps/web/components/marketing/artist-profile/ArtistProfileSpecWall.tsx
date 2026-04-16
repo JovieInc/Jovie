@@ -10,7 +10,7 @@ const SPEC_TILE_ICONS: Partial<
 > = {
   'fast-by-design': Zap,
   'deep-link-modes': Link2,
-  'zero-setup': PlugZap,
+  'share-ready': PlugZap,
 };
 
 const SPEC_TILE_POSITIONS: Partial<
@@ -18,7 +18,7 @@ const SPEC_TILE_POSITIONS: Partial<
 > = {
   'fast-by-design': 'lg:left-20 lg:top-20',
   'deep-link-modes': 'lg:right-20 lg:top-20',
-  'zero-setup': 'lg:bottom-16 lg:left-1/2 lg:-translate-x-1/2',
+  'share-ready': 'lg:bottom-16 lg:left-1/2 lg:-translate-x-1/2',
 };
 
 const SPEC_TILE_ACCENTS: Record<ArtistProfileFeatureTile['accent'], string> = {

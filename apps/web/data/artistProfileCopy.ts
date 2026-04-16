@@ -27,10 +27,11 @@ export interface ArtistProfileModeDrawerItem {
 
 export interface ArtistProfileOutcomeCard {
   readonly id:
-    | 'dedicated-release-pages'
-    | 'trackable-qr-codes'
-    | 'dark-mode-first'
-    | 'intelligent-routing';
+    | 'drive-streams'
+    | 'sell-out'
+    | 'get-paid'
+    | 'say-thanks'
+    | 'share-anywhere';
   readonly title: string;
   readonly description: string;
 }
@@ -130,6 +131,7 @@ export interface ArtistProfileLandingCopy {
     readonly headlineOptions: readonly string[];
     readonly body: string;
     readonly principles: readonly string[];
+    readonly rules: readonly ArtistProfileOpinionatedRule[];
   };
   readonly specWall: {
     readonly eyebrow: string;
@@ -157,6 +159,12 @@ export interface ArtistProfileLandingCopy {
     readonly ctaLabel: string;
     readonly signature: string;
   };
+}
+
+export interface ArtistProfileOpinionatedRule {
+  readonly id: 'release' | 'shows' | 'support';
+  readonly context: string;
+  readonly result: string;
 }
 
 export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
@@ -226,8 +234,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc:
-          '/product-screenshots/artist-profile-mode-release-phone.png',
+        screenshotSrc: '/product-screenshots/tim-white-profile-live-phone.png',
         screenshotAlt: 'Jovie artist profile showing a release-first view.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -275,8 +282,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc:
-          '/product-screenshots/artist-profile-mode-shows-phone.png',
+        screenshotSrc: '/product-screenshots/tim-white-profile-tour-phone.png',
         screenshotAlt:
           'Jovie artist profile showing nearby shows and ticket paths.',
         screenshotWidth: 660,
@@ -313,7 +319,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc: '/product-screenshots/artist-profile-mode-pay-phone.png',
+        screenshotSrc: '/product-screenshots/tim-white-profile-pay-phone.png',
         screenshotAlt: 'Jovie artist profile showing direct support options.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -350,7 +356,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ],
         },
         screenshotSrc:
-          '/product-screenshots/artist-profile-mode-subscribe-phone.png',
+          '/product-screenshots/tim-white-profile-subscribe-phone.png',
         screenshotAlt: 'Jovie artist profile showing fan subscription capture.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -393,7 +399,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ],
         },
         screenshotSrc:
-          '/product-screenshots/artist-profile-mode-links-phone.png',
+          '/product-screenshots/tim-white-profile-listen-phone.png',
         screenshotAlt:
           'Jovie artist profile showing important fan destinations.',
         screenshotWidth: 660,
@@ -404,29 +410,36 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   outcomes: {
     eyebrow: 'Fan outcomes',
     headline: 'Built for artists.',
-    body: '',
+    body: 'Five ways the same artist profile can move a fan from attention to action.',
     cards: [
       {
-        id: 'dedicated-release-pages',
-        title: 'Dedicated release pages',
+        id: 'drive-streams',
+        title: 'Drive streams',
         description:
-          'Every drop gets its own smart-link page for presave, countdown, and release day.',
+          'Put the latest release, pre-save, or countdown at the front of the profile.',
       },
       {
-        id: 'trackable-qr-codes',
-        title: 'Trackable QR codes',
-        description: 'Know which flyer, sticker, etc got you the most fans.',
-      },
-      {
-        id: 'dark-mode-first',
-        title: 'Dark mode first',
+        id: 'sell-out',
+        title: 'Sell out',
         description:
-          'Designed for low-light taps in clubs, venues, and late-night scrolls.',
+          'Surface the right show moment with saved dates, nearby venues, and ticket intent.',
       },
       {
-        id: 'intelligent-routing',
-        title: 'Intelligent routing',
-        description: 'Surfaces the right actions for the fan in front of it.',
+        id: 'get-paid',
+        title: 'Get paid',
+        description: 'Make direct support feel native to the artist profile.',
+      },
+      {
+        id: 'say-thanks',
+        title: 'Say thanks',
+        description:
+          'Turn a support moment into a personal follow-up fans remember.',
+      },
+      {
+        id: 'share-anywhere',
+        title: 'Share anywhere',
+        description:
+          'Use one clean profile link across bio, QR, posts, stories, and shows.',
       },
     ],
   },
@@ -449,16 +462,16 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     subhead: 'Turn anonymous profile visits into fans you can reach again.',
     body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
     action: {
-      title: 'Fan capture',
-      detail: 'One visit becomes a direct line.',
+      title: 'Subscribe',
+      detail: 'Get release and show alerts from Tim White.',
       ctaLabel: 'Subscribe',
       confirmedLabel: 'Captured',
       beforeLabel: 'Before',
       beforeTitle: 'Anonymous visit',
-      beforeDetail: 'jov.ie/you opened from Spotify in LA.',
+      beforeDetail: 'Spotify / LA / Release page',
       afterLabel: 'After',
       afterTitle: 'Reachable fan',
-      afterDetail: 'Email verified. Notifications on. Context saved.',
+      afterDetail: 'Email verified / Notifications on / Source saved',
     },
     audienceRails: [
       [
@@ -467,28 +480,28 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           icon: 'spotify',
           identity: 'Jason',
           chips: ['LA', 'Spotify'],
-          action: 'listened',
+          action: 'Listened',
         },
         {
           id: 'email-brian',
           icon: 'email',
           identity: 'Brian M',
-          chips: ['email'],
-          action: 'subscribed',
+          chips: ['Email'],
+          action: 'Subscribed',
         },
         {
           id: 'shows-london-o2',
           icon: 'shows',
           identity: 'Ava',
           chips: ['London', 'O2 Arena'],
-          action: 'saved',
+          action: 'Saved',
         },
         {
           id: 'qr-berlin-flyer',
           icon: 'qr',
           identity: 'Mika',
-          chips: ['Berlin', 'flyer'],
-          action: 'scanned',
+          chips: ['Berlin', 'Flyer'],
+          action: 'Scanned',
         },
       ],
       [
@@ -496,29 +509,29 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           id: 'apple-tokyo',
           icon: 'apple',
           identity: 'Kenji',
-          chips: ['Tokyo', 'latest release'],
-          action: 'opened',
+          chips: ['Tokyo', 'Latest Release'],
+          action: 'Opened',
         },
         {
           id: 'youtube-sao-paulo',
           icon: 'youtube',
           identity: 'Luana',
           chips: ['São Paulo', 'YouTube'],
-          action: 'watched',
+          action: 'Watched',
         },
         {
           id: 'subscribe-maya-notifications',
           icon: 'subscribe',
           identity: 'Maya',
-          chips: ['notifications'],
-          action: 'enabled',
+          chips: ['Notifications'],
+          action: 'Enabled',
         },
         {
           id: 'spotify-amelia-london',
           icon: 'spotify',
           identity: 'Amelia',
           chips: ['London', 'Spotify'],
-          action: 'saved',
+          action: 'Saved',
         },
       ],
       [
@@ -526,29 +539,29 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           id: 'shows-chicago',
           icon: 'shows',
           identity: 'Marcus',
-          chips: ['Chicago', 'shows'],
-          action: 'saved',
+          chips: ['Chicago', 'Shows'],
+          action: 'Saved',
         },
         {
           id: 'qr-miami-sticker',
           icon: 'qr',
           identity: 'Sofia',
-          chips: ['Miami', 'sticker'],
-          action: 'scanned',
+          chips: ['Miami', 'Sticker'],
+          action: 'Scanned',
         },
         {
           id: 'email-nina',
           icon: 'email',
           identity: 'Nina P',
-          chips: ['email'],
-          action: 'confirmed',
+          chips: ['Email Opt-In'],
+          action: 'Confirmed',
         },
         {
           id: 'pay-diego-support',
           icon: 'pay',
           identity: 'Diego',
-          chips: ['pay', 'support'],
-          action: 'supported',
+          chips: ['Support', 'Apple Pay'],
+          action: 'Paid',
         },
       ],
     ],
@@ -563,6 +576,23 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
     body: 'Jovie is intentionally constrained. No theme builder. No layout rabbit hole. No generic creator-site sprawl. Every profile teaches fans what to tap because the product is built around release moments, show moments, and conversion.',
     principles: ['No theme builder', 'No template maze', 'Built to convert'],
+    rules: [
+      {
+        id: 'release',
+        context: 'Release moment',
+        result: 'Music first',
+      },
+      {
+        id: 'shows',
+        context: 'Nearby show',
+        result: 'Tickets first',
+      },
+      {
+        id: 'support',
+        context: 'Support intent',
+        result: 'Pay first',
+      },
+    ],
   },
   specWall: {
     eyebrow: 'Specs',

@@ -22,6 +22,7 @@ import {
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
+  SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
   waitForImages,
   waitForSettle,
@@ -196,6 +197,9 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
+  await page.clock.setFixedTime(
+    new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
+  );
   await page.setViewportSize(viewport);
   await page.goto(scenario.route, {
     waitUntil: 'domcontentloaded',

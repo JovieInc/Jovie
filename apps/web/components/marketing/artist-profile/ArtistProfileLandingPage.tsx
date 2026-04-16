@@ -3,6 +3,7 @@ import type {
   ArtistProfileFeatureTile,
   ArtistProfileLaunchFeature,
 } from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
@@ -36,35 +37,65 @@ export function ArtistProfileLandingPage({
   if (!flags.FULL_PAGE) {
     return (
       <>
-        <HomeHero layout='f' />
-        <HomeTrustSection />
+        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
+          <HomeHero />
+        </div>
+        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
+          <HomeTrustSection />
+        </div>
       </>
     );
   }
 
   return (
     <>
-      <HomeHero layout='f' />
-      <HomeTrustSection />
-      <ArtistProfileAdaptiveSequence
-        adaptive={copy.adaptive}
-        phoneCaption={copy.hero.phoneCaption}
-        phoneSubcaption={copy.hero.phoneSubcaption}
-      />
-      <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
-      <ArtistProfileMonetizationSection monetization={copy.monetization} />
-      <ArtistProfileCaptureSection capture={copy.capture} />
-      <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
-      <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />
-      <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
-      {flags.SOCIAL_PROOF ? (
-        <ArtistProfileSocialProof
-          socialProof={copy.socialProof}
-          proofData={socialProof}
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
+        <HomeHero />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}>
+        <ArtistProfileAdaptiveSequence
+          adaptive={copy.adaptive}
+          phoneCaption={copy.hero.phoneCaption}
+          phoneSubcaption={copy.hero.phoneSubcaption}
         />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
+        <HomeTrustSection />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
+        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
+        <ArtistProfileMonetizationSection monetization={copy.monetization} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
+        <ArtistProfileCaptureSection capture={copy.capture} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.opinionated}>
+        <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
+        <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
+        <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
+      </div>
+      {flags.SOCIAL_PROOF ? (
+        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.socialProof}>
+          <ArtistProfileSocialProof
+            socialProof={copy.socialProof}
+            proofData={socialProof}
+          />
+        </div>
       ) : null}
-      {flags.FAQ ? <ArtistProfileFaq faq={copy.faq} /> : null}
-      <ArtistProfileFinalCta finalCta={copy.finalCta} />
+      {flags.FAQ ? (
+        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>
+          <ArtistProfileFaq faq={copy.faq} />
+        </div>
+      ) : null}
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
+        <ArtistProfileFinalCta finalCta={copy.finalCta} />
+      </div>
     </>
   );
 }

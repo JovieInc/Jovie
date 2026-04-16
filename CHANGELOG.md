@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.153.7] - 2026-04-15
+## [26.4.153.7] - 2026-04-16
 
-> Artist Profiles now uses real captured product mode shots and a more focused fan-capture story, while keeping production gated to the homepage hero.
+> Artist Profiles now uses real Tim White profile screenshots for proof, with cleaner demo chrome and a more focused fan-capture story.
 
 ### Added
 
-- Added dedicated Artist Profile mode screenshot scenarios and public exports for release, shows, pay, subscribe, and links states.
-- Added generated product screenshots to power the Artist Profiles mode switcher instead of live placeholder mockups.
+- Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
+- Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
 - Added regression coverage for profile release drawer gating and UTC release-year rendering.
 
 ### Changed
@@ -20,10 +20,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Reworked the Artist Profiles adaptive section around the “One profile. Adapts to every fan.” thesis with one-line mode pills and captured product shots.
 - Rebuilt the Capture Every Fan section as a restrained audience-intelligence surface with opt-in action and slow audience rails.
 - Updated the Built for artists spec wall with a Dedicated release pages tile.
+- Updated the outcomes headline to “Built for artists.”
 - Made the Artist Profiles FAQ keep only one item open at a time.
+- Hid demo-only profile chrome from the Tim White marketing screenshots while keeping live public profile behavior unchanged.
 
 ### Removed
 
+- Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
 - Removed the duplicated lower logo row from the Artist Profiles proof section.
 
 ## [26.4.153.6] - 2026-04-15
@@ -58,6 +61,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Public release-lite query now returns an explicit public DTO and serializes release dates as ISO strings before crossing server-client boundaries.
 
 ## [26.4.153.3] - 2026-04-15
+
+> Homepage demo proof now uses canonical featured artists, and the add-release CTA remains clearly visible on dark surfaces.
 
 ### Changed
 

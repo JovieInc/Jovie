@@ -238,6 +238,25 @@ describe('ProfileCompactTemplate', () => {
     expect(trigger.className).toContain('border-transparent');
   });
 
+  it('can hide the menu trigger for clean marketing screenshots', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        hideMoreMenu
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /more options/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Create your artist profile on Jovie' })
+    ).toBeInTheDocument();
+  });
+
   it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=listen');
