@@ -6,7 +6,6 @@ import {
   primaryProviderKeys,
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
-import { ArtistProfileContent } from '@/app/app/(shell)/settings/artist-profile/ArtistProfileContent';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { DashboardPay } from '@/features/dashboard/dashboard-pay';
@@ -25,7 +24,9 @@ import { DemoClientProviders } from './DemoClientProviders';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
+import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
+import { DemoSettingsPanel } from './DemoSettingsPanel';
 import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
 import {
   DEMO_EARNINGS_RESPONSE,
@@ -258,18 +259,14 @@ export function DemoShowcaseSurface({
     }
     case 'settings':
       return (
-        <SettingsDemoHarness
-          dashboardData={DEMO_DASHBOARD_DATA}
-          initialLinks={DEMO_PROFILE_SOCIAL_LINKS}
-          shell='settings'
-        >
-          <div data-testid='demo-showcase-settings'>
-            <ArtistProfileContent />
-          </div>
-        </SettingsDemoHarness>
+        <DemoShowcasePanel testId='demo-showcase-settings'>
+          <DemoSettingsPanel />
+        </DemoShowcasePanel>
       );
     case 'release-landing':
       return <DemoReleaseLandingSurface />;
+    case 'release-tracked-links':
+      return <DemoReleaseTrackedLinksSurface />;
     case 'release-presave':
       return <DemoReleasePresaveSurface />;
     case 'release-tasks':

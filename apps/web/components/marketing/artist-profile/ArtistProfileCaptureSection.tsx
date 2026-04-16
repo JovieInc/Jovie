@@ -190,11 +190,16 @@ export function ArtistProfileCaptureSection({
         }
 
         .artist-profile-subscribe-flow-input {
-          animation: artist-profile-subscribe-flow-out 5.6s ease-in-out infinite;
+          animation: artist-profile-subscribe-flow-out 5.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
         }
 
         .artist-profile-subscribe-flow-success {
-          animation: artist-profile-subscribe-flow-in 5.6s ease-in-out infinite;
+          animation: artist-profile-subscribe-flow-in 5.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+
+        .artist-profile-subscribe-success-pill {
+          transform-origin: right center;
+          animation: artist-profile-subscribe-pill-grow 5.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
         }
 
         .artist-profile-subscribe-typed {
@@ -241,29 +246,48 @@ export function ArtistProfileCaptureSection({
 
         @keyframes artist-profile-subscribe-flow-out {
           0%,
-          38% {
+          40% {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) scale(1);
           }
 
-          50%,
+          56%,
           100% {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: translateY(-8px) scale(0.98);
           }
         }
 
         @keyframes artist-profile-subscribe-flow-in {
           0%,
-          40% {
+          42% {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(6px);
           }
 
-          52%,
+          50%,
           100% {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+
+        @keyframes artist-profile-subscribe-pill-grow {
+          0%,
+          42% {
+            opacity: 0;
+            transform: scaleX(0.34);
+          }
+
+          50% {
+            opacity: 1;
+            transform: scaleX(0.34);
+          }
+
+          64%,
+          100% {
+            opacity: 1;
+            transform: scaleX(1);
           }
         }
 
@@ -295,6 +319,7 @@ export function ArtistProfileCaptureSection({
           .artist-profile-audience-rail,
           .artist-profile-subscribe-flow-input,
           .artist-profile-subscribe-flow-success,
+          .artist-profile-subscribe-success-pill,
           .artist-profile-subscribe-typed,
           .artist-profile-subscribe-caret {
             animation: none;
@@ -349,20 +374,17 @@ export function ArtistProfileCaptureSection({
               </span>
             </div>
             <div
-              className='artist-profile-subscribe-flow-success absolute inset-0 flex items-center gap-2 rounded-full bg-white/[0.055] px-2 py-1.5 text-left'
+              className='artist-profile-subscribe-flow-success absolute inset-0 px-2 py-1.5 text-left'
               aria-hidden='true'
             >
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black'>
-                <Check className='h-4 w-4' strokeWidth={2.1} />
-              </span>
-              <span className='min-w-0 flex-1'>
-                <span className='block text-[12px] font-semibold tracking-[-0.02em] text-primary-token'>
-                  Subscribed
+              <div className='artist-profile-subscribe-success-pill flex h-full items-center justify-center gap-2.5 rounded-full bg-white px-4 text-black shadow-[0_14px_34px_rgba(0,0,0,0.18)]'>
+                <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-white'>
+                  <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
                 </span>
-                <span className='block text-[11px] tracking-[-0.01em] text-secondary-token'>
-                  Email saved
+                <span className='text-[13px] font-semibold tracking-[-0.02em]'>
+                  {capture.action.confirmedLabel}
                 </span>
-              </span>
+              </div>
             </div>
             <p className='sr-only'>
               A demo email is typed into the subscribe input, then the UI

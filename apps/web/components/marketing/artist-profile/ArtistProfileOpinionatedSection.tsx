@@ -1,4 +1,4 @@
-import { ArrowRight, BellRing, Mail, Sparkles } from 'lucide-react';
+import { BellRing, Mail, Sparkles } from 'lucide-react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -115,99 +115,96 @@ export function ArtistProfileReactivationSection({
       className='overflow-hidden bg-[#040506] py-24 sm:py-28 lg:py-32'
       width='page'
     >
-      <div className='mx-auto max-w-[1120px]'>
-        <div className='mx-auto max-w-[40rem] text-center'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.26em] text-white/64'>
-            {reactivation.eyebrow}
-          </p>
-          <h2 className='mt-4 text-[clamp(3rem,6vw,5.6rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
+      <div className='mx-auto max-w-[1040px]'>
+        <div className='mx-auto max-w-[38rem] text-center'>
+          <h2 className='text-[clamp(2.8rem,5vw,4.6rem)] font-semibold leading-[0.92] tracking-[-0.07em] text-primary-token'>
             {reactivation.headline}
           </h2>
-          <p className='mx-auto mt-4 max-w-[34rem] text-[clamp(1rem,1.8vw,1.28rem)] font-medium leading-[1.3] tracking-[-0.03em] text-secondary-token'>
+          <p className='mx-auto mt-5 max-w-[33rem] text-[clamp(1rem,1.5vw,1.14rem)] leading-[1.65] text-secondary-token'>
             {reactivation.subhead}
           </p>
         </div>
 
-        <div className='relative mt-12 lg:mt-14'>
-          <div
-            className='pointer-events-none absolute left-1/2 top-10 h-48 w-48 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.12),rgba(255,255,255,0))] blur-3xl'
-            aria-hidden='true'
-          />
-
-          <div className='relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] px-4 py-4 shadow-[0_30px_120px_rgba(0,0,0,0.38)] sm:px-5 sm:py-5 lg:px-7 lg:py-7'>
-            <div
-              className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),rgba(0,0,0,0))]'
-              aria-hidden='true'
-            />
-
-            <div className='relative hidden grid-cols-[minmax(0,1.1fr)_24px_minmax(0,1fr)_24px_minmax(0,1fr)_24px_minmax(0,0.88fr)] items-center gap-y-4 border-b border-white/8 pb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60 lg:grid'>
-              <span>{reactivation.workflow.columns[0]}</span>
-              <span />
-              <span>{reactivation.workflow.columns[1]}</span>
-              <span />
-              <span>{reactivation.workflow.columns[2]}</span>
-              <span />
-              <span>{reactivation.workflow.columns[3]}</span>
-            </div>
-
-            <div className='relative mt-2 space-y-3 lg:mt-4 lg:space-y-4'>
-              {reactivation.workflow.rows.map(row => (
-                <div
-                  key={row.id}
-                  className='rounded-[1.5rem] border border-white/8 bg-white/[0.03] px-4 py-4 backdrop-blur-xl lg:grid lg:grid-cols-[minmax(0,1.1fr)_24px_minmax(0,1fr)_24px_minmax(0,1fr)_24px_minmax(0,0.88fr)] lg:items-center lg:gap-x-2 lg:px-5 lg:py-4'
-                >
-                  <WorkflowCell
-                    label={reactivation.workflow.columns[0]}
-                    value={row.trigger}
-                  />
-                  <WorkflowArrow />
-                  <WorkflowCell
-                    label={reactivation.workflow.columns[1]}
-                    value={row.audience}
-                  />
-                  <WorkflowArrow />
-                  <WorkflowCell
-                    label={reactivation.workflow.columns[2]}
-                    value={row.message}
-                  />
-                  <WorkflowArrow />
-                  <WorkflowCell
-                    label={reactivation.workflow.columns[3]}
-                    value={row.destination}
-                    tone='destination'
-                  />
-                </div>
-              ))}
-            </div>
+        <div className='mt-12 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025] shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:mt-14'>
+          <div className='hidden border-b border-white/8 px-6 py-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.92fr)] lg:gap-6 lg:px-8'>
+            {reactivation.workflow.columns.map((column, index) => (
+              <span
+                key={column}
+                className={
+                  index === 0
+                    ? 'text-[12px] font-medium tracking-[-0.01em] text-white/60'
+                    : 'border-l border-white/8 pl-6 text-[12px] font-medium tracking-[-0.01em] text-white/60'
+                }
+              >
+                {column}
+              </span>
+            ))}
           </div>
 
-          <div className='mt-5 grid gap-3 sm:grid-cols-2 lg:absolute lg:-bottom-8 lg:left-8 lg:right-8 lg:grid-cols-3 lg:gap-4'>
-            {reactivation.outputs.map(output => {
-              const Icon = OUTPUT_ICONS[output.id];
+          <div className='divide-y divide-white/8'>
+            {reactivation.workflow.rows.map(row => (
+              <div
+                key={row.id}
+                className='px-5 py-5 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.92fr)] lg:gap-6 lg:px-8 lg:py-6'
+              >
+                <WorkflowCell
+                  label={reactivation.workflow.columns[0]}
+                  value={row.trigger}
+                />
+                <WorkflowCell
+                  bordered
+                  label={reactivation.workflow.columns[1]}
+                  value={row.audience}
+                />
+                <WorkflowCell
+                  bordered
+                  label={reactivation.workflow.columns[2]}
+                  value={row.message}
+                />
+                <WorkflowCell
+                  bordered
+                  label={reactivation.workflow.columns[3]}
+                  tone='destination'
+                  value={row.destination}
+                />
+              </div>
+            ))}
+          </div>
 
-              return (
-                <article
-                  key={output.id}
-                  className='rounded-[1.35rem] border border-white/8 bg-[#0b0d11]/88 px-4 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.26)] backdrop-blur-xl'
-                >
-                  <div className='flex items-center justify-between gap-3'>
-                    <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-white/64'>
-                      {output.label}
+          <div className='border-t border-white/8 bg-white/[0.015]'>
+            <div className='grid divide-y divide-white/8 lg:grid-cols-3 lg:divide-x lg:divide-y-0'>
+              {reactivation.outputs.map(output => {
+                const Icon = OUTPUT_ICONS[output.id];
+
+                return (
+                  <article
+                    key={output.id}
+                    className='px-5 py-5 sm:px-6 lg:px-7 lg:py-6'
+                  >
+                    <div className='flex items-center justify-between gap-3'>
+                      <p className='text-[12px] font-medium tracking-[-0.01em] text-white/64'>
+                        {output.label}
+                      </p>
+                      <Icon
+                        className='h-4 w-4 text-white/48'
+                        strokeWidth={1.85}
+                      />
+                    </div>
+                    <p className='mt-3 max-w-[18rem] text-[1.02rem] font-semibold leading-[1.35] tracking-[-0.03em] text-primary-token'>
+                      {output.title}
                     </p>
-                    <Icon className='h-4 w-4 text-white/55' strokeWidth={1.9} />
-                  </div>
-                  <p className='mt-3 text-[1.05rem] font-semibold leading-[1.2] tracking-[-0.03em] text-primary-token'>
-                    {output.title}
-                  </p>
-                  <div className='mt-3 flex items-center justify-between gap-3 text-[12px] text-white/54'>
-                    <span>{output.detail}</span>
-                    <span className='rounded-full bg-white/[0.06] px-3 py-1 font-medium text-white/72'>
-                      {output.destination}
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
+                    <div className='mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4'>
+                      <span className='text-[13px] leading-[1.5] text-secondary-token'>
+                        {output.detail}
+                      </span>
+                      <span className='text-right text-[12px] font-medium tracking-[-0.01em] text-tertiary-token'>
+                        {output.destination}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -216,36 +213,36 @@ export function ArtistProfileReactivationSection({
 }
 
 function WorkflowCell({
+  bordered,
   label,
   tone,
   value,
 }: Readonly<{
+  bordered?: boolean;
   label: string;
   tone?: 'default' | 'destination';
   value: string;
 }>) {
   return (
-    <div className='grid gap-1 lg:gap-0'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.2em] text-white/34 lg:hidden'>
+    <div
+      className={
+        bordered
+          ? 'mt-4 border-t border-white/8 pt-4 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0'
+          : ''
+      }
+    >
+      <p className='text-[12px] font-medium tracking-[-0.01em] text-tertiary-token lg:hidden'>
         {label}
       </p>
       <p
         className={
           tone === 'destination'
-            ? 'text-[15px] font-semibold tracking-[-0.03em] text-white'
-            : 'text-[15px] font-semibold tracking-[-0.03em] text-white/88'
+            ? 'mt-1 text-[17px] font-semibold tracking-[-0.03em] text-primary-token lg:mt-0'
+            : 'mt-1 text-[17px] font-semibold tracking-[-0.03em] text-white/86 lg:mt-0'
         }
       >
         {value}
       </p>
-    </div>
-  );
-}
-
-function WorkflowArrow() {
-  return (
-    <div className='hidden items-center justify-center lg:flex'>
-      <ArrowRight className='h-4 w-4 text-white/28' strokeWidth={1.8} />
     </div>
   );
 }

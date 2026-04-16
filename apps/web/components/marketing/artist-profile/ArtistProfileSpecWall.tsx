@@ -214,46 +214,13 @@ function renderPowerFeatureProof(tile: ArtistProfileFeatureTile) {
       );
     case 'geo-insights':
       return (
-        <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[radial-gradient(circle_at_18%_18%,rgba(244,162,89,0.18),transparent_28%),radial-gradient(circle_at_80%_22%,rgba(77,209,191,0.12),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01)),#090c12] p-4'>
-          <div className='grid h-full grid-rows-[1fr_auto] gap-4'>
-            <div className='relative overflow-hidden rounded-[1.15rem] border border-white/8 bg-black/28 p-4'>
-              <div className='absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:40px_40px] opacity-40' />
-              <div className='relative z-10 space-y-3'>
-                {[
-                  ['Los Angeles', '+24%'],
-                  ['Mexico City', '+18%'],
-                  ['London', '+11%'],
-                  ['Manila', '+9%'],
-                ].map(([city, value], index) => (
-                  <div
-                    key={city}
-                    className='flex items-center justify-between rounded-[0.95rem] bg-white/[0.055] px-3 py-2'
-                    style={{
-                      transform:
-                        index % 2 === 0 ? 'translateX(0)' : 'translateX(8px)',
-                    }}
-                  >
-                    <span className='text-[12px] font-medium text-primary-token'>
-                      {city}
-                    </span>
-                    <span className='text-[11px] font-semibold text-[color:var(--tile-accent)]'>
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className='grid grid-cols-3 gap-2'>
-              {['Book', 'Announce', 'Spend'].map(action => (
-                <div
-                  key={action}
-                  className='rounded-[0.95rem] border border-white/8 bg-white/[0.045] px-3 py-2 text-center text-[11px] font-medium text-secondary-token'
-                >
-                  {action}
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
+          <ScreenshotCrop
+            alt={tile.screenshotAlt ?? tile.title}
+            className='h-full'
+            objectPosition={tile.objectPosition}
+            src={tile.screenshotSrc ?? ''}
+          />
         </div>
       );
     case 'always-in-sync':
@@ -265,21 +232,15 @@ function renderPowerFeatureProof(tile: ArtistProfileFeatureTile) {
               Updated across profile surfaces
             </div>
             <span className='text-[11px] font-semibold text-[color:var(--tile-accent)]'>
-              Static TTFB &lt;100ms
+              Static and always current
             </span>
           </div>
-          <div className='mt-4 grid flex-1 grid-cols-2 gap-3'>
+          <div className='mt-4 h-[11rem]'>
             <ScreenshotCrop
               alt={tile.screenshotAlt ?? tile.title}
-              className='min-h-[9rem]'
+              className='h-full'
               objectPosition={tile.objectPosition}
               src={tile.screenshotSrc ?? ''}
-            />
-            <ScreenshotCrop
-              alt='Jovie artist profile showing the listen mode.'
-              className='min-h-[9rem]'
-              objectPosition='50% 0%'
-              src='/product-screenshots/tim-white-profile-listen-phone.png'
             />
           </div>
         </div>
@@ -287,102 +248,34 @@ function renderPowerFeatureProof(tile: ArtistProfileFeatureTile) {
     case 'retarget-warm-fans':
       return (
         <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
-          <div className='rounded-[1rem] border border-white/8 bg-white/[0.035] p-3'>
-            <div className='flex items-center justify-between text-[11px] text-secondary-token'>
-              <span>Return rate</span>
-              <span className='font-medium text-[color:var(--tile-accent)]'>
-                +17%
-              </span>
-            </div>
-            <svg
-              aria-hidden='true'
-              className='mt-3 h-10 w-full text-[color:var(--tile-accent)]'
-              viewBox='0 0 120 40'
-            >
-              <path
-                d='M4 28 C20 30, 28 22, 42 24 S67 12, 80 14 S100 18, 116 6'
-                fill='none'
-                opacity='0.95'
-                stroke='currentColor'
-                strokeWidth='2.5'
-              />
-            </svg>
-          </div>
-          <div className='mt-3 flex flex-wrap gap-2'>
-            {['Visited release', 'Showed intent', 'Re-engaged'].map(item => (
-              <ProofChip key={item}>{item}</ProofChip>
-            ))}
-          </div>
+          <ScreenshotCrop
+            alt={tile.screenshotAlt ?? tile.title}
+            className='h-full'
+            objectPosition={tile.objectPosition}
+            src={tile.screenshotSrc ?? ''}
+          />
         </div>
       );
     case 'press-ready-assets':
       return (
         <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
-          <div className='flex items-start justify-between gap-3'>
-            <div className='grid flex-1 grid-cols-3 gap-2'>
-              <ScreenshotCrop
-                alt={tile.screenshotAlt ?? tile.title}
-                className='aspect-[0.82]'
-                objectPosition='38% 12%'
-                src={tile.screenshotSrc ?? ''}
-              />
-              <ScreenshotCrop
-                alt='Jovie artist profile desktop crop for square media.'
-                className='aspect-[0.82]'
-                objectPosition='50% 22%'
-                src='/product-screenshots/profile-desktop.png'
-              />
-              <ScreenshotCrop
-                alt='Jovie artist profile mobile video crop for press assets.'
-                className='aspect-[0.82]'
-                objectPosition='50% 8%'
-                src='/product-screenshots/tim-white-profile-video-phone.png'
-              />
-            </div>
-            <ProofChip>Partner-ready</ProofChip>
-          </div>
+          <ScreenshotCrop
+            alt={tile.screenshotAlt ?? tile.title}
+            className='h-full'
+            objectPosition={tile.objectPosition}
+            src={tile.screenshotSrc ?? ''}
+          />
         </div>
       );
     case 'utm-builder':
       return (
         <div className='relative h-full overflow-hidden rounded-[1.3rem] border border-white/8 bg-[#090c12] p-3'>
-          <div className='rounded-[1rem] border border-white/8 bg-white/[0.035] p-3'>
-            <div className='flex items-center justify-between gap-3 rounded-[0.85rem] border border-white/8 bg-black/32 px-3 py-2'>
-              <span className='text-[12px] text-secondary-token'>
-                UTM Builder
-              </span>
-              <div className='flex items-center gap-1.5 text-[10px] font-semibold text-primary-token'>
-                <span className='rounded-md border border-white/10 bg-white/[0.06] px-2 py-1'>
-                  release
-                </span>
-                <span className='rounded-md border border-white/10 bg-white/[0.06] px-2 py-1'>
-                  tour
-                </span>
-              </div>
-            </div>
-            <div className='mt-3 space-y-2'>
-              {[
-                ['source', 'instagram-story'],
-                ['campaign', 'spring-tour'],
-                ['medium', 'creator-share'],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className='flex items-center justify-between rounded-[0.85rem] bg-white/[0.05] px-3 py-2'
-                >
-                  <span className='text-[11px] uppercase tracking-[0.14em] text-secondary-token'>
-                    {label}
-                  </span>
-                  <span className='text-[12px] font-medium text-primary-token'>
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className='mt-3 rounded-[0.85rem] border border-dashed border-white/10 bg-black/24 px-3 py-2 text-[11px] text-secondary-token'>
-              jov.ie/timwhite?utm_source=instagram-story&utm_campaign=spring-tour
-            </div>
-          </div>
+          <ScreenshotCrop
+            alt={tile.screenshotAlt ?? tile.title}
+            className='h-full'
+            objectPosition={tile.objectPosition}
+            src={tile.screenshotSrc ?? ''}
+          />
         </div>
       );
     default: {

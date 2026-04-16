@@ -630,7 +630,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       title: 'Get updates',
       detail: 'Release and show alerts.',
       ctaLabel: 'Subscribe',
-      confirmedLabel: 'Subscribed',
+      confirmedLabel: 'Notifications Enabled',
       beforeLabel: 'Before',
       beforeTitle: 'Anonymous fan action',
       beforeDetail: 'Clicked through to Spotify',

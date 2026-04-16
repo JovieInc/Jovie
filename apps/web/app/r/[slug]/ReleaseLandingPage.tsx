@@ -94,6 +94,7 @@ interface ReleaseLandingPageProps
     } | null;
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
+    readonly initialMenuOpen?: boolean;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -229,8 +230,9 @@ export function ReleaseLandingPage({
   parentRelease = null,
   claimBanner = null,
   downloadUrl = null,
+  initialMenuOpen = false,
 }: Readonly<ReleaseLandingPageProps>) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
   const clickableProviders = providers.filter(
@@ -413,6 +415,7 @@ export function ReleaseLandingPage({
         open={menuOpen}
         onOpenChange={setMenuOpen}
         title='Menu'
+        dataTestId='release-landing-menu-drawer'
       >
         <div className='flex flex-col gap-0.5'>
           <button

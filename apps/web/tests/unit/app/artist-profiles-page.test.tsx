@@ -157,7 +157,7 @@ describe('ArtistProfilesPage', () => {
     expect(outcomesSection.getByText('The Deep End')).toBeInTheDocument();
     expect(outcomesSection.getByText('Pre-save live')).toBeInTheDocument();
     expect(outcomesSection.getByText('Nearby date')).toBeInTheDocument();
-    expect(outcomesSection.getByText('May 18')).toBeInTheDocument();
+    expect(outcomesSection.getAllByText('May 18').length).toBeGreaterThan(0);
     expect(outcomesSection.getAllByText('The Novo').length).toBeGreaterThan(0);
     expect(outcomesSection.getByText('Tour Dates')).toBeInTheDocument();
     expect(
@@ -267,7 +267,9 @@ describe('ArtistProfilesPage', () => {
       screen.getByTestId('artist-profile-section-how-it-works')
     );
     expect(captureSection.getByText('ava@icloud.com')).toBeInTheDocument();
-    expect(captureSection.getAllByText('Subscribed').length).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Notifications Enabled').length
+    ).toBeGreaterThan(0);
     expect(
       captureSection.getByText('Clicked through to Spotify')
     ).toBeInTheDocument();
@@ -380,7 +382,7 @@ describe('ArtistProfilesPage', () => {
       powerFeaturesSection.getAllByText('UTM Builder').length
     ).toBeGreaterThan(0);
     expect(
-      powerFeaturesSection.getByText('Static TTFB <100ms')
+      powerFeaturesSection.getByText('Static and always current')
     ).toBeInTheDocument();
     expect(
       powerFeaturesSection.queryByText('Fast by design')

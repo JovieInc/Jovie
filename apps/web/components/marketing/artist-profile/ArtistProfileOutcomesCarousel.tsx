@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useRef } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
@@ -35,7 +34,8 @@ export function ArtistProfileOutcomesCarousel({
       return;
     }
 
-    const delta = direction === 'next' ? 360 : -360;
+    const delta =
+      (direction === 'next' ? 1 : -1) * Math.round(scroller.clientWidth * 0.92);
     scroller.scrollBy({
       left: delta,
       behavior: 'smooth',
@@ -43,9 +43,13 @@ export function ArtistProfileOutcomesCarousel({
   };
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.01]' width='page'>
-      <div className='mx-auto max-w-[1120px]'>
-        <div className='flex items-end justify-between gap-6'>
+    <ArtistProfileSectionShell
+      className='bg-white/[0.01]'
+      containerClassName='max-w-none px-0'
+      width='page'
+    >
+      <div>
+        <div className='mx-auto flex max-w-[1120px] items-end justify-between gap-6 px-5 sm:px-6 lg:px-8'>
           <div>
             <h2 className='max-w-[9ch] text-[clamp(3.35rem,7vw,6.9rem)] font-semibold leading-[0.88] tracking-[-0.08em] text-primary-token'>
               {outcomes.headline}
@@ -82,7 +86,7 @@ export function ArtistProfileOutcomesCarousel({
 
         <div
           ref={scrollerRef}
-          className='relative mt-10 flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pr-[12vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pr-[18vw] lg:pr-[22vw] [&::-webkit-scrollbar]:hidden'
+          className='relative left-1/2 mt-10 flex w-screen -translate-x-1/2 gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-1120px)/2+1.25rem))] pr-[10vw] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-5 sm:pl-[max(1.5rem,calc((100vw-1120px)/2+1.5rem))] sm:pr-[12vw] lg:pl-[max(2rem,calc((100vw-1120px)/2+2rem))] lg:pr-[14vw] [&::-webkit-scrollbar]:hidden'
         >
           <button
             type='button'
@@ -111,13 +115,13 @@ function OutcomeCard({
 }>) {
   const style: OutcomeAccentStyle = {
     '--outcome-accent': OUTCOME_CARD_ACCENTS[card.id],
-    flex: '0 0 min(84vw, 62rem)',
+    flex: '0 0 clamp(22rem, 82vw, 58rem)',
   };
   const proof = outcomes.syntheticProofs;
 
   return (
     <article
-      className='group relative flex min-h-[34rem] snap-start flex-col overflow-hidden rounded-[1.9rem] bg-[#050505]'
+      className='group relative flex min-h-[32rem] snap-start flex-col overflow-hidden rounded-[1.9rem] bg-[#050505] sm:min-h-[33rem] lg:min-h-[34rem] xl:min-h-[35rem]'
       style={style}
     >
       <div
@@ -129,17 +133,17 @@ function OutcomeCard({
         aria-hidden='true'
       />
 
-      <div className='relative flex h-full flex-col p-6 sm:p-7'>
+      <div className='relative flex h-full flex-col p-6 sm:p-7 lg:p-8'>
         <div className='min-w-0'>
-          <h3 className='max-w-[10ch] text-[clamp(2.85rem,5vw,4.9rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
+          <h3 className='max-w-[10ch] text-[clamp(2.8rem,4.8vw,4.75rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
             {card.title}
           </h3>
-          <p className='mt-4 max-w-[25rem] text-[15px] leading-[1.55] text-secondary-token'>
+          <p className='mt-4 max-w-[22rem] text-[14px] leading-[1.65] text-secondary-token'>
             {card.description}
           </p>
         </div>
 
-        <div className='mt-auto pt-10'>
+        <div className='mt-auto pt-12 sm:pt-14'>
           {card.id === 'drive-streams' ? (
             <DriveStreamsProof proof={proof.visualProofs.driveStreams} />
           ) : null}
@@ -164,35 +168,33 @@ function DriveStreamsProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['driveStreams'];
 }>) {
   return (
-    <div className='relative h-[20.5rem] overflow-hidden rounded-[1.45rem] bg-black/32 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div className='absolute left-5 top-5 z-20 w-[15rem] rounded-[1.35rem] border border-white/8 bg-[#0d0d0d]/92 p-4 text-left shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-md'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-white/48'>
+    <div className='max-w-[23rem] rounded-[1.45rem] border border-white/8 bg-black/32 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)] sm:p-5'>
+      <div className='border-b border-white/8 pb-4'>
+        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
           {proof.floatingCardLabel}
         </p>
-        <p className='mt-3 text-[1.35rem] font-semibold leading-[1.02] tracking-[-0.05em] text-white'>
+        <p className='mt-3 text-[1.3rem] font-semibold leading-[1.06] tracking-[-0.04em] text-white'>
           {proof.floatingCardTitle}
         </p>
         <p className='mt-1 text-[12px] font-medium text-white/64'>
           {proof.artistName}
         </p>
-        <div className='mt-4 flex items-center justify-between gap-3'>
-          <span className='rounded-full bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold text-white/84'>
-            {proof.floatingCardMeta}
-          </span>
-          <span className='rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
-            {proof.primaryCtaLabel}
-          </span>
-        </div>
       </div>
 
-      <Image
-        src={proof.screenshotSrc}
-        alt={proof.screenshotAlt}
-        width={660}
-        height={1368}
-        sizes='240px'
-        className='absolute bottom-[-6.4rem] right-4 w-[14rem] max-w-none rounded-[2.25rem] shadow-[0_28px_70px_rgba(0,0,0,0.42)] sm:right-6 sm:w-[15.5rem]'
-      />
+      <div className='divide-y divide-white/8 py-2'>
+        <div className='flex items-center justify-between gap-4 py-3 text-[12px] text-white/62'>
+          <span>Status</span>
+          <span className='text-white/86'>{proof.floatingCardMeta}</span>
+        </div>
+        <div className='flex items-center justify-between gap-4 py-3 text-[12px] text-white/62'>
+          <span>CTA</span>
+          <span className='text-white/86'>{proof.primaryCtaLabel}</span>
+        </div>
+        <div className='flex items-center justify-between gap-4 py-3 text-[12px] text-white/62'>
+          <span>Placement</span>
+          <span className='text-white/86'>Front of profile</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -203,41 +205,40 @@ function SellOutProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['sellOut'];
 }>) {
   return (
-    <div className='relative h-[21rem] overflow-hidden rounded-[1.45rem] bg-black/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <div className='absolute left-5 top-5 z-20 w-[13rem] rounded-[1.3rem] bg-[#f7f6f1] p-4 text-black shadow-[0_18px_45px_rgba(0,0,0,0.24)]'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-black/62'>
-          {proof.nearbyCardLabel}
-        </p>
-        <p className='mt-3 text-[1.8rem] font-semibold leading-none tracking-[-0.07em]'>
-          {proof.nearbyDate}
-        </p>
-        <p className='mt-3 text-[1rem] font-semibold leading-[1.1] tracking-[-0.03em]'>
-          {proof.nearbyVenue}
-        </p>
-        <p className='mt-1 text-[12px] leading-[1.35] text-black/56'>
-          {proof.nearbyLocation}
-        </p>
-        <span className='mt-4 inline-flex rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white'>
+    <div className='max-w-[26rem] rounded-[1.45rem] border border-white/8 bg-black/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)] sm:p-5'>
+      <div className='flex items-end justify-between gap-4 border-b border-white/8 pb-4'>
+        <div>
+          <p className='text-[11px] font-medium tracking-[-0.01em] text-white/64'>
+            {proof.nearbyCardLabel}
+          </p>
+          <p className='mt-2 text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-white'>
+            {proof.nearbyDate}
+          </p>
+          <p className='mt-2 text-[14px] font-semibold tracking-[-0.02em] text-white/88'>
+            {proof.nearbyVenue}
+          </p>
+          <p className='mt-1 text-[11px] text-white/64'>
+            {proof.nearbyLocation}
+          </p>
+        </div>
+        <span className='rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/84'>
           {proof.nearbyCtaLabel}
         </span>
       </div>
 
-      <div className='absolute inset-x-5 bottom-5 z-20 max-w-[23rem] rounded-[1.3rem] border border-white/8 bg-[#0f0f0f]/94 p-4 text-left shadow-[0_18px_45px_rgba(0,0,0,0.26)] backdrop-blur-md'>
-        <p className='text-[14px] font-semibold tracking-[-0.03em] text-white'>
+      <div className='pt-4'>
+        <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-[12px] text-white/48'>{proof.drawerSubtitle}</p>
-        <div className='mt-4 space-y-2.5'>
+        <p className='mt-1 text-[11px] text-white/48'>{proof.drawerSubtitle}</p>
+        <div className='mt-4 divide-y divide-white/8'>
           {proof.drawerRows.map(row => (
             <div
               key={row.id}
-              className='grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-[1rem] bg-white/[0.04] px-3 py-3'
+              className='grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 py-3'
             >
-              <span className='rounded-[0.85rem] bg-white/[0.06] px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-white/64'>
-                {row.month}
-                <span className='mt-0.5 block text-[18px] leading-none tracking-[-0.05em] text-white'>
-                  {row.day}
-                </span>
+              <span className='text-[11px] font-medium tracking-[-0.01em] text-white/56'>
+                {row.month} {row.day}
               </span>
               <span className='min-w-0'>
                 <span className='block truncate text-[13px] font-semibold text-white'>
@@ -247,22 +248,13 @@ function SellOutProof({
                   {row.location}
                 </span>
               </span>
-              <span className='rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/84'>
+              <span className='text-[11px] font-medium text-white/72'>
                 {row.ctaLabel}
               </span>
             </div>
           ))}
         </div>
       </div>
-
-      <Image
-        src={proof.screenshotSrc}
-        alt={proof.screenshotAlt}
-        width={660}
-        height={1368}
-        sizes='220px'
-        className='absolute right-[-1rem] top-3 w-[11.5rem] max-w-none rounded-[2rem] opacity-90 shadow-[0_24px_60px_rgba(0,0,0,0.4)] sm:right-0 sm:w-[12.5rem]'
-      />
     </div>
   );
 }
@@ -273,50 +265,40 @@ function GetPaidProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['getPaid'];
 }>) {
   return (
-    <div className='relative h-[21rem] overflow-hidden rounded-[1.45rem] bg-black/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <Image
-        src={proof.screenshotSrc}
-        alt={proof.screenshotAlt}
-        width={660}
-        height={1368}
-        sizes='240px'
-        className='absolute right-1 top-1 w-[13rem] max-w-none rounded-[2rem] opacity-78 shadow-[0_24px_60px_rgba(0,0,0,0.36)] sm:right-3 sm:w-[14.25rem]'
-      />
-
-      <div className='absolute inset-x-5 bottom-5 z-20 rounded-[1.45rem] border border-white/8 bg-[#111]/96 px-4 pb-4 pt-3 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md'>
-        <div className='mx-auto mb-4 h-1 w-10 rounded-full bg-white/18' />
-        <p className='text-[15px] font-semibold tracking-[-0.03em] text-white/92'>
+    <div className='max-w-[24rem] rounded-[1.45rem] border border-white/8 bg-black/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)] sm:p-5'>
+      <div className='border-b border-white/8 pb-4'>
+        <p className='text-[14px] font-semibold tracking-[-0.03em] text-white/92'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-[12px] text-white/48'>{proof.drawerSubtitle}</p>
-        <p className='mt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/64'>
+        <p className='mt-1 text-[11px] text-white/48'>{proof.drawerSubtitle}</p>
+      </div>
+
+      <div className='pt-4'>
+        <p className='text-[10px] font-medium tracking-[-0.01em] text-white/64'>
           {proof.chooseAmountLabel}
         </p>
-        <div className='mt-3 grid grid-cols-3 gap-2.5'>
+        <div className='mt-3 grid grid-cols-3 divide-x divide-white/8 rounded-[1rem] border border-white/8 bg-white/[0.03]'>
           {proof.amountRows.map(row => (
             <div
               key={row.id}
-              className='rounded-[1rem] border px-2.5 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              className='px-3 py-2 text-center'
               style={{
                 background: row.featured
                   ? 'rgba(255,255,255,0.95)'
-                  : 'rgba(255,255,255,0.06)',
-                borderColor: row.featured
-                  ? 'rgba(255,255,255,0.7)'
-                  : 'rgba(255,255,255,0.08)',
+                  : 'transparent',
                 color: row.featured ? '#111' : 'rgba(255,255,255,0.92)',
               }}
             >
-              <p className='text-[10px] font-semibold uppercase tracking-[0.08em] opacity-64'>
+              <p className='text-[9px] font-medium tracking-[-0.01em] opacity-64'>
                 {row.currency}
               </p>
-              <p className='mt-2 text-[1.75rem] font-semibold leading-none tracking-[-0.07em]'>
+              <p className='mt-1.5 text-[1.35rem] font-semibold leading-none tracking-[-0.05em]'>
                 {row.amount}
               </p>
             </div>
           ))}
         </div>
-        <div className='mt-4 rounded-full bg-white px-4 py-3 text-center text-[13px] font-semibold tracking-[-0.02em] text-black'>
+        <div className='mt-4 rounded-full bg-white px-4 py-2.5 text-center text-[12px] font-semibold tracking-[-0.02em] text-black'>
           {proof.ctaLabel}
         </div>
       </div>
@@ -330,18 +312,18 @@ function ShareProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['shareAnywhere'];
 }>) {
   return (
-    <div className='mx-auto flex min-h-[20rem] w-full max-w-[22rem] flex-col items-center justify-center rounded-[1.6rem] bg-[#fbfaf6] px-6 py-7 text-center text-black shadow-[0_24px_60px_rgba(0,0,0,0.24)]'>
-      <p className='text-[12px] font-semibold tracking-[0.02em] text-black/72'>
+    <div className='mx-auto flex min-h-[18rem] w-full max-w-[18rem] flex-col items-center justify-center rounded-[1.6rem] bg-[#fbfaf6] px-5 py-6 text-center text-black shadow-[0_24px_60px_rgba(0,0,0,0.24)]'>
+      <p className='text-[11px] font-semibold tracking-[0.02em] text-black/72'>
         {proof.title}
       </p>
-      <div className='relative mt-6'>
+      <div className='relative mt-5'>
         <div className='absolute inset-x-8 -top-5 h-10 rounded-full bg-black/10 blur-2xl' />
-        <div className='relative rounded-[1.75rem] bg-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.14)]'>
+        <div className='relative rounded-[1.5rem] bg-white p-3 shadow-[0_20px_40px_rgba(0,0,0,0.14)]'>
           <div className='grid grid-cols-7 gap-[6px]'>
             {QR_CELLS.map(cell => (
               <span
                 key={cell.id}
-                className='h-3.5 w-3.5 rounded-[3px]'
+                className='h-3 w-3 rounded-[3px]'
                 style={{
                   backgroundColor: cell.filled ? '#0b0b0b' : '#f2f0ea',
                 }}
@@ -350,7 +332,7 @@ function ShareProof({
           </div>
         </div>
       </div>
-      <p className='mt-5 font-mono text-[13px] font-semibold tracking-[-0.02em] text-black'>
+      <p className='mt-4 font-mono text-[12px] font-semibold tracking-[-0.02em] text-black'>
         {proof.url}
       </p>
       <p className='mt-2 text-[12px] font-medium text-black/64'>

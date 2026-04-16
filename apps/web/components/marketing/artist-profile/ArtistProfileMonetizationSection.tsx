@@ -1,9 +1,39 @@
-import { ArrowRight, QrCode } from 'lucide-react';
+import {
+  ArrowRight,
+  BellRing,
+  CircleDollarSign,
+  MailCheck,
+  QrCode,
+} from 'lucide-react';
 import type {
   ArtistProfileLandingCopy,
   ArtistProfileMode,
 } from '@/data/artistProfileCopy';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+
+const RELATIONSHIP_TIMELINE_CARD_META = {
+  payment: {
+    icon: CircleDollarSign,
+    timestamp: 'Just now',
+    iconClassName: 'text-[#9fddb3]',
+    chipClassName:
+      'bg-[#163325] text-[#b9e8c7] ring-[#2d5943]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+  },
+  'follow-up-sent': {
+    icon: MailCheck,
+    timestamp: '1 min',
+    iconClassName: 'text-[#a7c5ff]',
+    chipClassName:
+      'bg-[#16233a] text-[#c8d9ff] ring-[#304b73]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+  },
+  'fan-reached': {
+    icon: BellRing,
+    timestamp: '4 min',
+    iconClassName: 'text-[#d2c7ff]',
+    chipClassName:
+      'bg-[#221a38] text-[#ddd5ff] ring-[#43356a]/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+  },
+} as const;
 
 interface ArtistProfileMonetizationSectionProps {
   readonly monetization: ArtistProfileLandingCopy['monetization'];
@@ -121,49 +151,125 @@ function RelationshipCard({
 }: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['relationshipCard'];
 }>) {
+  const stackOffsets = [
+    'sm:-translate-x-3',
+    'sm:translate-x-3',
+    'sm:-translate-x-1',
+  ] as const;
+
+  const stackWidths = [
+    'max-w-[19rem] sm:max-w-[20.5rem]',
+    'max-w-[21rem] sm:max-w-[22.75rem]',
+    'max-w-[19.25rem] sm:max-w-[20.75rem]',
+  ] as const;
+
   return (
-    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#fbfbf7] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[640px] lg:p-10'>
+    <article className='relative isolate flex min-h-[560px] flex-col overflow-hidden rounded-[1.9rem] bg-[#f7f7f2] p-7 text-black shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:p-8 lg:min-h-[640px] lg:p-10'>
       <div
         className='absolute inset-x-0 top-0 h-[62%] bg-[linear-gradient(180deg,rgba(0,0,0,0.055),rgba(255,255,255,0))]'
         aria-hidden='true'
       />
+      <div
+        aria-hidden='true'
+        className='absolute inset-x-[18%] top-10 h-40 rounded-full bg-black/[0.04] blur-3xl'
+      />
 
-      <div className='relative z-20 mx-auto w-full max-w-[20rem] pt-3 sm:max-w-[21rem]'>
+      <div className='relative z-20 mx-auto w-full max-w-[22.5rem] pt-2 sm:max-w-[24rem]'>
         <div
           aria-hidden='true'
-          className='absolute bottom-6 left-1/2 top-8 w-px -translate-x-1/2 bg-black/10'
+          className='absolute bottom-7 left-1/2 top-10 w-px -translate-x-1/2 bg-[linear-gradient(180deg,rgba(16,16,16,0.02),rgba(16,16,16,0.1),rgba(16,16,16,0.04))]'
         />
-        <div className='relative grid gap-3.5'>
-          {card.timeline.map(step => (
-            <div
+        <div className='relative grid gap-4.5'>
+          {card.timeline.map((step, index) => (
+            <RelationshipTimelineCard
               key={step.id}
-              className='mx-auto w-full max-w-[18.75rem] rounded-[1.35rem] bg-[#111111] px-4 py-4 text-white shadow-[0_14px_32px_rgba(0,0,0,0.14)] sm:px-5'
-            >
-              <p className='text-center text-[10px] font-semibold tracking-[0.06em] text-white/62'>
-                {step.label}
-              </p>
-              <p className='mt-2 text-center text-[14px] font-semibold leading-snug tracking-[-0.03em] text-white/96'>
-                {step.title}
-              </p>
-              <p className='mt-2.5 text-center text-[12px] leading-[1.45] text-white/54'>
-                {step.detail}
-              </p>
-              <p className='mt-1 text-center text-[11px] font-medium text-white/68'>
-                {step.meta}
-              </p>
-            </div>
+              step={step}
+              className={[
+                stackOffsets[index] ?? '',
+                stackWidths[index] ?? 'max-w-[18.5rem]',
+              ].join(' ')}
+            />
           ))}
         </div>
       </div>
 
-      <div className='relative z-10 mt-auto max-w-[29rem] pt-16 sm:pt-20'>
-        <h3 className='max-w-[8ch] text-[clamp(2.75rem,5vw,4.6rem)] font-semibold leading-[0.9] tracking-[-0.08em]'>
+      <div className='relative z-10 mt-auto max-w-[24rem] pt-12 sm:pt-16'>
+        <p className='text-[11px] font-medium tracking-[-0.01em] text-black/42'>
+          Retention loop
+        </p>
+        <h3 className='mt-2 max-w-[7ch] text-[clamp(2.1rem,4vw,3.4rem)] font-semibold leading-[0.92] tracking-[-0.065em]'>
           {card.title}
         </h3>
-        <p className='mt-5 max-w-[25rem] text-[15px] leading-[1.55] tracking-[-0.02em] text-black/62'>
+        <p className='mt-4 max-w-[21rem] text-[14px] leading-[1.55] tracking-[-0.02em] text-black/58'>
           {card.body}
         </p>
       </div>
     </article>
+  );
+}
+
+function RelationshipTimelineCard({
+  step,
+  className,
+}: Readonly<{
+  step: ArtistProfileLandingCopy['monetization']['relationshipCard']['timeline'][number];
+  className?: string;
+}>) {
+  const meta =
+    RELATIONSHIP_TIMELINE_CARD_META[
+      step.id as keyof typeof RELATIONSHIP_TIMELINE_CARD_META
+    ];
+  const Icon = meta.icon;
+
+  return (
+    <div
+      className={[
+        'relative mx-auto w-full rounded-[1.1rem] border border-white/[0.055] bg-[#111214]/96 px-4 py-4 text-white shadow-[0_12px_28px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.035)] backdrop-blur-xl sm:px-5 sm:py-[1.125rem]',
+        className ?? '',
+      ].join(' ')}
+    >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-5 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)]'
+      />
+      <div className='flex items-center justify-between gap-3'>
+        <div className='flex min-w-0 items-center gap-2.5'>
+          <span
+            className={[
+              'flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-[0.65rem] bg-white/[0.045] ring-1 ring-white/[0.06]',
+              meta.iconClassName,
+            ].join(' ')}
+          >
+            <Icon className='h-4 w-4' strokeWidth={1.9} />
+          </span>
+          <div className='min-w-0'>
+            <p className='truncate text-[11px] font-medium tracking-[-0.01em] text-white/46'>
+              {step.label}
+            </p>
+          </div>
+        </div>
+        <p className='shrink-0 text-[10px] font-medium tracking-[-0.01em] text-white/32'>
+          {meta.timestamp}
+        </p>
+      </div>
+
+      <p className='mt-3 text-[13px] font-semibold leading-[1.28] tracking-[-0.028em] text-white/96 sm:text-[13.5px]'>
+        {step.title}
+      </p>
+      <p className='mt-2.5 text-[12px] leading-[1.45] text-white/56'>
+        {step.detail}
+      </p>
+      <div className='mt-3 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3'>
+        <span
+          className={[
+            'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[-0.01em] ring-1',
+            meta.chipClassName,
+          ].join(' ')}
+        >
+          {step.meta}
+        </span>
+        <span aria-hidden='true' className='h-1 w-1 rounded-full bg-white/20' />
+      </div>
+    </div>
   );
 }

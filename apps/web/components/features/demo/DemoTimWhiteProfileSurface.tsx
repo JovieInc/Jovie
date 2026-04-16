@@ -17,6 +17,45 @@ import {
 } from '@/features/profile/StaticArtistPage';
 import { DemoClientProviders } from './DemoClientProviders';
 
+const DEMO_PRESS_PHOTOS = [
+  {
+    id: 'press-photo-1',
+    blobUrl: '/images/avatars/tim-white-founder.jpg',
+    smallUrl: '/images/avatars/tim-white-founder.jpg',
+    mediumUrl: '/images/avatars/tim-white-founder.jpg',
+    largeUrl: '/images/avatars/tim-white-founder.jpg',
+    originalFilename: 'tim-white-portrait.avif',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 0,
+  },
+  {
+    id: 'press-photo-2',
+    blobUrl: '/images/hero/tim-profile.avif',
+    smallUrl: '/images/hero/tim-profile.avif',
+    mediumUrl: '/images/hero/tim-profile.avif',
+    largeUrl: '/images/hero/tim-profile.avif',
+    originalFilename: 'tim-white-editorial.avif',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 1,
+  },
+  {
+    id: 'press-photo-3',
+    blobUrl: '/images/avatars/tim-white.jpg',
+    smallUrl: '/images/avatars/tim-white.jpg',
+    mediumUrl: '/images/avatars/tim-white.jpg',
+    largeUrl: '/images/avatars/tim-white.jpg',
+    originalFilename: 'tim-white-live.jpg',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 2,
+  },
+] as const;
+
 type DemoRelease = NonNullable<StaticArtistPageProps['latestRelease']>;
 type ReleaseVariant = 'presave' | 'live' | 'video';
 type DemoReleaseVariant = {
@@ -99,6 +138,7 @@ export function DemoTimWhiteProfileSurface() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
   const releaseParam = searchParams.get('release');
+  const captureMode = searchParams.get('capture');
 
   const mode: ProfileMode = isProfileMode(modeParam) ? modeParam : 'profile';
   const releaseKey: ReleaseVariant = isValidRelease(releaseParam)
@@ -110,6 +150,8 @@ export function DemoTimWhiteProfileSurface() {
   // For presave, omit tour dates so the countdown card renders instead
   const tourDates =
     releaseKey === 'presave' ? [] : [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
+  const seededPressPhotos =
+    captureMode === 'press-assets' ? [...DEMO_PRESS_PHOTOS] : [];
 
   return (
     <DemoClientProviders>
@@ -121,6 +163,8 @@ export function DemoTimWhiteProfileSurface() {
           subtitle='Official artist profile'
           socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
           contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+          pressPhotos={seededPressPhotos}
+          allowPhotoDownloads={captureMode === 'press-assets'}
           tourDates={tourDates}
           latestRelease={latestRelease}
           genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres}
