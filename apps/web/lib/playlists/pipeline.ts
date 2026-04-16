@@ -61,6 +61,13 @@ interface GeneratePlaylistOptions {
   readonly recordCadenceOnSuccess?: boolean;
 }
 
+function sqlTextArray(values: readonly string[]) {
+  return drizzleSql`ARRAY[${drizzleSql.join(
+    values.map(value => drizzleSql`${value}`),
+    drizzleSql`, `
+  )}]::text[]`;
+}
+
 export async function generatePlaylist(
   options: GeneratePlaylistOptions = {}
 ): Promise<PipelineResult> {
@@ -210,10 +217,10 @@ export async function generatePlaylist(
             ${concept.description},
             ${slug},
             ${concept.title},
-            ${concept.genreTags},
-            ${concept.moodTags},
+            ${sqlTextArray(concept.genreTags)},
+            ${sqlTextArray(concept.moodTags)},
             ${curated.trackCount},
-            ${coverImageUrlForDb},
+            ${coverImageUrlForDb === null ? null : coverImageUrlForDb},
             ${concept.editorialNote},
             ${llmPrompt},
             ${'haiku+sonnet'},
@@ -295,10 +302,10 @@ export async function generatePlaylist(
             ${concept.description},
             ${slug},
             ${concept.title},
-            ${concept.genreTags},
-            ${concept.moodTags},
+            ${sqlTextArray(concept.genreTags)},
+            ${sqlTextArray(concept.moodTags)},
             ${curated.trackCount},
-            ${coverImageUrlForDb},
+            ${coverImageUrlForDb ?? null},
             ${concept.editorialNote},
             ${llmPrompt},
             ${'haiku+sonnet'},
