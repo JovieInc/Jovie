@@ -32,6 +32,7 @@ export type AdminWorkspaceId =
   | 'overview'
   | 'people'
   | 'growth'
+  | 'platform_connections'
   | 'activity'
   | 'investors'
   | 'screenshots'
@@ -51,6 +52,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
   'people',
   'growth',
+  'platform_connections',
   'activity',
 ] as const satisfies readonly AdminWorkspaceId[];
 
@@ -80,6 +82,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Growth',
     href: APP_ROUTES.ADMIN_GROWTH,
     description: 'Leads, outreach, campaigns, and ingest workflows',
+    section: 'workspaces',
+  },
+  {
+    id: 'platform_connections',
+    label: 'Platform Connections',
+    href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
+    description: 'Spotify publisher and playlist generation controls',
     section: 'workspaces',
   },
   {

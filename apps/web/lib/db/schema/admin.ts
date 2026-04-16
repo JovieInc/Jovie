@@ -64,6 +64,31 @@ export const campaignSettings = pgTable('campaign_settings', {
   updatedBy: text('updated_by'),
 });
 
+// Admin system settings (singleton row, id=1)
+export const adminSystemSettings = pgTable('admin_system_settings', {
+  id: integer('id').primaryKey().default(1),
+  playlistSpotifyClerkUserId: text('playlist_spotify_clerk_user_id'),
+  playlistSpotifyUpdatedAt: timestamp('playlist_spotify_updated_at'),
+  playlistSpotifyUpdatedBy: uuid('playlist_spotify_updated_by').references(
+    () => users.id,
+    { onDelete: 'set null' }
+  ),
+  playlistEngineEnabled: boolean('playlist_engine_enabled')
+    .default(false)
+    .notNull(),
+  playlistGenerationIntervalValue: integer('playlist_generation_interval_value')
+    .default(3)
+    .notNull(),
+  playlistGenerationIntervalUnit: text('playlist_generation_interval_unit')
+    .$type<'hours' | 'days' | 'weeks'>()
+    .default('days')
+    .notNull(),
+  playlistLastGeneratedAt: timestamp('playlist_last_generated_at'),
+  playlistNextEligibleAt: timestamp('playlist_next_eligible_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Schema validations
 export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog);
 export const selectAdminAuditLogSchema = createSelectSchema(adminAuditLog);
@@ -72,6 +97,10 @@ export const insertCampaignSettingsSchema =
   createInsertSchema(campaignSettings);
 export const selectCampaignSettingsSchema =
   createSelectSchema(campaignSettings);
+export const insertAdminSystemSettingsSchema =
+  createInsertSchema(adminSystemSettings);
+export const selectAdminSystemSettingsSchema =
+  createSelectSchema(adminSystemSettings);
 
 // Types
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
@@ -79,3 +108,5 @@ export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;
 
 export type CampaignSettings = typeof campaignSettings.$inferSelect;
 export type NewCampaignSettings = typeof campaignSettings.$inferInsert;
+export type AdminSystemSettings = typeof adminSystemSettings.$inferSelect;
+export type NewAdminSystemSettings = typeof adminSystemSettings.$inferInsert;

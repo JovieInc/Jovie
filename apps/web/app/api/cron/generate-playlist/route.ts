@@ -10,11 +10,14 @@
  */
 
 import { NextResponse } from 'next/server';
+import {
+  getPlaylistEngineSettings,
+  getPlaylistSpotifyStatus,
+  markPlaylistGeneratedAt,
+} from '@/lib/admin/platform-connections';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { generatePlaylist } from '@/lib/playlists/pipeline';
-import { checkJovieSpotifyHealth } from '@/lib/spotify/jovie-account';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -29,33 +32,52 @@ export async function GET(request: Request) {
   });
   if (authError) return authError;
 
-  // Feature flag check
-  if (!FEATURE_FLAGS.PLAYLIST_ENGINE) {
+  const settings = await getPlaylistEngineSettings();
+  if (!settings.enabled) {
     return NextResponse.json(
-      { success: true, skipped: true, reason: 'PLAYLIST_ENGINE flag is off' },
+      { success: true, skipped: true, reason: 'Playlist engine is disabled' },
       { headers: NO_STORE }
     );
   }
 
-  // OAuth health check
-  const spotifyHealthy = await checkJovieSpotifyHealth();
-  if (!spotifyHealthy) {
+  const now = new Date();
+  if (settings.nextEligibleAt && settings.nextEligibleAt > now) {
+    return NextResponse.json(
+      {
+        success: true,
+        skipped: true,
+        reason: 'Playlist engine is not eligible yet',
+        nextEligibleAt: settings.nextEligibleAt.toISOString(),
+      },
+      { headers: NO_STORE }
+    );
+  }
+
+  const spotifyStatus = await getPlaylistSpotifyStatus();
+  if (!spotifyStatus.healthy) {
     captureError(
       '[Playlist Cron] Spotify OAuth health check failed. Skipping generation.',
-      null
+      null,
+      { source: spotifyStatus.source, error: spotifyStatus.error }
     );
     return NextResponse.json(
       {
-        success: false,
-        error:
+        success: true,
+        skipped: true,
+        reason:
+          spotifyStatus.error ??
           'Spotify OAuth health check failed. Re-link Spotify in admin settings.',
       },
-      { status: 503, headers: NO_STORE }
+      { headers: NO_STORE }
     );
   }
 
   // Run the pipeline
   const result = await generatePlaylist();
+
+  if (result.success && !result.skipped) {
+    await markPlaylistGeneratedAt(now);
+  }
 
   return NextResponse.json(
     {
