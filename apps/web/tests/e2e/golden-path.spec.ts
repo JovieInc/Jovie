@@ -396,7 +396,6 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     test.setTimeout(360_000);
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 1: Landing page loads
     // STEP 1: Enter the canonical signup route directly.
     // Public homepage coverage lives in the dedicated public/responsive
     // golden-path specs; this funnel should measure signup -> onboarding ->
@@ -414,7 +413,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     const { clerkUserId } = await createFreshUser(page);
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 4-6: Onboarding V2 — Handle, Spotify import, finish flow
+    // STEP 3-5: Onboarding V2 — Handle, Spotify import, finish flow
     // ──────────────────────────────────────────────────────────────────
     const uniqueHandle = buildValidOnboardingHandle(
       `gp-${Date.now().toString(36)}`,
@@ -567,7 +566,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     expect(
       checkoutOption!.amount && checkoutOption!.amount > 0,
       'Checkout price amount must be a positive value'
-    );
+    ).toBeTruthy();
     expect(
       checkoutOption!.description,
       'Checkout price description missing'
