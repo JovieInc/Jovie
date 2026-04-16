@@ -80,10 +80,29 @@ export function ArtistProfileOutcomesCarousel({
         </div>
       </div>
 
-      <div
+      <section
         ref={scrollerRef}
+        aria-label='Artist profile outcome cards'
         className='mt-12 flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
       >
+        <div className='sr-only'>
+          <button
+            type='button'
+            onClick={() => {
+              scrollByAmount('prev');
+            }}
+          >
+            Scroll to previous outcome card
+          </button>
+          <button
+            type='button'
+            onClick={() => {
+              scrollByAmount('next');
+            }}
+          >
+            Scroll to next outcome card
+          </button>
+        </div>
         {outcomes.cards.map((card, index) => (
           <article
             key={card.id}
@@ -112,7 +131,7 @@ export function ArtistProfileOutcomesCarousel({
             </div>
           </article>
         ))}
-      </div>
+      </section>
     </ArtistProfileSectionShell>
   );
 }

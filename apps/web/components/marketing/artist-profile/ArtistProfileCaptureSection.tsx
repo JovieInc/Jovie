@@ -71,7 +71,7 @@ export function ArtistProfileCaptureSection({
                   <p className='text-[13px] font-medium text-primary-token'>
                     Stay close
                   </p>
-                  <p className='mt-1 text-[12px] text-tertiary-token'>
+                  <p className='mt-1 text-[12px] text-secondary-token'>
                     Release, show, and drop alerts
                   </p>
                 </div>

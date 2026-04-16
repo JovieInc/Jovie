@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import type { AudienceSourceType } from '@/lib/audience/activity-types';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -313,6 +314,27 @@ function resolveAudienceObjectType(
   return 'external_url' as const;
 }
 
+function resolveAudienceEventVerb(linkType: string): string {
+  if (linkType === 'tip' || linkType === 'social') return 'opened';
+  if (linkType === 'listen') return 'checked_out';
+  return 'clicked';
+}
+
+function resolveTrackSourceKind(
+  resolvedSource: string | undefined
+): AudienceSourceType | null {
+  if (resolvedSource === 'qr') return 'qr';
+  if (resolvedSource === 'short_link') return 'short_link';
+  if (resolvedSource === 'utm') return 'utm';
+  if (resolvedSource === 'referrer') return 'referrer';
+  if (resolvedSource === 'social') return 'social';
+  if (resolvedSource === 'email') return 'email';
+  if (resolvedSource === 'sms') return 'sms';
+  if (resolvedSource === 'direct') return 'direct';
+  if (resolvedSource === 'unknown') return 'unknown';
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting: Check IP-based rate limit for track events
@@ -451,16 +473,9 @@ export async function POST(request: NextRequest) {
           creatorProfileId: profile.id,
           audienceMemberId,
           eventType: resolveAudienceEventType(linkType, context),
-          verb:
-            linkType === 'tip'
-              ? 'opened'
-              : linkType === 'social'
-                ? 'opened'
-                : linkType === 'listen'
-                  ? 'checked_out'
-                  : 'clicked',
+          verb: resolveAudienceEventVerb(linkType),
           confidence: 'observed',
-          sourceKind: resolvedSource === 'qr' ? 'qr' : 'short_link',
+          sourceKind: resolveTrackSourceKind(resolvedSource),
           sourceLabel: resolvedSource ?? undefined,
           objectType: resolveAudienceObjectType(linkType, context),
           objectId: context?.contentId ?? linkId ?? null,

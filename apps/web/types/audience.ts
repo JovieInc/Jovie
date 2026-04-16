@@ -98,16 +98,7 @@ export type AudienceSourceLink = {
   updatedAt: string;
 };
 
-export type AudienceEventSentenceToken = {
-  kind: 'actor' | 'verb' | 'source' | 'object' | 'platform' | 'time';
-  label: string;
-};
-
-export type AudienceEventSentence =
-  | { kind: 'empty' }
-  | {
-      kind: 'sentence';
-      icon: string;
-      text: string;
-      tokens: AudienceEventSentenceToken[];
-    };
+export type {
+  AudienceEventSentence,
+  AudienceEventSentenceToken,
+} from '@/lib/audience/activity-types';

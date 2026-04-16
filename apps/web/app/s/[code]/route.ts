@@ -51,6 +51,21 @@ function inferDeviceType(
   return 'desktop';
 }
 
+function resolveObjectType(
+  destinationKind: string | null
+): 'tour_date' | 'release' | 'profile' | 'external_url' {
+  switch (destinationKind) {
+    case 'tour_date':
+      return 'tour_date';
+    case 'release':
+      return 'release';
+    case 'profile':
+      return 'profile';
+    default:
+      return 'external_url';
+  }
+}
+
 async function resolveAudienceMemberId(
   tx: Parameters<Parameters<typeof withSystemIngestionSession>[0]>[0],
   input: {
@@ -167,6 +182,8 @@ export async function GET(
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
     const consent = parseConsentCookie(request);
+    // Match /api/track semantics: absence of jv_cc means default-allow unless the
+    // visitor explicitly rejected marketing cookies.
     const hasMarketingConsent = consent === null || consent.marketing === true;
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
@@ -204,14 +221,7 @@ export async function GET(
           sourceKind: sourceLink.sourceType === 'qr' ? 'qr' : 'short_link',
           sourceLabel: sourceLink.name,
           sourceLinkId: sourceLink.id,
-          objectType:
-            sourceLink.destinationKind === 'tour_date'
-              ? 'tour_date'
-              : sourceLink.destinationKind === 'release'
-                ? 'release'
-                : sourceLink.destinationKind === 'profile'
-                  ? 'profile'
-                  : 'external_url',
+          objectType: resolveObjectType(sourceLink.destinationKind),
           objectId: sourceLink.destinationId,
           objectLabel:
             typeof sourceLink.metadata?.objectLabel === 'string'

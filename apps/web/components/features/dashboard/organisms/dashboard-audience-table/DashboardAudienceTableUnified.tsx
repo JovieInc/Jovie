@@ -34,6 +34,7 @@ import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelCo
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/utils/download';
@@ -104,6 +105,8 @@ type SourceLinkPayload = {
   readonly shortUrl: string;
   readonly archivedAt?: string | null;
 };
+
+const profileQrSourceRequests = new Map<string, Promise<SourceLinkPayload>>();
 
 function sanitizeQrFilename(value: string): string {
   return value
@@ -487,53 +490,80 @@ export const DashboardAudienceTableUnified = memo(
           throw new Error('Missing profile');
         }
 
-        const existingResponse = await fetch(
-          `/api/dashboard/audience/source-links?profileId=${encodeURIComponent(profileId)}`,
-          { cache: 'no-store' }
-        );
-        if (existingResponse.ok) {
-          const existingPayload = (await existingResponse.json()) as {
+        const existingRequest = profileQrSourceRequests.get(profileId);
+        if (existingRequest) {
+          return existingRequest;
+        }
+
+        const requestPromise = (async () => {
+          const existingResponse = await fetch(
+            `/api/dashboard/audience/source-links?profileId=${encodeURIComponent(profileId)}`,
+            { cache: 'no-store' }
+          );
+          if (!existingResponse.ok && existingResponse.status !== 404) {
+            void captureError(
+              'Audience source links preload failed',
+              new Error(
+                `source-links preload failed with ${existingResponse.status}`
+              ),
+              {
+                profileId,
+                status: existingResponse.status,
+              }
+            );
+          }
+          if (existingResponse.ok) {
+            const existingPayload = (await existingResponse.json()) as {
+              links?: SourceLinkPayload[];
+            };
+            const existingLink = existingPayload.links?.find(
+              link =>
+                link.name === PROFILE_QR_SOURCE_NAME &&
+                link.sourceType === 'qr' &&
+                link.destinationKind === 'profile' &&
+                !link.archivedAt &&
+                Boolean(link.shortUrl)
+            );
+            if (existingLink) return existingLink;
+          }
+
+          const createResponse = await fetch(
+            '/api/dashboard/audience/source-groups',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                profileId,
+                name: PROFILE_QR_SOURCE_NAME,
+                sourceType: 'qr',
+                destinationKind: 'profile',
+                destinationUrl: profileUrl,
+              }),
+            }
+          );
+
+          if (!createResponse.ok) {
+            throw new Error('Failed to create QR source');
+          }
+
+          const createdPayload = (await createResponse.json()) as {
             links?: SourceLinkPayload[];
           };
-          const existingLink = existingPayload.links?.find(
-            link =>
-              link.name === PROFILE_QR_SOURCE_NAME &&
-              link.sourceType === 'qr' &&
-              link.destinationKind === 'profile' &&
-              !link.archivedAt &&
-              Boolean(link.shortUrl)
-          );
-          if (existingLink) return existingLink;
-        }
-
-        const createResponse = await fetch(
-          '/api/dashboard/audience/source-groups',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              profileId,
-              name: PROFILE_QR_SOURCE_NAME,
-              sourceType: 'qr',
-              destinationKind: 'profile',
-              destinationUrl: profileUrl,
-            }),
+          const link = createdPayload.links?.[0];
+          if (!link?.shortUrl) {
+            throw new Error('Source link create returned no link');
           }
-        );
 
-        if (!createResponse.ok) {
-          throw new Error('Failed to create QR source');
+          return link;
+        })();
+
+        profileQrSourceRequests.set(profileId, requestPromise);
+
+        try {
+          return await requestPromise;
+        } finally {
+          profileQrSourceRequests.delete(profileId);
         }
-
-        const createdPayload = (await createResponse.json()) as {
-          links?: SourceLinkPayload[];
-        };
-        const link = createdPayload.links?.[0];
-        if (!link?.shortUrl) {
-          throw new Error('Source link create returned no link');
-        }
-
-        return link;
       }, [profileId, profileUrl]);
 
     const handleSourceLinkAction = React.useCallback(

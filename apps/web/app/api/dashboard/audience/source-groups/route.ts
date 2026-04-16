@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL, getProfileUrl } from '@/constants/domains';
@@ -16,6 +16,7 @@ import { slugify } from '@/lib/utm/build-url';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const AUDIENCE_SOURCE_PAGE_SIZE = 100;
 
 const createSourceGroupSchema = z.object({
   profileId: z.string().uuid(),
@@ -39,6 +40,14 @@ function buildDefaultUtmParams(groupName: string, linkName: string) {
 function buildShortLinkUrl(code: string): string {
   const url = new URL(`/s/${code}`, BASE_URL);
   return url.toString();
+}
+
+async function parseJsonBody(request: NextRequest): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new Error('Malformed JSON');
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -66,7 +75,7 @@ export async function GET(request: NextRequest) {
         .from(audienceSourceGroups)
         .where(eq(audienceSourceGroups.creatorProfileId, profileId))
         .orderBy(desc(audienceSourceGroups.createdAt))
-        .limit(100);
+        .limit(AUDIENCE_SOURCE_PAGE_SIZE);
 
       return NextResponse.json({ groups }, { headers: NO_STORE_HEADERS });
     });
@@ -85,7 +94,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
-      const parsed = createSourceGroupSchema.safeParse(await request.json());
+      let body: unknown;
+      try {
+        body = await parseJsonBody(request);
+      } catch {
+        return NextResponse.json(
+          { error: 'Malformed JSON' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const parsed = createSourceGroupSchema.safeParse(body);
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid source group payload' },
@@ -108,6 +127,42 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Profile not found' },
           { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      await tx.execute(
+        drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${profileId}), hashtext(${`${sourceType}:${name.trim().toLowerCase()}`}))`
+      );
+
+      const [existingGroup] = await tx
+        .select()
+        .from(audienceSourceGroups)
+        .where(
+          and(
+            eq(audienceSourceGroups.creatorProfileId, profileId),
+            eq(audienceSourceGroups.name, name),
+            eq(audienceSourceGroups.sourceType, sourceType)
+          )
+        )
+        .limit(1);
+
+      if (existingGroup && !existingGroup.archivedAt) {
+        const existingLinks = await tx
+          .select()
+          .from(audienceSourceLinks)
+          .where(eq(audienceSourceLinks.sourceGroupId, existingGroup.id))
+          .orderBy(desc(audienceSourceLinks.createdAt))
+          .limit(AUDIENCE_SOURCE_PAGE_SIZE);
+
+        return NextResponse.json(
+          {
+            group: existingGroup,
+            links: existingLinks.map(link => ({
+              ...link,
+              shortUrl: buildShortLinkUrl(link.code),
+            })),
+          },
+          { headers: NO_STORE_HEADERS }
         );
       }
 

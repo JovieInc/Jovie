@@ -33,4 +33,20 @@ describe('audience source link codes', () => {
       'https://example.com/profile?existing=true&utm_source=qr_code&utm_medium=print&utm_campaign=tour-flyers&utm_content=london-o2-arena'
     );
   });
+
+  it('handles URLs that already have UTM params', () => {
+    const url = appendSourceUtmParams(
+      'https://example.com/profile?utm_source=old&other=true',
+      {
+        source: 'qr_code',
+        medium: 'print',
+        campaign: 'tour-flyers',
+        content: 'london-o2-arena',
+      }
+    );
+
+    expect(url).toBe(
+      'https://example.com/profile?utm_source=qr_code&other=true&utm_medium=print&utm_campaign=tour-flyers&utm_content=london-o2-arena'
+    );
+  });
 });
