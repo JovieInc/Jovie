@@ -168,6 +168,13 @@ describe('ArtistProfilesPage', () => {
     expect(
       outcomesSection.getByText('Bio, QR, stories, and shows.')
     ).toBeInTheDocument();
+    const outcomesScroller = outcomesSection.getByTestId(
+      'artist-profile-outcomes-scroller'
+    );
+    expect(outcomesScroller).toHaveClass('overflow-x-auto');
+    expect(outcomesScroller).toHaveClass('overflow-y-hidden');
+    expect(outcomesScroller).toHaveClass('overscroll-contain');
+    expect(outcomesScroller).toHaveClass('scrollbar-hide');
     const monetizationSection = within(
       screen.getByTestId('artist-profile-section-monetization')
     );
@@ -306,6 +313,73 @@ describe('ArtistProfilesPage', () => {
     ).not.toBeInTheDocument();
     expect(captureSection.queryByText('Jason')).not.toBeInTheDocument();
     expect(captureSection.queryByText('Spotify')).not.toBeInTheDocument();
+    expect(
+      Boolean(
+        screen
+          .getByRole('heading', {
+            name: 'Capture every fan.',
+          })
+          .compareDocumentPosition(
+            screen.getByRole('heading', {
+              name: 'Bring them back automatically.',
+            })
+          ) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+    const reactivationSection = within(
+      screen.getByTestId('artist-profile-section-reactivation')
+    );
+    expect(
+      reactivationSection.getByRole('heading', {
+        name: 'Bring them back automatically.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText(
+        'When the next moment hits, fans come back in.'
+      )
+    ).toBeInTheDocument();
+    expect(reactivationSection.getByText('New Release')).toBeInTheDocument();
+    expect(reactivationSection.getByText('Subscribers')).toBeInTheDocument();
+    expect(reactivationSection.getByText('Hear It First')).toBeInTheDocument();
+    expect(reactivationSection.getAllByText('/music').length).toBeGreaterThan(
+      0
+    );
+    expect(reactivationSection.getByText('Nearby Fans')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('Date Just Added')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('Recent Listeners')
+    ).toBeInTheDocument();
+    expect(reactivationSection.getByText('Watch Now')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('Thanks for Being Here')
+    ).toBeInTheDocument();
+    expect(reactivationSection.getByText('New Music')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('First Listen Goes Out Fast.')
+    ).toBeInTheDocument();
+    expect(reactivationSection.getByText('Nearby Shows')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('The Right City Gets the Date.')
+    ).toBeInTheDocument();
+    expect(reactivationSection.getByText('Thank-Yous')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('Support Turns Into the Next Listen.')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('Email sent')
+    ).not.toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('Alert sent')
+    ).not.toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('Notification sent')
+    ).not.toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('Thank-you sent')
+    ).not.toBeInTheDocument();
     const powerFeaturesSection = within(
       screen.getByTestId('artist-profile-section-spec-wall')
     );

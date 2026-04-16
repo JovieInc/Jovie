@@ -1,4 +1,4 @@
-import { BellRing, Mail, Sparkles } from 'lucide-react';
+import { ArrowRight, BellRing, Mail, Sparkles } from 'lucide-react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -126,48 +126,34 @@ export function ArtistProfileReactivationSection({
         </div>
 
         <div className='mt-12 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025] shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:mt-14'>
-          <div className='hidden border-b border-white/8 px-6 py-4 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.92fr)] lg:gap-6 lg:px-8'>
-            {reactivation.workflow.columns.map((column, index) => (
-              <span
-                key={column}
-                className={
-                  index === 0
-                    ? 'text-[12px] font-medium tracking-[-0.01em] text-white/60'
-                    : 'border-l border-white/8 pl-6 text-[12px] font-medium tracking-[-0.01em] text-white/60'
-                }
-              >
-                {column}
-              </span>
-            ))}
-          </div>
-
-          <div className='divide-y divide-white/8'>
+          <div className='space-y-3 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8'>
             {reactivation.workflow.rows.map(row => (
-              <div
+              <article
                 key={row.id}
-                className='px-5 py-5 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.92fr)] lg:gap-6 lg:px-8 lg:py-6'
+                className='rounded-[1.4rem] border border-white/7 bg-white/[0.018] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:px-5 sm:py-5'
               >
-                <WorkflowCell
-                  label={reactivation.workflow.columns[0]}
-                  value={row.trigger}
-                />
-                <WorkflowCell
-                  bordered
-                  label={reactivation.workflow.columns[1]}
-                  value={row.audience}
-                />
-                <WorkflowCell
-                  bordered
-                  label={reactivation.workflow.columns[2]}
-                  value={row.message}
-                />
-                <WorkflowCell
-                  bordered
-                  label={reactivation.workflow.columns[3]}
-                  tone='destination'
-                  value={row.destination}
-                />
-              </div>
+                <div className='flex flex-wrap items-center gap-2.5 lg:gap-3'>
+                  <WorkflowBeat value={row.trigger} />
+                  <WorkflowArrow />
+                  <WorkflowBeat
+                    label={reactivation.workflow.columns[1]}
+                    tone='audience'
+                    value={row.audience}
+                  />
+                  <WorkflowArrow />
+                  <WorkflowBeat
+                    label={reactivation.workflow.columns[2]}
+                    tone='message'
+                    value={row.message}
+                  />
+                  <WorkflowArrow />
+                  <WorkflowBeat
+                    label={reactivation.workflow.columns[3]}
+                    tone='destination'
+                    value={row.destination}
+                  />
+                </div>
+              </article>
             ))}
           </div>
 
@@ -213,36 +199,63 @@ export function ArtistProfileReactivationSection({
 }
 
 function WorkflowCell({
-  bordered,
   label,
   tone,
   value,
 }: Readonly<{
-  bordered?: boolean;
   label: string;
-  tone?: 'default' | 'destination';
+  tone?: 'audience' | 'default' | 'destination' | 'message';
   value: string;
 }>) {
   return (
     <div
       className={
-        bordered
-          ? 'mt-4 border-t border-white/8 pt-4 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0'
-          : ''
+        tone === 'destination'
+          ? 'rounded-full border border-white/12 bg-white/[0.07] px-3.5 py-2 text-primary-token'
+          : tone === 'message'
+            ? 'rounded-full border border-white/8 bg-white/[0.045] px-3.5 py-2 text-white/88'
+            : tone === 'audience'
+              ? 'rounded-full border border-white/8 bg-white/[0.028] px-3.5 py-2 text-secondary-token'
+              : 'rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-2 text-primary-token'
       }
     >
-      <p className='text-[12px] font-medium tracking-[-0.01em] text-tertiary-token lg:hidden'>
-        {label}
-      </p>
+      <p className='sr-only'>{label}</p>
       <p
         className={
           tone === 'destination'
-            ? 'mt-1 text-[17px] font-semibold tracking-[-0.03em] text-primary-token lg:mt-0'
-            : 'mt-1 text-[17px] font-semibold tracking-[-0.03em] text-white/86 lg:mt-0'
+            ? 'text-[15px] font-semibold tracking-[-0.03em] text-primary-token'
+            : tone === 'audience'
+              ? 'text-[14px] font-medium tracking-[-0.02em] text-secondary-token'
+              : tone === 'message'
+                ? 'text-[14px] font-medium tracking-[-0.02em] text-white/88'
+                : 'text-[15px] font-semibold tracking-[-0.03em] text-primary-token'
         }
       >
         {value}
       </p>
     </div>
+  );
+}
+
+function WorkflowBeat({
+  label = 'Trigger',
+  tone,
+  value,
+}: Readonly<{
+  label?: string;
+  tone?: 'audience' | 'default' | 'destination' | 'message';
+  value: string;
+}>) {
+  return <WorkflowCell label={label} tone={tone} value={value} />;
+}
+
+function WorkflowArrow() {
+  return (
+    <span
+      aria-hidden='true'
+      className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/35'
+    >
+      <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.85} />
+    </span>
   );
 }
