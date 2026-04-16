@@ -92,10 +92,187 @@ export function PlatformConnectionsClient({
   engineSettings,
   currentUser,
 }: PlatformConnectionsClientProps) {
+  if (currentTab === 'spotify') {
+    return (
+      <SpotifyTabContent
+        spotifyStatus={spotifyStatus}
+        currentUser={currentUser}
+      />
+    );
+  }
+
+  return (
+    <EngineTabContent
+      spotifyStatus={spotifyStatus}
+      engineSettings={engineSettings}
+    />
+  );
+}
+
+function SpotifyTabContent({
+  spotifyStatus,
+  currentUser,
+}: Readonly<{
+  spotifyStatus: SpotifyStatus;
+  currentUser: PlatformConnectionsClientProps['currentUser'];
+}>) {
   const router = useRouter();
   const { user } = useUserSafe();
   const [isPending, startTransition] = useTransition();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  function refresh() {
+    router.refresh();
+  }
+
+  async function connectSpotify() {
+    if (!user) return;
+    setResult(null);
+    setIsConnecting(true);
+    try {
+      const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
+      await user.createExternalAccount({
+        strategy: SPOTIFY_OAUTH_TOKEN_STRATEGY,
+        additionalScopes: [...REQUIRED_PLAYLIST_SPOTIFY_SCOPES],
+        redirectUrl,
+      });
+    } catch (error) {
+      setResult({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'Failed to connect Spotify.',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  }
+
+  function handleUseAccount() {
+    setResult(null);
+    startTransition(async () => {
+      const response = await setCurrentAdminAsPlaylistSpotifyPublisher();
+      setResult(response);
+      if (response.success) refresh();
+    });
+  }
+
+  const isBusy = isPending || isConnecting;
+  const connectButtonLabel = isConnecting
+    ? 'Connecting'
+    : currentUser.hasSpotify
+      ? 'Reconnect Spotify'
+      : 'Connect Spotify';
+
+  return (
+    <div className='divide-y divide-(--linear-app-frame-seam) rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1'>
+      <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
+        <div className='flex min-w-0 flex-wrap items-center gap-2'>
+          <StatusBadge
+            ok={spotifyStatus.connected}
+            label={spotifyStatus.connected ? 'Connected' : 'Disconnected'}
+          />
+          <StatusBadge
+            ok={spotifyStatus.healthy}
+            label={spotifyStatus.healthy ? 'Healthy' : 'Needs attention'}
+          />
+          <Badge variant='secondary' size='sm'>
+            Source: {spotifyStatus.source}
+          </Badge>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          onClick={refresh}
+          className='h-8 gap-2'
+        >
+          <RefreshCw className='size-4' aria-hidden />
+          Refresh Status
+        </Button>
+      </div>
+
+      <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
+        <div>
+          <p className='font-[510] text-primary-token'>Active Publisher</p>
+          <p className='mt-1 text-secondary-token'>
+            {spotifyStatus.accountLabel ??
+              spotifyStatus.clerkUserId ??
+              'Not set'}
+          </p>
+          <p className='mt-1 text-[12px] text-tertiary-token'>
+            Updated {formatDate(spotifyStatus.updatedAt)}
+          </p>
+        </div>
+        <div>
+          <p className='font-[510] text-primary-token'>Current Admin Account</p>
+          <p className='mt-1 text-secondary-token'>
+            {currentUser.hasSpotify
+              ? (currentUser.label ?? 'Spotify connected')
+              : 'Spotify is not connected'}
+          </p>
+          {currentUser.missingScopes.length > 0 ? (
+            <p className='mt-1 text-[12px] text-red-300'>
+              Missing scopes: {currentUser.missingScopes.join(', ')}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {spotifyStatus.error ? (
+        <div className='px-4 py-3 text-[12px] text-red-300'>
+          {spotifyStatus.error}
+        </div>
+      ) : null}
+
+      <div className='flex flex-wrap items-center gap-2 px-4 py-3'>
+        <Button
+          type='button'
+          size='sm'
+          variant='secondary'
+          onClick={() => {
+            void connectSpotify();
+          }}
+          disabled={isBusy}
+        >
+          {connectButtonLabel}
+        </Button>
+        <Button
+          type='button'
+          size='sm'
+          onClick={handleUseAccount}
+          disabled={
+            !currentUser.hasSpotify ||
+            currentUser.missingScopes.length > 0 ||
+            isBusy
+          }
+          className='gap-2'
+        >
+          {isBusy ? (
+            <Loader2 className='size-4 animate-spin' aria-hidden />
+          ) : (
+            <ShieldCheck className='size-4' aria-hidden />
+          )}
+          Use This Account
+        </Button>
+        <ResultMessage result={result} />
+      </div>
+    </div>
+  );
+}
+
+function EngineTabContent({
+  spotifyStatus,
+  engineSettings,
+}: Readonly<{
+  spotifyStatus: SpotifyStatus;
+  engineSettings: EngineSettings;
+}>) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
@@ -124,38 +301,7 @@ export function PlatformConnectionsClient({
     router.refresh();
   }
 
-  async function connectSpotify() {
-    if (!user) return;
-    setResult(null);
-    setIsConnecting(true);
-    try {
-      const redirectUrl = `${globalThis.location.origin}${APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS}`;
-      await user.createExternalAccount({
-        strategy: SPOTIFY_OAUTH_TOKEN_STRATEGY,
-        additionalScopes: [...REQUIRED_PLAYLIST_SPOTIFY_SCOPES],
-        redirectUrl,
-      });
-    } catch (error) {
-      setResult({
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to connect Spotify.',
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  }
-
-  async function handleUseAccount() {
-    setResult(null);
-    startTransition(async () => {
-      const response = await setCurrentAdminAsPlaylistSpotifyPublisher();
-      setResult(response);
-      if (response.success) refresh();
-    });
-  }
-
-  async function handleSaveEngine() {
+  function handleSaveEngine() {
     setResult(null);
     startTransition(async () => {
       const response = await updatePlaylistEngineSettings({
@@ -190,114 +336,10 @@ export function PlatformConnectionsClient({
     });
   }
 
-  const isBusy = isPending || isConnecting || isGenerating;
+  const isBusy = isPending || isGenerating;
   const publisherNote = spotifyStatus.accountLabel
     ? ` Publisher: ${spotifyStatus.accountLabel}.`
     : '';
-
-  if (currentTab === 'spotify') {
-    return (
-      <div className='divide-y divide-(--linear-app-frame-seam) rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1'>
-        <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
-          <div className='flex min-w-0 flex-wrap items-center gap-2'>
-            <StatusBadge
-              ok={spotifyStatus.connected}
-              label={spotifyStatus.connected ? 'Connected' : 'Disconnected'}
-            />
-            <StatusBadge
-              ok={spotifyStatus.healthy}
-              label={spotifyStatus.healthy ? 'Healthy' : 'Needs attention'}
-            />
-            <Badge variant='secondary' size='sm'>
-              Source: {spotifyStatus.source}
-            </Badge>
-          </div>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={refresh}
-            className='h-8 gap-2'
-          >
-            <RefreshCw className='size-4' aria-hidden />
-            Refresh Status
-          </Button>
-        </div>
-
-        <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
-          <div>
-            <p className='font-[510] text-primary-token'>Active Publisher</p>
-            <p className='mt-1 text-secondary-token'>
-              {spotifyStatus.accountLabel ??
-                spotifyStatus.clerkUserId ??
-                'Not set'}
-            </p>
-            <p className='mt-1 text-[12px] text-tertiary-token'>
-              Updated {formatDate(spotifyStatus.updatedAt)}
-            </p>
-          </div>
-          <div>
-            <p className='font-[510] text-primary-token'>
-              Current Admin Account
-            </p>
-            <p className='mt-1 text-secondary-token'>
-              {currentUser.hasSpotify
-                ? (currentUser.label ?? 'Spotify connected')
-                : 'Spotify is not connected'}
-            </p>
-            {currentUser.missingScopes.length > 0 ? (
-              <p className='mt-1 text-[12px] text-red-300'>
-                Missing scopes: {currentUser.missingScopes.join(', ')}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        {spotifyStatus.error ? (
-          <div className='px-4 py-3 text-[12px] text-red-300'>
-            {spotifyStatus.error}
-          </div>
-        ) : null}
-
-        <div className='flex flex-wrap items-center gap-2 px-4 py-3'>
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={() => {
-              void connectSpotify();
-            }}
-            disabled={isBusy}
-          >
-            {isConnecting
-              ? 'Connecting'
-              : currentUser.hasSpotify
-                ? 'Reconnect Spotify'
-                : 'Connect Spotify'}
-          </Button>
-          <Button
-            type='button'
-            size='sm'
-            onClick={handleUseAccount}
-            disabled={
-              !currentUser.hasSpotify ||
-              currentUser.missingScopes.length > 0 ||
-              isBusy
-            }
-            className='gap-2'
-          >
-            {isBusy ? (
-              <Loader2 className='size-4 animate-spin' aria-hidden />
-            ) : (
-              <ShieldCheck className='size-4' aria-hidden />
-            )}
-            Use This Account
-          </Button>
-          <ResultMessage result={result} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

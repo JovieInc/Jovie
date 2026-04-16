@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { HomeProfileShowcase } from './HomeProfileShowcase';
 
 export function HomeHeroPhoneComposition() {
-  const ref = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
   const [progress, setProgress] = useState(0);
 
@@ -46,6 +45,7 @@ export function HomeHeroPhoneComposition() {
   const slideOut = progress * 30;
   // Slide downward: drop below center phone
   const dropDown = progress * 4; // 0 → 4rem
+  const showFlanks = reducedMotion || progress > 0.01;
 
   const leftStyle = {
     transform: `translateX(-${slideOut}%) translateY(${dropDown}rem) rotateY(${rotateY}deg) scale(${flankScale})`,
@@ -61,20 +61,21 @@ export function HomeHeroPhoneComposition() {
 
   return (
     <div
-      ref={ref}
       className='homepage-hero-composition'
       data-testid='homepage-hero-composition'
     >
-      <div
-        className='homepage-hero-comp-flank homepage-hero-comp-left'
-        style={leftStyle}
-      >
-        <HomeProfileShowcase
-          stateId='streams-presave'
-          presentation='full-phone'
-          className='homepage-hero-comp-phone-small'
-        />
-      </div>
+      {showFlanks ? (
+        <div
+          className='homepage-hero-comp-flank homepage-hero-comp-left'
+          style={leftStyle}
+        >
+          <HomeProfileShowcase
+            stateId='streams-presave'
+            presentation='full-phone'
+            className='homepage-hero-comp-phone-small'
+          />
+        </div>
+      ) : null}
 
       <div className='homepage-hero-comp-center'>
         <HomeProfileShowcase
@@ -84,16 +85,18 @@ export function HomeHeroPhoneComposition() {
         />
       </div>
 
-      <div
-        className='homepage-hero-comp-flank homepage-hero-comp-right'
-        style={rightStyle}
-      >
-        <HomeProfileShowcase
-          stateId='tour'
-          presentation='full-phone'
-          className='homepage-hero-comp-phone-small'
-        />
-      </div>
+      {showFlanks ? (
+        <div
+          className='homepage-hero-comp-flank homepage-hero-comp-right'
+          style={rightStyle}
+        >
+          <HomeProfileShowcase
+            stateId='tour'
+            presentation='full-phone'
+            className='homepage-hero-comp-phone-small'
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

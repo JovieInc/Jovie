@@ -14,7 +14,6 @@ import {
   acquirePlaylistGenerationLease,
   getPlaylistEngineSettings,
   getPlaylistSpotifyStatus,
-  markPlaylistGeneratedAt,
   releasePlaylistGenerationLease,
 } from '@/lib/admin/platform-connections';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -91,9 +90,7 @@ export async function GET(request: Request) {
     // Run the pipeline. The admin DB eligibility gate is the cadence control.
     result = await generatePlaylist({
       skipComplianceCheck: true,
-      onSuccessfulPersist: async generatedAt => {
-        await markPlaylistGeneratedAt(generatedAt);
-      },
+      recordCadenceOnSuccess: true,
     });
   } catch (error) {
     await releasePlaylistGenerationLease(lease);
