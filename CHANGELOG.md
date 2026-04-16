@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.153.8] - 2026-04-15
+
+> Internal follow-up fixes tightened playlist generation durability, cleaned up the admin controls surface, and trimmed homepage hero work to stabilize CI.
+
+### Fixed
+
+- [internal] Moved playlist cadence persistence into the durable generation path so cron lease retries cannot create duplicate pending playlists after a partial success.
+- [internal] Split the Admin Platform Connections client into smaller Spotify and engine tab components and resolved follow-up review comments around control labels and button state logic.
+- [internal] Reduced hidden homepage hero rendering work to improve the public Lighthouse margin on the landing page.
+
 ## [26.4.153.7] - 2026-04-15
 
 > Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
