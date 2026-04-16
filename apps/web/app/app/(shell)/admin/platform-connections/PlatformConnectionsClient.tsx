@@ -391,7 +391,7 @@ function EngineTabContent({
                 setIntervalUnit(event.target.value as IntervalUnit)
               }
               aria-label='Playlist generation interval unit'
-              className='h-8 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-primary-token'
+              className='h-8 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
             >
               {INTERVAL_UNITS.map(unit => (
                 <option key={unit} value={unit}>

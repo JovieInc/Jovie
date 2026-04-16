@@ -203,4 +203,15 @@ describe('GET /api/cron/generate-playlist', () => {
       expect.objectContaining({ claimed: true })
     );
   });
+
+  it('releases the lease and re-throws when generation throws', async () => {
+    mockGeneratePlaylist.mockRejectedValueOnce(new Error('Unexpected failure'));
+
+    const { GET } = await import('@/app/api/cron/generate-playlist/route');
+
+    await expect(GET(request())).rejects.toThrow('Unexpected failure');
+    expect(mockReleasePlaylistGenerationLease).toHaveBeenCalledWith(
+      expect.objectContaining({ claimed: true })
+    );
+  });
 });
