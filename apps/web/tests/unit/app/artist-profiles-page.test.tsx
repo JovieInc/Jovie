@@ -151,9 +151,6 @@ describe('ArtistProfilesPage', () => {
       outcomesSection.getByRole('heading', { name: 'Get paid' })
     ).toBeInTheDocument();
     expect(
-      outcomesSection.getByRole('heading', { name: 'Say thanks' })
-    ).toBeInTheDocument();
-    expect(
       outcomesSection.getByRole('heading', { name: 'Share anywhere' })
     ).toBeInTheDocument();
     expect(outcomesSection.getByText('Latest release')).toBeInTheDocument();
@@ -166,18 +163,11 @@ describe('ArtistProfilesPage', () => {
     expect(
       outcomesSection.getAllByText('Continue with Venmo').length
     ).toBeGreaterThan(0);
-    expect(outcomesSection.getByText('Activity feed')).toBeInTheDocument();
-    expect(
-      outcomesSection.getByText('One support moment keeps moving.')
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByText('Scanned at merch table')
-    ).toBeInTheDocument();
-    expect(outcomesSection.getByText('Supported')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Subscribed')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Opened new single')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Saved next show')).toBeInTheDocument();
     expect(outcomesSection.getByText('Share-ready')).toBeInTheDocument();
+    expect(outcomesSection.getByText('jov.ie/tim')).toBeInTheDocument();
+    expect(
+      outcomesSection.getByText('Bio, QR, stories, and shows.')
+    ).toBeInTheDocument();
     const monetizationSection = within(
       screen.getByTestId('artist-profile-section-monetization')
     );

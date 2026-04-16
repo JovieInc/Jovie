@@ -26,12 +26,7 @@ export interface ArtistProfileModeDrawerItem {
 }
 
 export interface ArtistProfileOutcomeCard {
-  readonly id:
-    | 'drive-streams'
-    | 'sell-out'
-    | 'get-paid'
-    | 'say-thanks'
-    | 'share-anywhere';
+  readonly id: 'drive-streams' | 'sell-out' | 'get-paid' | 'share-anywhere';
   readonly title: string;
   readonly description: string;
 }
@@ -81,16 +76,10 @@ export interface ArtistProfileOutcomeProof {
       readonly ctaLabel: string;
     };
   };
-  readonly activityFeed: {
-    readonly label: string;
-    readonly title: string;
-    readonly steps: readonly string[];
-  };
   readonly shareAnywhere: {
     readonly url: string;
-    readonly copiedLabel: string;
     readonly title: string;
-    readonly channels: readonly string[];
+    readonly subtitle: string;
   };
 }
 
@@ -312,7 +301,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc: '/product-screenshots/tim-white-profile-live-phone.png',
+        screenshotSrc:
+          '/product-screenshots/tim-white-profile-listen-phone.png',
         screenshotAlt: 'Jovie artist profile showing a listen-first view.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -450,7 +440,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   outcomes: {
     eyebrow: 'Fan outcomes',
     headline: 'Built for artists.',
-    body: 'Five ways the same artist profile can move a fan from attention to action.',
+    body: 'Four ways the same artist profile can move a fan from attention to action.',
     cards: [
       {
         id: 'drive-streams',
@@ -468,12 +458,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'get-paid',
         title: 'Get paid',
         description: 'Make direct support feel native to the artist profile.',
-      },
-      {
-        id: 'say-thanks',
-        title: 'Say thanks',
-        description:
-          'Turn a support moment into a personal follow-up fans remember.',
       },
       {
         id: 'share-anywhere',
@@ -554,22 +538,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ctaLabel: 'Continue with Venmo',
         },
       },
-      activityFeed: {
-        label: 'Activity feed',
-        title: 'One support moment keeps moving.',
-        steps: [
-          'Scanned at merch table',
-          'Supported',
-          'Subscribed',
-          'Opened new single',
-          'Saved next show',
-        ],
-      },
       shareAnywhere: {
-        url: 'jov.ie/timwhite',
-        copiedLabel: 'Copied',
+        url: 'jov.ie/tim',
         title: 'Share-ready',
-        channels: ['Bio', 'QR', 'Stories'],
+        subtitle: 'Bio, QR, stories, and shows.',
       },
     },
   },

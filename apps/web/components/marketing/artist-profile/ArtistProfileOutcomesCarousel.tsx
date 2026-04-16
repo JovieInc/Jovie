@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useRef } from 'react';
@@ -17,7 +17,6 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
   'drive-streams': 'var(--color-accent-teal)',
   'sell-out': 'var(--color-accent-blue)',
   'get-paid': 'var(--color-accent-green)',
-  'say-thanks': 'var(--color-accent-orange)',
   'share-anywhere': 'var(--color-accent-orange)',
 };
 
@@ -140,9 +139,6 @@ function OutcomeCard({
           ) : null}
           {card.id === 'get-paid' ? (
             <GetPaidProof proof={proof.visualProofs.getPaid} />
-          ) : null}
-          {card.id === 'say-thanks' ? (
-            <ActivityFeedProof proof={proof.activityFeed} />
           ) : null}
           {card.id === 'share-anywhere' ? (
             <ShareProof proof={proof.shareAnywhere} />
@@ -319,66 +315,55 @@ function GetPaidProof({
   );
 }
 
-function ActivityFeedProof({
-  proof,
-}: Readonly<{
-  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['activityFeed'];
-}>) {
-  return (
-    <div className='mx-auto flex min-h-[20rem] w-full max-w-[22rem] flex-col justify-center rounded-[1.6rem] bg-[#fbfaf6] px-6 py-7 text-left text-black shadow-[0_24px_60px_rgba(0,0,0,0.24)]'>
-      <div className='text-center'>
-        <span className='text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42'>
-          {proof.label}
-        </span>
-        <p className='mt-2 text-[16px] font-semibold leading-[1.2] tracking-[-0.03em] text-black'>
-          {proof.title}
-        </p>
-      </div>
-
-      <div className='mx-auto mt-6 w-full max-w-[17rem] space-y-2.5'>
-        {proof.steps.map(step => (
-          <div
-            key={step}
-            className='grid grid-cols-[0.5rem_minmax(0,1fr)] items-center gap-3 rounded-[1rem] border border-black/[0.06] bg-white px-4 py-3.5 text-[12px] font-medium tracking-[-0.02em] text-black/72 shadow-[0_1px_0_rgba(0,0,0,0.03)]'
-          >
-            <span className='h-2.5 w-2.5 rounded-full bg-black/16' />
-            <span>{step}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ShareProof({
   proof,
 }: Readonly<{
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['shareAnywhere'];
 }>) {
   return (
-    <div className='mx-auto w-full max-w-[21rem] rounded-[1.45rem] border border-white/7 bg-black/34 p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.055)]'>
-      <p className='text-[12px] font-semibold tracking-[0.02em] text-primary-token'>
+    <div className='mx-auto flex min-h-[20rem] w-full max-w-[22rem] flex-col items-center justify-center rounded-[1.6rem] bg-[#fbfaf6] px-6 py-7 text-center text-black shadow-[0_24px_60px_rgba(0,0,0,0.24)]'>
+      <p className='text-[12px] font-semibold tracking-[0.02em] text-black/72'>
         {proof.title}
       </p>
-      <div className='mt-3 flex items-center justify-between gap-3 rounded-full bg-white/[0.055] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'>
-        <span className='font-mono text-[12px] text-secondary-token'>
-          {proof.url}
-        </span>
-        <span className='flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black'>
-          <Copy className='h-3.5 w-3.5' strokeWidth={2} />
-          {proof.copiedLabel}
-        </span>
+      <div className='relative mt-6'>
+        <div className='absolute inset-x-8 -top-5 h-10 rounded-full bg-black/10 blur-2xl' />
+        <div className='relative rounded-[1.75rem] bg-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.14)]'>
+          <div className='grid grid-cols-7 gap-[6px]'>
+            {QR_CELLS.map(cell => (
+              <span
+                key={cell.id}
+                className='h-3.5 w-3.5 rounded-[3px]'
+                style={{
+                  backgroundColor: cell.filled ? '#0b0b0b' : '#f2f0ea',
+                }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
-      <div className='mt-3 flex flex-wrap gap-2'>
-        {proof.channels.map(channel => (
-          <span
-            key={channel}
-            className='rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-secondary-token'
-          >
-            {channel}
-          </span>
-        ))}
-      </div>
+      <p className='mt-5 font-mono text-[13px] font-semibold tracking-[-0.02em] text-black'>
+        {proof.url}
+      </p>
+      <p className='mt-2 text-[12px] font-medium text-black/52'>
+        {proof.subtitle}
+      </p>
     </div>
   );
 }
+
+const QR_PATTERN = [
+  '1110111',
+  '1010101',
+  '1110111',
+  '0001000',
+  '1111101',
+  '1010001',
+  '1110111',
+] as const;
+
+const QR_CELLS = QR_PATTERN.flatMap((row, rowIndex) =>
+  row.split('').map((cell, cellIndex) => ({
+    id: `r${rowIndex}c${cellIndex}`,
+    filled: cell === '1',
+  }))
+);

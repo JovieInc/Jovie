@@ -55,16 +55,16 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
     },
     {
-      id: 'capture',
-      label: 'Capture Every Fan',
-      testId: 'artist-profile-section-capture',
-      screenshotScenarioId: 'artist-profile-capture-section-desktop',
-    },
-    {
       id: 'monetization',
       label: 'Monetization',
       testId: 'artist-profile-section-monetization',
       screenshotScenarioId: 'artist-profile-monetization-section-desktop',
+    },
+    {
+      id: 'capture',
+      label: 'Capture Every Fan',
+      testId: 'artist-profile-section-capture',
+      screenshotScenarioId: 'artist-profile-capture-section-desktop',
     },
     {
       id: 'opinionated',
