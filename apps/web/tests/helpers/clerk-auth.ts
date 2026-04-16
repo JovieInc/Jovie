@@ -555,6 +555,16 @@ async function waitForClerkSignInApi(page: Page): Promise<boolean> {
   return false;
 }
 
+function isMissingClerkAccountError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /couldn't find your account/i.test(message) ||
+    /cannot find your account/i.test(message) ||
+    /account.*not found/i.test(message) ||
+    /identifier.*not found/i.test(message)
+  );
+}
+
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
     timeout: 120_000,
@@ -1019,7 +1029,13 @@ export async function signInUser(
 
   // Cold local compiles can reach the auth loading shell before Clerk's sign-in
   // client API is actually ready. Wait for the concrete API surface we need.
-  await waitForClerkSignInApi(page);
+  const clerkSignInReady = await waitForClerkSignInApi(page);
+  if (!clerkSignInReady) {
+    throw new ClerkTestError(
+      'Clerk sign-in API never became ready on /signin.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   try {
     // Use the official Clerk testing helper
@@ -1031,8 +1047,7 @@ export async function signInUser(
       try {
         await signInExistingTestEmailSession(page, username);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes("Couldn't find your account")) {
+        if (isMissingClerkAccountError(error)) {
           await createOrReuseTestUserSession(page, username);
         } else {
           throw error;
