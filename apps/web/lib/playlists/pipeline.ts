@@ -183,7 +183,7 @@ export async function generatePlaylist(
             ${concept.genreTags},
             ${concept.moodTags},
             ${curated.trackCount},
-            ${coverImageUrl === null ? null : coverImageUrl},
+            ${coverImageUrl},
             ${concept.editorialNote},
             ${llmPrompt},
             ${'haiku+sonnet'},
