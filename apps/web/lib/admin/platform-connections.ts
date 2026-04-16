@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { clerkClient } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminSystemSettings } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -21,14 +21,9 @@ export const PLAYLIST_INTERVAL_UNITS = ['hours', 'days', 'weeks'] as const;
 export type PlaylistIntervalUnit = (typeof PLAYLIST_INTERVAL_UNITS)[number];
 
 const SETTINGS_ROW_ID = 1;
-const SETTINGS_CACHE_TTL_MS = 30_000;
+const PLAYLIST_GENERATION_LEASE_MS = 15 * 60 * 1000;
 
 type SettingsRow = typeof adminSystemSettings.$inferSelect;
-
-let settingsCache: {
-  readonly value: SettingsRow | null;
-  readonly expiresAt: number;
-} | null = null;
 
 export interface PlaylistEngineSettings {
   readonly enabled: boolean;
@@ -36,6 +31,12 @@ export interface PlaylistEngineSettings {
   readonly intervalUnit: PlaylistIntervalUnit;
   readonly lastGeneratedAt: Date | null;
   readonly nextEligibleAt: Date | null;
+}
+
+export interface PlaylistGenerationLease {
+  readonly claimed: boolean;
+  readonly claimedAt: Date;
+  readonly leaseExpiresAt: Date;
 }
 
 export interface PlaylistSpotifyStatus {
@@ -91,24 +92,18 @@ function getEnvFallbackClerkUserId(): string | null {
 }
 
 async function readSettingsRow(): Promise<SettingsRow | null> {
-  const now = Date.now();
-  if (settingsCache && settingsCache.expiresAt > now) {
-    return settingsCache.value;
-  }
-
   const [settings] = await db
     .select()
     .from(adminSystemSettings)
     .where(eq(adminSystemSettings.id, SETTINGS_ROW_ID))
     .limit(1);
 
-  const value = settings ?? null;
-  settingsCache = { value, expiresAt: now + SETTINGS_CACHE_TTL_MS };
-  return value;
+  return settings ?? null;
 }
 
 export function invalidatePlatformConnectionsCache(): void {
-  settingsCache = null;
+  // Settings are read directly from the database because these controls gate
+  // cron and publisher behavior across multiple server instances.
 }
 
 export async function getPlaylistSpotifyClerkUserId(): Promise<string | null> {
@@ -445,6 +440,56 @@ export async function markPlaylistGeneratedAt(
         updatedAt: new Date(),
       },
     });
+
+  invalidatePlatformConnectionsCache();
+}
+
+export async function acquirePlaylistGenerationLease(
+  claimedAt: Date,
+  leaseMs = PLAYLIST_GENERATION_LEASE_MS
+): Promise<PlaylistGenerationLease> {
+  const leaseExpiresAt = new Date(claimedAt.getTime() + leaseMs);
+  const [claimed] = await db
+    .update(adminSystemSettings)
+    .set({
+      playlistNextEligibleAt: leaseExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(adminSystemSettings.id, SETTINGS_ROW_ID),
+        eq(adminSystemSettings.playlistEngineEnabled, true),
+        or(
+          isNull(adminSystemSettings.playlistNextEligibleAt),
+          lte(adminSystemSettings.playlistNextEligibleAt, claimedAt)
+        )
+      )
+    )
+    .returning({ id: adminSystemSettings.id });
+
+  return {
+    claimed: Boolean(claimed),
+    claimedAt,
+    leaseExpiresAt,
+  };
+}
+
+export async function releasePlaylistGenerationLease(
+  lease: PlaylistGenerationLease
+): Promise<void> {
+  if (!lease.claimed) return;
+  await db
+    .update(adminSystemSettings)
+    .set({
+      playlistNextEligibleAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(adminSystemSettings.id, SETTINGS_ROW_ID),
+        eq(adminSystemSettings.playlistNextEligibleAt, lease.leaseExpiresAt)
+      )
+    );
 
   invalidatePlatformConnectionsCache();
 }

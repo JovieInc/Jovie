@@ -111,7 +111,12 @@ export async function getSpotifyTokenForClerkUser(
  * Throws SpotifyAuthError if the account is not linked or token retrieval fails.
  */
 export async function getJovieSpotifyToken(): Promise<string> {
-  const configuredUserId = await getPlaylistSpotifyClerkUserId();
+  let configuredUserId: string | null = null;
+  try {
+    configuredUserId = await getPlaylistSpotifyClerkUserId();
+  } catch (error) {
+    captureError('[Jovie Spotify] Failed to read configured publisher', error);
+  }
   const userId = configuredUserId ?? getJovieSystemUserId();
 
   if (!userId) {

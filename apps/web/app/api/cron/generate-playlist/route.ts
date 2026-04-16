@@ -11,9 +11,11 @@
 
 import { NextResponse } from 'next/server';
 import {
+  acquirePlaylistGenerationLease,
   getPlaylistEngineSettings,
   getPlaylistSpotifyStatus,
   markPlaylistGeneratedAt,
+  releasePlaylistGenerationLease,
 } from '@/lib/admin/platform-connections';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
@@ -72,11 +74,32 @@ export async function GET(request: Request) {
     );
   }
 
-  const reservedAt = new Date();
-  await markPlaylistGeneratedAt(reservedAt);
+  const lease = await acquirePlaylistGenerationLease(new Date());
+  if (!lease.claimed) {
+    return NextResponse.json(
+      {
+        success: true,
+        skipped: true,
+        reason: 'Playlist generation is already in progress or not eligible',
+      },
+      { headers: NO_STORE }
+    );
+  }
 
-  // Run the pipeline. The admin DB eligibility gate is the cadence control.
-  const result = await generatePlaylist({ skipComplianceCheck: true });
+  let result: Awaited<ReturnType<typeof generatePlaylist>>;
+  try {
+    // Run the pipeline. The admin DB eligibility gate is the cadence control.
+    result = await generatePlaylist({ skipComplianceCheck: true });
+  } catch (error) {
+    await releasePlaylistGenerationLease(lease);
+    throw error;
+  }
+
+  if (result.success && !result.skipped) {
+    await markPlaylistGeneratedAt(new Date());
+  } else {
+    await releasePlaylistGenerationLease(lease);
+  }
 
   return NextResponse.json(
     {

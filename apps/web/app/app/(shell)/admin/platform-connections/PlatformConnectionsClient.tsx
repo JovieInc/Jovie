@@ -3,7 +3,7 @@
 import { Badge, Button, Input, Switch } from '@jovie/ui';
 import { CheckCircle2, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
@@ -109,6 +109,16 @@ export function PlatformConnectionsClient({
     engineSettings.intervalUnit
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    setEnabled(engineSettings.enabled);
+    setIntervalValue(String(engineSettings.intervalValue));
+    setIntervalUnit(engineSettings.intervalUnit);
+  }, [
+    engineSettings.enabled,
+    engineSettings.intervalValue,
+    engineSettings.intervalUnit,
+  ]);
 
   function refresh() {
     router.refresh();
@@ -309,13 +319,23 @@ export function PlatformConnectionsClient({
 
         <div className='grid gap-4 px-4 py-4 sm:grid-cols-[1fr_1.2fr]'>
           <div className='flex items-center gap-3 text-[13px] text-primary-token'>
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
-            Playlist Engine
+            <Switch
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              aria-labelledby='playlist-engine-toggle-label'
+            />
+            <span id='playlist-engine-toggle-label'>Playlist Engine</span>
           </div>
 
           <div className='flex flex-wrap items-center gap-2 text-[13px]'>
-            <span className='text-secondary-token'>Eligible every</span>
+            <label
+              htmlFor='playlist-generation-interval-value'
+              className='text-secondary-token'
+            >
+              Eligible every
+            </label>
             <Input
+              id='playlist-generation-interval-value'
               type='number'
               min={1}
               value={intervalValue}
@@ -323,10 +343,12 @@ export function PlatformConnectionsClient({
               className='h-8 w-20'
             />
             <select
+              id='playlist-generation-interval-unit'
               value={intervalUnit}
               onChange={event =>
                 setIntervalUnit(event.target.value as IntervalUnit)
               }
+              aria-label='Playlist generation interval unit'
               className='h-8 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-primary-token'
             >
               {INTERVAL_UNITS.map(unit => (
