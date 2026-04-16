@@ -95,6 +95,6 @@ describe('AudienceMemberActivityFeed', () => {
     };
     render(<ActivityFeed member={member} />);
     const items = screen.getAllByRole('listitem');
-    expect(items[0].textContent).toContain('Newer_action');
+    expect(items[0].textContent).toContain('Newer Action');
   });
 });

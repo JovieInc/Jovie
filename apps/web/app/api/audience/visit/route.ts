@@ -9,6 +9,7 @@ import {
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
 import { isVisitorBlocked } from '@/lib/audience/block-check';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { unwrapPgError } from '@/lib/db/errors';
 import {
@@ -86,6 +87,39 @@ function inferDeviceType(
     return 'mobile';
   }
   return 'desktop';
+}
+
+function resolveVisitSourceKind(
+  utmParams: { source?: string } | undefined,
+  referrer: string | null | undefined
+) {
+  if (utmParams?.source) return 'utm' as const;
+  if (referrer) return 'referrer' as const;
+  return 'direct' as const;
+}
+
+function resolveVisitSourceLabel(
+  utmParams:
+    | {
+        source?: string;
+        medium?: string;
+        campaign?: string;
+        content?: string;
+      }
+    | undefined,
+  referrer: string | null | undefined
+): string | null {
+  if (utmParams?.source) {
+    return utmParams.medium
+      ? `${utmParams.source} / ${utmParams.medium}`
+      : utmParams.source;
+  }
+  if (!referrer) return null;
+  try {
+    return new URL(referrer).hostname.replace('www.', '');
+  } catch {
+    return referrer;
+  }
 }
 
 async function incrementDailyProfileViews(
@@ -503,6 +537,23 @@ export async function POST(request: NextRequest) {
               }
             }
           }
+          await recordAudienceEvent(tx, {
+            creatorProfileId: profileId,
+            audienceMemberId: existing.id,
+            eventType: 'profile_visited',
+            verb: 'visited',
+            confidence: 'observed',
+            sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
+            sourceLabel: resolveVisitSourceLabel(utmParams, latestReferrerUrl),
+            objectType: 'profile',
+            objectId: profileId,
+            objectLabel: 'Profile',
+            properties: {
+              referrer: latestReferrerUrl,
+              utmParams: resolvedUtmParams,
+            },
+            timestamp: now,
+          });
           return;
         }
 
@@ -558,6 +609,25 @@ export async function POST(request: NextRequest) {
               throw error;
             }
           }
+        }
+        if (inserted) {
+          await recordAudienceEvent(tx, {
+            creatorProfileId: profileId,
+            audienceMemberId: inserted.id,
+            eventType: 'profile_visited',
+            verb: 'visited',
+            confidence: 'observed',
+            sourceKind: resolveVisitSourceKind(utmParams, latestReferrerUrl),
+            sourceLabel: resolveVisitSourceLabel(utmParams, latestReferrerUrl),
+            objectType: 'profile',
+            objectId: profileId,
+            objectLabel: 'Profile',
+            properties: {
+              referrer: latestReferrerUrl,
+              utmParams: resolvedUtmParams,
+            },
+            timestamp: now,
+          });
         }
       });
 

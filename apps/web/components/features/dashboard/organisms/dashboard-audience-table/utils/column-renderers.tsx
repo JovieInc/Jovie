@@ -130,6 +130,7 @@ export function renderSourceCell({
     <AudienceSourceCell
       referrerHistory={row.original.referrerHistory}
       utmParams={row.original.utmParams}
+      actions={row.original.latestActions}
     />
   );
 }
@@ -151,6 +152,7 @@ export function renderPlatformsCell({
         <AudienceSourceCell
           referrerHistory={row.original.referrerHistory}
           utmParams={row.original.utmParams}
+          actions={row.original.latestActions}
           className='w-4'
         />
       </div>
@@ -291,6 +293,7 @@ function buildUserSubtitleParts(
   m: AudienceMember,
   hiddenMetadataColumns: {
     readonly location: boolean;
+    readonly source: boolean;
     readonly engagement: boolean;
     readonly lastSeen: boolean;
   }
@@ -323,6 +326,14 @@ function buildUserSubtitleParts(
     : null;
   if (locationCity) {
     parts.push({ key: 'location', text: safeDecode(locationCity) });
+  }
+
+  const latestSource =
+    hiddenMetadataColumns.source && m.latestActions[0]?.sourceLabel
+      ? m.latestActions[0].sourceLabel
+      : null;
+  if (latestSource) {
+    parts.push({ key: 'source', text: latestSource });
   }
 
   if (hiddenMetadataColumns.lastSeen && m.lastSeenAt) {

@@ -117,7 +117,7 @@ export function ArtistProfileReactivationSection({
     >
       <div className='mx-auto max-w-[1120px]'>
         <div className='mx-auto max-w-[40rem] text-center'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.26em] text-white/42'>
+          <p className='text-[11px] font-semibold uppercase tracking-[0.26em] text-white/64'>
             {reactivation.eyebrow}
           </p>
           <h2 className='mt-4 text-[clamp(3rem,6vw,5.6rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'>
@@ -140,7 +140,7 @@ export function ArtistProfileReactivationSection({
               aria-hidden='true'
             />
 
-            <div className='relative hidden grid-cols-[minmax(0,1.1fr)_24px_minmax(0,1fr)_24px_minmax(0,1fr)_24px_minmax(0,0.88fr)] items-center gap-y-4 border-b border-white/8 pb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/38 lg:grid'>
+            <div className='relative hidden grid-cols-[minmax(0,1.1fr)_24px_minmax(0,1fr)_24px_minmax(0,1fr)_24px_minmax(0,0.88fr)] items-center gap-y-4 border-b border-white/8 pb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60 lg:grid'>
               <span>{reactivation.workflow.columns[0]}</span>
               <span />
               <span>{reactivation.workflow.columns[1]}</span>
@@ -191,7 +191,7 @@ export function ArtistProfileReactivationSection({
                   className='rounded-[1.35rem] border border-white/8 bg-[#0b0d11]/88 px-4 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.26)] backdrop-blur-xl'
                 >
                   <div className='flex items-center justify-between gap-3'>
-                    <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42'>
+                    <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-white/64'>
                       {output.label}
                     </p>
                     <Icon className='h-4 w-4 text-white/55' strokeWidth={1.9} />

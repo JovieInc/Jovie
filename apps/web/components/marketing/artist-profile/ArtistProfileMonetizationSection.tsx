@@ -68,7 +68,7 @@ function GetPaidCard({
             <p className='text-[12px] font-semibold tracking-[-0.02em] text-black/86'>
               {card.contextLabel}
             </p>
-            <p className='mt-0.5 text-[11px] tracking-[-0.01em] text-black/52'>
+            <p className='mt-0.5 text-[11px] tracking-[-0.01em] text-black/64'>
               {card.contextDetail}
             </p>
           </div>
@@ -139,7 +139,7 @@ function RelationshipCard({
               key={step.id}
               className='mx-auto w-full max-w-[18.75rem] rounded-[1.35rem] bg-[#111111] px-4 py-4 text-white shadow-[0_14px_32px_rgba(0,0,0,0.14)] sm:px-5'
             >
-              <p className='text-center text-[10px] font-semibold tracking-[0.06em] text-white/38'>
+              <p className='text-center text-[10px] font-semibold tracking-[0.06em] text-white/62'>
                 {step.label}
               </p>
               <p className='mt-2 text-center text-[14px] font-semibold leading-snug tracking-[-0.03em] text-white/96'>
