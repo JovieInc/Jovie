@@ -352,6 +352,7 @@ export function AdminFeedbackTable({
         isOpen={Boolean(selected)}
         width={560}
         ariaLabel='Feedback details'
+        scrollStrategy='shell'
         onClose={() => setSelectedId(null)}
         headerMode='minimal'
         hideMinimalHeaderBar
