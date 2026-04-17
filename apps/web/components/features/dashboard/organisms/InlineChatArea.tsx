@@ -27,30 +27,15 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { ChatAlbumArtCard } from '@/components/jovie/components/ChatAlbumArtCard';
-import { ChatAnalyticsCard } from '@/components/jovie/components/ChatAnalyticsCard';
-import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
-import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
-import {
-  type ArtistContext,
-  type ChatInsightsToolResult,
-  isChatAlbumArtToolResult,
-  isToolInvocationPart,
-  type SocialLinkToolResult,
-  type ToolInvocationPart,
-} from '@/components/jovie/types';
+import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
+import { type ArtistContext, type MessagePart } from '@/components/jovie/types';
 import { getMessageText } from '@/components/jovie/utils';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
-import {
-  type ProfileEditPreview,
-  ProfileEditPreviewCard,
-} from './ProfileEditPreviewCard';
 
 interface InlineChatAreaProps {
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
@@ -70,26 +55,15 @@ export interface InlineChatAreaRef {
   isLoading: boolean;
 }
 
-// Helper to extract tool invocation parts from message
-function getToolInvocations(
-  parts: Array<{ type: string }>
-): ToolInvocationPart[] {
-  return parts.filter(isToolInvocationPart);
-}
-
 /** Memoized per-message renderer to avoid reprocessing tool invocations on every render. */
 const InlineChatMessage = memo(function InlineChatMessage({
   message,
   profileId,
 }: {
-  message: { id: string; role: string; parts: Array<{ type: string }> };
+  message: { id: string; role: string; parts: MessagePart[] };
   profileId: string;
 }) {
   const textContent = getMessageText(message.parts);
-  const toolInvocations = useMemo(
-    () => getToolInvocations(message.parts),
-    [message.parts]
-  );
 
   return (
     <div className='space-y-3'>
@@ -125,90 +99,14 @@ const InlineChatMessage = memo(function InlineChatMessage({
         </div>
       )}
 
-      {toolInvocations.map(toolInvocation => {
-        const result = toolInvocation.result as
-          | Record<string, unknown>
-          | undefined;
-        if (
-          toolInvocation.toolName === 'proposeProfileEdit' &&
-          toolInvocation.state === 'result' &&
-          result?.success &&
-          result.preview
-        ) {
-          return (
-            <div key={toolInvocation.toolInvocationId} className='ml-10'>
-              <ProfileEditPreviewCard
-                preview={result.preview as ProfileEditPreview}
-                profileId={profileId}
-              />
-            </div>
-          );
-        }
-
-        if (
-          toolInvocation.toolName === 'proposeAvatarUpload' &&
-          toolInvocation.state === 'result' &&
-          toolInvocation.result?.success
-        ) {
-          return (
-            <div key={toolInvocation.toolInvocationId} className='ml-10'>
-              <ChatAvatarUploadCard />
-            </div>
-          );
-        }
-
-        if (
-          toolInvocation.toolName === 'showTopInsights' &&
-          toolInvocation.state === 'result' &&
-          toolInvocation.result?.success
-        ) {
-          return (
-            <div key={toolInvocation.toolInvocationId} className='ml-10'>
-              <ChatAnalyticsCard
-                result={
-                  toolInvocation.result as unknown as ChatInsightsToolResult
-                }
-              />
-            </div>
-          );
-        }
-
-        if (
-          toolInvocation.toolName === 'generateAlbumArt' &&
-          toolInvocation.state === 'result' &&
-          isChatAlbumArtToolResult(toolInvocation.result)
-        ) {
-          return (
-            <div key={toolInvocation.toolInvocationId} className='ml-10'>
-              <ChatAlbumArtCard
-                result={toolInvocation.result}
-                profileId={profileId}
-              />
-            </div>
-          );
-        }
-
-        if (
-          toolInvocation.toolName === 'proposeSocialLink' &&
-          toolInvocation.state === 'result' &&
-          toolInvocation.result?.success
-        ) {
-          const result =
-            toolInvocation.result as unknown as SocialLinkToolResult;
-          return (
-            <div key={toolInvocation.toolInvocationId} className='ml-10'>
-              <ChatLinkConfirmationCard
-                profileId={profileId}
-                platform={result.platform}
-                normalizedUrl={result.normalizedUrl}
-                originalUrl={result.originalUrl}
-              />
-            </div>
-          );
-        }
-
-        return null;
-      })}
+      <div className='ml-10'>
+        <ToolPartsRenderer
+          parts={message.parts}
+          profileId={profileId}
+          variant='inline'
+          hasMessageText={Boolean(textContent)}
+        />
+      </div>
     </div>
   );
 });

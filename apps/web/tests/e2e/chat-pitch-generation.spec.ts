@@ -70,7 +70,9 @@ test.describe
       // suggested prompts entirely. Check for either the suggestion OR the
       // profile completion card.
       const pitchSuggestion = page.getByText(/generate pitches/i);
-      const profileCard = page.getByText(/your profile is not live/i);
+      const profileCompletionGate = page.getByRole('button', {
+        name: /profile \d+% complete/i,
+      });
       const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
 
       // At minimum, the chat input should be present
@@ -79,7 +81,7 @@ test.describe
       // If the profile completion card is showing, pitch suggestion is hidden
       // because SuggestedPrompts only renders when profile is 100% complete.
       // This is correct behavior — not a test failure.
-      const isProfileIncomplete = await profileCard
+      const isProfileIncomplete = await profileCompletionGate
         .isVisible()
         .catch(() => false);
       if (!isProfileIncomplete) {
@@ -109,21 +111,12 @@ test.describe
       await expect(sendButton).toBeEnabled({ timeout: 5_000 });
       await sendButton.click();
 
-      // Verify the user message appears in the chat
-      const userMessage = page.getByText(
-        'Generate playlist pitches for my latest release.'
+      // Wait for the actual pitch tool UI, not just "some assistant activity".
+      // The tool can surface either the loading title or the completed card.
+      const pitchToolUi = page.getByText(
+        /Generating pitches|Playlist Pitches/i
       );
-      await expect(userMessage).toBeVisible({ timeout: 10_000 });
-
-      // Wait for the AI to start responding (look for assistant message indicators)
-      // The response may include:
-      // - A "Generating pitches..." tool label
-      // - A ChatPitchCard (loading or success state)
-      // - Or just text if the model decides not to use the tool
-      const assistantResponse = page.locator(
-        '[data-index="1"], [class*="animate-bounce"]'
-      );
-      await expect(assistantResponse.first()).toBeVisible({ timeout: 30_000 });
+      await expect(pitchToolUi.first()).toBeVisible({ timeout: 30_000 });
     });
 
     test('billing status reflects pro plan via API', async ({ page }) => {

@@ -2,8 +2,12 @@ import { gateway } from '@ai-sdk/gateway';
 import { generateText } from 'ai';
 import { and, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
+import {
+  type ChatPersistenceMessage,
+  chatPersistenceBatchSchema,
+  chatPersistenceMessageSchema,
+} from '@/lib/chat/tool-events';
 import { TITLE_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
@@ -13,16 +17,6 @@ import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../../../session-error-response';
 
 export const runtime = 'nodejs';
-
-const messageSchema = z.object({
-  role: z.enum(['user', 'assistant']),
-  content: z.string().min(1).max(50000),
-  toolCalls: z.array(z.record(z.string(), z.unknown())).optional(),
-});
-
-const batchMessageSchema = z.object({
-  messages: z.array(messageSchema).min(1).max(100),
-});
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -35,7 +29,7 @@ interface RouteParams {
  */
 async function maybeGenerateTitle(
   conversationId: string,
-  messages: z.infer<typeof messageSchema>[]
+  messages: ChatPersistenceMessage[]
 ): Promise<void> {
   const userMessage = messages.find(m => m.role === 'user');
   if (!userMessage?.content) return;
@@ -144,18 +138,30 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
 
     // Try to parse as batch first, then as single message
-    const batchResult = batchMessageSchema.safeParse(body);
-    const singleResult = messageSchema.safeParse(body);
+    const batchResult = chatPersistenceBatchSchema.safeParse(body);
+    const singleResult = chatPersistenceMessageSchema.safeParse(body);
 
-    let messagesToInsert: z.infer<typeof messageSchema>[];
+    let messagesToInsert: ChatPersistenceMessage[];
 
     if (batchResult.success) {
       messagesToInsert = batchResult.data.messages;
     } else if (singleResult.success) {
       messagesToInsert = [singleResult.data];
     } else {
+      const validationError =
+        isRecord(body) && Array.isArray(body.messages)
+          ? batchResult.error
+          : singleResult.error;
+      logger.warn(
+        'Rejected invalid chat message payload',
+        {
+          conversationId,
+          issueCount: validationError.issues.length,
+        },
+        'chat-messages'
+      );
       return NextResponse.json(
-        { error: 'Invalid message format', details: singleResult.error.issues },
+        { error: 'Invalid message format', details: validationError.issues },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
@@ -219,4 +225,8 @@ export async function POST(req: Request, { params }: RouteParams) {
       { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
