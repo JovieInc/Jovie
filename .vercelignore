@@ -24,6 +24,8 @@ ideation/
 **/*.spec.tsx
 **/tests/
 **/e2e/
+!apps/web/lib/e2e/
+!apps/web/lib/e2e/runtime.ts
 **/playwright/
 playwright-report/
 test-results/
