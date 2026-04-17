@@ -7,6 +7,7 @@ interface LogoLinkProps
     readonly href?: string;
     readonly className?: string;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly prefetch?: boolean;
     readonly variant?: LogoVariant;
     readonly 'data-testid'?: string;
   }> {}
@@ -15,12 +16,14 @@ export function LogoLink({
   href = '/',
   className,
   logoSize = 'sm',
+  prefetch,
   variant = 'word',
   'data-testid': dataTestId = 'site-logo',
 }: LogoLinkProps) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       className={cn('flex items-center space-x-2', className)}
       aria-label='Jovie'
       data-testid={`${dataTestId}-link`}

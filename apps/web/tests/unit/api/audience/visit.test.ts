@@ -11,6 +11,7 @@ const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -32,6 +33,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema', () => ({
   audienceMembers: {},
+  audienceReferrers: {},
   creatorProfiles: {},
 }));
 
@@ -46,7 +48,7 @@ vi.mock('@/lib/analytics/tracking-rate-limit', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
-  captureError: vi.fn(),
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/analytics/tracking-token', () => ({
@@ -81,6 +83,7 @@ describe('POST /api/audience/visit', () => {
     mockIsTrackingTokenEnabled.mockReturnValue(false);
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
     mockDoesTableExist.mockResolvedValue(true);
+    mockCaptureError.mockReset();
   });
 
   it('returns 429 when rate limited', async () => {
@@ -124,7 +127,9 @@ describe('POST /api/audience/visit', () => {
         values: vi.fn().mockImplementation(value => {
           insertedValues.push(value);
           return {
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           };
         }),
       });
@@ -219,7 +224,9 @@ describe('POST /api/audience/visit', () => {
         }),
         insert: vi.fn().mockReturnValue({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         }),
       });
@@ -331,7 +338,9 @@ describe('POST /api/audience/visit', () => {
         })
         .mockReturnValueOnce({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         });
 
@@ -389,7 +398,9 @@ describe('POST /api/audience/visit', () => {
         })
         .mockReturnValueOnce({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         });
 
@@ -466,7 +477,9 @@ describe('POST /api/audience/visit', () => {
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
           })
           .mockReturnValueOnce({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
       });
 
@@ -498,6 +511,46 @@ describe('POST /api/audience/visit', () => {
     expect(data.fingerprint).toBeDefined();
   });
 
+  it('fails soft when optional persistence degrades after fingerprint resolution', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+    mockWithSystemIngestionSession.mockRejectedValue(
+      new Error('analytics persistence unavailable')
+    );
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.degraded).toBe(true);
+    expect(data.fingerprint).toBeDefined();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Audience visit persistence degraded',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/audience/visit',
+        method: 'POST',
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      })
+    );
+  });
+
   it('writes one activated event for Instagram-sourced visits inside the activation window', async () => {
     const insideActivationWindow = new Date(
       Date.now() - (BIO_LINK_ACTIVATION_WINDOW_DAYS - 1) * MS_PER_DAY
@@ -522,6 +575,7 @@ describe('POST /api/audience/visit', () => {
       const mockInsert = vi
         .fn()
         .mockReturnValueOnce({
+          // 1. daily profile view insert
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
@@ -530,6 +584,7 @@ describe('POST /api/audience/visit', () => {
           }),
         })
         .mockReturnValueOnce({
+          // 2. distribution event insert (before audience member)
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
@@ -538,11 +593,23 @@ describe('POST /api/audience/visit', () => {
           }),
         })
         .mockReturnValueOnce({
+          // 3. audience member insert (new member path)
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
-              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi
+                  .fn()
+                  .mockResolvedValue([{ id: 'inserted_member' }]),
+              }),
             };
+          }),
+        })
+        .mockReturnValueOnce({
+          // 4. audienceReferrers dual-write
+          values: vi.fn().mockImplementation(value => {
+            insertedValues.push(value);
+            return Promise.resolve(undefined);
           }),
         });
 
@@ -631,7 +698,11 @@ describe('POST /api/audience/visit', () => {
           values: vi.fn().mockImplementation(value => {
             insertedValues.push(value);
             return {
-              onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+              onConflictDoNothing: vi.fn().mockReturnValue({
+                returning: vi
+                  .fn()
+                  .mockResolvedValue([{ id: 'inserted_member' }]),
+              }),
             };
           }),
         });
@@ -710,7 +781,11 @@ describe('POST /api/audience/visit', () => {
             onConflictDoNothing:
               value.eventType === 'activated'
                 ? vi.fn().mockRejectedValueOnce(missingTableError)
-                : vi.fn().mockResolvedValue(undefined),
+                : vi.fn().mockReturnValue({
+                    returning: vi
+                      .fn()
+                      .mockResolvedValue([{ id: 'inserted_member' }]),
+                  }),
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
           })),
       });
@@ -781,7 +856,9 @@ describe('POST /api/audience/visit', () => {
         }),
         insert: vi.fn().mockReturnValue({
           values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
+            }),
           }),
         }),
       });

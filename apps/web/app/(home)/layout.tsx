@@ -13,10 +13,7 @@ export default function HomeLayout({
     <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-black text-primary-token'>
       <SkipToContent />
       <MarketingHeader logoSize='xs' />
-      <main
-        id='main-content'
-        className='flex flex-1 flex-col pt-[var(--linear-header-height)]'
-      >
+      <main id='main-content' className='flex flex-1 flex-col'>
         {children}
       </main>
       <footer className='home-legal-bar'>
@@ -30,7 +27,7 @@ export default function HomeLayout({
           >
             Privacy
           </Link>
-          <span aria-hidden='true' className='text-quaternary-token/40'>
+          <span aria-hidden='true' className='text-secondary-token/60'>
             ·
           </span>
           <Link

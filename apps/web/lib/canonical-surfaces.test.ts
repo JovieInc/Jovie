@@ -7,12 +7,17 @@ import {
 import { SCREENSHOT_SCENARIO_IDS } from './screenshots/registry';
 
 describe('canonical surface registry', () => {
-  it('exposes exactly the four canonical surface ids in order', () => {
+  it('exposes the canonical surface ids in order', () => {
     expect(CANONICAL_SURFACE_IDS).toEqual([
       'homepage',
       'public-profile',
       'release-landing',
       'dashboard-releases',
+      'dashboard-audience',
+      'dashboard-insights',
+      'dashboard-earnings',
+      'settings-artist-profile',
+      'settings-links',
     ]);
 
     expect(CANONICAL_SURFACES.map(surface => surface.id)).toEqual(
@@ -37,6 +42,21 @@ describe('canonical surface registry', () => {
       '/demo/showcase/release-landing'
     );
     expect(getCanonicalSurface('dashboard-releases').reviewRoute).toBe('/demo');
+    expect(getCanonicalSurface('dashboard-audience').reviewRoute).toBe(
+      '/demo/audience'
+    );
+    expect(getCanonicalSurface('dashboard-insights').reviewRoute).toBe(
+      '/demo/showcase/analytics'
+    );
+    expect(getCanonicalSurface('dashboard-earnings').reviewRoute).toBe(
+      '/demo/showcase/earnings'
+    );
+    expect(getCanonicalSurface('settings-artist-profile').reviewRoute).toBe(
+      '/demo/showcase/settings'
+    );
+    expect(getCanonicalSurface('settings-links').reviewRoute).toBe(
+      '/demo/showcase/links'
+    );
   });
 
   it('explicitly excludes redirect-only routes from canonical live surfaces', () => {
@@ -53,6 +73,19 @@ describe('canonical surface registry', () => {
       'dashboard-releases-desktop',
       'dashboard-releases-sidebar-desktop',
       'dashboard-release-sidebar-detail-desktop',
+      'dashboard-release-sidebar-platforms-desktop',
     ]);
+  });
+
+  it('tracks live source ownership for every mirrored demo surface', () => {
+    for (const surface of CANONICAL_SURFACES) {
+      expect(surface.sourceRoute.length).toBeGreaterThan(0);
+      expect(surface.sourceComponent.length).toBeGreaterThan(0);
+      expect(surface.fixtureSetId.length).toBeGreaterThan(0);
+
+      if (surface.id !== 'homepage') {
+        expect(surface.demoRoute.startsWith('/demo')).toBe(true);
+      }
+    }
   });
 });

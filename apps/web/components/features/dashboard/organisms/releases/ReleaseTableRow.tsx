@@ -47,6 +47,8 @@ interface ReleaseTableRowProps {
   ) => Promise<void>;
   readonly isAddingUrl?: boolean;
   readonly artistName?: string | null;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
 }
 
 export const ReleaseTableRow = memo(function ReleaseTableRow({
@@ -62,6 +64,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   onAddUrl,
   isAddingUrl,
   artistName,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
 }: Readonly<ReleaseTableRowProps>) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -142,6 +146,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             handleCopyQrCode().catch(() => {});
           },
           qrCodeIcon,
+          canGenerateAlbumArt,
+          onGenerateAlbumArt,
         })
       ),
     [
@@ -152,6 +158,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
       onDelete,
       handleCopyQrCode,
       qrCodeIcon,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
     ]
   );
 

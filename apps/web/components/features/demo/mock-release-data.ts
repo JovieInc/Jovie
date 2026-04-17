@@ -69,6 +69,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     title: release.title,
     artistNames: [...release.artistNames],
     releaseDate: release.releaseDate,
+    status: 'released' as const,
     artworkUrl: release.artworkUrl,
     slug: release.slug,
     smartLinkPath: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
@@ -287,6 +288,19 @@ const INTENT_TAGS: Record<string, string[]> = {
 };
 
 const DEMO_DEVICE_TYPES = ['mobile', 'desktop', 'tablet'] as const;
+const DEMO_AUDIENCE_BASE_TIME = new Date('2026-04-15T18:00:00.000Z');
+
+function getDeterministicPurchaseCount(index: number): number {
+  return index < 10 ? index % 3 : 0;
+}
+
+function getDeterministicTipAmountCents(index: number): number {
+  return index < 15 ? ((index * 347 + 116) % 2_000) + 100 : 0;
+}
+
+function getDeterministicTipCount(index: number): number {
+  return index < 15 ? (index % 4) + 1 : 0;
+}
 
 function makeAudienceMember(index: number): AudienceMember {
   const name = NAMES[index % NAMES.length];
@@ -311,7 +325,7 @@ function makeAudienceMember(index: number): AudienceMember {
 
   // Days ago for lastSeenAt
   const daysAgo = Math.floor(index * 0.7);
-  const lastSeen = new Date();
+  const lastSeen = new Date(DEMO_AUDIENCE_BASE_TIME);
   lastSeen.setDate(lastSeen.getDate() - daysAgo);
 
   return {
@@ -333,9 +347,9 @@ function makeAudienceMember(index: number): AudienceMember {
     email: hasEmail ? name : null,
     phone: index % 5 === 0 ? `+1555${String(1000 + index).slice(0, 4)}` : null,
     spotifyConnected: index % 3 === 0,
-    purchaseCount: index < 10 ? Math.floor(Math.random() * 3) : 0,
-    tipAmountTotalCents: index < 15 ? Math.floor(Math.random() * 2000) : 0,
-    tipCount: index < 15 ? Math.floor(Math.random() * 5) : 0,
+    purchaseCount: getDeterministicPurchaseCount(index),
+    tipAmountTotalCents: getDeterministicTipAmountCents(index),
+    tipCount: getDeterministicTipCount(index),
     tags: INTENT_TAGS[intentLevel ?? ''] ?? [],
     deviceType: DEMO_DEVICE_TYPES[index % 3],
     lastSeenAt: lastSeen.toISOString(),

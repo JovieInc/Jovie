@@ -10,6 +10,7 @@ export default function NotFound() {
 
       <main
         id='main-content'
+        data-testid='not-found'
         style={{ paddingTop: 'var(--linear-header-height, 64px)' }}
       >
         <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
@@ -17,7 +18,7 @@ export default function NotFound() {
             {/* Error code — oversized, muted, architectural */}
             <div className='mb-8 select-none'>
               <span
-                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.06]'
+                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.34]'
                 aria-hidden='true'
               >
                 404

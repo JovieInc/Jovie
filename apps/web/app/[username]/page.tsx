@@ -2,16 +2,25 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+
+export const dynamic = 'force-dynamic';
+
+import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
-import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
-import { ProfileFooter } from '@/features/profile/ProfileFooter';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
+import {
+  getProfileMode,
+  getProfileModeDefinition,
+} from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
-import { JoviePixel } from '@/features/tracking';
+import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import {
+  getProfileVisitorState,
+  supportsDirectProfileClaim,
+} from '@/lib/claim/visitor-state';
 import {
   buildBreadcrumbObject,
   buildListenActions,
@@ -22,15 +31,18 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
+import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { logger } from '@/lib/utils/logger';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -43,11 +55,13 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
+import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
-const MAX_EVENT_SCHEMAS = 10;
+const MAX_EVENT_SCHEMAS = 5;
 
 /**
  * Map ticketStatus enum to schema.org Event properties.
@@ -372,10 +386,15 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    await captureError('Error fetching creator profile', error, {
-      username,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching creator profile',
+      {
+        error,
+        route: '/[username]',
+        username,
+      },
+      'public-profile'
+    );
     return {
       profile: null,
       links: [],
@@ -425,7 +444,8 @@ const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
     process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development'
+    process.env.NODE_ENV === 'development' ||
+    shouldBypassPublicProfileQaCache()
   ) {
     return fetchProfileAndLinks(username);
   }
@@ -480,6 +500,9 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+  readonly searchParams?: Promise<{
+    readonly mode?: string | string[];
+  }>;
 }
 
 async function getPublicTourDates(
@@ -488,16 +511,49 @@ async function getPublicTourDates(
   try {
     return await getUpcomingTourDatesForProfile(profileId);
   } catch (error) {
-    await captureError('Error fetching public profile tour dates', error, {
-      profileId,
-      route: '/[username]',
-    });
+    logger.error(
+      'Error fetching public profile tour dates',
+      {
+        error,
+        profileId,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
     return [];
   }
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
+async function getPublicReleases(
+  profileId: string
+): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+  try {
+    return await getReleasesForProfileLite(profileId);
+  } catch (error) {
+    try {
+      await captureError('Error fetching public profile releases', error, {
+        profileId,
+        route: '/[username]',
+      });
+    } catch {
+      // Best-effort telemetry only; do not block page rendering.
+    }
+
+    return [];
+  }
+}
+
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: Readonly<Props>) {
   const { username } = await params;
+  const resolvedSearchParams = await searchParams;
+  const requestedMode = getProfileMode(
+    Array.isArray(resolvedSearchParams?.mode)
+      ? resolvedSearchParams?.mode[0]
+      : resolvedSearchParams?.mode
+  );
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -519,6 +575,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     genres,
     status,
     creatorIsPro,
+    creatorClerkId,
     latestRelease: fetchedLatestRelease,
     pressPhotos,
   } = profileResult;
@@ -545,6 +602,20 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
+  const directClaimSupported = supportsDirectProfileClaim({
+    spotifyId: profile.spotify_id,
+  });
+  const visitorState = getProfileVisitorState({
+    profile: {
+      id: profile.id,
+      username: artist.handle,
+      isClaimed: profile.is_claimed,
+      userClerkId: creatorClerkId,
+      spotifyId: profile.spotify_id,
+    },
+    authUserId: null,
+    pendingClaimContext: null,
+  });
 
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
@@ -557,12 +628,16 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   }
 
   const tourDatesPromise = getPublicTourDates(profile.id);
+  const releasesPromise = getPublicReleases(profile.id);
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
   );
+  const showPayButton = links.some(link => link.platform === 'venmo');
+  const showBackButton = requestedMode !== 'profile';
+  const subtitle = getProfileModeDefinition(requestedMode).subtitle;
 
   // Read profile photo download settings
   const profileSettings =
@@ -574,13 +649,26 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     profile.avatar_url
   );
 
-  // Await tour dates (started above, non-blocking — errors resolve to empty)
+  // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const tourDates = (
-    await tourDatesPromise.catch(() => [] as TourDateViewModel[])
-  ).sort(
+  const [tourDatesRaw, allReleases] = await Promise.all([
+    tourDatesPromise.catch(() => [] as TourDateViewModel[]),
+    releasesPromise,
+  ]);
+  const tourDates = tourDatesRaw.sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+
+  // Serialize releases for client (query returns newest-first via DESC NULLS LAST)
+  const releases: PublicRelease[] = allReleases.map(r => ({
+    id: r.id,
+    title: r.title,
+    slug: r.slug ?? '',
+    releaseType: r.releaseType,
+    releaseDate: r.releaseDate,
+    artworkUrl: r.artworkUrl,
+    artistNames: r.artistNames,
+  }));
 
   // Generate structured data for SEO (after tour dates resolve)
   const structuredData = generateProfileStructuredData(
@@ -600,19 +688,24 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
-      {!profile.is_claimed && (
-        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
-      )}
+      <PublicClaimBanner
+        profileHandle={artist.handle}
+        displayName={artist.name}
+        directClaimSupported={directClaimSupported}
+        isClaimed={profile.is_claimed}
+        visitorState={visitorState}
+      />
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode='profile'
+        mode={requestedMode}
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}
         contacts={publicContacts}
-        subtitle='Artist'
-        showBackButton={false}
+        subtitle={subtitle}
+        showBackButton={showBackButton}
+        showPayButton={showPayButton}
         showTourButton={true}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
@@ -625,11 +718,14 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        profileSettings={{
+          showOldReleases: profileSettings.showOldReleases === true,
+        }}
+        releases={releases}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
-      <ProfileFooter artist={artist} />
     </>
   );
 }

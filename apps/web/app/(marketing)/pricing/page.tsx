@@ -173,6 +173,7 @@ function PricingTier({
       {/* CTA Button */}
       <Link
         href={buttonHref}
+        prefetch={false}
         className={`mt-6 mb-6 block w-full text-center md:mt-8 md:mb-8 ${
           buttonVariant === 'primary'
             ? 'public-action-primary'
@@ -315,13 +316,21 @@ export default function PricingPage() {
                 color: 'var(--linear-text-secondary)',
               }}
             >
-              Start free, upgrade anytime. No credit card required.
+              Start with a free 14-day Pro trial. No credit card required.
             </p>
             <div className='mt-8 flex items-center justify-center gap-4'>
-              <Link href='/signup' className='public-action-primary'>
+              <Link
+                href='/signup'
+                prefetch={false}
+                className='public-action-primary'
+              >
                 Get started
               </Link>
-              <Link href='/' className='public-action-secondary'>
+              <Link
+                href='/'
+                prefetch={false}
+                className='public-action-secondary'
+              >
                 Learn more
               </Link>
             </div>

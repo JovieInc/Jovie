@@ -24,10 +24,25 @@ vi.mock('@/lib/billing/verified-upgrade', () => ({
   formatVerifiedPriceLabel: () => '$20/mo',
 }));
 
+const mockUseBillingStatusQuery = vi.fn(() => ({
+  isLoading: false,
+  data: { isPro: false },
+}));
+
+const mockUsePlanGate = vi.fn(() => ({
+  isPro: true,
+  isTrialing: false,
+}));
+
 vi.mock('@/lib/queries', () => ({
-  useBillingStatusQuery: () => ({ isLoading: false, data: { isPro: false } }),
+  useBillingStatusQuery: (...args: unknown[]) =>
+    mockUseBillingStatusQuery(...args),
   usePricingOptionsQuery: () => ({ data: { options: [] } }),
   useCheckoutMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
+}));
+
+vi.mock('@/lib/queries/usePlanGate', () => ({
+  usePlanGate: () => mockUsePlanGate(),
 }));
 
 vi.mock('@/hooks/usePWAInstall', () => ({
@@ -38,18 +53,6 @@ vi.mock('@/hooks/usePWAInstall', () => ({
     dismiss: vi.fn(),
   }),
 }));
-
-vi.mock('@/lib/feature-flags/shared', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      PWA_INSTALL_BANNER: true,
-    },
-  };
-});
 
 vi.mock('@/lib/hooks/useVersionMonitor', () => ({
   useVersionMonitor: vi.fn(),

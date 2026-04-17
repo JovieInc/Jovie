@@ -2,6 +2,7 @@ import {
   Activity,
   Banknote,
   Briefcase,
+  Cable,
   CalendarDays,
   CheckSquare,
   FolderKanban,
@@ -14,8 +15,8 @@ import {
   MailCheck,
   Music,
   PieChart,
-  Radio,
   Settings,
+  Share2,
   ShieldCheck,
   SquarePen,
   UserCircle,
@@ -74,13 +75,6 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
-  },
-  {
-    name: 'Presence',
-    href: APP_ROUTES.PRESENCE,
-    id: 'presence',
-    icon: Radio,
-    description: 'See your profiles across streaming platforms',
   },
 ];
 
@@ -173,9 +167,11 @@ const adminIconById = {
   overview: LayoutDashboard,
   people: Users,
   growth: FolderKanban,
+  platform_connections: Cable,
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  share_studio: Share2,
 } as const;
 
 function buildAdminNavigationItems(

@@ -44,6 +44,9 @@ export interface PublicContact {
   roleLabel: string;
   territorySummary: string;
   territoryCount: number;
+  territories?: readonly string[];
+  companyLabel?: string;
+  contactName?: string;
   secondaryLabel?: string;
   primaryContactLabel?: string;
   channels: PublicContactChannel[];

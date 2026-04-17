@@ -1,6 +1,7 @@
+import Link from 'next/link';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
-import { MarketingFooter } from './MarketingFooter';
 import {
   MarketingHeader,
   type MarketingHeaderVariant,
@@ -38,7 +39,28 @@ export function PublicPageShell({
       >
         {children}
       </main>
-      <MarketingFooter />
+      <footer className='home-legal-bar'>
+        <nav
+          className='mx-auto flex w-full max-w-[var(--linear-content-max)] items-center justify-center gap-3 px-5 pb-6 pt-3 text-[11px] tracking-[-0.01em] sm:px-6 lg:px-0'
+          aria-label='Legal'
+        >
+          <Link
+            href={APP_ROUTES.LEGAL_PRIVACY}
+            className='home-legal-link focus-ring-themed rounded-md px-1.5 py-0.5'
+          >
+            Privacy
+          </Link>
+          <span aria-hidden='true' className='text-secondary-token/60'>
+            ·
+          </span>
+          <Link
+            href={APP_ROUTES.LEGAL_TERMS}
+            className='home-legal-link focus-ring-themed rounded-md px-1.5 py-0.5'
+          >
+            Terms
+          </Link>
+        </nav>
+      </footer>
     </div>
   );
 }

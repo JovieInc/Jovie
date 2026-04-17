@@ -42,7 +42,7 @@ export function LatestReleaseCard({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const releaseYear = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
+    ? new Date(release.releaseDate).getUTCFullYear()
     : null;
 
   const releaseTypeLabel =

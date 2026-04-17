@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 
 export function useTipPageTracking({
   artistHandle,
@@ -23,7 +23,7 @@ export function useTipPageTracking({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistHandle) return;
-    if (mode !== 'tip') return;
+    if (mode !== 'pay') return;
 
     trackTipRef.current.mutate({
       handle: artistHandle,
@@ -80,6 +80,7 @@ export function useProfileVisitTracking(
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistId) return;
+    if (process.env.NEXT_PUBLIC_CI === 'true') return;
 
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;

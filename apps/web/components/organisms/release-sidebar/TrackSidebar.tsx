@@ -347,11 +347,11 @@ export function TrackSidebar({
                 }
                 meta={
                   <div className='flex flex-wrap items-center gap-2 text-[10.5px] text-tertiary-token'>
-                    {track.durationMs != null ? (
+                    {track.durationMs == null ? null : (
                       <span className='tabular-nums'>
                         {formatDuration(track.durationMs)}
                       </span>
-                    ) : null}
+                    )}
                     {track.isrc ? (
                       <span className='font-mono text-[9.5px] tracking-[0.02em]'>
                         {track.isrc}

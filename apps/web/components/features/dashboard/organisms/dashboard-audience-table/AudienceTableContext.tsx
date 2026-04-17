@@ -24,6 +24,7 @@ interface AudienceTableStableContextValue {
   /** Indicates which metadata columns are currently hidden from the desktop table. */
   readonly hiddenMetadataColumns: {
     readonly location: boolean;
+    readonly source: boolean;
     readonly engagement: boolean;
     readonly lastSeen: boolean;
   };

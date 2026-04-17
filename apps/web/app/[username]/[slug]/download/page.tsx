@@ -16,14 +16,14 @@ import {
   SmartLinkPageFrame,
 } from '@/features/release/SmartLinkPagePrimitives';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import {
   getContentBySlug,
   getCreatorByUsername,
   getFeaturedSmartLinkStaticParams,
 } from '../_lib/data';
+import { isMissingPromoDownloadsRelation } from '../_lib/promo-download-errors';
 import { PromoDownloadGate } from './PromoDownloadGate';
 
 export const revalidate = 300; // ISR: 5 minutes
@@ -44,7 +44,7 @@ export async function generateMetadata({
   if (!creator) return {};
 
   const content = await getContentBySlug(creator.id, slug);
-  if (!content || content.type !== 'release') return {};
+  if (content?.type !== 'release') return {};
 
   const artistName = creator.displayName ?? creator.username;
 
@@ -70,17 +70,10 @@ export default async function PromoDownloadPage({ params }: PageProps) {
 
   const content = await getContentBySlug(creator.id, slug);
   // Only releases have promo downloads, not tracks
-  if (!content || content.type !== 'release') notFound();
+  if (content?.type !== 'release') notFound();
 
-  // Check artist has Pro plan
-  const [user] = await db
-    .select({ isPro: users.isPro })
-    .from(creatorProfiles)
-    .leftJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.id, creator.id))
-    .limit(1);
-
-  if (!user?.isPro) notFound();
+  const { plan } = await getCreatorEntitlements(creator.id);
+  if (plan === 'free') notFound();
 
   // Fetch active promo downloads for this release
   const files = await db
@@ -98,7 +91,13 @@ export default async function PromoDownloadPage({ params }: PageProps) {
         eq(promoDownloads.isActive, true)
       )
     )
-    .orderBy(promoDownloads.position);
+    .orderBy(promoDownloads.position)
+    .catch(error => {
+      if (!isMissingPromoDownloadsRelation(error)) {
+        throw error;
+      }
+      return [];
+    });
 
   if (files.length === 0) notFound();
 

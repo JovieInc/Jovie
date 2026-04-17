@@ -23,6 +23,7 @@ type PrimaryAction =
       rel?: string;
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
+      prefetch?: boolean;
       /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
       shortcut?: string;
     };
@@ -34,6 +35,7 @@ type SecondaryAction =
       target?: React.HTMLAttributeAnchorTarget;
       rel?: string;
       ariaLabel?: string;
+      prefetch?: boolean;
     }
   | {
       label: string;
@@ -138,6 +140,7 @@ export function EmptyState({
         <Button asChild variant={action.variant ?? 'primary'} size={buttonSize}>
           <Link
             href={action.href}
+            prefetch={action.prefetch ?? false}
             target={action.target}
             rel={action.rel}
             aria-label={action.ariaLabel ?? action.label}
@@ -168,6 +171,7 @@ export function EmptyState({
         <Button asChild variant='outline' size={buttonSize}>
           <Link
             href={secondaryAction.href}
+            prefetch={secondaryAction.prefetch ?? false}
             target={secondaryAction.target}
             rel={secondaryAction.rel}
             aria-label={secondaryAction.ariaLabel ?? secondaryAction.label}
@@ -203,7 +207,7 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-surface-0',
+            'mb-3 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1',
             styles.iconWrapper
           )}
           aria-hidden='true'

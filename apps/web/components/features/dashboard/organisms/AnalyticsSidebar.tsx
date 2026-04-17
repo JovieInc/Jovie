@@ -15,7 +15,10 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import type { AnalyticsRange } from '@/types/analytics';
+import type {
+  AnalyticsRange,
+  DashboardAnalyticsResponse,
+} from '@/types/analytics';
 
 /**
  * Calculate conversion rate between two funnel stages.
@@ -39,7 +42,7 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: '30d', label: '30d' },
 ];
 
-type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
+export type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
 
 const ANALYTICS_TAB_OPTIONS = [
   { value: 'cities' as const, label: 'Cities' },
@@ -133,7 +136,10 @@ function FunnelCard({
   const maxValue = stages[0]?.value ?? 0;
 
   return (
-    <DrawerSurfaceCard className='divide-y divide-subtle overflow-hidden py-1'>
+    <DrawerSurfaceCard
+      variant='card'
+      className='divide-y divide-subtle overflow-hidden py-1'
+    >
       {stages.map((stage, index) => {
         const barPercent = maxValue > 0 ? (stage.value / maxValue) * 100 : 0;
         const rate =
@@ -195,8 +201,9 @@ function RankedList({
 
   if (items.length === 0) {
     return (
-      <div className='min-h-[196px]'>
-        <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
+      <div className='flex min-h-[196px] flex-col items-center justify-center text-center'>
+        <IconComponent className='mb-1.5 h-4 w-4 text-quaternary-token' />
+        <p className='text-[12px] text-tertiary-token'>{emptyMessage}</p>
       </div>
     );
   }
@@ -231,19 +238,34 @@ export interface AnalyticsSidebarProps {
   readonly onClose: () => void;
 }
 
-export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
-  const [range, setRange] = useState<AnalyticsRange>('30d');
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
+  readonly data: DashboardAnalyticsResponse | null | undefined;
+  readonly loading: boolean;
+  readonly isFetching?: boolean;
+  readonly range: AnalyticsRange;
+  readonly onRangeChange: (range: AnalyticsRange) => void;
+  readonly showRangeControl?: boolean;
+  readonly activeTab: AnalyticsTab;
+  readonly onActiveTabChange: (tab: AnalyticsTab) => void;
+  readonly testId?: string;
+  readonly tabbedCardTestId?: string;
+}
 
-  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
-    range,
-    view: 'full',
-    enabled: true,
-  });
-
-  const loading = isLoading;
+export function AnalyticsSidebarView({
+  isOpen,
+  onClose,
+  data,
+  loading,
+  isFetching = false,
+  range,
+  onRangeChange,
+  showRangeControl = true,
+  activeTab,
+  onActiveTabChange,
+  testId = 'analytics-sidebar',
+  tabbedCardTestId = 'analytics-sidebar-tabbed-card',
+}: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
-
   const stages = [
     { label: 'Profile Views', value: data?.profile_views ?? 0 },
     { label: 'Unique Visitors', value: data?.unique_users ?? 0 },
@@ -254,7 +276,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Analytics'
-      data-testid='analytics-sidebar'
+      data-testid={testId}
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeader={
@@ -276,14 +298,16 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              <AppSegmentControl
-                value={range}
-                onValueChange={setRange}
-                options={RANGE_OPTIONS}
-                size='sm'
-                className='shrink-0'
-                aria-label='Analytics time range'
-              />
+              {showRangeControl ? (
+                <AppSegmentControl
+                  value={range}
+                  onValueChange={onRangeChange}
+                  options={RANGE_OPTIONS}
+                  size='sm'
+                  className='shrink-0'
+                  aria-label='Analytics time range'
+                />
+              ) : null}
             </div>
           </div>
         </DrawerSurfaceCard>
@@ -322,11 +346,11 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           ) : null}
         </DrawerStatGrid>
         <DrawerTabbedCard
-          testId='analytics-sidebar-tabbed-card'
+          testId={tabbedCardTestId}
           tabs={
             <DrawerTabs
               value={activeTab}
-              onValueChange={value => setActiveTab(value as AnalyticsTab)}
+              onValueChange={onActiveTabChange}
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'
@@ -386,5 +410,60 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         </DrawerTabbedCard>
       </div>
     </EntitySidebarShell>
+  );
+}
+
+export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
+  const [range, setRange] = useState<AnalyticsRange>('30d');
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+
+  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
+    range,
+    view: 'full',
+    enabled: true,
+  });
+
+  return (
+    <AnalyticsSidebarView
+      isOpen={isOpen}
+      onClose={onClose}
+      data={data}
+      loading={isLoading}
+      isFetching={isFetching}
+      range={range}
+      onRangeChange={setRange}
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
+    />
+  );
+}
+
+export function StaticAnalyticsSidebar({
+  isOpen,
+  onClose,
+  data,
+  testId = 'demo-analytics-sidebar',
+  tabbedCardTestId = 'demo-analytics-tabbed-card',
+}: AnalyticsSidebarProps & {
+  readonly data: DashboardAnalyticsResponse;
+  readonly testId?: string;
+  readonly tabbedCardTestId?: string;
+}) {
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+
+  return (
+    <AnalyticsSidebarView
+      isOpen={isOpen}
+      onClose={onClose}
+      data={data}
+      loading={false}
+      range='30d'
+      onRangeChange={() => {}}
+      showRangeControl={false}
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
+      testId={testId}
+      tabbedCardTestId={tabbedCardTestId}
+    />
   );
 }

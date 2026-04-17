@@ -108,7 +108,18 @@ export type ReleaseType =
   | 'compilation'
   | 'live'
   | 'mixtape'
+  | 'music_video'
   | 'other';
+
+/** Metadata stored in discogReleases.metadata JSONB for music_video releases */
+export interface MusicVideoMetadata {
+  youtubeVideoId: string;
+  youtubeThumbnailUrl?: string;
+  youtubePremiereDate?: string;
+  youtubeChannelId?: string;
+  youtubeChannelName?: string;
+  duration?: number;
+}
 
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
@@ -120,6 +131,9 @@ export interface ReleaseViewModel {
   title: string;
   artistNames?: string[];
   releaseDate?: string;
+  status: 'draft' | 'scheduled' | 'released';
+  revealDate?: string;
+  deletedAt?: string;
   artworkUrl?: string;
   slug: string;
   smartLinkPath: string;

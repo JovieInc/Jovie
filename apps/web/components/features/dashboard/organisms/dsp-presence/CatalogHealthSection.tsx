@@ -50,6 +50,45 @@ function getCatalogScanPollDelayMs(
 }
 
 // ============================================================================
+// Header helpers
+// ============================================================================
+
+function getCatalogHeaderText(opts: {
+  isScanning: boolean;
+  scanFailed: boolean;
+  neverScanned: boolean;
+  allClear: boolean;
+  matchedCount: number;
+  unresolvedCount: number;
+}): string {
+  if (opts.isScanning) return 'Scanning...';
+  if (opts.scanFailed) return 'Scan failed';
+  if (opts.neverScanned) return 'Catalog Health';
+  if (opts.allClear) return `All clear — ${opts.matchedCount} ISRCs matched`;
+  return `Catalog Health — ${opts.unresolvedCount} to review`;
+}
+
+function CatalogStatusIcon({
+  isScanning,
+  scanFailed,
+  allClear,
+  hasResults,
+}: Readonly<{
+  isScanning: boolean;
+  scanFailed: boolean;
+  allClear: boolean;
+  hasResults: boolean;
+}>) {
+  if (isScanning)
+    return <Loader2 className='h-3.5 w-3.5 animate-spin text-primary' />;
+  if (scanFailed) return <XCircle className='h-3.5 w-3.5 text-destructive' />;
+  if (allClear) return <CheckCircle2 className='h-3.5 w-3.5 text-green-500' />;
+  if (hasResults)
+    return <AlertTriangle className='h-3.5 w-3.5 text-amber-500' />;
+  return <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />;
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -250,15 +289,14 @@ export function CatalogHealthSection({
     scan?.status === 'completed' && unresolvedNotInCatalog.length === 0;
   const scanFailed = scan?.status === 'failed' || !!scanError;
 
-  const headerText = isScanning
-    ? 'Scanning...'
-    : scanFailed
-      ? 'Scan failed'
-      : neverScanned
-        ? 'Catalog Health'
-        : allClear
-          ? `All clear — ${scan?.matchedCount ?? 0} ISRCs matched`
-          : `Catalog Health — ${unresolvedNotInCatalog.length} to review`;
+  const headerText = getCatalogHeaderText({
+    isScanning,
+    scanFailed,
+    neverScanned,
+    allClear,
+    matchedCount: scan?.matchedCount ?? 0,
+    unresolvedCount: unresolvedNotInCatalog.length,
+  });
 
   return (
     <div className='border-t border-border'>
@@ -269,17 +307,12 @@ export function CatalogHealthSection({
         className='flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50'
         aria-expanded={isOpen}
       >
-        {isScanning ? (
-          <Loader2 className='h-3.5 w-3.5 animate-spin text-primary' />
-        ) : scanFailed ? (
-          <XCircle className='h-3.5 w-3.5 text-destructive' />
-        ) : allClear ? (
-          <CheckCircle2 className='h-3.5 w-3.5 text-green-500' />
-        ) : hasResults ? (
-          <AlertTriangle className='h-3.5 w-3.5 text-amber-500' />
-        ) : (
-          <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />
-        )}
+        <CatalogStatusIcon
+          isScanning={isScanning}
+          scanFailed={scanFailed}
+          allClear={allClear}
+          hasResults={hasResults}
+        />
 
         <span className='flex-1 text-xs font-medium'>{headerText}</span>
 

@@ -113,6 +113,10 @@ function formatTitleFromSlug(slug: string): string {
     .join(' ');
 }
 
+function stripHtmlH1Blocks(html: string): string {
+  return html.replaceAll(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, '');
+}
+
 async function readBlogPostFile(slug: string): Promise<{
   content: string;
   data: Record<string, string>;
@@ -128,6 +132,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
   const doc = await createMarkdownDocument(content);
   const excerpt = createExcerpt(content);
   const words = countWords(content);
+  const html = stripHtmlH1Blocks(doc.html);
+  const toc = doc.toc.filter(entry => entry.level !== 1);
 
   return {
     slug,
@@ -144,6 +150,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     readingTime: calculateReadingTime(words),
     wordCount: words,
     ...doc,
+    html,
+    toc,
   };
 }
 
@@ -162,7 +170,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
 
   const slugs = entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-    .map(entry => entry.name.replace(/\.md$/, ''));
+    .map(entry => entry.name.slice(0, -3));
 
   const posts = await Promise.all(
     slugs.map(async slug => {
@@ -202,5 +210,5 @@ export const getBlogPostSlugs = cache(async (): Promise<string[]> => {
   }
   return entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-    .map(entry => entry.name.replace(/\.md$/, ''));
+    .map(entry => entry.name.slice(0, -3));
 });

@@ -1,11 +1,18 @@
 import { UnreleasedReleaseHero } from '@/features/release/UnreleasedReleaseHero';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { DemoClientProviders } from './DemoClientProviders';
+
+/** Returns a date N days from now so the countdown always looks realistic. */
+function futureDate(daysFromNow: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d;
+}
 
 /**
  * Demo surface for a presave/unreleased release state.
- * Uses a far-future date so the countdown does not expire in demo/proof surfaces.
- * Backed by UnreleasedReleaseHero with the canonical internal demo DJ data.
+ * Uses a rolling 10-day-from-now date so the countdown always looks realistic.
+ * Backed by UnreleasedReleaseHero with the founder's profile data.
  */
 export function DemoReleasePresaveSurface() {
   return (
@@ -17,16 +24,16 @@ export function DemoReleasePresaveSurface() {
             slug: 'the-deep-end',
             title: 'The Deep End',
             artworkUrl: null,
-            releaseDate: new Date('2099-12-31T00:00:00Z'),
+            releaseDate: futureDate(10),
             trackId: null,
             hasSpotify: true,
             hasAppleMusic: true,
           }}
           artist={{
-            id: 'demo-calvin-harris',
-            name: INTERNAL_DJ_DEMO_PERSONA.profile.displayName,
-            handle: INTERNAL_DJ_DEMO_PERSONA.profile.handle,
-            avatarUrl: INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc,
+            id: 'demo-tim-white',
+            name: TIM_WHITE_PROFILE.name,
+            handle: TIM_WHITE_PROFILE.handle,
+            avatarUrl: TIM_WHITE_PROFILE.avatarSrc,
           }}
         />
       </div>

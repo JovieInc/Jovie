@@ -1,8 +1,8 @@
 import { and, eq, gte } from 'drizzle-orm';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { db } from '@/lib/db';
 import type { TourDate } from '@/lib/db/schema/tour';
 import { tourDates } from '@/lib/db/schema/tour';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { toISOStringSafe } from '@/lib/utils/date';
 
 function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {

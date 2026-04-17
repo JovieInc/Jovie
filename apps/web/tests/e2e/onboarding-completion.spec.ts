@@ -113,7 +113,7 @@ test.describe('Onboarding Completion & Empty States', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // STEP 3: Complete handle entry
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Claim your handle');
     await expect(handleInput).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(async () => (await handleInput.inputValue()).trim(), {
@@ -286,7 +286,7 @@ test.describe('Onboarding State Persistence', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // Enter handle (partial progress)
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Claim your handle');
     await expect(handleInput).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(async () => (await handleInput.inputValue()).trim(), {

@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockUsePlanGate = vi.fn(() => ({
@@ -120,6 +119,42 @@ vi.mock('@/components/molecules/drawer', () => ({
       data-testid={testId}
       data-surface-variant={variant}
     >
+      {children}
+    </div>
+  ),
+  DrawerInspectorStack: ({
+    children,
+    'data-testid': testId,
+  }: {
+    children?: React.ReactNode;
+    'data-testid'?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  DrawerInspectorCard: ({
+    children,
+    title,
+    actions,
+    'data-testid': testId,
+  }: {
+    children?: React.ReactNode;
+    title: string;
+    actions?: React.ReactNode;
+    'data-testid'?: string;
+  }) => (
+    <section data-testid={testId}>
+      <h3>{title}</h3>
+      {actions}
+      {children}
+    </section>
+  ),
+  DrawerFormGridRow: ({
+    children,
+    label,
+  }: {
+    children?: React.ReactNode;
+    label: React.ReactNode;
+  }) => (
+    <div>
+      <span>{label}</span>
       {children}
     </div>
   ),
@@ -326,11 +361,16 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
 
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareContextMenuItems: () => [],
-  getUTMShareDropdownItems: () => [],
-}));
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareContextMenuItems: () => [],
+    getUTMShareDropdownItems: () => [],
+  };
+});
 
 // Import after mocks
 const { ReleaseSidebar } = await import(
@@ -364,7 +404,7 @@ const defaultProps = {
   providerConfig: {} as Record<string, { label: string; accent: string }>,
 };
 
-describe('ReleaseSidebar Links tab', () => {
+describe('ReleaseSidebar inspector cards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUsePlanGate.mockReturnValue({
@@ -381,60 +421,29 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Tracks, DSPs, Details, and Lyrics works', async () => {
-    const user = userEvent.setup();
+  it('renders Tracks, DSPs, Details, Settings, Lyrics, and Tasks as inspector cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Tracks tab active by default
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
-    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
-
-    // Switch to DSPs tab
-    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
-
-    // Switch to Details tab
-    await user.click(screen.getByTestId('drawer-tab-details'));
-    expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
-    expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-
-    // Switch to Settings tab (async-toggle lives here now)
-    await user.click(screen.getByTestId('drawer-tab-settings'));
     expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
-    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
-
-    // Switch to Lyrics tab
-    await user.click(screen.getByTestId('drawer-tab-lyrics'));
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.getByTestId('lyrics')).toHaveAttribute(
       'data-variant',
       'flat'
     );
-    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
-
-    // Switch back to Tracks
-    await user.click(screen.getByTestId('drawer-tab-playback'));
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
-
-    // Switch to Tasks
-    await user.click(screen.getByTestId('drawer-tab-tasks'));
     expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
-  it('shows the compact upgrade card when task access is locked', async () => {
+  it('shows the compact upgrade card when task access is locked', () => {
     mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: false,
     });
 
-    const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
-
-    await user.click(screen.getByTestId('drawer-tab-tasks'));
 
     expect(
       screen.getByTestId('compact-release-plan-upgrade-card')
@@ -442,16 +451,13 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
-  it('shows a loading state instead of the lock card while task access is resolving', async () => {
+  it('shows a loading state instead of the lock card while task access is resolving', () => {
     mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: true,
     });
 
-    const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
-
-    await user.click(screen.getByTestId('drawer-tab-tasks'));
 
     expect(
       screen.getByTestId('release-tasks-loading-state')
@@ -476,30 +482,25 @@ describe('ReleaseSidebar Links tab', () => {
       'data-surface-variant',
       'card'
     );
-    // DrawerTabbedCard always renders as card variant (no configurable prop)
-    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
+    expect(screen.queryByTestId('release-tabbed-card')).not.toBeInTheDocument();
   });
 
-  it('preserves active tab when release changes', async () => {
-    const user = userEvent.setup();
+  it('keeps inspector cards rendered when release changes', () => {
     const { rerender } = render(
       <ReleaseSidebar release={mockRelease} {...defaultProps} />
     );
 
-    // Switch to Links tab
-    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
 
-    // Change release
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    // Should preserve the Links tab for workflow continuity
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
   });
 
-  it('Links tab renders DSP links section', async () => {
-    const user = userEvent.setup();
+  it('renders DSP links section actions', () => {
     render(
       <ReleaseSidebar
         release={mockRelease}
@@ -511,7 +512,6 @@ describe('ReleaseSidebar Links tab', () => {
       />
     );
 
-    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     expect(
@@ -535,18 +535,16 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tab-details')).toBeInTheDocument();
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
+    expect(screen.queryByTestId('drawer-tabs')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('release-tab-panel-card')
     ).not.toBeInTheDocument();
   });
 
-  it('opts the release sidebar tabs into horizontal scroll mode', () => {
+  it('does not render the old release sidebar tab rail', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('drawer-tabs')).toHaveAttribute(
-      'data-overflow-mode',
-      'scroll'
-    );
+    expect(screen.queryByTestId('drawer-tabs')).not.toBeInTheDocument();
   });
 });

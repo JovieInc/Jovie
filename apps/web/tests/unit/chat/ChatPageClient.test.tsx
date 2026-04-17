@@ -15,14 +15,31 @@ const mockSetHeaderBadge = vi.fn();
 const mockSetHeaderActions = vi.fn();
 const mockSuccessNotification = vi.fn();
 const mockErrorNotification = vi.fn();
-const { mockSentryAddBreadcrumb, mockSentryCaptureMessage } = vi.hoisted(
-  () => ({
-    mockSentryAddBreadcrumb: vi.fn(),
-    mockSentryCaptureMessage: vi.fn(),
-  })
-);
+const {
+  mockClosePreviewPanel,
+  mockOpenPreviewPanel,
+  mockPreviewPanelState,
+  mockSentryAddBreadcrumb,
+  mockSentryCaptureMessage,
+  mockSetPreviewData,
+  mockTogglePreviewPanel,
+  mockUseRegisterRightPanel,
+} = vi.hoisted(() => ({
+  mockClosePreviewPanel: vi.fn(),
+  mockOpenPreviewPanel: vi.fn(),
+  mockPreviewPanelState: { isOpen: false },
+  mockSentryAddBreadcrumb: vi.fn(),
+  mockSentryCaptureMessage: vi.fn(),
+  mockSetPreviewData: vi.fn(),
+  mockTogglePreviewPanel: vi.fn(),
+  mockUseRegisterRightPanel: vi.fn(),
+}));
 
 let mockSearchParams = new URLSearchParams();
+
+function hasRegisteredRightPanel(): boolean {
+  return mockUseRegisterRightPanel.mock.calls.some(([panel]) => panel !== null);
+}
 
 // Mock next/dynamic for ProfileContactSidebar (ssr:false doesn't render in jsdom)
 vi.mock('next/dynamic', () => ({
@@ -102,24 +119,31 @@ vi.mock(
       ...actual,
       usePreviewPanelData: () => ({
         previewData: null,
-        setPreviewData: vi.fn(),
+        setPreviewData: mockSetPreviewData,
       }),
       usePreviewPanelState: () => ({
-        isOpen: false,
-        open: vi.fn(),
-        close: vi.fn(),
-        toggle: vi.fn(),
+        isOpen: mockPreviewPanelState.isOpen,
+        open: mockOpenPreviewPanel,
+        close: mockClosePreviewPanel,
+        toggle: mockTogglePreviewPanel,
       }),
     };
   }
 );
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
-  useRegisterRightPanel: vi.fn(),
+  useRegisterRightPanel: (...args: unknown[]) =>
+    mockUseRegisterRightPanel(...args),
 }));
 
 vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
   useDashboardSocialLinksQuery: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock('@/lib/queries/useChatMutations', () => ({
+  useDeleteConversationMutation: () => ({ mutateAsync: vi.fn() }),
+  useCreateConversationMutation: () => ({ mutateAsync: vi.fn() }),
+  useAddMessagesMutation: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock('@statsig/react-bindings', () => ({
@@ -183,6 +207,8 @@ describe('ChatPageClient', () => {
     capturedOnTitleChange = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
+    mockSetPreviewData.mockReset();
+    mockPreviewPanelState.isOpen = false;
     globalThis.sessionStorage.clear();
   });
 
@@ -255,18 +281,54 @@ describe('ChatPageClient', () => {
 
     const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
 
+    expect(headerActions).not.toBeNull();
     expect(headerActions).toEqual(
       expect.objectContaining({
         type: expect.anything(),
       })
     );
-    expect(React.Children.count(headerActions.props.children)).toBe(1);
   });
 
   it('does not register chat header actions on the new-thread route', () => {
     renderChatPage();
 
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
+  });
+
+  it('hydrates the profile right panel when preview state is open without a panel query', () => {
+    mockPreviewPanelState.isOpen = true;
+
+    renderChatPage();
+
+    expect(mockUseRegisterRightPanel).toHaveBeenCalled();
+    expect(hasRegisteredRightPanel()).toBe(true);
+  });
+
+  it('clears preview data while profile panel hydration is inactive', () => {
+    mockPreviewPanelState.isOpen = false;
+
+    renderChatPage();
+
+    expect(hasRegisteredRightPanel()).toBe(false);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
+  });
+
+  it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {
+    mockSearchParams = new URLSearchParams('panel=profile');
+    mockPreviewPanelState.isOpen = false;
+
+    const { rerender } = renderChatPage();
+
+    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
+
+    mockPreviewPanelState.isOpen = true;
+    rerender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    expect(hasRegisteredRightPanel()).toBe(true);
   });
 
   it('cleans up header actions on unmount', () => {

@@ -81,11 +81,13 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_REVIEW: '/app/admin/outreach/review',
   ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
+  ADMIN_SHARE_STUDIO: '/app/admin/share-studio',
   ADMIN_RELEASES: '/app/admin/releases',
   ADMIN_USERS_BAN: '/app/admin/users/ban',
   ADMIN_USERS_UNBAN: '/app/admin/users/unban',
   ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
   ADMIN_PLAYLISTS: '/app/admin/playlists',
+  ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
 
   // System
   UNAVAILABLE: '/unavailable',
@@ -93,14 +95,24 @@ export const APP_ROUTES = {
   // Marketing
   HOME: '/',
   ABOUT: '/about',
+  AI: '/ai',
+  ALTERNATIVES: '/alternatives',
   ARTIST_PROFILES: '/artist-profiles',
+  BLOG: '/blog',
+  BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',
+  BLOG_THE_MYSPACE_PROBLEM: '/blog/the-myspace-problem',
+  COMPARE: '/compare',
   DEMO: '/demo',
+  DEMO_VIDEO: '/demo/video',
+  ENGAGEMENT_ENGINE: '/engagement-engine',
+  INVESTORS: '/investors',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
   SUPPORT: '/support',
+  PAY: '/pay',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

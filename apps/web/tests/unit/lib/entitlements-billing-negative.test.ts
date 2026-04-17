@@ -157,7 +157,7 @@ describe('Entitlements – Free Tier Boundary Enforcement', () => {
     });
     const e = await getCurrentUserEntitlements();
 
-    expect(e.contactsLimit).toBe(5000);
+    expect(e.contactsLimit).toBeNull();
   });
 
   it('max user has unlimited contacts (null, not Infinity)', async () => {

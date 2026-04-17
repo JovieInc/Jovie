@@ -286,6 +286,7 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 ### 4b. Subtraction Principle (Tim White Canon)
 
 - UI cleanup must follow the subtraction principle: remove before adding
+- Before building a child component, open the parent container file and list what chrome (title, header, card surface, borders) it already renders — then omit those from the child
 - When a screen feels messy, agents should first look for duplicated labels, redundant helper text, nested containers, extra borders, repeated actions, and unnecessary variants
 - Prefer one clear heading, one clear action cluster, and one clear surface hierarchy instead of layering multiple decorative cues
 - If an existing label, icon, placeholder, or layout already communicates the action, remove the extra explanatory UI around it
@@ -297,11 +298,37 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
-- Do **NOT** wrap every block in rounded cards or bordered boxes just to create structure; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast
 - Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
 - Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
 - Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
 - When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
+
+### 4d. No Redundant Chrome (Container-Aware Design)
+
+Before adding a title, header, card wrapper, or label to a component, **read the parent container** that will render it. Containers already provide chrome — do not duplicate it.
+
+| Container | Chrome it provides | Do NOT add inside it |
+|---|---|---|
+| `EntitySidebarShell` | `DrawerHeader` via `title` prop | Card header or heading repeating the drawer title |
+| `Sheet` / `Dialog` | `SheetHeader` / `DialogHeader` + title | Second heading or Card wrapping the body content |
+| `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
+| `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
+| `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name (see §No Duplicate Page Titles) |
+
+**Checklist (run before every UI component PR):**
+
+1. **Read the mount point** — open the parent layout/page and identify what container renders your component. What title, header, and surface does it already provide?
+2. **Grep for repeated text** — search the route tree for your title/label string. If the same label appears 3+ times on one screen, deduplicate.
+3. **Check surface nesting** — if the parent is already a Card, Sheet, or `DrawerSurfaceCard`, do not wrap children in another Card. Use `variant='flat'` or plain `div`.
+4. **One heading per visual section** — a section gets exactly one title. If the container already renders one, your component renders zero.
+
+**Banned patterns:**
+- `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
+- `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
+- Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
+
+This is 4b (subtraction principle) applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
 ### 5. Conventional Commits Required
 
@@ -442,7 +469,15 @@ Never mark a task complete without confirming the fix works:
 - Screenshot test: before and after a perf PR, the fully-loaded page must look identical
 - If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
 
-### 17. Outbound Email Personalization Must Fail Safe
+### 17. CSP Domains Must Stay In Sync With Providers
+
+When adding a new DSP, social platform, or any feature that loads external images or media in the browser, update `apps/web/constants/platforms/cdn-domains.ts`:
+- Image CDNs → `PLATFORM_CDN_DOMAINS` (governs CSP `img-src` + Next.js `remotePatterns`)
+- Audio/video CDNs → `PLATFORM_MEDIA_DOMAINS` (governs CSP `media-src`)
+
+These registries are the **single source of truth** consumed by the CSP builder, Next.js config, and avatar hostname validation. Do **NOT** edit CSP directives in `content-security-policy.ts` directly — add domains to the registry instead.
+
+### 18. Outbound Email Personalization Must Fail Safe
 
 - In cold email, lifecycle email, or claim-invite copy, **NEVER** greet recipients with raw usernames, handles, emoji names, or other guessed merge fields
 - Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener
@@ -1441,6 +1476,8 @@ AI agents confidently make decisions about topics they have zero context on. The
 
 5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
 
+6. **Verify before trusting.** When the user (or another agent's output) states something verifiable — "we use X," "competitor Y doesn't do Z," "this API returns W" — check it. A quick grep, file read, or doc lookup takes seconds. If the claim is wrong, say so clearly. This is how we catch agent drift (an agent introduced something it shouldn't have), stale assumptions, and documentation gaps. Being corrected is a feature, not a problem.
+
 ### Operational Awareness Checklist
 
 Before merging any PR that introduces background/scheduled work, verify:
@@ -1690,3 +1727,10 @@ Key routing rules:
 - Design system, brand → invoke `design-consultation`
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
+
+## CI Seeding Guardrail
+
+- In shared CI lanes that audit public routes (`Lighthouse`, `a11y`, public smoke), seed scripts must fail only on required schema.
+- Optional fixtures that depend on add-on relations, such as `promo_downloads`, must warn and skip when the relation is missing unless that lane explicitly provisions the schema first.
+- Playwright route-audit specs must not resolve manifests or env-dependent surface lists in a way that can crash the module import. Catch resolution failures and surface them through an always-registered test or equivalent explicit failure path; `beforeAll` alone is insufficient if manifest failure can result in zero generated tests.
+- Test-bypass health/debug endpoints must fail closed on production deploys. Preview-only bypass logic may exist for CI smoke runs, but `VERCEL_ENV=production` must hard-block access regardless of spoofable headers or bypass flags.

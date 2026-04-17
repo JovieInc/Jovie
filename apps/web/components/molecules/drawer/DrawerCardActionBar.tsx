@@ -128,8 +128,10 @@ export function DrawerCardActionBar({
           {overflowTrigger}
           {floatingCloseButton}
         </div>
-      ) : overflowTriggerPlacement === 'card-top-right' &&
-        floatingCloseButton ? (
+      ) : null}
+      {overflowTriggerPlacement === 'card-top-right' &&
+      !overflowTrigger &&
+      floatingCloseButton ? (
         <div className='absolute right-3 top-3 z-10'>{floatingCloseButton}</div>
       ) : null}
       {displayActions.map(action => {

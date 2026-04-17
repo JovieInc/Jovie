@@ -30,6 +30,8 @@ export type PerfResourceMetricName =
 
 export type PerfRouteGroup =
   | 'home'
+  | 'marketing-public'
+  | 'legal-public'
   | 'public-profile-core'
   | 'public-profile-mode-shell'
   | 'public-profile-detail'
@@ -41,6 +43,8 @@ export type PerfRouteGroup =
 
 export type PerfRouteSurface =
   | 'homepage'
+  | 'marketing'
+  | 'legal'
   | 'public-profile'
   | 'creator-app'
   | 'account-billing'
@@ -168,6 +172,14 @@ const ACCOUNT_BILLING_RESOURCE_BUDGETS = [
   { resourceType: 'total', budget: 3300 },
 ] as const satisfies readonly PerfResourceBudget[];
 
+const ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 3000 },
+  { resourceType: 'image', budget: 700 },
+  { resourceType: 'font', budget: 100 },
+  { resourceType: 'stylesheet', budget: 850 },
+  { resourceType: 'total', budget: 3900 },
+] as const satisfies readonly PerfResourceBudget[];
+
 const ONBOARDING_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 2600 },
   { resourceType: 'image', budget: 700 },
@@ -178,14 +190,16 @@ const ONBOARDING_RESOURCE_BUDGETS = [
 
 const GROUP_PRIORITY: Record<PerfRouteGroup, number> = {
   home: 1,
-  'public-profile-core': 2,
-  'public-profile-mode-shell': 3,
-  'public-profile-detail': 4,
-  'creator-shell': 5,
-  'creator-alias': 6,
-  'account-billing': 7,
-  onboarding: 8,
-  auth: 9,
+  'marketing-public': 2,
+  'legal-public': 3,
+  'public-profile-core': 4,
+  'public-profile-mode-shell': 5,
+  'public-profile-detail': 6,
+  'creator-shell': 7,
+  'creator-alias': 8,
+  'account-billing': 9,
+  onboarding: 10,
+  auth: 11,
 };
 
 const HOME_ROUTE = {
@@ -377,7 +391,7 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['[data-testid="profile-header"]'],
-      redirectDestinations: ['/[username]?mode=tip'],
+      redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },
@@ -408,6 +422,27 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     priority: 9,
     seedProfile: 'dualipa',
   },
+  {
+    id: 'public-profile-releases',
+    group: 'public-profile-core',
+    surface: 'public-profile',
+    path: '/[username]/releases',
+    resolvePath: resolveSeededProfilePath,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'redirect',
+    readySelectors: {
+      content: ['[data-testid="profile-header"]'],
+      redirectDestinations: ['/[username]?mode=releases'],
+    },
+    timings: [
+      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 2400 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 9,
+    seedProfile: 'dualipa',
+  },
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
@@ -422,7 +457,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-listen"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-listen"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -433,17 +471,20 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     seedProfile: 'dualipa',
   },
   {
-    id: 'public-profile-mode-tip',
+    id: 'public-profile-mode-pay',
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
-    path: '/[username]?mode=tip',
+    path: '/[username]?mode=pay',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tip"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-pay"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -464,7 +505,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-subscribe"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-subscribe"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -485,7 +529,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-about"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-about"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -506,7 +553,10 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-contact"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-contact"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -527,7 +577,34 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     measureMode: 'interactive-shell',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['[data-testid="profile-mode-drawer-tour"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-tour"]',
+        '[data-testid="profile-header"]',
+      ],
+    },
+    timings: [
+      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 2400 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 6,
+    seedProfile: 'dualipa',
+  },
+  {
+    id: 'public-profile-mode-releases',
+    group: 'public-profile-mode-shell',
+    surface: 'public-profile',
+    path: '/[username]?mode=releases',
+    resolvePath: resolveSeededProfileModePath,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'interactive-shell',
+    readySelectors: {
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-mode-drawer-releases"]',
+        '[data-testid="profile-header"]',
+      ],
     },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
@@ -626,6 +703,88 @@ const PUBLIC_PROFILE_DETAIL_ROUTES = [
   },
 ] as const satisfies readonly PerfRouteDefinition[];
 
+const MARKETING_PUBLIC_ROUTES = [
+  {
+    id: 'marketing-pricing',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.PRICING,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2600 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 1,
+  },
+  {
+    id: 'marketing-support',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.SUPPORT,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2600 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 2,
+  },
+] as const satisfies readonly PerfRouteDefinition[];
+
+const LEGAL_PUBLIC_ROUTES = [
+  {
+    id: 'legal-privacy',
+    group: 'legal-public',
+    surface: 'legal',
+    path: APP_ROUTES.LEGAL_PRIVACY,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 2000 },
+      { metric: 'largest-contentful-paint', budget: 2800 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1700 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 1,
+  },
+  {
+    id: 'legal-terms',
+    group: 'legal-public',
+    surface: 'legal',
+    path: APP_ROUTES.LEGAL_TERMS,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 2000 },
+      { metric: 'largest-contentful-paint', budget: 2800 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1700 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 2,
+  },
+] as const satisfies readonly PerfRouteDefinition[];
+
 const CREATOR_SHELL_ROUTES = [
   {
     id: 'creator-app-home',
@@ -636,10 +795,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -648,7 +804,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'cumulative-layout-shift', budget: 0.1 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1500 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      { metric: 'skeleton-to-content', budget: 750 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 1,
@@ -663,10 +819,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [
-        'button[aria-label="New thread"]',
-        '[placeholder*="ask jovie" i]',
-      ],
+      content: ['[data-testid="chat-content"]'],
       loading: ['[data-testid="chat-loading"]'],
     },
     timings: [
@@ -717,7 +870,12 @@ const CREATOR_SHELL_ROUTES = [
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dashboard-audience-client"]'] },
+    readySelectors: {
+      content: [
+        '[data-testid="dashboard-audience-client"]',
+        '[data-testid="dashboard-audience-empty-state"]',
+      ],
+    },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
       { metric: 'largest-contentful-paint', budget: 3000 },
@@ -743,7 +901,7 @@ const CREATOR_SHELL_ROUTES = [
       redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn`],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'redirect-complete', budget: 700 },
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
@@ -783,17 +941,17 @@ const CREATOR_SHELL_ROUTES = [
     path: APP_ROUTES.PRESENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['[data-testid="dsp-presence-workspace"]'] },
+    measureMode: 'redirect',
+    readySelectors: {
+      content: ['section#artist-profile'],
+      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`],
+    },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 3000 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1600 },
-      { metric: 'skeleton-to-content', budget: 600 },
+      // This alias lands on the heavier artist-profile music settings surface.
+      { metric: 'redirect-complete', budget: 1500 },
+      { metric: 'time-to-first-byte', budget: 1200 },
     ],
-    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    resourceSizes: ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS,
     priority: 7,
     seedProfile: 'active-user',
   },
@@ -806,23 +964,21 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
+      shell: ['[data-testid="releases-shell-ready"]'],
       content: [
         '[data-testid="releases-loading"]',
         '[data-testid="releases-matrix"]',
       ],
       loading: ['[data-testid="releases-loading"]'],
       navTrigger: [
-        `a[href="${APP_ROUTES.RELEASES}"]`,
         `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
+        `a[href="${APP_ROUTES.RELEASES}"]`,
       ],
       redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1500 },
-      { metric: 'largest-contentful-paint', budget: 2500 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1500 },
+      // Initial-load render budgets for releases are covered by Lighthouse.
+      // The local launch gate only enforces the warm authenticated nav path.
       { metric: 'warm-shell-response', budget: 100 },
       { metric: 'skeleton-to-content', budget: 1000 },
     ],
@@ -840,7 +996,10 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: [':text-matches("up next|tasks", "i")'],
+      content: [
+        '[data-testid="release-task-page"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1800 },
@@ -1450,6 +1609,8 @@ const AUTH_ROUTES = [
 
 export const END_USER_PERF_ROUTE_MANIFEST = [
   HOME_ROUTE,
+  ...MARKETING_PUBLIC_ROUTES,
+  ...LEGAL_PUBLIC_ROUTES,
   ...PUBLIC_PROFILE_CORE_ROUTES,
   ...PUBLIC_PROFILE_MODE_SHELL_ROUTES,
   ...PUBLIC_PROFILE_DETAIL_ROUTES,

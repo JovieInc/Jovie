@@ -5,6 +5,372 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.154.2] - 2026-04-16
+
+> Public demo and screenshot pages now stay aligned with the real product screens, so review links and captures reflect the UI the team is actually shipping.
+
+### Added
+
+- [internal] Added canonical surface ownership metadata and demo parity coverage for shared dashboard screenshot routes.
+
+### Changed
+
+- [internal] `/demo/audience`, analytics, settings, links, earnings, and onboarding demo flows now render shared app surfaces with fixture-backed data instead of separate demo-only panels.
+- [internal] Homepage smart-link proof now uses a generated product screenshot instead of mounting a live demo widget.
+
+### Fixed
+
+- [internal] Demo releases no longer request live-auth-only release credits on the public route.
+- [internal] Demo audience fixtures are now deterministic, which removes hydration drift while keeping hot-reload parity stable.
+
+## [26.4.154.1] - 2026-04-16
+
+> Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
+
+### Added
+
+- Added the Admin Platform Connections page with Spotify Publisher and Playlist Engine controls.
+- Added admin system settings for playlist publisher and engine eligibility state.
+- [internal] Added focused unit coverage for platform connection helpers, Spotify token lookup, cron gating, and the admin UI smoke path.
+
+### Changed
+
+- [internal] Playlist generation cron now uses the admin database toggle and eligibility interval instead of the playlist feature flag.
+- [internal] Jovie Spotify token resolution now prefers the configured admin publisher and falls back to the legacy env system account when present.
+### Fixed
+
+- [internal] Moved playlist cadence persistence into the durable generation path so cron lease retries cannot create duplicate pending playlists after a partial success.
+- [internal] Split the Admin Platform Connections client into smaller Spotify and engine tab components and resolved follow-up review comments around control labels and button state logic.
+- [internal] Reduced hidden homepage hero rendering work to improve the public Lighthouse margin on the landing page.
+
+## [26.4.154.0] - 2026-04-15
+
+> Audience now explains fan activity with verified, source-aware language and trackable QR links.
+
+### Added
+
+- Added structured audience actions with evidence-safe sentence rendering, so Spotify, Apple, and YouTube clicks render as checked-out or opened activity instead of overclaiming listens or watches.
+- Added creator-owned source groups and source links for QR and short-link attribution, so audience activity shows where scans and link visits came from.
+- Added audience source creation and share actions from the existing dashboard share pattern: Copy Link, Open Link, and Download QR Code.
+- [internal] Added `/s/[code]` redirects, UTM appending, scan counting, and missing-code handling for source links.
+- [internal] Added tests for audience activity grammar, source-link code generation, audience table rendering, redirect behavior, and structured tracking expectations.
+
+### Changed
+
+- [internal] Updated audience click, visit, track, subscription, and activity-feed paths to write structured audience events while preserving legacy latest-action projections.
+- Updated the audience table and member sidebar to show Source, Last Activity, tokenized activity language, and combined QR/UTM/referrer source rows.
+
+### Fixed
+
+- [internal] Fixed Source menu triggering in the Audience header by using a Radix-compatible header action button.
+- [internal] Fixed QR PNG downloads by converting generated data URLs locally instead of fetching `data:` URLs blocked by CSP.
+
+## [26.4.153.7] - 2026-04-16
+
+> Artist Profiles now uses real Tim White profile screenshots for proof, with cleaner demo chrome and a more focused fan-capture story.
+
+### Added
+
+- [internal] Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
+- [internal] Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
+- [internal] Added regression coverage for profile release drawer gating and UTC release-year rendering.
+
+### Changed
+
+- Reworked the Artist Profiles adaptive section around the “One profile. Adapts to every fan.” thesis with one-line mode pills and captured product shots.
+- Rebuilt the Capture Every Fan section as a restrained audience-intelligence surface with opt-in action and slow audience rails.
+- Updated the Built for artists spec wall with a Dedicated release pages tile.
+- Updated the outcomes headline to “Built for artists.”
+- Made the Artist Profiles FAQ keep only one item open at a time.
+- Hid demo-only profile chrome from the Tim White marketing screenshots while keeping live public profile behavior unchanged.
+
+### Removed
+
+- [internal] Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
+- Removed the duplicated lower logo row from the Artist Profiles proof section.
+## [26.4.153.6] - 2026-04-15
+
+> Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
+
+### Fixed
+
+- [internal] Addressed drawer inspector review feedback around collapsible section state updates, card header alignment, client boundaries, and test placement.
+
+## [26.4.153.5] - 2026-04-15
+
+> The Artist Profiles final call-to-action now has more breathing room, so the closing claim section feels calmer and less cramped.
+
+### Changed
+
+- Increased the final Artist Profiles claim section spacing for a more generous closing layout.
+
+### Fixed
+
+- Fixed Profile navigation on chat routes so sidebar and mobile Profile clicks open the right drawer from preview-panel state without requiring a profile query parameter.
+- Cleared stale chat preview data while profile drawer hydration is inactive so reopened drawers do not briefly show the previous profile.
+- Added regression coverage for Profile nav click behavior, state-open drawer hydration, profile deep-link hydration, and inactive preview-data cleanup.
+
+## [26.4.153.4] - 2026-04-15
+
+> Release drawers now use compact inspector cards, and public profile releases now fail safely with timezone-consistent year rendering.
+
+### Changed
+
+- Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
+- Public profile release fetch now uses a fail-safe helper so telemetry/reporting errors do not break page rendering.
+- Release year extraction now uses UTC year semantics across profile and release matrix surfaces.
+- Profile drawer release navigation now gates on visible navigable releases instead of raw release presence flags.
+
+### Fixed
+
+- Public release-lite query now returns an explicit public DTO and serializes release dates as ISO strings before crossing server-client boundaries.
+
+## [26.4.153.3] - 2026-04-15
+
+> Homepage demo proof now uses canonical featured artists, and the add-release CTA remains clearly visible on dark surfaces.
+
+### Changed
+
+- Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
+- Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
+- Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+- Updated homepage demo proof fallbacks to use Tim White, David Guetta, and Kaskade.
+
+### Fixed
+
+- Increased contrast on the add-release sidebar footer CTA so the Create Release button stays visible on dark surfaces.
+- Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
+
+## [26.4.153.2] - 2026-04-15
+
+> Dropdown menus are now more consistent across the app, with better search, keyboard behavior, and loading states. Drawer detail panes also have a cleaner shared layout for compact record details. Theme setup also happens earlier so pages avoid the brief visual mismatch on load.
+
+### Added
+
+- [internal] Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
+- Shared dropdown menus now support consistent loading, selected, active, danger, trailing content, count, and searchable nested states through the common dropdown primitive
+- Recursive dropdown search now supports submenu-local filters, custom radio-item matching, and regression coverage for keyboard search flows
+
+### Changed
+
+- [internal] Common dropdown rendering is split into focused renderer, item renderer, type, and utility modules so future menu variants reuse the same styles and behavior
+- Common dropdown, context menu, and submenu surfaces now draw from the same centralized menu style tokens
+
+### Fixed
+
+- Searchable dropdowns preserve keyboard access: Escape clears search before closing, arrow navigation can leave the search field, Enter can activate the first result, and clear keeps focus in the input
+- Controlled dropdown close no longer emits duplicate empty search callbacks, while the legacy `onSearch` callback remains limited to non-empty queries
+- Theme initialization runs before first paint without reintroducing the local hydration mismatch
+
+## [26.4.153.1] - 2026-04-13
+
+### Added
+
+- Agent guardrail: "No Redundant Chrome" rule (4d) prevents AI agents from adding duplicate titles, headers, and card wrappers inside containers that already provide them
+- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, DrawerSurfaceCard, and DashboardHeader to the chrome they provide
+- Mechanical 4-step checklist for agents to verify container-aware design before PRs
+
+### Changed
+
+- Subtraction Principle (4b) now explicitly requires reading parent container chrome before building child components
+- No AI-Slop rule (4c) now names specific parent surfaces (Sheet, Drawer, existing Card) instead of generic "every block"
+
+## [26.4.153.0] - 2026-04-13
+
+### Added
+
+- Music video release type: artists can now create video releases that show an embedded YouTube player with email subscribe CTA on the release landing page
+- YouTube URL parser and Data API metadata fetcher with graceful degradation
+- Embed timeout-based error detection: redirects to artist profile on load failure, fires tracking beacon for broken video monitoring
+- Demo seed data includes a Calvin Harris music video release for testing
+
+### Changed
+
+- Artist profile latest release now excludes music_video releases to keep the profile focused on email conversion
+- Release filter counts and type styles updated to include music_video
+
+## [26.4.152.1] - 2026-04-13
+
+### Fixed
+
+- Remove double logo on auth pages (hide Clerk's built-in logoBox, keep custom BrandLogo)
+- Change sign-in/sign-up CTA button from purple to white with dark text
+
+## [26.4.152.0] - 2026-04-12
+
+### Added
+
+- "Resend code" link on any OTP error with 30-second cooldown and inline confirmation
+- Segmented birthday input with grouped [MM]/[DD]/[YYYY] digit boxes (replaces plain text input)
+- `useSegmentedInput` shared hook powering both OTP and birthday digit inputs
+- Birthday now captures the full year (stored as YYYY-MM-DD, backwards-compatible with legacy MM-DD)
+- Wire `processTipCompleted` into Stripe checkout webhook, enabling fan audience tracking and thank-you emails for every completed tip
+- Stripe Connect money routing: tips now flow directly to creators with active Connect accounts, with live account verification and platform fee retention
+- Venmo pixel tracking: `VenmoTipSelector` now fires `venmo_link_click` events (previously fired nothing)
+
+### Changed
+
+- Venmo clicks fire `venmo_link_click` instead of `tip_intent` to distinguish unverifiable Venmo link opens from Stripe payment intents in analytics
+- Profile query in tip checkout now includes `stripeAccountId` and `stripePayoutsEnabled` fields
+
+### Fixed
+
+- OTP verification: expired or invalid codes no longer allow submitting (all subscribe components)
+- OTP auto-clears after error so fans get a fresh slate to retype
+- Step transitions in the inline subscribe flow are tighter and smoother (~370ms down to ~240ms)
+- `processTipCompleted` (fan audience upsert + thank-you email) was dead code with zero callers, now wired into the checkout webhook with error isolation
+
+## [26.4.151.6] - 2026-04-12
+
+> Releases page filtering now works: tracks/releases toggle switches the table view, all 7 release types appear in the filter dropdown, and filter badge counts stay stable when filters are applied.
+
+### Fixed
+
+- Wire up the tracks/releases segment control to actually switch between `ReleaseTable` and `ReleaseTableWithTracks`
+- Add missing release type filter options (Live, Mixtape, Other) to match all 7 `ReleaseType` values
+- Compute filter badge counts from unfiltered releases so numbers stay stable when filters are applied
+- Sync tracks view toggle with `localStorage` preferences so the selection persists across page loads
+
+## [26.4.151.5] - 2026-04-12
+
+> Centered action menu icons in the sidebar and task list, and fixed stale release drawer persisting when switching tasks.
+
+### Fixed
+
+- Vertically center the three-dot action menu in sidebar nav items using transform instead of fixed pixel offsets
+- Vertically center the overdue badge relative to the action button in task list rows
+- Close the release sidebar when switching tasks so the drawer doesn't persist without context
+
+## [26.4.151.4] - 2026-04-12
+
+### Fixed
+
+- Handle `DYNAMIC_SERVER_USAGE` error in root layout so public profile pages can use ISR with `revalidate` without crashing the build
+
+## [26.4.151.3] - 2026-04-12
+
+> Agents now verify verifiable claims before acting, reducing drift from stale assumptions.
+
+### Added
+
+- [internal] Agent guardrail: "Verify before trusting" rule added to AGENTS.md — agents now verify user claims before acting on them
+
+## [26.4.148.1] - 2026-04-12
+
+### Removed
+
+- Delete 23 dead loading skeletons on redirect-only routes that never rendered
+- Remove orphaned `WaitlistSkeleton` component and Storybook story
+- Remove unused `BrandingSettingsLoading`, `NotificationsSettingsLoading`, and `BillingSettingsLoading` exports
+
+### Fixed
+
+- Fix infinite page refresh loop on release pages when countdown expires (affects ScheduledReleasePage, MysteryReleasePage, PreSaveActions, ProfileCompactTemplate)
+- Show specific handle validation errors during onboarding instead of generic "Not available" for all failures
+- Rewrite retargeting-ads loading skeleton to match actual page layout (summary cards, ad group grids, instructions)
+- Rewrite blog index loading skeleton from timeline to featured post + 2-column grid layout
+- Replace billing success/cancel `AuthLoader` skeletons with page-matching celebration and cancel layouts
+- Add missing ad-pixels section skeleton to audience settings loader
+- Fix billing settings loader description text ("Subscription" to "Plan")
+
+## [26.4.148.0] - 2026-04-11
+
+### Fixed
+
+- Eliminate chat message flickering by skipping entrance animation on messages loaded from persistence
+- Rewrite chat skeleton loader to match actual message layout (circular logo above bubble, correct border styling)
+- Cap chat thread and input width at 44rem to prevent overly wide layouts on large screens
+
+### Changed
+
+- Chat copy buttons now show icon-only with circle background only on hover, matching the sidebar toggle pattern
+- Replace top-right Copy Session ID button with an ellipsis dropdown menu containing Copy and Archive actions
+
+## [26.4.147.0] - 2026-04-11
+
+### Fixed
+
+- Gracefully handle missing Clerk middleware context on `/api/images/upload` instead of throwing unhandled errors (Fixes JOVIE-WEB-JC)
+- Add CSP `media-src` directive to allow audio previews from Spotify, Apple Music, and Deezer CDNs, and video from Vercel blob storage (Fixes JOVIE-WEB-JD)
+
+### Added
+
+- Centralized media CDN domain registry (`PLATFORM_MEDIA_DOMAINS`) alongside existing image CDN registry, so CSP stays in sync when new providers are added
+- AGENTS.md guardrail requiring CSP domain updates go through the CDN registry, not direct CSP edits
+
+## [26.4.146.3] - 2026-04-11
+
+### Changed
+
+- Standardize badge styling across settings pages to use Badge component variants instead of custom inline classes
+- Add CheckCircle icon to "Verified" badge in Connected Accounts for consistency with Email section
+- Convert raw `<span>` "Current session" badge to Badge component in Session Management
+- Correct theme selector card border radius from 12px to 10px in Appearance settings
+
+## [26.4.146.2] - 2026-04-11
+
+### Fixed
+
+- Pass CSP nonce from middleware to theme-init Script in root layout, fixing hydration mismatch on authenticated pages
+- Suppress expected hydration warning on smart link URLs where server/client origins intentionally differ
+
+## [26.4.146.1] - 2026-04-11
+
+### Changed
+
+- Normalize settings typography: descriptions from 13px to 12px in SettingsActionRow and SettingsToggleRow
+- Align SettingsPanel title letter-spacing to -0.02em to match row components
+- Override SettingsSection header to 13px/font-[540] with 12px descriptions via new PageHeader pass-through props
+- Moved playlist pages from `(marketing)` to `(dynamic)` route group so ISR pages with DB queries no longer violate the static marketing page contract
+- Added dedicated playlist layout to preserve site header, footer, and dark theme styling
+
+## [26.4.146.0] - 2026-04-11
+
+### Fixed
+
+- Staging auth routes (/signup, /signin) returning 500, blocking CI canary health gate since April 8
+- Detect production Clerk keys on staging and skip middleware instead of crashing on domain mismatch
+- Add try-catch safety net around staging Clerk middleware call
+- Fix auth layout tests missing CLERK_SECRET_KEY in test environment
+- Gate x-clerk-publishable-key header injection on both PK and SK presence
+
+## [26.4.145.2] - 2026-04-11
+
+### Fixed
+
+- Fixed territory badge border token in ContactDetailSidebar — replaced `border-(--linear-app-frame-seam)` (divider token) with `border-subtle` (card-level token) to match release sidebar badge pattern
+- Standardized dashboard elevation tokens to 3-tier system (DataCard, EmptyState, banners, empty state icons)
+- Added card wrapper to audience funnel stats (Profile Views, Unique Visitors, Followers)
+- Removed double shadow on chat input that caused visible border artifact
+- Fixed drawer card clipping from oversized 18px border radius
+- Improved smart link URL contrast from tertiary to secondary text color
+- Removed directional shadow-card from drawer/sidebar cards to fix uneven border weight
+- Centered empty state text with contextual icons in analytics sidebar tabs
+
+## [26.4.145.1] - 2026-04-10
+
+### Fixed
+
+- Bumped `next` 16.2.1 → 16.2.3 across all apps to fix Server Components DoS vulnerability
+- Bumped `drizzle-orm` override to 0.45.2 to fix SQL injection via improperly escaped identifiers
+- Bumped `vite` override to ^6.4.2 to fix arbitrary file read and path traversal (dev-only)
+- Bumped `basic-ftp` override to ^5.2.2 to fix FTP command injection via CRLF (dev-only)
+- Bumped `lodash` override to >=4.18.1 to fix code injection and prototype pollution
+- Added overrides for `lodash-es`, `handlebars`, `@xmldom/xmldom`, and `brace-expansion` to remediate transitive dependency vulnerabilities
+
+## [26.4.145] - 2026-04-10
+
+### Changed
+
+- Normalized audience JSONB arrays (referrer history, actions) into relational tables for query performance and schema safety
+- Made `url` column on `audience_referrers` NOT NULL since the write path already guards against null values
+- Populated the `source` field from referrer URL hostname on every referrer insert
+- Removed redundant `onConflictDoNothing()` on referrer inserts where no unique constraint exists
+
+### Fixed
+
+- Profile nav button now toggles the right drawer open and closed instead of only opening it
+
 ## [26.4.144.1] - 2026-04-10
 
 ### Added

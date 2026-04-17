@@ -38,7 +38,7 @@ export interface ClaimInviteTemplateData {
  * Build the claim URL with token
  */
 export function buildClaimUrl(username: string, claimToken: string): string {
-  return `${getProfileUrl(username)}/claim?token=${encodeURIComponent(claimToken)}`;
+  return `${BASE_URL}/claim/${encodeURIComponent(claimToken)}`;
 }
 
 /**
@@ -61,6 +61,7 @@ export function getClaimInviteSubject(_data: ClaimInviteTemplateData): string {
 export function getClaimInviteText(data: ClaimInviteTemplateData): string {
   const { creatorName, username, claimToken, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
+  const previewUrl = buildPreviewUrl(username);
   const greetingName = resolveSafeFirstName(creatorName, username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
@@ -70,7 +71,9 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
     ? `\n\nDon't want to receive these emails? Unsubscribe: ${unsubscribeUrl}`
     : '';
 
-  return `${greetingName ? `${greetingName}!` : 'Ayyy!'}
+  const greeting = greetingName ? `${greetingName}!` : 'Ayyy!';
+
+  return `${greeting}
 
 What up. It's Tim White, artist and founder of ${APP_NAME}.
 
@@ -78,7 +81,9 @@ I got sick of sending fans to a generic Linktree page and losing people there, s
 
 Saw you're on Linktree, so I went ahead and made you a free ${APP_NAME} profile:
 
-${claimUrl}
+${previewUrl}
+
+Claim it here: ${claimUrl}
 
 No pressure to use it. But if you check it out, I'd really love your honest take.
 
@@ -132,6 +137,7 @@ function wrapWithClickTracking(
 export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
   const { creatorName, username, claimToken, avatarUrl, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
+  const previewUrl = buildPreviewUrl(username);
   const greetingName = resolveSafeFirstName(creatorName, username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
@@ -145,6 +151,11 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
     claimUrl,
     trackingPayload,
     'claim_cta'
+  );
+  const trackedPreviewUrl = wrapWithClickTracking(
+    previewUrl,
+    trackingPayload,
+    'profile_preview'
   );
 
   // Generate open tracking pixel
@@ -225,9 +236,9 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               <!-- Profile Preview Card -->
               <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your profile URL:</p>
-                <span style="font-size: 18px; font-weight: 600; color: #000;">
+                <a href="${trackedPreviewUrl}" style="font-size: 18px; font-weight: 600; color: #000; text-decoration: none;">
                   ${BASE_URL}/${safeUsername}
-                </span>
+                </a>
               </div>
 
               <!-- CTA Button -->

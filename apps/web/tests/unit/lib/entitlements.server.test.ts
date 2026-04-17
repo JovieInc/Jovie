@@ -46,6 +46,9 @@ describe('getCurrentUserEntitlements', () => {
       plan: 'free',
       isPro: false,
       hasAdvancedFeatures: false,
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
@@ -56,6 +59,7 @@ describe('getCurrentUserEntitlements', () => {
       canCreateManualReleases: true,
       canAccessTasksWorkspace: false,
       canGenerateReleasePlans: false,
+      canGenerateAlbumArt: false,
       canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
       canSendNotifications: false,
@@ -185,6 +189,9 @@ describe('getCurrentUserEntitlements', () => {
       isAuthenticated: true,
       isAdmin: false,
       plan: 'free',
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
       isPro: false,
       hasAdvancedFeatures: false,
       canExportContacts: false,
@@ -197,6 +204,7 @@ describe('getCurrentUserEntitlements', () => {
       canCreateManualReleases: true,
       canAccessTasksWorkspace: false,
       canGenerateReleasePlans: false,
+      canGenerateAlbumArt: false,
       canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
       canSendNotifications: false,
@@ -247,6 +255,9 @@ describe('getCurrentUserEntitlements', () => {
       isAuthenticated: true,
       isAdmin: false,
       plan: 'pro',
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
       isPro: true,
       hasAdvancedFeatures: false,
       canExportContacts: true,
@@ -258,8 +269,9 @@ describe('getCurrentUserEntitlements', () => {
       aiCanUseTools: true,
       canCreateManualReleases: true,
       canAccessTasksWorkspace: true,
-      canGenerateReleasePlans: true,
-      canAccessMetadataSubmissionAgent: true,
+      canGenerateReleasePlans: false,
+      canGenerateAlbumArt: true,
+      canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,
@@ -275,10 +287,10 @@ describe('getCurrentUserEntitlements', () => {
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
       analyticsRetentionDays: 180,
-      contactsLimit: 5000,
+      contactsLimit: null,
       smartLinksLimit: null,
       aiDailyMessageLimit: 100,
-      aiPitchGenPerRelease: null,
+      aiPitchGenPerRelease: 5,
     });
   });
 
@@ -309,6 +321,9 @@ describe('getCurrentUserEntitlements', () => {
       isAuthenticated: true,
       isAdmin: false,
       plan: 'growth',
+      isTrialing: false,
+      trialEndsAt: null,
+      trialDaysRemaining: null,
       isPro: true,
       hasAdvancedFeatures: true,
       canExportContacts: true,
@@ -321,6 +336,7 @@ describe('getCurrentUserEntitlements', () => {
       canCreateManualReleases: true,
       canAccessTasksWorkspace: true,
       canGenerateReleasePlans: true,
+      canGenerateAlbumArt: true,
       canAccessMetadataSubmissionAgent: true,
       canAccessFutureReleases: true,
       canSendNotifications: true,
@@ -394,7 +410,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.isPro).toBe(true);
     expect(entitlements.canExportContacts).toBe(true);
     expect(entitlements.analyticsRetentionDays).toBe(180);
-    expect(entitlements.contactsLimit).toBe(5000);
+    expect(entitlements.contactsLimit).toBeNull();
   });
 
   it('defaults to pro plan when isPro=true but dbPlan is empty string', async () => {

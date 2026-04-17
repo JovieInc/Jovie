@@ -1,5 +1,5 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
-import { expect, Page } from '@playwright/test';
+import { APIResponse, expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
@@ -40,6 +40,59 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolveSleep => {
     setTimeout(resolveSleep, ms);
   });
+}
+
+async function fetchJsonInBrowserContext<T>(
+  page: Page,
+  url: string
+): Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  readonly payload: T | null;
+}> {
+  const probePage = await page.context().newPage();
+
+  try {
+    const response = await probePage.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    const status = response?.status() ?? 0;
+    const rawBody =
+      (await probePage
+        .locator('body')
+        .textContent()
+        .catch(() => null)) ?? '';
+    let payload: T | null = null;
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody) as T;
+      } catch {
+        payload = null;
+      }
+    }
+
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      payload,
+    };
+  } finally {
+    await probePage.close().catch(() => undefined);
+  }
+}
+
+async function parseJsonSafely<T>(response: APIResponse): Promise<T | null> {
+  const rawBody = await response.text();
+  if (rawBody.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    return null;
+  }
 }
 
 export function canFallbackToBypassUserId(
@@ -211,6 +264,9 @@ export async function waitForAuthenticatedHealth(
     '/api/dev/test-auth/session',
     baseUrl
   ).toString();
+  const shouldPreferBypassSession =
+    isTestAuthBypassEnabled() ||
+    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP === '1';
 
   await expect
     .poll(
@@ -228,25 +284,99 @@ export async function waitForAuthenticatedHealth(
               : {}),
           };
 
-          let response = await page.request.get(authHealthUrl, {
-            failOnStatusCode: false,
-            headers: bypassHeaders,
-          });
-
-          if (response.status() === 403) {
-            response = await page.request.get(bypassSessionUrl, {
-              failOnStatusCode: false,
-              headers: bypassHeaders,
-            });
-
-            if (!response.ok()) {
-              return `http-${response.status()}`;
-            }
-
-            const payload = (await response.json()) as {
+          if (shouldPreferBypassSession) {
+            const bypassResponse = await fetchJsonInBrowserContext<{
               active?: boolean;
               userId?: string | null;
-            };
+            }>(page, bypassSessionUrl);
+
+            if (bypassResponse.ok) {
+              const payload = bypassResponse.payload;
+
+              if (payload?.active) {
+                if (expectedUserId && payload.userId !== expectedUserId) {
+                  return `user-mismatch:${payload.userId ?? 'unknown'}`;
+                }
+
+                return 'authenticated';
+              }
+            }
+
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
+
+            if (bypassSessionResponse.ok()) {
+              const payload = await parseJsonSafely<{
+                active?: boolean;
+                userId?: string | null;
+              }>(bypassSessionResponse);
+
+              if (!payload) {
+                return `http-${bypassSessionResponse.status()}`;
+              }
+
+              if (!payload.active) {
+                return 'anonymous';
+              }
+
+              if (expectedUserId && payload.userId !== expectedUserId) {
+                return `user-mismatch:${payload.userId ?? 'unknown'}`;
+              }
+
+              return 'authenticated';
+            }
+          }
+
+          const response = await fetchJsonInBrowserContext<{
+            authenticated?: boolean;
+            userId?: string | null;
+          }>(page, authHealthUrl);
+
+          if (response.status === 403) {
+            const bypassResponse = await fetchJsonInBrowserContext<{
+              active?: boolean;
+              userId?: string | null;
+            }>(page, bypassSessionUrl);
+
+            if (bypassResponse.ok) {
+              const payload = bypassResponse.payload;
+
+              if (!payload?.active) {
+                return 'anonymous';
+              }
+
+              if (expectedUserId && payload.userId !== expectedUserId) {
+                return `user-mismatch:${payload.userId ?? 'unknown'}`;
+              }
+
+              return 'authenticated';
+            }
+
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
+
+            if (!bypassSessionResponse.ok()) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
+
+            const payload = await parseJsonSafely<{
+              active?: boolean;
+              userId?: string | null;
+            }>(bypassSessionResponse);
+
+            if (!payload) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
 
             if (!payload.active) {
               return 'anonymous';
@@ -259,14 +389,70 @@ export async function waitForAuthenticatedHealth(
             return 'authenticated';
           }
 
-          if (!response.ok()) {
-            return `http-${response.status()}`;
+          if (response.ok) {
+            const payload = response.payload;
+
+            if (!payload?.authenticated) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
           }
 
-          const payload = (await response.json()) as {
+          const fallbackResponse = await page.request.get(authHealthUrl, {
+            failOnStatusCode: false,
+            headers: bypassHeaders,
+          });
+
+          if (fallbackResponse.status() === 403) {
+            const bypassSessionResponse = await page.request.get(
+              bypassSessionUrl,
+              {
+                failOnStatusCode: false,
+                headers: bypassHeaders,
+              }
+            );
+
+            if (!bypassSessionResponse.ok()) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
+
+            const payload = await parseJsonSafely<{
+              active?: boolean;
+              userId?: string | null;
+            }>(bypassSessionResponse);
+
+            if (!payload) {
+              return `http-${bypassSessionResponse.status()}`;
+            }
+
+            if (!payload.active) {
+              return 'anonymous';
+            }
+
+            if (expectedUserId && payload.userId !== expectedUserId) {
+              return `user-mismatch:${payload.userId ?? 'unknown'}`;
+            }
+
+            return 'authenticated';
+          }
+
+          if (!fallbackResponse.ok()) {
+            return `http-${fallbackResponse.status()}`;
+          }
+
+          const payload = await parseJsonSafely<{
             authenticated?: boolean;
             userId?: string | null;
-          };
+          }>(fallbackResponse);
+
+          if (!payload) {
+            return `http-${fallbackResponse.status()}`;
+          }
 
           if (!payload.authenticated) {
             return 'anonymous';

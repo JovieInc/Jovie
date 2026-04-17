@@ -76,7 +76,7 @@ export async function POST(
       .where(eq(promoDownloads.id, id))
       .limit(1);
 
-    if (!download || !download.isActive || !download.isPro) {
+    if (!download?.isActive || !download?.isPro) {
       return NextResponse.json(
         { error: 'Not found' },
         { status: 404, headers: NO_STORE_HEADERS }

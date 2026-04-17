@@ -116,6 +116,7 @@ function HeroProfilePanel() {
         chrome='framed'
         glowTone='violet'
         imageClassName='object-cover'
+        imageSizes='256px'
         className='shadow-[0_34px_90px_rgba(0,0,0,0.5)]'
         priority
       />
@@ -135,6 +136,7 @@ function HeroSmartLinkPanel() {
         chrome='framed'
         glowTone='blue'
         imageClassName='object-cover'
+        imageSizes='208px'
         className='shadow-[0_30px_90px_rgba(0,0,0,0.44)]'
       />
     </div>
@@ -144,42 +146,61 @@ function HeroSmartLinkPanel() {
 export function HomeHeroSurfaceCluster() {
   return (
     <>
-      {/* Mobile: stacked with profile dominant */}
+      {/* Mobile: profile dominant, release + tasks below */}
       <div className='relative mx-auto w-full max-w-[34rem] lg:hidden'>
         <div className='space-y-4'>
-          <div className='relative mx-auto max-w-[16rem]'>
+          <div className='mx-auto max-w-[14rem]'>
             <HeroProfilePanel />
-            <div className='absolute -left-8 top-4 w-[10rem] rotate-[-3deg] opacity-60 blur-[2px]'>
+          </div>
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='mx-auto w-full max-w-[10rem]'>
               <HeroSmartLinkPanel />
             </div>
-          </div>
-          <div className='sm:ml-auto sm:max-w-[20rem]'>
-            <HeroTaskPanel />
+            <div className='flex items-center'>
+              <HeroTaskPanel />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Desktop: Spotlight Depth — dominant phone, blurred release behind, tasks bottom-right */}
-      <div className='relative hidden min-h-[28rem] lg:block'>
-        {/* Atmospheric glow behind the phone cluster */}
+      {/* Desktop: three elements fanned out, staggered vertically */}
+      <div
+        className='relative hidden lg:block'
+        style={{ perspective: '1600px' }}
+      >
+        {/* Atmospheric glow */}
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-0 hero-cluster-glow'
         />
 
-        {/* Back layer: release card, blurred for depth */}
-        <div className='absolute -left-4 top-2 w-[13rem] rotate-[-3deg] opacity-60 blur-sm'>
-          <HeroSmartLinkPanel />
-        </div>
+        <div className='relative flex items-start justify-center gap-4 xl:gap-6'>
+          {/* Left: release card, tilted + dropped */}
+          <div
+            className='w-[9.5rem] shrink-0 pt-14 xl:w-[10.5rem]'
+            style={{
+              transform: 'rotateY(6deg) rotateZ(-1deg)',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <HeroSmartLinkPanel />
+          </div>
 
-        {/* Front layer: dominant profile phone */}
-        <div className='relative z-10 mx-auto w-[16rem]'>
-          <HeroProfilePanel />
-        </div>
+          {/* Center: dominant profile phone, elevated */}
+          <div className='z-10 w-[12.5rem] shrink-0 xl:w-[14rem]'>
+            <HeroProfilePanel />
+          </div>
 
-        {/* Task panel: anchored bottom-right, small scale */}
-        <div className='absolute -right-2 bottom-4 z-20 w-[11rem] scale-[0.88] origin-bottom-right'>
-          <HeroTaskPanel />
+          {/* Right: task panel, tilted opposite + dropped further */}
+          <div
+            className='w-[11.5rem] shrink-0 pt-20 xl:w-[12.5rem]'
+            style={{
+              transform: 'rotateY(-4deg) rotateZ(1deg)',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <HeroTaskPanel />
+          </div>
         </div>
       </div>
     </>

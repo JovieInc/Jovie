@@ -40,6 +40,7 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel={`${label} profile details`}
+      scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar

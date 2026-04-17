@@ -15,5 +15,5 @@ interface ProgressiveArtistPageProps {
 }
 
 export function ProgressiveArtistPage(props: ProgressiveArtistPageProps) {
-  return <StaticArtistPage {...props} />;
+  return <StaticArtistPage {...props} presentation='compact-preview' />;
 }

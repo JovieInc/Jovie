@@ -1,8 +1,8 @@
 import { CalendarDays, MapPin, Play, Ticket } from 'lucide-react';
 import Link from 'next/link';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
 type ReleaseSummary = {
@@ -58,7 +58,7 @@ export function ProfileFeaturedCard({
 
   if (featuredContent.kind === 'release') {
     const releaseYear = featuredContent.release.releaseDate
-      ? new Date(featuredContent.release.releaseDate).getFullYear()
+      ? new Date(featuredContent.release.releaseDate).getUTCFullYear()
       : null;
     const releaseTypeLabel =
       featuredContent.release.releaseType === 'ep'

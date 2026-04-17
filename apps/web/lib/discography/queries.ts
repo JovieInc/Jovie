@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
@@ -41,6 +41,15 @@ export interface ReleaseWithProviders extends DiscogRelease {
   trackSummary?: TrackSummary;
 }
 
+export interface PublicDiscogReleaseLite {
+  id: string;
+  title: string;
+  slug: string | null;
+  releaseType: DiscogRelease['releaseType'];
+  releaseDate: string | null;
+  artworkUrl: string | null;
+}
+
 export interface UpsertReleaseInput {
   creatorProfileId: string;
   title: string;
@@ -52,6 +61,7 @@ export interface UpsertReleaseInput {
     | 'compilation'
     | 'live'
     | 'mixtape'
+    | 'music_video'
     | 'other';
   releaseDate?: Date | null;
   label?: string | null;
@@ -211,7 +221,14 @@ export async function getLatestReleaseForProfile(
   const [release] = await db
     .select()
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
@@ -234,6 +251,9 @@ export async function getLatestReleaseByUsername(
       slug: discogReleases.slug,
       releaseType: discogReleases.releaseType,
       releaseDate: discogReleases.releaseDate,
+      status: discogReleases.status,
+      revealDate: discogReleases.revealDate,
+      deletedAt: discogReleases.deletedAt,
       label: discogReleases.label,
       upc: discogReleases.upc,
       totalTracks: discogReleases.totalTracks,
@@ -255,7 +275,15 @@ export async function getLatestReleaseByUsername(
       creatorProfiles,
       eq(discogReleases.creatorProfileId, creatorProfiles.id)
     )
-    .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+    .where(
+      and(
+        eq(creatorProfiles.usernameNormalized, usernameNormalized),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        ne(discogReleases.releaseType, 'music_video'),
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
@@ -269,6 +297,11 @@ export async function getLatestReleaseByUsername(
 export async function getReleaseStatsByUsername(
   usernameNormalized: string
 ): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
+  const publicFilter = and(
+    eq(creatorProfiles.usernameNormalized, usernameNormalized),
+    isNull(discogReleases.deletedAt),
+    ne(discogReleases.status, 'draft')
+  );
   const [countResult, topReleases] = await Promise.all([
     db
       .select({
@@ -279,7 +312,7 @@ export async function getReleaseStatsByUsername(
         creatorProfiles,
         eq(discogReleases.creatorProfileId, creatorProfiles.id)
       )
-      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized)),
+      .where(publicFilter),
     db
       .select({ title: discogReleases.title })
       .from(discogReleases)
@@ -287,7 +320,7 @@ export async function getReleaseStatsByUsername(
         creatorProfiles,
         eq(discogReleases.creatorProfileId, creatorProfiles.id)
       )
-      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .where(publicFilter)
       .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
       .limit(3),
   ]);
@@ -299,16 +332,68 @@ export async function getReleaseStatsByUsername(
 }
 
 /**
+ * Lightweight release list for public profile display.
+ * Returns releases with artist names but skips provider links and track summaries.
+ * Sorted newest-first (DESC NULLS LAST) so null dates appear at the end.
+ * Capped at 200 releases to bound serialisation cost.
+ */
+export async function getReleasesForProfileLite(
+  creatorProfileId: string
+): Promise<Array<PublicDiscogReleaseLite & { artistNames: string[] }>> {
+  const releases = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      releaseType: discogReleases.releaseType,
+      releaseDate: discogReleases.releaseDate,
+      artworkUrl: discogReleases.artworkUrl,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        // Intentionally includes music videos for the public releases drawer.
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(200);
+
+  if (releases.length === 0) return [];
+
+  const artistNamesByRelease = await getArtistNamesForReleases(
+    releases.map(r => r.id)
+  );
+
+  return releases.map(release => ({
+    ...release,
+    releaseDate: release.releaseDate?.toISOString() ?? null,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+  }));
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(
-  creatorProfileId: string
+  creatorProfileId: string,
+  options?: { includeDrafts?: boolean }
 ): Promise<ReleaseWithProviders[]> {
-  // Fetch releases
+  const filters = [
+    eq(discogReleases.creatorProfileId, creatorProfileId),
+    isNull(discogReleases.deletedAt),
+  ];
+  if (!options?.includeDrafts) {
+    filters.push(ne(discogReleases.status, 'draft'));
+  }
+  // Fetch releases (always exclude soft-deleted)
   const releases = await db
     .select()
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .where(and(...filters))
     .orderBy(discogReleases.releaseDate);
 
   if (releases.length === 0) {

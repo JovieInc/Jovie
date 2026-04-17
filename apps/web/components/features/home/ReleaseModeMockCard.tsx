@@ -52,9 +52,9 @@ function ReleaseArtwork({
           <p className='text-[14px] font-[560] tracking-[-0.02em] text-white'>
             {title}
           </p>
-          {!compact ? (
+          {compact ? null : (
             <p className='mt-1 text-[10px] leading-4 text-white/72'>{artist}</p>
-          ) : null}
+          )}
         </div>
       </div>
     </div>

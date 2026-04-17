@@ -28,7 +28,7 @@ export const users = pgTable(
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
-    plan: text('plan').default('free'), // 'free' | 'pro' | 'max'
+    plan: text('plan').default('free'), // 'free' | 'trial' | 'pro' | 'max'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     stripePriceId: text('stripe_price_id'),
@@ -43,6 +43,11 @@ export const users = pgTable(
     // Max plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
+    // Reverse trial tracking
+    trialStartedAt: timestamp('trial_started_at'),
+    trialEndsAt: timestamp('trial_ends_at'),
+    trialConvertedAt: timestamp('trial_converted_at'),
+    trialNotificationsSent: integer('trial_notifications_sent').default(0),
     // Active creator profile (FK added post-create to avoid circular dependency)
     activeProfileId: uuid('active_profile_id'),
     // Referral tracking

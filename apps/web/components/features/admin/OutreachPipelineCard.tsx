@@ -10,15 +10,11 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { formatPercent } from '@/lib/admin/format';
 import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface OutreachPipelineCardProps {
   readonly metrics: AdminFunnelMetrics;
-}
-
-function formatPercent(rate: number | null): string {
-  if (rate === null) return '--';
-  return `${(rate * 100).toFixed(1)}%`;
 }
 
 function formatDollarPerOutreach(value: number | null): string {

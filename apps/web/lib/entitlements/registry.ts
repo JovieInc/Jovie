@@ -13,9 +13,9 @@ import { PLAN_PRICES } from '@/lib/config/plan-prices';
 // Plan IDs
 // ---------------------------------------------------------------------------
 
-export type PlanId = 'free' | 'pro' | 'max';
+export type PlanId = 'free' | 'trial' | 'pro' | 'max';
 
-const PLAN_IDS: readonly PlanId[] = ['free', 'pro', 'max'] as const;
+const PLAN_IDS: readonly PlanId[] = ['free', 'trial', 'pro', 'max'] as const;
 
 // ---------------------------------------------------------------------------
 // Entitlement key unions
@@ -28,6 +28,7 @@ export type BooleanEntitlement =
   | 'canAccessAdPixels'
   | 'canBeVerified'
   | 'aiCanUseTools'
+  | 'canGenerateAlbumArt'
   | 'canCreateManualReleases'
   | 'canAccessTasksWorkspace'
   | 'canGenerateReleasePlans'
@@ -87,10 +88,11 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessAdPixels: true,
   canBeVerified: true,
   aiCanUseTools: true,
+  canGenerateAlbumArt: true,
   canCreateManualReleases: true,
   canAccessTasksWorkspace: true,
-  canGenerateReleasePlans: true,
-  canAccessMetadataSubmissionAgent: true,
+  canGenerateReleasePlans: false,
+  canAccessMetadataSubmissionAgent: false,
   canAccessFutureReleases: true,
   canSendNotifications: true,
   canEditSmartLinks: true,
@@ -110,22 +112,22 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
 
 const PRO_LIMITS: PlanEntitlements['limits'] = {
   analyticsRetentionDays: 180,
-  contactsLimit: 5000,
+  contactsLimit: null,
   smartLinksLimit: null,
   aiDailyMessageLimit: 100,
-  aiPitchGenPerRelease: null,
+  aiPitchGenPerRelease: 5,
 };
 
 const PRO_FEATURES: readonly string[] = [
   'All Free features +',
+  'Release notifications to fans',
   'Pre-save campaigns',
   'Pre-release & countdown pages',
-  'Release notifications',
   'Extended analytics (180 days)',
   'Advanced analytics & geographic insights',
   'Traffic quality filtering',
   'AI-powered insights',
-  'Up to 5,000 contacts',
+  'Unlimited contacts',
   'Contact export',
   'Fan CRM',
   'Tips & payments',
@@ -134,7 +136,7 @@ const PRO_FEATURES: readonly string[] = [
   'Ad pixel tracking',
   'Verified badge',
   'AI assistant (100 messages/day)',
-  'Unlimited AI pitch generation',
+  'AI pitch generation (5 per release)',
   'Priority support',
 ];
 
@@ -151,6 +153,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: false,
       canBeVerified: false,
       aiCanUseTools: true,
+      canGenerateAlbumArt: false,
       canCreateManualReleases: true,
       canAccessTasksWorkspace: false,
       canGenerateReleasePlans: false,
@@ -180,7 +183,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     },
     marketing: {
       displayName: 'Free',
-      tagline: 'Free for everyone',
+      tagline: 'Your artist profile, free forever',
       features: [
         'Unlimited smart links',
         'Auto-sync from Spotify',
@@ -212,7 +215,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
-      tagline: 'The serious artist toolkit.',
+      tagline: 'Turn on fan notifications once. We handle the rest.',
       features: PRO_FEATURES,
       price: {
         monthly: PLAN_PRICES.pro.monthly,
@@ -228,6 +231,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: true,
       canBeVerified: true,
       aiCanUseTools: true,
+      canGenerateAlbumArt: true,
       canCreateManualReleases: true,
       canAccessTasksWorkspace: true,
       canGenerateReleasePlans: true,
@@ -257,11 +261,14 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     },
     marketing: {
       displayName: 'Max',
-      tagline: "Your team's command center.",
+      tagline: 'Your release ops, automated.',
       features: [
         'All Pro features +',
+        'Release plan generation',
+        'Metadata submission agent',
         'Unlimited analytics',
         'AI assistant (500 messages/day)',
+        'Unlimited AI pitch generation',
         'Stripe Connect payouts',
         'Fan subscriptions',
         'Email campaigns',
@@ -277,7 +284,28 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       },
     },
   },
+  trial: {
+    booleans: {
+      ...PRO_BOOLEANS,
+    },
+    limits: {
+      analyticsRetentionDays: 180,
+      contactsLimit: 250,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
+      aiPitchGenPerRelease: 3,
+    },
+    marketing: {
+      displayName: 'Pro Trial',
+      tagline: '14 days of Pro, on us.',
+      features: PRO_FEATURES,
+      price: null,
+    },
+  },
 } as const;
+
+/** 50 notification recipients total during trial period. */
+export const TRIAL_NOTIFICATION_RECIPIENT_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // Pricing comparison chart data
@@ -441,7 +469,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       {
         name: 'Contact / subscriber capture',
         free: 'Up to 100',
-        pro: 'Up to 5,000',
+        pro: 'Unlimited',
         max: 'Unlimited',
       },
       {
@@ -491,7 +519,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       {
         name: 'AI pitch generation',
         free: '1 / release',
-        pro: 'Unlimited',
+        pro: '5 / release',
         max: 'Unlimited',
       },
     ],
@@ -519,6 +547,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
 export function getEntitlements(
   plan: string | null | undefined
 ): PlanEntitlements {
+  if (plan === 'trial') return ENTITLEMENT_REGISTRY.trial;
   if (plan === 'growth' || plan === 'max') return ENTITLEMENT_REGISTRY.max;
   if (plan === 'pro' || plan === 'founding') return ENTITLEMENT_REGISTRY.pro;
   return ENTITLEMENT_REGISTRY.free;
@@ -543,7 +572,11 @@ export function getLimit(
 /** Whether the plan is pro or higher. */
 export function isProPlan(plan: string | null | undefined): boolean {
   return (
-    plan === 'founding' || plan === 'pro' || plan === 'max' || plan === 'growth'
+    plan === 'founding' ||
+    plan === 'pro' ||
+    plan === 'trial' ||
+    plan === 'max' ||
+    plan === 'growth'
   );
 }
 

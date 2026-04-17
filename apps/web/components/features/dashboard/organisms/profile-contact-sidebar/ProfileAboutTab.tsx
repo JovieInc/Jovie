@@ -14,7 +14,10 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
+import {
+  updateAllowProfilePhotoDownloads,
+  updateShowOldReleases,
+} from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';
 import {
@@ -29,6 +32,14 @@ import type { PressPhoto } from '@/types/press-photos';
 
 const MAX_PRESS_PHOTOS = 6;
 
+function DetailLabel({ children }: { readonly children: string }) {
+  return (
+    <span className='text-[11px] font-medium text-tertiary-token'>
+      {children}
+    </span>
+  );
+}
+
 interface ProfileAboutTabProps {
   readonly bio: string | null;
   readonly genres: string[] | null;
@@ -36,6 +47,7 @@ interface ProfileAboutTabProps {
   readonly hometown: string | null;
   readonly activeSinceYear: number | null;
   readonly allowPhotoDownloads: boolean;
+  readonly showOldReleases: boolean;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly onBioChange?: (bio: string) => void;
   readonly onLocationChange?: (location: string | null) => void;
@@ -573,6 +585,7 @@ export function ProfileAboutTab({
   hometown,
   activeSinceYear,
   allowPhotoDownloads,
+  showOldReleases,
   pressPhotos = [],
   onBioChange,
   onLocationChange,
@@ -589,122 +602,130 @@ export function ProfileAboutTab({
 
   return (
     <div className='space-y-4'>
-      <DrawerSection
-        title='Bio'
-        collapsible={false}
-        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
-      >
-        {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
-        {!onBioChange && bio && (
-          <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
-            {bio}
-          </p>
-        )}
-        {!onBioChange && !bio && (
-          <p className='text-[12px] text-tertiary-token'>
-            No bio yet. Use the chat to generate one.
-          </p>
-        )}
-      </DrawerSection>
+      {/* Consolidated detail card: Bio + Location/Hometown + Genres */}
+      <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+        {/* Bio */}
+        <div className='space-y-1.5'>
+          <DetailLabel>Bio</DetailLabel>
+          {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
+          {!onBioChange && bio && (
+            <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
+              {bio}
+            </p>
+          )}
+          {!onBioChange && !bio && (
+            <p className='text-[12px] text-tertiary-token'>
+              No bio yet. Use the chat to generate one.
+            </p>
+          )}
+        </div>
 
-      {(hasMetadata || editable) && (
-        <DrawerSection
-          title='Location'
-          collapsible={false}
-          className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
-        >
-          <div className='space-y-1.5'>
-            <LocationField
-              icon={MapPin}
-              value={location}
-              label={v => v}
-              addLabel='Location'
-              onChange={onLocationChange}
-            />
-            <LocationField
-              icon={Home}
-              value={hometown}
-              label={v => `From ${v}`}
-              addLabel='Hometown'
-              onChange={onHometownChange}
-            />
+        {/* Location + Hometown side-by-side */}
+        {(hasMetadata || editable) && (
+          <div className='space-y-2'>
+            <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-4 sm:gap-y-2'>
+              <div className='space-y-1'>
+                <DetailLabel>Location</DetailLabel>
+                <LocationField
+                  icon={MapPin}
+                  value={location}
+                  label={v => v}
+                  addLabel='Location'
+                  onChange={onLocationChange}
+                />
+              </div>
+              <div className='space-y-1'>
+                <DetailLabel>Hometown</DetailLabel>
+                <LocationField
+                  icon={Home}
+                  value={hometown}
+                  label={v => v}
+                  addLabel='Hometown'
+                  onChange={onHometownChange}
+                />
+              </div>
+            </div>
 
             {Boolean(activeSinceYear) && (
-              <div className='flex items-center gap-2 text-[12px] text-tertiary-token'>
-                <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span>Active since {activeSinceYear}</span>
+              <div className='space-y-1' data-testid='active-since'>
+                <DetailLabel>Active Since</DetailLabel>
+                <div className='flex items-center gap-2 text-[12px] text-secondary-token'>
+                  <Calendar
+                    className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                  <span>{activeSinceYear}</span>
+                </div>
               </div>
             )}
           </div>
-        </DrawerSection>
-      )}
+        )}
 
-      <DrawerSection
-        title='Genres'
-        collapsible={false}
-        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
-      >
-        {hasGenres && (
-          <div className='flex flex-wrap gap-1.5'>
-            {genres.map(genre => (
-              <Badge
-                key={genre}
-                variant='secondary'
-                className='gap-1 capitalize'
-              >
-                {genre}
-                {onGenresChange && (
-                  <button
-                    type='button'
-                    onClick={() =>
-                      onGenresChange(genres.filter(g => g !== genre))
-                    }
-                    className='ml-0.5 hover:text-primary-token transition-colors'
-                    aria-label={`Remove ${genre}`}
-                  >
-                    <X className='h-3 w-3' />
-                  </button>
-                )}
-              </Badge>
-            ))}
-            {onGenresChange && (
-              <GenrePicker
-                selected={genres}
-                onChange={onGenresChange}
-                trigger={
-                  <button
-                    type='button'
-                    className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
-                  >
-                    <Plus className='h-3 w-3' />
-                    Add
-                  </button>
-                }
-              />
-            )}
-          </div>
-        )}
-        {!hasGenres && onGenresChange && (
-          <GenrePicker
-            selected={[]}
-            onChange={onGenresChange}
-            trigger={
-              <button
-                type='button'
-                className='flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
-              >
-                <Plus className='h-3.5 w-3.5' />
-                <span>Add genres</span>
-              </button>
-            }
-          />
-        )}
-        {!hasGenres && !onGenresChange && (
-          <p className='text-[12px] text-tertiary-token'>
-            Auto-detected from your music connections.
-          </p>
-        )}
-      </DrawerSection>
+        {/* Genres */}
+        <div className='space-y-1.5'>
+          <DetailLabel>Genres</DetailLabel>
+          {hasGenres && (
+            <div className='flex flex-wrap gap-1.5'>
+              {genres.map(genre => (
+                <Badge
+                  key={genre}
+                  variant='secondary'
+                  className='gap-1 capitalize'
+                >
+                  {genre}
+                  {onGenresChange && (
+                    <button
+                      type='button'
+                      onClick={() =>
+                        onGenresChange(genres.filter(g => g !== genre))
+                      }
+                      className='ml-0.5 hover:text-primary-token transition-colors'
+                      aria-label={`Remove ${genre}`}
+                    >
+                      <X className='h-3 w-3' />
+                    </button>
+                  )}
+                </Badge>
+              ))}
+              {onGenresChange && (
+                <GenrePicker
+                  selected={genres}
+                  onChange={onGenresChange}
+                  trigger={
+                    <button
+                      type='button'
+                      className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
+                    >
+                      <Plus className='h-3 w-3' />
+                      Add
+                    </button>
+                  }
+                />
+              )}
+            </div>
+          )}
+          {!hasGenres && onGenresChange && (
+            <GenrePicker
+              selected={[]}
+              onChange={onGenresChange}
+              trigger={
+                <button
+                  type='button'
+                  className='flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
+                >
+                  <Plus className='h-3.5 w-3.5' />
+                  <span>Add genres</span>
+                </button>
+              }
+            />
+          )}
+          {!hasGenres && !onGenresChange && (
+            <p className='text-[12px] text-tertiary-token'>
+              Auto-detected from your music connections.
+            </p>
+          )}
+        </div>
+      </div>
 
       {(pressPhotos.length > 0 || onPressPhotoUpload || onPressPhotoDelete) && (
         <PressPhotosSection
@@ -729,6 +750,17 @@ export function ProfileAboutTab({
             on
               ? 'Photo downloads enabled for visitors'
               : 'Photo downloads disabled'
+          }
+        />
+        <DrawerAsyncToggle
+          label='Show releases older than 90 days'
+          ariaLabel='Keep showing releases older than 90 days on your public profile'
+          checked={showOldReleases}
+          onToggle={updateShowOldReleases}
+          successMessage={on =>
+            on
+              ? 'Old releases will stay visible on your profile'
+              : 'Releases older than 90 days will be hidden'
           }
         />
       </DrawerSection>

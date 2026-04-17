@@ -1,7 +1,20 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
-import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
+  AlertCircle,
+  Archive,
+  Check,
+  Copy,
+  Ellipsis,
+  RefreshCw,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
@@ -16,10 +29,10 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DRAWER_HEADER_ICON_BUTTON_CLASSNAME } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -27,7 +40,10 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
-import { useDashboardSocialLinksQuery } from '@/lib/queries';
+import {
+  useDashboardSocialLinksQuery,
+  useDeleteConversationMutation,
+} from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
 
@@ -83,6 +99,74 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
+interface ChatProfileFallbackProps {
+  readonly needsOnboarding: boolean;
+  readonly dashboardLoadError: unknown;
+  readonly isProfileSetupRace: boolean;
+  readonly canAutoRetry: boolean;
+  readonly autoRetryCount: number;
+  readonly onRetry: () => void;
+}
+
+function ChatProfileFallback({
+  needsOnboarding,
+  dashboardLoadError,
+  isProfileSetupRace,
+  canAutoRetry,
+  autoRetryCount,
+  onRetry,
+}: ChatProfileFallbackProps) {
+  if (needsOnboarding && !dashboardLoadError) {
+    return (
+      <ChatWorkspaceSurface>
+        <div className='flex h-full items-center justify-center p-6'>
+          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+            <LoadingSpinner size='lg' tone='muted' />
+            <p className='text-sm text-secondary-token'>
+              Taking you to onboarding…
+            </p>
+          </ContentSurfaceCard>
+        </div>
+      </ChatWorkspaceSurface>
+    );
+  }
+
+  const profileMessage = isProfileSetupRace
+    ? 'Finishing your dashboard setup…'
+    : 'We hit a problem loading your profile. Please retry in a moment.';
+
+  return (
+    <ChatWorkspaceSurface>
+      <div className='flex h-full items-center justify-center p-6'>
+        <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+          {isProfileSetupRace ? (
+            <LoadingSpinner size='lg' tone='muted' />
+          ) : (
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          )}
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
+          {isProfileSetupRace && canAutoRetry && (
+            <p className='text-xs text-tertiary-token'>
+              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
+            </p>
+          )}
+          {!isProfileSetupRace && (
+            <Button
+              onClick={onRetry}
+              variant='secondary'
+              size='sm'
+              className='gap-2'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </Button>
+          )}
+        </ContentSurfaceCard>
+      </div>
+    </ChatWorkspaceSurface>
+  );
+}
+
 export function ChatPageClient({
   conversationId,
   isFirstSession = false,
@@ -95,7 +179,8 @@ export function ChatPageClient({
     isFirstSession: dashboardIsFirstSession,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
-  const { open: openPreviewPanel } = usePreviewPanelState();
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -130,18 +215,25 @@ export function ChatPageClient({
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
-  // Only hydrate preview panel when explicitly requested via ?panel=profile
-  // or coming from onboarding. Otherwise, panel stays closed by default.
+  // Hydrate only when the panel is open, deep-linked, or onboarding requested it.
+  // This keeps closed chat routes cheap while allowing sidebar/mobile profile clicks.
   const shouldHydratePreviewPanel =
-    enablePreviewPanel && (panelParam === 'profile' || fromOnboarding);
+    enablePreviewPanel &&
+    (isPreviewPanelOpen || panelParam === 'profile' || fromOnboarding);
+
+  useEffect(() => {
+    if (shouldHydratePreviewPanel) return;
+    setPreviewData(null);
+  }, [setPreviewData, shouldHydratePreviewPanel]);
 
   useEffect(() => {
     return () => {
+      setPreviewData(null);
       if (welcomeChatRetryTimeoutRef.current !== null) {
         globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
       }
     };
-  }, []);
+  }, [setPreviewData]);
 
   useEffect(() => {
     if (needsOnboarding && !selectedProfile && !dashboardLoadError) {
@@ -225,6 +317,8 @@ export function ChatPageClient({
     onError: () => notifications.error('Could not copy session ID'),
   });
 
+  const deleteConversation = useDeleteConversationMutation();
+
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {
       notifications.error(
@@ -235,33 +329,51 @@ export function ChatPageClient({
     copySessionId(conversationId);
   }, [conversationId, notifications, copySessionId]);
 
+  const handleArchive = useCallback(async () => {
+    if (!conversationId) return;
+    await deleteConversation.mutateAsync({ conversationId });
+    router.push(APP_ROUTES.CHAT);
+    notifications.success('Thread archived');
+  }, [conversationId, deleteConversation, router, notifications]);
+
   const headerActions = useMemo(() => {
     if (!conversationId) {
       return null;
     }
 
     return (
-      <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0.5'>
-        <SimpleTooltip
-          content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
-        >
-          <DashboardHeaderActionButton
-            ariaLabel={
-              sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
-            }
-            onClick={handleCopyConversationId}
-            icon={
-              sessionIdCopied ? (
-                <Check aria-hidden='true' className='size-4' />
-              ) : (
-                <Copy aria-hidden='true' className='size-4' />
-              )
-            }
-          />
-        </SimpleTooltip>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type='button'
+            className={DRAWER_HEADER_ICON_BUTTON_CLASSNAME}
+            aria-label='Thread options'
+          >
+            <Ellipsis aria-hidden='true' className='size-4' />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end'>
+          <DropdownMenuItem onClick={handleCopyConversationId}>
+            {sessionIdCopied ? (
+              <Check aria-hidden='true' className='size-3.5' />
+            ) : (
+              <Copy aria-hidden='true' className='size-3.5' />
+            )}
+            {sessionIdCopied ? 'Copied!' : 'Copy Session ID'}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleArchive}>
+            <Archive aria-hidden='true' className='size-3.5' />
+            Archive
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
-  }, [conversationId, sessionIdCopied, handleCopyConversationId]);
+  }, [
+    conversationId,
+    sessionIdCopied,
+    handleCopyConversationId,
+    handleArchive,
+  ]);
 
   const handleConversationCreate = useCallback(
     (newConversationId: string) => {
@@ -531,54 +643,15 @@ export function ChatPageClient({
   ]);
 
   if (!activeProfile) {
-    if (needsOnboarding && !dashboardLoadError) {
-      return (
-        <ChatWorkspaceSurface>
-          <div className='flex h-full items-center justify-center p-6'>
-            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-              <LoadingSpinner size='lg' tone='muted' />
-              <p className='text-sm text-secondary-token'>
-                Taking you to onboarding…
-              </p>
-            </ContentSurfaceCard>
-          </div>
-        </ChatWorkspaceSurface>
-      );
-    }
-
-    const profileMessage = isProfileSetupRace
-      ? 'Finishing your dashboard setup…'
-      : 'We hit a problem loading your profile. Please retry in a moment.';
-
     return (
-      <ChatWorkspaceSurface>
-        <div className='flex h-full items-center justify-center p-6'>
-          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            {isProfileSetupRace ? (
-              <LoadingSpinner size='lg' tone='muted' />
-            ) : (
-              <AlertCircle className='h-8 w-8 text-tertiary-token' />
-            )}
-            <p className='text-sm text-secondary-token'>{profileMessage}</p>
-            {isProfileSetupRace && canAutoRetry && (
-              <p className='text-xs text-tertiary-token'>
-                Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
-              </p>
-            )}
-            {!isProfileSetupRace && (
-              <Button
-                onClick={() => router.refresh()}
-                variant='secondary'
-                size='sm'
-                className='gap-2'
-              >
-                <RefreshCw className='h-4 w-4' />
-                Retry
-              </Button>
-            )}
-          </ContentSurfaceCard>
-        </div>
-      </ChatWorkspaceSurface>
+      <ChatProfileFallback
+        needsOnboarding={needsOnboarding}
+        dashboardLoadError={dashboardLoadError}
+        isProfileSetupRace={isProfileSetupRace}
+        canAutoRetry={canAutoRetry}
+        autoRetryCount={autoRetryCount}
+        onRetry={() => router.refresh()}
+      />
     );
   }
 

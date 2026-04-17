@@ -15,7 +15,12 @@ export interface DemoPersonaRelease {
   readonly id: string;
   readonly title: string;
   readonly slug: string;
-  readonly releaseType: 'single' | 'ep' | 'album' | 'compilation';
+  readonly releaseType:
+    | 'single'
+    | 'ep'
+    | 'album'
+    | 'compilation'
+    | 'music_video';
   readonly releaseDate: string;
   readonly artworkUrl: string;
   readonly totalTracks: number;
@@ -28,6 +33,8 @@ export interface DemoPersonaRelease {
   readonly primaryIsrc: string;
   readonly providerUrls: Readonly<Partial<Record<ProviderKey, string>>>;
   readonly tracks?: readonly DemoPersonaTrack[];
+  /** JSONB metadata for the release (e.g., MusicVideoMetadata for music_video type) */
+  readonly metadata?: Record<string, unknown>;
 }
 
 export interface DemoPersonaTourDate {
@@ -220,8 +227,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'blessings-featuring-clementine-douglas',
       releaseType: 'single',
       releaseDate: '2025-06-09',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-1.png',
       totalTracks: 1,
       totalDurationMs: 221000,
       upc: '194399301001',
@@ -258,8 +264,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: '96-months',
       releaseType: 'album',
       releaseDate: '2025-09-05',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-2.png',
       totalTracks: 18,
       totalDurationMs: 4080000,
       upc: '194399301002',
@@ -337,8 +342,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'lovers-in-a-past-life-with-ragnbone-man',
       releaseType: 'single',
       releaseDate: '2024-02-16',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-3.png',
       totalTracks: 1,
       totalDurationMs: 189000,
       upc: '194399301003',
@@ -376,8 +380,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'desire-with-sam-smith',
       releaseType: 'single',
       releaseDate: '2023-07-28',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-4.png',
       totalTracks: 1,
       totalDurationMs: 180000,
       upc: '194399301004',
@@ -415,8 +418,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       slug: 'miracle-with-ellie-goulding',
       releaseType: 'single',
       releaseDate: '2023-07-22',
-      artworkUrl:
-        'https://images.unsplash.com/photo-1446057032654-9d8885db76c6?auto=format&fit=crop&w=640&q=80',
+      artworkUrl: '/images/demo/artwork-5.png',
       totalTracks: 1,
       totalDurationMs: 219000,
       upc: '194399301005',
@@ -447,6 +449,32 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
           isrc: 'GBARL2300722',
         },
       ],
+    },
+    {
+      id: 'calvin-miracle-video',
+      title: 'Miracle (Official Music Video)',
+      slug: 'miracle-official-music-video',
+      releaseType: 'music_video',
+      releaseDate: '2023-04-14',
+      artworkUrl: 'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+      totalTracks: 0,
+      totalDurationMs: 219000,
+      label: 'Columbia',
+      spotifyPopularity: 0,
+      artistNames: ['Calvin Harris', 'Ellie Goulding'],
+      genres: ['Dance', 'House'],
+      primaryIsrc: '',
+      providerUrls: {
+        youtube: 'https://www.youtube.com/watch?v=v7GHn2WJCM4',
+      },
+      metadata: {
+        youtubeVideoId: 'v7GHn2WJCM4',
+        youtubeThumbnailUrl:
+          'https://i.ytimg.com/vi/v7GHn2WJCM4/maxresdefault.jpg',
+        youtubeChannelId: 'UCIjYyZxkFucP_W-tmXg_ILw',
+        youtubeChannelName: 'Calvin Harris',
+        duration: 219,
+      },
     },
   ],
   tourDates: [
@@ -513,6 +541,22 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
       timezone: 'Asia/Kolkata',
       startDate: '2026-04-19T20:00:00+05:30',
       startTime: '8:00 PM',
+    },
+    {
+      externalId: 'calvin-london-2026',
+      title: null,
+      venueName: 'The O2',
+      city: 'London',
+      region: null,
+      country: 'UK',
+      provider: 'manual',
+      ticketStatus: 'available',
+      ticketUrl: 'https://calvinharris.com/shows',
+      latitude: 51.503,
+      longitude: 0.003,
+      timezone: 'Europe/London',
+      startDate: '2026-04-25T21:00:00+01:00',
+      startTime: '9:00 PM',
     },
     {
       externalId: 'calvin-vegas-2026-05-02',

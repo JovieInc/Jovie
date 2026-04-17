@@ -40,10 +40,11 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+const routeModulePromise = import('@/app/api/stripe/plan-change/route');
+
 describe('/api/stripe/plan-change route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
   });
@@ -52,7 +53,7 @@ describe('/api/stripe/plan-change route', () => {
     it('returns 401 for unauthenticated users', async () => {
       mockAuth.mockResolvedValue({ userId: null });
 
-      const { POST } = await import('@/app/api/stripe/plan-change/route');
+      const { POST } = await routeModulePromise;
       const request = new NextRequest(
         'http://localhost/api/stripe/plan-change',
         {
@@ -69,7 +70,7 @@ describe('/api/stripe/plan-change route', () => {
     it('returns 400 when priceId is invalid', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
 
-      const { POST } = await import('@/app/api/stripe/plan-change/route');
+      const { POST } = await routeModulePromise;
       const request = new NextRequest(
         'http://localhost/api/stripe/plan-change',
         {
@@ -88,7 +89,7 @@ describe('/api/stripe/plan-change route', () => {
       mockIsMaxPlanEnabled.mockReturnValue(false);
       mockIsMaxPriceId.mockReturnValue(true);
 
-      const { POST } = await import('@/app/api/stripe/plan-change/route');
+      const { POST } = await routeModulePromise;
       const request = new NextRequest(
         'http://localhost/api/stripe/plan-change',
         {
@@ -122,7 +123,7 @@ describe('/api/stripe/plan-change route', () => {
         effectiveDate,
       });
 
-      const { POST } = await import('@/app/api/stripe/plan-change/route');
+      const { POST } = await routeModulePromise;
       const request = new NextRequest(
         'http://localhost/api/stripe/plan-change',
         {
@@ -156,7 +157,7 @@ describe('/api/stripe/plan-change route', () => {
         availableChanges: [{ plan: 'pro' }],
       });
 
-      const { GET } = await import('@/app/api/stripe/plan-change/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -188,7 +189,7 @@ describe('/api/stripe/plan-change route', () => {
         schedule: null,
       });
 
-      const { GET } = await import('@/app/api/stripe/plan-change/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -213,7 +214,7 @@ describe('/api/stripe/plan-change route', () => {
         schedule: { id: 'sub_sched_123' },
       });
 
-      const { GET } = await import('@/app/api/stripe/plan-change/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -238,7 +239,7 @@ describe('/api/stripe/plan-change route', () => {
       });
       mockGetActiveSubscription.mockResolvedValue(null);
 
-      const { DELETE } = await import('@/app/api/stripe/plan-change/route');
+      const { DELETE } = await routeModulePromise;
       const response = await DELETE();
 
       expect(response.status).toBe(400);
@@ -256,7 +257,7 @@ describe('/api/stripe/plan-change route', () => {
       mockGetActiveSubscription.mockResolvedValue({ id: 'sub_123' });
       mockCancelScheduledPlanChange.mockResolvedValue({ success: true });
 
-      const { DELETE } = await import('@/app/api/stripe/plan-change/route');
+      const { DELETE } = await routeModulePromise;
       const response = await DELETE();
 
       expect(response.status).toBe(200);

@@ -136,14 +136,14 @@ function ListenContent() {
   );
 }
 
-function TipContent() {
+function PayContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {([3, 5, 7] as const).map((amount, i) => (
+        {([5, 10, 20] as const).map((amount, i) => (
           <div
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center ${
@@ -184,12 +184,9 @@ function TourContent() {
           {show.date}
         </span>
       </div>
-      <button
-        type='button'
-        className='text-[12px] font-medium text-tertiary-token hover:text-secondary-token transition-colors'
-      >
+      <span className='text-[12px] font-medium text-tertiary-token'>
         See more dates
-      </button>
+      </span>
     </div>
   );
 }
@@ -214,12 +211,9 @@ function ProfileContent() {
             New Single
           </p>
         </div>
-        <button
-          type='button'
-          className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'
-        >
+        <span className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
           Listen
-        </button>
+        </span>
       </div>
     </div>
   );
@@ -228,10 +222,10 @@ function ProfileContent() {
 /** Pre-built mode content keyed by mode ID. */
 export const MODE_CONTENT: Record<string, React.ReactNode> = {
   listen: <ListenContent />,
-  tip: <TipContent />,
+  pay: <PayContent />,
   tour: <TourContent />,
   profile: <ProfileContent />,
 };
 
 /** Mode IDs in display order. */
-export const MODE_IDS = ['profile', 'tour', 'tip', 'listen'] as const;
+export const MODE_IDS = ['profile', 'tour', 'pay', 'listen'] as const;

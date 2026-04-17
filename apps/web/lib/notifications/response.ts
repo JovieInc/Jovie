@@ -143,4 +143,8 @@ export const buildSubscribeNotFoundError = () =>
   buildSubscribeErrorResponse(404, 'Artist not found', 'not_found');
 
 export const buildSubscribeServerError = () =>
-  buildSubscribeErrorResponse(500, 'Server error', 'server_error');
+  buildSubscribeErrorResponse(
+    500,
+    'We couldn’t turn on notifications. Try again in a moment.',
+    'server_error'
+  );

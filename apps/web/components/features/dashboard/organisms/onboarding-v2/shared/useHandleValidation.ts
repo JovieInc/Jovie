@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
-import { isAbortError } from '@/lib/pacer/errors';
+import { isAbortError, isNetworkError } from '@/lib/pacer/errors';
 import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 import {
   generateUsernameSuggestions,
@@ -11,6 +11,7 @@ import {
 import type { HandleValidationState } from './types';
 
 interface UseHandleValidationOptions {
+  assumeInitialHandleAvailable?: boolean;
   normalizedInitialHandle: string;
   fullName: string;
 }
@@ -38,6 +39,11 @@ interface HandleValidationResponse {
 /** Maximum time (ms) to stay in "checking" state before resetting */
 const CHECKING_SAFETY_TIMEOUT_MS =
   PACER_TIMING.VALIDATION_TIMEOUT_MS + PACER_TIMING.VALIDATION_DEBOUNCE_MS;
+/**
+ * Cold dev-server compiles can abort the first couple of availability checks.
+ * Allow a small bounded retry budget before surfacing an error to the user.
+ */
+const MAX_TRANSIENT_RETRIES = 3;
 
 /**
  * Hook to manage handle validation state and API checks.
@@ -49,6 +55,7 @@ const CHECKING_SAFETY_TIMEOUT_MS =
  * - Race condition prevention
  */
 export function useHandleValidation({
+  assumeInitialHandleAvailable = false,
   normalizedInitialHandle,
   fullName,
 }: UseHandleValidationOptions): UseHandleValidationReturn {
@@ -56,7 +63,8 @@ export function useHandleValidation({
   const handleRef = useRef(normalizedInitialHandle);
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
-      available: Boolean(normalizedInitialHandle),
+      available:
+        assumeInitialHandleAvailable && Boolean(normalizedInitialHandle),
       checking: false,
       error: null,
       clientValid: Boolean(normalizedInitialHandle),
@@ -65,6 +73,8 @@ export function useHandleValidation({
 
   // TanStack Pacer hook for API validation with debouncing and caching
   const latestRequestedHandleRef = useRef(normalizedInitialHandle);
+  const abortRetryCountRef = useRef(new Map<string, number>());
+  const abortRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     handleRef.current = handle;
@@ -101,6 +111,8 @@ export function useHandleValidation({
         return;
       }
 
+      abortRetryCountRef.current.delete(input);
+
       if (result.available) {
         setHandleValidation({
           available: true,
@@ -129,14 +141,36 @@ export function useHandleValidation({
         return;
       }
 
-      if (isAbortError(error)) {
+      if (isAbortError(error) || isNetworkError(error)) {
+        const currentHandle = latestRequestedHandleRef.current;
+        const currentRetryCount =
+          abortRetryCountRef.current.get(currentHandle) ?? 0;
+
+        if (currentHandle && currentRetryCount < MAX_TRANSIENT_RETRIES) {
+          abortRetryCountRef.current.set(currentHandle, currentRetryCount + 1);
+          if (abortRetryTimerRef.current) {
+            clearTimeout(abortRetryTimerRef.current);
+          }
+          abortRetryTimerRef.current = setTimeout(() => {
+            setHandleValidation(prev => ({
+              ...prev,
+              checking: true,
+            }));
+            validateApiRef.current(currentHandle);
+          }, 250);
+          return;
+        }
+
         // Reset local checking flag. If Pacer still has a pending request,
         // isChecking (isPending || isValidating) keeps the combined state true.
         // If nothing is pending (e.g. timeout abort), this unblocks the UI.
-        setHandleValidation(prev => ({
-          ...prev,
+        setHandleValidation({
+          available: false,
           checking: false,
-        }));
+          clientValid: true,
+          error: 'Unable to check handle right now. Please try again.',
+          suggestions: [],
+        });
         return;
       }
 
@@ -164,6 +198,14 @@ export function useHandleValidation({
   useEffect(() => {
     validateApiRef.current = validateApi;
   }, [validateApi]);
+
+  useEffect(() => {
+    return () => {
+      if (abortRetryTimerRef.current) {
+        clearTimeout(abortRetryTimerRef.current);
+      }
+    };
+  }, []);
 
   // Safety valve: reset checking after max duration to prevent infinite "Checking..."
   // This catches edge cases where Pacer state or callbacks don't resolve.
@@ -202,9 +244,11 @@ export function useHandleValidation({
       const normalizedInput = input.trim().toLowerCase();
 
       latestRequestedHandleRef.current = normalizedInput;
+      abortRetryCountRef.current.delete(normalizedInput);
 
       // Fast path: if input matches initial handle, mark as valid immediately
       if (
+        assumeInitialHandleAvailable &&
         normalizedInitialHandle &&
         normalizedInput === normalizedInitialHandle
       ) {
@@ -247,10 +291,11 @@ export function useHandleValidation({
       // Trigger API validation via Pacer (debounced, cached)
       validateApiRef.current(normalizedInput);
     },
-    [cancelValidation, normalizedInitialHandle]
+    [assumeInitialHandleAvailable, cancelValidation, normalizedInitialHandle]
   );
 
   const isSeededInitialHandleReady =
+    assumeInitialHandleAvailable &&
     Boolean(normalizedInitialHandle) &&
     handle === normalizedInitialHandle &&
     handleValidation.available &&

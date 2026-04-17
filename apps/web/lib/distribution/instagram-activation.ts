@@ -52,7 +52,9 @@ interface ActivationSourceParams {
   } | null;
 }
 
-function coerceDate(value: Date | string | null | undefined): Date | null {
+type DateInput = Date | string | null | undefined;
+
+function coerceDate(value: DateInput): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -109,7 +111,7 @@ export function buildDistributionDedupeKey(
 }
 
 export function getBioLinkActivationWindowEnd(
-  onboardingCompletedAt: Date | string | null | undefined
+  onboardingCompletedAt: DateInput
 ): Date | null {
   const onboardingDate = coerceDate(onboardingCompletedAt);
   if (!onboardingDate) {
@@ -175,7 +177,7 @@ export async function postDistributionEvent(
 ): Promise<boolean> {
   // This helper relies on a same-origin relative URL and keepalive semantics,
   // so accidental server-side calls should no-op instead of throwing.
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return false;
   }
 

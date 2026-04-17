@@ -1,25 +1,17 @@
-/**
- * Unit tests for StaticArtistPage.
- *
- * StaticArtistPage is now a thin wrapper that always renders
- * ProfileCompactTemplate. These tests verify props are forwarded correctly.
- */
-
 import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
-const mountIds: string[] = [];
+const compactPreviewMountIds: string[] = [];
 
-// Mock the compact template
 vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
   ProfileCompactTemplate: (props: Record<string, unknown>) => {
     const mountIdRef = React.useRef(
-      `mount-${(props.artist as Artist)?.id}-${mountIds.length + 1}`
+      `compact-${(props.artist as Artist)?.id}-${compactPreviewMountIds.length + 1}`
     );
-    if (!mountIds.includes(mountIdRef.current)) {
-      mountIds.push(mountIdRef.current);
+    if (!compactPreviewMountIds.includes(mountIdRef.current)) {
+      compactPreviewMountIds.push(mountIdRef.current);
     }
 
     return React.createElement('div', {
@@ -29,33 +21,34 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       'data-show-subscription-confirmed-banner': String(
         props.showSubscriptionConfirmedBanner
       ),
+      'data-hide-more-menu': String(props.hideMoreMenu),
       'data-mount-id': mountIdRef.current,
     });
   },
 }));
 
-// Mock hooks used by ProfileCompactTemplate (shouldn't be needed since it's mocked,
-// but the import chain may trigger them)
-vi.mock('@/components/organisms/profile-shell', () => ({
-  ProfileNotificationsContext: React.createContext(null),
-  useProfileShell: () => ({ notificationsContextValue: null }),
-}));
-
-const mockArtist: Artist = {
+const mockArtist = {
   id: 'test-id',
-  name: 'Test Artist',
+  owner_user_id: 'owner-1',
+  spotify_id: 'spotify-test-id',
   handle: 'testartist',
+  name: 'Test Artist',
   image_url: null,
   tagline: null,
   location: null,
   hometown: null,
   career_highlights: null,
-  is_public: true,
-  is_verified: false,
+  target_playlists: null,
   active_since_year: null,
+  genres: null,
+  settings: {},
+  theme: {},
   published: true,
-  is_verified_flag: false,
-};
+  is_verified: false,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: '2024-01-01T00:00:00.000Z',
+} as unknown as Artist;
 
 const mockSocialLinks = [
   {
@@ -70,11 +63,11 @@ const mockSocialLinks = [
 
 describe('StaticArtistPage', () => {
   afterEach(() => {
-    mountIds.length = 0;
+    compactPreviewMountIds.length = 0;
     cleanup();
   });
 
-  it('renders the compact template', async () => {
+  it('defaults to the full public profile presentation', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'
     );
@@ -85,7 +78,7 @@ describe('StaticArtistPage', () => {
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Profile'
+        subtitle='Artist'
         showBackButton={false}
       />
     );
@@ -93,7 +86,27 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
   });
 
-  it('forwards mode prop to compact template', async () => {
+  it('renders the compact preview presentation when requested', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+  });
+
+  it('forwards mode to the live compact presentation by default', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'
     );
@@ -109,74 +122,61 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    const template = screen.getByTestId('profile-compact-template');
-    expect(template.getAttribute('data-mode')).toBe('listen');
-  });
-
-  it('forwards artist to compact template', async () => {
-    const { StaticArtistPage } = await import(
-      '@/features/profile/StaticArtistPage'
-    );
-
-    render(
-      <StaticArtistPage
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Profile'
-        showBackButton={false}
-      />
-    );
-
-    const template = screen.getByTestId('profile-compact-template');
-    expect(template.getAttribute('data-artist-name')).toBe('Test Artist');
-  });
-
-  it('forwards subscription confirmation banner state to compact template', async () => {
-    const { StaticArtistPage } = await import(
-      '@/features/profile/StaticArtistPage'
-    );
-
-    render(
-      <StaticArtistPage
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Profile'
-        showBackButton={false}
-        showSubscriptionConfirmedBanner
-      />
-    );
-
-    const template = screen.getByTestId('profile-compact-template');
     expect(
-      template.getAttribute('data-show-subscription-confirmed-banner')
-    ).toBe('true');
+      screen.getByTestId('profile-compact-template').getAttribute('data-mode')
+    ).toBe('listen');
   });
 
-  it('forwards tour mode to the compact template', async () => {
+  it('forwards preview-only props to the compact presentation', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'
     );
 
     render(
       <StaticArtistPage
+        presentation='compact-preview'
         mode='tour'
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Tour dates'
         showBackButton={true}
+        showSubscriptionConfirmedBanner
       />
     );
 
     const template = screen.getByTestId('profile-compact-template');
     expect(template.getAttribute('data-mode')).toBe('tour');
+    expect(
+      template.getAttribute('data-show-subscription-confirmed-banner')
+    ).toBe('true');
   });
 
-  it('remounts the compact template when artist identity changes', async () => {
+  it('forwards demo chrome controls to the compact presentation', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+        hideMoreMenu
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-hide-more-menu',
+      'true'
+    );
+  });
+
+  it('remounts the active renderer when artist identity changes', async () => {
     const { StaticArtistPage } = await import(
       '@/features/profile/StaticArtistPage'
     );
@@ -187,7 +187,7 @@ describe('StaticArtistPage', () => {
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Profile'
+        subtitle='Artist'
         showBackButton={false}
       />
     );
@@ -207,7 +207,7 @@ describe('StaticArtistPage', () => {
         }}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Profile'
+        subtitle='Artist'
         showBackButton={false}
       />
     );

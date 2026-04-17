@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
+import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
@@ -93,6 +93,7 @@ export const metadata: Metadata = {
   },
   other: {
     'application-name': APP_NAME,
+    'apple-mobile-web-app-capable': 'yes',
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',
@@ -184,6 +185,7 @@ export default async function RootLayout({
       {children}
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
+      <InstantlyPixel />
     </>
   );
 
@@ -199,8 +201,9 @@ export default async function RootLayout({
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
-      <head>
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
+      <head suppressHydrationWarning>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Theme init must run before first paint and stays static in /public. */}
+        <script src='/theme-init.js' />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

@@ -14,7 +14,9 @@ import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
+import { audienceMembers } from '@/lib/db/schema/analytics';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { verifyOptInToken } from '@/lib/email/opt-in-token';
 import { captureError } from '@/lib/error-tracking';
@@ -57,13 +59,64 @@ function htmlResponse(title: string, message: string, status: number) {
 }
 
 async function applyOptIn(email: string, profileId: string, optIn: boolean) {
-  const [updated] = await db
-    .update(tipAudience)
-    .set({ marketingOptIn: optIn, updatedAt: new Date() })
+  const [existing] = await db
+    .select({
+      id: tipAudience.id,
+      marketingOptIn: tipAudience.marketingOptIn,
+    })
+    .from(tipAudience)
     .where(
       and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
     )
+    .limit(1);
+
+  if (!existing) return null;
+
+  const [updated] = await db
+    .update(tipAudience)
+    .set({ marketingOptIn: optIn, updatedAt: new Date() })
+    .where(eq(tipAudience.id, existing.id))
     .returning({ id: tipAudience.id });
+  if (updated && optIn && !existing.marketingOptIn) {
+    const [member] = await db
+      .select({ id: audienceMembers.id })
+      .from(audienceMembers)
+      .where(
+        and(
+          eq(audienceMembers.creatorProfileId, profileId),
+          eq(audienceMembers.email, email)
+        )
+      )
+      .limit(1);
+
+    if (member) {
+      try {
+        await recordAudienceEvent(db, {
+          creatorProfileId: profileId,
+          audienceMemberId: member.id,
+          eventType: 'subscription_created',
+          verb: 'subscribed',
+          confidence: 'verified',
+          sourceKind: 'email',
+          sourceLabel: 'Email',
+          objectType: 'profile',
+          objectId: profileId,
+          objectLabel: 'Profile',
+          properties: { email },
+        });
+      } catch (error) {
+        logger.error('[audience] Failed to record subscription_created event', {
+          email,
+          profileId,
+          error,
+        });
+        void captureError('opt-in audience event failed', error, {
+          profileId,
+          email,
+        });
+      }
+    }
+  }
   return updated ?? null;
 }
 

@@ -84,10 +84,9 @@ export function ProfileMenuDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={view === 'menu' ? 'Menu' : 'Notifications'}
-      subtitle={
-        view === 'notifications' ? 'Choose what you hear about.' : undefined
-      }
+      subtitle={view === 'notifications' ? 'Choose your updates.' : undefined}
       onBack={view === 'notifications' ? () => setView('menu') : undefined}
+      navigationLevel={view === 'notifications' ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
     >
       {view === 'menu' ? (
@@ -130,7 +129,7 @@ export function ProfileMenuDrawer({
               onClick={() => handleAction(onOpenTip)}
             >
               <Ticket className={iconClass} />
-              Tip
+              Pay
             </button>
           ) : null}
 
@@ -164,7 +163,7 @@ export function ProfileMenuDrawer({
               onClick={() => handleAction(onOpenSubscribe)}
             >
               <Bell className={iconClass} />
-              Get Notified
+              Turn on notifications
             </button>
           )}
         </div>

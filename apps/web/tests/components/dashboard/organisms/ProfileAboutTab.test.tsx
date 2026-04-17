@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
 
 vi.mock('@/app/app/(shell)/dashboard/actions/creator-profile', () => ({
   updateAllowProfilePhotoDownloads: vi.fn(),
+  updateShowOldReleases: vi.fn(),
 }));
 
 vi.mock('@/components/molecules/GenrePicker', () => ({
@@ -44,6 +45,7 @@ const baseProps = {
   hometown: 'Chicago, IL',
   activeSinceYear: 2015,
   allowPhotoDownloads: true,
+  showOldReleases: false,
 };
 
 describe('ProfileAboutTab', () => {
@@ -53,8 +55,10 @@ describe('ProfileAboutTab', () => {
 
       expect(screen.getByText('I make beats.')).toBeInTheDocument();
       expect(screen.getByText('Los Angeles, CA')).toBeInTheDocument();
-      expect(screen.getByText('From Chicago, IL')).toBeInTheDocument();
-      expect(screen.getByText('Active since 2015')).toBeInTheDocument();
+      expect(screen.getByText('Chicago, IL')).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('active-since')).getByText('2015')
+      ).toBeInTheDocument();
       expect(screen.getByText('hip-hop')).toBeInTheDocument();
       expect(screen.getByText('electronic')).toBeInTheDocument();
     });

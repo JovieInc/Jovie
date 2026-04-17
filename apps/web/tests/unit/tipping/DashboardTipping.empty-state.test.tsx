@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { DashboardTipping } from '@/features/dashboard/dashboard-tipping/DashboardTipping';
+import { DashboardPay } from '@/features/dashboard/dashboard-pay/DashboardPay';
 
 const mockUseDashboardData = vi.fn();
-const mockUseDashboardTipping = vi.fn();
+const mockUseDashboardPay = vi.fn();
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => mockUseDashboardData(),
@@ -23,11 +23,11 @@ vi.mock('@/components/organisms/Dialog', () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
-vi.mock('@/features/dashboard/dashboard-tipping/useDashboardTipping', () => ({
-  useDashboardTipping: () => mockUseDashboardTipping(),
+vi.mock('@/features/dashboard/dashboard-pay/useDashboardPay', () => ({
+  useDashboardPay: () => mockUseDashboardPay(),
 }));
 
-describe('DashboardTipping empty state behavior', () => {
+describe('DashboardPay empty state behavior', () => {
   it('shows a cohesive empty state and hides downstream cards when Venmo is not connected', () => {
     mockUseDashboardData.mockReturnValue({
       tippingStats: {
@@ -37,7 +37,7 @@ describe('DashboardTipping empty state behavior', () => {
       },
     });
 
-    mockUseDashboardTipping.mockReturnValue({
+    mockUseDashboardPay.mockReturnValue({
       artist: { handle: 'artist-handle', venmo_handle: undefined },
       venmoHandle: '',
       setVenmoHandle: vi.fn(),
@@ -51,7 +51,7 @@ describe('DashboardTipping empty state behavior', () => {
       handleDisconnect: vi.fn(),
     });
 
-    render(<DashboardTipping />);
+    render(<DashboardPay />);
 
     expect(
       screen.getByRole('heading', { name: 'Connect Venmo to unlock earnings' })
@@ -75,7 +75,7 @@ describe('DashboardTipping empty state behavior', () => {
       },
     });
 
-    mockUseDashboardTipping.mockReturnValue({
+    mockUseDashboardPay.mockReturnValue({
       artist: { handle: 'artist-handle', venmo_handle: '@artist' },
       venmoHandle: 'artist',
       setVenmoHandle: vi.fn(),
@@ -89,7 +89,7 @@ describe('DashboardTipping empty state behavior', () => {
       handleDisconnect: vi.fn(),
     });
 
-    render(<DashboardTipping />);
+    render(<DashboardPay />);
 
     expect(
       screen.getByRole('heading', { name: 'Earnings Dashboard' })

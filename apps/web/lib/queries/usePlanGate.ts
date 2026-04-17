@@ -52,6 +52,8 @@ export interface PlanGateEntitlements {
   canAccessTasksWorkspace: boolean;
   /** Pro: can generate release plans */
   canGenerateReleasePlans: boolean;
+  /** Pro: can generate album art from chat */
+  canGenerateAlbumArt: boolean;
   /** Pro: can access metadata submission workflows */
   canAccessMetadataSubmissionAgent: boolean;
   /** Pro: can access future/unreleased release smartlinks */
@@ -92,6 +94,12 @@ export interface PlanGateEntitlements {
   aiDailyMessageLimit: number;
   /** AI pitch generations per release based on plan (null = unlimited) */
   aiPitchGenPerRelease: number | null;
+  /** Whether the user is on an active trial */
+  isTrialing: boolean;
+  /** Days remaining in the trial (null if not trialing) */
+  trialDaysRemaining: number | null;
+  /** ISO date string when trial ends (null if not trialing) */
+  trialEndsAt: string | null;
 }
 
 /**
@@ -109,9 +117,13 @@ export function usePlanGate(): PlanGateEntitlements {
   const isPro = data?.isPro ?? false;
   const plan = data?.plan ?? null;
 
+  const isTrialing = plan === 'trial';
+
   let planKey: PlanId;
   if (plan === 'max' || plan === 'growth') {
     planKey = 'max';
+  } else if (plan === 'trial') {
+    planKey = 'trial';
   } else if (plan === 'pro' || plan === 'founding') {
     planKey = 'pro';
   } else {
@@ -119,11 +131,28 @@ export function usePlanGate(): PlanGateEntitlements {
   }
   const ent = ENTITLEMENT_REGISTRY[planKey];
 
+  // Derive trial days remaining from trialEndsAt if available
+  const trialEndsAt =
+    ((data as Record<string, unknown> | undefined)?.trialEndsAt as
+      | string
+      | null) ?? null;
+  let trialDaysRemaining: number | null = null;
+  if (isTrialing && trialEndsAt) {
+    const msRemaining = new Date(trialEndsAt).getTime() - Date.now();
+    trialDaysRemaining = Math.max(
+      0,
+      Math.floor(msRemaining / (1000 * 60 * 60 * 24))
+    );
+  }
+
   return {
     isLoading,
     isError,
     isPro,
     plan,
+    isTrialing,
+    trialDaysRemaining,
+    trialEndsAt,
     ...ent.booleans,
     ...ent.limits,
   };

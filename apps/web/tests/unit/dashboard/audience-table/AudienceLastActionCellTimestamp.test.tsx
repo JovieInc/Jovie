@@ -7,7 +7,7 @@ describe('AudienceLastActionCell with lastSeenAt', () => {
     render(
       <AudienceLastActionCell actions={[{ label: 'clicked spotify link' }]} />
     );
-    expect(screen.getByText('Clicked spotify link')).toBeInTheDocument();
+    expect(screen.getByText('Clicked Spotify Link')).toBeInTheDocument();
   });
 
   it('renders relative time when lastSeenAt is provided', () => {
@@ -19,7 +19,7 @@ describe('AudienceLastActionCell with lastSeenAt', () => {
       />
     );
     // Should show the action label
-    expect(screen.getByText('Visited profile')).toBeInTheDocument();
+    expect(screen.getByText('Visited Profile')).toBeInTheDocument();
     // Should show a dot separator between action and time
     expect(screen.getByText('·')).toBeInTheDocument();
     expect(screen.getByText(/ago/i)).toBeInTheDocument();

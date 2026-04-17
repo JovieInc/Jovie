@@ -285,7 +285,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
-export type UserPlan = 'free' | 'founding' | 'pro' | 'max';
+export type UserPlan = 'free' | 'trial' | 'founding' | 'pro' | 'max';
 
 export interface UserEntitlements {
   userId: string | null;
@@ -294,8 +294,12 @@ export interface UserEntitlements {
   isAdmin: boolean;
   // Plan info
   plan: UserPlan;
-  isPro: boolean; // true for founding, pro, or max
+  isPro: boolean; // true for trial, founding, pro, or max
   hasAdvancedFeatures: boolean; // true for max only
+  // Trial info
+  isTrialing: boolean;
+  trialEndsAt: string | null; // ISO date string
+  trialDaysRemaining: number | null;
   // Feature gates
   canExportContacts: boolean;
   canAccessAdvancedAnalytics: boolean;
@@ -303,6 +307,7 @@ export interface UserEntitlements {
   canAccessAdPixels: boolean;
   canBeVerified: boolean;
   aiCanUseTools: boolean;
+  canGenerateAlbumArt: boolean;
   canCreateManualReleases: boolean;
   canAccessTasksWorkspace: boolean;
   canGenerateReleasePlans: boolean;

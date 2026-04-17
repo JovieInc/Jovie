@@ -11,11 +11,10 @@ const ARTWORK_DOWNLOAD_SIZES = [1000, 500, 250] as const;
 const AVIF_QUALITY = 80; // Higher quality than avatars for artwork
 const AVIF_EFFORT = 4;
 
-export async function processArtworkToSizes(
-  file: File
+async function processArtworkInputBuffer(
+  inputBuffer: Buffer
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const inputBuffer = await fileToBuffer(file);
   const baseImage = sharp(inputBuffer, { failOnError: false })
     .rotate()
     .withMetadata({ orientation: undefined });
@@ -71,4 +70,16 @@ export async function processArtworkToSizes(
   }
 
   return results;
+}
+
+export async function processArtworkToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  return processArtworkInputBuffer(await fileToBuffer(file));
+}
+
+export async function processArtworkBufferToSizes(
+  buffer: Buffer
+): Promise<Record<string, Buffer>> {
+  return processArtworkInputBuffer(buffer);
 }

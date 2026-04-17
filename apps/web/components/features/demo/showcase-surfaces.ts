@@ -8,6 +8,7 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'release-landing',
   'release-presave',
   'release-tasks',
+  'tim-white-profile',
   'onboarding-handle',
   'onboarding-dsp',
   'onboarding-profile-review',

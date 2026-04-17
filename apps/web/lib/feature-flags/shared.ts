@@ -4,10 +4,7 @@
  * Overrides via dev toolbar are stored in localStorage.
  */
 
-/**
- * @deprecated Use FEATURE_FLAGS + useCodeFlag instead. Kept temporarily for migration.
- */
-export const FEATURE_FLAG_KEYS = {
+export const STATSIG_GATE_KEYS = {
   PROFILE_V2: 'feature_profile_v2',
   CLAIM_HANDLE: 'feature_claim_handle',
   HERO_SPOTIFY_CLAIM_FLOW: 'feature_hero_spotify_claim_flow',
@@ -25,16 +22,23 @@ export const FEATURE_FLAG_KEYS = {
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
 } as const;
 
-/** @deprecated Use CodeFlagName or FEATURE_FLAGS instead. */
-export type FeatureFlagKey =
-  (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
+export type StatsigGateKey =
+  (typeof STATSIG_GATE_KEYS)[keyof typeof STATSIG_GATE_KEYS];
+
+/**
+ * @deprecated Use FEATURE_FLAGS + useCodeFlag for code flags and STATSIG_GATE_KEYS
+ * only when interacting with legacy Statsig server evaluation.
+ */
+export const FEATURE_FLAG_KEYS = STATSIG_GATE_KEYS;
 
 export type SubscribeCTAVariant = 'two_step' | 'inline';
 
-/** @deprecated — bootstrap is no longer needed (Statsig removed). */
-export interface FeatureFlagsBootstrap {
+export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
+
+/** @deprecated Compatibility alias. Use StatsigFeatureFlagsBootstrap directly. */
+export interface FeatureFlagsBootstrap extends StatsigFeatureFlagsBootstrap {}
 
 /**
  * All feature flags — toggle the boolean, deploy, done.
@@ -80,8 +84,6 @@ export const FEATURE_FLAGS = {
   THREADS_ENABLED: false,
   /** "Replaces Linktree + Linkfire + Mailchimp" section on marketing homepage */
   SHOW_REPLACES_SECTION: false,
-  /** PWA install banner in the sidebar */
-  PWA_INSTALL_BANNER: false,
   /** Sticky phone tour on marketing homepage */
   SHOW_PHONE_TOUR: true,
   /** Logo bar ("Trusted by artists on") on marketing homepage */
@@ -91,11 +93,17 @@ export const FEATURE_FLAGS = {
   /** Final CTA section on marketing homepage */
   SHOW_FINAL_CTA: true,
 
+  /** Homepage sections below the hero (chapters, notify, bento, spec, CTA) */
+  SHOW_HOMEPAGE_SECTIONS: false,
+
   /** Filter and display toolbar buttons on the releases page. */
   SHOW_RELEASE_TOOLBAR_EXTRAS: false,
 
   /** Playlist engine: cron generation, public pages, admin queue. */
   PLAYLIST_ENGINE: false,
+
+  /** AI-generated release artwork via chat. */
+  ALBUM_ART_GENERATION: true,
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
@@ -122,11 +130,12 @@ export const CODE_FLAG_KEYS = {
   // Code flags
   THREADS_ENABLED: 'code:THREADS_ENABLED',
   SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
-  PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
   SHOW_PHONE_TOUR: 'code:SHOW_PHONE_TOUR',
   SHOW_LOGO_BAR: 'code:SHOW_LOGO_BAR',
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
   SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
+  SHOW_HOMEPAGE_SECTIONS: 'code:SHOW_HOMEPAGE_SECTIONS',
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
+  ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
 } as const satisfies Record<CodeFlagName, string>;

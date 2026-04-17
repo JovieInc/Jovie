@@ -34,6 +34,15 @@ const nextConfig = {
   output: 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Node 22 standalone tracing can miss Sentry's runtime interception deps when
+  // Turbopack externalizes them for instrumentation. Keep them in the traced
+  // server bundle so public-route smoke and Lighthouse boots do not 500.
+  outputFileTracingIncludes: {
+    '/*': [
+      '../../node_modules/.pnpm/node_modules/import-in-the-middle/**/*',
+      '../../node_modules/.pnpm/node_modules/require-in-the-middle/**/*',
+    ],
+  },
   // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
@@ -233,18 +242,18 @@ const nextConfig = {
       { source: '/app/contacts', destination: '/app/settings/contacts' },
       {
         source: '/app/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       {
         source: '/app/dashboard/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/dashboard/links',
@@ -252,7 +261,7 @@ const nextConfig = {
       },
       {
         source: '/app/dashboard/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#tips',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       {
         source: '/app/dashboard/profile',
@@ -373,6 +382,12 @@ const nextConfig = {
         permanent: false,
       },
       ...legacyAppRedirects,
+      // Old /tips landing page redirect
+      {
+        source: '/tips',
+        destination: '/pay',
+        permanent: true,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -405,6 +420,7 @@ const nextConfig = {
       0,
       7
     ),
+    NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
     // Clerk JS bundle URL — decoded from the publishable key at build time.
     // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
     // so Clerk JS + chunks load directly from Clerk infrastructure instead of

@@ -26,6 +26,14 @@ const PROFILE_COMPACT_TEMPLATE = join(
   'templates',
   'ProfileCompactTemplate.tsx'
 );
+const PROFILE_COMPACT_SURFACE = join(
+  ROOT,
+  'components',
+  'features',
+  'profile',
+  'templates',
+  'ProfileCompactSurface.tsx'
+);
 const PROFILE_SHELL = join(
   ROOT,
   'components',
@@ -46,6 +54,14 @@ const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
     'molecules',
     'ProfilePreview.tsx'
   ),
+  join(
+    ROOT,
+    'components',
+    'features',
+    'dashboard',
+    'organisms',
+    'DashboardPreview.tsx'
+  ),
 ] as const;
 
 describe('public profile contract guard', () => {
@@ -56,6 +72,7 @@ describe('public profile contract guard', () => {
       /import\s*\{\s*buildProfilePublicViewModel\s*\}\s*from\s*['"]@\/features\/profile\/view-models['"]/
     );
     expect(contents).toMatch(/buildProfilePublicViewModel\s*\(\s*\{/);
+    expect(contents).toContain("presentation = 'full-public'");
     expect(contents).toContain('<ProfileCompactTemplate');
   });
 
@@ -63,6 +80,17 @@ describe('public profile contract guard', () => {
     const offenders = REPRESENTATIVE_PROFILE_ENTRYPOINTS.filter(filePath => {
       const contents = readFileSync(filePath, 'utf8');
       return !contents.includes('<StaticArtistPage');
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps demo and preview surfaces on the compact preview presentation', () => {
+    const compactPreviewEntrypoints =
+      REPRESENTATIVE_PROFILE_ENTRYPOINTS.slice(1);
+    const offenders = compactPreviewEntrypoints.filter(filePath => {
+      const contents = readFileSync(filePath, 'utf8');
+      return !contents.includes("presentation='compact-preview'");
     });
 
     expect(offenders).toEqual([]);
@@ -78,7 +106,7 @@ describe('public profile contract guard', () => {
     expect(readFileSync(PROFILE_COMPACT_TEMPLATE, 'utf8')).toContain(
       '--profile-shell-card-radius'
     );
-    expect(readFileSync(PROFILE_COMPACT_TEMPLATE, 'utf8')).toContain(
+    expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
       '--profile-action-radius'
     );
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(

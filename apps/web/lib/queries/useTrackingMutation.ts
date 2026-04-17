@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 /**
  * Input type for tracking mutations.
@@ -46,6 +47,11 @@ export function useTrackingMutation<TInput = TrackingMutationInput>(
   return useMutation<void, Error, TInput>({
     mutationFn: async (input: TInput) => {
       const body = transform ? transform(input) : input;
+
+      if (method === 'POST') {
+        postJsonBeacon(endpoint, body);
+        return;
+      }
 
       await fetch(endpoint, {
         method,

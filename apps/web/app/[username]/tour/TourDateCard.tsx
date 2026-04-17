@@ -1,8 +1,8 @@
 'use client';
 
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 

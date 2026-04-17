@@ -37,6 +37,24 @@ vi.mock('@/features/profile/StaticListenInterface', () => ({
   ),
 }));
 
+vi.mock(
+  '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
+  () => ({
+    ArtistNotificationsCTA: () => (
+      <div data-testid='artist-notifications'>Subscribe content</div>
+    ),
+  })
+);
+
+vi.mock(
+  '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  () => ({
+    TwoStepNotificationsCTA: () => (
+      <div data-testid='two-step-notifications'>Subscribe content</div>
+    ),
+  })
+);
+
 vi.mock('@/features/profile/artist-notifications-cta', () => ({
   TwoStepNotificationsCTA: () => (
     <div data-testid='two-step-notifications'>Subscribe content</div>
@@ -46,8 +64,8 @@ vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/TipSelector', () => ({
-  TipSelector: () => <div data-testid='tip-selector'>Tip content</div>,
+vi.mock('@/components/molecules/PaySelector', () => ({
+  PaySelector: () => <div data-testid='pay-selector'>Pay content</div>,
 }));
 
 vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
@@ -83,9 +101,10 @@ const mockContacts: PublicContact[] = [
     role: 'manager',
     roleLabel: 'Manager',
     secondaryLabel: 'Team',
-    primaryContactLabel: 'manager@test.com',
+    primaryContactLabel: 'Taylor Lee',
     territorySummary: 'US',
-    channels: [{ type: 'email', value: 'manager@test.com' }],
+    territoryCount: 1,
+    channels: [{ type: 'email', encoded: 'encoded-email' }],
   },
 ];
 

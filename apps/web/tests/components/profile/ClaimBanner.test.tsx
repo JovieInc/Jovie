@@ -1,20 +1,12 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 
-// Mock useUserSafe and useAuthSafe hooks (used by ClaimBanner)
-const mockUseUser = vi.fn();
-vi.mock('@/hooks/useClerkSafe', () => ({
-  useUserSafe: () => mockUseUser(),
-  useAuthSafe: () => ({ isSignedIn: false }),
-}));
-
-// Mock analytics
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-// Mock next/link
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -24,7 +16,7 @@ vi.mock('next/link', () => ({
     'aria-label': ariaLabel,
   }: {
     href: string;
-    children: React.ReactNode;
+    children: ReactNode;
     className?: string;
     'data-testid'?: string;
     'aria-label'?: string;
@@ -41,99 +33,56 @@ vi.mock('next/link', () => ({
 }));
 
 describe('ClaimBanner', () => {
-  const defaultProps = {
-    profileHandle: 'testartist',
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('rendering', () => {
-    it('renders the claim banner with correct structure', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
+  it('renders the organic claim variant with the server-provided CTA', () => {
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/testartist/claim?next=auth'
+        variant='organic'
+      />
+    );
 
-      render(<ClaimBanner {...defaultProps} />);
-
-      expect(screen.getByTestId('claim-banner')).toBeInTheDocument();
-      expect(screen.getByTestId('claim-banner-cta')).toBeInTheDocument();
-      expect(screen.getByText('Claim Profile')).toBeInTheDocument();
-    });
-
-    it('displays banner text regardless of display name', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(<ClaimBanner {...defaultProps} />);
-
-      expect(
-        screen.getByText('Is this your profile? Claim it in 30 seconds.')
-      ).toBeInTheDocument();
-    });
-
-    it('displays banner text when display name is provided', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(
-        <ClaimBanner {...defaultProps} displayName='Test Artist Display' />
-      );
-
-      expect(
-        screen.getByText('Is this your profile? Claim it in 30 seconds.')
-      ).toBeInTheDocument();
-    });
-
-    it('has proper accessibility attributes', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(<ClaimBanner {...defaultProps} displayName='Test Artist' />);
-
-      const banner = screen.getByRole('banner');
-      expect(banner).toBeInTheDocument();
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'aria-label',
-        'Claim profile for Test Artist'
-      );
-    });
+    expect(screen.getByTestId('claim-banner')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Is this your profile? Claim it with Spotify in about a minute.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+      'href',
+      '/testartist/claim?next=auth'
+    );
   });
 
-  describe('URL generation', () => {
-    it('generates signup URL with redirect for all users', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
+  it('renders the claim-intent copy for token-backed visitors', () => {
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/testartist/claim?next=auth'
+        variant='claim_intent'
+      />
+    );
 
-      render(<ClaimBanner {...defaultProps} />);
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      // ClaimBanner no longer includes a claim token — it directs to signup
-      expect(cta).toHaveAttribute(
-        'href',
-        '/signup?handle=testartist&redirect_url=%2Ftestartist'
-      );
-    });
-
-    it('generates signup URL while loading', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: false });
-
-      render(<ClaimBanner {...defaultProps} />);
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'href',
-        '/signup?handle=testartist&redirect_url=%2Ftestartist'
-      );
-    });
+    expect(
+      screen.getByText(
+        'Your profile is ready. Claim it to turn on release emails.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('Claim Profile')).toBeInTheDocument();
   });
 
-  describe('responsive behavior', () => {
-    it('renders a single copy text visible at all breakpoints', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
+  it('renders an informational banner without a CTA when direct claim is unsupported', () => {
+    render(<ClaimBanner profileHandle='testartist' variant='unsupported' />);
 
-      render(<ClaimBanner {...defaultProps} />);
-
-      expect(
-        screen.getByText('Is this your profile? Claim it in 30 seconds.')
-      ).toBeInTheDocument();
-    });
+    expect(
+      screen.getByText(
+        'This profile needs a claim link before it can be claimed.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('claim-banner-cta')).not.toBeInTheDocument();
   });
 });

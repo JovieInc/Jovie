@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
@@ -55,6 +55,7 @@ export function AddReleaseSidebar({
   const [title, setTitle] = useState('');
   const [releaseType, setReleaseType] = useState<ReleaseType>('single');
   const [releaseDate, setReleaseDate] = useState('');
+  const [revealDate, setRevealDate] = useState('');
   const [genres, setGenres] = useState<string[]>([]);
   const [isExplicit, setIsExplicit] = useState(false);
   const [stagedArtworkFile, setStagedArtworkFile] = useState<File | null>(null);
@@ -67,6 +68,30 @@ export function AddReleaseSidebar({
     RELEASE_TYPE_OPTIONS.find(option => option.value === releaseType)?.label ??
     'Single';
 
+  // Show reveal date field when release date is in the future
+  const isFutureRelease = useMemo(() => {
+    if (!releaseDate) return false;
+    return new Date(releaseDate) > new Date();
+  }, [releaseDate]);
+
+  // Auto-calculate reveal date default (30 days before release)
+  const autoRevealDate = useMemo(() => {
+    if (!releaseDate || !isFutureRelease) return '';
+    const rd = new Date(releaseDate);
+    rd.setDate(rd.getDate() - 30);
+    const now = new Date();
+    const effective = rd > now ? rd : now;
+    return effective.toISOString().split('T')[0];
+  }, [releaseDate, isFutureRelease]);
+
+  // Auto-set reveal date when release date changes (only if user hasn't manually set one)
+  const [revealDateManuallySet, setRevealDateManuallySet] = useState(false);
+  useEffect(() => {
+    if (!revealDateManuallySet && autoRevealDate) {
+      setRevealDate(autoRevealDate);
+    }
+  }, [autoRevealDate, revealDateManuallySet]);
+
   const replaceStagedArtworkPreview = useCallback((nextUrl: string | null) => {
     setStagedArtworkPreviewUrl(nextUrl);
   }, []);
@@ -75,6 +100,8 @@ export function AddReleaseSidebar({
     setTitle('');
     setReleaseType('single');
     setReleaseDate('');
+    setRevealDate('');
+    setRevealDateManuallySet(false);
     setGenres([]);
     setIsExplicit(false);
     setStagedArtworkFile(null);
@@ -117,6 +144,7 @@ export function AddReleaseSidebar({
         title: title.trim(),
         releaseType,
         releaseDate: releaseDate || null,
+        revealDate: revealDate || null,
         genres,
         isExplicit,
       });
@@ -187,6 +215,7 @@ export function AddReleaseSidebar({
     onCreated,
     onArtworkUploaded,
     releaseDate,
+    revealDate,
     releaseType,
     resetForm,
     stagedArtworkFile,
@@ -207,6 +236,7 @@ export function AddReleaseSidebar({
       isOpen={isOpen}
       ariaLabel='Add release'
       data-testid='add-release-sidebar'
+      scrollStrategy='shell'
       onClose={handleClose}
       headerMode='minimal'
       hideMinimalHeaderBar
@@ -214,7 +244,7 @@ export function AddReleaseSidebar({
       footer={
         <DrawerButton
           tone='secondary'
-          className='h-8 w-full justify-center text-primary-token'
+          className='h-8 w-full justify-center border-white bg-white text-black hover:border-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:border-white disabled:bg-white disabled:text-black/55 disabled:opacity-100'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
@@ -320,10 +350,31 @@ export function AddReleaseSidebar({
               id='release-date'
               type='date'
               value={releaseDate}
-              onChange={event => setReleaseDate(event.target.value)}
+              onChange={event => {
+                setReleaseDate(event.target.value);
+                setRevealDateManuallySet(false);
+              }}
               className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormField>
+
+          {isFutureRelease && (
+            <DrawerFormField label='Reveal Date' htmlFor='reveal-date'>
+              <Input
+                id='reveal-date'
+                type='date'
+                value={revealDate}
+                onChange={event => {
+                  setRevealDate(event.target.value);
+                  setRevealDateManuallySet(true);
+                }}
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              />
+              <p className='mt-1 text-[11px] text-tertiary-token'>
+                Details hidden until this date (mystery page)
+              </p>
+            </DrawerFormField>
+          )}
 
           <DrawerFormField label='Genres'>
             <GenrePicker
@@ -339,7 +390,7 @@ export function AddReleaseSidebar({
                       genres.map(genre => (
                         <span
                           key={genre}
-                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[10.5px] capitalize text-secondary-token'
+                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[11px] capitalize text-secondary-token'
                         >
                           {genre}
                         </span>
