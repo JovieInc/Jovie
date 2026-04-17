@@ -17,9 +17,15 @@ const VALUE_CLASSNAME =
   'text-[12px] font-[460] leading-[16px] text-secondary-token';
 const ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 
+interface ReleaseCreditsSectionProps {
+  readonly releaseId: string;
+  readonly variant?: 'card' | 'flat';
+}
+
 export function ReleaseCreditsSection({
   releaseId,
-}: Readonly<{ releaseId: string }>) {
+  variant = 'card',
+}: ReleaseCreditsSectionProps) {
   const [credits, setCredits] = useState<CreditGroup[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,19 +58,30 @@ export function ReleaseCreditsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'overflow-hidden'
+      )}
       testId='release-credits-card'
     >
-      <div className='p-3'>
-        <p className='mb-2 text-[11px] font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
-          Credits
-        </p>
+      <div
+        className={cn(
+          variant === 'card'
+            ? 'p-3'
+            : 'border-t border-(--linear-app-frame-seam) px-3 pb-3 pt-2.5'
+        )}
+      >
+        {variant === 'card' ? (
+          <p className='mb-2 text-[11px] font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
+            Credits
+          </p>
+        ) : null}
         <div className='space-y-0.5'>
           {visibleCredits.map(group => (
             <DrawerPropertyRow
               key={group.role}
               label={group.label}
-              labelWidth={90}
               size='sm'
               className={ROW_CLASSNAME}
               labelClassName={LABEL_CLASSNAME}
