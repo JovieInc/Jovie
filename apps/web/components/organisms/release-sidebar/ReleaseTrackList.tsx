@@ -35,18 +35,10 @@ function getCanonicalTrackLabel(track: ReleaseSidebarTrack): string {
 function getDisplayTrackLabel(params: {
   track: ReleaseSidebarTrack;
   index: number;
-  tracks: readonly ReleaseSidebarTrack[];
-  totalTracks: number;
+  isSingleDiscPartialSubset: boolean;
 }): string {
-  const { track, index, tracks, totalTracks } = params;
-  const isPartialSubset = tracks.length < totalTracks;
-  const isSingleDisc = tracks.every(item => item.discNumber === 1);
-
-  if (!isSingleDisc) {
-    return getCanonicalTrackLabel(track);
-  }
-
-  if (isPartialSubset) {
+  const { track, index, isSingleDiscPartialSubset } = params;
+  if (isSingleDiscPartialSubset) {
     return String(index + 1);
   }
 
@@ -125,6 +117,14 @@ export function ReleaseTrackList({
     );
   }
 
+  const inferredDiscCount = Math.max(
+    1,
+    ...tracks.map(track => track.discNumber)
+  );
+  const isSingleDiscPartialSubset =
+    tracks.length < release.totalTracks &&
+    (release.totalDiscs ?? inferredDiscCount) === 1;
+
   return (
     <div className='space-y-1' data-testid='tracklist'>
       <p className='sr-only' aria-live='polite'>
@@ -137,8 +137,7 @@ export function ReleaseTrackList({
           trackLabel={getDisplayTrackLabel({
             track,
             index,
-            tracks,
-            totalTracks: release.totalTracks,
+            isSingleDiscPartialSubset,
           })}
           release={release}
           playbackState={playbackState}

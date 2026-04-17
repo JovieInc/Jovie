@@ -292,7 +292,7 @@ describe('ReleaseTrackList', () => {
   });
 
   it('keeps disc-track labels for multi-disc subsets', () => {
-    const release = { ...createMockRelease(), totalTracks: 10 };
+    const release = { ...createMockRelease(), totalTracks: 10, totalDiscs: 2 };
     const tracks = [
       createTrack(release, { id: 'track_1', trackNumber: 1, discNumber: 1 }),
       createTrack(release, {
@@ -324,6 +324,31 @@ describe('ReleaseTrackList', () => {
     expect(
       screen.getByTestId('release-track-control-track_2_3')
     ).toHaveTextContent('2-3');
+  });
+
+  it('keeps canonical numbering when a multi-disc subset only includes disc one tracks', () => {
+    const release = { ...createMockRelease(), totalTracks: 12, totalDiscs: 2 };
+    const tracks = [
+      createTrack(release, { id: 'track_1', trackNumber: 1, discNumber: 1 }),
+      createTrack(release, { id: 'track_5', trackNumber: 5, discNumber: 1 }),
+      createTrack(release, {
+        id: 'track_10',
+        trackNumber: 10,
+        discNumber: 1,
+      }),
+    ];
+
+    render(<ReleaseTrackList release={release} tracksOverride={tracks} />);
+
+    expect(
+      screen.getByTestId('release-track-control-track_1')
+    ).toHaveTextContent('1');
+    expect(
+      screen.getByTestId('release-track-control-track_5')
+    ).toHaveTextContent('5');
+    expect(
+      screen.getByTestId('release-track-control-track_10')
+    ).toHaveTextContent('10');
   });
 
   it('renders simplified loading, error, and empty states', () => {
