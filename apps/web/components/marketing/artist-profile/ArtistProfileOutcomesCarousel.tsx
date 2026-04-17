@@ -5,7 +5,6 @@ import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import {
@@ -34,7 +33,7 @@ type OutcomeAccentStyle = CSSProperties & {
 
 const SCROLL_TARGET_TOLERANCE = 2;
 const OUTCOME_CARD_TRANSITION =
-  'transform 340ms cubic-bezier(0.22,1,0.36,1), opacity 340ms cubic-bezier(0.22,1,0.36,1), box-shadow 340ms cubic-bezier(0.22,1,0.36,1)';
+  'box-shadow 240ms cubic-bezier(0.22,1,0.36,1), background 240ms cubic-bezier(0.22,1,0.36,1)';
 
 export function ArtistProfileOutcomesCarousel({
   outcomes,
@@ -43,7 +42,6 @@ export function ArtistProfileOutcomesCarousel({
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const programmaticTargetIndexRef = useRef<number | null>(null);
   const scrollRafRef = useRef<number | null>(null);
-  const reducedMotion = useReducedMotion();
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const maxCardIndex = outcomes.cards.length - 1;
 
@@ -108,10 +106,10 @@ export function ArtistProfileOutcomesCarousel({
       setActiveCardIndex(targetIndex);
       scroller.scrollTo({
         left: targetCard.offsetLeft,
-        behavior: reducedMotion ? 'auto' : 'smooth',
+        behavior: 'smooth',
       });
     },
-    [outcomes.cards.length, reducedMotion]
+    [outcomes.cards.length]
   );
 
   const scrollByDirection = useCallback(
@@ -179,7 +177,7 @@ export function ArtistProfileOutcomesCarousel({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-white/[0.01] py-24 sm:py-28 lg:py-32'
+      className='bg-white/[0.01]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
@@ -196,7 +194,7 @@ export function ArtistProfileOutcomesCarousel({
         </div>
 
         <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
+          <div className='artist-profile-outcomes-controls pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 items-center gap-2'>
             <button
               type='button'
               onClick={() => {
@@ -233,7 +231,7 @@ export function ArtistProfileOutcomesCarousel({
           <div
             ref={scrollerRef}
             data-testid='artist-profile-outcomes-scroller'
-            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] lg:pl-[max(0px,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] [&::-webkit-scrollbar]:hidden'
+            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] lg:hidden [&::-webkit-scrollbar]:hidden'
           >
             <button
               type='button'
@@ -252,13 +250,40 @@ export function ArtistProfileOutcomesCarousel({
                 }}
                 active={index === activeCardIndex}
                 card={card}
+                layout='carousel'
                 outcomes={outcomes}
-                reducedMotion={reducedMotion}
+                testId='artist-profile-outcome-card'
+              />
+            ))}
+          </div>
+
+          <div
+            data-testid='artist-profile-outcomes-grid'
+            className='mx-auto hidden max-w-[var(--linear-content-max)] gap-4 px-5 sm:px-6 lg:grid lg:grid-cols-2 lg:px-0'
+          >
+            {outcomes.cards.map(card => (
+              <OutcomeCard
+                key={`${card.id}-desktop`}
+                active
+                card={card}
+                layout='grid'
+                outcomes={outcomes}
               />
             ))}
           </div>
         </div>
       </div>
+      <style>{`
+        .artist-profile-outcomes-controls {
+          display: none;
+        }
+
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .artist-profile-outcomes-controls {
+            display: flex;
+          }
+        }
+      `}</style>
     </ArtistProfileSectionShell>
   );
 }
@@ -268,31 +293,36 @@ const OutcomeCard = forwardRef<
   Readonly<{
     active: boolean;
     card: ArtistProfileLandingCopy['outcomes']['cards'][number];
+    layout?: 'carousel' | 'grid';
     outcomes: ArtistProfileLandingCopy['outcomes'];
-    reducedMotion: boolean;
+    testId?: string;
   }>
->(function OutcomeCard({ active, card, outcomes, reducedMotion }, ref) {
+>(function OutcomeCard(
+  { active, card, layout = 'carousel', outcomes, testId },
+  ref
+) {
   const style: OutcomeAccentStyle = {
     '--outcome-accent': OUTCOME_CARD_ACCENTS[card.id],
-    flex: '0 0 clamp(20rem, 72vw, 50rem)',
-    opacity: reducedMotion ? 1 : active ? 1 : 0.78,
-    transform: reducedMotion
-      ? 'translateY(0)'
-      : active
-        ? 'translateY(0)'
-        : 'translateY(6px)',
-    boxShadow: active
-      ? '0 30px 70px rgba(0,0,0,0.34)'
-      : '0 20px 46px rgba(0,0,0,0.2)',
+    opacity: 1,
+    transform: 'translateY(0)',
+    boxShadow: '0 24px 56px rgba(0,0,0,0.26)',
     transition: OUTCOME_CARD_TRANSITION,
   };
+  if (layout === 'carousel') {
+    style.flex = '0 0 clamp(20rem, 72vw, 50rem)';
+  }
   const proof = outcomes.syntheticProofs;
 
   return (
     <article
-      data-testid='artist-profile-outcome-card'
+      data-testid={testId}
       ref={ref}
-      className='group relative flex min-h-[26rem] snap-start flex-col overflow-hidden rounded-[1.55rem] bg-[#050505] focus:outline-none sm:min-h-[27rem] lg:min-h-[28rem] xl:min-h-[29rem]'
+      className={cn(
+        'group relative flex flex-col overflow-hidden rounded-[1.55rem] bg-[#050505] focus:outline-none',
+        layout === 'carousel'
+          ? 'min-h-[26rem] snap-start sm:min-h-[27rem] xl:min-h-[29rem]'
+          : 'min-h-[28rem] xl:min-h-[29rem]'
+      )}
       style={style}
     >
       <div
@@ -341,31 +371,42 @@ function DriveStreamsProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['driveStreams'];
 }>) {
   return (
-    <div className='max-w-[20rem] rounded-[1.25rem] border border-white/7 bg-black/26 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:p-4'>
-      <div className='border-b border-white/6 pb-3.5'>
-        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
-          {proof.floatingCardLabel}
-        </p>
-        <p className='mt-2.5 text-[1.15rem] font-semibold leading-[1.06] tracking-[-0.04em] text-white'>
-          {proof.floatingCardTitle}
-        </p>
-        <p className='mt-1 text-[12px] font-medium text-white/64'>
-          {proof.artistName}
-        </p>
+    <div className='relative ml-auto h-[18.5rem] w-full max-w-[24rem] overflow-hidden rounded-[1.35rem]'>
+      <div className='absolute inset-x-7 bottom-3 h-10 rounded-full bg-white/10 blur-3xl' />
+      <div className='absolute right-0 top-0 h-[17.25rem] w-[10.9rem] overflow-hidden rounded-[1.2rem] border border-white/8 bg-black/24 shadow-[0_22px_56px_rgba(0,0,0,0.34)]'>
+        <Image
+          alt={proof.liveScreenshotAlt}
+          className='object-cover object-top'
+          fill
+          sizes='(max-width: 768px) 10.9rem, 10.9rem'
+          src={proof.liveScreenshotSrc}
+        />
       </div>
 
-      <div className='divide-y divide-white/6 py-1.5'>
-        <div className='flex items-center justify-between gap-4 py-2.5 text-[11.5px] text-white/58'>
-          <span>Status</span>
-          <span className='text-white/86'>{proof.floatingCardMeta}</span>
-        </div>
-        <div className='flex items-center justify-between gap-4 py-2.5 text-[11.5px] text-white/58'>
-          <span>CTA</span>
-          <span className='text-white/86'>{proof.primaryCtaLabel}</span>
-        </div>
-        <div className='flex items-center justify-between gap-4 py-2.5 text-[11.5px] text-white/58'>
-          <span>Placement</span>
-          <span className='text-white/86'>Front of profile</span>
+      <div className='absolute left-3 bottom-4 z-10 h-[14.4rem] w-[8.85rem] overflow-hidden rounded-[1.15rem] border border-white/8 bg-black/24 shadow-[0_22px_56px_rgba(0,0,0,0.32)] sm:left-4'>
+        <Image
+          alt={proof.presaveScreenshotAlt}
+          className='object-cover object-top'
+          fill
+          sizes='(max-width: 768px) 8.85rem, 8.85rem'
+          src={proof.presaveScreenshotSrc}
+        />
+      </div>
+
+      <div className='absolute bottom-4 right-3 z-10 max-w-[10rem] sm:right-4'>
+        <p className='text-[1.15rem] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
+          {proof.title}
+        </p>
+        <p className='mt-1 text-[12px] font-medium leading-[1.35] text-white/62'>
+          {proof.artistName}
+        </p>
+        <div className='mt-3 flex flex-wrap gap-2'>
+          <span className='rounded-full border border-white/8 bg-white/[0.05] px-2.75 py-1.25 text-[10.5px] font-medium text-white/72'>
+            {proof.liveLabel}
+          </span>
+          <span className='rounded-full border border-white/8 bg-white/[0.05] px-2.75 py-1.25 text-[10.5px] font-medium text-white/72'>
+            {proof.presaveLabel}
+          </span>
         </div>
       </div>
     </div>
@@ -378,8 +419,18 @@ function SellOutProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['sellOut'];
 }>) {
   return (
-    <div className='relative h-[17.25rem] w-full max-w-[23rem] overflow-hidden rounded-[1.35rem]'>
-      <div className='absolute inset-x-0 bottom-0 rounded-[1.25rem] border border-white/7 bg-black/32 px-3.5 pb-3.5 pt-11 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-4 sm:pb-4'>
+    <div className='relative h-[18rem] w-full max-w-[24.5rem] overflow-hidden rounded-[1.35rem]'>
+      <div className='absolute left-0 top-2 h-[15.9rem] w-[8.85rem] overflow-hidden rounded-[1.2rem] border border-white/8 bg-black/28 shadow-[0_20px_48px_rgba(0,0,0,0.26)]'>
+        <Image
+          alt={proof.screenshotAlt}
+          className='object-cover object-top'
+          fill
+          sizes='(max-width: 768px) 8.85rem, 8.85rem'
+          src={proof.screenshotSrc}
+        />
+      </div>
+
+      <div className='absolute bottom-2 right-0 w-[16rem] rounded-[1.25rem] border border-white/7 bg-black/32 px-4 pb-4 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'>
         <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
           {proof.drawerTitle}
         </p>
@@ -409,7 +460,7 @@ function SellOutProof({
         </div>
       </div>
 
-      <div className='absolute right-3.5 top-3.5 z-10 w-[11.75rem] rounded-[1.15rem] bg-[#f4f1e8] p-3.5 text-black shadow-[0_20px_42px_rgba(0,0,0,0.3)] sm:right-4 sm:top-4'>
+      <div className='absolute right-[3.4rem] top-2 z-10 w-[11rem] rounded-[1.15rem] bg-[#f4f1e8] p-3.5 text-black shadow-[0_20px_42px_rgba(0,0,0,0.3)]'>
         <p className='text-[10px] font-semibold tracking-[0.08em] text-black/54'>
           {proof.nearbyCardLabel}
         </p>
@@ -465,11 +516,17 @@ function ShareProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['shareAnywhere'];
 }>) {
   return (
-    <div className='mx-auto flex min-h-[15.5rem] w-full max-w-[15.5rem] flex-col items-center justify-center rounded-[1.4rem] bg-[#fbfaf6] px-4.5 py-5 text-center text-black shadow-[0_20px_40px_rgba(0,0,0,0.22)]'>
+    <div className='mx-auto flex min-h-[15.5rem] w-full max-w-[16rem] flex-col items-center justify-center rounded-[1.4rem] bg-[#fbfaf6] px-4.5 py-5 text-center text-black shadow-[0_20px_40px_rgba(0,0,0,0.22)]'>
       <p className='text-[11px] font-semibold tracking-[0.02em] text-black/72'>
         {proof.title}
       </p>
       <div className='relative mt-4.5'>
+        <div className='absolute -left-8 top-4 rounded-full bg-black/6 px-2.5 py-1 text-[10px] font-medium text-black/54'>
+          Bio
+        </div>
+        <div className='absolute -right-10 top-10 rounded-full bg-black/6 px-2.5 py-1 text-[10px] font-medium text-black/54'>
+          Stories
+        </div>
         <div className='absolute inset-x-7 -top-4 h-8 rounded-full bg-black/10 blur-2xl' />
         <div className='relative rounded-[1.3rem] bg-white p-2.5 shadow-[0_14px_26px_rgba(0,0,0,0.12)]'>
           <div className='grid grid-cols-7 gap-[6px]'>

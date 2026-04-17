@@ -1,5 +1,6 @@
 'use client';
 
+import { getLinearPillClassName } from '@jovie/ui';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
@@ -12,7 +13,7 @@ export function AuthActions() {
       {isAuthed ? (
         <Link
           href={APP_ROUTES.DASHBOARD}
-          className='btn-linear-signup focus-ring-themed'
+          className={getLinearPillClassName({ className: 'focus-ring-themed' })}
         >
           Open App
         </Link>
@@ -23,7 +24,12 @@ export function AuthActions() {
             Log in
           </Link>
           {/* Signup - Linear exact specs via CSS class */}
-          <Link href='/signup' className='btn-linear-signup focus-ring-themed'>
+          <Link
+            href='/signup'
+            className={getLinearPillClassName({
+              className: 'focus-ring-themed',
+            })}
+          >
             Sign up
           </Link>
         </>

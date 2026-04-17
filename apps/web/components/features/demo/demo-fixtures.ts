@@ -145,7 +145,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   {
     id: 'rel-06',
     displayId: 'REL-139',
-    title: 'Afterglow (Deluxe)',
+    title: 'The Deep End',
     artist: `${PRIMARY_ARTIST} & Kai Nomura`,
     type: 'Album',
     releaseDate: '2026-02-23',

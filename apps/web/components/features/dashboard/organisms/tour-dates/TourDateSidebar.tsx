@@ -2,7 +2,13 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, Input, Label } from '@jovie/ui';
-import { Globe, MapPin } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui/atoms/popover';
+import { format, parse } from 'date-fns';
+import { CalendarIcon, Globe, MapPin } from 'lucide-react';
 import {
   type ComponentType,
   useCallback,
@@ -11,6 +17,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
@@ -301,19 +308,54 @@ export function TourDateSidebar({
               <div className='grid grid-cols-2 gap-2'>
                 <div className='space-y-1.5'>
                   <Label htmlFor='startDate'>Date</Label>
-                  <Input
-                    id='startDate'
-                    type='date'
-                    value={formData.startDate}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        startDate: e.target.value,
-                      }))
-                    }
-                    disabled={isPending}
-                    required
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id='startDate'
+                        type='button'
+                        variant='outline'
+                        disabled={isPending}
+                        className={cn(
+                          'w-full justify-start gap-2 font-normal',
+                          !formData.startDate && 'text-tertiary-token'
+                        )}
+                      >
+                        <CalendarIcon className='h-3.5 w-3.5' />
+                        {formData.startDate
+                          ? format(
+                              parse(
+                                formData.startDate,
+                                'yyyy-MM-dd',
+                                new Date()
+                              ),
+                              'MMM d, yyyy'
+                            )
+                          : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-auto p-0' align='start'>
+                      <Calendar
+                        mode='single'
+                        selected={
+                          formData.startDate
+                            ? parse(
+                                formData.startDate,
+                                'yyyy-MM-dd',
+                                new Date()
+                              )
+                            : undefined
+                        }
+                        onSelect={date => {
+                          if (!date) return;
+                          setFormData(prev => ({
+                            ...prev,
+                            startDate: format(date, 'yyyy-MM-dd'),
+                          }));
+                        }}
+                        autoFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className='space-y-1.5'>
                   <Label htmlFor='startTime'>Time</Label>

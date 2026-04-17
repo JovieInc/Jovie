@@ -383,7 +383,7 @@ export interface ReleaseAutomationActivity {
 }
 
 export const RELEASE_AUTOMATION_RELEASE: ReleaseAutomationRelease = {
-  title: 'Afterglow (Deluxe)',
+  title: 'The Deep End',
   artist: 'Tim White',
   date: 'Feb 23, 2026',
   gradient: 'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
@@ -434,7 +434,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'detect',
     iconType: 'disc',
     iconColor: '#6C7AFF',
-    label: 'New release detected: Afterglow (Deluxe)',
+    label: 'New release detected: The Deep End',
     detail: 'ISRC matched · artwork downloaded · 14 tracks',
     time: '1m ago',
   },
@@ -470,7 +470,7 @@ export const SMARTLINK_KANBAN_COLUMNS = [
     cards: [
       {
         id: 'k1',
-        title: 'Afterglow (Deluxe)',
+        title: 'The Deep End',
         artist: 'Tim White',
         gradient:
           'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',

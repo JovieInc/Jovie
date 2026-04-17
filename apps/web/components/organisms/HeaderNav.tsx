@@ -1,3 +1,4 @@
+import { getLinearPillClassName } from '@jovie/ui';
 import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
@@ -28,7 +29,10 @@ function PublicAuthActions() {
       <Link href='/signin' className='btn-linear-login focus-ring-themed'>
         Log in
       </Link>
-      <Link href='/signup' className='btn-linear-signup focus-ring-themed'>
+      <Link
+        href='/signup'
+        className={getLinearPillClassName({ className: 'focus-ring-themed' })}
+      >
         Sign up
       </Link>
     </div>

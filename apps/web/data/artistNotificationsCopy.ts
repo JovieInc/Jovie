@@ -265,7 +265,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   finalCta: {
-    headline: 'An email list that sends itself.',
+    headline: 'Ready to Amplify?',
     subhead:
       'Capture demand on free. Turn on automatic artist notifications with Pro.',
     ctaLabel: 'Start Pro Trial',

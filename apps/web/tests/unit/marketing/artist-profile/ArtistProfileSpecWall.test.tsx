@@ -15,7 +15,7 @@ describe('ArtistProfileSpecWall', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Details that pull their weight.',
+        name: 'Details that matter.',
       })
     ).toBeInTheDocument();
     expect(

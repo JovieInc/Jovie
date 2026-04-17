@@ -273,6 +273,14 @@ export {
   selectContentClasses,
   subMenuContentClasses,
 } from './lib/dropdown-styles';
+export type { LinearPillSize, LinearPillTone } from './lib/linear-pill';
+export {
+  getLinearPillClassName,
+  linearPillIndicatorClassName,
+  linearPillLabelClassName,
+  linearPillSizeClassNames,
+  linearPillSurfaceClassName,
+} from './lib/linear-pill';
 
 // Design tokens
 export {

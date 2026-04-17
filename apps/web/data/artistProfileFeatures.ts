@@ -113,12 +113,11 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     layoutClassName:
       'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
     visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    screenshotSrc: '/product-screenshots/artist-spec-rich-analytics-panel.png',
     screenshotAlt:
       'Jovie analytics showing top-line profile and listen metrics.',
     screenshotWidth: 344,
     screenshotHeight: 540,
-    objectPosition: '50% 0%',
   },
   {
     id: 'geo-insights',
@@ -129,11 +128,10 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     layoutClassName:
       'xl:col-start-6 xl:row-start-1 xl:col-span-4 xl:row-span-2',
     visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-panel.png',
     screenshotAlt: 'Jovie geo insights showing the top cities list.',
     screenshotWidth: 344,
     screenshotHeight: 540,
-    objectPosition: '50% 100%',
   },
   {
     id: 'always-in-sync',
@@ -179,12 +177,14 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'teal',
     layoutClassName:
       'xl:col-start-7 xl:row-start-3 xl:col-span-6 xl:row-span-2',
-    visual: 'share-menu-crop',
-    screenshotSrc: '/product-screenshots/artist-spec-tracked-links-desktop.png',
-    screenshotAlt: 'Jovie share menu showing the UTM builder options.',
-    screenshotWidth: 920,
-    screenshotHeight: 442,
-    objectPosition: '50% 0%',
+    visual: 'mock-popover',
+    popoverLabel: 'Tracked links',
+    popoverItems: [
+      'Instagram bio',
+      'Tour poster QR',
+      'Release week ad set',
+      'Creator outreach',
+    ],
   },
   {
     id: 'blazing-fast',

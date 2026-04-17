@@ -37,6 +37,11 @@ export interface ArtistProfileSocialProofData {
   readonly logos: readonly ArtistProfileSocialProofLogo[];
   readonly profileCards: readonly ArtistProfileSocialProofCard[];
   readonly quotes: readonly ArtistProfileQuote[];
+  readonly founderQuote?: {
+    readonly quote: string;
+    readonly name: string;
+    readonly role: string;
+  };
   readonly founderFallback: string;
   readonly hasRealQuotes: boolean;
 }
@@ -80,6 +85,12 @@ export const ARTIST_PROFILE_SOCIAL_PROOF: ArtistProfileSocialProofData = {
   logos: ARTIST_PROFILE_PROOF_LOGOS,
   profileCards: ARTIST_PROFILE_PROOF_CARDS,
   quotes: ARTIST_PROFILE_QUOTES,
+  founderQuote: {
+    quote:
+      'We built Jovie because we were tired of stitching together tools made for fashion influencers just to promote our music.',
+    name: 'Tim White',
+    role: 'Founder, Jovie',
+  },
   founderFallback:
     'Built from real music-marketing and release workflow experience.',
   hasRealQuotes: ARTIST_PROFILE_QUOTES.length >= 3,

@@ -2,6 +2,7 @@ export { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 export { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 export { ArtistProfileFaq } from './ArtistProfileFaq';
 export { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
+export { ArtistProfileHero } from './ArtistProfileHero';
 export { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
 export { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 export { ArtistProfileLandingPage } from './ArtistProfileLandingPage';

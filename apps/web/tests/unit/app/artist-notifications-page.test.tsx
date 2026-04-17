@@ -125,7 +125,7 @@ describe('ArtistNotificationsPage', () => {
     ).toBeInTheDocument();
 
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'An email list that sends itself.'
+      'Ready to Amplify?'
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',

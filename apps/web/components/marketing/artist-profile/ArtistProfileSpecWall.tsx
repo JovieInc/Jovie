@@ -110,6 +110,38 @@ function IconBadgeVisual({
   );
 }
 
+function MockPopoverVisual({
+  popoverItems,
+  popoverLabel,
+}: Readonly<{
+  popoverItems: readonly string[];
+  popoverLabel: string;
+}>) {
+  return (
+    <div
+      role='img'
+      aria-label={`${popoverLabel} preview`}
+      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14] p-4'
+    >
+      <div className='w-full max-w-[15rem] rounded-[1rem] bg-[#121722] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
+        <div className='inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
+          {popoverLabel}
+        </div>
+        <div className='mt-3 space-y-2 rounded-[0.9rem] bg-[#0c1018] p-2.5'>
+          {popoverItems.map(item => (
+            <div
+              key={item}
+              className='rounded-[0.7rem] border border-white/6 bg-white/[0.03] px-3 py-2 text-[11px] font-medium text-primary-token'
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArtistProfilePowerFeatureTile({
   tile,
 }: Readonly<{
@@ -128,7 +160,7 @@ function ArtistProfilePowerFeatureTile({
       )}
       style={style}
     >
-      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015)),#07090d] p-4 shadow-[0_22px_64px_rgba(0,0,0,0.28)]'>
+      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.012)),#07090d] p-4 shadow-[0_22px_64px_rgba(0,0,0,0.28)]'>
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 top-0 h-24 opacity-75'
@@ -137,15 +169,7 @@ function ArtistProfilePowerFeatureTile({
               'radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--tile-accent) 16%, transparent), transparent 55%)',
           }}
         />
-        <div className='relative z-10 max-w-[24rem]'>
-          <h3 className='max-w-[18ch] text-[1.08rem] font-semibold tracking-[-0.04em] text-primary-token sm:text-[1.16rem]'>
-            {tile.title}
-          </h3>
-          <p className='mt-3 max-w-[34ch] text-[13px] leading-[1.58] text-secondary-token'>
-            {tile.body}
-          </p>
-        </div>
-        <div className='relative z-10 mt-5 flex-1'>
+        <div className='relative z-10 flex-1'>
           {tile.visual === 'button-chip' ? (
             <ButtonChipVisual
               chipIcon={tile.chipIcon}
@@ -156,6 +180,12 @@ function ArtistProfilePowerFeatureTile({
             <IconBadgeVisual
               badgeIcon={tile.badgeIcon}
               badgeLabel={tile.badgeLabel}
+            />
+          ) : null}
+          {tile.visual === 'mock-popover' ? (
+            <MockPopoverVisual
+              popoverItems={tile.popoverItems}
+              popoverLabel={tile.popoverLabel}
             />
           ) : null}
           {tile.visual === 'share-menu-crop' ? (
@@ -178,6 +208,14 @@ function ArtistProfilePowerFeatureTile({
             />
           ) : null}
         </div>
+        <div className='relative z-10 mt-4 max-w-[24rem]'>
+          <h3 className='max-w-[18ch] text-[1.08rem] font-semibold tracking-[-0.04em] text-primary-token sm:text-[1.16rem]'>
+            {tile.title}
+          </h3>
+          <p className='mt-2.5 max-w-[34ch] text-[13px] leading-[1.58] text-secondary-token'>
+            {tile.body}
+          </p>
+        </div>
       </div>
     </article>
   );
@@ -188,11 +226,7 @@ export function ArtistProfileSpecWall({
   tiles,
 }: Readonly<ArtistProfileSpecWallProps>) {
   return (
-    <ArtistProfileSectionShell
-      width='page'
-      className='py-24 sm:py-28 lg:py-32'
-      containerClassName='max-w-none'
-    >
+    <ArtistProfileSectionShell width='page' containerClassName='max-w-none'>
       <div className='mx-auto max-w-[var(--linear-content-max)]'>
         <ArtistProfileSectionHeader
           align='left'

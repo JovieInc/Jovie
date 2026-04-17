@@ -17,7 +17,7 @@ function StickyPhoneTourFallback({
   modes = MODES,
   introTitle = 'The right action for every fan.',
   introBadge = 'One profile. Every way fans support you.',
-  artistHandle = 'timwhite',
+  artistHandle = 'tim',
 }: StickyPhoneTourProps) {
   const slideCount = Math.max(modes.length, 1);
 

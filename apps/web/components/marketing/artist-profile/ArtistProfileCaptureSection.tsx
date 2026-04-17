@@ -133,7 +133,7 @@ export function ArtistProfileCaptureSection({
   }, [activated, phase, reducedMotion]);
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.008] py-24 sm:py-28 lg:py-32'>
+    <ArtistProfileSectionShell className='bg-white/[0.008]'>
       <style>{`
         .artist-profile-audience-mask {
           mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);
@@ -242,11 +242,11 @@ export function ArtistProfileCaptureSection({
           bodyClassName='mx-auto max-w-[34rem]'
         />
 
-        <div className='mx-auto mt-10 flex max-w-[32rem] justify-center'>
+        <div className='mx-auto mt-12 flex max-w-[32rem] justify-center sm:mt-14'>
           <CaptureActionPill capture={capture} phase={phase} />
         </div>
 
-        <div className='mt-14 space-y-3'>
+        <div className='mt-16 space-y-3 pb-3 sm:mt-20 sm:pb-5'>
           {capture.audienceRails.map((rail, railIndex) => (
             <AudienceRail
               key={rail.map(({ id }) => id).join('|')}

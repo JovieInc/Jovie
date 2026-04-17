@@ -287,7 +287,11 @@ export function VirtualizedTableBody<TData>({
         return (
           <React.Fragment key={row.id}>
             {wrappedRow}
-            {expandedContent}
+            <tr>
+              <td colSpan={columnCount} className='p-0'>
+                {expandedContent}
+              </td>
+            </tr>
           </React.Fragment>
         );
       })}

@@ -134,15 +134,17 @@ function buildShareItems(
           } satisfies ContextMenuItemType;
         }
 
+        const sourceIcon = getTrackedShareIcon(sourceGroup.source);
         return {
           id: `tracked-group-${sourceGroup.source}`,
           label: sourceGroup.label,
-          icon: getTrackedShareIcon(sourceGroup.source),
+          icon: sourceIcon,
           items: sourceGroup.presets.map(
             preset =>
               ({
                 id: `tracked-${preset.id}`,
                 label: preset.label,
+                icon: sourceIcon,
                 onClick: () => {
                   const result = buildUTMUrl({
                     url: smartLinkUrl,
@@ -163,37 +165,31 @@ function buildShareItems(
   ];
 
   if (utmShareItems.length > 0) {
-    items.push({ type: 'separator' }, ...utmShareItems);
+    items.push(...utmShareItems);
   }
 
   if (release.hasVideoLinks) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'copy-sounds-link',
-        label: 'Copy Use Sound link',
-        icon: menuIcon('Music'),
-        onClick: () => {
-          void onCopy(
-            `${release.smartLinkPath}/sounds`,
-            `${release.title} sounds link`,
-            `sounds-link-copy-${release.id}`
-          );
-        },
-      }
-    );
+    items.push({
+      id: 'copy-sounds-link',
+      label: 'Copy Use Sound link',
+      icon: menuIcon('Music'),
+      onClick: () => {
+        void onCopy(
+          `${release.smartLinkPath}/sounds`,
+          `${release.title} sounds link`,
+          `sounds-link-copy-${release.id}`
+        );
+      },
+    });
   }
 
   if (onCopyQrCode) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'copy-qr-code',
-        label: 'Copy QR code',
-        icon: qrCodeIcon,
-        onClick: onCopyQrCode,
-      }
-    );
+    items.push({
+      id: 'copy-qr-code',
+      label: 'Copy QR code',
+      icon: qrCodeIcon,
+      onClick: onCopyQrCode,
+    });
   }
 
   return items;
@@ -272,9 +268,6 @@ export function buildReleaseActions({
       items: shareItems,
     },
     {
-      type: 'separator',
-    },
-    {
       id: 'copy-metadata',
       label: 'Copy metadata',
       icon: menuIcon('Hash'),
@@ -301,22 +294,19 @@ export function buildReleaseActions({
   );
 
   if (externalProviders.length > 0) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'open-release',
-        label: 'Open in',
+    items.push({
+      id: 'open-release',
+      label: 'Open in',
+      icon: menuIcon('ExternalLink'),
+      items: externalProviders.map(provider => ({
+        id: `open-${provider.key}`,
+        label: `Open in ${providerLabels[provider.key] || provider.key}`,
         icon: menuIcon('ExternalLink'),
-        items: externalProviders.map(provider => ({
-          id: `open-${provider.key}`,
-          label: `Open in ${providerLabels[provider.key] || provider.key}`,
-          icon: menuIcon('ExternalLink'),
-          onClick: () => {
-            globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
-          },
-        })),
-      }
-    );
+        onClick: () => {
+          globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
+        },
+      })),
+    });
   }
 
   // ── Destructive group ──

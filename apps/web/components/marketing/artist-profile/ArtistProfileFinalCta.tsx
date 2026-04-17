@@ -29,7 +29,7 @@ export function ArtistProfileFinalCta({
     >
       <h2
         data-testid='final-cta-headline'
-        className='mx-auto max-w-[11ch] text-[clamp(2.9rem,5vw,5rem)] font-semibold leading-[0.92] tracking-[-0.075em] text-primary-token'
+        className='mx-auto max-w-[14ch] text-balance text-[clamp(2.9rem,5vw,5rem)] font-semibold leading-[0.92] tracking-[-0.075em] text-primary-token lg:max-w-none'
       >
         {finalCta.headline}
       </h2>
