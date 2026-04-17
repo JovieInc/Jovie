@@ -29,7 +29,10 @@ import {
   DashboardHeaderActionButton,
 } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { AnalyticsSidebar } from '@/features/dashboard/organisms/AnalyticsSidebar';
+import {
+  AnalyticsSidebar,
+  StaticAnalyticsSidebar,
+} from '@/features/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -291,6 +294,12 @@ export const DashboardAudienceTableUnified = memo(
     isFetchingNextPage,
     onLoadMore,
     tourDates,
+    actionAdapter,
+    analyticsMode = 'live',
+    analyticsData,
+    analyticsSidebarTestId,
+    analyticsTabbedCardTestId,
+    testId = 'dashboard-audience-table',
   }: DashboardAudienceTableProps) {
     const queryClient = useQueryClient();
     const {
@@ -426,21 +435,19 @@ export const DashboardAudienceTableUnified = memo(
       [profileId, selectedMember, setSelectedMember, queryClient]
     );
 
-    // Quick action: export member as vCard
-    const handleExportMember = React.useCallback((member: AudienceMember) => {
+    const defaultExportMember = React.useCallback((member: AudienceMember) => {
       downloadVCard(member);
       toast.success('Contact exported as vCard');
     }, []);
 
-    // Quick action: block/remove member
-    const handleBlockMember = React.useCallback(
+    const handleExportMember = React.useCallback(
       (member: AudienceMember) => {
-        handleRemoveMember(member).catch(() => {});
+        const callback = actionAdapter?.onExportMember ?? defaultExportMember;
+        callback(member);
       },
-      [handleRemoveMember]
+      [actionAdapter, defaultExportMember]
     );
 
-    // Quick action: view member profile (opens contact sidebar)
     const {
       mode: panelMode,
       toggle,
@@ -456,7 +463,7 @@ export const DashboardAudienceTableUnified = memo(
       }
     }, [panelMode, selectedMember, rows, setSelectedMember]);
 
-    const handleViewProfile = React.useCallback(
+    const defaultViewProfile = React.useCallback(
       (member: AudienceMember) => {
         setSelectedMember(member);
         openPanel('contact');
@@ -464,8 +471,15 @@ export const DashboardAudienceTableUnified = memo(
       [setSelectedMember, openPanel]
     );
 
-    // Quick action: send notification (copies contact info for now)
-    const handleSendNotification = React.useCallback(
+    const handleViewProfile = React.useCallback(
+      (member: AudienceMember) => {
+        const callback = actionAdapter?.onViewProfile ?? defaultViewProfile;
+        callback(member);
+      },
+      [actionAdapter, defaultViewProfile]
+    );
+
+    const defaultSendNotification = React.useCallback(
       (member: AudienceMember) => {
         const contact = member.email ?? member.phone;
         if (!contact) {
@@ -482,6 +496,27 @@ export const DashboardAudienceTableUnified = memo(
         });
       },
       []
+    );
+
+    const handleSendNotification = React.useCallback(
+      (member: AudienceMember) => {
+        const callback =
+          actionAdapter?.onSendNotification ?? defaultSendNotification;
+        callback(member);
+      },
+      [actionAdapter, defaultSendNotification]
+    );
+
+    const handleBlockMember = React.useCallback(
+      (member: AudienceMember) => {
+        const callback = actionAdapter?.onBlockMember;
+        if (callback) {
+          callback(member);
+          return;
+        }
+        handleRemoveMember(member).catch(() => {});
+      },
+      [actionAdapter, handleRemoveMember]
     );
 
     const ensureProfileQrSource =
@@ -574,6 +609,11 @@ export const DashboardAudienceTableUnified = memo(
         }
 
         try {
+          if (actionAdapter?.onSourceLinkAction) {
+            await actionAdapter.onSourceLinkAction(action);
+            return;
+          }
+
           const sourceLink = await ensureProfileQrSource();
 
           if (action === 'copy') {
@@ -608,7 +648,7 @@ export const DashboardAudienceTableUnified = memo(
           toast.error('Unable to load source link');
         }
       },
-      [ensureProfileQrSource, profileId]
+      [actionAdapter, ensureProfileQrSource, profileId]
     );
 
     const sourceShareItems = React.useMemo<CommonDropdownItem[]>(
@@ -683,17 +723,21 @@ export const DashboardAudienceTableUnified = memo(
             }
           },
           onSendNotification: handleSendNotification,
-          onExportVCard: m => {
-            downloadVCard(m);
-            toast.success('Contact exported as vCard');
-          },
+          onExportVCard: handleExportMember,
           onBlock: m => {
-            handleRemoveMember(m).catch(() => {});
+            handleBlockMember(m);
           },
-          canBlock: Boolean(profileId),
+          canBlock: Boolean(profileId || actionAdapter?.onBlockMember),
         });
       },
-      [setSelectedMember, profileId, handleRemoveMember, handleSendNotification]
+      [
+        actionAdapter?.onBlockMember,
+        handleBlockMember,
+        handleExportMember,
+        handleSendNotification,
+        profileId,
+        setSelectedMember,
+      ]
     );
 
     const columns = MEMBER_COLUMNS;
@@ -802,6 +846,22 @@ export const DashboardAudienceTableUnified = memo(
         );
       }
       if (panelMode === 'analytics') {
+        if (analyticsMode === 'static') {
+          if (!analyticsData) {
+            return null;
+          }
+
+          return (
+            <StaticAnalyticsSidebar
+              isOpen
+              onClose={handleClosePanel}
+              data={analyticsData}
+              testId={analyticsSidebarTestId}
+              tabbedCardTestId={analyticsTabbedCardTestId}
+            />
+          );
+        }
+
         return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
       }
       // Panel closed — render closed drawer to animate out
@@ -812,7 +872,16 @@ export const DashboardAudienceTableUnified = memo(
           onClose={handleClosePanel}
         />
       );
-    }, [panelMode, selectedMember, getContextMenuItems, handleClosePanel]);
+    }, [
+      analyticsData,
+      analyticsMode,
+      analyticsSidebarTestId,
+      analyticsTabbedCardTestId,
+      getContextMenuItems,
+      handleClosePanel,
+      panelMode,
+      selectedMember,
+    ]);
 
     useRegisterRightPanel(sidebarPanel);
 
@@ -884,7 +953,7 @@ export const DashboardAudienceTableUnified = memo(
         <AudienceTableVolatileProvider value={volatileContextValue}>
           <PageShell
             className='overflow-hidden'
-            data-testid='dashboard-audience-table'
+            data-testid={testId}
             toolbar={
               <AudienceTableSubheader
                 view={view}

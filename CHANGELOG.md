@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.154.2] - 2026-04-16
+
+> Public demo and screenshot pages now stay aligned with the real product screens, so review links and captures reflect the UI the team is actually shipping.
+
+### Added
+
+- [internal] Added canonical surface ownership metadata and demo parity coverage for shared dashboard screenshot routes.
+
+### Changed
+
+- [internal] `/demo/audience`, analytics, settings, links, earnings, and onboarding demo flows now render shared app surfaces with fixture-backed data instead of separate demo-only panels.
+- [internal] Homepage smart-link proof now uses a generated product screenshot instead of mounting a live demo widget.
+
+### Fixed
+
+- [internal] Demo releases no longer request live-auth-only release credits on the public route.
+- [internal] Demo audience fixtures are now deterministic, which removes hydration drift while keeping hot-reload parity stable.
+
 ## [26.4.154.1] - 2026-04-16
 
 > Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
