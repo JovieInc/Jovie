@@ -161,38 +161,46 @@ function hasTextContent(text: string) {
     node?.textContent?.includes(text) ?? false;
 }
 
+async function openReleasesMatrix() {
+  const releasesNavLabel = screen
+    .getAllByText('Releases')
+    .find(node => node.closest('button'));
+  expect(releasesNavLabel).toBeTruthy();
+  fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
+
+  const releasesMatrix = await screen.findByTestId('releases-matrix');
+  fireEvent.click(
+    within(releasesMatrix).getByRole('tab', { name: 'Releases' })
+  );
+
+  return releasesMatrix;
+}
+
+async function openReleaseDrawer(title: string) {
+  const releasesMatrix = await openReleasesMatrix();
+  const openButton = within(releasesMatrix).getByRole('button', {
+    name: `Open ${title}`,
+  });
+
+  fireEvent.click(openButton);
+
+  await screen.findByTestId('release-sidebar');
+}
+
 describe('DemoReleasesExperience', () => {
   it('renders fixture data and opens the selected release in the drawer', async () => {
     renderDemo();
 
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
-
-    const releasesNavLabel = screen
-      .getAllByText('Releases')
-      .find(node => node.closest('button'));
-    expect(releasesNavLabel).toBeTruthy();
-    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
-
-    const releasesMatrix = await screen.findByTestId('releases-matrix');
-    fireEvent.click(
-      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
-    );
+    await openReleaseDrawer('Blessings featuring Clementine Douglas');
 
     // Release titles should appear in the list
     expect(
-      within(releasesMatrix).getAllByText(
+      screen.getAllByText(
         hasTextContent('Blessings featuring Clementine Douglas')
       ).length
-    ).toBeGreaterThan(0);
-
-    // Click a release row to open the detail drawer
-    const releaseTitle = within(releasesMatrix).getAllByText(
-      hasTextContent('Blessings featuring Clementine Douglas')
-    )[0];
-    fireEvent.click(
-      releaseTitle.closest('tr') ?? releaseTitle.closest('td') ?? releaseTitle
-    );
+    ).toBeGreaterThan(1);
 
     // Selecting a row should surface the release details alongside the table.
     await waitFor(() => {
@@ -207,16 +215,7 @@ describe('DemoReleasesExperience', () => {
   it('renders release data in the table', async () => {
     renderDemo();
 
-    const releasesNavLabel = screen
-      .getAllByText('Releases')
-      .find(node => node.closest('button'));
-    expect(releasesNavLabel).toBeTruthy();
-    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
-
-    const releasesMatrix = await screen.findByTestId('releases-matrix');
-    fireEvent.click(
-      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
-    );
+    const releasesMatrix = await openReleasesMatrix();
 
     // The table should contain mock release titles
     expect(
@@ -224,5 +223,46 @@ describe('DemoReleasesExperience', () => {
         hasTextContent('Blessings featuring Clementine Douglas')
       ).length
     ).toBeGreaterThan(0);
+  });
+
+  it('normalizes sparse track numbering in the release drawer tracks tab', async () => {
+    renderDemo();
+
+    await openReleaseDrawer('96 Months');
+    fireEvent.click(screen.getByTestId('drawer-tab-tracks'));
+
+    const tracklist = await screen.findByTestId('tracklist');
+    const trackButtons = within(tracklist)
+      .getAllByRole('button')
+      .map(button => button.textContent?.trim());
+
+    expect(trackButtons).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(
+      screen.getByTestId('release-track-control-calvin-96-months-track-1')
+    ).toHaveTextContent('1');
+    expect(
+      screen.getByTestId('release-track-control-calvin-96-months-track-9')
+    ).toHaveTextContent('4');
+    expect(
+      screen.getByTestId('release-track-control-calvin-96-months-track-11')
+    ).toHaveTextContent('5');
+    expect(
+      screen.getByTestId('release-track-control-calvin-96-months-track-13')
+    ).toHaveTextContent('6');
+    expect(
+      within(tracklist).getByText('Free (with Ellie Goulding)')
+    ).toBeInTheDocument();
+    expect(
+      within(tracklist).getByText('Miracle (with Ellie Goulding)')
+    ).toBeInTheDocument();
+    expect(
+      within(tracklist).getByText('Desire (with Sam Smith)')
+    ).toBeInTheDocument();
+    expect(
+      within(tracklist).getByText("Lovers In A Past Life (with Rag'n'Bone Man)")
+    ).toBeInTheDocument();
+    expect(within(tracklist).queryByText('9')).not.toBeInTheDocument();
+    expect(within(tracklist).queryByText('11')).not.toBeInTheDocument();
+    expect(within(tracklist).queryByText('13')).not.toBeInTheDocument();
   });
 });

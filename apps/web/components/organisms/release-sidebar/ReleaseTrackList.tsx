@@ -26,10 +26,31 @@ interface TrackControlSource {
   readonly artworkUrl?: string | null;
 }
 
-function getTrackLabel(track: ReleaseSidebarTrack): string {
+function getCanonicalTrackLabel(track: ReleaseSidebarTrack): string {
   return track.discNumber > 1
     ? `${track.discNumber}-${track.trackNumber}`
     : String(track.trackNumber);
+}
+
+function getDisplayTrackLabel(params: {
+  track: ReleaseSidebarTrack;
+  index: number;
+  tracks: readonly ReleaseSidebarTrack[];
+  totalTracks: number;
+}): string {
+  const { track, index, tracks, totalTracks } = params;
+  const isPartialSubset = tracks.length < totalTracks;
+  const isSingleDisc = tracks.every(item => item.discNumber === 1);
+
+  if (!isSingleDisc) {
+    return getCanonicalTrackLabel(track);
+  }
+
+  if (isPartialSubset) {
+    return String(index + 1);
+  }
+
+  return getCanonicalTrackLabel(track);
 }
 
 export function ReleaseTrackList({
@@ -113,6 +134,12 @@ export function ReleaseTrackList({
         <TrackListRow
           key={track.id}
           track={track}
+          trackLabel={getDisplayTrackLabel({
+            track,
+            index,
+            tracks,
+            totalTracks: release.totalTracks,
+          })}
           release={release}
           playbackState={playbackState}
           onToggleTrack={toggleTrack}
@@ -125,12 +152,14 @@ export function ReleaseTrackList({
 
 function TrackListRow({
   track,
+  trackLabel,
   release,
   playbackState,
   onToggleTrack,
   isLastRow,
 }: {
   readonly track: ReleaseSidebarTrack;
+  readonly trackLabel: string;
   readonly release: Release;
   readonly playbackState: {
     activeTrackId: string | null;
@@ -140,7 +169,6 @@ function TrackListRow({
   readonly onToggleTrack: (track: TrackControlSource) => Promise<void>;
   readonly isLastRow: boolean;
 }) {
-  const trackLabel = getTrackLabel(track);
   const playableUrl = track.audioUrl ?? track.previewUrl ?? undefined;
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
