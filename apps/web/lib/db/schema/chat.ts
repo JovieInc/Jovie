@@ -7,6 +7,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import type { PersistedToolEvent } from '@/lib/chat/tool-events';
 import { users } from './auth';
 import { chatMessageRoleEnum } from './enums';
 import { creatorProfiles } from './profiles';
@@ -53,7 +54,7 @@ export const chatMessages = pgTable(
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
     role: chatMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
-    toolCalls: jsonb('tool_calls').$type<Record<string, unknown>[]>(),
+    toolCalls: jsonb('tool_calls').$type<PersistedToolEvent[]>(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({

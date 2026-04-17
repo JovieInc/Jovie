@@ -1,6 +1,7 @@
 import { and, desc, eq, lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { decodeToolEvents } from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
@@ -93,8 +94,26 @@ export async function GET(req: Request, { params }: RouteParams) {
     if (hasMore) rows.pop();
     rows.reverse();
 
+    const messages = rows.map(row => {
+      const decodedToolCalls = decodeToolEvents(row.toolCalls);
+
+      if (decodedToolCalls.source === 'legacy') {
+        logger.warn(
+          'Decoded legacy tool calls while loading conversation',
+          { conversationId: id, messageId: row.id },
+          'chat-conversation'
+        );
+      }
+
+      return {
+        ...row,
+        toolCalls:
+          decodedToolCalls.events.length > 0 ? decodedToolCalls.events : null,
+      };
+    });
+
     return NextResponse.json(
-      { conversation, messages: rows, hasMore },
+      { conversation, messages, hasMore },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

@@ -1,3 +1,10 @@
+import {
+  type DynamicToolUIPart,
+  isToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from 'ai';
+import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ChatInsightSummary } from '@/types/insights';
 
 export interface ArtistContext {
@@ -180,50 +187,13 @@ export function isChatAlbumArtToolResult(
   return false;
 }
 
-export interface ToolInvocationPart {
-  type: 'tool-invocation';
-  toolInvocationId: string;
-  toolName: string;
-  state: 'call' | 'result' | 'partial-call';
-  args?: Record<string, unknown>;
-  result?: Record<string, unknown> | ChatAlbumArtToolResult;
-  toolInvocation?: {
-    readonly toolName: string;
-    readonly state: string;
-  };
+export type JovieToolPart = ToolUIPart | DynamicToolUIPart;
+
+export function isJovieToolPart(part: unknown): part is JovieToolPart {
+  return isToolUIPart(part as UIMessage['parts'][number]);
 }
 
-export function isToolInvocationPart(
-  part: unknown
-): part is ToolInvocationPart {
-  if (typeof part !== 'object' || part === null) {
-    return false;
-  }
-  const candidate = part as Partial<ToolInvocationPart>;
-  return (
-    candidate.type === 'tool-invocation' &&
-    typeof candidate.toolInvocationId === 'string' &&
-    candidate.toolInvocationId.length > 0 &&
-    typeof candidate.toolName === 'string' &&
-    candidate.toolName.length > 0 &&
-    (candidate.state === 'call' ||
-      candidate.state === 'result' ||
-      candidate.state === 'partial-call')
-  );
-}
-
-export interface MessagePart {
-  readonly type: string;
-  readonly text?: string;
-  readonly toolInvocation?: {
-    readonly toolName: string;
-    readonly state: string;
-  };
-  /** File attachment URL (data URL or blob URL). Present when type === 'file'. */
-  readonly url?: string;
-  /** MIME type of the file attachment. Present when type === 'file'. */
-  readonly mediaType?: string;
-}
+export type MessagePart = UIMessage['parts'][number];
 
 /** Shape of file attachments passed to AI SDK's sendMessage. */
 export interface FileUIPart {
@@ -233,22 +203,19 @@ export interface FileUIPart {
 }
 
 /** User-friendly labels for AI tool invocations shown during streaming. */
-export const TOOL_LABELS: Record<string, string> = {
-  proposeProfileEdit: 'Editing profile...',
-  proposeAvatarUpload: 'Preparing photo upload...',
-  proposeSocialLink: 'Adding link...',
-  proposeSocialLinkRemoval: 'Removing link...',
-  showTopInsights: 'Checking your signals...',
-  checkCanvasStatus: 'Checking canvas status...',
-  suggestRelatedArtists: 'Finding related artists...',
-  generateAlbumArt: 'Generating album art...',
-  generateCanvasPlan: 'Planning canvas video...',
-  createPromoStrategy: 'Building promo strategy...',
-  markCanvasUploaded: 'Updating canvas status...',
-  createRelease: 'Creating release...',
-  submitFeedback: 'Submitting feedback...',
-  generateReleasePitch: 'Generating pitches...',
-};
+export const TOOL_LABELS: Record<string, string> = (() => {
+  const labels: Record<string, string> = {};
+  const registry = TOOL_UI_REGISTRY as Record<
+    string,
+    { readonly label: string; readonly loadingTitle?: string }
+  >;
+
+  for (const [toolName, config] of Object.entries(registry)) {
+    labels[toolName] = config.loadingTitle ?? config.label;
+  }
+
+  return labels;
+})();
 
 /** A chat suggestion card with icon, label, and prompt */
 export interface ChatSuggestion {

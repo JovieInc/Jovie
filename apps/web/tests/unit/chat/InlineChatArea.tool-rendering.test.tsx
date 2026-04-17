@@ -107,11 +107,12 @@ describe('InlineChatArea tool invocation rendering', () => {
         parts: [
           { type: 'text', text: "Here's a preview of the change:" },
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-1',
+            type: 'dynamic-tool',
             toolName: 'proposeProfileEdit',
-            state: 'result',
-            result: {
+            toolCallId: 'tool-1',
+            state: 'output-available',
+            input: { field: 'displayName' },
+            output: {
               success: true,
               preview: {
                 field: 'displayName',
@@ -140,11 +141,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-1',
+            type: 'dynamic-tool',
             toolName: 'proposeProfileEdit',
-            state: 'call',
-            args: {
+            toolCallId: 'tool-1',
+            state: 'input-available',
+            input: {
               field: 'displayName',
               newValue: 'New Name',
             },
@@ -165,11 +166,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-1',
+            type: 'dynamic-tool',
             toolName: 'proposeProfileEdit',
-            state: 'result',
-            result: {
+            toolCallId: 'tool-1',
+            state: 'output-available',
+            output: {
               success: false,
               error: 'Something went wrong',
             },
@@ -190,11 +191,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-2',
+            type: 'dynamic-tool',
             toolName: 'proposeAvatarUpload',
-            state: 'result',
-            result: { success: true, action: 'avatar_upload' },
+            toolCallId: 'tool-2',
+            state: 'output-available',
+            output: { success: true, action: 'avatar_upload' },
           },
         ],
       },
@@ -212,11 +213,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-3',
+            type: 'dynamic-tool',
             toolName: 'proposeSocialLink',
-            state: 'result',
-            result: {
+            toolCallId: 'tool-3',
+            state: 'output-available',
+            output: {
               success: true,
               platform: {
                 id: 'instagram',
@@ -248,11 +249,11 @@ describe('InlineChatArea tool invocation rendering', () => {
         role: 'assistant',
         parts: [
           {
-            type: 'tool-invocation',
-            toolInvocationId: 'tool-4',
+            type: 'dynamic-tool',
             toolName: 'showTopInsights',
-            state: 'result',
-            result: {
+            toolCallId: 'tool-4',
+            state: 'output-available',
+            output: {
               success: true,
               title: 'Top signals',
               totalActive: 2,
@@ -290,5 +291,32 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(screen.queryByTestId('avatar-upload-card')).toBeNull();
     expect(screen.queryByTestId('chat-analytics-card')).toBeNull();
     expect(screen.queryByTestId('link-confirmation-card')).toBeNull();
+  });
+
+  it('renders a compact status row for unknown tools', () => {
+    mockMessages = [
+      {
+        id: 'msg-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'summarizeAudience',
+            toolCallId: 'tool-5',
+            state: 'output-available',
+            output: {
+              summary: 'Audience summary complete.',
+            },
+          },
+        ],
+      },
+    ];
+
+    renderInlineChat();
+
+    const statusRow = screen.getByTestId('tool-status-row');
+    expect(statusRow.getAttribute('data-tool-name')).toBe('summarizeAudience');
+    expect(screen.getByText('Summarize Audience')).toBeDefined();
+    expect(screen.getByText('Audience summary complete.')).toBeDefined();
   });
 });
