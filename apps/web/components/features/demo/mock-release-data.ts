@@ -357,6 +357,6 @@ function makeAudienceMember(index: number): AudienceMember {
 }
 
 export const DEMO_AUDIENCE_MEMBERS: AudienceMember[] = Array.from(
-  { length: 5 },
+  { length: 12 },
   (_, i) => makeAudienceMember(i)
 );

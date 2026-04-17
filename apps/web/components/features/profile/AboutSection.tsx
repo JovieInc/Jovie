@@ -127,7 +127,7 @@ export function AboutSection({
       )}
 
       {hasPressPhotos && (
-        <div>
+        <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
             <h2 className='text-[13px] font-[510] text-white/70'>
               Press photos

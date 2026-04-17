@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
-import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -205,14 +204,7 @@ export function Footer({
 
           <div className='mt-16'>
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
-              <Copyright
-                variant='light'
-                className='order-2 text-[11px] leading-[16px] font-normal tracking-[-0.01em] sm:order-1'
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              />
-              <div className='flex items-center gap-4 order-1 sm:order-2'>
+              <div className='flex items-center gap-4'>
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
@@ -229,11 +221,14 @@ export function Footer({
                 >
                   Terms
                 </Link>
-                <CookieSettingsFooterButton
-                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)] cursor-pointer'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                />
               </div>
+              <Copyright
+                variant='light'
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
+                style={{
+                  color: 'var(--linear-text-tertiary)',
+                }}
+              />
             </div>
           </div>
         </div>
@@ -267,19 +262,6 @@ export function Footer({
         {config.layout === 'horizontal' && (
           <>
             <div
-              className={`flex flex-col items-center md:items-start ${variant === 'minimal' ? 'space-y-1' : 'space-y-2'}`}
-            >
-              <Copyright
-                variant={config.colorVariant}
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              />
-              {/* Removed "Made for musicians" tagline — tightened per JOV-1094 */}
-            </div>
-
-            <div
               className={`flex items-center ${variant === 'minimal' ? 'gap-3' : 'gap-4'}`}
             >
               {config.showLinks && links && links.length > 0 && (
@@ -295,10 +277,6 @@ export function Footer({
                       {link.label}
                     </Link>
                   ))}
-                  <CookieSettingsFooterButton
-                    className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)] cursor-pointer'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  />
                 </nav>
               )}
               {effectiveShowThemeToggle && (
@@ -320,6 +298,13 @@ export function Footer({
                 </>
               )}
             </div>
+            <Copyright
+              variant={config.colorVariant}
+              className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
+              style={{
+                color: 'var(--linear-text-tertiary)',
+              }}
+            />
           </>
         )}
       </div>

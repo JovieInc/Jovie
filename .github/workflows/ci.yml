@@ -2469,13 +2469,35 @@ jobs:
             echo "Using stub database URL for UI-only deployment"
           fi
 
-          # Deploy preview with DATABASE_URL injected only for this deployment
-          deployment_url=$(vercel deploy --prebuilt --archive=tgz \
-            --env DATABASE_URL="$POOLED_URL" \
-            --env GIT_BRANCH="${GIT_BRANCH}" \
-            --token $VERCEL_TOKEN)
-
-          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          # Retry for transient Vercel preview deploy failures.
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt/3"
+            if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
+              --env DATABASE_URL="$POOLED_URL" \
+              --env GIT_BRANCH="${GIT_BRANCH}" \
+              --token "$VERCEL_TOKEN" 2>&1)"; then
+              deploy_exit=0
+            else
+              deploy_exit=$?
+            fi
+            echo "$deploy_output"
+            if [ "$deploy_exit" -eq 0 ]; then
+              deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
+              if [ -z "$deployment_url" ]; then
+                echo "Deploy succeeded but no preview URL was found in Vercel output"
+                exit 1
+              fi
+              echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+              echo "Deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Deploy failed, retrying in 10s..."
+              sleep 10
+            fi
+          done
+          echo "Deploy failed after 3 attempts"
+          exit 1
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

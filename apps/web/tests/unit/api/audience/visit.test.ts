@@ -109,6 +109,20 @@ describe('POST /api/audience/visit', () => {
     expect(data.error).toBe('Rate limit exceeded');
   });
 
+  it('returns 400 when the request body is empty', async () => {
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON');
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+  });
+
   it('silently filters bot traffic', async () => {
     mockDetectBot.mockReturnValue({ isBot: true, reason: 'User-Agent match' });
     mockDbSelect.mockReturnValue({

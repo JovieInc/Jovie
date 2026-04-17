@@ -37,7 +37,21 @@
   --clerk-font-family: var(--font-sans);
   --clerk-spacing: 1.125rem;
   --clerk-focus-ring: 0 0 0 2px rgba(113, 112, 255, 0.28);
+  --clerk-motion-duration: 220ms;
+  --clerk-motion-duration-fast: 180ms;
+  --clerk-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
   font-feature-settings: var(--linear-font-features);
+}
+
+@keyframes clerk-auth-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* --- A2. Hide Clerk's built-in logo (we render our own BrandLogo above the card) --- */
@@ -63,6 +77,22 @@
   border-radius: var(--radius-3xl);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(24px);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-form,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldRow,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton {
+  animation: clerk-auth-enter var(--clerk-motion-duration)
+    var(--clerk-motion-ease) both;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
+  animation: clerk-auth-enter var(--clerk-motion-duration)
+    var(--clerk-motion-ease) both;
+  animation-delay: 40ms;
 }
 
 /* --- C. Typography --- */
@@ -107,15 +137,17 @@
 
 /* --- D. Inputs --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput {
-  min-height: 44px;
+  min-height: 48px;
+  padding-inline: 1rem;
   border: 1px solid var(--clerk-color-border);
   background: var(--clerk-color-input);
   color: var(--clerk-color-input-foreground);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-pill);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
   transition:
-    border-color 150ms var(--ease-interactive),
-    box-shadow 150ms var(--ease-interactive);
+    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput::placeholder {
@@ -254,7 +286,8 @@
 
 /* --- H. Primary button --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
-  min-height: 44px;
+  min-height: 48px;
+  padding-inline: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: #ffffff;
   color: #08090a;
@@ -263,9 +296,9 @@
   font-size: 0.9375rem;
   font-weight: 590;
   transition:
-    background-color 150ms var(--ease-interactive),
-    box-shadow 150ms var(--ease-interactive),
-    transform 150ms var(--ease-interactive);
+    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:hover {
@@ -294,15 +327,18 @@
 
 /* --- I. Social buttons --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
-  min-height: 44px;
+  min-height: 48px;
+  padding-inline: 1rem;
   border: 1px solid var(--clerk-color-border);
   background: var(--clerk-color-muted);
   color: var(--clerk-color-foreground);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
   transition:
-    background-color 150ms var(--ease-interactive),
-    border-color 150ms var(--ease-interactive),
-    transform 150ms var(--ease-interactive);
+    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
@@ -313,6 +349,7 @@
 @media (hover: hover) {
   :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
     transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   }
 }
 
@@ -442,21 +479,24 @@
 
 /* Alternative verification methods */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton {
-  min-height: 40px;
+  min-height: 48px;
+  padding-inline: 1rem;
   border: 1px solid var(--clerk-color-border);
   background: var(--clerk-color-muted);
   color: var(--clerk-color-foreground);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-pill);
   font-size: 0.875rem;
   font-weight: 450;
   transition:
-    background-color 150ms var(--ease-interactive),
-    border-color 150ms var(--ease-interactive);
+    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
+    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton:hover {
   border-color: var(--clerk-color-border-strong);
   background: var(--clerk-color-surface-2);
+  transform: translateY(-1px);
 }
 
 /* Magic link verification status */
@@ -519,4 +559,16 @@
   border-radius: var(--radius-3xl);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(24px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-form,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldRow,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
+    animation: none;
+  }
 }

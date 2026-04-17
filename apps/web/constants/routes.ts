@@ -97,6 +97,7 @@ export const APP_ROUTES = {
   ABOUT: '/about',
   AI: '/ai',
   ALTERNATIVES: '/alternatives',
+  ARTIST_NOTIFICATIONS: '/artist-notifications',
   ARTIST_PROFILES: '/artist-profiles',
   BLOG: '/blog',
   BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',

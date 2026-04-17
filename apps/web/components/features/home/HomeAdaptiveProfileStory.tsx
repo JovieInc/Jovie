@@ -45,15 +45,25 @@ export function HomeHero({
             ) : null}
             <h1
               id='home-hero-heading'
-              className='marketing-h1-linear text-primary-token'
+              className={cn(
+                'marketing-h1-linear text-primary-token',
+                variant === 'artist-profile' &&
+                  'homepage-hero-artist-profile-title'
+              )}
             >
               {HOME_HERO_CONTENT.title}
             </h1>
-            <p className='marketing-lead-linear mx-auto mt-6 max-w-[34rem] text-secondary-token'>
+            <p
+              className={cn(
+                'marketing-lead-linear mx-auto mt-6 max-w-[34rem] text-secondary-token',
+                variant === 'artist-profile' &&
+                  'homepage-hero-artist-profile-body'
+              )}
+            >
               {HOME_HERO_CONTENT.body}
             </p>
 
-            <div className='mt-8'>
+            <div className={cn(variant === 'artist-profile' ? 'mt-9' : 'mt-8')}>
               <HomeHeroCTA />
             </div>
           </div>
