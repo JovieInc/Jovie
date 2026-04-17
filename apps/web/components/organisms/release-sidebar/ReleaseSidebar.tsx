@@ -779,9 +779,6 @@ export function ReleaseSidebar({
           </DrawerTabbedCard>
 
           {showCredits ? (
-            <ReleaseCreditsSection releaseId={release.id} />
-          ) : null}
-          {showCredits ? (
             <ReleaseCreditsInspectorCard releaseId={release.id} />
           ) : null}
 
