@@ -86,32 +86,42 @@ fi
 echo "Prebuilt output file count: $prebuilt_file_count"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
-for attempt in 1 2 3; do
-  echo "Deploy attempt $attempt/3"
+deploy_modes=(archive)
 
-  if try_mode archive "$attempt" "${deploy_args[@]}"; then
+if [ "$can_use_plain_prebuilt" = true ]; then
+  deploy_modes+=(plain)
+fi
+
+deploy_modes+=(source)
+total_attempts="${#deploy_modes[@]}"
+attempt=0
+
+for mode in "${deploy_modes[@]}"; do
+  attempt=$((attempt + 1))
+
+  case "$mode" in
+    archive)
+      echo "Deploy attempt $attempt/$total_attempts (archive prebuilt)"
+      ;;
+    plain)
+      echo "Archive deploy failed; falling back to standard prebuilt upload."
+      echo "Deploy attempt $attempt/$total_attempts (plain prebuilt)"
+      ;;
+    source)
+      if [ "$can_use_plain_prebuilt" = true ]; then
+        echo "Plain prebuilt upload failed; falling back to source deployment."
+      else
+        echo "Skipping plain prebuilt fallback because Vercel rejects more than ${plain_prebuilt_limit} files and .vercel/output has ${prebuilt_file_count} files."
+        echo "Falling back to source deployment."
+      fi
+      echo "Deploy attempt $attempt/$total_attempts (source deploy)"
+      ;;
+  esac
+
+  if try_mode "$mode" "$attempt" "${deploy_args[@]}"; then
     exit 0
-  fi
-
-  if [ "$can_use_plain_prebuilt" = true ]; then
-    echo "Archive deploy failed; falling back to standard prebuilt upload."
-    if try_mode plain "$attempt" "${deploy_args[@]}"; then
-      exit 0
-    fi
-  else
-    echo "Skipping plain prebuilt fallback because Vercel rejects more than ${plain_prebuilt_limit} files and .vercel/output has ${prebuilt_file_count} files."
-  fi
-
-  echo "Falling back to source deployment."
-  if try_mode source "$attempt" "${deploy_args[@]}"; then
-    exit 0
-  fi
-
-  if [ "$attempt" -lt 3 ]; then
-    echo "Deploy failed, retrying in 10s..."
-    sleep 10
   fi
 done
 
-echo "Deploy failed after 3 attempts" >&2
+echo "Deploy failed after $total_attempts attempts" >&2
 exit 1
