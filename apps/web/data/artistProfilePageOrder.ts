@@ -49,10 +49,16 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       testId: 'artist-profile-section-trust',
     },
     {
-      id: 'outcomes',
-      label: 'Built For Artists',
-      testId: 'artist-profile-section-outcomes',
-      screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
+      id: 'capture',
+      label: 'Capture Every Fan',
+      testId: 'artist-profile-section-capture',
+      screenshotScenarioId: 'artist-profile-capture-section-desktop',
+    },
+    {
+      id: 'reactivation',
+      label: 'Notify Them Automatically',
+      testId: 'artist-profile-section-reactivation',
+      screenshotScenarioId: 'artist-profile-reactivation-section-desktop',
     },
     {
       id: 'monetization',
@@ -61,15 +67,10 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-monetization-section-desktop',
     },
     {
-      id: 'capture',
-      label: 'Capture Every Fan',
-      testId: 'artist-profile-section-capture',
-      screenshotScenarioId: 'artist-profile-capture-section-desktop',
-    },
-    {
-      id: 'reactivation',
-      label: 'Bring Them Back Automatically',
-      testId: 'artist-profile-section-reactivation',
+      id: 'outcomes',
+      label: 'Built for Artists',
+      testId: 'artist-profile-section-outcomes',
+      screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
     },
     {
       id: 'specWall',

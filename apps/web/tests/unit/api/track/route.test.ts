@@ -111,6 +111,21 @@ describe('POST /api/track', () => {
     vi.clearAllMocks();
   });
 
+  it('returns 400 when the request body is empty', async () => {
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON');
+  });
+
   it('logs errors when social link click updates fail', async () => {
     const request = new NextRequest('http://localhost/api/track', {
       method: 'POST',

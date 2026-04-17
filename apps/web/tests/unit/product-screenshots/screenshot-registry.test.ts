@@ -10,6 +10,7 @@ const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-live-mobile',
   'tim-white-profile-video-mobile',
   'tim-white-profile-subscribe-mobile',
+  'tim-white-profile-contact-mobile',
   'tim-white-profile-listen-mobile',
 ] as const;
 

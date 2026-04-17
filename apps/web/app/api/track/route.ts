@@ -352,7 +352,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Validate request using extracted validation module
     const validationResult = validateTrackRequest(body);

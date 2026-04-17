@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
+import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileSocialProofProps {
@@ -13,21 +14,21 @@ export function ArtistProfileSocialProof({
   proofData,
 }: Readonly<ArtistProfileSocialProofProps>) {
   return (
-    <ArtistProfileSectionShell>
-      <div className='mx-auto max-w-[34rem] text-center'>
-        <h2 className='marketing-h2-linear text-primary-token'>
-          {socialProof.headline}
-        </h2>
-        <p className='mt-5 text-[15px] leading-[1.7] text-secondary-token'>
-          {socialProof.intro}
-        </p>
-      </div>
+    <ArtistProfileSectionShell className='py-24 sm:py-28 lg:py-32'>
+      <ArtistProfileSectionHeader
+        align='center'
+        headline={socialProof.headline}
+        body={socialProof.intro}
+        className='max-w-[40rem]'
+        bodyClassName='mx-auto max-w-[30rem]'
+        headlineClassName='max-w-[11ch] text-[clamp(2.8rem,5vw,4.3rem)]'
+      />
 
       <div className='mx-auto mt-10 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
         {proofData.profileCards.map(card => (
           <article
             key={card.id}
-            className='overflow-hidden rounded-[1.4rem] bg-white/[0.03]'
+            className='overflow-hidden rounded-[1.25rem] bg-white/[0.02]'
           >
             <div className='relative aspect-[4/3]'>
               <Image
@@ -59,7 +60,7 @@ export function ArtistProfileSocialProof({
           {proofData.quotes.map(quote => (
             <article
               key={quote.id}
-              className='rounded-[1.3rem] bg-white/[0.03] p-5'
+              className='rounded-[1.15rem] bg-white/[0.02] p-5'
             >
               <p className='text-[14px] leading-[1.7] text-primary-token'>
                 {quote.quote}

@@ -1,3 +1,5 @@
+import type { MarketingFeatureTile } from './marketingFeatureTiles';
+
 export type ArtistProfileFeaturePlacement = 'section' | 'card' | 'spec tile';
 
 export interface ArtistProfileLaunchFeature {
@@ -8,37 +10,7 @@ export interface ArtistProfileLaunchFeature {
   readonly placement: ArtistProfileFeaturePlacement;
 }
 
-export interface ArtistProfileFeatureTile {
-  readonly id:
-    | 'audience-quality-filtering'
-    | 'own-your-fan-list'
-    | 'activate-creators'
-    | 'geo-insights'
-    | 'always-in-sync'
-    | 'retarget-warm-fans'
-    | 'press-ready-assets'
-    | 'utm-builder';
-  readonly title: string;
-  readonly body: string;
-  readonly size: 'large' | 'small';
-  readonly accent: 'blue' | 'teal' | 'green' | 'orange' | 'rose' | 'gray';
-  readonly kicker: string;
-  readonly proofMeta: readonly string[];
-  readonly proofVariant:
-    | 'audience-quality'
-    | 'fan-list'
-    | 'creator-activation'
-    | 'geo-insights'
-    | 'always-in-sync'
-    | 'retarget-warm-fans'
-    | 'press-ready-assets'
-    | 'utm-builder';
-  readonly screenshotSrc?: string;
-  readonly screenshotAlt?: string;
-  readonly screenshotWidth?: number;
-  readonly screenshotHeight?: number;
-  readonly objectPosition?: string;
-}
+export type ArtistProfileFeatureTile = MarketingFeatureTile;
 
 export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature[] =
   [
@@ -60,7 +32,7 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
     {
       feature: 'Conversion-focused design',
       benefit: 'Fans know what to do next without extra decisions.',
-      uiSurface: 'Hero, outcomes cards, opinionated section',
+      uiSurface: 'Hero and spec wall',
       copyCandidate: 'Built to convert, not decorate.',
       placement: 'section',
     },
@@ -133,109 +105,97 @@ export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature
 
 export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
-    id: 'audience-quality-filtering',
-    title: 'Audience quality filtering',
-    body: 'Filters junk traffic, self-visits, and low-signal clicks so your audience view stays real.',
+    id: 'rich-analytics',
+    title: 'Rich Analytics',
+    body: 'See the top-line signals fast without digging through extra dashboard noise.',
     size: 'large',
     accent: 'blue',
-    kicker: 'Signal clarity',
-    proofMeta: ['Quality view', 'Low-signal removed', 'Self-visits hidden'],
-    proofVariant: 'audience-quality',
-    screenshotSrc: '/product-screenshots/audience-crm.png',
-    screenshotAlt: 'Jovie audience CRM view showing clean audience rows.',
-    screenshotWidth: 2880,
-    screenshotHeight: 1800,
-    objectPosition: '74% 28%',
-  },
-  {
-    id: 'own-your-fan-list',
-    title: 'Own your fan list',
-    body: 'Fan CRM with exportable data, so the audience you build stays yours.',
-    size: 'large',
-    accent: 'teal',
-    kicker: 'Audience ownership',
-    proofMeta: ['Segments', 'Notes', 'Export-ready'],
-    proofVariant: 'fan-list',
-    screenshotSrc: '/product-screenshots/audience-crm.png',
-    screenshotAlt: 'Jovie audience CRM showing saved fan data and segments.',
-    screenshotWidth: 2880,
-    screenshotHeight: 1800,
-    objectPosition: '58% 42%',
-  },
-  {
-    id: 'activate-creators',
-    title: 'Activate creators',
-    body: 'Give fans and influencers a direct path to use the sound and spread the release.',
-    accent: 'green',
-    size: 'large',
-    kicker: 'Creator velocity',
-    proofMeta: ['Use this sound', 'Add to story', 'Creator share path'],
-    proofVariant: 'creator-activation',
-    screenshotSrc: '/product-screenshots/release-landing-desktop.png',
-    screenshotAlt: 'Jovie release landing page showing creator-share surfaces.',
-    screenshotWidth: 2880,
-    screenshotHeight: 1800,
-    objectPosition: '50% 16%',
-  },
-  {
-    id: 'geo-insights',
-    title: 'Geo insights',
-    body: 'See where attention is building before you book, announce, or spend.',
-    size: 'large',
-    accent: 'orange',
-    kicker: 'Tour planning',
-    proofMeta: ['Los Angeles +24%', 'Mexico City +18%', 'London +11%'],
-    proofVariant: 'geo-insights',
-  },
-  {
-    id: 'always-in-sync',
-    title: 'Always in sync',
-    body: 'New music, top tracks, and profile surfaces update automatically.',
-    size: 'small',
-    accent: 'rose',
-    kicker: 'Live updates',
-    proofMeta: ['New music', 'Top tracks', 'Profile refresh'],
-    proofVariant: 'always-in-sync',
-    screenshotSrc: '/product-screenshots/tim-white-profile-live-phone.png',
-    screenshotAlt: 'Jovie artist profile showing the latest release view.',
-    screenshotWidth: 780,
-    screenshotHeight: 1688,
+    layoutClassName:
+      'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
+    visual: 'cropped-screenshot',
+    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    screenshotAlt:
+      'Jovie analytics showing top-line profile and listen metrics.',
+    screenshotWidth: 344,
+    screenshotHeight: 540,
     objectPosition: '50% 0%',
   },
   {
-    id: 'retarget-warm-fans',
-    title: 'Retarget warm fans',
-    body: 'Reconnect with visitors who showed intent and bring them back to the next release.',
+    id: 'geo-insights',
+    title: 'Geo Insights',
+    body: 'See where attention is building before you book, announce, or spend.',
+    size: 'large',
+    accent: 'orange',
+    layoutClassName:
+      'xl:col-start-6 xl:row-start-1 xl:col-span-4 xl:row-span-2',
+    visual: 'cropped-screenshot',
+    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    screenshotAlt: 'Jovie geo insights showing the top cities list.',
+    screenshotWidth: 344,
+    screenshotHeight: 540,
+    objectPosition: '50% 100%',
+  },
+  {
+    id: 'always-in-sync',
+    title: 'Always in Sync',
+    body: 'New music and profile surfaces stay current automatically without manual rebuilding.',
     size: 'small',
-    accent: 'blue',
-    kicker: 'Return paths',
-    proofMeta: ['Warm audience', 'Next release', 'Brought back'],
-    proofVariant: 'retarget-warm-fans',
+    accent: 'pink',
+    layoutClassName:
+      'xl:col-start-10 xl:row-start-1 xl:col-span-3 xl:row-span-1',
+    visual: 'icon-badge',
+    badgeIcon: 'sync',
+    badgeLabel: 'Profiles stay current',
+  },
+  {
+    id: 'activate-creators',
+    title: 'Activate Creators',
+    body: 'Give fans and creators one obvious path to use the sound and post.',
+    accent: 'green',
+    size: 'small',
+    layoutClassName:
+      'xl:col-start-1 xl:row-start-3 xl:col-span-3 xl:row-span-1',
+    visual: 'button-chip',
+    chipIcon: 'sound',
+    chipLabel: 'Use This Sound',
   },
   {
     id: 'press-ready-assets',
-    title: 'Press-ready assets',
-    body: 'Photos and key assets ready for promoters, media, and partners.',
+    title: 'Press-Ready Assets',
+    body: 'Promoters, media, and partners can grab approved photos without back-and-forth.',
     size: 'small',
-    accent: 'gray',
-    kicker: 'Partner handoff',
-    proofMeta: ['Portrait', 'Square', 'Press'],
-    proofVariant: 'press-ready-assets',
-    screenshotSrc: '/product-screenshots/profile-desktop.png',
-    screenshotAlt:
-      'Jovie artist profile showing artist media and profile assets.',
-    screenshotWidth: 2880,
-    screenshotHeight: 1800,
-    objectPosition: '50% 18%',
+    accent: 'red',
+    layoutClassName:
+      'xl:col-start-4 xl:row-start-3 xl:col-span-3 xl:row-span-1',
+    visual: 'button-chip',
+    chipIcon: 'download',
+    chipLabel: 'Download Press Photos',
   },
   {
     id: 'utm-builder',
-    title: 'Track every campaign',
-    body: 'Build tagged links fast so every post, ad, and partner placement stays measurable.',
-    size: 'small',
+    title: 'UTM Builder',
+    body: 'Build tracked share links from the same share flow you already use.',
+    size: 'large',
     accent: 'teal',
-    kicker: 'UTM Builder',
-    proofMeta: ['Source tags', 'Campaign links', 'Saved presets'],
-    proofVariant: 'utm-builder',
+    layoutClassName:
+      'xl:col-start-7 xl:row-start-3 xl:col-span-6 xl:row-span-2',
+    visual: 'share-menu-crop',
+    screenshotSrc: '/product-screenshots/artist-spec-tracked-links-desktop.png',
+    screenshotAlt: 'Jovie share menu showing the UTM builder options.',
+    screenshotWidth: 920,
+    screenshotHeight: 442,
+    objectPosition: '50% 0%',
   },
-] as const;
+  {
+    id: 'blazing-fast',
+    title: 'Blazing Fast',
+    body: 'A slow profile kills conversions. Jovie is built to a much higher speed bar than a typical link-in-bio page.',
+    size: 'small',
+    accent: 'purple',
+    layoutClassName:
+      'xl:col-start-10 xl:row-start-2 xl:col-span-3 xl:row-span-1',
+    visual: 'icon-badge',
+    badgeIcon: 'speed',
+    badgeLabel: 'Fast by default',
+  },
+];

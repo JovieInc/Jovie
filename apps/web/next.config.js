@@ -388,6 +388,11 @@ const nextConfig = {
         destination: '/pay',
         permanent: true,
       },
+      {
+        source: '/engagement-engine',
+        destination: '/artist-notifications',
+        permanent: true,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];

@@ -314,10 +314,10 @@ const MARKETING_SURFACES = [
     interactions: GLOBAL_INTERACTIONS,
   },
   {
-    id: 'marketing-engagement-engine',
+    id: 'marketing-artist-notifications',
     family: 'marketing',
     expectedState: 'ok',
-    path: APP_ROUTES.ENGAGEMENT_ENGINE,
+    path: APP_ROUTES.ARTIST_NOTIFICATIONS,
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,

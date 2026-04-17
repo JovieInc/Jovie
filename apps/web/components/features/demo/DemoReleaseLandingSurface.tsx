@@ -1,3 +1,7 @@
+'use client';
+
+import { useSearchParams } from 'next/navigation';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { DemoClientProviders } from './DemoClientProviders';
@@ -11,8 +15,76 @@ const PROVIDER_ACCENTS: Record<string, string> = {
   amazon_music: '#00A8E1',
 };
 const DEFAULT_PROVIDER_ACCENT = '#5E6AD2';
+const DEMO_CREDITS: readonly SmartLinkCreditGroup[] = [
+  {
+    role: 'featured_artist',
+    label: 'Featured artist',
+    entries: [
+      {
+        artistId: 'credit-feature-1',
+        name: 'Clementine Douglas',
+        handle: null,
+        role: 'featured_artist',
+        position: 1,
+      },
+    ],
+  },
+  {
+    role: 'producer',
+    label: 'Producer',
+    entries: [
+      {
+        artistId: 'credit-producer-1',
+        name: 'Tim White',
+        handle: TIM_WHITE_PROFILE.handle,
+        role: 'producer',
+        position: 1,
+      },
+    ],
+  },
+] as const;
 
 export function DemoReleaseLandingSurface() {
+  const searchParams = useSearchParams();
+  const captureMode = searchParams.get('capture');
+
+  if (captureMode === 'creator-menu') {
+    return (
+      <DemoClientProviders>
+        <div data-testid='demo-showcase-release-landing'>
+          <div className='flex min-h-screen items-center justify-center bg-[#0b0d12] px-5 py-10'>
+            <div
+              className='w-full max-w-[340px] rounded-[32px] border border-white/8 bg-[linear-gradient(180deg,#12161f,#0c1017)] p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
+              data-testid='demo-release-creator-capture'
+            >
+              <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
+                <p className='text-center text-[12px] font-[560] tracking-[0.12em] text-white/45 uppercase'>
+                  Creator Activation
+                </p>
+                <div className='mt-4 rounded-[20px] bg-white/[0.05] px-4 py-5 text-center'>
+                  <p className='text-[15px] font-[560] text-white'>
+                    {RELEASE.title}
+                  </p>
+                  <p className='mt-1 text-[12px] text-white/58'>
+                    {TIM_WHITE_PROFILE.name}
+                  </p>
+                </div>
+                <div className='mt-5 flex justify-center'>
+                  <a
+                    href={`/${TIM_WHITE_PROFILE.handle}/take-me-over/sounds`}
+                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 text-[15px] font-[600] tracking-[-0.02em] text-black'
+                  >
+                    Use this sound
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DemoClientProviders>
+    );
+  }
+
   return (
     <DemoClientProviders>
       <div data-testid='demo-showcase-release-landing'>
@@ -34,7 +106,9 @@ export function DemoReleaseLandingSurface() {
             accent: PROVIDER_ACCENTS[provider.key] ?? DEFAULT_PROVIDER_ACCENT,
             url: provider.url,
           }))}
+          credits={[...DEMO_CREDITS]}
           soundsUrl={`/${TIM_WHITE_PROFILE.handle}/take-me-over/sounds`}
+          initialMenuOpen={false}
         />
       </div>
     </DemoClientProviders>

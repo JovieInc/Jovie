@@ -6,6 +6,8 @@ import type { ProviderKey } from '@/lib/discography/types';
 
 import { createMockRelease } from '@/tests/test-utils/factories';
 
+const mockFetchReleaseCreditsAction = vi.fn();
+
 // @jovie/ui: ReleaseSidebar uses SegmentControl; ReleaseDspLinks (real) uses
 // Button, Input, Label, Select*, SimpleTooltip.
 vi.mock('@jovie/ui', async () => {
@@ -296,14 +298,17 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerTabbedCard: ({
     children,
     tabs,
+    controls,
     testId,
   }: {
     children?: React.ReactNode;
     tabs?: React.ReactNode;
+    controls?: React.ReactNode;
     testId?: string;
   }) => (
     <div data-testid={testId}>
       {tabs}
+      {controls}
       {children}
     </div>
   ),
@@ -347,6 +352,9 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div>Metadata</div>,
 }));
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: () => <div>Credits</div>,
+}));
 vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
   ReleasePitchSection: () => <div>Pitch Section</div>,
 }));
@@ -359,6 +367,13 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
   TrackDetailPanel: () => <div>Track Detail</div>,
 }));
+vi.mock(
+  '@/components/organisms/release-sidebar/release-credits-action',
+  () => ({
+    fetchReleaseCreditsAction: (...args: unknown[]) =>
+      mockFetchReleaseCreditsAction(...args),
+  })
+);
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
   () => ({
@@ -415,6 +430,7 @@ describe('ReleaseSidebar DSP card interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchReleaseCreditsAction.mockResolvedValue([]);
   });
 
   it('adds a DSP link with expected payload shape', async () => {
@@ -439,6 +455,7 @@ describe('ReleaseSidebar DSP card interactions', () => {
       />
     );
 
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
@@ -473,6 +490,7 @@ describe('ReleaseSidebar DSP card interactions', () => {
       />
     );
 
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
@@ -505,6 +523,7 @@ describe('ReleaseSidebar DSP card interactions', () => {
       />
     );
 
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(
       screen.queryByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();

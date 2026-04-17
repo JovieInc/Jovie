@@ -130,27 +130,43 @@ export async function PUT(req: Request) {
         avatarUrl,
         usernameUpdate,
       } = parsedRequest;
+      const currentProfileRecord = await getProfileByClerkId(clerkUserId);
+      const currentProfile = currentProfileRecord?.profile ?? null;
+      const effectiveDisplayNameForUserUpdate =
+        displayNameForUserUpdate &&
+        displayNameForUserUpdate !== currentProfile?.displayName
+          ? displayNameForUserUpdate
+          : undefined;
+      const effectiveAvatarUrl =
+        avatarUrl && avatarUrl !== currentProfile?.avatarUrl
+          ? avatarUrl
+          : undefined;
+      const effectiveUsernameUpdate =
+        usernameUpdate && usernameUpdate !== currentProfile?.username
+          ? usernameUpdate
+          : undefined;
 
       if (process.env.NODE_ENV === 'test') {
         return handleTestProfileUpdate({
           clerkUserId,
-          usernameUpdate,
-          displayNameForUserUpdate,
-          avatarUrl,
+          dbProfileUpdates,
+          usernameUpdate: effectiveUsernameUpdate,
+          displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
+          avatarUrl: effectiveAvatarUrl,
         });
       }
 
       const usernameGuard = await guardUsernameUpdate(
         clerkUserId,
-        usernameUpdate
+        effectiveUsernameUpdate
       );
       if (usernameGuard instanceof NextResponse) return usernameGuard;
 
-      const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
+      const clerkUpdates = buildClerkUpdates(effectiveDisplayNameForUserUpdate);
       const { clerkSyncFailed, rollback } = await syncClerkProfile({
         clerkUserId,
         clerkUpdates,
-        avatarUrl,
+        avatarUrl: effectiveAvatarUrl,
       });
 
       let updateResult;
@@ -158,7 +174,7 @@ export async function PUT(req: Request) {
         updateResult = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
-          displayNameForUserUpdate,
+          displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
         });
       } catch (error) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
