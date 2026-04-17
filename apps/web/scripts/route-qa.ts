@@ -2,7 +2,12 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { type BrowserContext, chromium, type Page } from 'playwright';
+import {
+  type Browser,
+  type BrowserContext,
+  chromium,
+  type Page,
+} from 'playwright';
 import { APP_ROUTES } from '../constants/routes';
 import { getAlternativeSlugs } from '../content/alternatives';
 import { getComparisonSlugs } from '../content/comparisons';
@@ -1041,6 +1046,13 @@ async function writeArtifacts(
   await fs.writeFile(path.join(OUTPUT_ROOT, 'findings-ledger.md'), markdown);
 }
 
+async function flushStandardStreams() {
+  await Promise.all([
+    new Promise<void>(resolve => process.stdout.write('', () => resolve())),
+    new Promise<void>(resolve => process.stderr.write('', () => resolve())),
+  ]);
+}
+
 async function main() {
   await fs.rm(OUTPUT_ROOT, { recursive: true, force: true });
   await fs.mkdir(OUTPUT_ROOT, { recursive: true });
@@ -1050,38 +1062,51 @@ async function main() {
     authAvailability
   );
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 960 },
-    colorScheme: 'dark',
-  });
-
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
   const results: RouteResult[] = [];
-  for (const routeCase of routeCases) {
-    const result = await runRouteCase(context, routeCase);
-    results.push(result);
-    const marker =
-      result.status === 'pass'
-        ? 'PASS'
-        : result.status === 'blocked'
-          ? 'BLOCK'
-          : 'FAIL';
-    console.log(`${marker} ${routeCase.path}`);
-  }
+  let exitCode = 1;
+  let fatalError: unknown = null;
+  try {
+    browser = await chromium.launch({ headless: true });
+    context = await browser.newContext({
+      viewport: { width: 1440, height: 960 },
+      colorScheme: 'dark',
+    });
 
-  await context.close();
-  await browser.close();
-  await writeArtifacts(routeCases, results);
+    for (const routeCase of routeCases) {
+      const result = await runRouteCase(context, routeCase);
+      results.push(result);
+      const marker =
+        result.status === 'pass'
+          ? 'PASS'
+          : result.status === 'blocked'
+            ? 'BLOCK'
+            : 'FAIL';
+      console.log(`${marker} ${routeCase.path}`);
+    }
 
-  const summary = summarizeResults(results);
-  console.log(
-    `Route QA complete. Pass=${summary.pass} Fail=${summary.fail} Blocked=${summary.blocked}`
-  );
-  console.log(`Artifacts: ${OUTPUT_ROOT}`);
+    await writeArtifacts(routeCases, results);
 
-  if (summary.fail > 0) {
+    const summary = summarizeResults(results);
+    console.log(
+      `Route QA complete. Pass=${summary.pass} Fail=${summary.fail} Blocked=${summary.blocked}`
+    );
+    console.log(`Artifacts: ${OUTPUT_ROOT}`);
+
+    exitCode = summary.fail > 0 ? 1 : 0;
+    process.exitCode = exitCode;
+  } catch (error) {
+    fatalError = error;
     process.exitCode = 1;
+    console.error(error);
+  } finally {
+    await context?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
   }
+
+  await flushStandardStreams();
+  process.exit(fatalError ? 1 : exitCode);
 }
 
 const invokedPath = process.argv[1];
