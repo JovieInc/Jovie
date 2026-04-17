@@ -471,6 +471,89 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('renders the confirmed playlist fallback when no release is available', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        featuredPlaylistFallback={{
+          artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+          confirmedAt: '2026-01-01T00:00:00.000Z',
+          discoveredAt: '2026-01-01T00:00:00.000Z',
+          imageUrl: 'https://example.com/playlist.jpg',
+          playlistId: '37i9dQZF1DZ06evO2SKVTu',
+          searchQuery: 'site:open.spotify.com/playlist "This Is Tim White"',
+          source: 'serp_html',
+          title: 'This Is Tim White',
+          url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('link', {
+        name: `Open This Is playlist for ${mockArtist.name}`,
+      })
+    ).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
+    );
+    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
+  });
+
+  it('keeps the upcoming show CTA ahead of the playlist fallback', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        featuredPlaylistFallback={{
+          artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+          confirmedAt: '2026-01-01T00:00:00.000Z',
+          discoveredAt: '2026-01-01T00:00:00.000Z',
+          imageUrl: 'https://example.com/playlist.jpg',
+          playlistId: '37i9dQZF1DZ06evO2SKVTu',
+          searchQuery: 'site:open.spotify.com/playlist "This Is Tim White"',
+          source: 'serp_html',
+          title: 'This Is Tim White',
+          url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
+        }}
+        tourDates={[
+          {
+            id: 'tour-1',
+            profileId: mockArtist.id,
+            title: null,
+            venueName: 'The Ballroom',
+            city: 'Los Angeles',
+            region: 'CA',
+            country: 'US',
+            startDate: '2099-05-01T00:00:00.000Z',
+            endDate: null,
+            ticketUrl: 'https://tickets.example.com/show',
+            ticketStatus: 'onsale',
+            timezone: 'America/Los_Angeles',
+            latitude: null,
+            longitude: null,
+            source: 'manual',
+            sourceEventId: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Tickets')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', {
+        name: `Open This Is playlist for ${mockArtist.name}`,
+      })
+    ).not.toBeInTheDocument();
+  });
+
   it('clears the mode query and closes the deep-linked drawer', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=listen');

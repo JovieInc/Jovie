@@ -20,6 +20,7 @@ import {
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
@@ -50,6 +51,7 @@ interface ProfileCompactTemplateProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
@@ -148,6 +150,7 @@ export function ProfileCompactTemplate({
   showPayButton = false,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
@@ -573,6 +576,7 @@ export function ProfileCompactTemplate({
                 showPayButton={showPayButton}
                 latestRelease={latestRelease}
                 profileSettings={profileSettings}
+                featuredPlaylistFallback={featuredPlaylistFallback}
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
                 genres={genres}
