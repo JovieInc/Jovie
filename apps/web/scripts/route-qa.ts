@@ -85,6 +85,10 @@ const TEST_AUTH_PROBE_TIMEOUT_MS = Number.parseInt(
   process.env.ROUTE_QA_TEST_AUTH_PROBE_TIMEOUT_MS || '',
   10
 );
+const CLOSE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_CLOSE_TIMEOUT_MS || '',
+  10
+);
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -1001,6 +1005,29 @@ function summarizeResults(results: readonly RouteResult[]) {
   );
 }
 
+export async function settleWithTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number
+): Promise<
+  | { readonly timedOut: false; readonly result: T }
+  | { readonly timedOut: true; readonly result?: undefined }
+> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation.then(result => ({ timedOut: false as const, result })),
+      new Promise<{ readonly timedOut: true }>(resolve => {
+        timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function writeArtifacts(
   routeCases: readonly RouteCase[],
   results: readonly RouteResult[]
@@ -1075,6 +1102,9 @@ async function main() {
   const results: RouteResult[] = [];
   let exitCode = 1;
   let fatalError: unknown = null;
+  const closeTimeoutMs = Number.isFinite(CLOSE_TIMEOUT_MS)
+    ? CLOSE_TIMEOUT_MS
+    : 5_000;
   try {
     browser = await chromium.launch({ headless: true });
     context = await browser.newContext({
@@ -1109,8 +1139,29 @@ async function main() {
     process.exitCode = 1;
     console.error(error);
   } finally {
-    await context?.close().catch(() => undefined);
-    await browser?.close().catch(() => undefined);
+    if (context) {
+      const contextClose = await settleWithTimeout(
+        context.close().catch(() => undefined),
+        closeTimeoutMs
+      );
+      if (contextClose.timedOut) {
+        console.warn(
+          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
+        );
+      }
+    }
+
+    if (browser) {
+      const browserClose = await settleWithTimeout(
+        browser.close().catch(() => undefined),
+        closeTimeoutMs
+      );
+      if (browserClose.timedOut) {
+        console.warn(
+          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser.`
+        );
+      }
+    }
   }
 
   await flushStandardStreams();
