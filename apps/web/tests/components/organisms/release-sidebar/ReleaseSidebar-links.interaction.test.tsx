@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockUsePlanGate = vi.fn(() => ({
   canAccessTasksWorkspace: true,
   isLoading: false,
 }));
+const mockFetchReleaseCreditsAction = vi.fn();
 
 // ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
 // All other sub-components that use additional @jovie/ui parts are mocked below,
@@ -230,14 +232,17 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerTabbedCard: ({
     children,
     tabs,
+    controls,
     testId,
   }: {
     children?: React.ReactNode;
     tabs?: React.ReactNode;
+    controls?: React.ReactNode;
     testId?: string;
   }) => (
     <div data-testid={testId}>
       {tabs}
+      {controls}
       {children}
     </div>
   ),
@@ -312,6 +317,22 @@ vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
 }));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='release-credits' data-variant={variant ?? 'card'}>
+      Credits
+    </div>
+  ),
+}));
+
+vi.mock(
+  '@/components/organisms/release-sidebar/release-credits-action',
+  () => ({
+    fetchReleaseCreditsAction: (...args: unknown[]) =>
+      mockFetchReleaseCreditsAction(...args),
+  })
+);
 
 vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
   ReleasePitchSection: () => (
@@ -411,6 +432,7 @@ describe('ReleaseSidebar inspector cards', () => {
       canAccessTasksWorkspace: true,
       isLoading: false,
     });
+    mockFetchReleaseCreditsAction.mockResolvedValue([]);
   });
 
   it('shows empty state when no release selected', () => {
@@ -421,13 +443,24 @@ describe('ReleaseSidebar inspector cards', () => {
     );
   });
 
-  it('renders Tracks, DSPs, Details, Settings, Lyrics, and Tasks as inspector cards', () => {
+  it('renders the release drawer with a tabbed primary card and secondary collapsible cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
-    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('metadata')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
+    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
+    expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-settings-card-stack')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.getByTestId('lyrics')).toHaveAttribute(
@@ -483,24 +516,28 @@ describe('ReleaseSidebar inspector cards', () => {
       'card'
     );
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
-    expect(screen.queryByTestId('release-tabbed-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
   });
 
-  it('keeps inspector cards rendered when release changes', () => {
+  it('resets the active tab to Details when the release changes', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <ReleaseSidebar release={mockRelease} {...defaultProps} />
     );
 
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
   });
 
-  it('renders DSP links section actions', () => {
+  it('shows DSP actions only on the DSPs tab', async () => {
+    const user = userEvent.setup();
     render(
       <ReleaseSidebar
         release={mockRelease}
@@ -512,6 +549,8 @@ describe('ReleaseSidebar inspector cards', () => {
       />
     );
 
+    expect(screen.queryByTestId('drawer-split-button')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     expect(
@@ -529,22 +568,69 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
-  it('renders the release drawer as stacked header, analytics, standalone tabs, and detail cards', () => {
+  it('renders the release drawer as stacked header, analytics, tabbed primary content, and secondary cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
-    expect(screen.queryByTestId('drawer-tabs')).not.toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('release-tab-panel-card')
+      screen.queryByTestId('release-credits-card-stack')
     ).not.toBeInTheDocument();
   });
 
-  it('does not render the old release sidebar tab rail', () => {
+  it('switches between Details, DSPs, and Tracks tabs', async () => {
+    const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.queryByTestId('drawer-tabs')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-tracks'));
+    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+  });
+
+  it('omits the Tracks tab when the release has no tracks', () => {
+    render(
+      <ReleaseSidebar
+        release={{ ...mockRelease, totalTracks: 0 }}
+        {...defaultProps}
+      />
+    );
+
+    expect(screen.queryByTestId('drawer-tab-tracks')).not.toBeInTheDocument();
+  });
+
+  it('renders the Credits card only when credits exist and keeps the inner content flat', async () => {
+    mockFetchReleaseCreditsAction.mockResolvedValue([
+      {
+        role: 'producer',
+        label: 'Producer',
+        entries: [
+          { role: 'producer', artistId: 'artist_1', name: 'A', handle: null },
+        ],
+      },
+    ]);
+
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(
+      await screen.findByTestId('release-credits-card-stack')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('release-credits')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
   });
 });
