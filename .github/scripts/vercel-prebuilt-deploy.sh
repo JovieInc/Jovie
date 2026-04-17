@@ -26,25 +26,16 @@ write_deployment_url() {
   fi
 }
 
-run_deploy() {
-  local mode="$1"
-  shift
-
-  if [ "$mode" = "archive" ]; then
-    vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
-    return
-  fi
-
-  vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
+run_archive_deploy() {
+  vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
 }
 
-try_mode() {
-  local mode="$1"
-  local attempt="$2"
-  shift 2
+try_archive() {
+  local attempt="$1"
+  shift
 
   local deploy_output=""
-  if deploy_output="$(run_deploy "$mode" "$@" 2>&1)"; then
+  if deploy_output="$(run_archive_deploy "$@" 2>&1)"; then
     echo "$deploy_output"
     local deployment_url=""
     deployment_url="$(parse_deployment_url "$deploy_output")"
@@ -53,7 +44,7 @@ try_mode() {
       return 1
     fi
     write_deployment_url "$deployment_url"
-    echo "Deploy succeeded on attempt $attempt with ${mode} upload"
+    echo "Deploy succeeded on attempt $attempt with archive upload"
     return 0
   fi
 
@@ -61,19 +52,13 @@ try_mode() {
   return 1
 }
 
-use_archive=true
 for attempt in 1 2 3; do
   echo "Deploy attempt $attempt/3"
 
-  if [ "$use_archive" = true ]; then
-    if try_mode archive "$attempt" "${deploy_args[@]}"; then
-      exit 0
-    fi
-    echo "Archive deploy failed; falling back to standard prebuilt upload."
-    use_archive=false
-  fi
-
-  if try_mode plain "$attempt" "${deploy_args[@]}"; then
+  # Keep retries on archive mode. Plain prebuilt uploads exceed Vercel's file
+  # cap for this repo and turn transient archive errors into deterministic
+  # failures.
+  if try_archive "$attempt" "${deploy_args[@]}"; then
     exit 0
   fi
 
