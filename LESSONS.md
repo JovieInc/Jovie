@@ -71,6 +71,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Tim White's Spotify artist ID is `4u`, and sibling homepage references must be updated together.
 
+### Human feedback about visual slop must become a repo rule immediately
+**Mistake:** A human explicitly rejected eyebrow labels and extra marketing chrome multiple times, but the next revision still reintroduced eyebrows, separators, and wrapper cards because the correction was treated as local taste feedback instead of a persistent rule.
+
+**Rule:** When a human calls out visual slop in marketing UI, convert that correction into a shared repo rule immediately. Do not rely on remembering the preference for one file. If the correction is "remove eyebrows," "remove cards," or "stop adding extra copy," update the shared guidance and then delete the source of that pattern from the shared components and copy contracts.
+
 ---
 
 ## Email Personalization

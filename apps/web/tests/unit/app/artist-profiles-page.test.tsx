@@ -2,7 +2,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import ArtistProfilesPage from '@/app/(marketing)/artist-profiles/page';
 import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile';
-import { getAudienceRailAccentIndex } from '@/components/marketing/artist-profile/ArtistProfileCaptureSection';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_LAUNCH_FEATURES,
@@ -64,433 +63,215 @@ describe('ArtistProfilesPage', () => {
     globalThis.matchMedia = originalMatchMedia;
   });
 
-  it('renders the artist profile landing scaffold', { timeout: 20_000 }, () => {
+  it('renders the artist profile landing scaffold with subtraction-first copy', {
+    timeout: 20_000,
+  }, () => {
     render(<ArtistProfilesPage />);
+
     expectArtistProfileSectionOrder({
       FULL_PAGE: true,
       SOCIAL_PROOF: true,
       FAQ: true,
     });
 
-    expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
-      'homepage-hero--f'
-    );
     expect(screen.getByTestId('homepage-hero')).toHaveClass(
       'homepage-hero--artist-profile'
     );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
-    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'The link your music deserves.' })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Built for every mode.' })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        'One profile can flex from release push to ticket sales to fan capture.'
-      )
-    ).not.toBeInTheDocument();
+
+    for (const bannedCopy of [
+      'Owned audience',
+      'Automatic reactivation',
+      'Fan outcomes',
+      'Power features',
+      'Claim. Sync. Share.',
+    ]) {
+      expect(screen.queryByText(bannedCopy)).not.toBeInTheDocument();
+    }
+
     const adaptiveSequence = within(
       screen.getByTestId('artist-profile-adaptive-sequence')
     );
+    expect(
+      adaptiveSequence.getByRole('heading', { name: 'One profile.' })
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByText('Adapts to every fan.')
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('img', {
+        name: ARTIST_PROFILE_COPY.adaptive.restingScreenshotAlt,
+      })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      adaptiveSequence.getByRole('button', { name: 'Stay Booked' })
+    );
 
     expect(
-      adaptiveSequence.getByRole('button', { name: 'Drive Streams' })
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('button', { name: 'Get Paid' })
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('button', { name: 'Sell Out' })
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('button', { name: 'Stay Booked' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'One profile.' })
-    ).toBeInTheDocument();
-    expect(screen.getByText('Adapts to every fan.')).toBeInTheDocument();
-    expect(
-      screen.getByTestId('artist-profile-adaptive-sequence')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Source-aware')).toBeInTheDocument();
-    expect(screen.getByText('Location-aware')).toBeInTheDocument();
-    expect(screen.getByText('Device-aware')).toBeInTheDocument();
-    expect(screen.getByText('Intent-aware')).toBeInTheDocument();
-    expect(screen.getByText('/listen')).toBeInTheDocument();
-    expect(screen.getByText('/tour')).toBeInTheDocument();
-    expect(screen.getByText('/pay')).toBeInTheDocument();
-    expect(screen.getByText('/contact')).toBeInTheDocument();
-    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
-    expect(
-      adaptiveSequence.getByText('Make support one tap away.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByAltText(
-        'Jovie artist profile showing direct support options.'
+      adaptiveSequence.getByText(
+        'Make booking, management, and press easy to reach.'
       )
     ).toBeInTheDocument();
-    const outcomesSection = within(
-      screen.getByTestId('artist-profile-section-outcomes')
-    );
     expect(
-      outcomesSection.getByRole('heading', {
-        name: 'Built for artists.',
+      adaptiveSequence.getByRole('img', {
+        name: ARTIST_PROFILE_COPY.adaptive.modes.find(
+          mode => mode.id === 'contact'
+        )?.screenshotAlt,
       })
     ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByRole('heading', { name: 'Drive streams' })
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByRole('heading', { name: 'Sell out' })
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByRole('heading', { name: 'Get paid' })
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByRole('heading', { name: 'Share anywhere' })
-    ).toBeInTheDocument();
-    expect(outcomesSection.getByText('Latest release')).toBeInTheDocument();
-    expect(outcomesSection.getByText('The Deep End')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Pre-save live')).toBeInTheDocument();
-    expect(outcomesSection.getByText('Nearby date')).toBeInTheDocument();
-    expect(outcomesSection.getAllByText('May 18').length).toBeGreaterThan(0);
-    expect(outcomesSection.getAllByText('The Novo').length).toBeGreaterThan(0);
-    expect(outcomesSection.getByText('Tour Dates')).toBeInTheDocument();
-    expect(
-      outcomesSection.getAllByText('Continue with Venmo').length
-    ).toBeGreaterThan(0);
-    expect(outcomesSection.getByText('Share-ready')).toBeInTheDocument();
-    expect(outcomesSection.getByText('jov.ie/tim')).toBeInTheDocument();
-    expect(
-      outcomesSection.getByText('Bio, QR, stories, and shows.')
-    ).toBeInTheDocument();
-    const outcomesScroller = outcomesSection.getByTestId(
-      'artist-profile-outcomes-scroller'
-    );
-    expect(outcomesScroller).toBeVisible();
-    expect(
-      within(outcomesScroller).getAllByTestId('artist-profile-outcome-card')
-    ).toHaveLength(4);
-    const monetizationSection = within(
-      screen.getByTestId('artist-profile-section-monetization')
-    );
-    expect(
-      screen.getByRole('heading', {
-        name: 'Convert a one-time tip into a lifelong fan.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Get paid.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Keep the fan.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Turn real-world support into a fan you can reach again.'
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('QR-ready support for shows, merch tables, and bios.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Turn real-world support into a fan you can reach again.'
-      )
-    ).toBeInTheDocument();
-    expect(monetizationSection.getByText('Merch Table QR')).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Scan to support')
-    ).toBeInTheDocument();
-    expect(monetizationSection.getByText('Activity')).toBeInTheDocument();
-    expect(
-      monetizationSection.getAllByText('$10 support received').length
-    ).toBeGreaterThan(0);
-    expect(
-      monetizationSection.getByText('Merch Table QR · Venmo')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Email confirmed')
-    ).toBeInTheDocument();
-    expect(monetizationSection.getByText('Follow-up sent')).toBeInTheDocument();
-    expect(
-      monetizationSection.getAllByText(
-        "Thanks for the support tonight - here's the new song."
-      ).length
-    ).toBeGreaterThan(0);
-    expect(
-      monetizationSection.getByText('Release alert delivered')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Open new single')
-    ).toBeInTheDocument();
-    expect(monetizationSection.getByText('Fan reached')).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('New single opened')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Notifications on')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Ready for next show')
-    ).toBeInTheDocument();
-    expect(
-      Boolean(
-        screen
-          .getByRole('heading', { name: 'Drive streams' })
-          .compareDocumentPosition(
-            screen.getByRole('heading', {
-              name: 'Convert a one-time tip into a lifelong fan.',
-            })
-          ) & Node.DOCUMENT_POSITION_FOLLOWING
-      )
-    ).toBe(true);
-    expect(
-      Boolean(
-        screen
-          .getByRole('heading', {
-            name: 'Convert a one-time tip into a lifelong fan.',
-          })
-          .compareDocumentPosition(
-            screen.getByRole('heading', {
-              name: 'Capture every fan.',
-            })
-          ) & Node.DOCUMENT_POSITION_FOLLOWING
-      )
-    ).toBe(true);
-    expect(
-      screen.getByRole('heading', {
-        name: 'Capture every fan.',
-      })
-    ).toBeInTheDocument();
+    expect(screen.queryByText('/listen')).not.toBeInTheDocument();
+    expect(screen.queryByText('/tour')).not.toBeInTheDocument();
+    expect(screen.queryByText('/pay')).not.toBeInTheDocument();
+    expect(screen.queryByText('/contact')).not.toBeInTheDocument();
+
     const captureSection = within(
       screen.getByTestId('artist-profile-section-capture')
     );
-    const howItWorksSection = within(
-      screen.getByTestId('artist-profile-section-how-it-works')
-    );
-    expect(captureSection.getByText('ava@icloud.com')).toBeInTheDocument();
     expect(
-      captureSection.getAllByText('Notifications Enabled').length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getByText('Clicked through to Spotify')
+      captureSection.getByRole('heading', { name: 'Capture every fan.' })
     ).toBeInTheDocument();
     expect(
-      captureSection.getByText('Email saved / Notifications on')
+      captureSection.getByText('Notifications Enabled')
     ).toBeInTheDocument();
     expect(
       captureSection.getAllByText('Jason in LA clicked through to Spotify.')
         .length
     ).toBeGreaterThan(0);
     expect(
-      captureSection.getAllByText('Brian M subscribed by email.').length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Mika in Berlin scanned the flyer.').length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Kenji in Tokyo opened the release page.')
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Amelia in London checked out your Spotify.')
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Maya enabled notifications.').length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Diego paid with Apple Pay.').length
-    ).toBeGreaterThan(0);
-    expect(captureSection.queryByText('Get updates')).not.toBeInTheDocument();
-    expect(
-      captureSection.queryByText('Release and show alerts.')
-    ).not.toBeInTheDocument();
-    expect(captureSection.queryByText('Jason')).not.toBeInTheDocument();
-    expect(captureSection.queryByText('Spotify')).not.toBeInTheDocument();
-    expect(
-      Boolean(
-        screen
-          .getByRole('heading', {
-            name: 'Capture every fan.',
-          })
-          .compareDocumentPosition(
-            screen.getByRole('heading', {
-              name: 'Bring them back automatically.',
-            })
-          ) & Node.DOCUMENT_POSITION_FOLLOWING
-      )
-    ).toBe(true);
+      captureSection.queryByText('Trusted alerts, not marketing spam.')
+    ).toBe(null);
+
     const reactivationSection = within(
       screen.getByTestId('artist-profile-section-reactivation')
     );
     expect(
       reactivationSection.getByRole('heading', {
-        name: 'Bring them back automatically.',
+        name: 'Notify them automatically.',
       })
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getAllByTestId('artist-profile-reactivation-row')
+      reactivationSection.getByText('Subscribers hear it first.')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('The right city gets the date.')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('Support turns into the next listen.')
+    ).toBeInTheDocument();
+
+    const monetizationSection = within(
+      screen.getByTestId('artist-profile-section-monetization')
+    );
+    expect(
+      monetizationSection.getByRole('heading', {
+        name: 'Get paid. Again and again.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText(
+        'Turn a $5 busking tip into a lifelong customer.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getAllByTestId('artist-profile-monetization-card')
     ).toHaveLength(4);
+    for (const title of [
+      'Accept IRL payments',
+      'Capture the fan',
+      'Say thanks',
+      'Re-engage every release',
+    ]) {
+      expect(
+        monetizationSection.getByRole('heading', { name: title })
+      ).toBeInTheDocument();
+    }
+    expect(monetizationSection.getByText('Jessica')).toBeInTheDocument();
+    expect(monetizationSection.getByText('Los Angeles')).toBeInTheDocument();
     expect(
-      reactivationSection.getAllByTestId('artist-profile-reactivation-output')
-    ).toHaveLength(3);
+      monetizationSection.getByText('Wants the next song')
+    ).toBeInTheDocument();
     expect(
-      reactivationSection.queryByText('Email sent')
+      monetizationSection.getByText("Thanks. Here's the new song.")
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Thanks for the tip. Here is the new song.')
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText('Jessica paid you $5')
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText(
+        'One payment can turn into a fan who comes back again and again.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.queryByText('Retention loop')
     ).not.toBeInTheDocument();
+
+    const outcomesSection = within(
+      screen.getByTestId('artist-profile-section-outcomes')
+    );
     expect(
-      reactivationSection.queryByText('Alert sent')
-    ).not.toBeInTheDocument();
+      outcomesSection.getByRole('heading', { name: 'Built for Artists.' })
+    ).toBeInTheDocument();
     expect(
-      reactivationSection.queryByText('Notification sent')
-    ).not.toBeInTheDocument();
-    expect(
-      reactivationSection.queryByText('Thank-you sent')
-    ).not.toBeInTheDocument();
-    const powerFeaturesSection = within(
+      within(
+        outcomesSection.getByTestId('artist-profile-outcomes-scroller')
+      ).getAllByTestId('artist-profile-outcome-card')
+    ).toHaveLength(4);
+
+    const specWallSection = within(
       screen.getByTestId('artist-profile-section-spec-wall')
     );
     expect(
-      powerFeaturesSection.getByText('Power features')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', {
-        name: 'Built for artists. Obsessively specific.',
+      specWallSection.getByRole('heading', {
+        name: 'Details that pull their weight.',
       })
     ).toBeInTheDocument();
     expect(
-      powerFeaturesSection.getByText(
-        'The details that make one profile work harder.'
+      specWallSection.getByText(
+        'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.'
       )
     ).toBeInTheDocument();
+    for (const tile of ARTIST_PROFILE_SPEC_TILES) {
+      expect(
+        specWallSection.getByRole('heading', { name: tile.title })
+      ).toBeInTheDocument();
+    }
     expect(
-      powerFeaturesSection.getByText('Product philosophy')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByText('No theme builder')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByText('No template maze')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByText('Built to convert')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByText('Release moment')
-    ).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('Music first')).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('Nearby show')).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('Tickets first')).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByText('Support intent')
-    ).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('Pay first')).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', {
-        name: 'Audience quality filtering',
-      })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', { name: 'Own your fan list' })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', { name: 'Activate creators' })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', { name: 'Geo insights' })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', { name: 'Always in sync' })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', {
-        name: 'Retarget warm fans',
-      })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', {
-        name: 'Press-ready assets',
-      })
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getByRole('heading', {
-        name: 'Track every campaign',
-      })
-    ).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('Quality view')).toBeInTheDocument();
-    expect(powerFeaturesSection.getByText('New music')).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.getAllByText('UTM Builder').length
-    ).toBeGreaterThan(0);
-    expect(
-      powerFeaturesSection.getByText('Static and always current')
-    ).toBeInTheDocument();
-    expect(
-      powerFeaturesSection.queryByText('Fast by design')
+      specWallSection.queryByText('Audience quality filtering')
     ).not.toBeInTheDocument();
     expect(
-      powerFeaturesSection.queryByText('Deep-link modes')
+      specWallSection.queryByText('Opinionated design')
     ).not.toBeInTheDocument();
     expect(
-      powerFeaturesSection.queryByText('Share-ready')
+      specWallSection.queryByText('Product philosophy')
     ).not.toBeInTheDocument();
+
+    const howItWorksSection = within(
+      screen.getByTestId('artist-profile-section-how-it-works')
+    );
     expect(
-      screen.getAllByRole('heading', { name: 'Live in 60 seconds.' })
-    ).toHaveLength(1);
-    expect(screen.getByText('Claim. Sync. Share.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Claim' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Sync' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Share' })).toBeInTheDocument();
-    expect(screen.getByText('Spotify artist')).toBeInTheDocument();
-    expect(screen.getByText('Importing')).toBeInTheDocument();
-    expect(screen.getByText('86%')).toBeInTheDocument();
-    expect(screen.getByText('27+ providers')).toBeInTheDocument();
-    expect(
-      howItWorksSection.getAllByText('jov.ie/timwhite').length
-    ).toBeGreaterThan(0);
-    expect(howItWorksSection.getByText('Copy')).toBeInTheDocument();
-    expect(howItWorksSection.getByText('Bio')).toBeInTheDocument();
-    expect(howItWorksSection.getByText('Stories')).toBeInTheDocument();
-    expect(howItWorksSection.getByText('QR')).toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        'Claim your artist. Jovie builds the page. Share one link everywhere.'
-      )
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Spotify / LA / Release page')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Jason in LA listened on Spotify.')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Kenji in Tokyo opened the latest release.')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Search once and claim the profile.')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        'It imports your catalog across 27+ providers and keeps the profile current.'
-      )
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(
-        'Use it in bio, stories, QR, release posts, and shows.'
-      )
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('Share-ready profile')).not.toBeInTheDocument();
-    expect(
-      outcomesSection.getByText(
-        'Use one clean profile link across bio, QR, posts, stories, and shows.'
-      )
+      howItWorksSection.getByRole('heading', { name: 'Live in 60 seconds.' })
     ).toBeInTheDocument();
-    expect(screen.queryByText('Polished by default')).not.toBeInTheDocument();
+    expect(
+      howItWorksSection.getByText('Find your artist.')
+    ).toBeInTheDocument();
+    expect(
+      howItWorksSection.getByText('Pull your catalog in.')
+    ).toBeInTheDocument();
+    expect(
+      howItWorksSection.getByText('Use the same link everywhere.')
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('heading', { name: 'Real Artists. Real Workflows.' })
+    ).toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'Claim your profile' }).length
     ).toBeGreaterThan(0);
@@ -503,7 +284,7 @@ describe('ArtistProfilesPage', () => {
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      "Don't lose your next fan."
+      'Ready to Amplify?'
     );
     expect(
       screen.getByText(
@@ -559,35 +340,16 @@ describe('ArtistProfilesPage', () => {
       SOCIAL_PROOF: false,
       FAQ: false,
     });
-    expect(screen.getByTestId('homepage-hero')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-hero')).not.toHaveClass(
-      'homepage-hero--f'
-    );
     expect(screen.getByTestId('homepage-hero')).toHaveClass(
       'homepage-hero--artist-profile'
     );
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Listen' })
+      screen.queryByRole('button', { name: 'Stay Booked' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Drive streams' })
+      screen.queryByRole('heading', { name: 'Get paid. Again and again.' })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Get paid. Keep the fan.' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('staggers capture rail accent colors across visible rows', () => {
-    for (let pillIndex = 0; pillIndex < 8; pillIndex += 1) {
-      const columnAccentIndexes = [0, 1, 2].map(railIndex =>
-        getAudienceRailAccentIndex(railIndex, pillIndex)
-      );
-
-      expect(new Set(columnAccentIndexes).size).toBe(
-        columnAccentIndexes.length
-      );
-    }
   });
 });

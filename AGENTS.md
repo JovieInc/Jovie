@@ -298,10 +298,14 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
+- For marketing sections, the default composition is: one headline, one subhead, one visual. Do not add eyebrow text, labels, proof bars, separators, helper rows, or extra wrapper cards unless a human explicitly asks for that exact element
+- Eyebrow text is banned by default on marketing pages. Only add an eyebrow when a human explicitly requests it for that exact section
 - Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed
 - Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
 - Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
 - Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
+- When revising a marketing layout and the direction is unclear, do not add explanatory copy or chrome as a hedge. The fallback is subtraction: headline, subhead, one visual
 - When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
 
 ### 4d. No Redundant Chrome (Container-Aware Design)

@@ -249,6 +249,7 @@ function CoreProvidersInner({
 
 /** Marketing route prefixes where analytics are disabled */
 const MARKETING_PREFIXES = [
+  '/artist-notifications',
   '/blog',
   '/changelog',
   '/engagement-engine',

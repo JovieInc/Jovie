@@ -116,7 +116,6 @@ export interface ArtistProfileLandingCopy {
     readonly keywords: readonly string[];
   };
   readonly hero: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly subhead: string;
     readonly ctaLabel: string;
@@ -126,15 +125,15 @@ export interface ArtistProfileLandingCopy {
     readonly phoneSubcaption: string;
   };
   readonly adaptive: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly alternateHeadlines: readonly string[];
     readonly body: string;
     readonly contextCues: readonly [string, string, string, string];
+    readonly restingScreenshotAlt: string;
+    readonly restingScreenshotSrc: string;
     readonly modes: readonly ArtistProfileMode[];
   };
   readonly outcomes: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly body: string;
     readonly cards: readonly ArtistProfileOutcomeCard[];
@@ -143,42 +142,75 @@ export interface ArtistProfileLandingCopy {
   readonly monetization: {
     readonly headline: string;
     readonly subhead: string;
-    readonly paidCard: {
+    readonly irlPaymentsCard: {
+      readonly textAnchor: 'top';
       readonly title: string;
       readonly body: string;
+      readonly visualSide: 'right';
       readonly contextLabel: string;
       readonly contextDetail: string;
+      readonly amountLabel: string;
+      readonly amounts: readonly [
+        {
+          readonly id: 'five';
+          readonly amount: string;
+        },
+        {
+          readonly id: 'ten';
+          readonly amount: string;
+          readonly featured: true;
+        },
+        {
+          readonly id: 'twenty';
+          readonly amount: string;
+        },
+      ];
     };
-    readonly relationshipCard: {
+    readonly captureCard: {
+      readonly textAnchor: 'bottom';
       readonly title: string;
       readonly body: string;
-      readonly timeline: readonly [
+      readonly fanName: string;
+      readonly fanLocation: string;
+      readonly fanAmount: string;
+      readonly fanIntent: string;
+      readonly visualSide: 'left';
+    };
+    readonly thanksCard: {
+      readonly textAnchor: 'top';
+      readonly title: string;
+      readonly body: string;
+      readonly appName: string;
+      readonly sender: string;
+      readonly visualSide: 'right';
+      readonly notificationTitle: string;
+      readonly notificationPreview: string;
+    };
+    readonly reengageCard: {
+      readonly textAnchor: 'bottom';
+      readonly title: string;
+      readonly body: string;
+      readonly visualSide: 'left';
+      readonly outputs: readonly [
         {
           readonly id: 'payment';
-          readonly label: string;
           readonly title: string;
           readonly detail: string;
-          readonly meta: string;
         },
         {
-          readonly id: 'follow-up-sent';
-          readonly label: string;
+          readonly id: 'thanks';
           readonly title: string;
           readonly detail: string;
-          readonly meta: string;
         },
         {
-          readonly id: 'fan-reached';
-          readonly label: string;
+          readonly id: 'spotify';
           readonly title: string;
           readonly detail: string;
-          readonly meta: string;
         },
       ];
     };
   };
   readonly capture: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly subhead: string;
     readonly body: string;
@@ -187,17 +219,16 @@ export interface ArtistProfileLandingCopy {
       readonly detail: string;
       readonly ctaLabel: string;
       readonly confirmedLabel: string;
-      readonly beforeLabel: string;
-      readonly beforeTitle: string;
-      readonly beforeDetail: string;
-      readonly afterLabel: string;
-      readonly afterTitle: string;
-      readonly afterDetail: string;
+    };
+    readonly notification: {
+      readonly appName: string;
+      readonly timeLabel: string;
+      readonly title: string;
+      readonly detail: string;
     };
     readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
   };
   readonly reactivation: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly subhead: string;
     readonly workflow: {
@@ -223,27 +254,16 @@ export interface ArtistProfileLandingCopy {
       readonly destination: string;
     }[];
   };
-  readonly opinionated: {
-    readonly eyebrow: string;
-    readonly headline: string;
-    readonly headlineOptions: readonly string[];
-    readonly body: string;
-    readonly principles: readonly string[];
-    readonly rules: readonly ArtistProfileOpinionatedRule[];
-  };
   readonly specWall: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly subhead: string;
   };
   readonly howItWorks: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly body: string;
     readonly steps: readonly ArtistProfileHowItWorksStep[];
   };
   readonly socialProof: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly intro: string;
   };
@@ -257,12 +277,6 @@ export interface ArtistProfileLandingCopy {
     readonly ctaLabel: string;
     readonly signature: string;
   };
-}
-
-export interface ArtistProfileOpinionatedRule {
-  readonly id: 'release' | 'shows' | 'support';
-  readonly context: string;
-  readonly result: string;
 }
 
 export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
@@ -281,7 +295,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   hero: {
-    eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
       'Streams, drops, support, bookings, and fan capture in a single page.',
@@ -292,7 +305,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     phoneSubcaption: 'Adapts to every fan.',
   },
   adaptive: {
-    eyebrow: 'Adaptive profile',
     headline: 'Built for every mode.',
     alternateHeadlines: [
       'One profile for every release moment.',
@@ -306,6 +318,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       'Device-aware',
       'Intent-aware',
     ],
+    restingScreenshotAlt:
+      'Jovie artist profile showing the default profile view before a mode is opened.',
+    restingScreenshotSrc: '/product-screenshots/profile-phone.png',
     modes: [
       {
         id: 'listen',
@@ -476,9 +491,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   outcomes: {
-    eyebrow: 'Fan outcomes',
-    headline: 'Built for artists.',
-    body: 'Four ways the same artist profile can move a fan from attention to action.',
+    headline: 'Built for Artists.',
+    body: 'Every state is tuned to move the next tap forward.',
     cards: [
       {
         id: 'drive-streams',
@@ -584,45 +598,77 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   monetization: {
-    headline: 'Convert a one-time tip into a lifelong fan.',
-    subhead:
-      'Turn merch-table and QR support into a relationship you can reach again.',
-    paidCard: {
-      title: 'Get paid.',
-      body: 'QR-ready support for shows, merch tables, and bios.',
-      contextLabel: 'Merch Table QR',
+    headline: 'Get paid. Again and again.',
+    subhead: 'Turn a $5 busking tip into a lifelong customer.',
+    irlPaymentsCard: {
+      textAnchor: 'top',
+      title: 'Accept IRL payments',
+      body: 'A sidewalk scan should feel instant, native, and ready to close the tip.',
+      visualSide: 'right',
+      contextLabel: 'Busking QR',
       contextDetail: 'Scan to support',
+      amountLabel: 'Choose amount',
+      amounts: [
+        {
+          id: 'five',
+          amount: '$5',
+        },
+        {
+          id: 'ten',
+          amount: '$10',
+          featured: true,
+        },
+        {
+          id: 'twenty',
+          amount: '$20',
+        },
+      ],
     },
-    relationshipCard: {
-      title: 'Keep the fan.',
-      body: 'Turn real-world support into a fan you can reach again.',
-      timeline: [
+    captureCard: {
+      textAnchor: 'bottom',
+      title: 'Capture the fan',
+      body: 'A cashless street payment should become a reachable fan, not a dead-end receipt.',
+      fanName: 'Jessica',
+      fanLocation: 'Los Angeles',
+      fanAmount: '$5',
+      fanIntent: 'Wants the next song',
+      visualSide: 'left',
+    },
+    thanksCard: {
+      textAnchor: 'top',
+      title: 'Say thanks',
+      body: 'One clean thank-you can feel personal and send the fan straight back to the music.',
+      appName: 'Mail',
+      sender: 'Tim White',
+      visualSide: 'right',
+      notificationTitle: "Thanks. Here's the new song.",
+      notificationPreview: 'Thanks for the tip. Here is the new song.',
+    },
+    reengageCard: {
+      textAnchor: 'bottom',
+      title: 'Re-engage every release',
+      body: 'One payment can turn into a fan who comes back again and again.',
+      visualSide: 'left',
+      outputs: [
         {
           id: 'payment',
-          label: 'Activity',
-          title: '$10 support received',
-          detail: 'Merch Table QR · Venmo',
-          meta: 'Email confirmed',
+          title: 'Jessica paid you $5',
+          detail: 'From busking QR code',
         },
         {
-          id: 'follow-up-sent',
-          label: 'Follow-up sent',
-          title: "Thanks for the support tonight - here's the new song.",
-          detail: 'Release alert delivered',
-          meta: 'Open new single',
+          id: 'thanks',
+          title: 'Thanks email sent',
+          detail: 'With the latest release',
         },
         {
-          id: 'fan-reached',
-          label: 'Fan reached',
-          title: 'New single opened',
-          detail: 'Notifications on',
-          meta: 'Ready for next show',
+          id: 'spotify',
+          title: 'Fan activity',
+          detail: 'Clicked through to Spotify',
         },
       ],
     },
   },
   capture: {
-    eyebrow: 'Owned audience',
     headline: 'Capture every fan.',
     subhead: 'Turn anonymous profile visits into fans you can reach again.',
     body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
@@ -631,12 +677,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       detail: 'Release and show alerts.',
       ctaLabel: 'Subscribe',
       confirmedLabel: 'Notifications Enabled',
-      beforeLabel: 'Before',
-      beforeTitle: 'Anonymous fan action',
-      beforeDetail: 'Clicked through to Spotify',
-      afterLabel: 'After',
-      afterTitle: 'Reachable fan',
-      afterDetail: 'Email saved / Notifications on',
+    },
+    notification: {
+      appName: 'Jovie',
+      timeLabel: 'now',
+      title: 'Notifications Enabled',
+      detail: 'Next release goes out automatically.',
     },
     audienceRails: [
       [
@@ -708,9 +754,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   reactivation: {
-    eyebrow: 'Automatic reactivation',
-    headline: 'Bring them back automatically.',
-    subhead: 'When the next moment hits, fans come back in.',
+    headline: 'Notify them automatically.',
+    subhead:
+      'Once a fan opts in, new music, local shows, and thank-yous go out without rebuilding the moment.',
     workflow: {
       columns: ['Trigger', 'Audience', 'Message', 'Destination'],
       rows: [
@@ -747,87 +793,56 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     outputs: [
       {
         id: 'release-alerts',
-        label: 'New Music',
-        title: 'First Listen Goes Out Fast.',
+        label: 'New music',
+        title: 'Subscribers hear it first.',
         detail: 'New release live now',
         destination: 'Email -> /music',
       },
       {
         id: 'nearby-show-alerts',
-        label: 'Nearby Shows',
-        title: 'The Right City Gets the Date.',
+        label: 'Nearby shows',
+        title: 'The right city gets the date.',
         detail: 'Los Angeles added · The Novo',
         destination: 'Alert -> /shows',
       },
       {
         id: 'thank-you',
-        label: 'Thank-Yous',
-        title: 'Support Turns Into the Next Listen.',
+        label: 'Follow-up',
+        title: 'Support turns into the next listen.',
         detail: 'Thanks for the support tonight',
         destination: 'Message -> /music',
       },
     ],
   },
-  opinionated: {
-    eyebrow: 'Product philosophy',
-    headline: 'Opinionated. By design.',
-    headlineOptions: [
-      'Opinionated. By design.',
-      'Built to convert, not decorate.',
-      'No template maze.',
-    ],
-    body: 'Jovie is intentionally constrained. No theme builder. No layout rabbit hole. No generic creator-site sprawl. Every profile teaches fans what to tap because the product is built around release moments, show moments, and conversion.',
-    principles: ['No theme builder', 'No template maze', 'Built to convert'],
-    rules: [
-      {
-        id: 'release',
-        context: 'Release moment',
-        result: 'Music first',
-      },
-      {
-        id: 'shows',
-        context: 'Nearby show',
-        result: 'Tickets first',
-      },
-      {
-        id: 'support',
-        context: 'Support intent',
-        result: 'Pay first',
-      },
-    ],
-  },
   specWall: {
-    eyebrow: 'Power features',
-    headline: 'Built for artists. Obsessively specific.',
-    subhead: 'The details that make one profile work harder.',
+    headline: 'Details that pull their weight.',
+    subhead:
+      'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.',
   },
   howItWorks: {
-    eyebrow: 'Zero setup',
     headline: 'Live in 60 seconds.',
-    body: 'Claim. Sync. Share.',
+    body: 'Search once, go live fast, and share the same profile everywhere.',
     steps: [
       {
         id: 'claim',
         title: 'Claim',
-        description: 'Search once and claim the profile.',
+        description: 'Find your artist.',
       },
       {
         id: 'connect',
         title: 'Sync',
-        description:
-          'It imports your catalog across 27+ providers and keeps the profile current.',
+        description: 'Pull your catalog in.',
       },
       {
         id: 'share',
         title: 'Share',
-        description: 'Use it in bio, stories, QR, release posts, and shows.',
+        description: 'Use the same link everywhere.',
       },
     ],
   },
   socialProof: {
-    eyebrow: 'Proof',
-    headline: 'Real Artists. Real workflows.',
-    intro: 'Real artist profiles. Real release moments.',
+    headline: 'Real Artists. Real Workflows.',
+    intro: 'Real artist profiles built around real release moments.',
   },
   faq: {
     headline: 'Frequently Asked Questions',
@@ -865,7 +880,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   finalCta: {
-    headline: "Don't lose your next fan.",
+    headline: 'Ready to Amplify?',
     subhead: 'Turn every visit into a stream, save, signup, or support.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
