@@ -249,8 +249,12 @@ function CommonDropdownSubmenuRenderer({
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const [measuredMinWidth, setMeasuredMinWidth] = React.useState<
+    string | undefined
+  >(undefined);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
   const Sub =
     context.kind === 'context'
       ? ContextMenuPrimitive.Sub
@@ -298,12 +302,23 @@ function CommonDropdownSubmenuRenderer({
     handleQueryChange('');
   }, [handleQueryChange]);
 
+  const measureTriggerWidth = React.useCallback(() => {
+    if (item.minWidth !== undefined || !triggerRef.current) {
+      return;
+    }
+
+    const nextWidth = Math.round(
+      triggerRef.current.getBoundingClientRect().width
+    );
+    setMeasuredMinWidth(nextWidth > 0 ? `${nextWidth}px` : undefined);
+  }, [item.minWidth]);
+
   const content = (
     <SubContent
       ref={contentRef}
       data-menu-surface='toolbar'
       className={cn(subMenuContentClasses, transformOrigin)}
-      style={getContentStyle(item.minWidth, item.maxHeight)}
+      style={getContentStyle(item.minWidth ?? measuredMinWidth, item.maxHeight)}
       onFocusOutside={event => {
         if (contentRef.current?.contains(event.target as Node)) {
           event.preventDefault();
@@ -345,6 +360,9 @@ function CommonDropdownSubmenuRenderer({
       key={item.id}
       open={open}
       onOpenChange={nextOpen => {
+        if (nextOpen) {
+          measureTriggerWidth();
+        }
         setOpen(nextOpen);
         if (!nextOpen && query) {
           clearQuery();
@@ -352,6 +370,7 @@ function CommonDropdownSubmenuRenderer({
       }}
     >
       <SubTrigger
+        ref={triggerRef}
         disabled={item.disabled}
         data-menu-row=''
         className={cn(context.itemBase, item.className)}

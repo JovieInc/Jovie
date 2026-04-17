@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.155] - 2026-04-16
+
+> Dropdown submenus now keep a stable width and row alignment even when optional icons are absent.
+
+### Fixed
+
+- [internal] `CommonDropdown` submenus now inherit the trigger row width when no explicit submenu width is provided, which keeps nested menus aligned with their parent entry in the shared dropdown system.
+- [internal] Added regression coverage for inherited submenu width, explicit width overrides, and icon-less submenu row structure so shared dropdown menus keep consistent sizing across future refactors.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.155`.
+
 ## [26.4.154.2] - 2026-04-16
 
 > Public demo and screenshot pages now stay aligned with the real product screens, so review links and captures reflect the UI the team is actually shipping.
