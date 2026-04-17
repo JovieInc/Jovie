@@ -183,7 +183,7 @@ export const CircleIconButton = React.forwardRef<
     <Button
       ref={ref}
       asChild={asChild}
-      type={type}
+      type={asChild ? undefined : type}
       variant={variantConfig.buttonVariant}
       size='icon'
       className={cn(
