@@ -254,9 +254,17 @@ function parsePlaywrightJsonReport(raw: string): PlaywrightJsonReport {
   }
 
   for (let index = 0; index < raw.length; index += 1) {
+    if (raw[index] !== '{') {
+      continue;
+    }
+
+    let cursor = index - 1;
+    while (cursor >= 0 && (raw[cursor] === ' ' || raw[cursor] === '\t')) {
+      cursor -= 1;
+    }
+
     const isJsonStart =
-      raw[index] === '{' &&
-      (index === 0 || raw[index - 1] === '\n' || raw[index - 1] === '\r');
+      cursor < 0 || raw[cursor] === '\n' || raw[cursor] === '\r';
 
     if (!isJsonStart) {
       continue;

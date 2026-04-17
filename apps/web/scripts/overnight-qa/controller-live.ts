@@ -311,17 +311,21 @@ export async function runLiveController(params: {
         ? error.message
         : 'Overnight QA controller failed.');
 
-    await writeState(
-      {
-        ...state,
-        status: 'blocked',
+    try {
+      await writeState(
+        {
+          ...state,
+          status: 'blocked',
+          stopReason,
+        },
+        paths
+      );
+      await appendRunEvent(runDir, 'controller-error', {
         stopReason,
-      },
-      paths
-    );
-    await appendRunEvent(runDir, 'controller-error', {
-      stopReason,
-    });
+      });
+    } catch {
+      // Best-effort persistence should not mask the original controller error.
+    }
 
     throw error;
   } finally {

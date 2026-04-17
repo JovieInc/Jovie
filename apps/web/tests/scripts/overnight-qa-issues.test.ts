@@ -41,4 +41,23 @@ describe('overnight-qa issues', () => {
     expect(issues[0]?.summary).toContain('authenticate');
     expect(issues[0]?.signature).toContain('Test timeout');
   });
+
+  it('parses indented Playwright json after noisy setup lines', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'overnight-qa-issues-'));
+    const reportPath = join(root, 'smoke-public-indented.json');
+
+    await writeFile(
+      reportPath,
+      [
+        '[dotenv@17.3.1] injecting env (0) from .env.local',
+        '  {"suites":[{"title":"auth.setup.ts","file":"auth.setup.ts","specs":[{"title":"authenticate","file":"auth.setup.ts","tests":[{"results":[{"status":"failed","error":{"message":"indented json still parsed"}}]}]}]}]}',
+      ].join('\n'),
+      'utf8'
+    );
+
+    const issues = await parsePlaywrightIssues(PLAYWRIGHT_SUITE, reportPath);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.summary).toContain('indented json still parsed');
+  });
 });
