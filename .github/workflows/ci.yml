@@ -2474,6 +2474,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ALLOW_SOURCE_FALLBACK: '1'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
