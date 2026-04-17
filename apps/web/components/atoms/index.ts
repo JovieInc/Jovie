@@ -60,7 +60,6 @@ export {
 export { JovieIcon } from './JovieIcon';
 export type { LabelProps } from './Label';
 export { Label } from './Label';
-export { LinearButton } from './LinearButton';
 export type { LoadingSpinnerProps, LoadingSpinnerTone } from './LoadingSpinner';
 export { LoadingSpinner, Spinner } from './LoadingSpinner';
 export type { LogoVariant } from './Logo';
