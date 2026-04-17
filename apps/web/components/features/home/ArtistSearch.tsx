@@ -40,7 +40,7 @@ export function ArtistSearch() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder='Search for your artist name...'
-          className='w-full px-4 py-3 pl-12 pr-4 text-lg bg-surface-0/80 backdrop-blur-sm border border-default rounded-xl text-primary-token placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-all duration-300'
+          className='w-full px-4 py-3 pl-12 pr-4 text-lg bg-surface-0/80 backdrop-blur-sm border border-default rounded-xl text-primary-token placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-all duration-slower'
           disabled={isSearching}
         />
         <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>

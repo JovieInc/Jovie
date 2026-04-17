@@ -52,16 +52,16 @@ const condensedDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
+    <p className='text-[13px] font-[590] tracking-[-0.015em] text-secondary-token'>
       {children}
     </p>
   );
 }
 
 const panelClassName =
-  'rounded-[28px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] px-5 py-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
+  'rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] px-5 py-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
 const flatSurfaceClassName =
-  'rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl';
+  'rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl';
 const profileActionPrimaryClassName = `${profilePrimaryPillClassName} min-h-11 px-4 py-2.5`;
 const profileActionSecondaryClassName = `${profileSecondaryPillClassName} min-h-11 px-4 py-2.5`;
 
@@ -195,7 +195,7 @@ function TourDateRow({
     <article
       className={`${flatSurfaceClassName} grid gap-4 px-4 py-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center`}
     >
-      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[20px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
+      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[var(--profile-drawer-radius-desktop)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
         <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
           {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
             new Date(tourDate.startDate)
