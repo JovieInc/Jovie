@@ -123,6 +123,7 @@ export function OnboardingFormWrapper({
     >
       {isResumeFlow ? (
         <OnboardingV2Form
+          assumeInitialHandleAvailable={assumeInitialHandleAvailable}
           key={formKey}
           initialDisplayName={initialDisplayName}
           initialHandle={resolvedHandle}

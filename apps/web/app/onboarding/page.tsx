@@ -21,6 +21,7 @@ import { extractErrorMessage } from '@/lib/utils/errors';
 interface OnboardingPageProps {
   readonly searchParams?: Promise<{
     readonly handle?: string;
+    readonly username?: string;
     readonly resume?: string;
   }>;
 }
@@ -48,10 +49,12 @@ export default async function OnboardingPage({
   const resolvedSearchParams = await searchParams;
   const pendingClaim = await readPendingClaimContext();
   const targetProfileId = pendingClaim?.creatorProfileId ?? null;
+  const handleQuery =
+    resolvedSearchParams?.handle ?? resolvedSearchParams?.username;
   const shouldSkipDashboardPrefetch =
-    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
+    isE2EFastOnboardingEnabled() && Boolean(handleQuery);
   const assumeInitialHandleAvailable =
-    isE2EFastOnboardingEnabled() && Boolean(resolvedSearchParams?.handle);
+    isE2EFastOnboardingEnabled() && Boolean(handleQuery);
 
   const authResult = await resolveUserState();
 
@@ -72,7 +75,7 @@ export default async function OnboardingPage({
 
   const hasResumeSignal = Boolean(resolvedSearchParams?.resume);
   const hasOnboardingContinuationSignal = Boolean(
-    resolvedSearchParams?.handle || resolvedSearchParams?.resume
+    handleQuery || resolvedSearchParams?.resume
   );
   const shouldLoadExistingProfile = Boolean(
     targetProfileId ?? authResult.profileId
@@ -132,9 +135,7 @@ export default async function OnboardingPage({
   // Start handle reservation early with what we know now (display name from Clerk)
   const earlyDisplayName = clerkIdentity.displayName || '';
   const earlyProvidedHandle =
-    resolvedSearchParams?.handle ||
-    pendingClaim?.username ||
-    spotifySuggestedHandle;
+    handleQuery || pendingClaim?.username || spotifySuggestedHandle;
   const reservedHandlePromise =
     !earlyProvidedHandle && earlyDisplayName
       ? reserveOnboardingHandle(earlyDisplayName)
@@ -163,7 +164,7 @@ export default async function OnboardingPage({
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
   const providedHandle =
-    resolvedSearchParams?.handle ||
+    handleQuery ||
     pendingClaim?.username ||
     existingProfile?.username ||
     spotifySuggestedHandle;
@@ -187,7 +188,7 @@ export default async function OnboardingPage({
 
   const shouldAutoSubmitHandle =
     Boolean(spotifySuggestedHandle) &&
-    !resolvedSearchParams?.handle &&
+    !handleQuery &&
     !existingProfile?.username;
 
   return (
