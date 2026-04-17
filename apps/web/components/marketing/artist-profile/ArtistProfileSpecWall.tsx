@@ -161,7 +161,7 @@ function AnalyticsFunnelHeroVisual() {
                     </span>
                     {index > 0 ? (
                       <span className='inline-flex items-center rounded-full border border-white/6 bg-[color-mix(in_srgb,var(--tile-accent-secondary)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[color:var(--tile-accent-secondary)] sm:text-[10px]'>
-                        {index === 1 ? '66%' : '15%'}
+                        {stage.width}
                       </span>
                     ) : null}
                   </div>
