@@ -27,7 +27,7 @@ function BentoCard({
 }: BentoCardProps) {
   return (
     <div
-      className={`rounded-2xl border border-white/8 bg-white/[0.03] p-6 transition-colors duration-normal hover:bg-white/[0.05] ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-6 transition-colors duration-normal hover:bg-white/[0.05] ${className}`}
     >
       {/* Top edge highlight */}
       <div

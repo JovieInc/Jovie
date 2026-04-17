@@ -23,7 +23,7 @@ export function ProfileSkeleton() {
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
-            className={`relative w-full h-[48dvh] min-h-[420px] max-h-[620px] md:h-[56dvh] md:min-h-[520px] md:rounded-t-[30px] overflow-hidden ${pulse}`}
+            className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] ${pulse}`}
           >
             <div className='absolute inset-0 bg-gradient-to-b from-white/[0.04] via-[#12141a]/60 to-[#0a0b0e]/95' />
 

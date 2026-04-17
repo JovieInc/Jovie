@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 
 export function WaitlistLink() {
   return (
@@ -21,7 +22,7 @@ export function WaitlistLink() {
               size='lg'
               className='rounded-md bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-slow'
             >
-              <Link href='/signup'>Sign up</Link>
+              <Link href={APP_ROUTES.SIGNUP}>Sign Up</Link>
             </Button>
           </div>
         </div>
