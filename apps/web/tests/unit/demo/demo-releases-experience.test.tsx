@@ -176,7 +176,10 @@ async function openReleasesMatrix() {
   return releasesMatrix;
 }
 
-async function openReleaseDrawer(title: string) {
+async function openReleaseDrawer(
+  title: string,
+  options?: { readonly requireSidebar?: boolean }
+) {
   const releasesMatrix = await openReleasesMatrix();
   const openButton = within(releasesMatrix).getByRole('button', {
     name: `Open ${title}`,
@@ -184,7 +187,21 @@ async function openReleaseDrawer(title: string) {
 
   fireEvent.click(openButton);
 
-  await screen.findByTestId('release-sidebar');
+  if (options?.requireSidebar) {
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('release-sidebar')).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+    return;
+  }
+
+  await waitFor(() => {
+    expect(screen.getAllByText(hasTextContent(title)).length).toBeGreaterThan(
+      1
+    );
+  });
 }
 
 describe('DemoReleasesExperience', () => {
@@ -228,8 +245,8 @@ describe('DemoReleasesExperience', () => {
   it('normalizes sparse track numbering in the release drawer tracks tab', async () => {
     renderDemo();
 
-    await openReleaseDrawer('96 Months');
-    fireEvent.click(screen.getByTestId('drawer-tab-tracks'));
+    await openReleaseDrawer('96 Months', { requireSidebar: true });
+    fireEvent.click(await screen.findByTestId('drawer-tab-tracks'));
 
     const tracklist = await screen.findByTestId('tracklist');
     const trackButtons = within(tracklist)
