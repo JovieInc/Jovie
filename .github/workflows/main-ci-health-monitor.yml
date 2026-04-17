@@ -6,14 +6,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write
   contents: read
-  pull-requests: read
 
 jobs:
   monitor:
     name: Detect stalled or failing CI on main
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       summary: ${{ steps.evaluate.outputs.summary }}

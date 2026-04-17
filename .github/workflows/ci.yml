@@ -1522,7 +1522,7 @@ jobs:
 
       - name: Upload build manifest
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         continue-on-error: true
         with:
           name: build-manifest
@@ -2438,16 +2438,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel@50.22.1
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v1.8
+        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
-        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
       - name: Build (PR preview)
-        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -2944,8 +2942,6 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel@50.22.1
       - name: DB safety check (production - preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
@@ -2971,16 +2967,14 @@ jobs:
         # merge commit message. The Slack drift notification in deploy-notify
         # fires when verify fails but deploy proceeds (bypass alert).
         continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
-      - name: Upgrade corepack
-        run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v1.8
+        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
-        run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
       - name: Build (preview target for staging verification)
-        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -2999,7 +2993,7 @@ jobs:
 
       - name: Alias preview to staging.jov.ie
         run: |
-          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
+          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -3035,15 +3029,15 @@ jobs:
       name: Production – jovie
       url: https://jov.ie
     steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@50.22.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Promote verified staging to production
         run: |
           # Use the staging alias directly — GitHub Actions masks job outputs
           # containing secret substrings (org name in Vercel URLs), so we
           # cannot rely on deploy_url passed between jobs.
           set +e
-          promote_output=$(vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
+          promote_output=$(./node_modules/.bin/vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
           promote_exit_code=$?
           set -e
 

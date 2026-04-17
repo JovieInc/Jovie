@@ -23,10 +23,6 @@ on:
     - cron: '0 9 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-
 concurrency:
   group: screenshots
   cancel-in-progress: true
@@ -36,6 +32,9 @@ jobs:
     name: Generate Screenshots
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     defaults:
       run:
         working-directory: apps/web
@@ -62,7 +61,14 @@ jobs:
       - name: Start production server
         run: |
           pnpm run start &
-          npx wait-on http://localhost:3000 --timeout 60000
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3000 >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for the production server to start."
+          exit 1
 
       - name: Capture screenshot catalog
         run: |

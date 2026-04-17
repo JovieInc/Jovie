@@ -209,6 +209,14 @@ jobs:
             echo "reason=Post-deploy errors ($POST_DEPLOY) within ${THRESHOLD}x of baseline ($BASELINE)" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Checkout repository for rollback
+        if: steps.evaluate.outputs.gate_status == 'failed'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js and pnpm for rollback
+        if: steps.evaluate.outputs.gate_status == 'failed'
+        uses: ./.github/actions/setup-node-pnpm
+
       - name: Auto-rollback on error spike
         if: steps.evaluate.outputs.gate_status == 'failed'
         env:
@@ -218,10 +226,7 @@ jobs:
         run: |
           echo "Sentry error gate FAILED. Triggering auto-rollback..."
 
-          # Install Vercel CLI
-          npm install -g vercel@50.22.1 2>/dev/null
-
-          vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
+          ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
             echo "Auto-rollback failed or not supported. Manual intervention required."
             exit 0
           }
