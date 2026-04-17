@@ -84,6 +84,7 @@ if [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
 fi
 
 echo "Prebuilt output file count: $prebuilt_file_count"
+echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
 for attempt in 1 2 3; do
   echo "Deploy attempt $attempt/3"
