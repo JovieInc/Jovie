@@ -235,6 +235,11 @@ export function ReleaseLandingPage({
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(initialMenuOpen);
+  }, [initialMenuOpen]);
+
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );

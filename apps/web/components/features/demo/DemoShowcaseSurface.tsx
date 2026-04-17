@@ -24,8 +24,8 @@ import { DemoClientProviders } from './DemoClientProviders';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
-import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
+import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
 import {
