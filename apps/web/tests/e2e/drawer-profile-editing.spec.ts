@@ -28,6 +28,8 @@ import {
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const TEST_PRESS_PHOTO_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8s6sAAAAASUVORK5CYII=';
+const PROFILE_DRAWER_SCROLL_REGION_TEST_ID =
+  'profile-contact-tabbed-card-scroll-region';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab rendering
@@ -96,6 +98,118 @@ test.describe('Profile drawer — tab rendering', () => {
       document.body.innerText.toLowerCase()
     );
     expect(body).not.toMatch(/application error|something went wrong/);
+  });
+
+  test('About tab scrolls to lower settings content on desktop', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('tab', { name: 'About' }).click();
+    await page.waitForTimeout(500);
+
+    const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);
+    const lowerSettingsControl = page
+      .getByText('Show releases older than 90 days')
+      .first();
+
+    await expect(scrollRegion).toBeVisible({ timeout: 30_000 });
+    await expect(lowerSettingsControl).toBeVisible({ timeout: 30_000 });
+
+    const regionMetrics = await scrollRegion.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+    }));
+    expect(regionMetrics.scrollHeight).toBeGreaterThan(
+      regionMetrics.clientHeight
+    );
+
+    const regionBox = await scrollRegion.boundingBox();
+    const beforeBox = await lowerSettingsControl.boundingBox();
+    expect(regionBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect((beforeBox?.y ?? 0) + (beforeBox?.height ?? 0)).toBeGreaterThan(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0)
+    );
+
+    await scrollRegion.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await page.waitForTimeout(250);
+
+    const afterScrollTop = await scrollRegion.evaluate(
+      element => element.scrollTop
+    );
+    expect(afterScrollTop).toBeGreaterThan(regionMetrics.scrollTop);
+
+    const afterBox = await lowerSettingsControl.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect((afterBox?.y ?? 0) + (afterBox?.height ?? 0)).toBeLessThanOrEqual(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0) + 2
+    );
+  });
+
+  test('About tab scrolls to lower settings content on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('tab', { name: 'About' }).click();
+    await page.waitForTimeout(500);
+
+    const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);
+    const lowerSettingsControl = page
+      .getByText('Show releases older than 90 days')
+      .first();
+
+    await expect(scrollRegion).toBeVisible({ timeout: 30_000 });
+    await expect(lowerSettingsControl).toBeVisible({ timeout: 30_000 });
+
+    const regionMetrics = await scrollRegion.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+    }));
+    expect(regionMetrics.scrollHeight).toBeGreaterThan(
+      regionMetrics.clientHeight
+    );
+
+    const regionBox = await scrollRegion.boundingBox();
+    const beforeBox = await lowerSettingsControl.boundingBox();
+    expect(regionBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect((beforeBox?.y ?? 0) + (beforeBox?.height ?? 0)).toBeGreaterThan(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0)
+    );
+
+    await scrollRegion.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await page.waitForTimeout(250);
+
+    const afterScrollTop = await scrollRegion.evaluate(
+      element => element.scrollTop
+    );
+    expect(afterScrollTop).toBeGreaterThan(regionMetrics.scrollTop);
+
+    const afterBox = await lowerSettingsControl.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect((afterBox?.y ?? 0) + (afterBox?.height ?? 0)).toBeLessThanOrEqual(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0) + 2
+    );
   });
 
   test('About tab uploads and deletes a press photo', async ({ page }) => {
