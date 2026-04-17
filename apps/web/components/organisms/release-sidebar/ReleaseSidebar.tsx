@@ -26,8 +26,8 @@ import {
   DrawerCardActionBar,
   DrawerFormGridRow,
   DrawerInspectorCard,
-  DrawerInspectorStack,
   DrawerMediaThumb,
+  DrawerSection,
   DrawerSplitButton,
   DrawerSurfaceCard,
   DrawerTabbedCard,
@@ -656,7 +656,7 @@ export function ReleaseSidebar({
       emptyMessage='Select a release in the table to view its details.'
     >
       {release && (
-        <DrawerInspectorStack data-testid='release-inspector-stack'>
+        <div className='space-y-2.5'>
           <DrawerTabbedCard
             testId='release-tabbed-card'
             tabs={
@@ -754,11 +754,13 @@ export function ReleaseSidebar({
             </DrawerInspectorCard>
           ) : null}
 
-          <DrawerInspectorCard
+          <DrawerSection
             title='Lyrics'
+            surface='card'
             defaultOpen={false}
-            data-testid='release-lyrics-card'
-            gridClassName='space-y-2.5'
+            lazyMount
+            testId='release-lyrics-card'
+            contentClassName='p-0'
           >
             <ReleaseLyricsSection
               releaseId={release.id}
@@ -769,13 +771,15 @@ export function ReleaseSidebar({
               onSaveLyrics={onSaveLyrics}
               onFormatLyrics={onFormatLyrics}
             />
-          </DrawerInspectorCard>
+          </DrawerSection>
 
-          <DrawerInspectorCard
-            title='Settings'
+          <DrawerSection
+            title='Extras'
+            surface='card'
             defaultOpen={false}
-            data-testid='release-settings-card-stack'
-            gridClassName='space-y-2.5'
+            lazyMount
+            testId='release-extras-card'
+            contentClassName='space-y-3 p-3'
           >
             {isEditable ? (
               <ReleaseArtworkDownloadsSetting
@@ -789,15 +793,17 @@ export function ReleaseSidebar({
               targetPlaylists={release.targetPlaylists}
               onSave={readOnly ? undefined : onSaveTargetPlaylists}
               readOnly={readOnly}
+              variant='flat'
             />
             {!readOnly ? (
               <ReleasePitchSection
                 releaseId={release.id}
                 existingPitches={release.generatedPitches}
+                variant='flat'
               />
             ) : null}
-          </DrawerInspectorCard>
-        </DrawerInspectorStack>
+          </DrawerSection>
+        </div>
       )}
     </EntitySidebarShell>
   );

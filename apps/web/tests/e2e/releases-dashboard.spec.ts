@@ -364,15 +364,11 @@ test.describe('Releases dashboard', () => {
     });
 
     const sidebar = await openFirstReleaseSidebar(page);
+    await expect(sidebar.getByTestId('release-properties-card')).toBeVisible();
     await expect(sidebar.getByTestId('release-tabbed-card')).toBeVisible();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
