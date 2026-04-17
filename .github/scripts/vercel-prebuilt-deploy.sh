@@ -28,7 +28,6 @@ write_deployment_url() {
 
 count_prebuilt_files() {
   if [ ! -d ".vercel/output" ]; then
-    echo "0"
     return
   fi
 
@@ -77,16 +76,28 @@ try_mode() {
 
 plain_prebuilt_limit=15000
 prebuilt_file_count="$(count_prebuilt_files)"
+has_prebuilt_output=true
 can_use_plain_prebuilt=true
 
-if [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
+if [ -z "$prebuilt_file_count" ]; then
+  has_prebuilt_output=false
+  can_use_plain_prebuilt=false
+elif [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
   can_use_plain_prebuilt=false
 fi
 
-echo "Prebuilt output file count: $prebuilt_file_count"
+if [ "$has_prebuilt_output" = true ]; then
+  echo "Prebuilt output file count: $prebuilt_file_count"
+else
+  echo "Prebuilt output file count: unavailable (.vercel/output missing)"
+fi
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
-deploy_modes=(archive)
+deploy_modes=()
+
+if [ "$has_prebuilt_output" = true ]; then
+  deploy_modes+=(archive)
+fi
 
 if [ "$can_use_plain_prebuilt" = true ]; then
   deploy_modes+=(plain)
@@ -108,7 +119,10 @@ for mode in "${deploy_modes[@]}"; do
       echo "Deploy attempt $attempt/$total_attempts (plain prebuilt)"
       ;;
     source)
-      if [ "$can_use_plain_prebuilt" = true ]; then
+      if [ "$has_prebuilt_output" = false ]; then
+        echo "Skipping prebuilt deploy modes because .vercel/output is missing."
+        echo "Falling back to source deployment."
+      elif [ "$can_use_plain_prebuilt" = true ]; then
         echo "Plain prebuilt upload failed; falling back to source deployment."
       else
         echo "Skipping plain prebuilt fallback because Vercel rejects more than ${plain_prebuilt_limit} files and .vercel/output has ${prebuilt_file_count} files."
