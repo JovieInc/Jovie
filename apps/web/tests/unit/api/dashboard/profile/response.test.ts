@@ -34,6 +34,21 @@ describe('addAvatarCacheBust', () => {
     );
   });
 
+  it('preserves protocol-relative avatar hosts when adding a cache-bust query param', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-16T10:20:00.000Z'));
+
+    const profile = {
+      avatarUrl: '//cdn.example.com/avatars/default-user.png?size=large',
+    } as Parameters<typeof addAvatarCacheBust>[0];
+
+    const result = addAvatarCacheBust(profile);
+
+    expect(result.avatarUrl).toBe(
+      '//cdn.example.com/avatars/default-user.png?size=large&v=1776334800000'
+    );
+  });
+
   it('leaves malformed absolute avatar URLs unchanged', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-16T10:20:00.000Z'));

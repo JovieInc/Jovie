@@ -306,6 +306,16 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });
 
+    const profileResponse = await page.request.get('/api/dashboard/profile');
+    expect(profileResponse.ok()).toBeTruthy();
+    const profilePayload = (await profileResponse.json()) as {
+      profile?: {
+        usernameNormalized?: string | null;
+      };
+    };
+    const expectedProfilePath = `/${profilePayload.profile?.usernameNormalized ?? ''}`;
+    expect(profilePayload.profile?.usernameNormalized).toBeTruthy();
+
     // Use a deterministic command so this assertion is not gated on model latency.
     await chatInput.fill('preview profile');
     const sendButton = page.getByRole('button', { name: /send message/i });
@@ -324,7 +334,10 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
 
     const previewPage = await popupPromise;
     await previewPage.waitForLoadState('domcontentloaded');
-    await expect(previewPage).toHaveURL(/\/[^/?#]+$/, { timeout: 15_000 });
+    await expect(previewPage).toHaveURL(
+      new RegExp(`${expectedProfilePath.replace('/', '\\/')}([?#].*)?$`),
+      { timeout: 15_000 }
+    );
     await previewPage.close();
 
     await expect(assistantMessages.nth(previousAssistantCount)).toContainText(

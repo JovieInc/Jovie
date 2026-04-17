@@ -23,7 +23,7 @@ export interface TestProfileUpdateParams {
 
 export async function handleTestProfileUpdate({
   clerkUserId,
-  dbProfileUpdates: _dbProfileUpdates,
+  dbProfileUpdates,
   usernameUpdate,
   displayNameForUserUpdate,
   avatarUrl,
@@ -77,7 +77,10 @@ export async function handleTestProfileUpdate({
   const maybeDb = db as unknown as OptionalDb | undefined;
   const updater = maybeDb?.update?.(creatorProfiles);
   const chained = updater
-    ?.set?.({ updatedAt: new Date() })
+    ?.set?.({
+      ...(dbProfileUpdates as Partial<typeof creatorProfiles.$inferInsert>),
+      updatedAt: new Date(),
+    })
     ?.from?.(users)
     ?.where?.(() => true);
   chained?.returning?.();
