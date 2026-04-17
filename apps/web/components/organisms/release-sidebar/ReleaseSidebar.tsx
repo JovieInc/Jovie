@@ -585,6 +585,7 @@ export function ReleaseSidebar({
       isOpen={isOpen}
       width={width ?? 344}
       ariaLabel='Release details'
+      scrollStrategy='shell'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid='release-sidebar'

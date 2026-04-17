@@ -236,6 +236,7 @@ export function AddReleaseSidebar({
       isOpen={isOpen}
       ariaLabel='Add release'
       data-testid='add-release-sidebar'
+      scrollStrategy='shell'
       onClose={handleClose}
       headerMode='minimal'
       hideMinimalHeaderBar

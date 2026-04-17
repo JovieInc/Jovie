@@ -234,6 +234,7 @@ export function TourDateSidebar({
       <EntitySidebarShell
         isOpen={Boolean(tourDate)}
         ariaLabel='Edit tour date'
+        scrollStrategy='shell'
         onClose={onClose}
         headerMode='minimal'
         hideMinimalHeaderBar

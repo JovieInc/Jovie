@@ -122,39 +122,36 @@ export function AudienceMemberSidebar({
       emptyMessage='Select a row in the table to view contact details.'
     >
       {member && (
-        <div className='flex min-h-full flex-col gap-2 pt-0.5'>
-          <div className='min-h-0 flex-1'>
-            <DrawerTabbedCard
-              testId='audience-member-tabbed-card'
-              tabs={
-                <DrawerTabs
-                  value={activeTab}
-                  onValueChange={value => setActiveTab(value as AudienceTab)}
-                  options={AUDIENCE_TAB_OPTIONS}
-                  ariaLabel='Audience member tabs'
-                  distribution='intrinsic'
-                />
-              }
-              contentClassName='pt-2'
-            >
-              {activeTab === 'details' && (
-                <div data-testid='audience-details-card'>
-                  <AudienceMemberDetails member={member} />
-                </div>
-              )}
-              {activeTab === 'activity' && (
-                <div data-testid='audience-activity-card'>
-                  <AudienceMemberActivityFeed member={member} />
-                </div>
-              )}
-              {activeTab === 'sources' && (
-                <div data-testid='audience-sources-card'>
-                  <AudienceMemberReferrers member={member} />
-                </div>
-              )}
-            </DrawerTabbedCard>
-          </div>
-        </div>
+        <DrawerTabbedCard
+          testId='audience-member-tabbed-card'
+          className='pt-0.5'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AudienceTab)}
+              options={AUDIENCE_TAB_OPTIONS}
+              ariaLabel='Audience member tabs'
+              distribution='intrinsic'
+            />
+          }
+          contentClassName='pt-2'
+        >
+          {activeTab === 'details' && (
+            <div data-testid='audience-details-card'>
+              <AudienceMemberDetails member={member} />
+            </div>
+          )}
+          {activeTab === 'activity' && (
+            <div data-testid='audience-activity-card'>
+              <AudienceMemberActivityFeed member={member} />
+            </div>
+          )}
+          {activeTab === 'sources' && (
+            <div data-testid='audience-sources-card'>
+              <AudienceMemberReferrers member={member} />
+            </div>
+          )}
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );
