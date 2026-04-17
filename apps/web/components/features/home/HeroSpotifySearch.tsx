@@ -16,6 +16,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
+import { InputAuraFrame } from './InputAuraFrame';
 
 const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
 
@@ -247,72 +248,78 @@ export function HeroSpotifySearch() {
       <label htmlFor='hero-spotify-search' className='sr-only'>
         Search Spotify artists or paste a link
       </label>
-      <div
-        className={cn(
-          'w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
-          'transition-all duration-slow',
-          shouldShowDropdown
-            ? 'border-focus ring-2 ring-focus/20'
-            : 'border-strong hover:border-focus'
-        )}
-      >
-        <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
-          <SocialIcon
-            platform='spotify'
-            className='w-3.5 h-3.5 text-brand-spotify'
-          />
-        </div>
-        <input
-          ref={inputRef}
-          id='hero-spotify-search'
-          type='text'
-          value={searchQuery}
-          onChange={handleSearchInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (searchQuery.trim().length >= 1 && !isSpotifyUrl(searchQuery)) {
-              setShowResults(true);
+      <InputAuraFrame>
+        <div
+          className={cn(
+            'relative w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
+            'transition-all duration-200',
+            shouldShowDropdown
+              ? 'border-focus ring-2 ring-focus/20'
+              : 'border-strong hover:border-focus'
+          )}
+        >
+          <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
+            <SocialIcon
+              platform='spotify'
+              className='w-3.5 h-3.5 text-brand-spotify'
+            />
+          </div>
+          <input
+            ref={inputRef}
+            id='hero-spotify-search'
+            type='text'
+            value={searchQuery}
+            onChange={handleSearchInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              if (
+                searchQuery.trim().length >= 1 &&
+                !isSpotifyUrl(searchQuery)
+              ) {
+                setShowResults(true);
+              }
+            }}
+            onBlur={e => {
+              // Keep dropdown open if focus moves to another element inside the container
+              if (containerRef.current?.contains(e.relatedTarget as Node))
+                return;
+              setShowResults(false);
+              setActiveIndex(-1);
+            }}
+            placeholder='Search your artist name or paste a Spotify link'
+            autoCapitalize='none'
+            autoCorrect='off'
+            autoComplete='off'
+            className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
+            role='combobox'
+            aria-expanded={shouldShowDropdown}
+            aria-controls='hero-spotify-results'
+            aria-activedescendant={
+              activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
             }
-          }}
-          onBlur={e => {
-            // Keep dropdown open if focus moves to another element inside the container
-            if (containerRef.current?.contains(e.relatedTarget as Node)) return;
-            setShowResults(false);
-            setActiveIndex(-1);
-          }}
-          placeholder='Search your artist name or paste a Spotify link'
-          autoCapitalize='none'
-          autoCorrect='off'
-          autoComplete='off'
-          className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
-          role='combobox'
-          aria-expanded={shouldShowDropdown}
-          aria-controls='hero-spotify-results'
-          aria-activedescendant={
-            activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
-          }
-        />
-        {showClaimButton ? (
-          <button
-            type='button'
-            disabled={claimButtonDisabled}
-            onClick={handleClaimArtist}
-            className={cn(
-              'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
-              claimButtonDisabled
-                ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
-                : 'bg-btn-primary text-btn-primary-foreground'
-            )}
-          >
-            {isLoading && (
-              <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
-            )}
-            Claim Artist
-          </button>
-        ) : (
-          <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
-        )}
-      </div>
+          />
+          {showClaimButton ? (
+            <button
+              type='button'
+              disabled={claimButtonDisabled}
+              onClick={handleClaimArtist}
+              className={cn(
+                'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
+                claimButtonDisabled
+                  ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
+                  : 'bg-btn-primary text-btn-primary-foreground'
+              )}
+            >
+              {isLoading && (
+                <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+              )}
+              Claim Artist
+            </button>
+          ) : (
+            <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
+          )}
+        </div>
+      </InputAuraFrame>
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
