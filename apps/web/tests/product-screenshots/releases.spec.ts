@@ -92,6 +92,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
       timeout: TIMEOUTS.CONTENT_VISIBLE,
     });
     await platformsTab.click();
+    await expect(platformsTab).toHaveAttribute('aria-selected', 'true');
     const tabbedCard = sidebar.getByTestId('release-tabbed-card');
     await expect(tabbedCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
     await waitForSettle(page);

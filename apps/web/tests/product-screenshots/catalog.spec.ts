@@ -226,8 +226,10 @@ async function prepareScenario(
     });
 
     if (scenario.interaction === 'open-first-release-dsps') {
-      await page.getByTestId('drawer-tab-dsps').click();
+      const dspsTab = page.getByTestId('drawer-tab-dsps');
+      await dspsTab.click();
       await waitForSettle(page);
+      await expect(dspsTab).toHaveAttribute('aria-selected', 'true');
     }
   }
 
