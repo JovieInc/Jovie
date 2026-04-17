@@ -33,7 +33,7 @@ export function ProfileViewportShell({
       <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:px-6 md:py-8'>
         <main className='relative flex w-full items-stretch'>
           <div
-            className='relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+            className='relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
             data-testid='profile-viewport-shell'
           >
             <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />

@@ -658,8 +658,8 @@ export const DashboardAudienceTableUnified = memo(
           id: 'copy-source-link',
           label: 'Copy Link',
           icon: Copy,
-          onClick: () => {
-            void handleSourceLinkAction('copy');
+          onClick: async () => {
+            await handleSourceLinkAction('copy');
           },
         },
         {
@@ -667,8 +667,8 @@ export const DashboardAudienceTableUnified = memo(
           id: 'open-source-link',
           label: 'Open Link',
           icon: ExternalLink,
-          onClick: () => {
-            void handleSourceLinkAction('open');
+          onClick: async () => {
+            await handleSourceLinkAction('open');
           },
         },
         {
@@ -676,8 +676,8 @@ export const DashboardAudienceTableUnified = memo(
           id: 'download-source-qr',
           label: 'Download QR Code',
           icon: Download,
-          onClick: () => {
-            void handleSourceLinkAction('download');
+          onClick: async () => {
+            await handleSourceLinkAction('download');
           },
         },
       ],

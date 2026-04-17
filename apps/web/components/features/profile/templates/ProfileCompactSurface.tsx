@@ -31,6 +31,7 @@ import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
@@ -95,6 +96,7 @@ interface ProfileCompactSurfaceProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
@@ -244,6 +246,7 @@ export function ProfileCompactSurface({
   showPayButton = true,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
@@ -554,6 +557,37 @@ export function ProfileCompactSurface({
                 </div>
                 <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
                   {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
+                </span>
+              </a>
+            ) : featuredPlaylistFallback ? (
+              <a
+                href={featuredPlaylistFallback.url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={actionCardClassName}
+                aria-label={`Open This Is playlist for ${artist.name}`}
+              >
+                {featuredPlaylistFallback.imageUrl ? (
+                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
+                    <ImageWithFallback
+                      src={featuredPlaylistFallback.imageUrl}
+                      alt={featuredPlaylistFallback.title}
+                      fill
+                      sizes='44px'
+                      className='object-cover'
+                      fallbackVariant='release'
+                    />
+                  </div>
+                ) : (
+                  <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
+                )}
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[13px] font-[560] text-white/88'>
+                    {featuredPlaylistFallback.title}
+                  </p>
+                </div>
+                <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
+                  Open Playlist
                 </span>
               </a>
             ) : mergedDSPs.length > 0 ? (

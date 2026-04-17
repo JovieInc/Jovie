@@ -49,13 +49,13 @@ export const profileQuietIconButtonClassName =
   'border-transparent bg-transparent text-white/72 shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_86%,transparent)] hover:text-white focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,transparent)] focus-visible:text-white active:bg-[var(--profile-pearl-bg-active)] active:text-white';
 
 export const subscriptionComposerSurfaceClassName =
-  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-200 ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
+  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_8px_20px_rgba(15,17,24,0.06)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-slow ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
 
 export const subscriptionComposerFocusClassName =
   'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_14px_30px_rgba(15,17,24,0.12)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
 
 export const subscriptionInputClassName =
-  'h-12 w-full bg-transparent px-2 text-[15px] font-[580] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 transition-[color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-0';
+  'h-12 w-full bg-transparent px-2 text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
 
 export const subscriptionPrimaryActionClassName = `${profilePrimaryPillClassName} shrink-0`;
 
@@ -436,7 +436,7 @@ export function SubscriptionSuccess({
   if (canCaptureName && (phase === 'ask' || phase === 'saving')) {
     return (
       <div
-        className={`space-y-3 transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+        className={`space-y-3 transition-all duration-slower ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
       >
         <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
           <CheckCircle2
@@ -447,7 +447,7 @@ export function SubscriptionSuccess({
         </p>
 
         <p
-          className='text-center text-[13px] font-[560] tracking-[-0.015em] text-primary-token/88'
+          className='text-center text-[13px] font-[590] tracking-[-0.015em] text-primary-token/88'
           style={noFontSynthesisStyle}
         >
           What should we call you?
@@ -499,7 +499,7 @@ export function SubscriptionSuccess({
   // Personalized success (name was saved)
   if (phase === 'saved' && savedName) {
     return (
-      <div className='space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300'>
+      <div className='space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-slower'>
         <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
           <CheckCircle2
             className='h-4 w-4 shrink-0 text-green-600 dark:text-green-400'
@@ -523,7 +523,7 @@ export function SubscriptionSuccess({
   // Default success (skipped or no name capture)
   return (
     <div
-      className={`space-y-3 ${phase === 'skipped' ? 'animate-in fade-in duration-300' : ''}`}
+      className={`space-y-3 ${phase === 'skipped' ? 'animate-in fade-in duration-slower' : ''}`}
     >
       <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
         <CheckCircle2

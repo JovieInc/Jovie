@@ -40,7 +40,7 @@ function buildCreateReleasePrompt(title: string | null): string {
 }
 
 function submitChatPrompt(prompt: string): void {
-  window.dispatchEvent(
+  globalThis.dispatchEvent(
     new CustomEvent('jovie-chat-submit-prompt', { detail: { prompt } })
   );
 }

@@ -10,6 +10,9 @@ const hoisted = vi.hoisted(() => {
   const processMusicFetchEnrichmentJobMock = vi
     .fn()
     .mockResolvedValue(undefined);
+  const refreshFeaturedPlaylistFallbackCandidateMock = vi
+    .fn()
+    .mockResolvedValue(undefined);
   const captureErrorMock = vi.fn();
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
@@ -61,6 +64,7 @@ const hoisted = vi.hoisted(() => {
     noStoreMock,
     processDspArtistDiscoveryJobStandaloneMock,
     processMusicFetchEnrichmentJobMock,
+    refreshFeaturedPlaylistFallbackCandidateMock,
     readPendingClaimContextMock,
     revalidatePathMock,
     revalidateTagMock,
@@ -158,6 +162,11 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 vi.mock('@/lib/discography/spotify-import', () => ({
   syncReleasesFromSpotify: hoisted.syncReleasesFromSpotifyMock,
+}));
+
+vi.mock('@/lib/profile/featured-playlist-fallback', () => ({
+  refreshFeaturedPlaylistFallbackCandidate:
+    hoisted.refreshFeaturedPlaylistFallbackCandidateMock,
 }));
 
 vi.mock('@/lib/dsp-enrichment/jobs', () => ({
@@ -258,6 +267,14 @@ describe('connectOnboardingSpotifyArtist', () => {
       hoisted.processDspArtistDiscoveryJobStandaloneMock
     ).toHaveBeenCalledOnce();
     expect(hoisted.processMusicFetchEnrichmentJobMock).toHaveBeenCalledOnce();
+    expect(
+      hoisted.refreshFeaturedPlaylistFallbackCandidateMock
+    ).toHaveBeenCalledWith({
+      artistName: 'Artist Name',
+      artistSpotifyId: 'artist_spotify_id',
+      profileId: 'profile_123',
+      usernameNormalized: 'artist',
+    });
     expect(hoisted.updateSetArgs[1]).toMatchObject({
       settings: expect.objectContaining({
         spotifyArtistName: 'Artist Name',
