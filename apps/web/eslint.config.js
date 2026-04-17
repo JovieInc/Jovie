@@ -66,7 +66,8 @@ const baseConfig = {
           },
           {
             name: '@/components/atoms/LinearButton',
-            message: "Use Button from '@jovie/ui' instead of LinearButton.",
+            message:
+              "LinearButton was a link component. Use <Link> from 'next/link' or <Button asChild> with a Link child instead.",
           },
           {
             name: '@/components/atoms/Sheet',
@@ -133,6 +134,15 @@ const baseConfig = {
               'components/atoms/Button',
             ],
             message: "Use Button from '@jovie/ui' instead of local atoms.",
+          },
+          {
+            group: [
+              '../components/atoms/LinearButton',
+              './components/atoms/LinearButton',
+              'components/atoms/LinearButton',
+            ],
+            message:
+              "LinearButton was a link component. Use <Link> from 'next/link' or <Button asChild> with a Link child instead.",
           },
         ],
       },
