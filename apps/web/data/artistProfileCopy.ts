@@ -320,7 +320,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
     restingScreenshotAlt:
       'Jovie artist profile showing the default profile view before a mode is opened.',
-    restingScreenshotSrc: '/product-screenshots/profile-phone.png',
+    restingScreenshotSrc:
+      '/product-screenshots/tim-white-profile-listen-phone.png',
     modes: [
       {
         id: 'listen',

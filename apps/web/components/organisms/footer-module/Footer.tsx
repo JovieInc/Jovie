@@ -23,22 +23,9 @@ const FOOTER_COLUMNS = [
     id: 'product',
     heading: 'Product',
     links: [
-      { href: '/#release', label: 'Smart Links' },
-      { href: '/#profile', label: 'Artist Profile' },
-      { href: '/#release', label: 'Release Automation' },
-      { href: '/#audience', label: 'Audience Intelligence' },
-      { href: '/#ai', label: 'AI Assistant' },
+      { href: '/artist-profiles', label: 'Artist Profiles' },
       { href: '/pricing', label: 'Pricing' },
-    ],
-  },
-  {
-    id: 'features',
-    heading: 'Features',
-    links: [
-      { href: '/#release', label: 'Analytics' },
-      { href: '/#profile', label: 'Fan Capture' },
-      { href: '/#profile', label: 'Tipping' },
-      { href: '/#profile', label: 'Tour Dates' },
+      { href: '/support', label: 'Support' },
     ],
   },
   {
@@ -50,16 +37,19 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
-    id: 'resources',
-    heading: 'Resources',
-    links: [{ href: '/support', label: 'Support' }],
+    id: 'account',
+    heading: 'Account',
+    links: [
+      { href: '/signin', label: 'Log in' },
+      { href: '/signup', label: 'Get started' },
+    ],
   },
   {
-    id: 'connect',
-    heading: 'Connect',
+    id: 'legal',
+    heading: 'Legal',
     links: [
-      { href: 'https://x.com/jovieapp', label: 'X (Twitter)' },
-      { href: 'https://instagram.com/jovieapp', label: 'Instagram' },
+      { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+      { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
     ],
   },
 ] as const;
@@ -151,26 +141,23 @@ export function Footer({
         <div
           className={cn(
             containerSize === 'homepage'
-              ? 'px-5 sm:px-6 lg:px-[77px]'
+              ? 'px-5 sm:px-6 lg:px-0'
               : 'mx-auto px-6 lg:px-8',
-            'pt-14 pb-14',
+            'pt-16 pb-14',
             maxWidthClass
           )}
         >
-          <div className='flex flex-col items-center gap-12 lg:gap-16 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:items-start'>
-            <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
+          <div className='grid gap-12 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-20'>
+            <div className='flex flex-col items-start text-left'>
               <FooterBranding
                 variant='linear'
                 showCTA={false}
                 mark={brandingMark}
-                className={cn(
-                  'items-center sm:items-start',
-                  brandingMark === 'icon' ? 'sm:justify-start' : ''
-                )}
+                className='items-start'
               />
             </div>
 
-            <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-3 sm:gap-8 sm:text-left lg:grid-cols-5 lg:gap-10'>
+            <div className='grid w-full grid-cols-2 gap-x-10 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-12 lg:gap-x-16'>
               {FOOTER_COLUMNS.map(col => (
                 <nav key={col.id} aria-labelledby={`footer-${col.id}-heading`}>
                   <h2
@@ -180,7 +167,7 @@ export function Footer({
                   >
                     {col.heading}
                   </h2>
-                  <ul className='flex flex-col gap-0.5'>
+                  <ul className='flex flex-col gap-2.5'>
                     {col.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
                         <Link
@@ -202,8 +189,8 @@ export function Footer({
             </div>
           </div>
 
-          <div className='mt-16'>
-            <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
+          <div className='mt-14'>
+            <div className='flex flex-col items-start gap-4 border-t border-white/8 pt-6 sm:flex-row sm:items-center sm:justify-between'>
               <div className='flex items-center gap-4'>
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
@@ -253,7 +240,7 @@ export function Footer({
       <div
         className={cn(
           containerSize === 'homepage'
-            ? 'px-5 sm:px-6 lg:px-[77px]'
+            ? 'px-5 sm:px-6 lg:px-0'
             : 'mx-auto px-6 lg:px-8',
           'flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
           CONTAINER_SIZES[containerSize]

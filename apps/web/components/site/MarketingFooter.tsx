@@ -1,46 +1,36 @@
-import Link from 'next/link';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { PUBLIC_SHELL_FOOTER_LINKS } from './public-shell.constants';
+'use client';
 
-export function MarketingFooter() {
+import { usePathname } from 'next/navigation';
+import { Footer as FooterOrganism } from '@/components/organisms/footer-module';
+import { APP_ROUTES } from '@/constants/routes';
+
+interface MarketingFooterProps {
+  readonly variant?: 'auto' | 'expanded' | 'minimal';
+}
+
+export function MarketingFooter({
+  variant = 'auto',
+}: Readonly<MarketingFooterProps>) {
+  const pathname = usePathname();
+  const resolvedVariant =
+    variant === 'auto'
+      ? pathname === APP_ROUTES.PRICING
+        ? 'regular'
+        : 'minimal'
+      : variant === 'expanded'
+        ? 'regular'
+        : 'minimal';
+
   return (
-    <footer style={{ backgroundColor: 'var(--linear-bg-footer)' }}>
-      <div
-        aria-hidden='true'
-        className='h-px'
-        style={{
-          background:
-            'linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)',
-        }}
-      />
-      <div className='mx-auto flex w-full max-w-[var(--linear-content-max)] flex-col items-center gap-5 px-5 py-8 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left lg:px-0'>
-        <Link
-          href='/'
-          prefetch={false}
-          className='inline-flex items-center gap-2 rounded-md p-1 -m-1 focus-ring-themed'
-        >
-          <BrandLogo size={20} tone='white' />
-          <span
-            className='text-[12px] font-medium tracking-[-0.01em]'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Jovie
-          </span>
-        </Link>
-        <div className='flex items-center gap-4'>
-          {PUBLIC_SHELL_FOOTER_LINKS.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              prefetch={false}
-              className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-    </footer>
+    <FooterOrganism
+      variant={resolvedVariant}
+      brandingMark='icon'
+      containerSize='homepage'
+      showThemeToggle={false}
+      links={[
+        { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+        { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+      ]}
+    />
   );
 }

@@ -108,7 +108,7 @@ function HeroProfilePanel() {
   return (
     <div data-testid='homepage-hero-profile-card'>
       <MarketingSurfaceCard
-        src='/product-screenshots/profile-phone.png'
+        src='/product-screenshots/tim-white-profile-listen-phone.png'
         alt='Mobile artist profile showing Tim White identity and fan CTA'
         aspectRatio='9 / 16'
         objectPosition='center top'

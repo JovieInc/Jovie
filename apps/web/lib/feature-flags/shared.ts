@@ -95,6 +95,8 @@ export const FEATURE_FLAGS = {
 
   /** Homepage sections below the hero (chapters, notify, bento, spec, CTA) */
   SHOW_HOMEPAGE_SECTIONS: false,
+  /** Social proof section on staged homepage v2 (`/new`). */
+  SHOW_HOMEPAGE_V2_SOCIAL_PROOF: false,
 
   /** Filter and display toolbar buttons on the releases page. */
   SHOW_RELEASE_TOOLBAR_EXTRAS: false,
@@ -135,6 +137,7 @@ export const CODE_FLAG_KEYS = {
   SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
   SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
   SHOW_HOMEPAGE_SECTIONS: 'code:SHOW_HOMEPAGE_SECTIONS',
+  SHOW_HOMEPAGE_V2_SOCIAL_PROOF: 'code:SHOW_HOMEPAGE_V2_SOCIAL_PROOF',
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
