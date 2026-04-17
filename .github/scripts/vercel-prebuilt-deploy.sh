@@ -16,7 +16,7 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
 fi
 
 parse_deployment_url() {
-  printf '%s\n' "$1" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1
+  printf '%s\n' "$1" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1 || true
 }
 
 write_deployment_url() {
