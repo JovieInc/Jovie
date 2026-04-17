@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import type { SmartLinkCreditGroup as CreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
@@ -30,6 +31,8 @@ import {
   DrawerMediaThumb,
   DrawerSplitButton,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
+  DrawerTabs,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -59,12 +62,15 @@ import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
+import { fetchReleaseCreditsAction } from './release-credits-action';
 import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = 'overflow-hidden';
 const PLATFORM_RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
+
+type ReleaseSidebarTab = 'details' | 'dsps' | 'tracks';
 
 function formatCooldown(remainingMs: number): string {
   if (remainingMs <= 0) return '';
@@ -264,6 +270,66 @@ function ReleaseArtworkDownloadsSetting({
   );
 }
 
+function ReleaseCreditsInspectorCard({
+  releaseId,
+}: {
+  readonly releaseId: string;
+}) {
+  const [creditsGroups, setCreditsGroups] = useState<CreditGroup[] | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCreditsGroups(null);
+    setIsLoading(true);
+
+    fetchReleaseCreditsAction(releaseId)
+      .then(groups => {
+        if (cancelled) return;
+        setCreditsGroups(groups);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCreditsGroups(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [releaseId]);
+
+  const hasVisibleCredits =
+    creditsGroups?.some(
+      group => group.role !== 'main_artist' && group.entries.length > 0
+    ) ?? false;
+
+  if (isLoading || !hasVisibleCredits) {
+    return null;
+  }
+
+  return (
+    <DrawerInspectorCard
+      title='Credits'
+      defaultOpen={false}
+      data-testid='release-credits-card-stack'
+    >
+      <ReleaseCreditsSection
+        releaseId={releaseId}
+        variant='flat'
+        creditsGroups={creditsGroups}
+      />
+    </DrawerInspectorCard>
+  );
+}
+
 export function ReleaseSidebar({
   release,
   mode,
@@ -335,6 +401,7 @@ export function ReleaseSidebar({
   const { canAccessTasksWorkspace, isLoading: isTasksWorkspaceGateLoading } =
     usePlanGate();
   const [showTasksUpgrade, setShowTasksUpgrade] = useState(true);
+  const [activeTab, setActiveTab] = useState<ReleaseSidebarTab>('details');
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
   const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -346,6 +413,7 @@ export function ReleaseSidebar({
     setPlatformRescanCooldownEnd(0);
     setPlatformRescanRemainingMs(0);
     setShowTasksUpgrade(true);
+    setActiveTab('details');
   }, [release?.id]);
 
   useEffect(() => {
@@ -507,6 +575,28 @@ export function ReleaseSidebar({
   const isPlatformRescanDisabled =
     !onRescanIsrc || isRescanningIsrc || isPlatformRescanCoolingDown;
 
+  const releaseTabOptions = useMemo(() => {
+    const options: Array<{ value: ReleaseSidebarTab; label: string }> = [
+      { value: 'details' as const, label: 'Details' },
+      { value: 'dsps' as const, label: 'DSPs' },
+    ];
+
+    if ((release?.totalTracks ?? 0) > 0) {
+      options.push({ value: 'tracks' as const, label: 'Tracks' });
+    }
+
+    return options;
+  }, [release?.totalTracks]);
+
+  useEffect(() => {
+    if (
+      activeTab === 'tracks' &&
+      !releaseTabOptions.some(option => option.value === 'tracks')
+    ) {
+      setActiveTab('details');
+    }
+  }, [activeTab, releaseTabOptions]);
+
   const handleOpenPlatformAddForm = useCallback(() => {
     if (!isEditable || availablePlatformProviders.length === 0) {
       return;
@@ -630,57 +720,66 @@ export function ReleaseSidebar({
     >
       {release && (
         <DrawerInspectorStack data-testid='release-inspector-stack'>
-          <ReleaseMetadata
-            release={release}
-            isEditable={isEditable}
-            variant='card'
-            onSaveMetadata={readOnly ? undefined : onSaveMetadata}
-            onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
-            onCanvasStatusChange={
-              canEditCanvasStatus ? handleCanvasStatusChange : undefined
+          <DrawerTabbedCard
+            testId='release-tabbed-card'
+            tabs={
+              <DrawerTabs
+                value={activeTab}
+                onValueChange={value =>
+                  setActiveTab(value as ReleaseSidebarTab)
+                }
+                options={releaseTabOptions}
+                ariaLabel='Release sidebar tabs'
+                overflowMode='scroll'
+                distribution='intrinsic'
+              />
             }
-          />
-
-          <DrawerInspectorCard
-            title='DSPs'
-            actions={platformCardActions}
-            data-testid='release-platforms-card'
+            controls={activeTab === 'dsps' ? platformCardActions : undefined}
+            contentClassName='pt-2'
           >
-            <ReleaseDspLinks
-              release={release}
-              providerConfig={providerConfig}
-              isEditable={isEditable}
-              isAddingLink={isAddingLink}
-              newLinkUrl={newLinkUrl}
-              selectedProvider={selectedProvider}
-              isAddingDspLink={isAddingDspLink}
-              isRemovingDspLink={isRemovingDspLink}
-              onSetIsAddingLink={setIsAddingLink}
-              onSetNewLinkUrl={setNewLinkUrl}
-              onSetSelectedProvider={setSelectedProvider}
-              onAddLink={handleAddLink}
-              onRemoveLink={handleRemoveLink}
-              onNewLinkKeyDown={handleNewLinkKeyDown}
-              showHeading={false}
-            />
-          </DrawerInspectorCard>
+            {activeTab === 'details' ? (
+              <ReleaseMetadata
+                release={release}
+                isEditable={isEditable}
+                variant='flat'
+                onSaveMetadata={readOnly ? undefined : onSaveMetadata}
+                onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
+                onCanvasStatusChange={
+                  canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                }
+              />
+            ) : null}
 
-          {release.totalTracks > 0 ? (
-            <DrawerInspectorCard
-              title='Tracks'
-              defaultOpen={release.totalTracks <= 5}
-              lazyMount={release.totalTracks > 5}
-              data-testid='release-tracks-card'
-            >
+            {activeTab === 'dsps' ? (
+              <ReleaseDspLinks
+                release={release}
+                providerConfig={providerConfig}
+                isEditable={isEditable}
+                isAddingLink={isAddingLink}
+                newLinkUrl={newLinkUrl}
+                selectedProvider={selectedProvider}
+                isAddingDspLink={isAddingDspLink}
+                isRemovingDspLink={isRemovingDspLink}
+                onSetIsAddingLink={setIsAddingLink}
+                onSetNewLinkUrl={setNewLinkUrl}
+                onSetSelectedProvider={setSelectedProvider}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                onNewLinkKeyDown={handleNewLinkKeyDown}
+                showHeading={false}
+              />
+            ) : null}
+
+            {activeTab === 'tracks' ? (
               <ReleaseTrackList
                 release={release}
                 tracksOverride={tracksOverride}
               />
-            </DrawerInspectorCard>
-          ) : null}
+            ) : null}
+          </DrawerTabbedCard>
 
           {showCredits ? (
-            <ReleaseCreditsSection releaseId={release.id} />
+            <ReleaseCreditsInspectorCard releaseId={release.id} />
           ) : null}
 
           {shouldRenderTasks ? (

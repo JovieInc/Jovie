@@ -17,19 +17,29 @@ const VALUE_CLASSNAME =
   'text-[12px] font-[460] leading-[16px] text-secondary-token';
 const ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 
-interface ReleaseCreditsSectionProps {
+export interface ReleaseCreditsSectionProps {
   readonly releaseId: string;
   readonly variant?: 'card' | 'flat';
+  readonly creditsGroups?: CreditGroup[] | null;
 }
 
 export function ReleaseCreditsSection({
   releaseId,
   variant = 'card',
+  creditsGroups,
 }: ReleaseCreditsSectionProps) {
-  const [credits, setCredits] = useState<CreditGroup[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState<CreditGroup[] | null>(
+    creditsGroups ?? null
+  );
+  const [loading, setLoading] = useState(creditsGroups === undefined);
 
   useEffect(() => {
+    if (creditsGroups !== undefined) {
+      setCredits(creditsGroups);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     fetchReleaseCreditsAction(releaseId)
@@ -45,7 +55,7 @@ export function ReleaseCreditsSection({
     return () => {
       cancelled = true;
     };
-  }, [releaseId]);
+  }, [creditsGroups, releaseId]);
 
   // Don't render the card if still loading or no credits
   if (loading || !credits || credits.length === 0) return null;
@@ -56,58 +66,55 @@ export function ReleaseCreditsSection({
   );
   if (visibleCredits.length === 0) return null;
 
+  const content = (
+    <div className='space-y-0.5' data-testid='release-credits-content'>
+      {visibleCredits.map(group => (
+        <DrawerPropertyRow
+          key={group.role}
+          label={group.label}
+          labelWidth={90}
+          size='sm'
+          className={ROW_CLASSNAME}
+          labelClassName={LABEL_CLASSNAME}
+          valueClassName={VALUE_CLASSNAME}
+          value={
+            <span>
+              {group.entries.map((entry, i) => (
+                <span key={`${entry.role}-${entry.artistId}`}>
+                  {i > 0 && ', '}
+                  {entry.handle ? (
+                    <Link
+                      href={`/${entry.handle}`}
+                      className='hover:text-primary-token transition-colors'
+                    >
+                      {entry.name}
+                    </Link>
+                  ) : (
+                    entry.name
+                  )}
+                </span>
+              ))}
+            </span>
+          }
+        />
+      ))}
+    </div>
+  );
+
+  if (variant === 'flat') {
+    return content;
+  }
+
   return (
     <DrawerSurfaceCard
-      variant={variant}
-      className={cn(
-        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
-        'overflow-hidden'
-      )}
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
       testId='release-credits-card'
     >
-      <div
-        className={cn(
-          variant === 'card'
-            ? 'p-3'
-            : 'border-t border-(--linear-app-frame-seam) px-3 pb-3 pt-2.5'
-        )}
-      >
-        {variant === 'card' ? (
-          <p className='mb-2 text-[11px] font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
-            Credits
-          </p>
-        ) : null}
-        <div className='space-y-0.5'>
-          {visibleCredits.map(group => (
-            <DrawerPropertyRow
-              key={group.role}
-              label={group.label}
-              size='sm'
-              className={ROW_CLASSNAME}
-              labelClassName={LABEL_CLASSNAME}
-              valueClassName={VALUE_CLASSNAME}
-              value={
-                <span>
-                  {group.entries.map((entry, i) => (
-                    <span key={`${entry.role}-${entry.artistId}`}>
-                      {i > 0 && ', '}
-                      {entry.handle ? (
-                        <Link
-                          href={`/${entry.handle}`}
-                          className='hover:text-primary-token transition-colors'
-                        >
-                          {entry.name}
-                        </Link>
-                      ) : (
-                        entry.name
-                      )}
-                    </span>
-                  ))}
-                </span>
-              }
-            />
-          ))}
-        </div>
+      <div className='p-3'>
+        <p className='mb-2 text-[11px] font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
+          Credits
+        </p>
+        {content}
       </div>
     </DrawerSurfaceCard>
   );
