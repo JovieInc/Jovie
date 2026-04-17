@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { OVERNIGHT_WEB_ROOT } from './paths';
@@ -59,6 +60,30 @@ async function waitForServer(
   );
 }
 
+export function pipeServerLogs(
+  server: ReturnType<typeof spawn>,
+  stdoutPath: string,
+  stderrPath: string
+) {
+  const stdoutStream = createWriteStream(stdoutPath, { flags: 'a' });
+  const stderrStream = createWriteStream(stderrPath, { flags: 'a' });
+
+  server.stdout?.pipe(stdoutStream);
+  server.stderr?.pipe(stderrStream);
+
+  const closeStreams = () => {
+    stdoutStream.end();
+    stderrStream.end();
+  };
+
+  server.once('close', closeStreams);
+  server.once('error', closeStreams);
+
+  return {
+    close: closeStreams,
+  };
+}
+
 export async function startManagedDevServer(
   runDir: string
 ): Promise<ManagedServer> {
@@ -100,12 +125,7 @@ export async function startManagedDevServer(
     }
   );
 
-  server.stdout?.on('data', async chunk => {
-    await writeFile(stdoutPath, chunk, { flag: 'a' });
-  });
-  server.stderr?.on('data', async chunk => {
-    await writeFile(stderrPath, chunk, { flag: 'a' });
-  });
+  const logPipes = pipeServerLogs(server, stdoutPath, stderrPath);
 
   await waitForServer(baseUrl, server);
 
@@ -124,6 +144,8 @@ export async function startManagedDevServer(
       if (server.exitCode === null) {
         server.kill('SIGKILL');
       }
+
+      logPipes.close();
     },
   };
 }
