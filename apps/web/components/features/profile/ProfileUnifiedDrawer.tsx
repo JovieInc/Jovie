@@ -131,7 +131,7 @@ interface ProfileUnifiedDrawerProps {
 }
 
 const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
+  'flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 text-left text-[14px] font-[450] text-white/88 transition-colors duration-normal active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -162,7 +162,7 @@ function ContactList({
         return (
           <div
             key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[14px] px-4 py-3'
+            className='flex items-center justify-between gap-4 rounded-[var(--profile-action-radius)] px-4 py-3'
           >
             {primaryHref ? (
               <a
@@ -170,7 +170,7 @@ function ContactList({
                 className='flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left'
                 onClick={() => trackAction(primary, contact)}
               >
-                <span className='text-[14px] font-[470] text-white/88'>
+                <span className='text-[14px] font-[450] text-white/88'>
                   {contact.roleLabel}
                 </span>
                 {contact.secondaryLabel ? (
@@ -192,7 +192,7 @@ function ContactList({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/80'
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-normal hover:bg-white/[0.08] hover:text-white/80'
                     aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
                     onClick={() => trackAction(channel, contact)}
                   >
@@ -621,10 +621,10 @@ export function ProfileUnifiedDrawer({
               {NOTIFICATION_CONTENT_TYPES.map(pref => (
                 <div
                   key={pref.key}
-                  className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
+                  className='flex w-full items-center justify-between rounded-[var(--profile-action-radius)] px-4 py-3 text-left'
                 >
                   <div className='flex flex-col gap-0.5'>
-                    <span className='text-[14px] font-[470] text-white/88'>
+                    <span className='text-[14px] font-[450] text-white/88'>
                       {pref.label}
                     </span>
                     <span className='text-[11px] font-[400] text-white/40'>
@@ -645,7 +645,7 @@ export function ProfileUnifiedDrawer({
               <button
                 type='button'
                 role='menuitem'
-                className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
+                className='flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 text-left text-[14px] font-[450] text-red-400/85 transition-colors duration-normal active:bg-white/[0.06]'
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
@@ -729,7 +729,7 @@ export function ProfileUnifiedDrawer({
                   paymentLabel='Venmo'
                 />
               ) : (
-                <div className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
+                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
                   <p className='text-sm font-[590] text-white/88'>
                     Payments not available yet
                   </p>

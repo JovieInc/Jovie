@@ -37,7 +37,7 @@ interface ProfileMenuDrawerProps {
 }
 
 const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
+  'flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 text-left text-[14px] font-[450] text-white/88 transition-colors duration-normal active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
 export function ProfileMenuDrawer({
@@ -172,10 +172,10 @@ export function ProfileMenuDrawer({
           {NOTIFICATION_CONTENT_TYPES.map(pref => (
             <div
               key={pref.key}
-              className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
+              className='flex w-full items-center justify-between rounded-[var(--profile-action-radius)] px-4 py-3 text-left'
             >
               <div className='flex flex-col gap-0.5'>
-                <span className='text-[14px] font-[470] text-white/88'>
+                <span className='text-[14px] font-[450] text-white/88'>
                   {pref.label}
                 </span>
                 <span className='text-[11px] font-[400] text-white/40'>
@@ -195,7 +195,7 @@ export function ProfileMenuDrawer({
 
           <button
             type='button'
-            className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
+            className='flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 text-left text-[14px] font-[450] text-red-400/85 transition-colors duration-normal active:bg-white/[0.06]'
             onClick={onUnsubscribe}
             disabled={isUnsubscribing}
           >

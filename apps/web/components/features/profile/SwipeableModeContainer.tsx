@@ -108,7 +108,7 @@ function ProfilePane({
         <button
           type='button'
           onClick={onSubscribeClick}
-          className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0'
+          className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-normal hover:border-subtle hover:bg-surface-0'
         >
           Get notified
         </button>

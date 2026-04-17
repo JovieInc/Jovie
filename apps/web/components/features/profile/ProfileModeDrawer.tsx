@@ -146,7 +146,7 @@ function ProfileModeDrawerContactList({
         return (
           <div
             key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[26px] border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-white/[0.05]'
+            className='flex items-center justify-between gap-4 rounded-[var(--profile-inner-radius)] border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-[background-color,border-color] duration-normal ease-out hover:bg-white/[0.05]'
             data-testid='contact-drawer-item'
           >
             {primaryHref ? (
