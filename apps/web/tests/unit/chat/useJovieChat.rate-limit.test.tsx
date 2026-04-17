@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({
 const sendMessageMock = vi.fn();
 const maybeExecuteMock = vi.fn();
 const mutateAsyncMock = vi.fn();
+const addMessagesMutateMock = vi.fn();
 const setMessagesMock = vi.fn();
 let onRejectHandler: (() => void) | undefined;
 let mockStatus: 'ready' | 'streaming' = 'ready';
@@ -23,7 +24,7 @@ let currentTransportConversationId: string | null = null;
 let mockMessages: Array<{
   id: string;
   role: string;
-  parts: Array<{ type: 'text'; text: string }>;
+  parts: Array<Record<string, unknown>>;
   createdAt: Date;
 }> = [];
 let mockConversationData:
@@ -92,7 +93,7 @@ vi.mock('@/lib/queries/useChatConversationQuery', () => ({
 
 vi.mock('@/lib/queries/useChatMutations', () => ({
   useAddMessagesMutation: () => ({
-    mutate: vi.fn(),
+    mutate: addMessagesMutateMock,
   }),
   useCreateConversationMutation: () => ({
     mutateAsync: mutateAsyncMock,
@@ -105,6 +106,7 @@ describe('useJovieChat', () => {
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
     mutateAsyncMock.mockReset();
+    addMessagesMutateMock.mockReset();
     setMessagesMock.mockReset();
     mutateAsyncMock.mockResolvedValue({
       conversation: { id: 'conv_123' },
@@ -203,5 +205,124 @@ describe('useJovieChat', () => {
       conversationIdAtSend: 'conv_123',
       payload: { text: 'Hello Jovie' },
     });
+  });
+
+  it('persists tool-only assistant turns and clears submission state on success', async () => {
+    let onSuccess:
+      | ((data: { messages: unknown[]; titlePending?: boolean }) => void)
+      | undefined;
+
+    addMessagesMutateMock.mockImplementation(
+      (
+        _variables: unknown,
+        options?: {
+          onSuccess?: (data: {
+            messages: unknown[];
+            titlePending?: boolean;
+          }) => void;
+        }
+      ) => {
+        onSuccess = options?.onSuccess;
+      }
+    );
+
+    const { result, rerender } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_123' })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage('Generate album art');
+    });
+
+    expect(result.current.isSubmitting).toBe(true);
+    expect(addMessagesMutateMock).not.toHaveBeenCalled();
+
+    mockMessages = [
+      {
+        id: 'assistant_1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'generateAlbumArt',
+            toolCallId: 'tool_album',
+            state: 'output-available',
+            input: { prompt: 'Generate album art' },
+            output: {
+              success: true,
+              state: 'generated',
+              generationId: 'generation-1',
+              releaseTitle: 'Neon Nights',
+              releaseId: 'release-1',
+              hasExistingArtwork: false,
+              candidates: [
+                {
+                  id: 'candidate-1',
+                  previewUrl: 'https://example.com/cover-1.jpg',
+                  styleLabel: 'Cinematic',
+                },
+              ],
+            },
+          },
+        ],
+        createdAt: new Date('2026-01-01T00:00:05.000Z'),
+      },
+    ] as typeof mockMessages;
+
+    rerender();
+
+    expect(addMessagesMutateMock).toHaveBeenCalledWith(
+      {
+        conversationId: 'conv_123',
+        messages: [
+          { role: 'user', content: 'Generate album art' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              expect.objectContaining({
+                toolCallId: 'tool_album',
+                toolName: 'generateAlbumArt',
+                state: 'succeeded',
+              }),
+            ],
+          },
+        ],
+      },
+      expect.any(Object)
+    );
+    expect(result.current.isSubmitting).toBe(true);
+
+    act(() => {
+      onSuccess?.({ messages: [], titlePending: false });
+    });
+
+    expect(result.current.isSubmitting).toBe(false);
+  });
+
+  it('does not persist until an assistant response exists', async () => {
+    const { result, rerender } = renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_123' })
+    );
+
+    await act(async () => {
+      await result.current.submitMessage('Generate album art');
+    });
+
+    expect(addMessagesMutateMock).not.toHaveBeenCalled();
+
+    mockMessages = [
+      {
+        id: 'user_1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Generate album art' }],
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ];
+
+    rerender();
+
+    expect(addMessagesMutateMock).not.toHaveBeenCalled();
+    expect(result.current.isSubmitting).toBe(true);
   });
 });
