@@ -65,6 +65,10 @@ const baseConfig = {
             message: "Use Button from '@jovie/ui' instead of local atoms.",
           },
           {
+            name: '@/components/atoms/LinearButton',
+            message: "Use Button from '@jovie/ui' instead of LinearButton.",
+          },
+          {
             name: '@/components/atoms/Sheet',
             message:
               "Use Sheet components from '@jovie/ui' instead of local atoms.",
