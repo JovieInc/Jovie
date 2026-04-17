@@ -41,4 +41,10 @@ describe('filesystem-paths', () => {
       /apps\/web\/content\/legal\/cookies\.md$/
     );
   });
+
+  it('falls back safely when existsSync is unavailable', () => {
+    expect(resolveAppWebRoot('/workspace/jovie', undefined)).toMatch(
+      /apps\/web$/
+    );
+  });
 });

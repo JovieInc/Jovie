@@ -1,9 +1,11 @@
-import { existsSync } from 'node:fs';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 
 const LIB_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const safeExistsSync: (candidatePath: string) => boolean =
+  typeof fs.existsSync === 'function' ? fs.existsSync : () => false;
 
 function dedupeCandidates(candidates: readonly string[]): string[] {
   return [...new Set(candidates.map(candidate => path.resolve(candidate)))];
@@ -31,7 +33,7 @@ function isMonorepoRoot(
 
 export function resolveAppWebRoot(
   cwd = process.cwd(),
-  exists: (candidatePath: string) => boolean = existsSync
+  exists: (candidatePath: string) => boolean = safeExistsSync
 ): string {
   const candidates = dedupeCandidates([
     path.resolve(LIB_DIRECTORY, '..'),
@@ -49,7 +51,7 @@ export function resolveAppWebRoot(
 
 export function resolveMonorepoRoot(
   cwd = process.cwd(),
-  exists: (candidatePath: string) => boolean = existsSync
+  exists: (candidatePath: string) => boolean = safeExistsSync
 ): string {
   const appWebRoot = resolveAppWebRoot(cwd, exists);
   const candidates = dedupeCandidates([
