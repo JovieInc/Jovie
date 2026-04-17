@@ -34,32 +34,40 @@ interface PlaylistFallbackMutationOptions {
   ) => Record<string, unknown>;
 }
 
-export async function getPlaylistFallbackRequestContext(
-  request: Request,
-  params: Promise<{ id: string }>
-): Promise<PlaylistFallbackRequestContext | NextResponse> {
-  const { id: playlistId } = await params;
+type OwnedPlaylistFallbackProfile = Pick<
+  PlaylistFallbackRequestContext,
+  'profileId' | 'settings' | 'usernameNormalized'
+>;
+
+type InvalidRequestDetails = ReturnType<
+  z.ZodError<{ profileId: string }>['flatten']
+>;
+
+function invalidRequestResponse(details: InvalidRequestDetails) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Invalid request',
+      details,
+    },
+    { status: 400 }
+  );
+}
+
+async function getOwnedPlaylistFallbackProfile(
+  request: Request
+): Promise<OwnedPlaylistFallbackProfile | NextResponse> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await request.json();
-  const parsed = requestSchema.safeParse(body);
+  const parsed = requestSchema.safeParse(await request.json());
 
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Invalid request',
-        details: parsed.error.flatten(),
-      },
-      { status: 400 }
-    );
+    return invalidRequestResponse(parsed.error.flatten());
   }
-
-  const { profileId } = parsed.data;
 
   const [profile] = await db
     .select({
@@ -70,7 +78,7 @@ export async function getPlaylistFallbackRequestContext(
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.id, profileId))
+    .where(eq(creatorProfiles.id, parsed.data.profileId))
     .limit(1);
 
   if (!profile || profile.clerkId !== userId) {
@@ -80,7 +88,25 @@ export async function getPlaylistFallbackRequestContext(
     );
   }
 
-  const settings = (profile.settings ?? {}) as Record<string, unknown>;
+  return {
+    profileId: profile.id,
+    settings: (profile.settings ?? {}) as Record<string, unknown>,
+    usernameNormalized: profile.usernameNormalized,
+  };
+}
+
+export async function getPlaylistFallbackRequestContext(
+  request: Request,
+  params: Promise<{ id: string }>
+): Promise<PlaylistFallbackRequestContext | NextResponse> {
+  const { id: playlistId } = await params;
+  const profile = await getOwnedPlaylistFallbackProfile(request);
+
+  if (profile instanceof NextResponse) {
+    return profile;
+  }
+
+  const { profileId, settings, usernameNormalized } = profile;
   const candidate = getFeaturedPlaylistFallbackCandidate(settings);
 
   if (!candidate || candidate.playlistId !== playlistId) {
@@ -95,7 +121,7 @@ export async function getPlaylistFallbackRequestContext(
     profileId,
     settings,
     candidate,
-    usernameNormalized: profile.usernameNormalized,
+    usernameNormalized,
   };
 }
 
