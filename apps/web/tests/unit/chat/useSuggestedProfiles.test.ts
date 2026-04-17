@@ -3,6 +3,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useSuggestedProfiles } from '@/components/jovie/hooks/useSuggestedProfiles';
 
+const defaultStarterContext = {
+  conversationCount: 2,
+  isRecentlyOnboarded: false,
+  latestReleaseTitle: null,
+};
+
+const playlistFallbackSuggestion = {
+  id: '37i9dQZF1DZ06evO2SKVTu',
+  type: 'playlist_fallback' as const,
+  platform: 'spotify',
+  platformLabel: 'Spotify',
+  title: 'This Is Tim White',
+  subtitle: 'Official playlist fallback suggestion',
+  imageUrl: null,
+  externalUrl: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
+  confidence: null,
+};
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 describe('useSuggestedProfiles', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -27,33 +52,23 @@ describe('useSuggestedProfiles', () => {
 
   it('fetches suggestions when enabled', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          suggestions: [
-            {
-              id: 'suggestion_1',
-              type: 'dsp_match',
-              platform: 'spotify',
-              platformLabel: 'Spotify',
-              title: 'Artist Match',
-              subtitle: 'Potential profile',
-              imageUrl: null,
-              externalUrl: null,
-              confidence: 0.96,
-            },
-          ],
-          starterContext: {
-            conversationCount: 2,
-            isRecentlyOnboarded: false,
-            latestReleaseTitle: null,
+      jsonResponse({
+        success: true,
+        suggestions: [
+          {
+            id: 'suggestion_1',
+            type: 'dsp_match',
+            platform: 'spotify',
+            platformLabel: 'Spotify',
+            title: 'Artist Match',
+            subtitle: 'Potential profile',
+            imageUrl: null,
+            externalUrl: null,
+            confidence: 0.96,
           },
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      )
+        ],
+        starterContext: defaultStarterContext,
+      })
     );
 
     const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
@@ -73,41 +88,13 @@ describe('useSuggestedProfiles', () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            success: true,
-            suggestions: [
-              {
-                id: '37i9dQZF1DZ06evO2SKVTu',
-                type: 'playlist_fallback',
-                platform: 'spotify',
-                platformLabel: 'Spotify',
-                title: 'This Is Tim White',
-                subtitle: 'Official playlist fallback suggestion',
-                imageUrl: null,
-                externalUrl:
-                  'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
-                confidence: null,
-              },
-            ],
-            starterContext: {
-              conversationCount: 2,
-              isRecentlyOnboarded: false,
-              latestReleaseTitle: null,
-            },
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ success: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
+        jsonResponse({
+          success: true,
+          suggestions: [playlistFallbackSuggestion],
+          starterContext: defaultStarterContext,
         })
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
 
     const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
 
@@ -131,41 +118,13 @@ describe('useSuggestedProfiles', () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            success: true,
-            suggestions: [
-              {
-                id: '37i9dQZF1DZ06evO2SKVTu',
-                type: 'playlist_fallback',
-                platform: 'spotify',
-                platformLabel: 'Spotify',
-                title: 'This Is Tim White',
-                subtitle: 'Official playlist fallback suggestion',
-                imageUrl: null,
-                externalUrl:
-                  'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
-                confidence: null,
-              },
-            ],
-            starterContext: {
-              conversationCount: 2,
-              isRecentlyOnboarded: false,
-              latestReleaseTitle: null,
-            },
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ success: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
+        jsonResponse({
+          success: true,
+          suggestions: [playlistFallbackSuggestion],
+          starterContext: defaultStarterContext,
         })
-      );
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
 
     const { result } = renderHook(() => useSuggestedProfiles('profile_1'));
 
