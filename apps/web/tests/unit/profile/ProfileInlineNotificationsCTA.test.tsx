@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
@@ -35,6 +35,10 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/useReducedMotion', () => ({
+  useReducedMotion: () => true,
 }));
 
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
@@ -201,7 +205,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
   // Regression: OTP input never appeared when notificationsState became pending_confirmation
   // Found by /investigate on 2026-04-10
-  it('renders OTP input when notificationsState is pending_confirmation after email submit', () => {
+  it('renders OTP input when notificationsState is pending_confirmation after email submit', async () => {
     // Start in idle state so the CTA button appears
     mockUseSubscriptionForm.mockReturnValue({
       emailInput: '',
@@ -262,10 +266,14 @@ describe('ProfileInlineNotificationsCTA', () => {
     rerender(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     // The OTP input should be rendered
-    expect(screen.getByTestId('mock-otp-input')).toBeInTheDocument();
+    const otpInput = screen.getByTestId('mock-otp-input');
+    expect(otpInput).toBeInTheDocument();
     expect(
       screen.getByLabelText(/enter 6-digit verification code/i)
     ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(otpInput).toHaveFocus();
+    });
   });
 
   it('does not create a reopen loop when focus returns after closing the drawer', () => {
