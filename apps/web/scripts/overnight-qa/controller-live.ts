@@ -304,6 +304,26 @@ export async function runLiveController(params: {
     }
 
     await writeState({ ...state, status: 'complete' }, paths);
+  } catch (error) {
+    const stopReason =
+      state.stopReason ??
+      (error instanceof Error
+        ? error.message
+        : 'Overnight QA controller failed.');
+
+    await writeState(
+      {
+        ...state,
+        status: 'blocked',
+        stopReason,
+      },
+      paths
+    );
+    await appendRunEvent(runDir, 'controller-error', {
+      stopReason,
+    });
+
+    throw error;
   } finally {
     await server.stop();
   }
