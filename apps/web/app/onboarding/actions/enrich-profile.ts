@@ -31,6 +31,7 @@ import {
 } from '@/lib/dsp-enrichment/providers/spotify';
 import { captureError } from '@/lib/error-tracking';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { logger } from '@/lib/utils/logger';
 import { uploadRemoteAvatar } from './avatar';
 
@@ -402,6 +403,13 @@ export async function enrichProfileFromDsp(
       { profileId: profile.id, spotifyArtistId }
     );
   }
+
+  void refreshFeaturedPlaylistFallbackCandidate({
+    profileId: profile.id,
+    usernameNormalized: profile.usernameNormalized,
+    artistName: result.name ?? profile.displayName ?? profile.username,
+    artistSpotifyId: spotifyArtistId,
+  });
 
   return result;
 }
