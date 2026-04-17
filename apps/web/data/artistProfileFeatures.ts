@@ -112,13 +112,7 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'blue',
     layoutClassName:
       'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
-    visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
-    screenshotAlt:
-      'Jovie analytics showing top-line profile and listen metrics.',
-    screenshotWidth: 344,
-    screenshotHeight: 540,
-    objectPosition: '50% 0%',
+    visual: 'analytics-funnel-hero',
   },
   {
     id: 'geo-insights',

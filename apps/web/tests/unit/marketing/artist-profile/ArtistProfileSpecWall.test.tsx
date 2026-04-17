@@ -50,6 +50,20 @@ describe('ArtistProfileSpecWall', () => {
       expect(within(card).getByRole('img')).toBeInTheDocument();
     }
 
+    const richAnalyticsCard = screen
+      .getByRole('heading', { name: 'Rich Analytics' })
+      .closest('article');
+
+    expect(richAnalyticsCard).not.toBeNull();
+
+    if (richAnalyticsCard) {
+      expect(
+        within(richAnalyticsCard).getByRole('img', {
+          name: 'Rich analytics funnel preview',
+        })
+      ).toBeInTheDocument();
+    }
+
     expect(screen.queryByText('Power features')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Audience quality filtering')
