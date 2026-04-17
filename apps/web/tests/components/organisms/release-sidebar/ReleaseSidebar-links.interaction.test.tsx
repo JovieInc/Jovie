@@ -63,6 +63,7 @@ vi.mock('@jovie/ui', async () => {
 vi.mock('@/components/molecules/drawer', () => ({
   EntitySidebarShell: ({
     children,
+    contextMenuItems,
     isEmpty,
     emptyMessage,
     entityHeader,
@@ -75,6 +76,12 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader?: React.ReactNode;
     tabs?: React.ReactNode;
     footer?: React.ReactNode;
+    contextMenuItems?: Array<{
+      id?: string;
+      type?: string;
+      label?: string;
+      onClick?: () => void;
+    }>;
     [key: string]: unknown;
   }) =>
     isEmpty ? (
@@ -83,6 +90,18 @@ vi.mock('@/components/molecules/drawer', () => ({
       <div data-testid='right-drawer'>
         {entityHeader}
         {tabs}
+        {contextMenuItems?.map(item =>
+          item.type === 'action' && item.label ? (
+            <button
+              key={item.id ?? item.label}
+              type='button'
+              data-testid={`context-menu-${item.id ?? item.label}`}
+              onClick={item.onClick}
+            >
+              {item.label}
+            </button>
+          ) : null
+        )}
         {children}
         {footer}
       </div>
@@ -343,7 +362,14 @@ vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
-  ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
+  ReleaseDspLinks: ({ isAddingLink }: { isAddingLink?: boolean }) => (
+    <div
+      data-testid='dsp-links'
+      data-adding-link={isAddingLink ? 'true' : 'false'}
+    >
+      DSP Links Content
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
@@ -615,6 +641,31 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(
       screen.getByTestId('drawer-split-menu-item-refresh-platform-links')
     ).toBeInTheDocument();
+  });
+
+  it('opens the DSP tab and add-link form from the edit release links action', async () => {
+    const user = userEvent.setup();
+    render(
+      <ReleaseSidebar
+        release={mockRelease}
+        {...defaultProps}
+        providerConfig={{
+          spotify: { label: 'Spotify', accent: '#1DB954' },
+        }}
+      />
+    );
+
+    await user.click(screen.getByTestId('context-menu-edit'));
+
+    expect(screen.getByTestId('drawer-tab-dsps')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('dsp-links')).toHaveAttribute(
+      'data-adding-link',
+      'true'
+    );
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
   });
 
   it('smart link analytics card renders when a release is selected', async () => {

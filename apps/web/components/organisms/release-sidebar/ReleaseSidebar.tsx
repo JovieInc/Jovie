@@ -447,6 +447,7 @@ export function ReleaseSidebar({
       buildReleaseActions({
         release,
         onEdit: () => {
+          setActiveTab('dsps');
           setIsAddingLink(true);
         },
         onCopy: (path, label) => handleCopyReleasePath(path, label),
@@ -539,8 +540,14 @@ export function ReleaseSidebar({
       return;
     }
 
+    setActiveTab('dsps');
     setIsAddingLink(true);
-  }, [availablePlatformProviders.length, isEditable, setIsAddingLink]);
+  }, [
+    availablePlatformProviders.length,
+    isEditable,
+    setActiveTab,
+    setIsAddingLink,
+  ]);
 
   const handlePlatformRescan = useCallback(() => {
     if (isPlatformRescanDisabled) {
