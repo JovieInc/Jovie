@@ -190,6 +190,15 @@ export function isChatAlbumArtToolResult(
 export type JovieToolPart = ToolUIPart | DynamicToolUIPart;
 
 export function isJovieToolPart(part: unknown): part is JovieToolPart {
+  if (
+    typeof part !== 'object' ||
+    part === null ||
+    !('type' in part) ||
+    typeof part.type !== 'string'
+  ) {
+    return false;
+  }
+
   return isToolUIPart(part as UIMessage['parts'][number]);
 }
 

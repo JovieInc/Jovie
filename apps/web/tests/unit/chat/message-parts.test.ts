@@ -49,7 +49,7 @@ describe('message parts persistence', () => {
         toolCallId: 'tool-2',
         toolName: 'generateReleasePitch',
         state: 'failed',
-        errorMessage: undefined,
+        errorMessage: 'Pitch provider unavailable',
         summary: 'Pitch provider unavailable',
       }),
     ]);

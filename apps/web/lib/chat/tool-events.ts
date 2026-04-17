@@ -16,6 +16,12 @@ export type PersistedToolState =
 
 export type PersistedToolUiHint = 'artifact' | 'status';
 
+export interface PersistedToolApproval {
+  readonly id: string;
+  readonly approved?: boolean;
+  readonly reason?: string;
+}
+
 export interface PersistedToolEvent {
   readonly schemaVersion: 2;
   readonly toolCallId: string;
@@ -26,6 +32,7 @@ export interface PersistedToolEvent {
   readonly errorMessage?: string;
   readonly summary?: string;
   readonly uiHint: PersistedToolUiHint;
+  readonly approval?: PersistedToolApproval;
 }
 
 export interface PendingToolPersistenceEnvelope {
@@ -33,6 +40,11 @@ export interface PendingToolPersistenceEnvelope {
 }
 
 const recordSchema = z.record(z.string(), z.unknown());
+const approvalSchema = z.object({
+  id: z.string().min(1),
+  approved: z.boolean().optional(),
+  reason: z.string().optional(),
+});
 
 export const persistedToolEventSchema = z.object({
   schemaVersion: z.literal(2),
@@ -44,6 +56,7 @@ export const persistedToolEventSchema = z.object({
   errorMessage: z.string().optional(),
   summary: z.string().optional(),
   uiHint: z.enum(['artifact', 'status']),
+  approval: approvalSchema.optional(),
 });
 
 export const persistedToolEventsSchema = z.array(persistedToolEventSchema);
@@ -126,6 +139,19 @@ function extractSummary(value: unknown): string | undefined {
   return undefined;
 }
 
+function extractErrorMessage(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const error = value.error;
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error.trim();
+  }
+
+  return undefined;
+}
+
 function mapUiStateToPersistedState(
   state: string
 ): PersistedToolState | undefined {
@@ -147,15 +173,16 @@ function mapUiStateToPersistedState(
   }
 }
 
-function mapPersistedStateToUiState(
-  state: PersistedToolState
+function mapPersistedEventToUiState(
+  event: PersistedToolEvent
 ):
+  | 'approval-requested'
+  | 'approval-responded'
   | 'input-available'
   | 'output-available'
-  | 'output-error'
   | 'output-denied'
-  | 'approval-requested' {
-  switch (state) {
+  | 'output-error' {
+  switch (event.state) {
     case 'running':
       return 'input-available';
     case 'succeeded':
@@ -165,8 +192,24 @@ function mapPersistedStateToUiState(
     case 'denied':
       return 'output-denied';
     case 'needs-approval':
-      return 'approval-requested';
+      return typeof event.approval?.approved === 'boolean'
+        ? 'approval-responded'
+        : 'approval-requested';
   }
+}
+
+function normalizeApproval(value: unknown): PersistedToolApproval | undefined {
+  if (!isRecord(value) || typeof value.id !== 'string' || value.id.length < 1) {
+    return undefined;
+  }
+
+  return {
+    id: value.id,
+    ...(typeof value.approved === 'boolean'
+      ? { approved: value.approved }
+      : {}),
+    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}),
+  };
 }
 
 function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
@@ -192,10 +235,18 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
     mappedState === 'succeeded' && output?.success === false
       ? 'failed'
       : mappedState;
+  const approval = normalizeApproval(part.approval);
   const approvalReason =
-    part.approval && typeof part.approval.reason === 'string'
-      ? part.approval.reason
+    approval && typeof approval.reason === 'string'
+      ? approval.reason
       : undefined;
+  const outputError = extractErrorMessage(output);
+  const errorMessage =
+    typeof part.errorText === 'string'
+      ? part.errorText
+      : state === 'failed' || state === 'denied'
+        ? (outputError ?? approvalReason)
+        : undefined;
 
   return {
     schemaVersion: 2,
@@ -204,19 +255,15 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
     state,
     input,
     output,
-    errorMessage:
-      typeof part.errorText === 'string'
-        ? part.errorText
-        : state === 'denied'
-          ? approvalReason
-          : undefined,
+    errorMessage,
     summary:
       state === 'succeeded'
         ? extractSummary(output)
         : state === 'failed' || state === 'denied'
-          ? (extractSummary(output) ?? approvalReason)
+          ? (extractSummary(output) ?? outputError ?? approvalReason)
           : undefined,
     uiHint: config.uiHint,
+    approval,
   };
 }
 
@@ -335,7 +382,7 @@ export function decodeToolEvents(toolCalls: unknown): DecodedToolEvents {
 export function toolEventToMessagePart(
   event: PersistedToolEvent
 ): DynamicToolUIPart {
-  const uiState = mapPersistedStateToUiState(event.state);
+  const uiState = mapPersistedEventToUiState(event);
 
   if (uiState === 'input-available') {
     return {
@@ -384,14 +431,29 @@ export function toolEventToMessagePart(
     };
   }
 
+  if (uiState === 'approval-requested') {
+    return {
+      type: 'dynamic-tool',
+      toolName: event.toolName,
+      toolCallId: event.toolCallId,
+      state: uiState,
+      input: event.input ?? {},
+      approval: {
+        id: event.approval?.id ?? `${event.toolCallId}-approval`,
+      },
+    };
+  }
+
   return {
     type: 'dynamic-tool',
     toolName: event.toolName,
     toolCallId: event.toolCallId,
-    state: 'approval-requested',
+    state: uiState,
     input: event.input ?? {},
     approval: {
-      id: `${event.toolCallId}-approval`,
+      id: event.approval?.id ?? `${event.toolCallId}-approval`,
+      approved: event.approval?.approved ?? false,
+      ...(event.approval?.reason ? { reason: event.approval.reason } : {}),
     },
   };
 }

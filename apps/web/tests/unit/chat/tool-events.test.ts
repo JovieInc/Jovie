@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   decodeToolEvents,
+  encodeToolEvents,
   persistedToolEventsSchema,
+  toolEventToMessagePart,
 } from '@/lib/chat/tool-events';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import {
@@ -80,6 +82,49 @@ describe('tool event contract', () => {
     for (const toolName of CHAT_ROUTE_TOOL_NAMES) {
       expect(TOOL_UI_REGISTRY[toolName]).toBeDefined();
     }
+  });
+
+  it('preserves approval responses through persistence and hydration', () => {
+    const [event] =
+      encodeToolEvents([
+        {
+          type: 'dynamic-tool',
+          toolName: 'submitFeedback',
+          toolCallId: 'approval-1',
+          state: 'approval-responded',
+          input: { feedback: 'Ship it' },
+          approval: {
+            id: 'approval-1-state',
+            approved: true,
+            reason: 'Reviewed by user',
+          },
+        },
+      ]) ?? [];
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        toolCallId: 'approval-1',
+        state: 'needs-approval',
+        approval: {
+          id: 'approval-1-state',
+          approved: true,
+          reason: 'Reviewed by user',
+        },
+      })
+    );
+
+    expect(toolEventToMessagePart(event)).toEqual({
+      type: 'dynamic-tool',
+      toolName: 'submitFeedback',
+      toolCallId: 'approval-1',
+      state: 'approval-responded',
+      input: { feedback: 'Ship it' },
+      approval: {
+        id: 'approval-1-state',
+        approved: true,
+        reason: 'Reviewed by user',
+      },
+    });
   });
 });
 
