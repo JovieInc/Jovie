@@ -81,6 +81,10 @@ const ROUTE_CASE_TIMEOUT_MS = Number.parseInt(
   process.env.ROUTE_QA_CASE_TIMEOUT_MS || '',
   10
 );
+const TEST_AUTH_PROBE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_TEST_AUTH_PROBE_TIMEOUT_MS || '',
+  10
+);
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -644,7 +648,11 @@ async function buildRouteMatrix(): Promise<RouteCase[]> {
   return [...dedupedCases.values()];
 }
 
-async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
+export async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
+  const timeoutMs = Number.isFinite(TEST_AUTH_PROBE_TIMEOUT_MS)
+    ? TEST_AUTH_PROBE_TIMEOUT_MS
+    : 15_000;
+
   try {
     const response = await fetch(
       new URL('/api/dev/test-auth/session', BASE_URL),
@@ -652,6 +660,7 @@ async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
         headers: {
           Accept: 'application/json',
         },
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
 
@@ -670,11 +679,10 @@ async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
       reason: typeof payload.reason === 'string' ? payload.reason : null,
     };
   } catch (error) {
-    return {
-      enabled: false,
-      trustedHost: false,
-      reason: `Auth bootstrap probe failed: ${(error as Error).message}`,
-    };
+    console.warn(
+      `[route-qa] Auth bootstrap probe failed after ${timeoutMs}ms: ${(error as Error).message}`
+    );
+    return null;
   }
 }
 
