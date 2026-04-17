@@ -2,9 +2,11 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { getFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 
 const requestSchema = z.object({
@@ -15,8 +17,21 @@ interface PlaylistFallbackRequestContext {
   readonly playlistId: string;
   readonly profileId: string;
   readonly settings: Record<string, unknown>;
-  readonly candidate: ReturnType<typeof getFeaturedPlaylistFallbackCandidate>;
+  readonly candidate: NonNullable<
+    ReturnType<typeof getFeaturedPlaylistFallbackCandidate>
+  >;
   readonly usernameNormalized: string;
+}
+
+interface PlaylistFallbackMutationOptions {
+  readonly request: Request;
+  readonly params: Promise<{ id: string }>;
+  readonly route: string;
+  readonly errorMessage: string;
+  readonly successMessage: string;
+  readonly buildSettings: (
+    context: PlaylistFallbackRequestContext
+  ) => Record<string, unknown>;
 }
 
 export async function getPlaylistFallbackRequestContext(
@@ -82,4 +97,47 @@ export async function getPlaylistFallbackRequestContext(
     candidate,
     usernameNormalized: profile.usernameNormalized,
   };
+}
+
+export async function handlePlaylistFallbackMutation({
+  request,
+  params,
+  route,
+  errorMessage,
+  successMessage,
+  buildSettings,
+}: PlaylistFallbackMutationOptions) {
+  try {
+    const context = await getPlaylistFallbackRequestContext(request, params);
+
+    if (context instanceof NextResponse) {
+      return context;
+    }
+
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: buildSettings(context),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, context.profileId));
+
+    await invalidateProfileCache(context.usernameNormalized);
+
+    return NextResponse.json({
+      success: true,
+      playlistId: context.playlistId,
+      message: successMessage,
+    });
+  } catch (error) {
+    await captureError(errorMessage, error, { route });
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Internal server error',
+      },
+      { status: 500 }
+    );
+  }
 }
