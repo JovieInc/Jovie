@@ -7,16 +7,19 @@
  * and StickyPhoneTour (scroll-driven phone with mode transitions).
  */
 
+import { motion } from 'motion/react';
 import {
   Children,
   isValidElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
 import { Avatar } from '@/components/molecules/Avatar';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { PhoneFrame } from './PhoneFrame';
 import {
   MOCK_ARTIST,
@@ -147,6 +150,11 @@ export function CrossfadeBlock({
 const ROTATION_INTERVAL = 3500;
 const ROTATION_DELAY = 1500;
 
+interface TabFrame {
+  readonly left: number;
+  readonly width: number;
+}
+
 /** Tab labels shown beneath the phone, using URL-style paths. */
 export const MODE_TAB_LABELS: Record<string, string> = {
   profile: '/profile',
@@ -176,9 +184,28 @@ export function PhoneShowcase({
   const [internalIndex, setInternalIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('left');
   const [started, setStarted] = useState(!autoRotate);
+  const [tabFrame, setTabFrame] = useState<TabFrame | null>(null);
+  const reducedMotion = useReducedMotion();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tabRailRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const activeIndex = controlledIndex ?? internalIndex;
+
+  const syncActiveTab = useCallback(() => {
+    const tabRail = tabRailRef.current;
+    const activeTab = tabRefs.current[activeIndex];
+    if (!tabRail || !activeTab) {
+      return;
+    }
+
+    const railRect = tabRail.getBoundingClientRect();
+    const activeRect = activeTab.getBoundingClientRect();
+    setTabFrame({
+      left: activeRect.left - railRect.left,
+      width: activeRect.width,
+    });
+  }, [activeIndex]);
 
   // Notify parent of index changes
   useEffect(() => {
@@ -243,6 +270,37 @@ export function PhoneShowcase({
   // Slide direction: entering slides in from left/right, exiting slides out the other way
   const slideOffset = direction === 'left' ? '100%' : '-100%';
   const slideOffsetOut = direction === 'left' ? '-100%' : '100%';
+
+  useLayoutEffect(() => {
+    syncActiveTab();
+  }, [syncActiveTab]);
+
+  useEffect(() => {
+    if (globalThis.ResizeObserver === undefined) {
+      globalThis.addEventListener('resize', syncActiveTab);
+      return () => {
+        globalThis.removeEventListener('resize', syncActiveTab);
+      };
+    }
+
+    const resizeObserver = new globalThis.ResizeObserver(() => {
+      syncActiveTab();
+    });
+
+    if (tabRailRef.current) {
+      resizeObserver.observe(tabRailRef.current);
+    }
+
+    for (const tab of tabRefs.current) {
+      if (tab) {
+        resizeObserver.observe(tab);
+      }
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [syncActiveTab]);
 
   return (
     <div className='flex flex-col items-center'>
@@ -310,29 +368,46 @@ export function PhoneShowcase({
       {/* Tabs beneath the phone (can be hidden when rendered externally) */}
       {!hideTabs && (
         <nav
-          className='mt-4 flex items-center gap-1'
+          ref={tabRailRef}
+          className='relative mt-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-subtle bg-surface-0/80 p-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.18)] [scrollbar-width:none] supports-[backdrop-filter]:bg-surface-0/70 supports-[backdrop-filter]:backdrop-blur-lg [&::-webkit-scrollbar]:hidden'
           aria-label='Phone mode tabs'
         >
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-5 top-px h-8 rounded-full bg-white/[0.04] blur-2xl'
+          />
+          {tabFrame ? (
+            <motion.div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-y-1.5 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,244,255,0.94))] shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] ring-1 ring-black/5'
+              initial={false}
+              animate={{ x: tabFrame.left, width: tabFrame.width }}
+              transition={
+                reducedMotion
+                  ? { duration: 0.16, ease: 'easeOut' }
+                  : {
+                      type: 'spring',
+                      stiffness: 360,
+                      damping: 30,
+                      mass: 0.7,
+                    }
+              }
+            />
+          ) : null}
           {modes.map((mode, i) => (
             <button
               key={mode.id}
               type='button'
+              aria-pressed={i === activeIndex}
               onClick={() => handleTabClick(i)}
-              className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
-              style={{
-                backgroundColor:
-                  i === activeIndex
-                    ? 'var(--linear-bg-surface-2)'
-                    : 'transparent',
-                color:
-                  i === activeIndex
-                    ? 'var(--linear-text-primary)'
-                    : 'var(--linear-text-quaternary)',
-                border:
-                  i === activeIndex
-                    ? '1px solid var(--linear-border-default)'
-                    : '1px solid transparent',
+              ref={node => {
+                tabRefs.current[i] = node;
               }}
+              className={`relative z-10 rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-colors duration-300 ${
+                i === activeIndex
+                  ? 'text-[var(--linear-text-primary)]'
+                  : 'text-[var(--linear-text-quaternary)] hover:text-[var(--linear-text-secondary)]'
+              }`}
             >
               {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}
             </button>

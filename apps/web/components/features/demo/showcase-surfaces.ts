@@ -6,6 +6,7 @@ export const DEMO_SHOWCASE_SURFACE_IDS = [
   'settings',
   'public-profile',
   'release-landing',
+  'release-tracked-links',
   'release-presave',
   'release-tasks',
   'tim-white-profile',

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import {
@@ -16,6 +17,45 @@ import {
   type StaticArtistPageProps,
 } from '@/features/profile/StaticArtistPage';
 import { DemoClientProviders } from './DemoClientProviders';
+
+const DEMO_PRESS_PHOTOS = [
+  {
+    id: 'press-photo-1',
+    blobUrl: '/images/avatars/tim-white-founder.jpg',
+    smallUrl: '/images/avatars/tim-white-founder.jpg',
+    mediumUrl: '/images/avatars/tim-white-founder.jpg',
+    largeUrl: '/images/avatars/tim-white-founder.jpg',
+    originalFilename: 'tim-white-portrait.avif',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 0,
+  },
+  {
+    id: 'press-photo-2',
+    blobUrl: '/images/hero/tim-profile.avif',
+    smallUrl: '/images/hero/tim-profile.avif',
+    mediumUrl: '/images/hero/tim-profile.avif',
+    largeUrl: '/images/hero/tim-profile.avif',
+    originalFilename: 'tim-white-editorial.avif',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 1,
+  },
+  {
+    id: 'press-photo-3',
+    blobUrl: '/images/avatars/tim-white.jpg',
+    smallUrl: '/images/avatars/tim-white.jpg',
+    mediumUrl: '/images/avatars/tim-white.jpg',
+    largeUrl: '/images/avatars/tim-white.jpg',
+    originalFilename: 'tim-white-live.jpg',
+    width: 1200,
+    height: 1500,
+    status: 'ready',
+    sortOrder: 2,
+  },
+] as const;
 
 type DemoRelease = NonNullable<StaticArtistPageProps['latestRelease']>;
 type ReleaseVariant = 'presave' | 'live' | 'video';
@@ -99,6 +139,7 @@ export function DemoTimWhiteProfileSurface() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
   const releaseParam = searchParams.get('release');
+  const captureMode = searchParams.get('capture');
 
   const mode: ProfileMode = isProfileMode(modeParam) ? modeParam : 'profile';
   const releaseKey: ReleaseVariant = isValidRelease(releaseParam)
@@ -110,6 +151,60 @@ export function DemoTimWhiteProfileSurface() {
   // For presave, omit tour dates so the countdown card renders instead
   const tourDates =
     releaseKey === 'presave' ? [] : [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
+  const seededPressPhotos =
+    captureMode === 'press-assets' ? [...DEMO_PRESS_PHOTOS] : [];
+
+  if (captureMode === 'press-assets') {
+    return (
+      <DemoClientProviders>
+        <div data-testid='demo-showcase-tim-white-profile'>
+          <div className='flex min-h-screen items-center justify-center bg-[#0b0d12] px-5 py-10'>
+            <div
+              className='w-full max-w-[360px] rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,#12161f,#0b0e14)] p-4 shadow-[0_32px_100px_rgba(0,0,0,0.46)]'
+              data-testid='demo-press-assets-capture'
+            >
+              <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
+                <div className='flex items-start justify-between gap-3'>
+                  <div>
+                    <p className='text-[12px] font-[560] text-white/50'>
+                      About
+                    </p>
+                    <h2 className='mt-1 text-[20px] font-[600] tracking-[-0.03em] text-white'>
+                      Share press photos
+                    </h2>
+                  </div>
+                  <div className='rounded-[18px] border border-white/8 bg-[#10141c] p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]'>
+                    <div className='rounded-[12px] bg-white/[0.04] px-3 py-2 text-[12px] font-[560] text-white'>
+                      Download press photos
+                    </div>
+                  </div>
+                </div>
+
+                <div className='mt-4 grid grid-cols-2 gap-3'>
+                  {DEMO_PRESS_PHOTOS.slice(0, 2).map(photo => (
+                    <div
+                      key={photo.id}
+                      className='overflow-hidden rounded-[18px] bg-white/[0.04]'
+                    >
+                      <div className='relative aspect-[4/5]'>
+                        <Image
+                          src={photo.mediumUrl}
+                          alt={photo.originalFilename}
+                          fill
+                          sizes='160px'
+                          className='object-cover'
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DemoClientProviders>
+    );
+  }
 
   return (
     <DemoClientProviders>
@@ -121,6 +216,8 @@ export function DemoTimWhiteProfileSurface() {
           subtitle='Official artist profile'
           socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
           contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+          pressPhotos={seededPressPhotos}
+          allowPhotoDownloads={captureMode === 'press-assets'}
           tourDates={tourDates}
           latestRelease={latestRelease}
           genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres}

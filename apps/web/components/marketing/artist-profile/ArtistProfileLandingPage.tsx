@@ -8,14 +8,14 @@ import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
-import { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
+import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
-import { ArtistProfileReactivationSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
+import { ArtistProfileReactivationSection } from './ArtistProfileReactivationSection';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from './ArtistProfileSpecWall';
 
@@ -34,10 +34,6 @@ export function ArtistProfileLandingPage({
   socialProof,
   flags,
 }: Readonly<ArtistProfileLandingPageProps>) {
-  const payMode =
-    copy.adaptive.modes.find(mode => mode.id === 'pay') ??
-    copy.adaptive.modes[0];
-
   if (!flags.FULL_PAGE) {
     return (
       <>
@@ -53,40 +49,28 @@ export function ArtistProfileLandingPage({
 
   return (
     <>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-        <HomeHero showPhoneComposition={false} variant='artist-profile' />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}>
-        <ArtistProfileAdaptiveSequence
-          adaptive={copy.adaptive}
-          phoneCaption={copy.hero.phoneCaption}
-          phoneSubcaption={copy.hero.phoneSubcaption}
-        />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
-        <HomeTrustSection />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
-        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
-        <ArtistProfileMonetizationSection
-          monetization={copy.monetization}
-          payMode={payMode}
-        />
-      </div>
+      <ArtistProfileHeroAdaptiveIntro
+        adaptive={copy.adaptive}
+        phoneCaption={copy.hero.phoneCaption}
+        phoneSubcaption={copy.hero.phoneSubcaption}
+      />
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection capture={copy.capture} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.reactivation}>
-        <ArtistProfileReactivationSection reactivation={copy.reactivation} />
+        <ArtistProfileReactivationSection
+          notification={copy.capture.notification}
+          reactivation={copy.reactivation}
+        />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
+        <ArtistProfileMonetizationSection monetization={copy.monetization} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
+        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
-        <ArtistProfileSpecWall
-          opinionated={copy.opinionated}
-          specWall={copy.specWall}
-          tiles={specTiles}
-        />
+        <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
@@ -105,7 +89,7 @@ export function ArtistProfileLandingPage({
         </div>
       ) : null}
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
-        <ArtistProfileFinalCta finalCta={copy.finalCta} />
+        <ArtistProfileFinalCta finalCta={copy.finalCta} roomy />
       </div>
     </>
   );
