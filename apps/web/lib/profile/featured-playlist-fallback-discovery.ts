@@ -37,9 +37,12 @@ async function fetchSpotifyPublicPage(url: string): Promise<string | null> {
         return await response.text();
       }
 
-      if (response.status >= 500 && attempt < MAX_PAGE_FETCH_ATTEMPTS) {
-        await sleep(RETRY_BACKOFF_BASE_MS * attempt);
-        continue;
+      if (response.status >= 500) {
+        if (attempt < MAX_PAGE_FETCH_ATTEMPTS) {
+          await sleep(RETRY_BACKOFF_BASE_MS * attempt);
+          continue;
+        }
+        return null;
       }
 
       if (
@@ -85,7 +88,7 @@ export async function discoverThisIsPlaylistCandidate(input: {
   const safeArtistName = artistName.replaceAll('"', '');
   const artistSpotifyId = input.artistSpotifyId.trim();
 
-  if (!artistName || !artistSpotifyId) {
+  if (!artistName || !safeArtistName || !artistSpotifyId) {
     return null;
   }
 
