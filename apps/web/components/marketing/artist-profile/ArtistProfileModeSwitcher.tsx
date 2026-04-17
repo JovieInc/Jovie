@@ -84,9 +84,6 @@ export function ArtistProfileModeSwitcher({
 
     const listenIndex = adaptive.modes.findIndex(mode => mode.id === 'listen');
     const tourIndex = adaptive.modes.findIndex(mode => mode.id === 'tour');
-    const contactIndex = adaptive.modes.findIndex(
-      mode => mode.id === 'contact'
-    );
     const firstIndex = listenIndex >= 0 ? listenIndex : 0;
 
     sequenceStartedRef.current = true;
@@ -112,12 +109,6 @@ export function ArtistProfileModeSwitcher({
     queueSelection(firstIndex, 220);
     if (tourIndex >= 0 && tourIndex !== firstIndex) {
       queueSelection(tourIndex, 1320);
-    }
-    if (contactIndex >= 0) {
-      queueSelection(
-        contactIndex,
-        tourIndex >= 0 && tourIndex !== firstIndex ? 2260 : 1320
-      );
     }
   }, [adaptive.modes, reducedMotion]);
 

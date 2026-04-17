@@ -112,20 +112,15 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      adaptiveSequence.getByRole('button', { name: 'Stay Booked' })
-    );
+    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
 
     expect(
-      adaptiveSequence.getByText(
-        'Make booking, management, and press easy to reach.'
-      )
+      adaptiveSequence.getByText('Make support one tap away.')
     ).toBeInTheDocument();
     expect(
       adaptiveSequence.getByRole('img', {
-        name: ARTIST_PROFILE_COPY.adaptive.modes.find(
-          mode => mode.id === 'contact'
-        )?.screenshotAlt,
+        name: ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'pay')
+          ?.screenshotAlt,
       })
     ).toBeInTheDocument();
     expect(screen.queryByText('/listen')).not.toBeInTheDocument();
