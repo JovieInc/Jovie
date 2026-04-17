@@ -56,8 +56,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 }));
 
 vi.mock('@/lib/profile/featured-playlist-fallback-discovery', () => ({
-  discoverThisIsPlaylistCandidate:
-    hoisted.discoverThisIsPlaylistCandidateMock,
+  discoverThisIsPlaylistCandidate: hoisted.discoverThisIsPlaylistCandidateMock,
 }));
 
 describe('featured playlist fallback settings helpers', () => {
