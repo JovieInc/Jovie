@@ -1,10 +1,9 @@
-import { EventEmitter } from 'node:events';
+import { writeSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pipeServerLogs } from '../../scripts/overnight-qa/server';
+import { openServerLogDescriptors } from '../../scripts/overnight-qa/server';
 
 const tempDirs: string[] = [];
 
@@ -16,31 +15,20 @@ afterEach(async () => {
   );
 });
 
-describe('overnight-qa server log piping', () => {
-  it('streams child stdout and stderr into append-mode log files', async () => {
+describe('overnight-qa server log descriptors', () => {
+  it('opens append-mode file descriptors for direct child stdio', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'overnight-qa-server-'));
     tempDirs.push(tempDir);
 
-    const server = new EventEmitter() as EventEmitter & {
-      stdout: PassThrough;
-      stderr: PassThrough;
-    };
-    server.stdout = new PassThrough();
-    server.stderr = new PassThrough();
-
-    pipeServerLogs(
-      server as never,
+    const logs = openServerLogDescriptors(
       join(tempDir, 'dev-server.stdout.log'),
       join(tempDir, 'dev-server.stderr.log')
     );
 
-    server.stdout.write('ready\n');
-    server.stderr.write('warn\n');
-    server.stdout.end();
-    server.stderr.end();
-    server.emit('close');
-
-    await new Promise(resolve => setTimeout(resolve, 25));
+    writeSync(logs.stdoutFd, 'ready\n');
+    writeSync(logs.stderrFd, 'warn\n');
+    logs.close();
+    logs.close();
 
     await expect(
       readFile(join(tempDir, 'dev-server.stdout.log'), 'utf8')
