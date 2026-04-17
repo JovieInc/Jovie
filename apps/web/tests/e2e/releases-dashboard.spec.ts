@@ -285,6 +285,7 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
       'Tasks'
     );
+    await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-dsps').click();
 
     const smartLinkPage = await page.context().newPage();
@@ -368,13 +369,11 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-dsps').click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
-<<<<<<< HEAD
-=======
-    await sidebar.getByRole('button', { name: 'Tasks' }).click();
+    await sidebar.getByTestId('drawer-tab-tasks').click();
     await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
       'Tasks'
     );
->>>>>>> 5c5e2755f (test(release-sidebar): sync qa and screenshots)
+    await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
