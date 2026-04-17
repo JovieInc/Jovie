@@ -261,10 +261,10 @@ test.describe('Releases dashboard', () => {
     await installClipboardSpy(page);
 
     const sidebar = await openFirstReleaseSidebar(page);
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
     await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toHaveAttribute(
+    await sidebar.getByTestId('drawer-tab-dsps').click();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toHaveAttribute(
       'aria-selected',
       'true'
     );
@@ -282,11 +282,10 @@ test.describe('Releases dashboard', () => {
       .toBe(copiedUrl);
 
     await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
+    await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
+      'Tasks'
     );
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
 
     const smartLinkPage = await page.context().newPage();
     try {
@@ -369,6 +368,13 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-dsps').click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
+<<<<<<< HEAD
+=======
+    await sidebar.getByRole('button', { name: 'Tasks' }).click();
+    await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
+      'Tasks'
+    );
+>>>>>>> 5c5e2755f (test(release-sidebar): sync qa and screenshots)
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
@@ -394,7 +400,7 @@ test.describe('Releases dashboard', () => {
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
     expect(smartLinkHandle).toBeTruthy();
 
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
     const smartLinkTokens = sidebar.locator(
       '[title^="http://"], [title^="https://"]'
     );

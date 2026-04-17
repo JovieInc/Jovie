@@ -209,20 +209,26 @@ async function prepareScenario(
     timeout: TIMEOUTS.NAVIGATION,
   });
 
+  const isOpenFirstRelease =
+    scenario.interaction === 'open-first-release' ||
+    scenario.interaction === 'open-first-release-dsps';
   const initialWaitSelector =
-    scenario.interaction === 'open-first-release'
-      ? '[data-testid="releases-matrix"]'
-      : scenario.waitFor;
+    isOpenFirstRelease ? '[data-testid="releases-matrix"]' : scenario.waitFor;
   const initialWait = page.locator(initialWaitSelector).first();
   await expect(initialWait).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
 
-  if (scenario.interaction === 'open-first-release') {
+  if (isOpenFirstRelease) {
     await waitForImages(page, 'table').catch(() => {});
     await waitForSettle(page, 2000);
     await page.locator('[data-testid="release-row"]').first().click();
     await expect(page.locator(scenario.waitFor).first()).toBeVisible({
       timeout: TIMEOUTS.SIDEBAR_VISIBLE,
     });
+
+    if (scenario.interaction === 'open-first-release-dsps') {
+      await page.getByTestId('drawer-tab-dsps').click();
+      await waitForSettle(page);
+    }
   }
 
   await waitForImages(page).catch(() => {});

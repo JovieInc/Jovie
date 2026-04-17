@@ -87,13 +87,15 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-detail.png');
 
-    await sidebar.getByTestId('drawer-tab-links').click();
-    const platformsCard = sidebar.getByTestId('release-platforms-card');
-    await expect(platformsCard).toBeVisible({
+    const platformsTab = sidebar.getByTestId('drawer-tab-dsps');
+    await expect(platformsTab).toBeVisible({
       timeout: TIMEOUTS.CONTENT_VISIBLE,
     });
+    await platformsTab.click();
+    const tabbedCard = sidebar.getByTestId('release-tabbed-card');
+    await expect(tabbedCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
     await waitForSettle(page);
-    await platformsCard.screenshot({
+    await tabbedCard.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,
     });
     console.log('📸 Saved: release-sidebar-platforms.png');
