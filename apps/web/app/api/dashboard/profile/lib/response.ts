@@ -14,9 +14,31 @@ export function addAvatarCacheBust(
 ) {
   const responseProfile = { ...updatedProfile };
   if (responseProfile.avatarUrl) {
-    const url = new URL(responseProfile.avatarUrl);
-    url.searchParams.set('v', Date.now().toString());
-    responseProfile.avatarUrl = url.toString();
+    const cacheBustValue = Date.now().toString();
+    if (responseProfile.avatarUrl.startsWith('//')) {
+      const protocolRelativeUrl = new URL(`https:${responseProfile.avatarUrl}`);
+      protocolRelativeUrl.searchParams.set('v', cacheBustValue);
+      responseProfile.avatarUrl = `//${protocolRelativeUrl.host}${protocolRelativeUrl.pathname}${protocolRelativeUrl.search}${protocolRelativeUrl.hash}`;
+      return responseProfile;
+    }
+
+    if (responseProfile.avatarUrl.startsWith('/')) {
+      const relativeUrl = new URL(responseProfile.avatarUrl, 'https://jov.ie');
+      relativeUrl.searchParams.set('v', cacheBustValue);
+      responseProfile.avatarUrl = `${relativeUrl.pathname}${relativeUrl.search}${relativeUrl.hash}`;
+      return responseProfile;
+    }
+
+    try {
+      const url = new URL(responseProfile.avatarUrl);
+      url.searchParams.set('v', cacheBustValue);
+      responseProfile.avatarUrl = url.toString();
+    } catch (error) {
+      logger.warn('Failed to parse avatar URL for cache busting', {
+        avatarUrl: responseProfile.avatarUrl.split('?')[0],
+        error,
+      });
+    }
   }
   return responseProfile;
 }
