@@ -48,8 +48,12 @@ scripts/
 cleanup_old_branches*.sh
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
+!apps/web/content/
+!apps/web/content/**
 !apps/web/lib/docs/
 !apps/web/lib/docs/**
+!apps/web/lib/chat/knowledge/topics/
+!apps/web/lib/chat/knowledge/topics/**
 !apps/web/lib/e2e/
 !apps/web/lib/e2e/**
 !apps/web/lib/submission-agent/artifacts/
