@@ -2,7 +2,7 @@
 
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
@@ -21,7 +21,6 @@ import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard'
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import type {
-  ChatAlbumArtToolResult,
   ChatInsightsToolResult,
   MessagePart,
   SocialLinkRemovalToolResult,
@@ -95,6 +94,14 @@ function getToolStatusBody(event: PersistedToolEvent): string | undefined {
   }
 }
 
+const TOOL_STATUS_ICONS: Record<PersistedToolEvent['state'], typeof Loader2> = {
+  running: Loader2,
+  failed: AlertCircle,
+  denied: AlertCircle,
+  succeeded: CheckCircle2,
+  'needs-approval': CheckCircle2,
+};
+
 function ToolStatusRow({
   event,
   variant,
@@ -106,7 +113,7 @@ function ToolStatusRow({
   const isInline = variant === 'inline';
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
-  const Icon = isRunning ? Loader2 : isError ? AlertCircle : CheckCircle2;
+  const Icon = TOOL_STATUS_ICONS[event.state];
 
   return (
     <div
@@ -160,6 +167,140 @@ function ToolStatusRow({
   );
 }
 
+function isPitchOutput(value: unknown): value is {
+  readonly releaseTitle?: string;
+  readonly pitches: {
+    readonly spotify: string;
+    readonly appleMusic: string;
+    readonly amazon: string;
+    readonly generic: string;
+  };
+  readonly success: true;
+} {
+  if (!isRecord(value) || value.success !== true || !isRecord(value.pitches)) {
+    return false;
+  }
+
+  return (
+    (value.releaseTitle === undefined ||
+      typeof value.releaseTitle === 'string') &&
+    typeof value.pitches.spotify === 'string' &&
+    typeof value.pitches.appleMusic === 'string' &&
+    typeof value.pitches.amazon === 'string' &&
+    typeof value.pitches.generic === 'string'
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type ArtifactRenderer = (
+  event: PersistedToolEvent,
+  profileId?: string
+) => ReactNode;
+
+function renderProfileEditArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !event.output?.success || !event.output.preview) {
+    return null;
+  }
+
+  return (
+    <ProfileEditPreviewCard
+      preview={event.output.preview as ProfileEditPreview}
+      profileId={profileId}
+    />
+  );
+}
+
+function renderAvatarUploadArtifact(event: PersistedToolEvent): ReactNode {
+  return event.output?.success ? <ChatAvatarUploadCard /> : null;
+}
+
+function renderInsightsArtifact(event: PersistedToolEvent): ReactNode {
+  return isInsightsResult(event.output) ? (
+    <ChatAnalyticsCard result={event.output} />
+  ) : null;
+}
+
+function renderSocialLinkArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isSocialLinkResult(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatLinkConfirmationCard
+      profileId={profileId}
+      platform={event.output.platform}
+      normalizedUrl={event.output.normalizedUrl}
+      originalUrl={event.output.originalUrl}
+    />
+  );
+}
+
+function renderSocialLinkRemovalArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isSocialLinkRemovalResult(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatLinkRemovalCard
+      profileId={profileId}
+      linkId={event.output.linkId}
+      platform={event.output.platform}
+      url={event.output.url}
+    />
+  );
+}
+
+function renderAlbumArtArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
+  if (!profileId || !isChatAlbumArtToolResult(event.output)) {
+    return null;
+  }
+
+  return <ChatAlbumArtCard result={event.output} profileId={profileId} />;
+}
+
+function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
+  if (!isPitchOutput(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatPitchCard
+      state='success'
+      releaseTitle={event.output.releaseTitle}
+      pitches={event.output.pitches}
+    />
+  );
+}
+
+const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
+  proposeAvatarUpload: event => renderAvatarUploadArtifact(event),
+  proposeProfileEdit: (event, profileId) =>
+    renderProfileEditArtifact(event, profileId),
+  proposeSocialLink: (event, profileId) =>
+    renderSocialLinkArtifact(event, profileId),
+  proposeSocialLinkRemoval: (event, profileId) =>
+    renderSocialLinkRemovalArtifact(event, profileId),
+  showTopInsights: event => renderInsightsArtifact(event),
+  generateAlbumArt: (event, profileId) =>
+    renderAlbumArtArtifact(event, profileId),
+  generateReleasePitch: event => renderReleasePitchArtifact(event),
+};
+
 function renderArtifactCard(
   event: PersistedToolEvent,
   profileId?: string
@@ -168,102 +309,8 @@ function renderArtifactCard(
     return null;
   }
 
-  if (
-    event.toolName === 'proposeProfileEdit' &&
-    profileId &&
-    event.output?.success &&
-    event.output.preview
-  ) {
-    return (
-      <ProfileEditPreviewCard
-        preview={event.output.preview as ProfileEditPreview}
-        profileId={profileId}
-      />
-    );
-  }
-
-  if (event.toolName === 'proposeAvatarUpload' && event.output?.success) {
-    return <ChatAvatarUploadCard />;
-  }
-
-  if (event.toolName === 'showTopInsights' && isInsightsResult(event.output)) {
-    return <ChatAnalyticsCard result={event.output} />;
-  }
-
-  if (
-    event.toolName === 'proposeSocialLink' &&
-    profileId &&
-    isSocialLinkResult(event.output)
-  ) {
-    return (
-      <ChatLinkConfirmationCard
-        profileId={profileId}
-        platform={event.output.platform}
-        normalizedUrl={event.output.normalizedUrl}
-        originalUrl={event.output.originalUrl}
-      />
-    );
-  }
-
-  if (
-    event.toolName === 'proposeSocialLinkRemoval' &&
-    profileId &&
-    isSocialLinkRemovalResult(event.output)
-  ) {
-    return (
-      <ChatLinkRemovalCard
-        profileId={profileId}
-        linkId={event.output.linkId}
-        platform={event.output.platform}
-        url={event.output.url}
-      />
-    );
-  }
-
-  if (
-    event.toolName === 'generateAlbumArt' &&
-    profileId &&
-    isChatAlbumArtToolResult(event.output as ChatAlbumArtToolResult)
-  ) {
-    return (
-      <ChatAlbumArtCard
-        result={event.output as ChatAlbumArtToolResult}
-        profileId={profileId}
-      />
-    );
-  }
-
-  if (
-    event.toolName === 'generateReleasePitch' &&
-    isRecord(event.output) &&
-    event.output.success === true &&
-    isRecord(event.output.pitches)
-  ) {
-    return (
-      <ChatPitchCard
-        state='success'
-        releaseTitle={
-          typeof event.output.releaseTitle === 'string'
-            ? event.output.releaseTitle
-            : undefined
-        }
-        pitches={
-          event.output.pitches as {
-            spotify: string;
-            appleMusic: string;
-            amazon: string;
-            generic: string;
-          }
-        }
-      />
-    );
-  }
-
-  return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  const renderer = ARTIFACT_RENDERERS[event.toolName];
+  return renderer?.(event, profileId) ?? null;
 }
 
 export function getRenderableToolEvents(parts: readonly MessagePart[]) {
@@ -276,7 +323,7 @@ export function ToolPartsRenderer({
   variant,
   hasMessageText = false,
 }: ToolPartsRendererProps) {
-  const events = getRenderableToolEvents(parts);
+  const events = useMemo(() => getRenderableToolEvents(parts), [parts]);
   const loggedFallbackToolCallsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
