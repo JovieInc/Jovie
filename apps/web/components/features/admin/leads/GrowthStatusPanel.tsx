@@ -68,7 +68,7 @@ export function GrowthStatusPanel() {
     <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Growth Status'
-        subtitle="Keep the pipeline on, verify today's throughput, and turn it off when needed."
+        subtitle='Keep the pipeline on, verify today’s throughput, and turn it off when needed.'
         actions={headerActions}
         className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         actionsClassName='shrink-0'
