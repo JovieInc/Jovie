@@ -79,7 +79,7 @@ prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
 can_use_plain_prebuilt=true
 
-if [ -z "$prebuilt_file_count" ]; then
+if [ -z "$prebuilt_file_count" ] || [ "$prebuilt_file_count" -eq 0 ]; then
   has_prebuilt_output=false
   can_use_plain_prebuilt=false
 elif [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
@@ -89,7 +89,7 @@ fi
 if [ "$has_prebuilt_output" = true ]; then
   echo "Prebuilt output file count: $prebuilt_file_count"
 else
-  echo "Prebuilt output file count: unavailable (.vercel/output missing)"
+  echo "Prebuilt output file count: unavailable (.vercel/output missing or empty)"
 fi
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
