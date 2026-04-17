@@ -2,16 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockReadFile = vi.fn();
 
-vi.mock('node:fs', () => ({
-  promises: {
-    readFile: mockReadFile,
-  },
-  default: {
+vi.mock('node:fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+
+  return {
+    ...actual,
     promises: {
+      ...actual.promises,
       readFile: mockReadFile,
     },
-  },
-}));
+    default: {
+      ...actual,
+      promises: {
+        ...actual.promises,
+        readFile: mockReadFile,
+      },
+    },
+  };
+});
 
 vi.mock('node:path', async () => {
   const actual = await vi.importActual<typeof import('node:path')>('node:path');
