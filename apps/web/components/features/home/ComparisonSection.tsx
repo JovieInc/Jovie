@@ -89,7 +89,7 @@ export function SocialProofSection() {
             {testimonials.map(testimonial => (
               <div key={testimonial.author} className='relative group'>
                 <div className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500' />
-                <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all duration-300'>
+                <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all duration-slower'>
                   <div className='mb-6'>
                     <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400'>
                       {testimonial.metric}

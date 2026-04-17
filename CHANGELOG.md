@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.156] - 2026-04-16
+
+> Homepage and Artist Profile surfaces now inherit the refreshed design-system timing, weights, and profile shell tokens, and the PR preview deploy path now survives Vercel archive upload failures without stalling review.
+
+### Changed
+
+- Homepage marketing interactions now use the shared motion-duration and font-weight tokens, so claim-handle flows, search states, demo proof, and CTA surfaces animate on the same rhythm as the refreshed design system.
+- Artist Profile cards, drawers, skeletons, and notification controls now read the canonical profile radius and action tokens instead of hardcoded pixel radii, which keeps the public profile shell aligned with the latest pearl surface system.
+- [internal] Added `--profile-card-radius` and `--profile-inner-radius` to the shared design system and aligned the profile layout contract test to the tokenized shell radius.
+- [internal] Extracted the shared profile drawer action classes into a single token-backed module so menu, notifications, releases, and contact rows stay aligned and Sonar duplication stays below the new-code gate.
+
+### Fixed
+
+- [internal] Reconciled the local home/profile polish pass against the latest `origin/main` design refresh without restoring deleted homepage proof-strip chrome or older profile surface values.
+- [internal] Rebalanced shared subscription, contact, and drawer surface styling to the current pearl token set so mobile and desktop profile CTAs render with the same shell geometry.
+- [internal] Restored the positioned Bento card shell, tokenized the remaining profile skeleton and drawer rows, and cleaned the waitlist route/button casing follow-up so the design-system pass matches the latest review feedback exactly.
+- [internal] Added a reusable Vercel prebuilt deploy wrapper that retries archive uploads and falls back to plain prebuilt deploys, which unblocks preview and staging deploys when Vercel rejects the archived upload path.
+
 ## [26.4.155] - 2026-04-16
 
 > Dropdown submenus now keep a stable width and row alignment even when optional icons are absent.

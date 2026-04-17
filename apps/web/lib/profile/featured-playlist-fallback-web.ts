@@ -21,7 +21,7 @@ export type FeaturedPlaylistFallbackCandidate = z.infer<
 >;
 
 function decodeHtmlEntities(value: string): string {
-  return value.replace(
+  return value.replaceAll(
     /&(#x?[0-9a-fA-F]+|amp|apos|quot|lt|gt);/g,
     (match, entity: string) => {
       switch (entity) {
@@ -49,7 +49,7 @@ function decodeHtmlEntities(value: string): string {
 }
 
 function normalizeWhitespace(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
+  return value.replaceAll(/\s+/g, ' ').trim();
 }
 
 function normalizeTitle(value: string): string {

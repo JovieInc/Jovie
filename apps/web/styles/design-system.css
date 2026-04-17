@@ -33,6 +33,8 @@
   --profile-shell-max-width: 430px;
   --profile-shell-header-max-width: 38rem;
   --profile-shell-card-radius: 30px;
+  --profile-card-radius: 28px;
+  --profile-inner-radius: 26px;
   --profile-drawer-radius-mobile: 24px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;

@@ -144,7 +144,7 @@ export function BlackHoleRecordingsLogo(props: React.SVGProps<SVGSVGElement>) {
         y='12'
         fontFamily='system-ui, -apple-system, Arial, sans-serif'
         fontSize='9'
-        fontWeight='700'
+        fontWeight='680'
         letterSpacing='1.4'
       >
         BLACK HOLE
@@ -171,7 +171,7 @@ export function DiscoWaxLogo(props: React.SVGProps<SVGSVGElement>) {
         y='11'
         fontFamily='system-ui, -apple-system, Arial, sans-serif'
         fontSize='10'
-        fontWeight='600'
+        fontWeight='590'
         letterSpacing='1.8'
         textLength='125'
         lengthAdjust='spacing'

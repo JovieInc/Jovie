@@ -1,4 +1,5 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -34,6 +35,7 @@ interface BuildProfilePublicViewModelInput {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly showFooter?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
@@ -52,6 +54,7 @@ export function buildProfilePublicViewModel({
   enableDynamicEngagement = false,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   pressPhotos = [],
@@ -98,6 +101,7 @@ export function buildProfilePublicViewModel({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
+    featuredPlaylistFallback,
     releases,
   };
 }

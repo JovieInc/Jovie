@@ -34,6 +34,7 @@ import type {
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
+import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -642,6 +643,8 @@ export default async function ArtistPage({
   // Read profile photo download settings
   const profileSettings =
     (profile.settings as Record<string, unknown> | null) ?? {};
+  const featuredPlaylistFallback =
+    getConfirmedFeaturedPlaylistFallback(profileSettings);
   const allowPhotoDownloads =
     profileSettings.allowProfilePhotoDownloads === true;
   const photoDownloadSizes = buildAvatarSizes(
@@ -721,6 +724,7 @@ export default async function ArtistPage({
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
+        featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
       />
       {isPublicNoAuthSmoke ? null : (
