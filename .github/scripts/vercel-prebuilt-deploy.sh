@@ -26,6 +26,15 @@ write_deployment_url() {
   fi
 }
 
+count_prebuilt_files() {
+  if [ ! -d ".vercel/output" ]; then
+    echo "0"
+    return
+  fi
+
+  find .vercel/output -type f | wc -l | tr -d ' '
+}
+
 run_deploy() {
   local mode="$1"
   shift
@@ -35,7 +44,12 @@ run_deploy() {
     return
   fi
 
-  vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
+  if [ "$mode" = "plain" ]; then
+    vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
+    return
+  fi
+
+  vercel deploy "$@" --token "$VERCEL_TOKEN"
 }
 
 try_mode() {
@@ -61,19 +75,34 @@ try_mode() {
   return 1
 }
 
-use_archive=true
+plain_prebuilt_limit=15000
+prebuilt_file_count="$(count_prebuilt_files)"
+can_use_plain_prebuilt=true
+
+if [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
+  can_use_plain_prebuilt=false
+fi
+
+echo "Prebuilt output file count: $prebuilt_file_count"
+
 for attempt in 1 2 3; do
   echo "Deploy attempt $attempt/3"
 
-  if [ "$use_archive" = true ]; then
-    if try_mode archive "$attempt" "${deploy_args[@]}"; then
-      exit 0
-    fi
-    echo "Archive deploy failed; falling back to standard prebuilt upload."
-    use_archive=false
+  if try_mode archive "$attempt" "${deploy_args[@]}"; then
+    exit 0
   fi
 
-  if try_mode plain "$attempt" "${deploy_args[@]}"; then
+  if [ "$can_use_plain_prebuilt" = true ]; then
+    echo "Archive deploy failed; falling back to standard prebuilt upload."
+    if try_mode plain "$attempt" "${deploy_args[@]}"; then
+      exit 0
+    fi
+  else
+    echo "Skipping plain prebuilt fallback because Vercel rejects more than ${plain_prebuilt_limit} files and .vercel/output has ${prebuilt_file_count} files."
+  fi
+
+  echo "Falling back to source deployment."
+  if try_mode source "$attempt" "${deploy_args[@]}"; then
     exit 0
   fi
 
