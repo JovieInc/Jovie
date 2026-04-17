@@ -113,5 +113,4 @@ describe('featured playlist fallback web helpers', () => {
       })
     ).toBeNull();
   });
-
 });
