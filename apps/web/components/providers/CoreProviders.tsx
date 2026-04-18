@@ -155,44 +155,50 @@ function CoreProvidersInner({
     });
     logger.groupEnd();
 
-    // Initialize Web Vitals tracking for performance monitoring
     let cleanupWebVitals: (() => void) | undefined;
     let isUnmounted = false;
 
-    import('@/lib/monitoring/web-vitals')
-      .then(({ initWebVitals }) => {
-        const cleanup = initWebVitals(metric => {
-          // Create a custom event for the performance dashboard
-          if (typeof window !== 'undefined') {
-            const event = new CustomEvent('web-vitals', { detail: metric });
-            window.dispatchEvent(event);
+    // Defer monitoring chunks past initial provider hydration so they do
+    // not contend with main-thread work during first paint. Web Vitals
+    // still captures FCP/LCP/CLS because the underlying PerformanceObserver
+    // subscriptions use `{ buffered: true }` to replay early entries.
+    const handle = setTimeout(() => {
+      import('@/lib/monitoring/web-vitals')
+        .then(({ initWebVitals }) => {
+          const cleanup = initWebVitals(metric => {
+            // Create a custom event for the performance dashboard
+            if (typeof window !== 'undefined') {
+              const event = new CustomEvent('web-vitals', { detail: metric });
+              window.dispatchEvent(event);
+            }
+          });
+
+          if (isUnmounted) {
+            cleanup();
+            return;
           }
-        });
 
-        if (isUnmounted) {
-          cleanup();
-          return;
-        }
-
-        cleanupWebVitals = cleanup;
-      })
-      .catch(error => {
-        logger.error('Failed to initialize Web Vitals:', error);
-      });
-
-    // Initialize other performance monitoring in production
-    if (process.env.NODE_ENV === 'production') {
-      import('@/lib/monitoring/client')
-        .then(({ initAllMonitoring }) => {
-          initAllMonitoring();
+          cleanupWebVitals = cleanup;
         })
         .catch(error => {
-          logger.error('Failed to initialize monitoring:', error);
+          logger.error('Failed to initialize Web Vitals:', error);
         });
-    }
+
+      // Initialize other performance monitoring in production
+      if (process.env.NODE_ENV === 'production') {
+        import('@/lib/monitoring/client')
+          .then(({ initAllMonitoring }) => {
+            initAllMonitoring();
+          })
+          .catch(error => {
+            logger.error('Failed to initialize monitoring:', error);
+          });
+      }
+    }, 300);
 
     return () => {
       isUnmounted = true;
+      clearTimeout(handle);
       cleanupWebVitals?.();
     };
   }, [enableMonitoring]);
