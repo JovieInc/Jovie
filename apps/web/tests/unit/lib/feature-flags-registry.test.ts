@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { STATSIG_GATE_KEYS } from '@/lib/feature-flags/shared';
+import { APP_FLAG_KEYS, LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
 
 const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
@@ -17,34 +17,8 @@ const SKIP_DIRECTORIES = new Set([
   'coverage',
 ]);
 
-/**
- * Derive flag literal prefixes dynamically from the canonical registry so the
- * regex stays comprehensive as new naming schemes are added.
- */
-function buildFlagLiteralRegex(): RegExp {
-  const prefixes = Array.from(
-    new Set(
-      Object.values(STATSIG_GATE_KEYS)
-        .map(flag => {
-          const match = flag.match(/^([a-z0-9]+[_.])/);
-          return match ? match[1] : null;
-        })
-        .filter((prefix): prefix is string => prefix !== null)
-    )
-  );
-
-  function escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  const alternatives = prefixes
-    .map(prefix => `${escapeRegex(prefix)}[A-Za-z0-9_.]+`)
-    .join('|');
-
-  return new RegExp(`['\`"](${alternatives})['\`"]`, 'g');
-}
-
-const FEATURE_FLAG_LITERAL_REGEX = buildFlagLiteralRegex();
+const APP_FLAG_CALL_REGEX =
+  /\b(?:useAppFlag|useFeatureFlag|getAppFlagValue)\(\s*['"`]([A-Z0-9_]+)['"`]/g;
 
 /** Stable package root resolved from this test file's location. */
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -85,18 +59,14 @@ function collectSourceFiles(rootDir: string): string[] {
 }
 
 describe('feature flag registry integrity', () => {
-  /** Known false positives -- strings matching flag prefixes but not actual flags. */
-  const falsePositives = new Set(['show_dialog', 'show_progress_bar']);
-
-  it('keeps all production feature-flag literals registered', () => {
+  it('keeps all runtime app-flag references registered', () => {
     const sourceFiles = collectSourceFiles(WEB_ROOT);
-
-    const registeredFlags = new Set<string>(Object.values(STATSIG_GATE_KEYS));
+    const registeredFlags = new Set<string>(Object.keys(APP_FLAG_KEYS));
     const discoveredFlags = new Set<string>();
 
     for (const sourceFile of sourceFiles) {
       const source = readFileSync(sourceFile, 'utf8');
-      const matches = source.matchAll(FEATURE_FLAG_LITERAL_REGEX);
+      const matches = source.matchAll(APP_FLAG_CALL_REGEX);
 
       for (const [, flag] of matches) {
         discoveredFlags.add(flag);
@@ -104,20 +74,55 @@ describe('feature flag registry integrity', () => {
     }
 
     const unregisteredFlags = [...discoveredFlags]
-      .filter(flag => !registeredFlags.has(flag) && !falsePositives.has(flag))
+      .filter(flag => !registeredFlags.has(flag))
       .sort();
 
     expect(unregisteredFlags).toEqual([]);
   });
 
   it('does not include chat-specific feature flags in the registry', () => {
-    const chatFlagsInKeys = Object.keys(STATSIG_GATE_KEYS).filter(key =>
+    const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(key =>
       /chat/i.test(key)
     );
-    const chatFlagsInValues = Object.values(STATSIG_GATE_KEYS).filter(flag =>
-      /chat/i.test(flag)
+    const chatFlagsInValues = Object.values(LEGACY_STATSIG_GATE_KEYS).filter(
+      flag => /chat/i.test(flag)
     );
 
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
+  });
+
+  it('limits legacy feature-flags imports to static marketing and compatibility files', () => {
+    const sourceFiles = collectSourceFiles(WEB_ROOT);
+    const legacyImportRegex =
+      /from ['"]@\/lib\/feature-flags\/(?:client|server|shared)['"]/;
+    const allowedFiles = new Set([
+      path.join('app', '(home)', 'page.tsx'),
+      path.join('components', 'features', 'home', 'SeeItInActionSafe.tsx'),
+      path.join(
+        'components',
+        'features',
+        'home',
+        'HomeAdaptiveProfileStory.tsx'
+      ),
+      path.join('components', 'features', 'home', 'HomePageNarrative.tsx'),
+      path.join('lib', 'feature-flags', 'client.tsx'),
+      path.join('lib', 'feature-flags', 'server.ts'),
+      path.join('lib', 'feature-flags', 'shared.ts'),
+    ]);
+
+    const violations = sourceFiles
+      .filter(sourceFile => {
+        const relativePath = path.relative(WEB_ROOT, sourceFile);
+        if (allowedFiles.has(relativePath)) {
+          return false;
+        }
+
+        const source = readFileSync(sourceFile, 'utf8');
+        return legacyImportRegex.test(source);
+      })
+      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
+      .sort();
+
+    expect(violations).toEqual([]);
   });
 });

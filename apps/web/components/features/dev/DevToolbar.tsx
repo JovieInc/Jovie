@@ -32,10 +32,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  CODE_FLAG_KEYS,
-  FEATURE_FLAGS,
-  FF_OVERRIDES_KEY,
-} from '@/lib/feature-flags/shared';
+  APP_FLAG_DEFAULTS,
+  APP_FLAG_OVERRIDE_KEYS,
+} from '@/lib/flags/contracts';
+import {
+  clearStoredAppFlagOverrides,
+  readStoredAppFlagOverrides,
+  writeStoredAppFlagOverrides,
+} from '@/lib/flags/overrides';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
 
@@ -56,19 +60,14 @@ import {
 import { useFlagBadges } from './FlagBadgeContext';
 
 function useLocalOverrides() {
-  const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
-    if (globalThis.window === undefined) return {};
-    try {
-      return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
-    } catch {
-      return {};
-    }
-  });
+  const [overrides, setOverrides] = useState<Record<string, boolean>>(
+    readStoredAppFlagOverrides
+  );
 
   const setOverride = useCallback((key: string, value: boolean) => {
     setOverrides(prev => {
       const next = { ...prev, [key]: value };
-      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
+      writeStoredAppFlagOverrides(next);
       return next;
     });
   }, []);
@@ -77,14 +76,14 @@ function useLocalOverrides() {
     setOverrides(prev => {
       const next = { ...prev };
       delete next[key];
-      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
+      writeStoredAppFlagOverrides(next);
       return next;
     });
   }, []);
 
   const clearOverrides = useCallback(() => {
     setOverrides({});
-    localStorage.removeItem(FF_OVERRIDES_KEY);
+    clearStoredAppFlagOverrides();
   }, []);
 
   return { overrides, setOverride, removeOverride, clearOverrides };
@@ -98,12 +97,12 @@ type FlagEntry = {
 };
 
 const ALL_FLAGS: FlagEntry[] = (
-  Object.entries(CODE_FLAG_KEYS) as [string, string][]
+  Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
 ).map(([name, key]) => ({
   name,
   key,
   source: 'code' as const,
-  serverDefault: FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS],
+  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
 }));
 
 const BREAKPOINTS = [
