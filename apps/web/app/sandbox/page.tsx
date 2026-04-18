@@ -1,31 +1,59 @@
 import { Button, Input } from '@jovie/ui';
+import type { Metadata } from 'next';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+
+export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
+};
 
 export default function SandboxPage() {
   return (
-    <main className='mx-auto max-w-2xl space-y-8 p-6'>
-      <header className='space-y-2'>
-        <h1 className='text-3xl font-bold'>UI Sandbox</h1>
-        <p className='text-gray-600 dark:text-gray-300'>
-          Preview core interface elements without signing in.
-        </p>
-      </header>
+    <StandaloneProductPage width='md'>
+      <div className='space-y-6'>
+        <ContentSurfaceCard surface='details'>
+          <ContentSectionHeader
+            density='compact'
+            title='UI sandbox'
+            subtitle='Preview core interface elements without signing in.'
+          />
 
-      <section className='space-y-4'>
-        <h2 className='text-xl font-semibold'>Buttons</h2>
-        <div className='flex flex-wrap gap-4'>
-          <Button>Primary</Button>
-          <Button variant='secondary'>Secondary</Button>
-          <Button variant='ghost'>Ghost</Button>
-        </div>
-      </section>
+          <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2 sm:p-4 sm:pt-0'>
+            <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
+              <div className='space-y-1'>
+                <h2 className='text-[13px] font-[560] text-primary-token'>
+                  Buttons
+                </h2>
+                <p className='text-[12px] text-secondary-token'>
+                  Core actions in their default product styles.
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-3'>
+                <Button>Primary</Button>
+                <Button variant='secondary'>Secondary</Button>
+                <Button variant='ghost'>Ghost</Button>
+              </div>
+            </ContentSurfaceCard>
 
-      <section className='space-y-4'>
-        <h2 className='text-xl font-semibold'>Inputs</h2>
-        <div className='space-y-2'>
-          <Input placeholder='Placeholder' />
-          <Input type='password' placeholder='Password' />
-        </div>
-      </section>
-    </main>
+            <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
+              <div className='space-y-1'>
+                <h2 className='text-[13px] font-[560] text-primary-token'>
+                  Inputs
+                </h2>
+                <p className='text-[12px] text-secondary-token'>
+                  Baseline form controls for product-surface checks.
+                </p>
+              </div>
+              <div className='space-y-3'>
+                <Input placeholder='Placeholder' />
+                <Input type='password' placeholder='Password' />
+              </div>
+            </ContentSurfaceCard>
+          </div>
+        </ContentSurfaceCard>
+      </div>
+    </StandaloneProductPage>
   );
 }

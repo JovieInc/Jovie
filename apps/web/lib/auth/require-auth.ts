@@ -1,8 +1,11 @@
 import 'server-only';
-import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
+import { getOptionalAuth } from '@/lib/auth/cached';
+import {
+  isTestAuthBypassEnabled,
+  resolveTestBypassUserId,
+} from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
@@ -59,7 +62,7 @@ export async function requireAuth(options?: {
 }): Promise<AuthResult> {
   const { message = 'Unauthorized', noCache = true } = options ?? {};
 
-  if (process.env.NODE_ENV === 'test') {
+  if (isTestAuthBypassEnabled()) {
     try {
       const headerStore = await headers();
       const testUserId = resolveTestBypassUserId(headerStore);
@@ -71,7 +74,7 @@ export async function requireAuth(options?: {
     }
   }
 
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
 
   if (!userId) {
     return {
@@ -102,7 +105,7 @@ export async function requireAuth(options?: {
  * ```
  */
 export async function getAuthUserId(): Promise<string | null> {
-  if (process.env.NODE_ENV === 'test') {
+  if (isTestAuthBypassEnabled()) {
     try {
       const headerStore = await headers();
       const testUserId = resolveTestBypassUserId(headerStore);
@@ -114,7 +117,7 @@ export async function getAuthUserId(): Promise<string | null> {
     }
   }
 
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
   return userId;
 }
 

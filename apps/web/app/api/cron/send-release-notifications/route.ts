@@ -1,14 +1,19 @@
 import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  getReleaseNotificationEligibility,
+  type ReleaseNotificationEligibilityReason,
+} from '@/lib/notifications/release-eligibility';
 import { sendNotification } from '@/lib/notifications/service';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
@@ -19,15 +24,12 @@ export const maxDuration = 120;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Process up to 100 notifications per run to avoid timeouts
-const MAX_NOTIFICATIONS_PER_RUN = 100;
+// Process up to 200 notifications per run, enough for one frequent-cron slice.
+const MAX_NOTIFICATIONS_PER_RUN = 200;
 
 // Timeout for stuck "sending" rows - if a notification has been in "sending" state
 // for longer than this, reset it to "pending" for retry
 const SENDING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
-
-// Number of notifications to process concurrently within each batch
-const CONCURRENCY_BATCH_SIZE = 10;
 
 // ============================================================================
 // Types
@@ -42,32 +44,38 @@ interface PendingNotification {
   metadata: unknown;
 }
 
+type ProcessResult = 'sent' | 'failed' | 'skipped';
+type CreatorEntitlementEntry = {
+  entitlements: {
+    booleans: {
+      canSendNotifications: boolean;
+    };
+  };
+  plan: string;
+};
 interface ProcessingContext {
   now: Date;
   notification: PendingNotification;
 }
 
-type ProcessResult = 'sent' | 'failed' | 'skipped';
-
-/** Count settled promise results by outcome category. */
-function countSettledResults(results: PromiseSettledResult<ProcessResult>[]): {
-  sent: number;
-  failed: number;
-  skipped: number;
-} {
-  let sent = 0;
-  let failed = 0;
-  let skipped = 0;
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      if (result.value === 'sent') sent++;
-      else if (result.value === 'failed') failed++;
-      else if (result.value === 'skipped') skipped++;
-    } else {
-      failed++;
-    }
+async function getCreatorEntitlementsMap(
+  creatorProfileIds: string[]
+): Promise<Map<string, CreatorEntitlementEntry> | null> {
+  try {
+    return (await getBatchCreatorEntitlements(creatorProfileIds)) as Map<
+      string,
+      CreatorEntitlementEntry
+    >;
+  } catch (error) {
+    logger.warn(
+      '[send-release-notifications] Batch entitlements lookup failed, preserving pending notifications for retry',
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        creatorCount: creatorProfileIds.length,
+      }
+    );
+    return null;
   }
-  return { sent, failed, skipped };
 }
 
 // Type aliases for batch-fetched data to simplify function signatures
@@ -77,11 +85,17 @@ type BatchRelease = {
   slug: string;
   artworkUrl: string | null;
   releaseDate: Date | null;
+  sourceType: string | null;
 };
 
 type BatchCreator = {
   id: string;
   displayName: string | null;
+  isClaimed: boolean | null;
+  ownerUserId: string | null;
+  settings: Record<string, unknown> | null;
+  spotifyId: string | null;
+  trialNotificationsSent: number | null;
   username: string;
   usernameNormalized: string;
 };
@@ -91,6 +105,7 @@ type BatchSubscriber = {
   channel: string;
   email: string | null;
   phone: string | null;
+  name: string | null;
 };
 
 // ============================================================================
@@ -178,6 +193,108 @@ async function updateNotificationStatus(
     .where(eq(fanReleaseNotifications.id, notificationId));
 }
 
+async function incrementTrialNotificationCount(userId: string): Promise<void> {
+  const MAX_OPTIMISTIC_LOCK_RETRIES = 3;
+
+  for (let attempt = 0; attempt < MAX_OPTIMISTIC_LOCK_RETRIES; attempt += 1) {
+    const [currentUser] = await db
+      .select({
+        id: users.id,
+        billingVersion: users.billingVersion,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!currentUser) {
+      logger.warn(
+        '[send-release-notifications] Trial notification count update skipped for missing user',
+        { userId }
+      );
+      return;
+    }
+
+    const updatedRows = await db
+      .update(users)
+      .set({
+        trialNotificationsSent: drizzleSql`COALESCE(${users.trialNotificationsSent}, 0) + 1`,
+        billingVersion: drizzleSql`${users.billingVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(users.billingVersion, currentUser.billingVersion)
+        )
+      )
+      .returning({ id: users.id });
+
+    if (updatedRows.length > 0) {
+      return;
+    }
+  }
+
+  logger.warn(
+    '[send-release-notifications] Trial notification count update lost optimistic lock after retries',
+    { userId, retries: 3 }
+  );
+}
+
+async function persistTrialNotificationCount(
+  notificationId: string,
+  ownerUserId: string,
+  trialState: {
+    isTrialing: boolean;
+    trialNotificationsSent: number;
+  }
+): Promise<void> {
+  if (!trialState.isTrialing) {
+    return;
+  }
+
+  trialState.trialNotificationsSent += 1;
+
+  try {
+    await incrementTrialNotificationCount(ownerUserId);
+  } catch (error) {
+    logger.error(
+      '[send-release-notifications] Failed to persist trial notification count:',
+      error
+    );
+    await captureError('Failed to persist trial notification count', error, {
+      notificationId,
+      userId: ownerUserId,
+    });
+  }
+}
+
+function getCancellationReason(
+  reason: ReleaseNotificationEligibilityReason
+): string {
+  switch (reason) {
+    case 'profile_not_claimed':
+      return 'Profile must be claimed before notifications can send';
+    case 'spotify_required':
+      return 'Spotify must be connected before notifications can send';
+    case 'catalog_import_pending':
+      return 'Catalog import is still pending';
+    case 'release_not_spotify_imported':
+      return 'Release was not imported from Spotify';
+    case 'notifications_disabled':
+      return 'Creator cannot send notifications on current plan';
+    case 'no_verified_subscribers':
+      return 'No verified subscribers remain';
+    case 'no_smart_link':
+      return 'Release smart link is missing';
+    case 'trial_exhausted':
+      return 'Trial notification quota exhausted';
+    case 'already_notified':
+      return 'Release notification already processed';
+    default:
+      return 'Release notification is not eligible to send';
+  }
+}
+
 // ============================================================================
 // Batch Data Fetching
 // ============================================================================
@@ -192,6 +309,7 @@ async function batchFetchReleases(releaseIds: string[]) {
       slug: discogReleases.slug,
       artworkUrl: discogReleases.artworkUrl,
       releaseDate: discogReleases.releaseDate,
+      sourceType: discogReleases.sourceType,
     })
     .from(discogReleases)
     .where(drizzleSql`${discogReleases.id} = ANY(${releaseIds})`);
@@ -206,10 +324,16 @@ async function batchFetchCreatorProfiles(creatorProfileIds: string[]) {
     .select({
       id: creatorProfiles.id,
       displayName: creatorProfiles.displayName,
+      isClaimed: creatorProfiles.isClaimed,
+      ownerUserId: creatorProfiles.userId,
+      settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
+      trialNotificationsSent: users.trialNotificationsSent,
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`);
 
   return new Map(creators.map(c => [c.id, c]));
@@ -224,6 +348,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
       channel: notificationSubscriptions.channel,
       email: notificationSubscriptions.email,
       phone: notificationSubscriptions.phone,
+      name: notificationSubscriptions.name,
     })
     .from(notificationSubscriptions)
     .where(
@@ -282,7 +407,12 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
 async function sendEmailNotification(
   ctx: ProcessingContext,
   subscriber: { email: string },
-  emailData: { subject: string; text: string; html: string },
+  emailData: {
+    subject: string;
+    text: string;
+    html: string;
+    headers?: Record<string, string>;
+  },
   senderContext: SenderContext
 ): Promise<ProcessResult> {
   const result = await sendNotification(
@@ -291,6 +421,7 @@ async function sendEmailNotification(
       subject: emailData.subject,
       text: emailData.text,
       html: emailData.html,
+      headers: emailData.headers,
       channels: ['email'],
       category: 'marketing',
       senderContext,
@@ -312,60 +443,111 @@ async function sendEmailNotification(
 }
 
 async function processNotificationWithBatchedData(
-  ctx: ProcessingContext,
+  notification: PendingNotification,
+  now: Date,
   releasesMap: Map<string, BatchRelease>,
   creatorsMap: Map<string, BatchCreator>,
   subscribersMap: Map<string, BatchSubscriber>,
-  linksMap: Map<string, Array<{ providerId: string; url: string }>>
+  linksMap: Map<string, Array<{ providerId: string; url: string }>>,
+  entitlementsMap: NonNullable<
+    Awaited<ReturnType<typeof getCreatorEntitlementsMap>>
+  >,
+  creatorTrialCounts: Map<
+    string,
+    {
+      isTrialing: boolean;
+      trialNotificationsSent: number;
+    }
+  >
 ): Promise<ProcessResult> {
   try {
-    // Atomically claim the notification
-    const claimed = await claimNotification(ctx.notification.id, ctx.now);
-    if (!claimed) {
-      return 'skipped';
-    }
-
-    // Get pre-fetched release details
-    const release = releasesMap.get(ctx.notification.releaseId);
+    const release = releasesMap.get(notification.releaseId);
     if (!release) {
-      throw new Error(`Release not found: ${ctx.notification.releaseId}`);
+      throw new Error(`Release not found: ${notification.releaseId}`);
     }
 
-    // Validate release date hasn't been rescheduled to future
-    if (release.releaseDate && release.releaseDate > ctx.now) {
+    if (release.releaseDate && release.releaseDate > now) {
       await updateNotificationStatus(
-        ctx.notification.id,
-        ctx.now,
+        notification.id,
+        now,
         'cancelled',
         'Release date changed to future date'
       );
       logger.info(
-        `[send-release-notifications] Cancelled notification ${ctx.notification.id} - release date changed to ${toISOStringSafe(release.releaseDate)}`
+        `[send-release-notifications] Cancelled notification ${notification.id} - release date changed to ${toISOStringSafe(release.releaseDate)}`
       );
       return 'skipped';
     }
 
-    // Get pre-fetched creator profile
-    const creator = creatorsMap.get(ctx.notification.creatorProfileId);
+    const creator = creatorsMap.get(notification.creatorProfileId);
     if (!creator) {
+      throw new Error(`Creator not found: ${notification.creatorProfileId}`);
+    }
+
+    const subscriber = subscribersMap.get(
+      notification.notificationSubscriptionId
+    );
+    const links = linksMap.get(release.id) ?? [];
+    const creatorEntitlements = entitlementsMap.get(
+      notification.creatorProfileId
+    );
+
+    if (!creatorEntitlements) {
       throw new Error(
-        `Creator not found: ${ctx.notification.creatorProfileId}`
+        `Creator entitlements missing: ${notification.creatorProfileId}`
       );
     }
 
-    // Get pre-fetched subscriber (also verifies they haven't unsubscribed)
-    const subscriber = subscribersMap.get(
-      ctx.notification.notificationSubscriptionId
-    );
-    if (!subscriber) {
-      await updateNotificationStatus(ctx.notification.id, ctx.now, 'cancelled');
+    const spotifyImportStatus =
+      typeof creator.settings?.spotifyImportStatus === 'string'
+        ? creator.settings.spotifyImportStatus
+        : null;
+    const trialState = creatorTrialCounts.get(
+      notification.creatorProfileId
+    ) ?? {
+      isTrialing: creatorEntitlements.plan === 'trial',
+      trialNotificationsSent: creator.trialNotificationsSent ?? 0,
+    };
+    creatorTrialCounts.set(notification.creatorProfileId, trialState);
+
+    const eligibility = getReleaseNotificationEligibility({
+      canSendNotifications:
+        creatorEntitlements.entitlements.booleans.canSendNotifications,
+      hasSmartLink: links.length > 0,
+      isClaimed: creator.isClaimed === true,
+      isTrialing: trialState.isTrialing,
+      releaseSourceType: release.sourceType,
+      spotifyId: creator.spotifyId,
+      spotifyImportStatus,
+      trialNotificationsSent: trialState.trialNotificationsSent,
+      verifiedSubscriberCount: subscriber ? 1 : 0,
+    });
+
+    if (!eligibility.eligible) {
+      await updateNotificationStatus(
+        notification.id,
+        now,
+        'cancelled',
+        getCancellationReason(eligibility.reason)
+      );
       return 'skipped';
     }
 
-    // Get pre-fetched streaming links
-    const links = linksMap.get(release.id) ?? [];
+    const claimed = await claimNotification(notification.id, now);
+    if (!claimed) {
+      return 'skipped';
+    }
 
-    // Build email content
+    if (!subscriber) {
+      await updateNotificationStatus(
+        notification.id,
+        now,
+        'cancelled',
+        'No verified subscribers remain'
+      );
+      return 'skipped';
+    }
+
     const artistName = creator.displayName ?? creator.username;
     const emailData = getReleaseDayNotificationEmail({
       artistName,
@@ -374,9 +556,9 @@ async function processNotificationWithBatchedData(
       username: creator.usernameNormalized,
       slug: release.slug,
       streamingLinks: links,
+      subscriberName: subscriber.name,
     });
 
-    // Build sender context for "Artist Name via Jovie" emails
     const senderContext: SenderContext = {
       creatorProfileId: creator.id,
       displayName: artistName,
@@ -384,38 +566,46 @@ async function processNotificationWithBatchedData(
       referenceId: release.id,
     };
 
-    // Send notification based on channel
     if (subscriber.channel === 'email' && subscriber.email) {
-      return sendEmailNotification(
-        ctx,
+      const result = await sendEmailNotification(
+        { now, notification },
         { email: subscriber.email },
         emailData,
         senderContext
       );
+
+      if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
+        await persistTrialNotificationCount(
+          notification.id,
+          creator.ownerUserId,
+          trialState
+        );
+      }
+
+      return result;
     }
 
     if (subscriber.channel === 'sms' && subscriber.phone) {
       await updateNotificationStatus(
-        ctx.notification.id,
-        ctx.now,
+        notification.id,
+        now,
         'failed',
         'SMS channel not yet implemented'
       );
       return 'failed';
     }
 
-    // No valid contact info
     await updateNotificationStatus(
-      ctx.notification.id,
-      ctx.now,
+      notification.id,
+      now,
       'failed',
       'No valid contact information'
     );
     return 'failed';
   } catch (error) {
     await updateNotificationStatus(
-      ctx.notification.id,
-      ctx.now,
+      notification.id,
+      now,
       'failed',
       error instanceof Error ? error.message : 'Unknown error'
     );
@@ -430,13 +620,6 @@ async function processNotificationWithBatchedData(
 // ============================================================================
 // API Route Handler
 // ============================================================================
-
-function createUnauthorizedResponse(): NextResponse {
-  return NextResponse.json(
-    { error: 'Unauthorized' },
-    { status: 401, headers: NO_STORE_HEADERS }
-  );
-}
 
 function createEmptyResponse(now: Date): NextResponse {
   return NextResponse.json(
@@ -493,34 +676,45 @@ async function processNotificationBatches(
   releasesMap: Map<string, BatchRelease>,
   creatorsMap: Map<string, BatchCreator>,
   subscribersMap: Map<string, BatchSubscriber>,
-  linksMap: Map<string, Array<{ providerId: string; url: string }>>
+  linksMap: Map<string, Array<{ providerId: string; url: string }>>,
+  entitlementsMap: NonNullable<
+    Awaited<ReturnType<typeof getCreatorEntitlementsMap>>
+  >
 ): Promise<{ totalSent: number; totalFailed: number; totalSkipped: number }> {
   let totalSent = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
+  const creatorTrialCounts = new Map<
+    string,
+    {
+      isTrialing: boolean;
+      trialNotificationsSent: number;
+    }
+  >();
 
-  for (
-    let i = 0;
-    i < pendingNotifications.length;
-    i += CONCURRENCY_BATCH_SIZE
-  ) {
-    const batch = pendingNotifications.slice(i, i + CONCURRENCY_BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map(notification =>
-        processNotificationWithBatchedData(
-          { now, notification },
-          releasesMap,
-          creatorsMap,
-          subscribersMap,
-          linksMap
-        )
-      )
+  for (const notification of pendingNotifications) {
+    const result = await processNotificationWithBatchedData(
+      notification,
+      now,
+      releasesMap,
+      creatorsMap,
+      subscribersMap,
+      linksMap,
+      entitlementsMap,
+      creatorTrialCounts
     );
 
-    const counts = countSettledResults(results);
-    totalSent += counts.sent;
-    totalFailed += counts.failed;
-    totalSkipped += counts.skipped;
+    if (result === 'sent') {
+      totalSent += 1;
+      continue;
+    }
+
+    if (result === 'failed') {
+      totalFailed += 1;
+      continue;
+    }
+
+    totalSkipped += 1;
   }
 
   return { totalSent, totalFailed, totalSkipped };
@@ -575,21 +769,18 @@ export async function sendPendingNotifications(): Promise<{
       batchFetchStreamingLinks(releaseIds),
     ]);
 
-  // Check which creators can send notifications based on their plan (single batch query)
-  const eligibleCreatorIds = new Set<string>();
-  try {
-    const entitlementsMap =
-      await getBatchCreatorEntitlements(creatorProfileIds);
-    for (const [profileId, { entitlements }] of entitlementsMap) {
-      if (entitlements.booleans.canSendNotifications) {
-        eligibleCreatorIds.add(profileId);
-      }
-    }
-  } catch {
-    logger.warn(
-      '[send-release-notifications] Batch entitlements lookup failed, skipping all creators'
+  const entitlementsMap = await getCreatorEntitlementsMap(creatorProfileIds);
+  if (!entitlementsMap) {
+    throw new Error(
+      'Creator entitlements lookup failed while sending release notifications'
     );
   }
+
+  const eligibleCreatorIds = new Set(
+    [...entitlementsMap.entries()]
+      .filter(([, value]) => value.entitlements.booleans.canSendNotifications)
+      .map(([profileId]) => profileId)
+  );
 
   // Cancel notifications for ineligible creators
   const ineligibleNotifications = pendingNotifications.filter(
@@ -633,7 +824,8 @@ export async function sendPendingNotifications(): Promise<{
     releasesMap,
     creatorsMap,
     subscribersMap,
-    linksMap
+    linksMap,
+    entitlementsMap
   );
 
   logger.info(
@@ -651,13 +843,13 @@ export async function sendPendingNotifications(): Promise<{
 /**
  * Cron job to send pending release day notifications.
  *
- * Schedule: Every hour (configured in vercel.json)
+ * Schedule: Every 15 minutes via /api/cron/frequent
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return createUnauthorizedResponse();
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/send-release-notifications',
+  });
+  if (authError) return authError;
 
   try {
     const result = await sendPendingNotifications();

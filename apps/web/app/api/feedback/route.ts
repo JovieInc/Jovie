@@ -1,9 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
 import { notifySlackFeedbackSubmission } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
@@ -18,7 +19,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     const body = await request.json();
     const parsed = payloadSchema.safeParse(body);
 
@@ -59,7 +60,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, id: feedback.id });
-  } catch {
+  } catch (error) {
+    logger.error('[api/feedback] Failed to submit feedback:', error);
+    await captureError('Feedback submission failed', error, {
+      route: '/api/feedback',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Unable to submit feedback' },
       { status: 500 }

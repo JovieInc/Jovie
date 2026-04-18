@@ -1,7 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { after } from 'next/server';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
@@ -20,24 +25,26 @@ import {
   sanitizeName,
   sanitizeText,
 } from '@/lib/spotify/sanitize';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
-
 import {
   parseArtistCredits,
   parseMainArtists,
   type SpotifyArtistInput,
 } from './artist-parser';
 import {
+  processRecordingArtistCredits,
   processReleaseArtistCredits,
-  processTrackArtistCredits,
 } from './artist-queries';
 import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
+  syncProfileGenresFromReleases,
   upsertProviderLink,
+  upsertRecording,
   upsertRelease,
-  upsertTrack,
+  upsertReleaseTrack,
 } from './queries';
 import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
@@ -79,11 +86,40 @@ function sanitizeBoundedNullableInteger(
   return Math.max(min, Math.min(Math.trunc(value), max));
 }
 
+function getMaxReleasesPerImport(): number {
+  return MAX_RELEASES_PER_IMPORT;
+}
+
+function getMaxTracksPerRelease(): number {
+  return MAX_TRACKS_PER_RELEASE;
+}
+
+function getEffectiveMaxReleasesPerImport(
+  override: number | undefined
+): number {
+  return sanitizeBoundedInteger(
+    override,
+    1,
+    MAX_RELEASES_PER_IMPORT,
+    getMaxReleasesPerImport()
+  );
+}
+
+function getEffectiveMaxTracksPerRelease(override: number | undefined): number {
+  return sanitizeBoundedInteger(
+    override,
+    1,
+    MAX_TRACKS_PER_RELEASE,
+    getMaxTracksPerRelease()
+  );
+}
+
 export interface SpotifyImportResult {
   success: boolean;
   imported: number;
   updated: number;
   failed: number;
+  total: number;
   releases: ReleaseWithProviders[];
   errors: string[];
 }
@@ -93,10 +129,14 @@ export interface SpotifyImportOptions {
   includeGroups?: ('album' | 'single' | 'compilation' | 'appears_on')[];
   /** Import tracks for each release. Defaults to true to enable ISRC discovery */
   includeTracks?: boolean;
+  /** Override the maximum number of releases imported in this run */
+  maxReleases?: number;
+  /** Override the maximum number of tracks imported per release */
+  maxTracksPerRelease?: number;
   /** Market for availability. Defaults to 'US' */
   market?: string;
-  /** Discover cross-platform links after import. Defaults to true */
-  discoverLinks?: boolean;
+  /** Discover cross-platform links after import. Defaults to 'background' */
+  discoverLinks?: boolean | 'sync' | 'background';
 }
 
 /**
@@ -106,9 +146,11 @@ async function discoverLinksForReleases(
   creatorProfileId: string,
   market: string
 ): Promise<void> {
-  const importedReleases = await getReleasesForProfile(creatorProfileId);
+  const importedReleases = await getReleasesForProfile(creatorProfileId, {
+    includeDrafts: true,
+  });
 
-  for (const release of importedReleases) {
+  await mapConcurrent(importedReleases, 5, async release => {
     try {
       // Only count canonical/manual links as existing — search fallback URLs
       // should be upgraded to canonical links via ISRC/UPC discovery.
@@ -131,6 +173,24 @@ async function discoverLinksForReleases(
         data: { releaseId: release.id, error },
       });
     }
+  });
+}
+
+function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
+  try {
+    after(task);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('outside a request scope')
+    ) {
+      queueMicrotask(() => {
+        void task();
+      });
+      return;
+    }
+
+    throw error;
   }
 }
 
@@ -141,12 +201,18 @@ async function importAlbumBatch(
   creatorProfileId: string,
   albumsToImport: SpotifyAlbum[],
   fullAlbumMap: Map<string, SpotifyAlbumFull>,
+  maxTracksPerRelease: number,
   result: SpotifyImportResult
 ): Promise<void> {
   for (const album of albumsToImport) {
     try {
       const fullAlbum = fullAlbumMap.get(album.id);
-      await importSingleRelease(creatorProfileId, album, fullAlbum);
+      await importSingleRelease(
+        creatorProfileId,
+        album,
+        fullAlbum,
+        maxTracksPerRelease
+      );
       result.imported++;
     } catch (error) {
       result.failed++;
@@ -181,6 +247,7 @@ function mergeFullTrackMetadata(
         return {
           ...track,
           external_ids: fullTrack.external_ids,
+          preview_url: track.preview_url ?? fullTrack.preview_url,
         };
       }),
     },
@@ -234,15 +301,31 @@ export async function importReleasesFromSpotify(
   const {
     includeGroups = ['album', 'single', 'compilation'],
     includeTracks = true, // Default to true for ISRC discovery
-    discoverLinks = true,
+    discoverLinks: discoverLinksOpt,
+    maxReleases,
+    maxTracksPerRelease,
     market = 'US',
   } = options;
+
+  // Normalize legacy boolean values to the new string union.
+  // `true` preserves original sync behavior; only omitted defaults to background.
+  let discoverLinksMode: false | 'sync' | 'background';
+  if (discoverLinksOpt === undefined) {
+    discoverLinksMode = 'background';
+  } else if (discoverLinksOpt === true) {
+    discoverLinksMode = 'sync';
+  } else if (discoverLinksOpt === false) {
+    discoverLinksMode = false;
+  } else {
+    discoverLinksMode = discoverLinksOpt;
+  }
 
   const result: SpotifyImportResult = {
     success: false,
     imported: 0,
     updated: 0,
     failed: 0,
+    total: 0,
     releases: [],
     errors: [],
   };
@@ -271,29 +354,61 @@ export async function importReleasesFromSpotify(
       span.setAttribute('creator_profile_id', creatorProfileId);
 
       try {
+        const maxReleasesPerImport =
+          getEffectiveMaxReleasesPerImport(maxReleases);
+
         // 1. Fetch all albums from Spotify
-        const spotifyAlbums = await getSpotifyArtistAlbums(spotifyArtistId, {
-          includeGroups,
-          market,
-        });
+        const { albums: spotifyAlbums, total: spotifyTotal } =
+          await getSpotifyArtistAlbums(spotifyArtistId, {
+            includeGroups,
+            market,
+          });
 
         if (spotifyAlbums.length === 0) {
           result.success = true;
-          result.releases = await getReleasesForProfile(creatorProfileId);
+          result.releases = await getReleasesForProfile(creatorProfileId, {
+            includeDrafts: true,
+          });
           return result;
         }
 
         // Safety limit: cap number of releases
-        const albumsToImport = spotifyAlbums.slice(0, MAX_RELEASES_PER_IMPORT);
-        if (spotifyAlbums.length > MAX_RELEASES_PER_IMPORT) {
+        const albumsToImport = spotifyAlbums.slice(0, maxReleasesPerImport);
+        result.total = Math.min(spotifyTotal, maxReleasesPerImport);
+        if (spotifyAlbums.length > maxReleasesPerImport) {
           captureWarning('Spotify import truncated due to limit', {
             totalReleases: spotifyAlbums.length,
-            limit: MAX_RELEASES_PER_IMPORT,
+            limit: maxReleasesPerImport,
             spotifyArtistId,
           });
         }
 
         span.setAttribute('spotify.album_count', albumsToImport.length);
+
+        // Early-write total to settings so polling can show determinate progress
+        try {
+          const { creatorProfiles } = await import('@/lib/db/schema');
+          const [current] = await db
+            .select({ settings: creatorProfiles.settings })
+            .from(creatorProfiles)
+            .where(eq(creatorProfiles.id, creatorProfileId))
+            .limit(1);
+          const currentSettings = (current?.settings ?? {}) as Record<
+            string,
+            unknown
+          >;
+          await db
+            .update(creatorProfiles)
+            .set({
+              settings: {
+                ...currentSettings,
+                spotifyImportTotal: result.total,
+              },
+            })
+            .where(eq(creatorProfiles.id, creatorProfileId));
+        } catch {
+          // Non-critical: progress bar falls back to shimmer if this fails
+        }
 
         // 2. Get full album details (includes tracks and UPC)
         const albumIds = albumsToImport.map(a => a.id);
@@ -301,8 +416,12 @@ export async function importReleasesFromSpotify(
           ? await getSpotifyAlbums(albumIds, market)
           : [];
 
+        const effectiveMaxTracksPerRelease =
+          getEffectiveMaxTracksPerRelease(maxTracksPerRelease);
         const spotifyTrackIds = fullAlbums.flatMap(album =>
-          album.tracks.items.map(track => track.id)
+          album.tracks.items
+            .slice(0, effectiveMaxTracksPerRelease)
+            .map(track => track.id)
         );
         const fullTracks = includeTracks
           ? await getSpotifyTracks(spotifyTrackIds, market)
@@ -315,7 +434,16 @@ export async function importReleasesFromSpotify(
         const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
         for (const album of fullAlbums) {
           const enrichedAlbum = mergeFullTrackMetadata(album, fullTracksById);
-          logTrackIsrcCoverage(enrichedAlbum);
+          logTrackIsrcCoverage({
+            ...enrichedAlbum,
+            tracks: {
+              ...enrichedAlbum.tracks,
+              items: enrichedAlbum.tracks.items.slice(
+                0,
+                effectiveMaxTracksPerRelease
+              ),
+            },
+          });
           fullAlbumMap.set(album.id, enrichedAlbum);
         }
 
@@ -324,16 +452,47 @@ export async function importReleasesFromSpotify(
           creatorProfileId,
           albumsToImport,
           fullAlbumMap,
+          effectiveMaxTracksPerRelease,
           result
         );
 
-        // 4. Discover cross-platform links
-        if (discoverLinks && includeTracks) {
-          await discoverLinksForReleases(creatorProfileId, market);
+        // 4. Sync profile genres from release data (best-effort)
+        try {
+          await syncProfileGenresFromReleases(creatorProfileId);
+        } catch (error) {
+          // Non-critical: don't fail the import if genre sync fails
+          Sentry.addBreadcrumb({
+            category: 'spotify-import',
+            message: 'Genre sync failed',
+            level: 'warning',
+            data: { creatorProfileId, error },
+          });
         }
 
-        // 5. Fetch the final state
-        result.releases = await getReleasesForProfile(creatorProfileId);
+        // 5. Discover cross-platform links
+        if (discoverLinksMode && includeTracks) {
+          if (discoverLinksMode === 'sync') {
+            await discoverLinksForReleases(creatorProfileId, market);
+          } else {
+            // Use after() in request scope, but fall back for tests and other
+            // non-request call sites that still need fire-and-forget behavior.
+            scheduleBackgroundDiscovery(() =>
+              discoverLinksForReleases(creatorProfileId, market).catch(
+                error => {
+                  captureWarning('Background link discovery failed', error, {
+                    source: 'spotify_import',
+                    creatorProfileId,
+                  });
+                }
+              )
+            );
+          }
+        }
+
+        // 6. Fetch the final state
+        result.releases = await getReleasesForProfile(creatorProfileId, {
+          includeDrafts: true,
+        });
         result.success = result.failed === 0;
 
         span.setAttribute('spotify.imported_count', result.imported);
@@ -445,32 +604,67 @@ async function fetchExistingTrackSlugs(
     return existingTracksBySpotifyId;
   }
 
-  const rows = await db
+  // Check new model (discogRecordings) first
+  const recordingRows = await db
     .select({
-      id: discogTracks.id,
-      slug: discogTracks.slug,
+      id: discogRecordings.id,
+      slug: discogRecordings.slug,
       spotifyTrackId:
-        drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+        drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`.as(
           'spotify_track_id'
         ),
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .where(
       and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
         inArray(
-          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+          drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`,
           spotifyTrackIds
         )
       )
     );
 
-  for (const row of rows) {
+  for (const row of recordingRows) {
     if (!row.spotifyTrackId) continue;
     existingTracksBySpotifyId.set(row.spotifyTrackId, {
       id: row.id,
       slug: row.slug,
     });
+  }
+
+  // Fall back to legacy tracks for any not found in recordings
+  const missingIds = spotifyTrackIds.filter(
+    id => !existingTracksBySpotifyId.has(id)
+  );
+  if (missingIds.length > 0) {
+    const rows = await db
+      .select({
+        id: discogTracks.id,
+        slug: discogTracks.slug,
+        spotifyTrackId:
+          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+            'spotify_track_id'
+          ),
+      })
+      .from(discogTracks)
+      .where(
+        and(
+          eq(discogTracks.creatorProfileId, creatorProfileId),
+          inArray(
+            drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+            missingIds
+          )
+        )
+      );
+
+    for (const row of rows) {
+      if (!row.spotifyTrackId) continue;
+      existingTracksBySpotifyId.set(row.spotifyTrackId, {
+        id: row.id,
+        slug: row.slug,
+      });
+    }
   }
 
   return existingTracksBySpotifyId;
@@ -484,12 +678,10 @@ async function processTracksForRelease(
   creatorProfileId: string,
   sanitizedTitle: string,
   slug: string,
-  fullAlbum: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull,
+  maxTracksPerRelease: number
 ): Promise<boolean> {
-  const tracksToImport = fullAlbum.tracks.items.slice(
-    0,
-    MAX_TRACKS_PER_RELEASE
-  );
+  const tracksToImport = fullAlbum.tracks.items.slice(0, maxTracksPerRelease);
   const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
   const existingTracksBySpotifyId = await fetchExistingTrackSlugs(
     creatorProfileId,
@@ -524,20 +716,21 @@ async function processTracksForRelease(
     const audioFallbackUrl = sanitizedPreviewUrl;
     const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
-    const createdTrack = await upsertTrack({
-      releaseId: release.id,
+    const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
+    const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
+
+    // New model: upsert recording (canonical audio entity)
+    const createdRecording = await upsertRecording({
       creatorProfileId,
       title: sanitizedTrackTitle,
       slug: trackSlug,
-      trackNumber: sanitizeBoundedInteger(track.track_number, 1, 999, 1),
-      discNumber: sanitizeBoundedInteger(track.disc_number, 1, 99, 1),
+      isrc: sanitizedIsrc,
       durationMs: sanitizeBoundedNullableInteger(
         track.duration_ms,
         0,
         60 * 60 * 1000
       ),
       isExplicit: track.explicit,
-      isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
       audioUrl: audioFallbackUrl,
       audioFormat: audioFallbackFormat,
@@ -548,8 +741,24 @@ async function processTracksForRelease(
       },
     });
 
+    // New model: upsert release track (recording appearance on release)
+    const createdReleaseTrack = await upsertReleaseTrack({
+      releaseId: release.id,
+      recordingId: createdRecording.id,
+      title: sanitizedTrackTitle,
+      slug: trackSlug,
+      trackNumber,
+      discNumber,
+      isExplicit: track.explicit,
+      sourceType: 'ingested',
+      metadata: {
+        spotifyId: track.id,
+      },
+    });
+
+    // Provider link on release_track (new model)
     await upsertProviderLink({
-      trackId: createdTrack.id,
+      releaseTrackId: createdReleaseTrack.id,
       providerId: 'spotify',
       url: buildSpotifyTrackUrl(track.id),
       externalId: null,
@@ -570,10 +779,14 @@ async function processTracksForRelease(
       track.name,
       trackArtistInputs
     );
-    await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
-      deleteExisting: true,
-      sourceType: 'ingested',
-    });
+    await processRecordingArtistCredits(
+      createdRecording.id,
+      trackArtistCredits,
+      {
+        deleteExisting: true,
+        sourceType: 'ingested',
+      }
+    );
   }
 
   // Update release explicit flag if any track is explicit
@@ -600,7 +813,8 @@ async function processTracksForRelease(
 async function importSingleRelease(
   creatorProfileId: string,
   album: SpotifyAlbum,
-  fullAlbum?: SpotifyAlbumFull
+  fullAlbum: SpotifyAlbumFull | undefined,
+  maxTracksPerRelease: number
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
 
@@ -651,7 +865,7 @@ async function importSingleRelease(
     releaseDate,
     label: metadata.sanitizedLabel,
     upc: metadata.sanitizedUpc,
-    totalTracks: Math.min(effectiveTotalTracks, MAX_TRACKS_PER_RELEASE),
+    totalTracks: Math.min(effectiveTotalTracks, maxTracksPerRelease),
     isExplicit: false,
     genres: metadata.genres,
     copyrightLine: metadata.copyrightLine,
@@ -698,7 +912,8 @@ async function importSingleRelease(
       creatorProfileId,
       metadata.sanitizedTitle,
       slug,
-      fullAlbum
+      fullAlbum,
+      maxTracksPerRelease
     );
   }
 }
@@ -763,6 +978,7 @@ export async function syncReleasesFromSpotify(
       imported: 0,
       updated: 0,
       failed: 0,
+      total: 0,
       releases: [],
       errors: [
         'No Spotify artist connected. Please connect your Spotify artist profile first.',

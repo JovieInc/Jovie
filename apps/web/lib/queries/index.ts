@@ -43,24 +43,32 @@
 export {
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
+  type AdminLeadsSortBy,
+  type AdminReleaseRow,
+  type AdminReleasesSort,
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
   useAdminCreatorsInfiniteQuery,
+  useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
   useAdminWaitlistInfiniteQuery,
+  useLeadsInfiniteQuery,
   type WaitlistEntryRow,
 } from './admin-infinite';
 // Audience infinite query
 export { useAudienceInfiniteQuery } from './audience-infinite';
 // Cache strategy presets
 export {
+  FREQUENT_BACKGROUND_CACHE,
   FREQUENT_CACHE,
   PAGINATED_CACHE,
   REALTIME_CACHE,
+  RETRY_BACKOFF,
   SEARCH_CACHE,
   STABLE_CACHE,
   STANDARD_CACHE,
+  STANDARD_NO_REMOUNT_CACHE,
   STATIC_CACHE,
 } from './cache-strategies';
 // Fetch utilities (Edge-compatible)
@@ -101,7 +109,6 @@ export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
 export {
   type AdminLead,
   type AdminLeadKeyword,
-  type AdminLeadListResponse,
   type DiscoveryKeywordDiagnostic,
   type DiscoveryResultResponse,
   type LeadPipelineSettings,
@@ -109,7 +116,6 @@ export {
   useDeleteLeadKeywordMutation,
   useLeadKeywordsQuery,
   useLeadPipelineSettingsQuery,
-  useLeadsListQuery,
   useMarkLeadDmSentMutation,
   useQueueLeadUrlsMutation,
   useRunLeadDiscoveryMutation,
@@ -125,6 +131,7 @@ export {
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
+export { useAlgorithmHealthQuery } from './useAlgorithmHealthQuery';
 export {
   type AppleMusicArtistResult,
   type AppleMusicSearchState,
@@ -199,9 +206,11 @@ export {
   type CampaignPreviewResponse,
   type CampaignStats,
   type CampaignStatsResponse,
+  DEFAULT_THROTTLING,
   type JobQueueStats,
   type SendCampaignInvitesInput,
   type SendCampaignInvitesResponse,
+  type ThrottlingConfig,
   useCampaignInvitesQuery,
   useCampaignOverviewQuery,
   useCampaignPreviewQuery,
@@ -320,6 +329,12 @@ export {
 } from './useEnvHealthQuery';
 // Feedback mutation
 export { useFeedbackMutation } from './useFeedbackMutation';
+export {
+  type ApplyGeneratedAlbumArtInput,
+  type CreateReleaseWithGeneratedAlbumArtInput,
+  useApplyGeneratedAlbumArtMutation,
+  useCreateReleaseWithGeneratedAlbumArtMutation,
+} from './useGeneratedAlbumArtMutations';
 // Growth plan early access request
 export {
   type GrowthAccessRequestInput,
@@ -380,8 +395,16 @@ export {
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
+  useUpdateSubscriberBirthdayMutation,
+  useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
+// Pixel health query
+export {
+  type PixelHealthData,
+  type PlatformHealth,
+  usePixelHealthQuery,
+} from './usePixelHealthQuery';
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
@@ -398,10 +421,16 @@ export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 // Pre-save mutation
 export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
+} from './usePressPhotoMutation';
+export {
   type PricingOption,
   type PricingOptionsResponse,
   usePricingOptionsQuery,
 } from './usePricingOptionsQuery';
+export { useProfileMonetizationSummary } from './useProfileMonetizationSummary';
 // Profile editor mutations (TanStack Query + Pacer integration)
 export {
   type ProfileData,
@@ -421,14 +450,22 @@ export {
 } from './usePublicProfileQuery';
 // QR code download mutation
 export { useQrCodeDownloadMutation } from './useQrCodeDownloadMutation';
+// Recent releases query (dashboard hero card)
+export {
+  type RecentRelease,
+  useRecentReleasesQuery,
+} from './useRecentReleasesQuery';
 export {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveCanvasStatusMutation,
+  useSavePrimaryIsrcMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
+  useSaveReleaseMetadataMutation,
+  useSaveReleaseTargetPlaylistsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
@@ -447,7 +484,6 @@ export {
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
-  useBrandingSettingsMutation,
   useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
@@ -466,6 +502,8 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// Tour date analytics query
+export { useTourDateAnalyticsQuery } from './useTourDateAnalyticsQuery';
 // Tour date mutations
 export {
   useConnectBandsintownMutation,

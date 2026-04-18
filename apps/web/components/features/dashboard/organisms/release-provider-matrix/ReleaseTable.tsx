@@ -1,64 +1,26 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { useCallback, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { TrackRowsContainer } from './components';
-import { useExpandedTracks } from './hooks/useExpandedTracks';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useSortingManager } from './hooks/useSortingManager';
 import { MobileReleaseList } from './MobileReleaseList';
+import type { ReleaseTableProps } from './ReleaseTable.types';
+import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
-  createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
-} from './utils/column-renderers';
-import { getReleaseContextMenuItems } from './utils/release-context-actions';
+} from './utils/release-table-renderers';
 
-interface ProviderConfig {
-  label: string;
-  readonly accent: string;
-}
-
-interface ReleaseTableProps {
-  readonly releases: ReleaseViewModel[];
-  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
-  readonly artistName?: string | null;
-  readonly onCopy: (
-    path: string,
-    label: string,
-    testId: string
-  ) => Promise<string>;
-  readonly onEdit: (release: ReleaseViewModel) => void;
-  /** Column visibility state from preferences */
-  readonly columnVisibility?: Record<string, boolean>;
-  /** Row height from density preference */
-  readonly rowHeight?: number;
-  /** Callback when focused row changes via keyboard navigation */
-  readonly onFocusedRowChange?: (release: ReleaseViewModel) => void;
-  /** Whether to show expandable track rows for albums/EPs */
-  readonly showTracks?: boolean;
-  /** Group releases by year with sticky headers */
-  readonly groupByYear?: boolean;
-  /** Release currently being refreshed for loading shimmer feedback */
-  readonly refreshingReleaseId?: string | null;
-  /** Release that should briefly flash after refresh success */
-  readonly flashedReleaseId?: string | null;
-  /** Currently selected release ID for active row highlighting */
-  readonly selectedReleaseId?: string | null;
-  readonly selectedTrackId?: string | null;
-  /** Check if a release's smart link is locked behind the pro gate */
-  readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
-  readonly onTrackClick?: (trackData: TrackSidebarData) => void;
-}
+const ReleaseTableWithTracks = lazy(() =>
+  import('./ReleaseTableWithTracks').then(m => ({
+    default: m.ReleaseTableWithTracks,
+  }))
+);
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
 
@@ -82,6 +44,9 @@ export function ReleaseTable({
   artistName,
   onCopy,
   onEdit,
+  onDelete,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -97,15 +62,6 @@ export function ReleaseTable({
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
-
-  // Track expansion state (only used when showTracks is enabled)
-  const {
-    expandedReleaseIds,
-    isExpanded,
-    isLoading: isLoadingTracks,
-    toggleExpansion,
-    getTracksForRelease,
-  } = useExpandedTracks();
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
@@ -117,18 +73,34 @@ export function ReleaseTable({
         release,
         onEdit,
         onCopy,
+        onDelete,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
       }),
-    [onEdit, onCopy, artistName, isSmartLinkLocked, getSmartLinkLockReason]
+    [
+      onEdit,
+      onCopy,
+      onDelete,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
+      artistName,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    ]
   );
 
   // Stable callbacks for UnifiedTable props
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
+  const getRowTestId = useCallback(
+    (_row: ReleaseViewModel, index: number) =>
+      index === 0 ? 'release-row' : undefined,
+    []
+  );
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
-      const isRowExpanded = showTracks && isExpanded(row.id);
       const isSelected = selectedReleaseId === row.id;
       const isRefreshing = refreshingReleaseId === row.id;
       const isFlashed = flashedReleaseId === row.id;
@@ -136,26 +108,21 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_48%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_52%,transparent)]';
-      } else if (isRowExpanded) {
-        baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_80%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,transparent)]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_75%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
       }
 
       const refreshClassName = isRefreshing
         ? 'relative overflow-hidden skeleton'
         : '';
       const flashClassName = isFlashed
-        ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
+        ? 'bg-emerald-500/5 transition-colors duration-700'
         : '';
 
       return [
-        'rounded-none',
-        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_26%,transparent)]',
-        'data-[state=selected]:bg-(--linear-row-selected)',
+        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -163,13 +130,7 @@ export function ReleaseTable({
         .filter(Boolean)
         .join(' ');
     },
-    [
-      showTracks,
-      isExpanded,
-      selectedReleaseId,
-      refreshingReleaseId,
-      flashedReleaseId,
-    ]
+    [selectedReleaseId, refreshingReleaseId, flashedReleaseId]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -185,28 +146,16 @@ export function ReleaseTable({
     [releases, onFocusedRowChange]
   );
 
-  // Get all providers for availability column and track row rendering
-  const allProviders = useMemo(
-    () => Object.keys(providerConfig) as ProviderKey[],
-    [providerConfig]
-  );
-
   // Build column definitions (catalog view)
   const columns = useMemo(() => {
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
       header: 'Release',
-      cell: showTracks
-        ? createExpandableReleaseCellRenderer(
-            artistName,
-            isExpanded,
-            isLoadingTracks,
-            toggleExpansion
-          )
-        : createReleaseCellRenderer(artistName),
+      cell: createReleaseCellRenderer(artistName, onEdit),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
+      meta: { className: 'pl-4 pr-2.5' },
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -217,21 +166,13 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 356,
-      minSize: 240,
-      meta: { className: 'hidden sm:table-cell' },
+      size: 260,
+      minSize: 100,
+      meta: { className: 'max-sm:hidden pl-2 pr-4 sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [
-    artistName,
-    showTracks,
-    isExpanded,
-    isLoadingTracks,
-    toggleExpansion,
-    isSmartLinkLocked,
-    getSmartLinkLockReason,
-  ]);
+  }, [artistName, onEdit, isSmartLinkLocked, getSmartLinkLockReason]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
@@ -245,69 +186,52 @@ export function ReleaseTable({
   // No fixed minWidth - on mobile, hidden columns allow the table to fit naturally
   const minWidth = '0';
 
-  // Check if any rows are expanded (affects virtualization)
-  const hasExpandedRows = useMemo(() => {
-    if (!showTracks) return false;
-    return releases.some(r => isExpanded(r.id));
-  }, [showTracks, releases, isExpanded]);
-
-  // When showTracks is enabled and rows are expanded, disable virtualization
-  // This allows dynamic row counts with track rows
-  const shouldVirtualize = !showTracks || !hasExpandedRows;
-
   // Year grouping configuration
   const groupingConfig = useMemo(() => {
     if (!groupByYear) return undefined;
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const year = new Date(release.releaseDate).getFullYear();
+        const year = new Date(release.releaseDate).getUTCFullYear();
         return Number.isNaN(year) ? 'Unknown' : year.toString();
       },
       getGroupLabel: (year: string) => year,
     };
   }, [groupByYear]);
 
-  // Render expanded content for track rows
-  const renderExpandedContent = useCallback(
-    (release: ReleaseViewModel, columnCount: number) => {
-      if (!showTracks) return null;
-
-      const tracks = getTracksForRelease(release.id);
-      if (!tracks) return null;
-
-      return (
-        <TrackRowsContainer
-          tracks={tracks}
-          release={release}
+  if (showTracks) {
+    return (
+      <Suspense
+        fallback={
+          <div className='px-4 py-3 text-[12px] text-secondary-token'>
+            Loading releases...
+          </div>
+        }
+      >
+        <ReleaseTableWithTracks
+          releases={releases}
           providerConfig={providerConfig}
-          allProviders={allProviders}
-          columnCount={columnCount}
-          columnVisibility={tanstackColumnVisibility}
-          onTrackClick={onTrackClick}
+          artistName={artistName}
+          onCopy={onCopy}
+          onEdit={onEdit}
+          canGenerateAlbumArt={canGenerateAlbumArt}
+          onGenerateAlbumArt={onGenerateAlbumArt}
+          columnVisibility={columnVisibility}
+          rowHeight={rowHeight}
+          onFocusedRowChange={onFocusedRowChange}
+          showTracks={showTracks}
+          groupByYear={groupByYear}
+          refreshingReleaseId={refreshingReleaseId}
+          flashedReleaseId={flashedReleaseId}
+          selectedReleaseId={selectedReleaseId}
           selectedTrackId={selectedTrackId}
+          isSmartLinkLocked={isSmartLinkLocked}
+          getSmartLinkLockReason={getSmartLinkLockReason}
+          onTrackClick={onTrackClick}
         />
-      );
-    },
-    [
-      showTracks,
-      getTracksForRelease,
-      providerConfig,
-      allProviders,
-      tanstackColumnVisibility,
-      onTrackClick,
-      selectedTrackId,
-    ]
-  );
-
-  // Get expandable row ID (same as row ID for releases)
-  const getExpandableRowId = useCallback(
-    (release: ReleaseViewModel) => release.id,
-    []
-  );
-
-  // Only pass expanded IDs when showTracks is enabled
-  const expandedRowIds = showTracks ? expandedReleaseIds : undefined;
+      </Suspense>
+    );
+  }
 
   // Mobile: render card-based list view instead of table
   if (isMobile) {
@@ -317,7 +241,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='mx-4 my-4 min-h-[200px]'
+          className='mx-4 my-3 min-h-[160px]'
         />
       );
     }
@@ -328,6 +252,8 @@ export function ReleaseTable({
         artistName={artistName}
         onEdit={onEdit}
         onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
         isSmartLinkLocked={isSmartLinkLocked}
         getSmartLinkLockReason={getSmartLinkLockReason}
         groupByYear={groupByYear}
@@ -345,30 +271,28 @@ export function ReleaseTable({
       getContextMenuItems={getContextMenuItems}
       onRowClick={onEdit}
       getRowId={getRowId}
+      getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
-      enableVirtualization={shouldVirtualize && !groupByYear}
+      enableVirtualization={!groupByYear}
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
       className='text-[13px] text-primary-token'
-      containerClassName='h-full'
+      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '240px' },
+        { variant: 'meta', width: '204px' },
       ]}
       groupingConfig={groupingConfig}
-      expandedRowIds={expandedRowIds}
-      renderExpandedContent={showTracks ? renderExpandedContent : undefined}
-      getExpandableRowId={getExpandableRowId}
       emptyState={
         <TableEmptyState
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='m-4 min-h-[200px]'
+          className='m-3 min-h-[160px]'
         />
       }
     />

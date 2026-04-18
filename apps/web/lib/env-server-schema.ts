@@ -33,12 +33,10 @@ export const ServerEnvSchema = z.object({
   RESEND_FROM_EMAIL: z.string().email().optional(),
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
+  RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
-
-  // Waitlist gate toggle (defaults to OFF when missing — new users skip waitlist)
-  WAITLIST_ENABLED: z.string().optional(),
 
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
@@ -46,6 +44,7 @@ export const ServerEnvSchema = z.object({
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
+  JOVIE_SYSTEM_CLERK_USER_ID: z.string().optional(),
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
 
   // Bandsintown configuration
@@ -62,20 +61,22 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
 
-  // Stripe price IDs for Founding tier ($9/mo, locked-in early supporter pricing)
-  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
-
-  // Stripe price IDs for Pro tier ($39/mo, $348/yr)
+  // Stripe price IDs for Pro tier (amounts in lib/config/plan-prices.ts)
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
-  // Stripe price IDs for Growth tier ($99/mo, $948/yr)
+  // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
+
+  // Stripe price IDs for Max tier (amounts in lib/config/plan-prices.ts)
+  STRIPE_PRICE_MAX_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_MAX_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
+  LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
 
   // Cron job authentication
@@ -83,7 +84,6 @@ export const ServerEnvSchema = z.object({
 
   // Security keys
   METADATA_HASH_KEY: z.string().optional(),
-  CONTACT_OBFUSCATION_KEY: z.string().optional(),
   PII_ENCRYPTION_KEY: z.string().optional(),
 
   // HUD (internal kiosk display)
@@ -103,8 +103,13 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
 
+  // SoundCloud API v2 (Pro badge detection)
+  SOUNDCLOUD_CLIENT_ID: z.string().optional(),
+
   // MusicFetch.io (cross-platform DSP profiles + social links via ISRC/UPC)
   MUSICFETCH_API_TOKEN: z.string().optional(),
+  MUSICFETCH_DAILY_HARD_LIMIT: z.string().optional(),
+  MUSICFETCH_MONTHLY_HARD_LIMIT: z.string().optional(),
 
   // Mercury (banking metrics)
   MERCURY_API_BASE_URL: z.string().url().optional(),
@@ -147,6 +152,12 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // xAI / Grok image generation
+  XAI_API_KEY: z.string().optional(),
+  ALBUM_ART_IMAGE_MODEL: z.string().optional(),
+  ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
+  ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -166,6 +177,13 @@ export const ServerEnvSchema = z.object({
   JOVIE_GOOGLE_API_SECRET: z.string().optional(),
   JOVIE_TIKTOK_PIXEL_ID: z.string().optional(),
   JOVIE_TIKTOK_ACCESS_TOKEN: z.string().optional(),
+
+  // E2E / Playwright auth helpers
+  E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
+  E2E_CLERK_USER_ID: z.string().optional(),
+  E2E_CLERK_USER_USERNAME: z.string().optional(),
+  DEMO_RECORDING: z.string().optional(),
+  DEMO_CLERK_USER_ID: z.string().optional(),
 });
 
 /**
@@ -182,11 +200,12 @@ export const ENV_KEYS = [
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
+  'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
-  'WAITLIST_ENABLED',
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
+  'JOVIE_SYSTEM_CLERK_USER_ID',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
@@ -196,17 +215,18 @@ export const ENV_KEYS = [
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
   'TIP_PLATFORM_FEE_PERCENT',
-  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
+  'STRIPE_PRICE_MAX_MONTHLY',
+  'STRIPE_PRICE_MAX_YEARLY',
   'INGESTION_CRON_SECRET',
+  'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',
-  'CONTACT_OBFUSCATION_KEY',
   'PII_ENCRYPTION_KEY',
   'HUD_KIOSK_TOKEN',
   'HUD_STARTUP_NAME',
@@ -219,7 +239,10 @@ export const ENV_KEYS = [
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
+  'SOUNDCLOUD_CLIENT_ID',
   'MUSICFETCH_API_TOKEN',
+  'MUSICFETCH_DAILY_HARD_LIMIT',
+  'MUSICFETCH_MONTHLY_HARD_LIMIT',
   'MERCURY_API_BASE_URL',
   'MERCURY_API_TOKEN',
   'MERCURY_API_KEY',
@@ -241,6 +264,10 @@ export const ENV_KEYS = [
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'XAI_API_KEY',
+  'ALBUM_ART_IMAGE_MODEL',
+  'ALBUM_ART_GENERATION_DAILY_LIMIT',
+  'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
@@ -253,4 +280,9 @@ export const ENV_KEYS = [
   'JOVIE_GOOGLE_API_SECRET',
   'JOVIE_TIKTOK_PIXEL_ID',
   'JOVIE_TIKTOK_ACCESS_TOKEN',
+  'E2E_USE_TEST_AUTH_BYPASS',
+  'E2E_CLERK_USER_ID',
+  'E2E_CLERK_USER_USERNAME',
+  'DEMO_RECORDING',
+  'DEMO_CLERK_USER_ID',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];

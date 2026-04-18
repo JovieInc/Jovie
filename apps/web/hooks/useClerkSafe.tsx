@@ -3,50 +3,15 @@
 import {
   useAuth as useAuthOriginal,
   useSession as useSessionOriginal,
-  useSignIn as useSignInOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 
 // Derive types from the actual hook return types
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
 type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
 type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
-type UseSignInReturn = ReturnType<typeof useSignInOriginal>;
-
-/**
- * Context to track whether Clerk is available in the current provider tree.
- * When Clerk is bypassed (e.g., missing publishableKey or mock mode),
- * this context will be false and safe hooks will return defaults.
- */
-const ClerkAvailabilityContext = createContext<boolean>(false);
-
-interface ClerkAvailabilityProviderProps {
-  readonly children: ReactNode;
-  readonly isAvailable: boolean;
-}
-
-/**
- * Provider that indicates whether Clerk is available.
- * Wrap your app with this to enable safe Clerk hooks.
- */
-export function ClerkAvailabilityProvider({
-  children,
-  isAvailable,
-}: ClerkAvailabilityProviderProps) {
-  return (
-    <ClerkAvailabilityContext.Provider value={isAvailable}>
-      {children}
-    </ClerkAvailabilityContext.Provider>
-  );
-}
-
-/**
- * Hook to check if Clerk is available in the current context.
- */
-export function useClerkAvailable(): boolean {
-  return useContext(ClerkAvailabilityContext);
-}
 
 /**
  * Default return value when Clerk is not available.
@@ -87,15 +52,149 @@ const DEFAULT_SESSION_RETURN: UseSessionReturn = {
   session: null,
 };
 
-/**
- * Default return value when Clerk is not available.
- * Matches the shape of useSignIn() return type.
- */
-const DEFAULT_SIGN_IN_RETURN = {
-  isLoaded: true,
-  signIn: undefined,
-  setActive: async () => {},
-} as unknown as UseSignInReturn;
+function splitFullName(fullName: string) {
+  const [firstName = fullName, ...rest] = fullName.trim().split(/\s+/);
+  return {
+    firstName,
+    lastName: rest.join(' ').trim() || null,
+  };
+}
+
+function createMockClerkActionError(action: string) {
+  return new Error(`${action} is unavailable in local test auth mode.`);
+}
+
+function createMockEmailAddress(id: string, emailAddress: string) {
+  return {
+    id,
+    emailAddress,
+    verification: {
+      status: 'verified',
+    },
+    prepareVerification: async () => {
+      throw createMockClerkActionError('Email verification');
+    },
+    attemptVerification: async () => {
+      throw createMockClerkActionError('Email verification');
+    },
+    destroy: async () => {
+      throw createMockClerkActionError('Email removal');
+    },
+  };
+}
+
+function createBootstrapUserReturn(
+  bootstrap: ClientAuthBootstrap
+): UseUserReturn {
+  const { firstName, lastName } = splitFullName(bootstrap.fullName);
+  const primaryEmailAddressId = `email_dev_test_${bootstrap.persona}`;
+  const primaryEmailAddress = createMockEmailAddress(
+    primaryEmailAddressId,
+    bootstrap.email
+  );
+
+  const user = {
+    id: bootstrap.userId,
+    username: bootstrap.username,
+    firstName,
+    lastName,
+    fullName: bootstrap.fullName,
+    imageUrl: '/avatars/default-user.png',
+    primaryEmailAddressId,
+    primaryEmailAddress,
+    emailAddresses: [primaryEmailAddress],
+    externalAccounts: [],
+    getSessions: async () => [],
+    createEmailAddress: async () => {
+      throw createMockClerkActionError('Email management');
+    },
+    update: async () => {
+      throw createMockClerkActionError('Account updates');
+    },
+    reload: async () => {},
+    privateMetadata: {
+      isAdmin: bootstrap.isAdmin,
+      devTestAuthPersona: bootstrap.persona,
+    },
+  } as unknown as NonNullable<UseUserReturn['user']>;
+
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    user,
+  } as UseUserReturn;
+}
+
+function createBootstrapSessionReturn(
+  bootstrap: ClientAuthBootstrap
+): UseSessionReturn {
+  const session = {
+    id: `sess_dev_test_${bootstrap.persona}`,
+    user: {
+      id: bootstrap.userId,
+    },
+  } as unknown as NonNullable<UseSessionReturn['session']>;
+
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    session,
+  } as UseSessionReturn;
+}
+
+function getRedirectUrlFromSignOutOptions(options: unknown): string | null {
+  if (!options || typeof options !== 'object') {
+    return null;
+  }
+
+  if ('redirectUrl' in options && typeof options.redirectUrl === 'string') {
+    return options.redirectUrl;
+  }
+
+  return null;
+}
+
+function createBootstrapAuthReturn(
+  bootstrap: ClientAuthBootstrap
+): UseAuthReturn {
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    userId: bootstrap.userId,
+    sessionId: `sess_dev_test_${bootstrap.persona}`,
+    sessionClaims: {} as UseAuthReturn['sessionClaims'],
+    actor: null,
+    orgId: null,
+    orgRole: null,
+    orgSlug: null,
+    has: () => false,
+    signOut: async (options?: unknown) => {
+      const response = await fetch('/api/dev/test-auth/session', {
+        method: 'DELETE',
+        credentials: 'include',
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        await fetch('/api/dev/clear-session', {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(() => null);
+      }
+
+      const redirectUrl = getRedirectUrlFromSignOutOptions(options);
+
+      if (redirectUrl && typeof globalThis.location?.assign === 'function') {
+        globalThis.location.assign(redirectUrl);
+        return;
+      }
+
+      if (typeof globalThis.location?.reload === 'function') {
+        globalThis.location.reload();
+      }
+    },
+    getToken: async () => null,
+  } as unknown as UseAuthReturn;
+}
 
 // ============================================================================
 // Context-based Safe Hooks
@@ -113,7 +212,6 @@ interface ClerkSafeContextValue {
   user: UseUserReturn;
   auth: UseAuthReturn;
   session: UseSessionReturn;
-  signIn: UseSignInReturn;
 }
 
 const ClerkSafeContext = createContext<ClerkSafeContextValue | null>(null);
@@ -126,12 +224,7 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
-  const signIn = useSignInOriginal();
-
-  const value = useMemo(
-    () => ({ user, auth, session, signIn }),
-    [user, auth, session, signIn]
-  );
+  const value = useMemo(() => ({ user, auth, session }), [user, auth, session]);
 
   return (
     <ClerkSafeContext.Provider value={value}>
@@ -154,9 +247,31 @@ export function ClerkSafeDefaultsProvider({
         user: DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
-        signIn: DEFAULT_SIGN_IN_RETURN,
       }}
     >
+      {children}
+    </ClerkSafeContext.Provider>
+  );
+}
+
+export function ClerkSafeBootstrapProvider({
+  bootstrap,
+  children,
+}: {
+  readonly bootstrap: ClientAuthBootstrap;
+  readonly children: ReactNode;
+}) {
+  const value = useMemo(
+    () => ({
+      user: createBootstrapUserReturn(bootstrap),
+      auth: createBootstrapAuthReturn(bootstrap),
+      session: createBootstrapSessionReturn(bootstrap),
+    }),
+    [bootstrap]
+  );
+
+  return (
+    <ClerkSafeContext.Provider value={value}>
       {children}
     </ClerkSafeContext.Provider>
   );
@@ -212,18 +327,5 @@ export function useSessionSafe(): UseSessionReturn {
   return context.session;
 }
 
-/**
- * Safe version of useSignIn that returns defaults when Clerk is unavailable.
- * Use this instead of useSignIn from @clerk/nextjs to prevent provider errors
- * on routes rendered in mock/bypass mode.
- */
-export function useSignInSafe(): UseSignInReturn {
-  const context = useContext(ClerkSafeContext);
-  if (!context) {
-    return DEFAULT_SIGN_IN_RETURN;
-  }
-  return context.signIn;
-}
-
 // Re-export types for convenience
-export type { UseAuthReturn, UseSessionReturn, UseSignInReturn, UseUserReturn };
+export type { UseAuthReturn, UseSessionReturn, UseUserReturn };

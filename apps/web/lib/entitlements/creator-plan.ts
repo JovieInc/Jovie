@@ -1,15 +1,18 @@
 import 'server-only';
 
-import { eq, inArray } from 'drizzle-orm';
+import { aliasedTable, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import {
   checkBoolean,
   getEntitlements,
   type PlanEntitlements,
   type PlanId,
 } from './registry';
+
+const claimedUsers = aliasedTable(users, 'claimed_users');
+const legacyUsers = aliasedTable(users, 'legacy_users');
 
 /**
  * Look up a creator's plan and entitlements by their profile ID.
@@ -22,13 +25,34 @@ export async function getCreatorEntitlements(
   creatorProfileId: string
 ): Promise<{ plan: PlanId; entitlements: PlanEntitlements }> {
   const [result] = await db
-    .select({ plan: users.plan })
+    .select({
+      claimedUserId: userProfileClaims.userId,
+      claimedPlan: claimedUsers.plan,
+      legacyUserId: creatorProfiles.userId,
+      legacyPlan: legacyUsers.plan,
+    })
     .from(creatorProfiles)
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .leftJoin(
+      userProfileClaims,
+      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+    )
+    .leftJoin(claimedUsers, eq(claimedUsers.id, userProfileClaims.userId))
+    .leftJoin(legacyUsers, eq(legacyUsers.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, creatorProfileId))
+    .orderBy(userProfileClaims.userId)
     .limit(1);
 
-  const plan = (result?.plan as PlanId) ?? 'free';
+  const ownerUserId = result?.claimedUserId ?? result?.legacyUserId ?? null;
+  if (!ownerUserId) {
+    return { plan: 'free', entitlements: getEntitlements('free') };
+  }
+
+  const plan =
+    ((result?.claimedUserId ? result.claimedPlan : result?.legacyPlan) as
+      | PlanId
+      | null
+      | undefined) ?? 'free';
+
   return { plan, entitlements: getEntitlements(plan) };
 }
 
@@ -43,22 +67,75 @@ export async function getBatchCreatorEntitlements(
 ): Promise<Map<string, { plan: PlanId; entitlements: PlanEntitlements }>> {
   if (creatorProfileIds.length === 0) return new Map();
 
-  const results = await db
+  const ownershipRows = await db
     .select({
       creatorProfileId: creatorProfiles.id,
-      plan: users.plan,
+      claimedUserId: userProfileClaims.userId,
+      legacyUserId: creatorProfiles.userId,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .leftJoin(
+      userProfileClaims,
+      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+    )
+    .orderBy(creatorProfiles.id, userProfileClaims.userId)
     .where(inArray(creatorProfiles.id, creatorProfileIds));
+
+  const ownerByCreatorProfileId = new Map<
+    string,
+    { claimedUserId: string | null; legacyUserId: string | null }
+  >();
+  for (const row of ownershipRows) {
+    const existing = ownerByCreatorProfileId.get(row.creatorProfileId);
+    if (!existing) {
+      ownerByCreatorProfileId.set(row.creatorProfileId, {
+        claimedUserId: row.claimedUserId,
+        legacyUserId: row.legacyUserId,
+      });
+      continue;
+    }
+
+    // Duplicate claim rows are invalid, but can appear transiently during
+    // backfills. Keep the first deterministically ordered claimed owner so
+    // public entitlement checks do not flap between plans.
+    if (!existing.claimedUserId && row.claimedUserId) {
+      ownerByCreatorProfileId.set(row.creatorProfileId, {
+        claimedUserId: row.claimedUserId,
+        legacyUserId: row.legacyUserId,
+      });
+    }
+  }
+
+  const ownerIds = Array.from(
+    new Set(
+      Array.from(ownerByCreatorProfileId.values())
+        .map(row => row.claimedUserId ?? row.legacyUserId)
+        .filter((userId): userId is string => Boolean(userId))
+    )
+  );
+
+  const userPlans =
+    ownerIds.length === 0
+      ? []
+      : await db
+          .select({ id: users.id, plan: users.plan })
+          .from(users)
+          .where(inArray(users.id, ownerIds));
+
+  const planByUserId = new Map(
+    userPlans.map(row => [row.id, (row.plan as PlanId | undefined) ?? 'free'])
+  );
 
   const map = new Map<
     string,
     { plan: PlanId; entitlements: PlanEntitlements }
   >();
-  for (const row of results) {
-    const plan = (row.plan as PlanId) ?? 'free';
-    map.set(row.creatorProfileId, {
+  for (const [creatorProfileId, row] of ownerByCreatorProfileId) {
+    const ownerUserId = row.claimedUserId ?? row.legacyUserId;
+    const plan = ownerUserId
+      ? (planByUserId.get(ownerUserId) ?? 'free')
+      : 'free';
+    map.set(creatorProfileId, {
       plan,
       entitlements: getEntitlements(plan),
     });

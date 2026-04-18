@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 interface LogoIconProps {
   readonly size?: number;
   readonly className?: string;
-  readonly variant?: 'color' | 'black' | 'white';
+  readonly variant?: 'color' | 'white' | 'muted';
 }
 
 export function LogoIcon({

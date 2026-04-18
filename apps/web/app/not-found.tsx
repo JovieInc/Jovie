@@ -1,20 +1,24 @@
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { Footer } from '@/components/site/Footer';
-import { Header } from '@/components/site/Header';
+import { MarketingFooter } from '@/components/site/MarketingFooter';
+import { MarketingHeader } from '@/components/site/MarketingHeader';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-base'>
-      <Header />
+    <div className='dark linear-marketing min-h-screen bg-base text-primary-token'>
+      <MarketingHeader logoSize='xs' />
 
-      <main style={{ paddingTop: 'var(--linear-header-height, 64px)' }}>
+      <main
+        id='main-content'
+        data-testid='not-found'
+        style={{ paddingTop: 'var(--linear-header-height, 64px)' }}
+      >
         <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
           <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
             {/* Error code — oversized, muted, architectural */}
             <div className='mb-8 select-none'>
               <span
-                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.06]'
+                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.34]'
                 aria-hidden='true'
               >
                 404
@@ -42,7 +46,7 @@ export default function NotFound() {
         </Container>
       </main>
 
-      <Footer />
+      <MarketingFooter />
     </div>
   );
 }

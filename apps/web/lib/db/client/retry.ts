@@ -6,6 +6,7 @@
 
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { PERFORMANCE_THRESHOLDS } from '../config';
+import { getDeepErrorMessage, unwrapPgError } from '../errors';
 import { dbCircuitBreaker } from './circuit-breaker';
 import { logDbError, logDbInfo } from './logging';
 
@@ -38,10 +39,17 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection pool exhausted/i,
   /client has encountered a connection error/i,
   /terminating connection due to administrator command/i,
-  // Neon/Drizzle wraps low-level connection failures as "Failed query: <sql>".
-  // These are transient (dropped WebSocket, cold-start timeout) and should be retried.
-  /^failed query/i,
 ] as const;
+
+const RETRYABLE_PG_CODES = new Set(['53300', '57P01', '57P03']);
+
+function isRetryablePgCode(code: string | null): boolean {
+  if (!code) {
+    return false;
+  }
+
+  return code.startsWith('08') || RETRYABLE_PG_CODES.has(code);
+}
 
 type RetryableErrorCandidate = {
   message?: unknown;
@@ -67,10 +75,16 @@ function getErrorText(error: unknown): string[] {
  * Check if an error is retryable (transient)
  */
 export function isRetryableError(error: unknown): boolean {
-  const errorText = getErrorText(error);
+  const errorText = [...getErrorText(error), getDeepErrorMessage(error)].filter(
+    Boolean
+  );
 
   if (errorText.length === 0) {
     return false;
+  }
+
+  if (isRetryablePgCode(unwrapPgError(error).code)) {
+    return true;
   }
 
   return RETRYABLE_ERROR_PATTERNS.some(pattern =>
@@ -143,7 +157,7 @@ export async function withRetry<T>(
               isRetryable,
               willRetry: false,
             },
-            { asBreadcrumb: false }
+            { asBreadcrumb: isRetryable }
           );
           throw error;
         });

@@ -113,12 +113,12 @@ export function CopyLinkInput({
         onClick={handleInputClick}
         aria-label='URL to copy'
         className={cn(
-          'w-full rounded-md border border-subtle bg-surface-1 px-2 py-1 pr-8',
+          'w-full rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 pr-9',
           'truncate font-mono text-[13px] text-secondary-token',
           'cursor-text focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           'transition-colors',
           size === 'sm' && 'h-7',
-          size === 'md' && 'h-8',
+          size === 'md' && 'h-9',
           isCopied &&
             'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700',
           inputClassName
@@ -130,8 +130,8 @@ export function CopyLinkInput({
         aria-label={isCopied ? 'Copied to clipboard' : 'Copy to clipboard'}
         title={isCopied ? 'Copied!' : 'Copy to clipboard'}
         className={cn(
-          'absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded',
-          'text-tertiary-token hover:bg-surface-2 hover:text-primary-token',
+          'absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full border border-transparent p-1',
+          'text-tertiary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token',
           'transition-colors',
           isCopied && 'text-success',
           buttonClassName

@@ -16,6 +16,8 @@
  * - Multi-DSP presence: +5 points
  * - Has contact email: +5 points
  * - Paid verification (Twitter/X, Instagram, Facebook, Threads): +10 points
+ * - SoundCloud Pro subscription (music-specific paid signal): +10 points
+ * - Has tracking pixels on link-in-bio: +5 points
  *
  * Max score: 100 points (capped)
  */
@@ -23,7 +25,7 @@
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 /** Current version of the scoring algorithm */
-export const FIT_SCORE_VERSION = 3;
+export const FIT_SCORE_VERSION = 5;
 
 /** Point values for each scoring criterion */
 export const SCORE_WEIGHTS = {
@@ -40,6 +42,8 @@ export const SCORE_WEIGHTS = {
   MULTI_DSP_PRESENCE: 5, // Present on 3+ streaming platforms
   HAS_CONTACT_EMAIL: 5, // Contact email available (easier outreach)
   PAID_VERIFICATION: 10, // Verified on a paid-verification platform (Twitter/X, Instagram, Facebook, Threads)
+  SOUNDCLOUD_PRO: 10, // SoundCloud Pro/Pro Unlimited/Next Pro subscription (music-specific paid signal)
+  HAS_TRACKING_PIXELS: 5,
 } as const;
 
 const SPOTIFY_POPULARITY_THRESHOLDS = [
@@ -160,6 +164,12 @@ export interface FitScoreInput {
   dspPlatformCount?: number;
   /** Platforms where the creator has paid verification (e.g., ['twitter', 'instagram']) */
   paidVerificationPlatforms?: string[];
+  /** Whether the artist has a SoundCloud Pro/Pro Unlimited/Next Pro subscription */
+  hasSoundCloudPro?: boolean;
+  /** SoundCloud Pro tier if detected */
+  soundCloudProTier?: string | null;
+  /** Whether the profile has tracking pixels detected on their link-in-bio */
+  hasTrackingPixels?: boolean;
 }
 
 /**
@@ -185,6 +195,8 @@ function createInitialBreakdown(now: Date): FitScoreBreakdown {
     multiDspPresence: 0,
     hasContactEmail: 0,
     paidVerification: 0,
+    soundcloudPro: 0,
+    hasTrackingPixels: 0,
     meta: {
       calculatedAt: now.toISOString(),
       version: FIT_SCORE_VERSION,
@@ -253,8 +265,32 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
     (breakdown.hasAlternativeDsp ?? 0) +
     (breakdown.multiDspPresence ?? 0) +
     (breakdown.hasContactEmail ?? 0) +
-    (breakdown.paidVerification ?? 0)
+    (breakdown.paidVerification ?? 0) +
+    (breakdown.soundcloudPro ?? 0) +
+    (breakdown.hasTrackingPixels ?? 0)
   );
+}
+
+function applyPaidSignalScores(
+  input: FitScoreInput,
+  breakdown: FitScoreBreakdown
+) {
+  if (
+    input.paidVerificationPlatforms &&
+    input.paidVerificationPlatforms.length > 0
+  ) {
+    breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
+    breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
+  }
+  if (input.hasSoundCloudPro) {
+    breakdown.soundcloudPro = SCORE_WEIGHTS.SOUNDCLOUD_PRO;
+  }
+  if (input.hasSoundCloudPro && input.soundCloudProTier) {
+    breakdown.meta!.soundcloudProTier = input.soundCloudProTier;
+  }
+  if (input.hasTrackingPixels) {
+    breakdown.hasTrackingPixels = SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
+  }
 }
 
 /**
@@ -315,9 +351,10 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
 
   // 8. Alternative DSP presence (+10) - helps non-Spotify profiles score higher
   // Only awarded if no Spotify to avoid double-counting
-  const alternativePlatforms: string[] = [];
-  if (input.hasAppleMusicId) alternativePlatforms.push('apple_music');
-  if (input.hasSoundCloudId) alternativePlatforms.push('soundcloud');
+  const alternativePlatforms = [
+    input.hasAppleMusicId && 'apple_music',
+    input.hasSoundCloudId && 'soundcloud',
+  ].filter(Boolean) as string[];
 
   if (!input.hasSpotifyId && alternativePlatforms.length > 0) {
     breakdown.hasAlternativeDsp = SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP;
@@ -336,15 +373,8 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
     breakdown.hasContactEmail = SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
   }
 
-  // 11. Paid verification on social platforms (+10) - signals willingness/ability to pay
-  // Platforms like Twitter/X, Instagram, Facebook, Threads require paid subscriptions for verification
-  if (
-    input.paidVerificationPlatforms &&
-    input.paidVerificationPlatforms.length > 0
-  ) {
-    breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
-    breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
-  }
+  // 11-13. Paid verification, SoundCloud Pro, and tracking pixels
+  applyPaidSignalScores(input, breakdown);
 
   // Calculate total score (capped at 100)
   const score = Math.min(100, getFitScoreTotal(breakdown));

@@ -16,6 +16,7 @@ export {
   DOMAIN_MISSPELLINGS,
   DOMAIN_PATTERNS,
   detectPlatform,
+  detectPlatformByHost,
   // Environment
   getBaseUrl,
   getPlatform,

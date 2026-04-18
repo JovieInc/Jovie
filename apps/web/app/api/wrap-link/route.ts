@@ -16,8 +16,8 @@
 
 export const runtime = 'nodejs';
 
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import {
   checkWrapLinkRateLimit,
@@ -30,20 +30,17 @@ import {
   updateWrappedLink,
 } from '@/lib/services/link-wrapping';
 import { detectBot } from '@/lib/utils/bot-detection';
-import { isValidUrl } from '@/lib/utils/url-encryption';
+import {
+  wrapLinkDeleteSchema,
+  wrapLinkPostSchema,
+  wrapLinkPutSchema,
+} from '@/lib/validation/schemas/wrap-link';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
   Pragma: 'no-cache',
   Expires: '0',
 } as const;
-
-interface RequestBody {
-  url: string;
-  platform?: string;
-  customAlias?: string;
-  expiresInHours?: number;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Get user ID if authenticated (needed for rate-limit keying)
     let userId: string | undefined;
     try {
-      const { userId: authUserId } = await auth();
+      const { userId: authUserId } = await getCachedAuth();
       userId = authUserId || undefined;
     } catch {
       // Not authenticated, continue without user ID
@@ -81,10 +78,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse request body
-    let body: RequestBody;
+    // Parse and validate request body
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { error: 'Invalid JSON' },
@@ -92,15 +89,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { url, customAlias, expiresInHours } = body;
-
-    // Validate URL
-    if (!url || !isValidUrl(url)) {
+    const parsed = wrapLinkPostSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid URL' },
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+
+    const { url, customAlias, expiresInHours } = parsed.data;
 
     // Create wrapped link
     const wrappedLink = await createWrappedLink({
@@ -152,7 +149,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const { userId: authUserId } = await auth();
+    const { userId: authUserId } = await getCachedAuth();
     if (!authUserId) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -160,13 +157,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    let body: {
-      shortId?: string;
-      titleAlias?: string;
-      expiresAt?: string | null;
-    };
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { error: 'Invalid JSON' },
@@ -174,18 +167,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (!body.shortId) {
+    const parsed = wrapLinkPutSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'shortId is required' },
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     const updated = await updateWrappedLink(
-      body.shortId,
+      parsed.data.shortId,
       {
-        titleAlias: body.titleAlias,
-        expiresAt: body.expiresAt ?? undefined,
+        titleAlias: parsed.data.titleAlias,
+        expiresAt: parsed.data.expiresAt ?? undefined,
       },
       authUserId
     );
@@ -218,7 +212,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { userId: authUserId } = await auth();
+    const { userId: authUserId } = await getCachedAuth();
     if (!authUserId) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -226,9 +220,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    let body: { shortId?: string };
+    let rawBody: unknown;
     try {
-      body = await request.json();
+      rawBody = await request.json();
     } catch {
       return NextResponse.json(
         { error: 'Invalid JSON' },
@@ -236,14 +230,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    if (!body.shortId) {
+    const parsed = wrapLinkDeleteSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'shortId is required' },
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const deleted = await deleteWrappedLink(body.shortId, authUserId);
+    const deleted = await deleteWrappedLink(parsed.data.shortId, authUserId);
 
     if (!deleted) {
       return NextResponse.json(

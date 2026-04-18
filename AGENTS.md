@@ -12,19 +12,58 @@ Before running ANY command in this repo, run:
 ./scripts/setup.sh
 ```
 
-This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), and Doppler CLI, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
+### Database Isolation for Agents
+
+Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
+
+`setup.sh` must stay a fast, idempotent local bootstrap:
+- verify/install required tools
+- install dependencies
+- verify Doppler auth/config
+- avoid creating remote infrastructure by default
+
+Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
+
+Use an ephemeral Neon branch **only when the task actually requires isolated DB state**, such as:
+- mutation-heavy QA or crawling
+- end-to-end flows that create/update/delete data
+- migration validation
+- debugging issues caused by shared state
+
+Default policy:
+- normal coding/review/docs tasks: use the standard local/dev configuration
+- local tasks needing isolated mutable state: provision a DB branch explicitly via a dedicated command or script
+- PR preview / CI QA: prefer per-PR ephemeral databases in CI or preview workflows, not local worktree bootstrap
+
+If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`), agents should run it explicitly when needed rather than baking branch creation into `setup.sh`.
+
 ### Running tests and commands requiring secrets
 
-ALL commands that need secrets MUST be prefixed with `doppler run --`:
+ALL commands that need secrets MUST be prefixed with Doppler, and local/dev commands should pin the repo's default scope explicitly as `doppler run --project jovie-web --config dev --`:
 
-- `doppler run -- pnpm test`
-- `doppler run -- pnpm exec playwright test`
-- `doppler run -- pnpm run dev:local`
+- `pnpm run test:web`
+- `pnpm run test:web:watch`
+- `pnpm run test:web:e2e`
+- `pnpm run test:web:smoke`
+- `pnpm run dev:web:local`
+- `pnpm run dev:web:browse`
 - `pnpm test` alone **will fail** — missing env vars
+
+Reason: local agents and worktrees should not rely on whatever Doppler scope happens to be active in the shell.
+
+### Local Auth Bypass For Perf And E2E
+
+When local perf or E2E work needs an authenticated session on loopback/private hosts, prefer the repo's dev auth bypass before assuming Clerk bootstrap is required or broken.
+
+- Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
+- Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows and `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) because host-only cookies do not cross between them.
+- If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
 
 ### If Doppler is not installed
 
@@ -126,7 +165,7 @@ pnpm turbo build --filter=@jovie/web
 | `yarn add` | `pnpm add` |
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
-| `cd apps/web && pnpm dev` | `pnpm --filter web dev` (from root) |
+| `cd apps/web && pnpm dev` | `pnpm run dev:web:local` |
 | `node script.js` with Node < 22 | Verify `node --version` first |
 
 ---
@@ -135,18 +174,20 @@ pnpm turbo build --filter=@jovie/web
 
 **Always run from repository root.** Never `cd` into packages to run commands.
 
+For local web dev and secret-bound test flows, prefer the root wrappers (`pnpm run dev:web:local`, `pnpm run dev:web:browse`, `pnpm run test:web`) over direct filtered package commands.
+
 ```bash
 # Development
 pnpm dev                    # Start all dev servers
-pnpm --filter web dev       # Start only web app
+pnpm run dev:web:local      # Start local web app with pinned Doppler scope
 
 # Building
 pnpm build                  # Build all packages
 pnpm --filter web build     # Build only web app
 
 # Testing
-pnpm test                   # Run all tests
-pnpm --filter web test      # Run web tests only
+pnpm test                   # Run all workspace tests
+pnpm run test:web           # Run web tests with pinned Doppler scope
 
 # Linting & Type Checking
 pnpm lint                   # Lint all packages
@@ -154,8 +195,8 @@ pnpm typecheck              # Type check all packages
 
 # Database (web app specific)
 pnpm --filter web drizzle:generate   # Generate migrations
-pnpm --filter web drizzle:migrate    # Apply migrations
-pnpm --filter web drizzle:studio     # Open Drizzle Studio
+pnpm run db:web:migrate             # Apply migrations with pinned Doppler scope
+pnpm run db:web:studio              # Open Drizzle Studio with pinned Doppler scope
 ```
 
 ---
@@ -211,8 +252,8 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 
 ### 1. Migration Files Are Immutable
 
-- **NEVER** edit files in `drizzle/migrations/`
-- **NEVER** delete or rename migration files
+- **NEVER** edit, delete, or rename migration SQL or snapshot files that already exist in `drizzle/migrations/` on the base branch
+- **ALLOW** generated append-only migration artifacts for a new migration: one new `*.sql`, one new `meta/*_snapshot.json`, and the corresponding append to `meta/_journal.json`
 - To fix a migration issue: create a NEW migration
 
 ### 2. No Direct middleware.ts Creation
@@ -233,6 +274,65 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Emoji looks cheap and undesigned — always use proper SVG icons instead
 - For decorative indicators, use small SVG icon components (e.g., Lucide icons or inline SVGs)
 - This applies to marketing pages, dashboards, mockups, and all user-facing surfaces
+
+### 4a. Text Casing Rules
+
+- All user-facing text must follow `DESIGN.md` casing rules
+- **Title Case** for labels, headings, buttons, badges, column headers, nav items
+- **Sentence case** for body text, descriptions, tooltips, toasts
+- Never lowercase the first word of a visible label or heading
+- Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database
+
+### 4b. Subtraction Principle (Tim White Canon)
+
+- UI cleanup must follow the subtraction principle: remove before adding
+- Before building a child component, open the parent container file and list what chrome (title, header, card surface, borders) it already renders — then omit those from the child
+- When a screen feels messy, agents should first look for duplicated labels, redundant helper text, nested containers, extra borders, repeated actions, and unnecessary variants
+- Prefer one clear heading, one clear action cluster, and one clear surface hierarchy instead of layering multiple decorative cues
+- If an existing label, icon, placeholder, or layout already communicates the action, remove the extra explanatory UI around it
+- Agents should not "solve" weak hierarchy by adding more badges, more cards, more copy, or more controls unless subtraction has clearly failed
+- During refactors and polish passes, explicitly audit for what can be deleted, merged, flattened, or simplified before introducing anything new
+
+### 4c. No AI-Slop Product UI
+
+- Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
+- Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
+- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
+- For marketing sections, the default composition is: one headline, one subhead, one visual. Do not add eyebrow text, labels, proof bars, separators, helper rows, or extra wrapper cards unless a human explicitly asks for that exact element
+- Eyebrow text is banned by default on marketing pages. Only add an eyebrow when a human explicitly requests it for that exact section
+- Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed
+- Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
+- Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
+- Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
+- When revising a marketing layout and the direction is unclear, do not add explanatory copy or chrome as a hedge. The fallback is subtraction: headline, subhead, one visual
+- When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
+
+### 4d. No Redundant Chrome (Container-Aware Design)
+
+Before adding a title, header, card wrapper, or label to a component, **read the parent container** that will render it. Containers already provide chrome — do not duplicate it.
+
+| Container | Chrome it provides | Do NOT add inside it |
+|---|---|---|
+| `EntitySidebarShell` | `DrawerHeader` via `title` prop | Card header or heading repeating the drawer title |
+| `Sheet` / `Dialog` | `SheetHeader` / `DialogHeader` + title | Second heading or Card wrapping the body content |
+| `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
+| `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
+| `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name (see §No Duplicate Page Titles) |
+
+**Checklist (run before every UI component PR):**
+
+1. **Read the mount point** — open the parent layout/page and identify what container renders your component. What title, header, and surface does it already provide?
+2. **Grep for repeated text** — search the route tree for your title/label string. If the same label appears 3+ times on one screen, deduplicate.
+3. **Check surface nesting** — if the parent is already a Card, Sheet, or `DrawerSurfaceCard`, do not wrap children in another Card. Use `variant='flat'` or plain `div`.
+4. **One heading per visual section** — a section gets exactly one title. If the container already renders one, your component renders zero.
+
+**Banned patterns:**
+- `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
+- `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
+- Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
+
+This is 4b (subtraction principle) applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
 ### 5. Conventional Commits Required
 
@@ -261,6 +361,15 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### 6a. Founder / Featured Creator Identity Must Be Canonical
+
+- **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used
+- For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values
+- If Tim White appears in homepage mocks, use the correct founder photo and the correct Spotify artist ID: `4u`
+- When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass
+
+**Why:** Using the wrong founder photo or wrong Spotify identity undermines trust in the product and makes the AI experience look careless.
+
 ### 7. Public/Webhook Coordination Must Be Durable
 
 - **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers
@@ -286,6 +395,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 - `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
 - Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
 - Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
+- Marketing copy must not invent adoption metrics, customer counts, waitlist sizes, or traction claims. If a number is not verified and current, use non-quantified launch-stage copy instead.
 - Blog and changelog pages must be fully static, reading content from filesystem at build time only.
 - Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
 - Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.
@@ -327,7 +437,7 @@ Forbidden patterns:
 
 For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
-### 10. Self-Improvement Loop
+### 13. Self-Improvement Loop
 
 After any correction from a human reviewer:
 
@@ -338,7 +448,7 @@ After any correction from a human reviewer:
 
 If you realize mid-task that you've made an assumption that turned out wrong, document it immediately without being asked.
 
-### 11. Plan Before Executing Complex Tasks
+### 14. Plan Before Executing Complex Tasks
 
 For any task with 3 or more steps, architectural decisions, schema changes, or significant refactors:
 
@@ -346,7 +456,7 @@ For any task with 3 or more steps, architectural decisions, schema changes, or s
 - Wait for human approval before executing
 - Single-step bug fixes and trivial copy changes do not require plan mode
 
-### 12. Verify Before Marking Done
+### 15. Verify Before Marking Done
 
 Never mark a task complete without confirming the fix works:
 
@@ -355,6 +465,82 @@ Never mark a task complete without confirming the fix works:
 - For UI changes: confirm the component renders without errors
 - For API changes: confirm the endpoint returns expected shape
 - Paste the passing output as evidence in the PR description
+
+### 16. Performance Must Not Replace Route UIs
+
+- **NEVER** replace a route's component with a different layout/design as a performance optimization
+- Use code-splitting (`dynamic()`), skeleton states, `Suspense`, and progressive hydration to make the *same* design faster
+- Screenshot test: before and after a perf PR, the fully-loaded page must look identical
+- If a route needs a genuinely different UI, that is a product decision requiring explicit approval, not a perf side effect
+
+### 17. CSP Domains Must Stay In Sync With Providers
+
+When adding a new DSP, social platform, or any feature that loads external images or media in the browser, update `apps/web/constants/platforms/cdn-domains.ts`:
+- Image CDNs → `PLATFORM_CDN_DOMAINS` (governs CSP `img-src` + Next.js `remotePatterns`)
+- Audio/video CDNs → `PLATFORM_MEDIA_DOMAINS` (governs CSP `media-src`)
+
+These registries are the **single source of truth** consumed by the CSP builder, Next.js config, and avatar hostname validation. Do **NOT** edit CSP directives in `content-security-policy.ts` directly — add domains to the registry instead.
+
+### 18. Outbound Email Personalization Must Fail Safe
+
+- In cold email, lifecycle email, or claim-invite copy, **NEVER** greet recipients with raw usernames, handles, emoji names, or other guessed merge fields
+- Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener
+- When fixing one risky personalization path, search sibling email templates that use the same creator/user fields and apply the same guard there
+
+---
+
+## Custom ESLint Rules (Quick Reference)
+
+11 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`. Violations block CI.
+
+| Rule | What It Blocks | Fix |
+|------|---------------|-----|
+| `use-client-directive` | React hooks (`useState`, `useEffect`, etc.) in files without `'use client'` | Add `'use client'` at top of file |
+| `server-only-imports` | `@/lib/db`, `@clerk/nextjs/server`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
+| `icon-usage` | Emoji in JSX, non-Lucide UI icons, direct `simple-icons` imports | Use `lucide-react` for UI icons; `SocialIcon` component for social/brand icons |
+| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use sequential operations or `db.insert().values([...])` batch |
+| `no-handler-initialization` | `new Stripe()`, `new Pool()`, `new Resend()`, `new Client()` inside `GET`/`POST`/`PUT`/`DELETE` handlers | Move to module-level singleton: `const stripe = getStripe()` at file top |
+| `no-hardcoded-routes` | String literals like `'/app/dashboard/audience'` in app code | Import from `APP_ROUTES`: `import { APP_ROUTES } from '@/constants/routes'` |
+| `no-manual-db-pooling` | `import { Pool } from 'pg'` or `import pg from 'pg'` | Use `import { db } from '@/lib/db'` |
+| `require-abort-signal` | `queryFn` in `useQuery`/`useSuspenseQuery` that doesn't destructure `{ signal }` | `queryFn: ({ signal }) => fetchThing(id, { signal })` |
+| `require-query-cache-config` | `useQuery` without `staleTime` and `gcTime` | Add both, or spread a preset from `lib/queries/cache-strategies.ts` |
+| `readonly-component-props` | Props interface/type properties without `readonly` modifier | Add `readonly` before each property (auto-fixable: ESLint will fix this for you) |
+| `edge-runtime-node-imports` | `node:fs`, `crypto`, `stripe`, `path`, `stream` in files with `export const runtime = 'edge'` | Remove the Node-only import or remove the Edge runtime declaration |
+
+**Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only)
+
+---
+
+## Claude Hooks Reference
+
+Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass them. Understanding what triggers them saves debugging time.
+
+**Pre-execution hooks** (block the operation before it runs):
+
+| Hook | Trigger | What It Blocks | Recovery |
+|------|---------|---------------|----------|
+| `bash-safety-check.sh` | Before: Bash | `rm -rf /`, force push to main, `npm publish` | Don't run destructive commands |
+| `file-protection-check.sh` | Before: Edit/Write | Editing existing migration SQL/snapshots; creating `middleware.ts`; `biome-ignore` comments; hardcoded dashboard route literals; dynamic `revalidate` in marketing pages; global UI singletons in nested layouts | See matching Hard Guardrail above |
+| `infra-guardrails-check.sh` | Before: Edit/Write | New cron route files (`app/api/cron/*/route.ts`); `vercel.json` cron changes | Get human approval first |
+
+**Post-execution hooks** (check the result and may block or warn):
+
+| Hook | Trigger | What It Catches | Recovery |
+|------|---------|----------------|----------|
+| `lint-check.sh` | After: Edit/Write | Biome lint/format errors | Auto-fixes first; fix remaining errors manually |
+| `typecheck.sh` | After: Edit/Write | TypeScript errors in modified file | Fix the type error; run `pnpm typecheck` for full output |
+| `biome-formatter.sh` | After: Edit/Write | N/A (non-blocking) | Auto-applies `biome check --write` silently; no action required |
+| `console-check.sh` | After: Edit/Write | `console.log/error/warn/info/debug` in production code (skips tests, scripts, configs) | Use `import { captureError } from '@/lib/error-tracking'` for errors; `import { logger } from '@/lib/utils/logger'` for logs |
+| `ts-strict-check.sh` | After: Edit/Write | `any` type in production code (**blocks**); `@ts-ignore` (**warns**) | Use proper types or `unknown`; use `@ts-expect-error` with explanation |
+| `file-size-check.sh` | After: Edit/Write | Files exceeding 500 lines (**warns**, skips tests/migrations/generated) | Split into smaller modules by concern |
+| `db-patterns-check.sh` | After: Edit/Write | `db.transaction()`, `pg`/`pg-pool` imports, `new Pool()`, `@/lib/db/client` import | Use `import { db } from '@/lib/db'`; batch for atomicity |
+
+**Lifecycle hooks:**
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `session-start.sh` | Session start | Verifies Node/pnpm versions, installs deps, builds gstack |
+| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if typecheck, Biome lint, server boundaries, or affected tests fail |
 
 ---
 
@@ -389,16 +575,16 @@ When scanning Linear for issues to work on, always filter with:
 
 ### Pre-Push Gate
 
-Before pushing to a branch, agents MUST pass locally:
-1. `pnpm turbo typecheck` (monorepo typecheck)
-2. `pnpm --filter web exec tsc --noEmit` (web typecheck)
-3. `pnpm biome check --write apps/web` (lint + auto-fix formatting) — **must use `--write` to apply fixes before checking**
-4. `pnpm vitest --run --changed` (affected tests)
-5. `pnpm --filter web lint:server-boundaries` (boundaries)
+The gstack skill pipeline handles verification. The standard agent workflow is:
 
-**IMPORTANT:** Always run `pnpm biome check --write apps/web` (not just `--check`) so formatting issues are fixed in-place before the pre-push hook runs. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations. Running `--write` first prevents this.
+1. `/qa` — Systematic QA testing (skip if already run manually)
+2. `/review` — Pre-landing code review (skip if already run manually)
+3. `/ship` — Tests, review, version bump, PR creation/update
+4. `/land-and-deploy` — Merge, CI wait, deploy verification
 
-Do NOT push code that fails any of these. Fix first, push once.
+`/ship` runs typecheck, lint, and tests as part of its pre-flight checks. There is no separate `/verify` step.
+
+**IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
 ### One PR = One Concern
 
@@ -408,18 +594,68 @@ Do NOT push code that fails any of these. Fix first, push once.
 
 ### Branch Hygiene
 
-- Always rebase on develop before pushing (not merge)
-- Follow the branch strategy: `feature/* -> develop -> preview -> production`
-- If a PR has been open >24h without progress, close it and re-create from fresh develop
+- Always rebase on main before pushing (not merge)
+- Follow the branch strategy: `feature/* -> main` (CI deploys to staging, then promotes to production)
+- If a PR has been open >24h without progress, close it and re-create from fresh main
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
 
 - When a command produces multiple independent fixes, ship each as its own PR
-- Push and enable auto-merge immediately — don't wait for CI before starting the next fix
+- **Open a draft PR on first push** — CI runs immediately, giving early feedback
+- Push frequently — concurrency groups cancel stale CI runs automatically
+- Run `/ship` when ready — it detects the draft PR and promotes it to ready-for-review
 - CI runs in parallel on all PRs while the agent continues working
 - This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
-- If a PR fails CI, the agent can fix it while other PRs continue merging
-- Each PR must still pass /verify locally before pushing
+- If a PR fails CI, fix and push again; don't create a new PR
+- Enable auto-merge only after the PR is marked ready (not while draft)
+
+### Draft PR First Workflow (Parallel Agents)
+
+AI agents MUST follow the "draft PR first, commit often" pattern for all non-trivial work:
+
+1. **First commit on branch:** Push immediately and open a draft PR:
+   ```bash
+   git push -u origin <branch-name>
+   gh pr create --draft --base main --title "WIP: <description>" --body "Draft — CI feedback loop in progress"
+   ```
+
+2. **Iterate on CI feedback:** Push frequently. Each push triggers CI with cancel-in-progress
+   (stale runs are automatically cancelled). Check CI status:
+   ```bash
+   gh pr checks <pr-number> --json name,state,conclusion
+   ```
+   Fix failures, push again.
+
+3. **Finalize:** When CI is green and code is ready, run `/ship`. The ship skill detects
+   the existing draft PR, updates its title/body with the standard template, and marks
+   it ready for review.
+
+**Why draft PRs first:**
+- CI catches build failures (now a merge gate), type errors, and test regressions within minutes
+- Parallel agents see each other's in-progress branches via PR list
+- Concurrency groups cancel stale CI runs automatically — frequent pushes are cheap
+- The PR summary comment gives a structured view of all check statuses
+
+### PR Labels (Required)
+
+Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
+
+- Add `testing` when a PR needs the heavyweight verification lanes (E2E, smoke tests, full build with secrets) beyond the default merge gate.
+- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
+- Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
+
+- Add `needs-human` when the PR should be held for human review or automation must stop.
+- Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
+- If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+
+- Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
+- Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
+
+- Use `deploy-preview` only when a PR specifically needs the build/preview lane for review or QA and `testing` is not otherwise warranted.
+- Do **NOT** rely on `deploy-preview` as a substitute for `testing` on risky changes.
+
+- Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
+- If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
 ### Auto-Merge Path Guardrails
 
@@ -451,13 +687,12 @@ When in doubt, skip auto-merge and request review.
 
 ## Pre-PR Checklist (required before opening any PR)
 
-1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
-2. **Run `/simplify`** - Simplify recently modified code for clarity
-3. **After pushing your branch, immediately open a draft PR** using GitHub CLI:
-   ```bash
-   gh pr create --draft --base main --title "<Linear issue title>" --body "## Summary\n- ...\n\nLinear: https://linear.app/jovie/issue/<ISSUE-ID>"
-   ```
-4. **Enable automerge** with squash:
+1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately (see "Draft PR First Workflow" above)
+2. **Iterate** — push frequently, let CI catch issues, fix and push again
+3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually)
+4. `/ship` handles: tests, review, version bump, CHANGELOG, commit, push, PR creation/update
+5. `/land-and-deploy` handles: merge, CI wait, deploy verification
+6. **Enable automerge** with squash after the PR is marked ready:
    ```bash
    gh pr merge --auto --squash
    ```
@@ -495,6 +730,22 @@ Jovie/
 └── turbo.json               # Monorepo task configuration
 ```
 
+### Documentation Index
+
+Reference docs for common agent lookups. These are table-driven and answer specific navigation questions:
+
+| Doc | Question It Answers |
+|-----|---------------------|
+| [`docs/SCHEMA_MAP.md`](docs/SCHEMA_MAP.md) | Which schema file defines this table? What are the key relationships? |
+| [`docs/API_ROUTE_MAP.md`](docs/API_ROUTE_MAP.md) | Does an API endpoint already exist for this? What auth does it need? |
+| [`docs/CRON_REGISTRY.md`](docs/CRON_REGISTRY.md) | What scheduled jobs already run? Can I add my logic to an existing one? |
+| [`docs/WEBHOOK_MAP.md`](docs/WEBHOOK_MAP.md) | Which webhooks handle this provider's events? |
+| [`docs/LIB_MODULE_INDEX.md`](docs/LIB_MODULE_INDEX.md) | Which lib module provides the functionality I need? |
+| [`docs/FEATURE_REGISTRY.md`](docs/FEATURE_REGISTRY.md) | What feature flags exist? What are their current states? |
+| [`docs/DB_MIGRATIONS.md`](docs/DB_MIGRATIONS.md) | How do I create/run migrations? What are the invariants? |
+| [`docs/TESTING_GUIDELINES.md`](docs/TESTING_GUIDELINES.md) | Testing philosophy, patterns, and when to write tests |
+| [`docs/DOPPLER_SETUP.md`](docs/DOPPLER_SETUP.md) | How to set up and use Doppler for secrets management |
+
 ### Component Architecture & Dependency Rules
 
 Components follow atomic design with feature-based grouping:
@@ -531,6 +782,95 @@ apps/web/components/
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`).
 
+### File Creation Patterns
+
+When creating new files, follow these templates. They reflect actual codebase patterns (derived from `app/api/feedback/route.ts` and similar).
+
+#### New API Route
+
+Location: `apps/web/app/api/{domain}/{action}/route.ts`
+
+```typescript
+import { auth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { db } from '@/lib/db';
+import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
+
+const payloadSchema = z.object({ /* ... */ });
+
+export async function POST(request: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await request.json();
+    const parsed = payloadSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+
+    // ... business logic using db ...
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    logger.error('[api/{domain}] Operation failed:', error);
+    await captureError('Description', error, { route: '/api/{domain}', method: 'POST' });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+```
+
+Key rules: Zod validation on input, auth check, try/catch with `captureError` + `logger.error`, no `new Stripe()` inside the handler (use module-level singletons). Only add `export const runtime = 'nodejs'` when documenting a specific constraint.
+
+#### New Component
+
+| Type | Location | When to use |
+|------|----------|-------------|
+| Design system atom | `packages/ui/atoms/MyComponent.tsx` | Pure UI, no Next.js/app imports |
+| App atom | `apps/web/components/atoms/MyComponent.tsx` | Small, reusable, may use Next.js hooks |
+| Molecule | `apps/web/components/molecules/MyComponent.tsx` | Composes 2+ atoms |
+| Organism | `apps/web/components/organisms/{feature}/MyComponent.tsx` | Complex shared widget |
+| Feature component | `apps/web/components/features/{feature}/MyComponent.tsx` | Feature-specific, can have internal atoms/molecules |
+
+```typescript
+'use client'; // ONLY if using hooks (useState, useEffect, etc.) — omit for server components
+
+import type { ReactNode } from 'react';
+
+interface MyComponentProps {
+  readonly title: string;        // Every prop MUST be readonly
+  readonly children?: ReactNode;
+  readonly onAction?: () => void;
+}
+
+export function MyComponent({ title, children, onAction }: MyComponentProps) {
+  return <div>{title}{children}</div>;
+}
+```
+
+#### New Server Action
+
+Location: `apps/web/app/{route}/actions.ts` or `apps/web/lib/actions/{domain}.ts`
+
+```typescript
+'use server';
+
+import { auth } from '@clerk/nextjs/server';
+import { revalidatePath } from 'next/cache';
+import { db } from '@/lib/db';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+```
+
+#### New Test
+
+Co-locate with source: `{name}.test.ts` or `{name}.test.tsx` (not `__tests__/` directories unless shared fixtures needed).
+
+```typescript
+import { describe, expect, it, vi } from 'vitest';
+```
+
+Name tests by behavior: `describe('ComponentName')` → `it('shows error when input is empty')`.
+
 ### Tech Stack
 
 | Layer | Technology |
@@ -539,12 +879,44 @@ apps/web/components/
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk |
+| Auth | Clerk (three instances, proxy via `/__clerk`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 22 LTS |
+
+### Clerk Auth Proxy Architecture
+
+**CRITICAL — read this before touching anything Clerk-related.**
+
+Jovie uses three distinct Clerk key pairs:
+- **Dev** (`dev`, account A development instance): local/dev worktrees use the `pk_test_...` + dev secret pair from Doppler `jovie-web/dev`
+- **Staging** (`stg`, account B production instance): `staging.jov.ie` uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
+- **Production** (`prd`, account A production instance): `jov.ie` uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+
+The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin. Dev mode doesn't use the proxy — ClerkProvider talks directly to Clerk.
+
+**How the proxy works:**
+- Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
+- Decodes the FAPI host from the active publishable key at runtime
+- Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
+- Uses strict host routing: `staging.jov.ie` must use the staging key pair and must never fall back to production keys
+
+**DO NOT:**
+- Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
+- Use `vercel.json` rewrites as the primary mechanism — same Host header problem
+- Hardcode FAPI hosts — always decode from the resolved publishable key
+- Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
+- Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
+
+**If Clerk auth breaks:**
+1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the resolved publishable key
+2. Check the active runtime exposes the correct key pair for that host:
+   production uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+   staging uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
+3. Check CSP allows the decoded FAPI host in connect-src, script-src, frame-src
+4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
 
 ### API Runtime
 
@@ -567,7 +939,7 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 **Typecheck Gate (Mandatory):**
 - **ALWAYS** run `pnpm turbo typecheck` before pushing any branch or creating a PR
 - If typecheck fails, fix all errors before pushing — do not push with known type errors
-- Use `/verify` or `/ship` commands which include typecheck as part of their validation
+- Use `/ship` which includes typecheck as part of its validation
 - The CI pipeline will block merges on type errors, but catching them locally is faster and prevents wasted CI cycles
 
 **Null Safety for String Methods:**
@@ -650,7 +1022,7 @@ Remove the import or remove "use client" if this should be a server component.
 | Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
 | `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+The project uses `@neondatabase/serverless` with the **WebSocket driver** for stateful RLS connections. Application code creates a client-side `Pool` (max 20 per Vercel container) because WebSocket connections are stateful and need lifecycle management. The DATABASE_URL uses Neon's **direct** endpoint (not the `-pooler` endpoint). Scripts and migrations use the HTTP driver for stateless one-off operations. The `lib/db/client.ts` is a legacy HTTP-based client — do not use it.
 
 **Transaction Restrictions (Canonical Policy):**
 - **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
@@ -662,11 +1034,30 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 **Forbidden Database Patterns:**
 | Forbidden                          | Why                               | Alternative                            |
 | ---------------------------------- | --------------------------------- | -------------------------------------- |
-| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `db.transaction(async (tx) => ...)` | Requires explicit approval; use approved RLS wrappers | Sequential operations or batch insert  |
 | `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
 | `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
 | `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
 | Loop with individual `db.insert()` | O(N) database operations          | `db.insert().values([...items])` batch |
+
+### Canonical Imports (Use These Exact Paths)
+
+Agents frequently import from wrong paths. This is the authoritative reference:
+
+| What | Correct Import | NOT This |
+|------|---------------|----------|
+| Database | `import { db } from '@/lib/db'` | `@/lib/db/client` (legacy, hook-blocked) |
+| Env vars | `import { env } from '@/lib/env'` | `process.env.X` (no validation) |
+| Routes | `import { APP_ROUTES } from '@/constants/routes'` | Hardcoded `'/app/dashboard/...'` strings (hook-blocked) |
+| Entitlements (server) | `import { getCurrentUserEntitlements } from '@/lib/entitlements/server'` | Reading billing rows directly in handlers |
+| Entitlements (registry) | `import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry'` | Duplicating plan matrices in components |
+| UI Icons | `import { IconName } from 'lucide-react'` | Emoji, FontAwesome, heroicons, custom SVGs |
+| Social/Brand Icons | `import { SocialIcon } from '@/components/atoms/SocialIcon'` | Lucide for social platforms, direct `simple-icons` |
+| Auth (client) | `import { useUser, useAuth } from '@clerk/nextjs'` | `@clerk/nextjs/server` in client files |
+| Auth (server) | `import { auth, currentUser } from '@clerk/nextjs/server'` | Server imports in `'use client'` files |
+| Error tracking | `import { captureError } from '@/lib/error-tracking'` | `console.error()` (hook-blocked in production code) |
+| Logger | `import { logger } from '@/lib/utils/logger'` | `console.log()` (hook-blocked in production code) |
+| Cache presets | `import { STABLE_CACHE } from '@/lib/queries/cache-strategies'` | Inline `staleTime`/`gcTime` values without presets |
 
 ### Data Serialization (Server → Client Boundaries)
 
@@ -741,9 +1132,13 @@ useQuery({
 - Without signal, requests continue after navigation, wasting resources
 
 **Cache Presets:**
-Use presets from `lib/queries/cache.ts` for consistency:
-- `STABLE_CACHE` - for data that rarely changes (user profile, billing status)
-- `DYNAMIC_CACHE` - for frequently updated data (notifications, real-time feeds)
+Use presets from `lib/queries/cache-strategies.ts` for consistency:
+- `REALTIME_CACHE` - for live data (notifications, active sessions)
+- `FREQUENT_CACHE` - for frequently updated data (dashboard stats)
+- `STANDARD_CACHE` - for typical data (5 min stale, 30 min gc)
+- `STABLE_CACHE` - for slowly changing data (user profile, billing status, feature flags)
+- `STATIC_CACHE` - for reference data that rarely changes (categories, platform lists)
+- `PAGINATED_CACHE` / `SEARCH_CACHE` - for list/search results
 
 **Disable Aggressive Refetch:**
 
@@ -762,6 +1157,45 @@ useQuery({
 - Tailwind utility classes only (no custom CSS unless necessary)
 - Follow existing design tokens in `tailwind.config.ts`
 - Mobile-first responsive design
+
+#### Surface Elevation Rules (Card/Background Consistency)
+
+The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a dedicated shell canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
+
+**Allowed patterns:**
+- Card on app-shell canvas parent → use `bg-surface-1` for shared cards and panels
+- Recessed/"well" element inside the shell or a card → use `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- Sticky shell chrome (toolbars, table headers, shell frame) → use `bg-(--linear-app-content-surface)`
+- Card with elevation → use `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
+- Nested card inside card → use `bg-surface-0` for the inner element
+- Table/workspace routes → wrap the primary content in `DashboardWorkspacePanel` plus a bordered `LINEAR_SURFACE.contentContainer`; do not render route content directly on the shell canvas
+
+**Banned patterns (will cause invisible cards):**
+- `bg-(--linear-app-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
+- Table/task routes that place their main list or empty state directly on the shell canvas instead of inside a framed content container
+- `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
+- `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
+- `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
+- `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
+- Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
+
+**Quick test:** If removing the element would cause no visual change, it's an elevation bug.
+
+#### No Duplicate Page Titles (Breadcrumb + Toolbar)
+
+The `DashboardHeader` breadcrumb already renders the page name prominently. Do NOT repeat the page name in `PageToolbar start={}`. The toolbar should only contain contextual metadata (counts, status) and action buttons.
+
+**Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
+**Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
+
+### Performance Optimization Loop
+
+`/perf-loop` runs an autonomous optimization loop that measures, experiments,
+and keeps only improvements. State is persisted to `.context/perf/` for resume
+capability. The skill uses `perf:loop` (performance-optimizer.ts) as its
+measurement primitive and commits each accepted improvement atomically.
+
+Runtime: ~30-50 minutes for a full run (4-10 iterations with builds).
 
 ### Testing
 
@@ -793,17 +1227,39 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 - Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
 - Do **not** mock Clerk auth in Playwright E2E tests.
 
-**Golden path reference:**
+**Golden path references:**
 
-- `apps/web/tests/e2e/golden-path-signup.spec.ts` is the canonical Clerk-authenticated onboarding example.
+- `apps/web/tests/e2e/onboarding.spec.ts` shows the canonical fresh-user Clerk-authenticated onboarding flow using `setupClerkTestingToken({ page })` plus `createOrReuseTestUserSession(page, email)`.
+- `apps/web/tests/e2e/auth.setup.ts` is the canonical shared auth bootstrap that writes `tests/.auth/user.json`.
+
+#### Next Cache APIs In Shared Test Helpers
+
+- Helpers used by Playwright global setup, `tsx` seed scripts, or any plain Node entrypoint must not call `revalidateTag()` or `revalidatePath()` unguarded.
+- Those Next cache APIs require a Next request/static-generation context and will throw `Invariant: static generation store missing` in plain Node.
+- If cache invalidation is best-effort in a shared helper, catch only that specific missing-context invariant and continue; rethrow all other errors.
+- For manual browse auth outside Playwright, use `doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts --base-url http://localhost:3002 --output /tmp/browse-clerk-cookies.json --persona creator` and import the exported cookies into browse.
 
 **Test user cleanup:**
 
 - E2E users are tagged with metadata (`role: 'e2e'`).
-- Clean stale users with:
-  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+- Clean stale users interactively:
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+- Clean stale users non-interactively (for agents and CI):
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force`
+- Preview what would be deleted (dry run):
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --dry-run`
 - To re-seed users:
-  - `doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
+  - `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
+
+**Agent cleanup requirement:**
+
+Agents **MUST** run cleanup after any session that creates test accounts via sign-up flows (E2E tests, `/qa` runs that trigger signup). Run:
+
+```bash
+doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
+```
+
+This deletes all Clerk users matching either `role: 'e2e'` metadata OR `+clerk_test` email pattern, AND their corresponding database records (cascading to related tables). Only works against test Clerk instances (`sk_test_` keys). Safe to run repeatedly.
 
 #### General E2E Rules (Required)
 
@@ -978,6 +1434,36 @@ When a PR introduces or modifies any of the following, the PR description MUST i
 
 ---
 
+## Agent Autonomy: When to Ask vs. Just Do It
+
+Compute is infinite. Human decision capacity is finite. Don't waste questions on engineering hygiene — save them for decisions only a human has context on.
+
+### Just do it (never ask)
+
+- **Error handling** — add it everywhere: internal utils, helpers, boundaries, all of it
+- **Edge cases** — handle anything a real user could realistically hit (bad input, network errors, race conditions, concurrent state)
+- **Tests** — always write tests for new/changed code, but avoid slop tests or tests for rapidly-changing UI (design, copy). Follow the Test Coverage Guidelines above.
+- **Linting, type fixes, dead code removal** — fix what you touch
+- **Validation, logging, cleanup** — if it makes the code more robust, do it
+
+### Auto-fix, ask about structural changes (gstack skills)
+
+- `/qa`, `/review`, `/ship` should auto-fix obvious issues (lint, types, small bugs) without asking
+- Ask before structural changes (moving files, changing APIs, refactoring patterns)
+
+### Always ask (genuine human decisions)
+
+- Product/UX decisions (how should this behave for users?)
+- Architecture choices (which approach/pattern?)
+- Scope changes (should we also tackle X while we're here?)
+- Breaking changes or migrations
+- New external dependencies or services
+- Trade-offs where both options have real downsides
+
+**The principle:** If the upside is obvious and the cost is small (a few minutes of compute), just do it. Save questions for decisions only a human has context on.
+
+---
+
 ## General Agent Decision-Making Rules
 
 ### You Don't Know What You Don't Know
@@ -988,11 +1474,13 @@ AI agents confidently make decisions about topics they have zero context on. The
 
 2. **Prefer boring, proven patterns.** The existing codebase has established patterns for webhooks, job queues, caching, and API integration. Use them. Don't invent new patterns for solved problems.
 
-3. **Scope your changes to what was asked.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer. Do the thing that was asked and nothing more.
+3. **Scope your changes to what was asked, plus hardening (error handling, edge cases, tests) for code you touch.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer — but do add error handling, edge case coverage, and tests for the code you modified.
 
 4. **When adding integrations, read the provider's docs on webhooks first.** Almost every SaaS provider (Stripe, Clerk, Resend, Vercel, etc.) has webhook support. Check for it before building a polling solution.
 
 5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
+
+6. **Verify before trusting.** When the user (or another agent's output) states something verifiable — "we use X," "competitor Y doesn't do Z," "this API returns W" — check it. A quick grep, file read, or doc lookup takes seconds. If the claim is wrong, say so clearly. This is how we catch agent drift (an agent introduced something it shouldn't have), stale assumptions, and documentation gaps. Being corrected is a feature, not a problem.
 
 ### Operational Awareness Checklist
 
@@ -1135,6 +1623,25 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
 | Ship | `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+
+#### Changelog
+
+**Do not manually edit `CHANGELOG.md` during development.** The `/ship` workflow generates changelog entries automatically from the diff and commit history.
+
+`CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+
+**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions:
+- **Summary blockquote:** Add `> plain-language summary` (max 3 sentences) right after the version heading. Written for non-technical users (artists, fans, investors).
+- **`[internal]` prefix:** Tag developer-facing entries with `- [internal] ...`. These are hidden from the public page, RSS feed, and emails but preserved for developer reference.
+- **Plain language:** Public entries should avoid jargon. Write what changed for the user, not how it was implemented. Example: "Tips now process correctly" not "Stop capture-tip infinite Stripe retry loop".
+- **Hidden releases:** Releases where ALL entries are `[internal]` are completely hidden from public surfaces.
+
+**Shared parser:** `apps/web/lib/changelog-parser.ts` is the single source of truth for changelog parsing in the Next.js app (page + RSS feed). `scripts/lib/changelog-parser.mjs` is the Node ESM version used by the email send script.
+
+**Post-merge emails:** After a PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`).
+
+**Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.
+
 | Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
 | Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
@@ -1160,6 +1667,74 @@ cd .claude/skills/gstack && git pull origin main && ./setup
 
 Or use `/gstack-upgrade` from within Claude Code.
 
+### QA & Browse Authentication (Jovie-Specific)
+
+When running `/qa` or `/browse` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials. Do NOT ask for cookie import help.**
+
+**Local default flow (`localhost`, `127.0.0.1`, private dev IPs):**
+
+1. Start the browse-compatible dev server:
+
+   ```bash
+   pnpm run dev:web:browse
+   ```
+
+2. Authenticate the browse session by opening:
+
+   ```text
+   /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+   ```
+
+3. Use `persona=admin` only when you intentionally need admin QA:
+
+   ```text
+   /api/dev/test-auth/enter?persona=admin&redirect=/app/admin
+   ```
+
+**What this does:**
+- sets the local auth-bypass cookies automatically
+- provisions a stable creator browse persona by default
+- avoids Clerk sign-in, OTP entry, and cookie handoff
+- works without `NEXT_PUBLIC_E2E_MODE=1`
+
+**Agent rules:**
+- `/browse` on local Jovie means: use the dev auth bootstrap route above
+- default persona is `creator`; `admin` is opt-in
+- if auth is needed on local browse QA, solve it yourself with this flow
+- only use `scripts/browse-auth.ts` as a fallback helper for non-loopback hosts
+- only use `/setup-browser-cookies` for importing a real human session when a human explicitly wants that path
+
+**Do NOT:**
+- prompt the user for credentials
+- fill the Clerk sign-in form manually for local QA
+- claim auth is blocked on local `/browse` without trying `/api/dev/test-auth/enter?...`
+- enable `NEXT_PUBLIC_E2E_MODE=1` just to make browse auth work
+
 ---
 
 **Remember: When in doubt, verify your Node version (`node --version`) and use pnpm from the repository root.**
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke `office-hours`
+- Bugs, errors, "why is this broken", 500 errors → invoke `investigate`
+- Ship, deploy, push, create PR → invoke `ship`
+- QA, test the site, find bugs → invoke `qa`
+- Code review, check my diff → invoke `review`
+- Update docs after shipping → invoke `document-release`
+- Weekly retro → invoke `retro`
+- Design system, brand → invoke `design-consultation`
+- Visual audit, design polish → invoke `design-review`
+- Architecture review → invoke `plan-eng-review`
+
+## CI Seeding Guardrail
+
+- In shared CI lanes that audit public routes (`Lighthouse`, `a11y`, public smoke), seed scripts must fail only on required schema.
+- Optional fixtures that depend on add-on relations, such as `promo_downloads`, must warn and skip when the relation is missing unless that lane explicitly provisions the schema first.
+- Playwright route-audit specs must not resolve manifests or env-dependent surface lists in a way that can crash the module import. Catch resolution failures and surface them through an always-registered test or equivalent explicit failure path; `beforeAll` alone is insufficient if manifest failure can result in zero generated tests.
+- Test-bypass health/debug endpoints must fail closed on production deploys. Preview-only bypass logic may exist for CI smoke runs, but `VERCEL_ENV=production` must hard-block access regardless of spoofable headers or bypass flags.

@@ -26,28 +26,28 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   }
 
   return (
-    <ul className='space-y-1.5'>
+    <ul className='space-y-1'>
       {member.latestActions.slice(0, 6).map(action => (
         <li
           key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
           className={cn(
-            'group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-sm text-primary-token transition-colors hover:border-subtle hover:bg-surface-2/60'
+            'group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-[12px] text-primary-token transition-colors hover:bg-surface-0'
           )}
         >
           <span
-            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
+            className='mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
             aria-hidden='true'
           >
             <Icon
               name={resolveAudienceActionIcon(action.label)}
-              className='h-3.5 w-3.5'
+              className='h-3 w-3'
             />
           </span>
-          <span className='min-w-0 flex-1'>
+          <span className='min-w-0 flex-1 leading-4'>
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 whitespace-nowrap text-[11px] text-secondary-token'>
+            <span className='ml-2 whitespace-nowrap text-[10.5px] text-secondary-token'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}

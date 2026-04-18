@@ -21,9 +21,9 @@ All files in this directory are checked into the repo and shared across the team
 |---------|-------------|
 | `/ship` | Run full pre-merge validation (migrations, typecheck, lint, tests) |
 | `/verify` | Self-verification checklist (13 checks including boundaries, CodeRabbit) |
+| `/review` | Pre-landing diff review with a built-in simplify pass and fix-first workflow |
 | `/simplify` | Refactor recently modified code for clarity |
 | `/pr` | Auto commit, push, and create PR |
-| `/orchestrate` | Review and process all open PRs |
 | `/check-migrations` | Check pending migration status |
 | `/generate-migration` | Generate a new Drizzle migration |
 | `/migrate-main` | Run migrations on main/staging |
@@ -77,8 +77,9 @@ Hooks run automatically on agent events. Configured in `settings.json`.
 The Stop hook runs when Claude finishes a task. It:
 1. Skips if no code changes (research/chat tasks pass through)
 2. Runs automated checks: TypeScript, Biome lint, server/client boundaries, affected tests
-3. On first stop: blocks to request `/simplify` and `/coderabbit:review`
-4. On second stop: re-validates and allows completion if clean
+3. Allows completion immediately if all checks pass
+
+Use `/review` explicitly when you want the simplify + pre-landing review workflow.
 
 ## Skills
 

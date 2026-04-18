@@ -26,6 +26,9 @@ export interface PreviewPanelData {
   avatarUrl: string | null;
   bio: string | null;
   genres: string[] | null;
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
   links: PreviewPanelLink[];
   profilePath: string;
   dspConnections: {
@@ -53,7 +56,7 @@ interface PreviewPanelStateContextValue {
 
 interface PreviewPanelDataContextValue {
   previewData: PreviewPanelData | null;
-  setPreviewData: (data: PreviewPanelData) => void;
+  setPreviewData: (data: PreviewPanelData | null) => void;
 }
 
 // Combined type for backwards compatibility

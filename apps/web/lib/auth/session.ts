@@ -1,12 +1,33 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+
+/** Shared error messages for auth/profile resolution. Used by route guards. */
+export const SESSION_ERRORS = {
+  USER_NOT_FOUND: 'User not found',
+  PROFILE_NOT_FOUND: 'Profile not found',
+  UNAUTHORIZED: 'Unauthorized',
+} as const;
+
+export class UnauthorizedSessionError extends Error {
+  constructor() {
+    super(SESSION_ERRORS.UNAUTHORIZED);
+    this.name = 'UnauthorizedSessionError';
+  }
+}
+
+export function isUnauthorizedSessionError(error: unknown): boolean {
+  return (
+    error instanceof UnauthorizedSessionError ||
+    (error instanceof Error && error.message === SESSION_ERRORS.UNAUTHORIZED)
+  );
+}
 
 /**
  * Validates that a userId is a safe Clerk ID format
@@ -40,7 +61,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new UnauthorizedSessionError();
   }
 
   // Validate userId format to prevent SQL injection
@@ -92,7 +113,7 @@ export async function setupDbSession(clerkUserId?: string) {
     userId = await resolveClerkUserId(clerkUserId);
   } catch (error) {
     // If no authenticated user, skip RLS setup gracefully
-    if (error instanceof Error && error.message === 'Unauthorized') {
+    if (isUnauthorizedSessionError(error)) {
       logDbInfo('setupDbSession', 'Skipping RLS setup — no authenticated user');
       return { userId: null };
     }
@@ -125,7 +146,7 @@ export async function withDbSession<T>(
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new UnauthorizedSessionError();
   }
   return operation(userId);
 }
@@ -179,7 +200,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new UnauthorizedSessionError();
   }
   return userId;
 }
@@ -283,13 +304,9 @@ export async function getProfileByDbUserId(
       isClaimed: creatorProfiles.isClaimed,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
-    .from(creatorProfiles)
-    .where(
-      and(
-        eq(creatorProfiles.userId, dbUserId),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
+    .from(users)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .where(eq(users.id, dbUserId))
     .limit(1);
 
   return profile ?? null;
@@ -338,29 +355,21 @@ export async function getSessionContext(options?: {
       userStatus: users.userStatus,
       // Profile fields (nullable from LEFT JOIN)
       profileId: creatorProfiles.id,
-      profileUserId: creatorProfiles.userId,
       profileUsername: creatorProfiles.username,
       profileUsernameNormalized: creatorProfiles.usernameNormalized,
       profileDisplayName: creatorProfiles.displayName,
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileIsPublic: creatorProfiles.isPublic,
-      profileIsClaimed: creatorProfiles.isClaimed,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(users)
-    .leftJoin(
-      creatorProfiles,
-      and(
-        eq(creatorProfiles.userId, users.id),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
+    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
   // User not found
   if (!result && requireUser) {
-    throw new TypeError('User not found');
+    throw new TypeError(SESSION_ERRORS.USER_NOT_FOUND);
   }
 
   if (!result) {
@@ -372,6 +381,21 @@ export async function getSessionContext(options?: {
   }
 
   // Build user context from result
+  // Guard: users.id must be a UUID. If a Clerk ID leaked into the id column
+  // (data issue), fail fast here instead of causing "invalid input syntax for
+  // type uuid" errors in every downstream query (see JOVIE-WEB-HH).
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(result.userId)) {
+    logDbError(
+      'getSessionContext',
+      new Error(
+        `user.id is not a UUID: ${result.userId} (clerkId=${clerkUserId})`
+      )
+    );
+    throw new TypeError(SESSION_ERRORS.USER_NOT_FOUND);
+  }
+
   const user: DbUserContext = {
     id: result.userId,
     clerkId: result.userClerkId,
@@ -385,19 +409,19 @@ export async function getSessionContext(options?: {
   const profile: ProfileContext | null = result.profileId
     ? {
         id: result.profileId,
-        userId: result.profileUserId,
+        userId: result.userId, // from users table, not profile
         username: result.profileUsername,
         usernameNormalized: result.profileUsernameNormalized,
         displayName: result.profileDisplayName,
         avatarUrl: result.profileAvatarUrl,
         isPublic: result.profileIsPublic,
-        isClaimed: result.profileIsClaimed,
+        isClaimed: true, // joined via activeProfileId = claimed
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
       }
     : null;
 
   if (!profile && requireProfile) {
-    throw new TypeError('Profile not found');
+    throw new TypeError(SESSION_ERRORS.PROFILE_NOT_FOUND);
   }
 
   return {

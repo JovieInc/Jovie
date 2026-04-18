@@ -14,7 +14,9 @@
     "unresolved"
   ],
   "workspaces": {
-    ".": {},
+    ".": {
+      "entry": ["scripts/knowledge/fetch.ts"]
+    },
     "apps/web": {
       "entry": [
         "instrumentation.{ts,js}",
@@ -39,7 +41,6 @@
         "@radix-ui/react-label",
         "@radix-ui/react-radio-group",
         "@radix-ui/react-select",
-        "@radix-ui/react-switch",
         "@radix-ui/react-tabs",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
@@ -91,6 +92,7 @@
     "packages/ui": {
       "entry": ["atoms/*.{ts,tsx}", "lib/*.ts", "theme/*.ts"],
       "project": ["**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@vitest/coverage-v8"],
       "vitest": {
         "config": ["vitest.config.mts"],
         "entry": ["**/*.test.{ts,tsx}"]

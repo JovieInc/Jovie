@@ -3,8 +3,8 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -57,17 +57,12 @@ export function SettingsAppearanceSection() {
   else if (resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
 
   return (
-    <ContentSurfaceCard className='divide-y divide-subtle/60 bg-surface-0/95'>
-      <div className='px-4 py-3.5'>
-        <div className='min-w-0'>
-          <h3 className='text-[13px] font-[510] text-primary-token'>
-            Interface theme
-          </h3>
-          <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-            Pick the appearance style that feels most comfortable.
-          </p>
-        </div>
-        <div className='mt-3 grid gap-1.5 sm:grid-cols-3'>
+    <SettingsPanel
+      title='Appearance'
+      description='Theme and contrast preferences for your workspace.'
+    >
+      <div className='space-y-4 px-4 py-4 sm:px-5'>
+        <div className='grid gap-1.5 sm:grid-cols-3'>
           {THEME_OPTIONS.map(option => {
             const isSelected = selectedTheme === option.value;
             const Icon = option.icon;
@@ -80,11 +75,11 @@ export function SettingsAppearanceSection() {
                 onClick={() => handleThemeChange(option.value)}
                 disabled={isThemePending}
                 className={cn(
-                  'h-auto justify-start rounded-md border px-2.5 py-1.5 text-left',
+                  'h-auto justify-start rounded-[10px] border px-3 py-2.5 text-left',
                   'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
                   isSelected
                     ? 'border-accent/45 bg-accent/6 text-primary-token'
-                    : 'border-subtle/80 bg-transparent text-secondary-token hover:bg-surface-1'
+                    : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1'
                 )}
                 aria-pressed={isSelected}
                 data-testid={`theme-option-${option.value}`}
@@ -124,18 +119,18 @@ export function SettingsAppearanceSection() {
             );
           })}
         </div>
-      </div>
 
-      <div className='px-4 py-2.5'>
-        <SettingsToggleRow
-          title='High contrast'
-          description='Increase contrast for text, borders, and surfaces'
-          checked={isHighContrast}
-          onCheckedChange={handleHighContrastChange}
-          disabled={isContrastPending}
-          ariaLabel='Toggle high contrast mode'
-        />
+        <div className='border-t border-subtle pt-4'>
+          <SettingsToggleRow
+            title='High contrast'
+            description='Increase contrast for text, borders, and surfaces.'
+            checked={isHighContrast}
+            onCheckedChange={handleHighContrastChange}
+            disabled={isContrastPending}
+            ariaLabel='Toggle high contrast mode'
+          />
+        </div>
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }

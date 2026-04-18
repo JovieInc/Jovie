@@ -77,6 +77,86 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
+function buildViewCondition(
+  view: 'all' | 'identified' | 'anonymous'
+): SQL<boolean> {
+  if (view === 'anonymous') {
+    return eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  }
+  if (view === 'identified') {
+    return or(
+      eq(audienceMembers.type, 'email'),
+      eq(audienceMembers.type, 'sms'),
+      eq(audienceMembers.type, 'spotify'),
+      eq(audienceMembers.type, 'customer')
+    ) as SQL<boolean>;
+  }
+  return drizzleSql<boolean>`true`;
+}
+
+type LtvMap = Map<string, { streamingClicks: number; tipValue: number }>;
+
+/**
+ * Batch-fetch LTV click data for the given member IDs.
+ * Replaces per-row correlated subqueries with a single aggregation query.
+ */
+async function batchFetchLtv(
+  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  memberIds: string[]
+): Promise<LtvMap> {
+  const map: LtvMap = new Map();
+  if (memberIds.length === 0) return map;
+
+  const ltvRows = await tx
+    .select({
+      audienceMemberId: clickEvents.audienceMemberId,
+      streamingClicks: drizzleSql<number>`COALESCE(COUNT(*) FILTER (
+          WHERE ${clickEvents.linkType} = 'listen'
+            AND ${clickEvents.isBot} = false
+        ), 0)`.as('streaming_clicks'),
+      tipValue: drizzleSql<number>`COALESCE(SUM(
+          CASE
+            WHEN ${clickEvents.linkType} = 'tip' AND ${clickEvents.isBot} = false
+              THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+            ELSE 0
+          END
+        ), 0)`.as('tip_value'),
+    })
+    .from(clickEvents)
+    .where(
+      drizzleSql`${clickEvents.audienceMemberId} IN (${drizzleSql.join(
+        memberIds.map(id => drizzleSql`${id}`),
+        drizzleSql`, `
+      )})`
+    )
+    .groupBy(clickEvents.audienceMemberId);
+
+  for (const row of ltvRows) {
+    if (row.audienceMemberId) {
+      map.set(row.audienceMemberId, {
+        streamingClicks: row.streamingClicks,
+        tipValue: row.tipValue,
+      });
+    }
+  }
+  return map;
+}
+
+/** Build next-page cursor from the last returned row. */
+function buildNextCursor(
+  hasMore: boolean,
+  rows: Array<{ id: string; lastSeenAt: Date | string | null }>
+): string | null {
+  if (!hasMore || rows.length === 0) return null;
+  const lastRow = rows.at(-1)!;
+  const rawSortVal = lastRow.lastSeenAt;
+  const sortValStr =
+    rawSortVal instanceof Date
+      ? rawSortVal.toISOString()
+      : String(rawSortVal ?? '');
+  return encodeCursor(sortValStr, lastRow.id);
+}
+
 export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -118,19 +198,7 @@ export async function GET(request: NextRequest) {
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const segmentCondition = buildSegmentCondition(segments);
-      let viewCondition: SQL<boolean>;
-      if (view === 'anonymous') {
-        viewCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
-      } else if (view === 'identified') {
-        viewCondition = or(
-          eq(audienceMembers.type, 'email'),
-          eq(audienceMembers.type, 'sms'),
-          eq(audienceMembers.type, 'spotify'),
-          eq(audienceMembers.type, 'customer')
-        ) as SQL<boolean>;
-      } else {
-        viewCondition = drizzleSql<boolean>`true`;
-      }
+      const viewCondition = buildViewCondition(view);
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
       let cursorCondition: SQL<unknown> = drizzleSql`true`;
@@ -173,27 +241,11 @@ export async function GET(request: NextRequest) {
           tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
             'tip_count'
           ),
-          ltvStreamingClicks: drizzleSql<number>`(
-            SELECT COALESCE(COUNT(*), 0)
-            FROM ${clickEvents}
-            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-              AND ${clickEvents.linkType} = 'listen'
-              AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-          )`.as('ltv_streaming_clicks'),
-          ltvTipClickValueCents: drizzleSql<number>`(
-            SELECT COALESCE(
-              SUM(
-                CASE
-                  WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-                    THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
-                  ELSE 0
-                END
-              ),
-              0
-            )
-            FROM ${clickEvents}
-            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-          )`.as('ltv_tip_click_value_cents'),
+          // LTV metrics are batch-fetched after pagination to avoid correlated subqueries.
+          ltvStreamingClicks: drizzleSql<number>`0`.as('ltv_streaming_clicks'),
+          ltvTipClickValueCents: drizzleSql<number>`0`.as(
+            'ltv_tip_click_value_cents'
+          ),
           ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
           ltvTicketSalesCents: drizzleSql<number>`0`.as(
             'ltv_ticket_sales_cents'
@@ -227,17 +279,10 @@ export async function GET(request: NextRequest) {
       const hasMore = rawRows.length > pageSize;
       const rows = hasMore ? rawRows.slice(0, pageSize) : rawRows;
 
-      // Build next-page cursor from the last returned row.
-      let nextCursor: string | null = null;
-      if (hasMore && rows.length > 0) {
-        const lastRow = rows[rows.length - 1];
-        const rawSortVal = lastRow.lastSeenAt;
-        const sortValStr =
-          rawSortVal instanceof Date
-            ? rawSortVal.toISOString()
-            : String(rawSortVal ?? '');
-        nextCursor = encodeCursor(sortValStr, lastRow.id);
-      }
+      const memberIds = rows.map(r => r.id);
+      const ltvMap = await batchFetchLtv(tx, memberIds);
+
+      const nextCursor = buildNextCursor(hasMore, rows);
 
       const serializeDate = (value?: Date | string | null) => {
         if (!value) return null;
@@ -267,8 +312,8 @@ export async function GET(request: NextRequest) {
         purchaseCount: member.purchaseCount,
         tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
         tipCount: member.tipCount ?? 0,
-        ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
-        ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+        ltvStreamingClicks: ltvMap.get(member.id)?.streamingClicks ?? 0,
+        ltvTipClickValueCents: ltvMap.get(member.id)?.tipValue ?? 0,
         ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
         ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
         tags: Array.isArray(member.tags) ? member.tags : [],
@@ -284,21 +329,21 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Dashboard Audience] Failed to load members', error);
-    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+    const isUnauthorized =
+      error instanceof Error && error.message === 'Unauthorized';
+    if (!isUnauthorized) {
       await captureError('Audience members fetch failed', error, {
         route: '/api/dashboard/audience/members',
         method: 'GET',
       });
     }
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
     return NextResponse.json(
-      { error: 'Unable to load audience members' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      {
+        error: isUnauthorized
+          ? 'Unauthorized'
+          : 'Unable to load audience members',
+      },
+      { status: isUnauthorized ? 401 : 500, headers: NO_STORE_HEADERS }
     );
   }
 }

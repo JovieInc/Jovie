@@ -7,6 +7,14 @@
  */
 
 export type {
+  LinearSurface,
+  LinearSurfaceTier,
+} from '@/components/tokens/linear-surface';
+export {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/components/tokens/linear-surface';
+export type {
   CardBorder,
   CardPadding,
   CardRadius,

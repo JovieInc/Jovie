@@ -5,15 +5,26 @@
 
 import { publicEnv } from '@/lib/env-public';
 
+const HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
+
 /**
  * Production hostnames
  */
-const PRODUCTION_HOSTNAMES = new Set(['jov.ie', 'meetjovie.com']);
+const PRODUCTION_HOSTNAMES = new Set([
+  HOSTNAME,
+  `www.${HOSTNAME}`,
+  'meetjovie.com',
+  'www.meetjovie.com',
+]);
 
 /**
  * Preview/staging hostnames
  */
-const PREVIEW_HOSTNAMES = new Set(['main.jov.ie', 'main.meetjovie.com']);
+const PREVIEW_HOSTNAMES = new Set([
+  `staging.${HOSTNAME}`,
+  `main.${HOSTNAME}`, // Legacy staging hostname
+  'main.meetjovie.com', // Legacy preview hostname on the old redirect domain
+]);
 
 /**
  * Dynamically get the base URL for the current browser origin.

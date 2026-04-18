@@ -1,3 +1,4 @@
+import { MAX_HEADER_SOCIAL_LINKS } from '@/lib/profile/social-link-limits';
 import type { LegacySocialLink } from '@/types/db';
 
 /**
@@ -123,4 +124,105 @@ export function getContextAwareLinks(
 
     return 0;
   });
+}
+
+const HEADER_SOCIAL_PRIORITY = [
+  'instagram',
+  'tiktok',
+  'youtube',
+  'twitter',
+  'facebook',
+] as const;
+
+const COUNTRY_HEADER_SOCIAL_PRIORITY: Record<string, readonly string[]> = {
+  BR: ['instagram', 'youtube', 'tiktok', 'twitter', 'facebook'],
+  DE: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+  GB: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+  JP: ['youtube', 'instagram', 'twitter', 'tiktok', 'facebook'],
+  MX: ['instagram', 'youtube', 'tiktok', 'facebook', 'twitter'],
+  US: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'],
+};
+
+function getPriorityIndexMap(countryCode?: string | null) {
+  const priority =
+    (countryCode
+      ? COUNTRY_HEADER_SOCIAL_PRIORITY[countryCode.toUpperCase()]
+      : null) ?? HEADER_SOCIAL_PRIORITY;
+
+  return new Map(priority.map((platform, index) => [platform, index]));
+}
+
+function getHeaderPriority(
+  platform: string,
+  countryCode?: string | null
+): number {
+  return (
+    getPriorityIndexMap(countryCode).get(platform) ?? Number.MAX_SAFE_INTEGER
+  );
+}
+
+export function sortSocialLinksByGeoPopularity(
+  links: LegacySocialLink[],
+  countryCode?: string | null
+): LegacySocialLink[] {
+  const priorityIndexMap = getPriorityIndexMap(countryCode);
+
+  return [...links].sort((a, b) => {
+    const aPlatform = a.platform?.toLowerCase() ?? '';
+    const bPlatform = b.platform?.toLowerCase() ?? '';
+    const aPriority =
+      priorityIndexMap.get(aPlatform) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority =
+      priorityIndexMap.get(bPlatform) ?? Number.MAX_SAFE_INTEGER;
+
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
+
+    return aPlatform.localeCompare(bPlatform);
+  });
+}
+
+export function getHeaderSocialLinks(
+  links: LegacySocialLink[],
+  countryCode?: string | null,
+  maxCount = MAX_HEADER_SOCIAL_LINKS,
+  excludePlatform?: string | null
+): LegacySocialLink[] {
+  const seenPlatforms = new Set<string>();
+  const priorityIndexMap = getPriorityIndexMap(countryCode);
+
+  return links
+    .filter(link => {
+      const platform = link.platform?.toLowerCase() ?? '';
+      if (!platform) {
+        return false;
+      }
+
+      if (!priorityIndexMap.has(platform)) {
+        return false;
+      }
+
+      if (seenPlatforms.has(platform)) {
+        return false;
+      }
+
+      // Exclude source platform if specified
+      if (platform === excludePlatform?.toLowerCase()) {
+        return false;
+      }
+
+      seenPlatforms.add(platform);
+      return true;
+    })
+    .sort((a, b) => {
+      const aPlatform = a.platform?.toLowerCase() ?? '';
+      const bPlatform = b.platform?.toLowerCase() ?? '';
+
+      return (
+        getHeaderPriority(aPlatform, countryCode) -
+        getHeaderPriority(bPlatform, countryCode)
+      );
+    })
+    .slice(0, maxCount);
 }

@@ -1,13 +1,14 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 interface AuthBackButtonProps {
-  readonly onClick?: () => void;
+  readonly onClick?: (event?: React.MouseEvent<HTMLElement>) => void;
   readonly href?: string;
   readonly className?: string;
   readonly ariaLabel?: string;
@@ -35,40 +36,52 @@ export function AuthBackButton({
         'top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))]',
         'md:top-6 md:left-6'
       );
+  const controlClasses = cn(
+    APP_CONTROL_BUTTON_CLASS,
+    'h-9 gap-2 px-3 text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_16px_-10px_rgba(0,0,0,0.24)]',
+    positionClasses,
+    className
+  );
 
-  // Responsive sizing - larger on mobile for better touch targets
-  const responsiveSizeClasses = 'h-11 w-11 sm:h-10 sm:w-10';
-
-  const handleClick = () => {
+  const handleClick = (event?: React.MouseEvent<HTMLElement>) => {
     haptic.light();
-    onClick?.();
+    onClick?.(event);
   };
 
   if (href) {
     return (
-      <CircleIconButton
+      <Button
         asChild
-        size='md'
-        variant='frosted'
-        ariaLabel={ariaLabel}
-        className={cn(positionClasses, responsiveSizeClasses, className)}
+        variant='ghost'
+        size='sm'
+        aria-label={ariaLabel}
+        className={controlClasses}
       >
-        <Link href={href} onClick={() => haptic.light()}>
-          <ArrowLeft />
+        <Link
+          href={href}
+          onClick={event => {
+            handleClick(event);
+          }}
+        >
+          <ArrowLeft className='h-3.5 w-3.5' />
+          <span className='text-[12px] font-[510] tracking-[-0.012em]'>
+            Back
+          </span>
         </Link>
-      </CircleIconButton>
+      </Button>
     );
   }
 
   return (
-    <CircleIconButton
-      size='md'
-      variant='frosted'
+    <Button
+      variant='ghost'
+      size='sm'
       onClick={handleClick}
-      ariaLabel={ariaLabel}
-      className={cn(positionClasses, responsiveSizeClasses, className)}
+      aria-label={ariaLabel}
+      className={controlClasses}
     >
-      <ArrowLeft />
-    </CircleIconButton>
+      <ArrowLeft className='h-3.5 w-3.5' />
+      <span className='text-[12px] font-[510] tracking-[-0.012em]'>Back</span>
+    </Button>
   );
 }

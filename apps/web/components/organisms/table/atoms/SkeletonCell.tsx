@@ -41,10 +41,10 @@ export function SkeletonCell({
         className={cn('flex items-start gap-2', className)}
         style={{ width }}
       >
-        <div className='mt-0.5 h-4.5 w-4.5 shrink-0 rounded-[5px] skeleton' />
-        <div className='min-w-0 flex-1 space-y-1'>
-          <div className='h-3 w-[56%] rounded skeleton' />
-          <div className='h-2.5 w-[38%] rounded skeleton' />
+        <div className='mt-0.5 h-4 w-4 shrink-0 rounded skeleton' />
+        <div className='min-w-0 flex-1 space-y-0.5'>
+          <div className='h-3 w-[56%] rounded-sm skeleton' />
+          <div className='h-2.5 w-[38%] rounded-sm skeleton' />
         </div>
       </div>
     );
@@ -59,9 +59,9 @@ export function SkeletonCell({
         )}
         style={{ width }}
       >
-        <div className='h-[22px] rounded-[7px] skeleton' />
+        <div className='h-5 rounded-sm skeleton' />
         <div className='h-2.5 w-2.5 justify-self-center rounded-full skeleton' />
-        <div className='h-3 w-7 justify-self-end rounded skeleton' />
+        <div className='h-3 w-7 justify-self-end rounded-sm skeleton' />
       </div>
     );
   }

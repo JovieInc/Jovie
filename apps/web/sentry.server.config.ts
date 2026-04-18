@@ -3,7 +3,11 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
-import { createBeforeSendHook, getBaseServerConfig } from '@/lib/sentry/config';
+import {
+  createBeforeSendHook,
+  getBaseServerConfig,
+  isNonProductionServerNoise,
+} from '@/lib/sentry/config';
 
 const baseConfig = getBaseServerConfig();
 
@@ -28,6 +32,10 @@ Sentry.init({
 
   // Extend shared beforeSend with server-specific filtering
   beforeSend: createBeforeSendHook(event => {
+    if (isNonProductionServerNoise(event)) {
+      return null;
+    }
+
     // EPIPE/ECONNRESET on /api/chat are expected client disconnects (tab close,
     // navigation). Drop them only for that path; surface them everywhere else.
     const isChatPath = event.request?.url?.includes('/api/chat');
@@ -57,6 +65,13 @@ Sentry.init({
     // is not authenticated. These are handled by the client error boundary
     // and are not bugs (JOV-1065).
     /^Unauthorized$/,
+    /TimeoutError: page\.waitForFunction/i,
+    /TimeoutError: locator\.waitFor/i,
+    /toHaveURL/,
+    // FeaturedCreators: table check timeout with graceful fallback already in place.
+    /\[FeaturedCreators\].*(?:timed out|failed or timed out)/,
+    // OutreachPipeline: hitting configured daily budget limit is expected behavior.
+    /Daily query budget exhausted/,
   ],
 
   // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)

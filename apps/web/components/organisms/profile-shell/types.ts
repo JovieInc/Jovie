@@ -31,23 +31,27 @@ export interface ProfileNotificationsContextValue {
   openSubscription: (channel?: NotificationChannel) => void;
   /** Register a callback to focus the subscription input */
   registerInputFocus: (focusFn: (() => void) | null) => void;
+  /** Whether SMS channel is enabled (Pro-only) */
+  smsEnabled: boolean;
 }
 
 export interface ProfileShellProps {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly viewerCountryCode?: string | null;
   readonly contacts?: PublicContact[];
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
   readonly mode?: ProfileMode;
-  readonly showTipButton?: boolean;
-  readonly isTipModeActive?: boolean;
+  readonly showPayButton?: boolean;
+  readonly isPayModeActive?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
   readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
+  readonly showShopButton?: boolean;
   readonly maxWidthClass?: string;
   readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   readonly showGradientBlurs?: boolean;

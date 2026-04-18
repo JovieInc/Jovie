@@ -10,7 +10,8 @@
 import { eq } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorContacts } from '@/lib/db/schema/profiles';
+import type { DiscoveredPixels } from '@/lib/db/schema/profiles';
+import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import {
   calculateAndStoreFitScore,
@@ -49,11 +50,56 @@ export interface ExtractionData {
   contactEmail?: string | null;
   /** Bio/description text from the profile */
   bio?: string | null;
+  /** Tracking pixels detected on the profile page */
+  discoveredPixels?: DiscoveredPixels | null;
 }
 
 /**
- * Result of profile extraction processing
+ * Run an enrichment step, logging a warning on failure instead of throwing.
  */
+async function safeEnrich(
+  label: string,
+  profileId: string,
+  fn: () => Promise<void>
+): Promise<void> {
+  try {
+    await fn();
+  } catch (error) {
+    logger.warn(`${label} failed`, {
+      profileId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Post-merge enrichment: pixels, fit score, contact email.
+ */
+async function runPostMergeEnrichment(
+  tx: DbOrTransaction,
+  profileId: string,
+  extraction: ExtractionData
+): Promise<void> {
+  if (extraction.discoveredPixels) {
+    await safeEnrich('Discovered pixels storage', profileId, () =>
+      storeDiscoveredPixels(tx, profileId, extraction.discoveredPixels!)
+    );
+  }
+
+  await safeEnrich('Fit score calculation', profileId, async () => {
+    if (typeof extraction.hasPaidTier === 'boolean') {
+      await updatePaidTierScore(tx, profileId, extraction.hasPaidTier);
+    }
+    await calculateAndStoreFitScore(tx, profileId);
+  });
+
+  if (extraction.contactEmail) {
+    await safeEnrich('Contact email storage', profileId, () =>
+      storeContactEmail(tx, profileId, extraction.contactEmail!)
+    );
+  }
+}
+
 export interface ProcessingResult {
   mergeError: string | null;
 }
@@ -116,36 +162,8 @@ export async function processProfileExtraction(
   // Mark ingestion as idle or failed based on merge result
   await IngestionStatusManager.markIdleOrFailed(tx, profile.id, mergeError);
 
-  // Calculate fit score for the profile
-  try {
-    if (typeof extraction.hasPaidTier === 'boolean') {
-      await updatePaidTierScore(tx, profile.id, extraction.hasPaidTier);
-    }
-    await calculateAndStoreFitScore(tx, profile.id);
-  } catch (fitScoreError) {
-    logger.warn('Fit score calculation failed', {
-      profileId: profile.id,
-      error:
-        fitScoreError instanceof Error
-          ? fitScoreError.message
-          : 'Unknown error',
-    });
-  }
-
-  // Store extracted contact email if found
-  if (extraction.contactEmail) {
-    try {
-      await storeContactEmail(tx, profile.id, extraction.contactEmail);
-    } catch (contactError) {
-      logger.warn('Contact email storage failed', {
-        profileId: profile.id,
-        error:
-          contactError instanceof Error
-            ? contactError.message
-            : 'Unknown error',
-      });
-    }
-  }
+  // Run post-merge enrichment steps (pixels, fit score, contact email)
+  await runPostMergeEnrichment(tx, profile.id, extraction);
 
   return { mergeError };
 }
@@ -194,4 +212,49 @@ async function storeContactEmail(
       profileId,
     });
   }
+}
+
+/**
+ * Store discovered tracking pixels for a profile with merge semantics.
+ *
+ * Merge rules:
+ * - If new detection has data for a platform → overwrite that platform's entry
+ * - If new detection has no data for a platform → keep existing entry
+ * - Never clear existing data with a null detection (handled by caller)
+ */
+async function storeDiscoveredPixels(
+  tx: DbOrTransaction,
+  profileId: string,
+  incoming: DiscoveredPixels
+): Promise<void> {
+  // Fetch existing discovered pixels for merge
+  const [existing] = await tx
+    .select({ discoveredPixels: creatorProfiles.discoveredPixels })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  const existingPixels = existing?.discoveredPixels as DiscoveredPixels | null;
+
+  // Merge: incoming platforms overwrite, existing platforms are preserved
+  const merged: DiscoveredPixels = {
+    ...existingPixels,
+    ...incoming,
+  };
+
+  await tx
+    .update(creatorProfiles)
+    .set({
+      discoveredPixels: merged,
+      discoveredPixelsAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profileId));
+
+  const platformCount = Object.keys(merged).length;
+  logger.info('Stored discovered tracking pixels', {
+    profileId,
+    platformCount,
+    platforms: Object.keys(merged),
+  });
 }

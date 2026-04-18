@@ -31,22 +31,22 @@ describe('Badge Component', () => {
 
       const badge = screen.getByText('Default Badge');
       expect(badge).toHaveClass('tracking-[-0.006em]');
-      expect(badge).not.toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).not.toHaveClass('bg-surface-1');
     });
 
     it('applies subtle emphasis styling', () => {
       render(<Badge emphasis='subtle'>Subtle Badge</Badge>);
 
       const badge = screen.getByText('Subtle Badge');
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-1)');
-      expect(badge).toHaveClass('text-(--linear-text-tertiary)');
+      expect(badge).toHaveClass('bg-surface-1');
+      expect(badge).toHaveClass('text-tertiary-token');
     });
 
     it('uses default emphasis when not specified', () => {
       render(<Badge>No Emphasis Specified</Badge>);
 
       const badge = screen.getByText('No Emphasis Specified');
-      expect(badge).not.toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).not.toHaveClass('bg-surface-1');
     });
   });
 
@@ -68,7 +68,7 @@ describe('Badge Component', () => {
 
       const badge = screen.getByText('Merged Styles');
       expect(badge).toHaveClass('my-custom-style');
-      expect(badge).toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('tracking-[-0.006em]');
     });
   });

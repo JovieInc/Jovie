@@ -498,7 +498,9 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   spotifyArtistId: string;
   targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
 }): Promise<string | null> {
-  const providers = (params.targetProviders ?? ['apple_music'])
+  const providers = (
+    params.targetProviders ?? ['apple_music', 'deezer', 'musicbrainz']
+  )
     .sort((a, b) => a.localeCompare(b))
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
@@ -506,7 +508,11 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   const payload = {
     creatorProfileId: params.creatorProfileId,
     spotifyArtistId: params.spotifyArtistId,
-    targetProviders: params.targetProviders ?? ['apple_music'],
+    targetProviders: params.targetProviders ?? [
+      'apple_music',
+      'deezer',
+      'musicbrainz',
+    ],
     dedupKey,
   };
 
@@ -542,6 +548,26 @@ export async function enqueueDspArtistDiscoveryJob(params: {
     runAt: new Date(),
     priority: 1, // Higher priority for user-triggered discovery
     attempts: 0,
+  });
+}
+
+/**
+ * Fire-and-forget DSP artist discovery for all providers.
+ *
+ * Consolidates the repeated pattern of enqueuing discovery with error
+ * swallowing used in refresh, sync, connect, and admin bulk operations.
+ */
+export function fireDspDiscovery(params: {
+  creatorProfileId: string;
+  spotifyArtistId: string;
+  onError?: (error: unknown) => void;
+}): void {
+  void enqueueDspArtistDiscoveryJob({
+    creatorProfileId: params.creatorProfileId,
+    spotifyArtistId: params.spotifyArtistId,
+    targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+  }).catch(error => {
+    params.onError?.(error);
   });
 }
 

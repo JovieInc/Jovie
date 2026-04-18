@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { AlertCircle, Copy, RefreshCw, WifiOff } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatError } from '../types';
 import { getNextStepMessage } from '../utils';
@@ -22,6 +22,13 @@ export function ErrorDisplay({
 }: ErrorDisplayProps) {
   const ErrorIcon = chatError.type === 'network' ? WifiOff : AlertCircle;
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const supportCode = useMemo(() => {
     if (!chatError.requestId && !chatError.errorCode) return null;
@@ -35,7 +42,8 @@ export function ErrorDisplay({
     try {
       await navigator.clipboard.writeText(supportCode);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard write can fail (permissions denied, non-secure context)
     }
@@ -46,51 +54,61 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'
+      className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'
     >
-      <ErrorIcon className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-      <div className='flex-1 space-y-2'>
-        <div>
-          <p className='text-sm font-medium text-primary-token'>
-            {chatError.message}
-          </p>
-          <p className='mt-1 text-xs text-secondary-token'>
-            {getNextStepMessage(chatError.type)}
-          </p>
+      <div className='flex items-start gap-3'>
+        <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-error/20 bg-error-subtle text-error'>
+          <ErrorIcon className='h-4.5 w-4.5' />
         </div>
+        <div className='min-w-0 flex-1 space-y-3'>
+          <div className='space-y-1'>
+            <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-error'>
+              Chat interrupted
+            </p>
+            <p className='text-sm font-medium text-primary-token'>
+              {chatError.message}
+            </p>
+            <p className='text-xs text-secondary-token'>
+              {getNextStepMessage(chatError.type)}
+            </p>
+          </div>
 
-        {supportCode && (
-          <div className='flex items-center gap-2 text-xs text-tertiary-token'>
-            <span className='font-mono'>Ref: {supportCode}</span>
+          {supportCode && (
+            <div className='flex flex-wrap items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-xs text-tertiary-token'>
+              <span className='text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
+                Reference
+              </span>
+              <span className='font-mono text-primary-token'>
+                {supportCode}
+              </span>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={handleCopySupportCode}
+                className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-[11px] font-[510] tracking-[-0.01em]'
+                aria-label='Copy support reference'
+              >
+                <Copy className='h-3 w-3' />
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          )}
+
+          {chatError.failedMessage && !chatError.retryAfter && (
             <Button
               type='button'
-              variant='ghost'
+              variant='secondary'
               size='sm'
-              onClick={() => {
-                void handleCopySupportCode();
-              }}
-              className='h-7 gap-1 px-2 text-xs'
-              aria-label='Copy support reference'
+              onClick={onRetry}
+              disabled={isLoading || isSubmitting}
+              className='h-9 gap-2 rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
             >
-              <Copy className='h-3 w-3' />
-              {copied ? 'Copied' : 'Copy'}
+              <RefreshCw className='h-3.5 w-3.5' />
+              Retry message
             </Button>
-          </div>
-        )}
-
-        {chatError.failedMessage && !chatError.retryAfter && (
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={onRetry}
-            disabled={isLoading || isSubmitting}
-            className='h-8 gap-2'
-          >
-            <RefreshCw className='h-3.5 w-3.5' />
-            Try again
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockUsePlanGate = vi.fn(() => ({
+  canAccessTasksWorkspace: true,
+  isLoading: false,
+}));
+const mockFetchReleaseCreditsAction = vi.fn();
+
 // ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
 // All other sub-components that use additional @jovie/ui parts are mocked below,
 // so only SegmentControl needs to be provided here.
@@ -87,9 +93,29 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
-  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
-    <section>{children}</section>
-  ),
+  DrawerSection: ({
+    children,
+    title,
+    testId,
+    defaultOpen = true,
+    collapsible,
+  }: {
+    children?: React.ReactNode;
+    title?: string;
+    testId?: string;
+    defaultOpen?: boolean;
+    collapsible?: boolean;
+  }) => {
+    const isCollapsible = collapsible ?? Boolean(title);
+    const isClosed = isCollapsible && !defaultOpen;
+
+    return (
+      <section data-testid={testId}>
+        {title ? <h3>{title}</h3> : null}
+        {!isClosed ? children : null}
+      </section>
+    );
+  },
   DrawerLinkSection: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -97,20 +123,81 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
   ),
+  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerSurfaceCard: ({
+    children,
+    className,
+    testId,
+    variant,
+  }: {
+    children?: React.ReactNode;
+    className?: string;
+    testId?: string;
+    variant?: 'card' | 'flat';
+  }) => (
+    <div
+      className={className}
+      data-testid={testId}
+      data-surface-variant={variant}
+    >
+      {children}
+    </div>
+  ),
+  DrawerInspectorStack: ({
+    children,
+    'data-testid': testId,
+  }: {
+    children?: React.ReactNode;
+    'data-testid'?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  DrawerInspectorCard: ({
+    children,
+    title,
+    actions,
+    'data-testid': testId,
+  }: {
+    children?: React.ReactNode;
+    title: string;
+    actions?: React.ReactNode;
+    'data-testid'?: string;
+  }) => (
+    <section data-testid={testId}>
+      <h3>{title}</h3>
+      {actions}
+      {children}
+    </section>
+  ),
+  DrawerFormGridRow: ({
+    children,
+    label,
+  }: {
+    children?: React.ReactNode;
+    label: React.ReactNode;
+  }) => (
+    <div>
+      <span>{label}</span>
+      {children}
+    </div>
+  ),
   DrawerTabs: ({
     value,
     onValueChange,
     options,
+    actions,
+    overflowMode,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     options: Array<{ value: string; label: string }>;
+    actions?: React.ReactNode;
+    overflowMode?: 'wrap' | 'scroll';
   }) => (
-    <div>
+    <div data-overflow-mode={overflowMode} data-testid='drawer-tabs'>
       {options.map(option => (
         <button
           key={option.value}
+          data-testid={`drawer-tab-${option.value}`}
           type='button'
           aria-selected={value === option.value}
           role='tab'
@@ -119,13 +206,75 @@ vi.mock('@/components/molecules/drawer', () => ({
           {option.label}
         </button>
       ))}
+      {actions}
+    </div>
+  ),
+  DrawerSplitButton: ({
+    primaryAction,
+    menuItems,
+  }: {
+    primaryAction?: {
+      ariaLabel: string;
+      label?: string;
+      onClick: () => void;
+      testId?: string;
+    };
+    menuItems?: Array<{
+      id: string;
+      label?: string;
+      onClick?: () => void;
+    }>;
+  }) =>
+    !primaryAction && (!menuItems || menuItems.length === 0) ? null : (
+      <div data-testid='drawer-split-button'>
+        {primaryAction ? (
+          <button
+            type='button'
+            aria-label={primaryAction.ariaLabel}
+            onClick={primaryAction.onClick}
+            data-testid={primaryAction.testId}
+          >
+            {primaryAction.label ?? primaryAction.ariaLabel}
+          </button>
+        ) : null}
+        {menuItems?.map(item => (
+          <button
+            key={item.id}
+            type='button'
+            onClick={item.onClick}
+            data-testid={`drawer-split-menu-item-${item.id}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+    controls,
+    testId,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+    controls?: React.ReactNode;
+    testId?: string;
+  }) => (
+    <div data-testid={testId}>
+      {tabs}
+      {controls}
+      {children}
     </div>
   ),
 }));
 
 // Mock sub-components that are not under test — useReleaseHeaderParts hook
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
+  useReleaseHeaderParts: () => ({
+    headerLabel: '',
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 
 vi.mock('next/image', () => ({
@@ -134,6 +283,12 @@ vi.mock('next/image', () => ({
 
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: () => <span data-testid='icon' />,
+}));
+
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { children: React.ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
 }));
 
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
@@ -156,7 +311,19 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
-  ReleaseMetadata: () => <div data-testid='metadata'>Metadata</div>,
+  ReleaseMetadata: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='metadata' data-variant={variant ?? 'card'}>
+      Metadata
+    </div>
+  ),
+}));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='credits' data-variant={variant ?? 'card'}>
+      Credits
+    </div>
+  ),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -164,7 +331,11 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
-  ReleaseLyricsSection: () => <div data-testid='lyrics'>Lyrics</div>,
+  ReleaseLyricsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='lyrics' data-variant={variant ?? 'card'}>
+      Lyrics
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
@@ -173,6 +344,43 @@ vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
+}));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='release-credits' data-variant={variant ?? 'card'}>
+      Credits
+    </div>
+  ),
+}));
+
+vi.mock(
+  '@/components/organisms/release-sidebar/release-credits-action',
+  () => ({
+    fetchReleaseCreditsAction: (...args: unknown[]) =>
+      mockFetchReleaseCreditsAction(...args),
+  })
+);
+
+vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
+  ReleasePitchSection: () => (
+    <div data-testid='pitch-section'>Pitch Section</div>
+  ),
+}));
+
+vi.mock('@/components/features/dashboard/release-tasks', () => ({
+  ReleaseTaskChecklist: () => <div data-testid='task-checklist'>Tasks</div>,
+}));
+
+vi.mock('@/lib/queries', () => ({
+  usePlanGate: () => mockUsePlanGate(),
+}));
+
+vi.mock('@/constants/routes', () => ({
+  APP_ROUTES: {
+    DASHBOARD_RELEASES: '/dashboard/releases',
+    DASHBOARD_RELEASE_TASKS: '/dashboard/releases/[releaseId]/tasks',
+  },
 }));
 
 vi.mock(
@@ -202,10 +410,16 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
 
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareDropdownItems: () => [],
-}));
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareContextMenuItems: () => [],
+    getUTMShareDropdownItems: () => [],
+  };
+});
 
 // Import after mocks
 const { ReleaseSidebar } = await import(
@@ -239,9 +453,14 @@ const defaultProps = {
   providerConfig: {} as Record<string, { label: string; accent: string }>,
 };
 
-describe('ReleaseSidebar Links tab', () => {
+describe('ReleaseSidebar inspector cards', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: true,
+      isLoading: false,
+    });
+    mockFetchReleaseCreditsAction.mockResolvedValue([]);
   });
 
   it('shows empty state when no release selected', () => {
@@ -252,69 +471,188 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Track list, Links, Details, and Lyrics works', async () => {
-    const user = userEvent.setup();
+  it('renders the release drawer with a tabbed primary card and a details properties panel', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Track list tab active by default — Tracks visible
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
+    expect(screen.getByTestId('metadata')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
+    expect(screen.getByTestId('release-credits')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-
-    // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
-    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
-
-    // Switch to Details tab
-    await user.click(screen.getByRole('tab', { name: /details/i }));
-    expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
-    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-settings-card-stack')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
-    expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-
-    // Switch to Lyrics tab
-    await user.click(screen.getByRole('tab', { name: /lyrics/i }));
-    expect(screen.getByTestId('lyrics')).toBeInTheDocument();
-    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
-
-    // Switch back to Track list
-    await user.click(screen.getByRole('tab', { name: /tracks/i }));
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    expect(screen.getByTestId('lyrics')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
+    expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
-  it('preserves active tab when release changes', async () => {
+  it('shows the compact upgrade card when task access is locked', () => {
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: false,
+    });
+
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('compact-release-plan-upgrade-card')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
+  it('shows a loading state instead of the lock card while task access is resolving', () => {
+    mockUsePlanGate.mockReturnValue({
+      canAccessTasksWorkspace: false,
+      isLoading: true,
+    });
+
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('release-tasks-loading-state')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('compact-release-plan-upgrade-card')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
+  it('does not render the generic Releases title row above the entity card', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.queryByText(/^Releases$/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+  });
+
+  it('opts into the card surface variant contract', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('release-header-card')).toHaveAttribute(
+      'data-surface-variant',
+      'card'
+    );
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+  });
+
+  it('resets the active tab to Details when the release changes', async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <ReleaseSidebar release={mockRelease} {...defaultProps} />
     );
 
-    // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-properties-card')
+    ).not.toBeInTheDocument();
 
-    // Change release
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    // Should preserve the Links tab for workflow continuity
-    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
   });
 
-  it('Links tab renders DSP links section', async () => {
+  it('shows DSP actions only on the DSPs tab', async () => {
+    const user = userEvent.setup();
+    render(
+      <ReleaseSidebar
+        release={mockRelease}
+        {...defaultProps}
+        providerConfig={{
+          spotify: { label: 'Spotify', accent: '#1DB954' },
+        }}
+        onRescanIsrc={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('drawer-split-button')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-sidebar-add-dsp-link')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('drawer-split-menu-item-refresh-platform-links')
+    ).toBeInTheDocument();
+  });
+
+  it('smart link analytics card renders when a release is selected', async () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    // Smart link + analytics are combined in one card
+    expect(screen.getByTestId('analytics')).toBeInTheDocument();
+  });
+
+  it('renders the release drawer as stacked header, analytics, tabbed primary content, and secondary cards', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('analytics')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-credits-card-stack')
+    ).not.toBeInTheDocument();
+  });
+
+  it('switches between Details, DSPs, and Tracks tabs', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-tracks'));
+    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
   });
 
-  it('smart link section renders in header area', async () => {
+  it('omits the Tracks tab when the release has no tracks', () => {
+    render(
+      <ReleaseSidebar
+        release={{ ...mockRelease, totalTracks: 0 }}
+        {...defaultProps}
+      />
+    );
+
+    expect(screen.queryByTestId('drawer-tab-tracks')).not.toBeInTheDocument();
+  });
+
+  it('renders the properties panel with flat metadata and credits content', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Smart link is always visible in the header when a release is selected
-    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
-      'Smart Link Content'
+    expect(screen.getByTestId('release-credits')).toHaveAttribute(
+      'data-variant',
+      'flat'
     );
   });
 });

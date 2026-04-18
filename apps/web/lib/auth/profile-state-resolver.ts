@@ -2,10 +2,11 @@
  * Profile State Resolver
  *
  * Resolves user state based on creator profile status.
+ * Uses the canonical isProfileComplete() from profile-completeness.ts.
  */
 
-// eslint-disable-next-line import/no-cycle -- mutual dependency with gate.ts for auth state
-import { UserState } from './gate';
+import { CanonicalUserState } from './canonical-user-state';
+import { isProfileComplete } from './profile-completeness';
 
 /**
  * Profile data for state resolution.
@@ -24,28 +25,13 @@ export interface ProfileData {
  * Result of profile state resolution.
  */
 export interface ProfileStateResult {
-  state: UserState;
+  state: CanonicalUserState;
   profileId: string | null;
   redirectTo: string | null;
 }
 
-/**
- * Determines if a creator profile is considered "complete" for access purposes.
- * A complete profile has: username, display name, is public, and has completed onboarding.
- * Avatar is intentionally optional because onboarding no longer requires a photo.
- *
- * @param profile - Profile data to check
- * @returns Whether the profile is complete
- */
-export function isProfileComplete(profile: ProfileData): boolean {
-  const hasHandle =
-    Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName?.trim());
-  const isPublic = profile.isPublic !== false;
-  const hasCompleted = Boolean(profile.onboardingCompletedAt);
-
-  return hasHandle && hasName && isPublic && hasCompleted;
-}
+// Re-export for consumers that imported isProfileComplete from here
+export { isProfileComplete } from './profile-completeness';
 
 /**
  * Resolves user state based on profile status.
@@ -59,7 +45,7 @@ export function resolveProfileState(
   // No profile exists
   if (!profile) {
     return {
-      state: UserState.NEEDS_ONBOARDING,
+      state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
       redirectTo: '/onboarding?fresh_signup=true',
     };
@@ -68,7 +54,7 @@ export function resolveProfileState(
   // Profile exists but is incomplete
   if (!isProfileComplete(profile)) {
     return {
-      state: UserState.NEEDS_ONBOARDING,
+      state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: profile.id,
       redirectTo: '/onboarding?fresh_signup=true',
     };
@@ -76,7 +62,7 @@ export function resolveProfileState(
 
   // Profile is complete - user is active
   return {
-    state: UserState.ACTIVE,
+    state: CanonicalUserState.ACTIVE,
     profileId: profile.id,
     redirectTo: null,
   };

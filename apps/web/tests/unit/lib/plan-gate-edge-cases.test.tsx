@@ -65,7 +65,6 @@ describe('usePlanGate – edge cases', () => {
     expect(result.current.plan).toBeNull();
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
-    expect(result.current.canRemoveBranding).toBe(false);
   });
 
   it('handles network error gracefully', async () => {
@@ -139,17 +138,16 @@ describe('usePlanGate – edge cases', () => {
     // isPro flag is still true from billing response
     expect(result.current.isPro).toBe(true);
     // But entitlements are derived from plan string via registry — null plan = free
-    expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 
-  it('growth user gets 365-day retention and unlimited contacts', async () => {
+  it('max user gets unlimited retention and unlimited contacts', async () => {
     mockBillingResponse({
       isPro: true,
-      plan: 'growth',
+      plan: 'max',
       stripeCustomerId: 'cus_g',
       stripeSubscriptionId: 'sub_g',
     });
@@ -162,9 +160,8 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.analyticsRetentionDays).toBe(365);
+    expect(result.current.analyticsRetentionDays).toBeNull();
     expect(result.current.contactsLimit).toBeNull();
-    expect(result.current.canRemoveBranding).toBe(true);
   });
 
   it('unknown plan string gets free retention and contact limits', async () => {
@@ -183,7 +180,7 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // getRetentionDays / getContactsLimit only recognize 'pro' and 'growth'
+    // getRetentionDays / getContactsLimit only recognize 'pro' and 'max'
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
@@ -207,7 +204,6 @@ describe('usePlanGate – feature consistency', () => {
     });
 
     // All boolean features should be true when isPro=true
-    expect(result.current.canRemoveBranding).toBe(true);
     expect(result.current.canAccessAdPixels).toBe(true);
     expect(result.current.canFilterSelfFromAnalytics).toBe(true);
     expect(result.current.canAccessAdvancedAnalytics).toBe(true);
@@ -231,7 +227,6 @@ describe('usePlanGate – feature consistency', () => {
     });
 
     // Pro-only features stay false
-    expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
@@ -241,7 +236,7 @@ describe('usePlanGate – feature consistency', () => {
     // Free-tier unlocked features
     expect(result.current.aiCanUseTools).toBe(true);
     expect(result.current.canCreateManualReleases).toBe(true);
-    expect(result.current.canSendNotifications).toBe(true);
+    expect(result.current.canSendNotifications).toBe(false);
     expect(result.current.canEditSmartLinks).toBe(true);
   });
 
@@ -264,7 +259,6 @@ describe('usePlanGate – feature consistency', () => {
     );
 
     expect(result.current.isError).toBe(true);
-    expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(30);

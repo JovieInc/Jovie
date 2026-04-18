@@ -3,7 +3,7 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
-import type { AdminUsagePoint } from '@/lib/admin/overview';
+import type { AdminUsagePoint } from '@/lib/admin/types';
 
 const LazyLineChart = dynamic(
   () =>
@@ -85,7 +85,8 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
 
   const stats = useMemo(() => {
     if (chartData.length === 0) return null;
-    const latest = chartData.at(-1)!;
+    const latest = chartData[chartData.length - 1];
+    if (!latest) return null;
     const start = chartData[0];
     const delta = latest.users - start.users;
     const deltaPct = start.users > 0 ? (delta / start.users) * 100 : 0;

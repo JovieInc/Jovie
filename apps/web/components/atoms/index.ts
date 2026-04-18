@@ -2,8 +2,6 @@
 // Basic building blocks that can't be broken down further
 // Named exports for tree-shaking (no `export *`)
 
-export type { CTAButtonProps } from '@/components/molecules/CTAButton';
-export { CTAButton } from '@/components/molecules/CTAButton';
 export { AmountSelector } from './AmountSelector';
 export { ArtistName } from './ArtistName';
 export type { Assignee } from './AssigneeAvatar';
@@ -60,15 +58,12 @@ export {
   InlineIconButton,
 } from './InlineIconButton';
 export { JovieIcon } from './JovieIcon';
-export { JovieLogo } from './JovieLogo';
 export type { LabelProps } from './Label';
 export { Label } from './Label';
-export { LinearButton } from './LinearButton';
 export type { LoadingSpinnerProps, LoadingSpinnerTone } from './LoadingSpinner';
 export { LoadingSpinner, Spinner } from './LoadingSpinner';
 export type { LogoVariant } from './Logo';
 export { Logo } from './Logo';
-export { LogoIcon } from './LogoIcon';
 export { LogoLink } from './LogoLink';
 export { LogoLoader } from './LogoLoader';
 export type { NavLinkProps } from './NavLink';

@@ -1,7 +1,16 @@
 export {
+  CollapsibleSectionHeading,
+  type CollapsibleSectionHeadingProps,
+} from './CollapsibleSectionHeading';
+export {
   DrawerActionRow,
   type DrawerActionRowProps,
 } from './DrawerActionRow';
+export {
+  DrawerAnalyticsSummaryCard,
+  type DrawerAnalyticsSummaryCardProps,
+  type DrawerAnalyticsSummaryMetric,
+} from './DrawerAnalyticsSummaryCard';
 export {
   DrawerAsyncToggle,
   type DrawerAsyncToggleProps,
@@ -15,6 +24,16 @@ export {
   DrawerButton,
   type DrawerButtonProps,
 } from './DrawerButton';
+export {
+  DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
+  DrawerCardActionBar,
+  type DrawerCardActionBarProps,
+} from './DrawerCardActionBar';
+export {
+  DrawerEditableTextField,
+  type DrawerEditableTextFieldAction,
+  type DrawerEditableTextFieldProps,
+} from './DrawerEditableTextField';
 export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
@@ -36,6 +55,18 @@ export {
   DrawerInlineIconButton,
   type DrawerInlineIconButtonProps,
 } from './DrawerInlineIconButton';
+export {
+  DrawerInspectorCard,
+  type DrawerInspectorCardProps,
+} from './DrawerInspectorCard';
+export {
+  DrawerInspectorGrid,
+  type DrawerInspectorGridProps,
+} from './DrawerInspectorGrid';
+export {
+  DrawerInspectorStack,
+  type DrawerInspectorStackProps,
+} from './DrawerInspectorStack';
 export {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
@@ -63,12 +94,21 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export {
+  DrawerSplitButton,
+  type DrawerSplitButtonAction,
+  type DrawerSplitButtonProps,
+} from './DrawerSplitButton';
 export { DrawerStatGrid, type DrawerStatGridProps } from './DrawerStatGrid';
 export {
   DRAWER_SURFACE_CARD_CLASSNAME,
   DrawerSurfaceCard,
   type DrawerSurfaceCardProps,
 } from './DrawerSurfaceCard';
+export {
+  DrawerTabbedCard,
+  type DrawerTabbedCardProps,
+} from './DrawerTabbedCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,

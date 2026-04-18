@@ -91,10 +91,10 @@ const CountryOptionButton = memo(function CountryOptionButton({
     <button
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-3 rounded-md px-2 py-1.5 text-[13px] font-medium leading-[20px] transition-colors duration-150 ease-out ${
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-2xl)] px-3 py-2 text-[13px] font-[590] leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
         isSelected
-          ? 'bg-interactive-hover text-primary-token'
-          : 'text-primary-token hover:bg-interactive-hover'
+          ? 'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token'
+          : 'text-primary-token hover:bg-[var(--profile-pearl-bg)]'
       }`}
       style={FONT_SYNTHESIS_STYLE}
     >
@@ -132,7 +132,7 @@ export function CountrySelector({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='h-12 pl-4 pr-3 flex items-center gap-1.5 bg-transparent text-[15px] text-primary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+          className='flex h-12 items-center gap-1.5 rounded-full px-3 text-[15px] font-[590] tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
           style={FONT_SYNTHESIS_STYLE}
           aria-label='Select country code'
         >
@@ -141,7 +141,11 @@ export function CountrySelector({
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
-      <PopoverContent align='start' sideOffset={4} className='w-64'>
+      <PopoverContent
+        align='start'
+        sideOffset={6}
+        className='w-64 rounded-[var(--radius-3xl)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-drawer-bg)] p-2 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'
+      >
         <div className='max-h-64 overflow-y-auto'>
           {COUNTRY_OPTIONS.map(option => (
             <CountryOptionButton

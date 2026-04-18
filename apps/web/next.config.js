@@ -1,11 +1,21 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 
 const nextConfig = {
+  // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
+  // Allow both so Next dev accepts asset/server-action requests from either host.
+  allowedDevOrigins: ['localhost', '127.0.0.1', '::1', '[::1]'],
+  // Move dev indicator to top-right so it doesn't overlap the DevToolbar
+  devIndicators: {
+    position: 'top-right',
+  },
   // Transpile workspace packages for proper module resolution
-  transpilePackages: ['@jovie/ui'],
+  transpilePackages: ['@jovie/ui', '@clerk/ui'],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
@@ -19,15 +29,20 @@ const nextConfig = {
     // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
     ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
-  eslint: {
-    // CI sets NEXT_IGNORE_ESLINT=1 — skip during build since lint runs separately
-    ignoreDuringBuilds: !!process.env.NEXT_IGNORE_ESLINT,
-  },
   // Never ship source maps to browsers (Sentry plugin uploads them separately)
   productionBrowserSourceMaps: false,
   output: 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Node 22 standalone tracing can miss Sentry's runtime interception deps when
+  // Turbopack externalizes them for instrumentation. Keep them in the traced
+  // server bundle so public-route smoke and Lighthouse boots do not 500.
+  outputFileTracingIncludes: {
+    '/*': [
+      '../../node_modules/.pnpm/node_modules/import-in-the-middle/**/*',
+      '../../node_modules/.pnpm/node_modules/require-in-the-middle/**/*',
+    ],
+  },
   // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
@@ -101,7 +116,7 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],
     deviceSizes: [640, 750, 828, 1080, 1200],
-    imageSizes: [64, 96, 128, 256, 384, 400, 1000],
+    imageSizes: [64, 96, 128, 256, 384, 400, 1024],
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year for better caching
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
@@ -221,13 +236,125 @@ const nextConfig = {
       { source: '/TIMWHITE', destination: '/tim', permanent: true },
     ];
 
-    return [
-      // Pricing page hidden for founding member launch (JOV-1050)
+    const legacyAppRedirects = [
+      { source: '/app/contact', destination: '/app/settings/contacts' },
+      { source: '/app/profile', destination: '/app/chat?panel=profile' },
+      { source: '/app/contacts', destination: '/app/settings/contacts' },
       {
-        source: '/pricing',
-        destination: '/',
-        permanent: false,
+        source: '/app/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
       },
+      {
+        source: '/app/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
+      },
+      { source: '/app/tour-dates', destination: '/app/settings/touring' },
+      { source: '/app/dashboard', destination: '/app' },
+      { source: '/app/dashboard/overview', destination: '/app' },
+      {
+        source: '/app/dashboard/earnings',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
+      },
+      {
+        source: '/app/dashboard/links',
+        destination: '/app/chat?panel=profile',
+      },
+      {
+        source: '/app/dashboard/tipping',
+        destination: '/app/settings/artist-profile?tab=earn#pay',
+      },
+      {
+        source: '/app/dashboard/profile',
+        destination: '/app/chat?panel=profile',
+      },
+      { source: '/app/dashboard/chat', destination: '/app/chat' },
+      {
+        source: '/app/dashboard/contacts',
+        destination: '/app/settings/contacts',
+      },
+      {
+        source: '/app/dashboard/tour-dates',
+        destination: '/app/settings/touring',
+      },
+      { source: '/app/settings', destination: '/app/settings/account' },
+      {
+        source: '/app/settings/profile',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/appearance',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/notifications',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/delete-account',
+        destination: '/app/settings/data-privacy',
+      },
+      {
+        source: '/app/settings/retargeting-ads',
+        destination: '/app/settings/audience',
+      },
+      {
+        source: '/app/settings/referral',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/referrals',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/remove-branding',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/ad-pixels',
+        destination: '/app/settings/audience',
+      },
+      {
+        source: '/app/settings/branding',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/admin/waitlist',
+        destination: '/app/admin/people?view=waitlist',
+      },
+      {
+        source: '/app/admin/creators',
+        destination: '/app/admin/people?view=creators',
+      },
+      {
+        source: '/app/admin/users',
+        destination: '/app/admin/people?view=users',
+      },
+      {
+        source: '/app/admin/feedback',
+        destination: '/app/admin/people?view=feedback',
+      },
+      {
+        source: '/app/admin/leads',
+        destination: '/app/admin/growth?view=leads',
+      },
+      {
+        source: '/app/admin/outreach',
+        destination: '/app/admin/growth?view=outreach',
+      },
+      {
+        source: '/app/admin/campaigns',
+        destination: '/app/admin/growth?view=campaigns',
+      },
+      {
+        source: '/app/admin/ingest',
+        destination: '/app/admin/growth?view=ingest',
+      },
+    ].map(route => ({
+      ...route,
+      permanent: false,
+    }));
+
+    return [
       // Legal page redirects
       {
         source: '/privacy',
@@ -240,6 +367,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/cookies',
+        destination: '/legal/cookies',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
         destination: '/app/dashboard/audience',
         permanent: false,
@@ -249,6 +381,18 @@ const nextConfig = {
         destination: '/app/dashboard/audience',
         permanent: false,
       },
+      ...legacyAppRedirects,
+      // Old /tips landing page redirect
+      {
+        source: '/tips',
+        destination: '/pay',
+        permanent: true,
+      },
+      {
+        source: '/engagement-engine',
+        destination: '/artist-notifications',
+        permanent: true,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -257,54 +401,67 @@ const nextConfig = {
     return [
       // Rewrite /app/* to /app/dashboard/* for cleaner URLs
       {
-        source: '/app/profile',
-        destination: '/app/dashboard/profile',
-      },
-      {
-        source: '/app/contacts',
-        destination: '/app/dashboard/contacts',
-      },
-      {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/tour-dates',
-        destination: '/app/dashboard/tour-dates',
       },
       {
         source: '/app/audience',
         destination: '/app/dashboard/audience',
       },
       {
-        source: '/app/earnings',
-        destination: '/app/dashboard/earnings',
-      },
-      {
-        source: '/app/chat',
-        destination: '/app/dashboard/chat',
-      },
-      {
         source: '/app/insights',
         destination: '/app/dashboard/insights',
+      },
+      {
+        source: '/app/presence',
+        destination: '/app/dashboard/presence',
       },
     ];
   },
   env: {
+    // Build-time env vars — these get inlined into client bundles by Next.js
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
       0,
       7
     ),
+    NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
+    // Clerk JS bundle URL — decoded from the publishable key at build time.
+    // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
+    // so Clerk JS + chunks load directly from Clerk infrastructure instead of
+    // going through the /__clerk middleware proxy which can't serve chunks.
+    ...(() => {
+      const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+      if (!pk.startsWith('pk_live_')) return {};
+      try {
+        const b64 = pk.replace(/^pk_live_/, '');
+        const host = Buffer.from(b64, 'base64').toString().replace(/\$$/, '');
+        if (!host) return {};
+        return {
+          NEXT_PUBLIC_CLERK_JS_URL: `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+        };
+      } catch {
+        return {};
+      }
+    })(),
   },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
+    // Cache client-side RSC responses to prevent skeleton flashes on navigation.
+    // Next.js 15+ defaults dynamic routes to 0s (always re-fetch), which causes
+    // unnecessary skeleton loaders on every page switch. Mutations that need
+    // immediate RSC refresh can still use router.refresh() selectively.
+    staleTimes: {
+      dynamic: 30, // Cache dynamic RSC responses for 30s
+      static: 300, // Cache static RSC responses for 5 min
+    },
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [
+      '@jovie/ui',
       '@headlessui/react',
       'lucide-react',
       'simple-icons',
@@ -354,38 +511,33 @@ const nextConfig = {
   },
 };
 
-// Enable Vercel Toolbar in non-production environments only.
-// Disabled in production to eliminate unnecessary JS bundles and 'unsafe-eval' CSP requirements.
-// Set NEXT_DISABLE_TOOLBAR=1 to opt out in non-production environments.
+// Vercel Toolbar: only on Vercel preview deploys (not local dev, not production).
+// Opt-in locally with NEXT_ENABLE_TOOLBAR=1 if needed.
 const enableVercelToolbar =
-  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+  process.env.VERCEL_ENV === 'preview' ||
+  process.env.NEXT_ENABLE_TOOLBAR === '1';
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: vercel toolbar -> sentry
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
-// Injected content via Sentry wizard below
-
+// Sentry build plugin: only in production/CI (source map upload, tunnel route).
+// The Sentry runtime SDK (sentry.server.config.ts) works independently in dev.
 const { withSentryConfig } = require('@sentry/nextjs');
 
-module.exports = withSentryConfig(module.exports, {
-  org: 'jovie',
-  project: 'jovie-web',
+const shouldUseSentryPlugin =
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  !!process.env.VERCEL_ENV;
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
-
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: '/monitoring',
-});
+module.exports = shouldUseSentryPlugin
+  ? withSentryConfig(module.exports, {
+      org: 'jovie',
+      project: 'jovie-web',
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      tunnelRoute: '/monitoring',
+    })
+  : module.exports;

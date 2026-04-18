@@ -28,10 +28,7 @@ export function AdminTableHeader({
       title={title}
       subtitle={subtitle}
       actions={actions}
-      className={cn(
-        'bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_0_var(--linear-app-frame-seam)]',
-        className
-      )}
+      className={className}
     />
   );
 }
@@ -53,8 +50,8 @@ export function AdminTableSubheader({
     <div
       className={cn(
         hasToolbar
-          ? 'bg-(--linear-app-content-surface)'
-          : 'border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-header-padding-x) py-1.5',
+          ? 'bg-surface-1'
+          : 'border-b border-(--linear-app-frame-seam) bg-surface-1 px-(--linear-app-header-padding-x) py-1',
         className
       )}
     >

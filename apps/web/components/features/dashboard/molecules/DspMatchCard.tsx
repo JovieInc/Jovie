@@ -87,8 +87,9 @@ export function DspMatchCard({
 
   return (
     <ContentSurfaceCard
+      surface='details'
       className={cn(
-        'p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0',
+        'p-3.5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0',
         className
       )}
     >
@@ -97,7 +98,7 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
               <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
@@ -108,7 +109,7 @@ export function DspMatchCard({
               />
             </div>
           ) : (
-            <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
+            <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
               <DspProviderIcon provider={providerId} size='lg' />
             </div>
           )}
@@ -124,7 +125,7 @@ export function DspMatchCard({
                   href={externalArtistUrl}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='shrink-0 text-tertiary-token transition-colors hover:text-primary-token'
+                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   title={`View on ${PROVIDER_LABELS[providerId]}`}
                 >
                   <Icon name='ExternalLink' className='h-3.5 w-3.5' />
@@ -149,11 +150,11 @@ export function DspMatchCard({
 
       {/* Expandable Confidence Breakdown */}
       {confidenceBreakdown && (
-        <div className='mt-3 border-t border-subtle pt-3'>
+        <div className='mt-3 border-t border-(--linear-app-frame-seam) pt-3'>
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex w-full items-center justify-between rounded-[6px] text-[13px] text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex h-7 w-full items-center justify-between rounded-[8px] border border-transparent px-2 text-[12px] text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           >
             <span>Confidence breakdown</span>
             <Icon
@@ -175,14 +176,14 @@ export function DspMatchCard({
 
       {/* Actions */}
       {isActionable && (
-        <div className='mt-3 flex items-center justify-end gap-2 border-t border-subtle pt-3'>
+        <div className='mt-3 flex items-center justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
           {onReject && (
             <Button
               variant='ghost'
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='text-[13px]'
+              className='h-7 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[11px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>
@@ -193,7 +194,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onConfirm(matchId)}
               disabled={isLoading}
-              className='text-[13px]'
+              className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
             >
               {isConfirming ? 'Confirming...' : 'Confirm Match'}
             </Button>

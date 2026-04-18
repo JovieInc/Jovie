@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -18,7 +18,7 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
-  const baseUrl = APP_URL.replace(/\/$/, '');
+  const baseUrl = BASE_URL.replace(/\/$/, '');
 
   if (!token) {
     return NextResponse.redirect(`${baseUrl}?error=invalid_token`);

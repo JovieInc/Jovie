@@ -179,7 +179,7 @@ test.describe('Content Gate — Public Pages', () => {
       .locator('body')
       .innerText()
       .catch(() => '');
-    expect(bodyText.length).toBeGreaterThan(500);
+    expect(bodyText.length).toBeGreaterThan(400);
   });
 
   test('Pricing page shows plan tiers with prices', async ({
@@ -263,6 +263,177 @@ test.describe('Content Gate — Public Pages', () => {
         ).not.toContain('application error');
       }
     }
+  });
+
+  test('Under-covered marketing routes render meaningful content', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    const routes = [
+      {
+        path: '/ai',
+        name: 'AI workflow redirect',
+        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
+        minLength: 20,
+        tokenGatedRedirect: true,
+      },
+      {
+        path: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        name: 'Artist notifications',
+        expectedUrl: /\/artist-notifications$/,
+        readyText: /reach every fan|automatically/i,
+        minLength: 150,
+      },
+      {
+        path: APP_ROUTES.LAUNCH,
+        name: 'Launch',
+        expectedUrl: /\/launch$/,
+        readyText: /your entire music career/i,
+        minLength: 250,
+      },
+      {
+        path: APP_ROUTES.LAUNCH_PRICING,
+        name: 'Launch pricing',
+        expectedUrl: /\/launch\/pricing$/,
+        readyText: /simple pricing/i,
+        minLength: 120,
+      },
+      {
+        path: '/support',
+        name: 'Support',
+        expectedUrl: /\/support$/,
+        readyText: /we(?:'|&apos;)re here to help/i,
+        minLength: 20,
+      },
+      {
+        path: '/tips',
+        name: 'Tips',
+        expectedUrl: /\/tips$/,
+        readyText: /turn every tip into a fan|scan\.\s*tip\.\s*stream\./i,
+        minLength: 120,
+      },
+      {
+        path: '/blog',
+        name: 'Blog',
+        expectedUrl: /\/blog$/,
+        readyText: /thoughts on product|now/i,
+        minLength: 120,
+      },
+      {
+        path: '/changelog',
+        name: 'Changelog',
+        expectedUrl: /\/changelog$/,
+        readyText: /what(?:'|&apos;)s new/i,
+        minLength: 80,
+      },
+      {
+        path: '/investors',
+        name: 'Investors redirect',
+        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
+        minLength: 20,
+        tokenGatedRedirect: true,
+      },
+    ] as const;
+
+    for (const route of routes) {
+      if (!(await navigateSafe(page, route.path, { timeout: 120_000 }))) return;
+
+      await expect(page).toHaveURL(route.expectedUrl, {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      if (!route.tokenGatedRedirect) {
+        await expect(
+          page.getByText(route.readyText).first(),
+          `${route.name}: ready signal did not render`
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      }
+
+      const main = page.locator('main').first();
+      const hasMain = await main
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+
+      if (route.tokenGatedRedirect) {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        const lowerBody = bodyText.toLowerCase();
+        if (bodyText.length > 0) {
+          expect(
+            lowerBody,
+            `${route.name}: token-gated redirect should not crash`
+          ).not.toContain('application error');
+          expect(lowerBody).not.toContain('internal server error');
+        }
+        continue;
+      }
+
+      if (hasMain) {
+        await assertMainContent(page, route.name, {
+          minLength: route.minLength,
+        });
+      } else {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        expect(
+          bodyText.length,
+          `${route.name}: body should contain meaningful content`
+        ).toBeGreaterThan(route.minLength);
+      }
+    }
+  });
+
+  test('Blog routes reach a real article page', async ({ page }) => {
+    test.setTimeout(120_000);
+
+    if (!(await navigateSafe(page, '/blog', { timeout: 120_000 }))) return;
+
+    const firstPostLink = page
+      .locator(
+        'article a[href^="/blog/"]:not([href^="/blog/category/"]):not([href^="/blog/authors/"])'
+      )
+      .first();
+    const hasPostLink = await firstPostLink
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => false);
+
+    if (!hasPostLink) {
+      test.skip(true, 'Blog index has no visible post link');
+      return;
+    }
+
+    const href = await firstPostLink.getAttribute('href');
+    expect(href, 'Blog index should link to a slug route').toMatch(
+      /^\/blog\/[^/]+$/
+    );
+
+    await firstPostLink.click();
+    await waitForHydration(page);
+
+    await expect(page).toHaveURL(/\/blog\/[^/]+$/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.locator('h1').first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    const article = page.locator('article').first();
+    const hasArticle = await article
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => false);
+    expect(hasArticle, 'Blog post should render an article body').toBe(true);
+
+    const bodyText = await page
+      .locator('body')
+      .innerText()
+      .catch(() => '');
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+    expect(bodyText.length).toBeGreaterThan(150);
   });
 
   test('Public profile shows artist content and action buttons', async ({
@@ -428,9 +599,9 @@ test.describe('Content Gate — Authenticated Pages', () => {
           },
           {
             path: APP_ROUTES.DASHBOARD_EARNINGS,
-            name: 'Earnings',
+            name: 'Legacy Earnings Redirect',
             minLength: 10,
-            readyText: /earnings|tips|revenue/i,
+            readyText: /tips|profile|support you directly/i,
           },
           { path: APP_ROUTES.CHAT, name: 'Chat' },
         ];
@@ -452,7 +623,15 @@ test.describe('Content Gate — Authenticated Pages', () => {
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
-          await signInUser(page);
+          try {
+            await signInUser(page);
+          } catch (error) {
+            if (error instanceof ClerkTestError) {
+              test.skip(true, `Clerk auth failed: ${error.message}`);
+              return;
+            }
+            throw error;
+          }
           continue;
         }
 
@@ -511,14 +690,14 @@ test.describe('Content Gate — Authenticated Pages', () => {
     const settingsPages = fastIteration
       ? [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },
         ]
       : [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },

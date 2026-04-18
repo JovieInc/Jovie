@@ -1,454 +1,179 @@
 # Component Architecture Guide
 
-## Philosophy: Speed + Simplicity + Scale
+## Overview
 
-Following Y Combinator principles: optimize for fast iteration, minimal cognitive overhead, and effortless scaling.
+Jovie’s current UI architecture is organized around three surface families:
 
-## Atomic Design + YC Speed Principles
+- Marketing
+- Public surface
+- Dashboard / app
 
-### Component Hierarchy
+The canonical route contract for design-system surfaces lives in
+[`apps/web/lib/canonical-surfaces.ts`](../apps/web/lib/canonical-surfaces.ts).
 
-```
-components/
-├── atoms/           # Primitives (Button, Input, QRCode)
-├── molecules/       # Combinations (AuthActions, SearchField)
-├── organisms/       # Systems (HeaderNav, ProductFlyout)
-└── [feature]/       # Feature-specific components
-    ├── atoms/
-    ├── molecules/
-    └── organisms/
-```
+Current canonical surfaces:
 
-### Naming Standards
+- `homepage`
+- `public-profile`
+- `release-landing`
+- `dashboard-releases`
 
-#### Files & Exports
-- **Single export per file**: Every component gets its own file
-- **Export name matches file name**: `Button.tsx` exports `Button`
-- **No default exports**: Always use named exports for predictability
-- **Props interface**: Always named `<ComponentName>Props`
+This is the source of truth for live routes, review routes, and screenshot
+alignment.
 
-#### Component Types
-
-**Atoms**: `PascalCase` nouns describing the primitive
-```typescript
-// ✅ Good
-export function Button({ children, variant, ...props }: ButtonProps) {
-  return <button className={cn(buttonVariants[variant])} {...props}>{children}</button>
-}
-
-// ❌ Bad - has business logic
-export function LoginButton() {
-  const { signIn } = useAuth() // ❌ Business logic in atom
-  return <button onClick={() => signIn()}>Login</button>
-}
-```
-
-**Molecules**: `PascalCase` describing the combination purpose
-```typescript
-// ✅ Good
-export function SearchField({ onSearch, placeholder }: SearchFieldProps) {
-  return (
-    <div className="flex gap-2">
-      <Input placeholder={placeholder} />
-      <Button onClick={onSearch}>Search</Button>
-    </div>
-  )
-}
-```
-
-**Organisms**: `PascalCase` describing the system function
-```typescript
-// ✅ Good
-export function HeaderNav() {
-  const [isOpen, setIsOpen] = useState(false)
-  const { user } = useAuth() // ✅ Business logic allowed
-  
-  return (
-    <header>
-      <Navigation />
-      <AuthActions user={user} />
-    </header>
-  )
-}
-```
-
-### Import Conventions
-
-```typescript
-// Atomic hierarchy (global reusable)
-import { Button } from '@/atoms/Button'
-import { AuthActions } from '@/molecules/AuthActions'
-import { HeaderNav } from '@/organisms/HeaderNav'
-
-// Feature-specific (domain-bounded)
-import { ClaimHandleForm } from '@/components/home/ClaimHandleForm'
-import { ProfileForm } from '@/components/dashboard/organisms/ProfileForm'
-```
-
-## Component Rules by Type
-
-### Atoms
-- **Zero business logic** - no API calls, no feature dependencies
-- **Highly reusable** - used across multiple features
-- **Props-driven** - behavior controlled entirely by props
-- **ForwardRef required** for DOM elements
-- **DisplayName required** for debugging
-
-```typescript
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children, variant = 'primary', className, ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={cn(buttonVariants[variant], className)}
-        data-testid="button"
-        {...props}
-      >
-        {children}
-      </button>
-    )
-  }
-)
-
-Button.displayName = 'Button'
-```
-
-### Molecules
-- **Single clear purpose** - solve one specific UI pattern
-- **Minimal state** - preferably stateless, controlled by parent
-- **Composable** - accept children and handlers for flexibility
-- **No complex business logic** - move to organisms if needed
-
-```typescript
-export function SearchField({ value, onChange, onSubmit, placeholder }: SearchFieldProps) {
-  return (
-    <form onSubmit={onSubmit} className="flex gap-2">
-      <Input
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        data-testid="search-input"
-      />
-      <Button type="submit" data-testid="search-button">
-        Search
-      </Button>
-    </form>
-  )
-}
-```
-
-### Organisms
-- **Complex systems** with multiple responsibilities
-- **State management** - can use `useState`, `useEffect`, etc.
-- **API integration** - can make API calls and handle data
-- **Business logic** - can contain feature-specific logic
-- **Self-contained** - should work independently
-
-```typescript
-export function ProductFlyout({ productId }: ProductFlyoutProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const { data: product, isLoading } = useProduct(productId)
-  
-  const handlePurchase = async () => {
-    await purchaseProduct(productId)
-    setIsOpen(false)
-  }
-  
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline">View Product</Button>
-      </PopoverTrigger>
-      <PopoverContent>
-        {isLoading ? (
-          <LoadingSkeleton />
-        ) : (
-          <ProductDetails product={product} onPurchase={handlePurchase} />
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
-```
-
-## Nested Atomic Structure Rules
-
-Feature-level nesting is allowed, but each level has strict scope boundaries.
-
-### Allowed
+## Global Hierarchy
 
 ```text
-components/
-└── dashboard/
-    ├── atoms/
-    ├── molecules/
-    └── organisms/
+apps/web/components/
+├── atoms/
+├── molecules/
+├── organisms/
+├── marketing/
+└── features/
 ```
 
-- `dashboard/atoms/*` can only contain dashboard-specific presentational primitives.
-- If a feature atom is reused outside its feature, promote it to `components/atoms/*`.
-- Feature molecules and organisms can compose feature atoms, but global atoms should remain dependency-free.
+Use global `atoms`, `molecules`, and `organisms` for reusable UI building
+blocks. Use `features/*` for domain-specific product logic.
 
-### Not Allowed
+## Surface Families
 
-- Adding business logic hooks (`useState`, `useEffect`, `useQuery`, custom `useX`) inside any `atoms/` directory.
-- Importing feature services, API clients, or route-specific state directly in atoms.
-- Keeping "temporary" atoms in a feature folder once they are reused globally.
+### 1. Marketing
 
-### Enforcement
+Reusable marketing-page primitives belong in:
 
-- ESLint blocks hook calls in `apps/web/components/atoms/**/*.tsx`.
-- Existing legacy exceptions are tracked and must be migrated using `docs/ATOMIC_MIGRATION_GUIDE.md`.
+- [`apps/web/components/marketing`](../apps/web/components/marketing)
 
-## Feature Organization
+Examples:
 
-When components are specific to a feature domain:
+- `MarketingPageShell`
+- `MarketingHero`
+- `MarketingSectionIntro`
+- `MarketingMetricCard`
+- `MarketingSurfaceCard`
 
-```
-components/
-└── dashboard/
-    ├── atoms/        # Dashboard-specific atoms
-    ├── molecules/    # Dashboard-specific molecules
-    ├── organisms/    # Dashboard-specific organisms
-    └── index.ts      # Export all dashboard components
-```
+These are the only reusable landing-page primitives. Route-specific marketing
+composition belongs under route-local `_components/` folders inside
+`app/(marketing)`.
 
-## Testing Strategy by Component Type
+Examples:
+
+- `app/(marketing)/new/_components/*`
+
+Do not create a second reusable landing library under `features/landing` or
+another route-specific shared folder.
+
+### 2. Public Surface
+
+Shared public-facing shell chrome belongs in:
+
+- [`apps/web/components/organisms/public-surface`](../apps/web/components/organisms/public-surface)
+
+Exports:
+
+- `PublicSurfaceShell`
+- `PublicSurfaceStage`
+- `PublicSurfaceHeader`
+- `PublicSurfaceFooter`
+
+These primitives own:
+
+- ambient background treatment
+- stage sizing and panel framing
+- top control row layout
+- bottom safe-area spacing
+
+Business logic stays in the feature shells that compose them.
+
+Current adopters:
+
+- `SmartLinkShell`
+- `ProfileShell`
+
+### 3. Dashboard / App
+
+Dashboard and authenticated app UI stays in feature-owned component families,
+using the shared token system but not the marketing or public-surface shell
+layers.
+
+The canonical dashboard design-system surface today is `dashboard-releases`.
+
+## Public Profile Path
+
+The live public profile rendering path is:
+
+- `/[username]`
+- `StaticArtistPage`
+- `ProfileCompactTemplate`
+
+That is the canonical production profile template path.
+
+Legacy profile implementations remain in the repo for test and story coverage,
+but they are not the live route path:
+
+- `PublicProfileTemplate`
+- `PublicProfileTemplateV2`
+- `AnimatedArtistPage`
+
+`ProgressiveArtistPage` now stays on `StaticArtistPage` and no longer upgrades
+to the animated legacy path.
+
+## Route Classification
+
+Important distinction:
+
+- `/artist-profiles` is a marketing acquisition page
+- it is not the canonical `public-profile` surface
+
+Redirect-only routes are also not design surfaces:
+
+- `/ai`
+- `/investors`
+
+## Atomic Design Rules
 
 ### Atoms
-```typescript
-describe('Button', () => {
-  it('applies variant classes correctly', () => {
-    render(<Button variant="primary">Click</Button>)
-    expect(screen.getByRole('button')).toHaveClass('bg-blue-600')
-  })
-  
-  it('forwards ref correctly', () => {
-    const ref = createRef<HTMLButtonElement>()
-    render(<Button ref={ref}>Click</Button>)
-    expect(ref.current).toBeInstanceOf(HTMLButtonElement)
-  })
-})
-```
+
+- no business logic
+- no feature services
+- props-driven only
 
 ### Molecules
-```typescript
-describe('SearchField', () => {
-  it('calls onSubmit when form is submitted', () => {
-    const onSubmit = vi.fn()
-    render(<SearchField onSubmit={onSubmit} />)
-    
-    fireEvent.submit(screen.getByRole('form'))
-    expect(onSubmit).toHaveBeenCalled()
-  })
-})
-```
+
+- one clear composition purpose
+- light state only
+- reusable within or across families
 
 ### Organisms
-```typescript
-describe('ProductFlyout', () => {
-  it('loads and displays product data', async () => {
-    mockUseProduct.mockReturnValue({ data: mockProduct, isLoading: false })
-    
-    render(<ProductFlyout productId="123" />)
-    
-    fireEvent.click(screen.getByText('View Product'))
-    await waitFor(() => {
-      expect(screen.getByText(mockProduct.name)).toBeVisible()
-    })
-  })
-})
-```
 
-## Accessibility Requirements
+- can own state and business logic
+- can compose feature-specific flows
+- should represent a coherent system, not a random wrapper
 
-### All Components
-- **ARIA labels**: For screen readers when text isn't sufficient
-- **Keyboard navigation**: Tab order and keyboard interactions
-- **Focus management**: Visible focus indicators
+## Placement Rules
 
-### Interactive Components
-```typescript
-export function Button({ children, ...props }: ButtonProps) {
-  return (
-    <button
-      className="focus-ring" // Standard focus utility
-      {...props}
-    >
-      {children}
-    </button>
-  )
-}
-```
+Use this decision order:
 
-## data-testid Strategy
+1. If it is reusable across many product areas, place it in global
+   `atoms` / `molecules` / `organisms`.
+2. If it is a reusable marketing-page primitive, place it in
+   `components/marketing/*`.
+3. If it is reusable public-facing shell chrome, place it in
+   `components/organisms/public-surface/*`.
+4. If it is route-local composition, keep it under that route’s `_components/`.
+5. If it is feature-specific business UI, keep it in `features/*`.
 
-> **Canonical reference:** See `AGENTS.md` section 8.1.1 for the full policy.
+## Current Source Files
 
-### Philosophy
-Selective and purposeful, not exhaustive. Prefer accessibility-based selectors (`getByRole`, `getByLabelText`) in tests. Add `data-testid` only when those selectors cannot reliably target an element.
+- [`apps/web/lib/canonical-surfaces.ts`](../apps/web/lib/canonical-surfaces.ts)
+- [`apps/web/components/marketing`](../apps/web/components/marketing)
+- [`apps/web/components/organisms/public-surface`](../apps/web/components/organisms/public-surface)
+- [`apps/web/components/features/profile/StaticArtistPage.tsx`](../apps/web/components/features/profile/StaticArtistPage.tsx)
+- [`apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx`](../apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx)
 
-### Requirements by Tier
+## Anti-Patterns
 
-| Tier | Requirement | Example |
-|------|-------------|---------|
-| **Organisms** | **REQUIRED** | `data-testid="profile-form"` on root, `data-testid="profile-save-button"` on submit |
-| **Molecules** | **RECOMMENDED** | Add when used in E2E/critical flows |
-| **Atoms** | **OPTIONAL** | Accept via props: `'data-testid'?: string` |
-
-### When to Add
-- Critical paths: auth, checkout, onboarding
-- Dynamic content: list items, cards (`data-testid="link-item-{id}"`)
-- Conditional UI: elements that appear/disappear
-- E2E smoke test entry points
-
-### When to Skip
-- Semantic HTML: use `getByRole('button')` instead
-- Static content: use `getByText('Welcome')`
-- Elements with clear accessibility selectors
-
-### Naming Convention
-```
-✅ data-testid="profile-save-button"
-✅ data-testid="onboarding-step-2"
-✅ data-testid="link-item-{id}"
-❌ data-testid="btn1"
-❌ data-testid="ProfileSaveButton"
-```
-
-### Atom Pattern (Accept via Props)
-```typescript
-interface ButtonProps {
-  children: React.ReactNode;
-  'data-testid'?: string;
-}
-
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ children, 'data-testid': testId, ...props }, ref) => (
-    <button ref={ref} data-testid={testId} {...props}>
-      {children}
-    </button>
-  )
-);
-```
-
-### Organism Pattern (Required on Root + Key Areas)
-```typescript
-export function ProfileForm({ onSave }: ProfileFormProps) {
-  return (
-    <form data-testid="profile-form" onSubmit={onSave}>
-      <Input name="displayName" />
-      <Button type="submit" data-testid="profile-save-button">
-        Save
-      </Button>
-    </form>
-  );
-}
-```
-
-## Component Generator Usage
-
-Use `pnpm generate` to scaffold new components:
-
-```bash
-# Create a new atom
-pnpm generate atom
-# → Prompts for name
-# → Creates Button.tsx, Button.stories.tsx, Button.test.tsx
-# → Updates atoms/index.ts
-
-# Create a feature component
-pnpm generate feature
-# → Prompts for feature, atomic level, name
-# → Creates in appropriate feature directory
-```
-
-## Atomic Enforcement Workflow
-
-When adding or editing atoms:
-
-1. Keep atom files props-driven and side-effect free.
-2. Move hook-based behavior into a colocated molecule or organism.
-3. Pass derived state to atoms through explicit props.
-4. If ESLint fails with "Hooks are not allowed in atoms," follow `docs/ATOMIC_MIGRATION_GUIDE.md`.
-
-## Migration and Refactoring
-
-### When to Refactor
-1. **Atom becomes complex**: Move business logic to organism
-2. **Molecule needs state**: Extract state to parent or move to organism
-3. **Component used in 3+ places**: Move to shared atomic hierarchy
-4. **Feature component becomes generic**: Move to atoms/molecules/organisms
-
-### Refactoring Checklist
-- [ ] Update imports in all consuming files
-- [ ] Move tests and stories
-- [ ] Update Storybook hierarchy
-- [ ] Check for breaking changes in props
-- [ ] Verify all tests still pass
-
-## Common Patterns
-
-### Compound Components
-```typescript
-// Expose sub-components as properties
-export const Dialog = {
-  Root: DialogRoot,
-  Trigger: DialogTrigger,
-  Content: DialogContent,
-  Title: DialogTitle,
-  Description: DialogDescription,
-}
-
-// Usage
-<Dialog.Root>
-  <Dialog.Trigger>Open</Dialog.Trigger>
-  <Dialog.Content>
-    <Dialog.Title>Title</Dialog.Title>
-    <Dialog.Description>Description</Dialog.Description>
-  </Dialog.Content>
-</Dialog.Root>
-```
-
-### Polymorphic Components
-```typescript
-type ButtonProps<T extends ElementType = 'button'> = {
-  as?: T
-} & ComponentPropsWithoutRef<T>
-
-export function Button<T extends ElementType = 'button'>({ 
-  as, 
-  children, 
-  ...props 
-}: ButtonProps<T>) {
-  const Component = as || 'button'
-  return <Component {...props}>{children}</Component>
-}
-
-// Usage
-<Button as="a" href="/link">Link Button</Button>
-```
-
-## Best Practices Summary
-
-✅ **Do**:
-- Search existing components before creating new ones
-- Use TypeScript interfaces for all props
-- Add `data-testid` to organisms (required) and molecules in critical flows (recommended)
-- Accept `data-testid` as optional prop in atoms
-- Write comprehensive Storybook stories
-- Follow naming conventions consistently
-- Keep components focused and single-purpose
-- Use forwardRef for DOM elements
-- Include accessibility attributes (semantic HTML, ARIA)
-
-❌ **Don't**:
-- Put business logic in atoms
-- Add `data-testid` to every element (use accessibility selectors first)
-- Create overly generic components
-- Use default exports
-- Skip tests for new components
-- Ignore accessibility requirements
-- Create components without clear purpose
-- Mix atomic levels within a component
-- Skip TypeScript types
+- treating the dashboard as the only “real” design system
+- creating route-specific reusable libraries when a shared family already exists
+- exporting legacy profile templates as if they are canonical live surfaces
+- treating redirect routes as design surfaces
+- adding homepage extraction work into the marketing/public-surface cleanup stack

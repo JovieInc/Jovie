@@ -13,6 +13,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -76,14 +77,21 @@ vi.mock('next/image', () => ({
 }));
 
 // --- Mock lucide-react ---
-vi.mock('lucide-react', () => ({
-  ArrowRight: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'arrow-right', ...props }),
-  Sparkles: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'sparkles', ...props }),
-  Music: (props: Record<string, unknown>) =>
-    React.createElement('svg', { 'data-testid': 'music-icon', ...props }),
-}));
+vi.mock('lucide-react', async importOriginal => {
+  const actual = await importOriginal<typeof import('lucide-react')>();
+
+  return {
+    ...actual,
+    ArrowRight: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'arrow-right', ...props }),
+    Sparkles: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'sparkles', ...props }),
+    Music: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'music-icon', ...props }),
+    Music2: (props: Record<string, unknown>) =>
+      React.createElement('svg', { 'data-testid': 'music2-icon', ...props }),
+  };
+});
 
 // --- Mock analytics ---
 const mockTrack = vi.fn();
@@ -103,7 +111,11 @@ describe('ClaimBanner', () => {
   it('renders banner with profile name', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
-      <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
+      <ClaimBanner
+        profileHandle='testartist'
+        displayName='Test Artist'
+        ctaHref='/signup?handle=testartist'
+      />
     );
 
     expect(screen.getByTestId('claim-banner')).toBeDefined();
@@ -113,7 +125,11 @@ describe('ClaimBanner', () => {
   it('has proper accessibility attributes', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
-      <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
+      <ClaimBanner
+        profileHandle='testartist'
+        displayName='Test Artist'
+        ctaHref='/signup?handle=testartist'
+      />
     );
 
     const banner = screen.getByTestId('claim-banner');
@@ -121,7 +137,7 @@ describe('ClaimBanner', () => {
 
     const cta = screen.getByTestId('claim-banner-cta');
     expect(cta.getAttribute('aria-label')).toBe(
-      'Claim profile for Test Artist'
+      'Claim Profile for Test Artist'
     );
   });
 
@@ -133,7 +149,12 @@ describe('ClaimBanner', () => {
     });
 
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
-    render(<ClaimBanner profileHandle='testartist' />);
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/signup?redirect_url=%2Fonboarding'
+      />
+    );
 
     const cta = screen.getByTestId('claim-banner-cta');
     const href = cta.getAttribute('href');
@@ -145,10 +166,15 @@ describe('ClaimBanner', () => {
 
   it('falls back to handle when displayName not provided', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
-    render(<ClaimBanner profileHandle='testartist' />);
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/signup?handle=testartist'
+      />
+    );
 
     const cta = screen.getByTestId('claim-banner-cta');
-    expect(cta.getAttribute('aria-label')).toBe('Claim profile for testartist');
+    expect(cta.getAttribute('aria-label')).toBe('Claim Profile for testartist');
   });
 });
 
@@ -160,6 +186,11 @@ describe('ProfileViewTracker', () => {
     vi.clearAllMocks();
     mockFetch.mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', mockFetch);
+    // requestIdleCallback runs synchronously in tests so tracking assertions work
+    vi.stubGlobal('requestIdleCallback', (cb: () => void) => {
+      cb();
+      return 0;
+    });
     Object.defineProperty(navigator, 'sendBeacon', {
       value: mockSendBeacon,
       writable: true,
@@ -179,9 +210,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('tracks profile_view event on mount', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -194,9 +222,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('uses sendBeacon for view counting API', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -211,9 +236,6 @@ describe('ProfileViewTracker', () => {
     mockSendBeacon.mockReturnValue(false);
     mockFetch.mockResolvedValue(new Response('ok'));
 
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -229,9 +251,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('only tracks once per mount (deduplication)', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     const queryClient = createTestQueryClient();
     const { rerender } = render(
       <QueryClientProvider client={queryClient}>
@@ -251,9 +270,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('renders nothing (returns null)', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     const { container } = renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -262,9 +278,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('uses custom source when provided', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker
         handle='testartist'

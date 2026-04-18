@@ -3,6 +3,7 @@
 import {
   type ColumnDef,
   type ColumnPinningState,
+  type FilterFn,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
@@ -84,7 +85,7 @@ export interface UnifiedTableProps<TData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 40
+   * @default 32
    */
   readonly rowHeight?: number;
 
@@ -125,12 +126,19 @@ export interface UnifiedTableProps<TData> {
   /**
    * Get context menu items for a row
    */
-  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (
+    row: TData
+  ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
 
   /**
    * Get custom class names for a row
    */
   readonly getRowClassName?: (row: TData, index: number) => string;
+
+  /**
+   * Get a stable test ID for a row when callers need selector-level targeting.
+   */
+  readonly getRowTestId?: (row: TData, index: number) => string | undefined;
 
   /**
    * Additional table class names
@@ -207,6 +215,13 @@ export interface UnifiedTableProps<TData> {
    * @default false
    */
   readonly enableFiltering?: boolean;
+
+  /**
+   * Custom global filter function for client-side search.
+   * Defaults to TanStack Table's built-in 'includesString'.
+   * Use createMultiFieldFilterFn() to search across non-column fields.
+   */
+  readonly globalFilterFn?: FilterFn<TData>;
 
   /**
    * Column pinning configuration
@@ -324,7 +339,7 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 40,
+  rowHeight = 32,
   overscan = 5,
   renderRow,
   getRowId,
@@ -333,6 +348,7 @@ export function UnifiedTable<TData>({
   onRowContextMenu,
   getContextMenuItems,
   getRowClassName,
+  getRowTestId,
   className,
   containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
@@ -345,6 +361,7 @@ export function UnifiedTable<TData>({
   globalFilter,
   onGlobalFilterChange,
   enableFiltering = false,
+  globalFilterFn: globalFilterFnProp,
   columnPinning,
   enablePinning = false,
   columnVisibility,
@@ -435,7 +452,7 @@ export function UnifiedTable<TData>({
     enableRowSelection: !!onRowSelectionChange,
     enableGlobalFilter: enableFiltering,
     enableColumnPinning: enablePinning,
-    globalFilterFn: 'includesString',
+    globalFilterFn: globalFilterFnProp ?? 'includesString',
   });
 
   const { rows } = table.getRowModel();
@@ -493,6 +510,7 @@ export function UnifiedTable<TData>({
           .getRowModel()
           .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows` triggers table model rebuild
     [rows, getRowId, table]
   );
 
@@ -518,6 +536,7 @@ export function UnifiedTable<TData>({
           onKeyDown={handleKeyDown}
           onFocusChange={setFocusedIndex}
           getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
         />
       );
@@ -531,7 +550,10 @@ export function UnifiedTable<TData>({
           : null;
 
       const wrappedRowElement = getContextMenuItems ? (
-        <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+        <TableContextMenu
+          key={row.id}
+          getItems={() => getContextMenuItems(rowData)}
+        >
           {rowElement}
         </TableContextMenu>
       ) : (
@@ -559,6 +581,7 @@ export function UnifiedTable<TData>({
       handleKeyDown,
       setFocusedIndex,
       getRowClassName,
+      getRowTestId,
       onRowShiftClick,
       getExpandableRowId,
       expandedRowIds,
@@ -696,6 +719,7 @@ export function UnifiedTable<TData>({
           getContextMenuItems={getContextMenuItems}
           onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
           renderRow={renderRow}
           getRowId={getRowId}
           expandedRowIds={expandedRowIds}
@@ -713,7 +737,7 @@ export function UnifiedTable<TData>({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className='py-3 text-center text-[11px] text-tertiary-token'
+                  className='py-1.5 text-center text-[11px] text-tertiary-token'
                 >
                   <span className='inline-flex items-center gap-1.5'>
                     <LoadingSpinner

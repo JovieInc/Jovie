@@ -1,12 +1,18 @@
-import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { db, doesTableExist } from '@/lib/db';
+import { and, sql as drizzleSql, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
   artists,
+  type DiscogRecording,
   type DiscogRelease,
+  type DiscogReleaseTrack,
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
+  type NewDiscogRecording,
   type NewDiscogRelease,
+  type NewDiscogReleaseTrack,
   type NewDiscogTrack,
   type NewProviderLink,
   type ProviderLink,
@@ -25,6 +31,7 @@ export type ReleaseSourceType = 'manual' | 'admin' | 'ingested';
 export interface TrackSummary {
   totalDurationMs: number | null;
   primaryIsrc: string | null;
+  primaryPreviewUrl: string | null;
 }
 
 // Types for release data with provider links
@@ -34,20 +41,13 @@ export interface ReleaseWithProviders extends DiscogRelease {
   trackSummary?: TrackSummary;
 }
 
-async function hasDiscogReleasesTable(): Promise<boolean> {
-  return doesTableExist('discog_releases');
-}
-
-async function hasDiscogTracksTable(): Promise<boolean> {
-  return doesTableExist('discog_tracks');
-}
-
-async function hasProviderLinksTable(): Promise<boolean> {
-  return doesTableExist('provider_links');
-}
-
-async function hasReleaseArtistsTable(): Promise<boolean> {
-  return doesTableExist('release_artists');
+export interface PublicDiscogReleaseLite {
+  id: string;
+  title: string;
+  slug: string | null;
+  releaseType: DiscogRelease['releaseType'];
+  releaseDate: string | null;
+  artworkUrl: string | null;
 }
 
 export interface UpsertReleaseInput {
@@ -61,6 +61,7 @@ export interface UpsertReleaseInput {
     | 'compilation'
     | 'live'
     | 'mixtape'
+    | 'music_video'
     | 'other';
   releaseDate?: Date | null;
   label?: string | null;
@@ -92,16 +93,26 @@ export interface UpsertReleaseProviderLinkInput extends UpsertProviderLinkBase {
   trackId?: never;
 }
 
-// Track-level provider link input
+// Track-level provider link input (LEGACY — use ReleaseTrack variant for new code)
 export interface UpsertTrackProviderLinkInput extends UpsertProviderLinkBase {
   trackId: string;
   releaseId?: never;
+  releaseTrackId?: never;
+}
+
+// ReleaseTrack-level provider link input
+export interface UpsertReleaseTrackProviderLinkInput
+  extends UpsertProviderLinkBase {
+  releaseTrackId: string;
+  releaseId?: never;
+  trackId?: never;
 }
 
 // Union type for the function
 export type UpsertProviderLinkInput =
   | UpsertReleaseProviderLinkInput
-  | UpsertTrackProviderLinkInput;
+  | UpsertTrackProviderLinkInput
+  | UpsertReleaseTrackProviderLinkInput;
 
 function isUniqueConstraintViolation(
   error: unknown,
@@ -110,38 +121,59 @@ function isUniqueConstraintViolation(
   return isUniqueViolationUtil(error, constraint);
 }
 
+/** Shared SQL select columns for track summary aggregation (lazy to avoid module-scope access). */
+function trackSummarySelectColumns() {
+  return {
+    releaseId: discogReleaseTracks.releaseId,
+    totalDurationMs: drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
+      'total_duration_ms'
+    ),
+    primaryIsrc:
+      drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
+        'primary_isrc'
+      ),
+    primaryPreviewUrl:
+      drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
+        'primary_preview_url'
+      ),
+  };
+}
+
+function rowToTrackSummary(row: {
+  totalDurationMs: number | null;
+  primaryIsrc: string | null;
+  primaryPreviewUrl: string | null;
+}): TrackSummary {
+  return {
+    totalDurationMs: row.totalDurationMs ?? null,
+    primaryIsrc: row.primaryIsrc ?? null,
+    primaryPreviewUrl: row.primaryPreviewUrl ?? null,
+  };
+}
+
 /**
  * Get track summaries (total duration, primary ISRC) for releases
  */
 async function getTrackSummariesForReleases(
   releaseIds: string[]
 ): Promise<Map<string, TrackSummary>> {
-  if (releaseIds.length === 0 || !(await hasDiscogTracksTable())) {
+  if (releaseIds.length === 0) {
     return new Map();
   }
 
-  // Aggregate track data per release using raw SQL for efficiency
   const summaries = await db
-    .select({
-      releaseId: discogTracks.releaseId,
-      totalDurationMs: drizzleSql<number>`sum(${discogTracks.durationMs})`.as(
-        'total_duration_ms'
-      ),
-      primaryIsrc:
-        drizzleSql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
-          'primary_isrc'
-        ),
-    })
-    .from(discogTracks)
-    .where(inArray(discogTracks.releaseId, releaseIds))
-    .groupBy(discogTracks.releaseId);
+    .select(trackSummarySelectColumns())
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(inArray(discogReleaseTracks.releaseId, releaseIds))
+    .groupBy(discogReleaseTracks.releaseId);
 
   const summaryMap = new Map<string, TrackSummary>();
   for (const row of summaries) {
-    summaryMap.set(row.releaseId, {
-      totalDurationMs: row.totalDurationMs ?? null,
-      primaryIsrc: row.primaryIsrc ?? null,
-    });
+    summaryMap.set(row.releaseId, rowToTrackSummary(row));
   }
   return summaryMap;
 }
@@ -149,7 +181,7 @@ async function getTrackSummariesForReleases(
 async function getArtistNamesForReleases(
   releaseIds: string[]
 ): Promise<Map<string, string[]>> {
-  if (releaseIds.length === 0 || !(await hasReleaseArtistsTable())) {
+  if (releaseIds.length === 0) {
     return new Map();
   }
 
@@ -186,14 +218,17 @@ async function getArtistNamesForReleases(
 export async function getLatestReleaseForProfile(
   creatorProfileId: string
 ): Promise<DiscogRelease | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
@@ -208,10 +243,6 @@ export async function getLatestReleaseForProfile(
 export async function getLatestReleaseByUsername(
   usernameNormalized: string
 ): Promise<DiscogRelease | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select({
       id: discogReleases.id,
@@ -220,17 +251,22 @@ export async function getLatestReleaseByUsername(
       slug: discogReleases.slug,
       releaseType: discogReleases.releaseType,
       releaseDate: discogReleases.releaseDate,
+      status: discogReleases.status,
+      revealDate: discogReleases.revealDate,
+      deletedAt: discogReleases.deletedAt,
       label: discogReleases.label,
       upc: discogReleases.upc,
       totalTracks: discogReleases.totalTracks,
       isExplicit: discogReleases.isExplicit,
       genres: discogReleases.genres,
+      targetPlaylists: discogReleases.targetPlaylists,
       copyrightLine: discogReleases.copyrightLine,
       distributor: discogReleases.distributor,
       artworkUrl: discogReleases.artworkUrl,
       spotifyPopularity: discogReleases.spotifyPopularity,
       sourceType: discogReleases.sourceType,
       metadata: discogReleases.metadata,
+      generatedPitches: discogReleases.generatedPitches,
       createdAt: discogReleases.createdAt,
       updatedAt: discogReleases.updatedAt,
     })
@@ -239,7 +275,15 @@ export async function getLatestReleaseByUsername(
       creatorProfiles,
       eq(discogReleases.creatorProfileId, creatorProfiles.id)
     )
-    .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+    .where(
+      and(
+        eq(creatorProfiles.usernameNormalized, usernameNormalized),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        ne(discogReleases.releaseType, 'music_video'),
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
     .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
@@ -253,10 +297,11 @@ export async function getLatestReleaseByUsername(
 export async function getReleaseStatsByUsername(
   usernameNormalized: string
 ): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
-  if (!(await hasDiscogReleasesTable())) {
-    return { releaseCount: 0, topReleaseTitles: [] };
-  }
-
+  const publicFilter = and(
+    eq(creatorProfiles.usernameNormalized, usernameNormalized),
+    isNull(discogReleases.deletedAt),
+    ne(discogReleases.status, 'draft')
+  );
   const [countResult, topReleases] = await Promise.all([
     db
       .select({
@@ -267,7 +312,7 @@ export async function getReleaseStatsByUsername(
         creatorProfiles,
         eq(discogReleases.creatorProfileId, creatorProfiles.id)
       )
-      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized)),
+      .where(publicFilter),
     db
       .select({ title: discogReleases.title })
       .from(discogReleases)
@@ -275,7 +320,7 @@ export async function getReleaseStatsByUsername(
         creatorProfiles,
         eq(discogReleases.creatorProfileId, creatorProfiles.id)
       )
-      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .where(publicFilter)
       .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
       .limit(3),
   ]);
@@ -287,20 +332,68 @@ export async function getReleaseStatsByUsername(
 }
 
 /**
+ * Lightweight release list for public profile display.
+ * Returns releases with artist names but skips provider links and track summaries.
+ * Sorted newest-first (DESC NULLS LAST) so null dates appear at the end.
+ * Capped at 200 releases to bound serialisation cost.
+ */
+export async function getReleasesForProfileLite(
+  creatorProfileId: string
+): Promise<Array<PublicDiscogReleaseLite & { artistNames: string[] }>> {
+  const releases = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      releaseType: discogReleases.releaseType,
+      releaseDate: discogReleases.releaseDate,
+      artworkUrl: discogReleases.artworkUrl,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        // Intentionally includes music videos for the public releases drawer.
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(200);
+
+  if (releases.length === 0) return [];
+
+  const artistNamesByRelease = await getArtistNamesForReleases(
+    releases.map(r => r.id)
+  );
+
+  return releases.map(release => ({
+    ...release,
+    releaseDate: release.releaseDate?.toISOString() ?? null,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+  }));
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(
-  creatorProfileId: string
+  creatorProfileId: string,
+  options?: { includeDrafts?: boolean }
 ): Promise<ReleaseWithProviders[]> {
-  if (!(await hasDiscogReleasesTable())) {
-    return [];
+  const filters = [
+    eq(discogReleases.creatorProfileId, creatorProfileId),
+    isNull(discogReleases.deletedAt),
+  ];
+  if (!options?.includeDrafts) {
+    filters.push(ne(discogReleases.status, 'draft'));
   }
-
-  // Fetch releases
+  // Fetch releases (always exclude soft-deleted)
   const releases = await db
     .select()
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, creatorProfileId))
+    .where(and(...filters))
     .orderBy(discogReleases.releaseDate);
 
   if (releases.length === 0) {
@@ -314,20 +407,15 @@ export async function getReleasesForProfile(
     await Promise.all([
       getTrackSummariesForReleases(releaseIds),
       getArtistNamesForReleases(releaseIds),
-      hasProviderLinksTable().then(async hasTable => {
-        if (!hasTable) return [];
-        if (releaseIds.length === 0) return [];
-        // Use SQL filtering instead of JavaScript for better performance
-        return db
-          .select()
-          .from(providerLinks)
-          .where(
-            and(
-              eq(providerLinks.ownerType, 'release'),
-              inArray(providerLinks.releaseId, releaseIds)
-            )
-          );
-      }),
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            inArray(providerLinks.releaseId, releaseIds)
+          )
+        ),
     ]);
 
   // Group links by release ID
@@ -355,10 +443,6 @@ export async function getReleaseBySlug(
   creatorProfileId: string,
   slug: string
 ): Promise<ReleaseWithProviders | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -374,29 +458,18 @@ export async function getReleaseBySlug(
     return null;
   }
 
-  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+  const [artistNamesByRelease, links] = await Promise.all([
     getArtistNamesForReleases([release.id]),
-    hasProviderLinksTable(),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
   ]);
-
-  if (!hasLinksTable) {
-    return {
-      ...release,
-      artistNames: artistNamesByRelease.get(release.id) ?? [],
-      providerLinks: [],
-    };
-  }
-
-  // Fetch provider links for this release
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, release.id)
-      )
-    );
 
   return {
     ...release,
@@ -411,10 +484,6 @@ export async function getReleaseBySlug(
 export async function getReleaseById(
   releaseId: string
 ): Promise<ReleaseWithProviders | null> {
-  if (!(await hasDiscogReleasesTable())) {
-    return null;
-  }
-
   const [release] = await db
     .select()
     .from(discogReleases)
@@ -425,29 +494,18 @@ export async function getReleaseById(
     return null;
   }
 
-  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+  const [artistNamesByRelease, links] = await Promise.all([
     getArtistNamesForReleases([release.id]),
-    hasProviderLinksTable(),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
   ]);
-
-  if (!hasLinksTable) {
-    return {
-      ...release,
-      artistNames: artistNamesByRelease.get(release.id) ?? [],
-      providerLinks: [],
-    };
-  }
-
-  // Fetch provider links for this release
-  const links = await db
-    .select()
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, release.id)
-      )
-    );
 
   return {
     ...release,
@@ -514,6 +572,49 @@ export async function upsertRelease(
   return result;
 }
 
+function resolveProviderLinkOwner(
+  input: UpsertProviderLinkInput,
+  isReleaseTrackLink: unknown,
+  isTrackLink: unknown
+) {
+  if (isReleaseTrackLink) {
+    return {
+      ownerType: 'release_track' as const,
+      releaseId: null,
+      trackId: null,
+      releaseTrackId: (input as UpsertReleaseTrackProviderLinkInput)
+        .releaseTrackId,
+    };
+  }
+  if (isTrackLink) {
+    return {
+      ownerType: 'track' as const,
+      releaseId: null,
+      trackId: (input as UpsertTrackProviderLinkInput).trackId,
+      releaseTrackId: null,
+    };
+  }
+  return {
+    ownerType: 'release' as const,
+    releaseId: (input as UpsertReleaseProviderLinkInput).releaseId,
+    trackId: null,
+    releaseTrackId: null,
+  };
+}
+
+function resolveConflictTarget(
+  isReleaseTrackLink: unknown,
+  isTrackLink: unknown
+) {
+  if (isReleaseTrackLink) {
+    return [providerLinks.providerId, providerLinks.releaseTrackId];
+  }
+  if (isTrackLink) {
+    return [providerLinks.providerId, providerLinks.trackId];
+  }
+  return [providerLinks.providerId, providerLinks.releaseId];
+}
+
 /**
  * Upsert a provider link for a release or track
  */
@@ -523,16 +624,17 @@ export async function upsertProviderLink(
   const now = new Date();
 
   // Determine owner type based on which ID is provided
+  const isReleaseTrackLink = 'releaseTrackId' in input && input.releaseTrackId;
   const isTrackLink = 'trackId' in input && input.trackId;
-  const ownerType = isTrackLink ? 'track' : 'release';
+  const { ownerType, releaseId, trackId, releaseTrackId } =
+    resolveProviderLinkOwner(input, isReleaseTrackLink, isTrackLink);
 
   const insertData: NewProviderLink = {
     providerId: input.providerId,
     ownerType,
-    releaseId: isTrackLink
-      ? null
-      : (input as UpsertReleaseProviderLinkInput).releaseId,
-    trackId: isTrackLink ? input.trackId : null,
+    releaseId,
+    trackId,
+    releaseTrackId,
     url: input.url,
     externalId: input.externalId ?? null,
     sourceType: input.sourceType ?? 'ingested',
@@ -543,9 +645,7 @@ export async function upsertProviderLink(
   };
 
   // Use the appropriate unique constraint target
-  const conflictTarget = isTrackLink
-    ? [providerLinks.providerId, providerLinks.trackId]
-    : [providerLinks.providerId, providerLinks.releaseId];
+  const conflictTarget = resolveConflictTarget(isReleaseTrackLink, isTrackLink);
 
   try {
     const [result] = await db
@@ -811,15 +911,87 @@ export async function updateTrackLyrics(
 }
 
 /**
+ * Update preview URL for a recording identified by ISRC + creator profile.
+ * Only updates if the recording's current previewUrl is NULL (doesn't overwrite existing).
+ */
+export async function updateRecordingPreviewByIsrc(
+  creatorProfileId: string,
+  isrc: string,
+  previewUrl: string
+): Promise<boolean> {
+  const result = await db
+    .update(discogRecordings)
+    .set({ previewUrl, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.isrc, isrc),
+        drizzleSql`${discogRecordings.previewUrl} IS NULL`
+      )
+    );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function setRecordingPreviewResolutionByIsrc(
+  creatorProfileId: string,
+  isrc: string,
+  resolution: {
+    status: 'verified' | 'fallback' | 'unknown' | 'missing';
+    source:
+      | 'audio_url'
+      | 'spotify'
+      | 'apple_music'
+      | 'deezer'
+      | 'musicfetch'
+      | null;
+    attemptedSources?: string[];
+  }
+): Promise<boolean> {
+  const [recording] = await db
+    .select({
+      id: discogRecordings.id,
+      metadata: discogRecordings.metadata,
+    })
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.isrc, isrc)
+      )
+    )
+    .limit(1);
+
+  if (!recording) {
+    return false;
+  }
+
+  const nextMetadata = {
+    ...recording.metadata,
+    previewResolution: {
+      status: resolution.status,
+      source: resolution.source,
+      checkedAt: new Date().toISOString(),
+      attemptedSources: resolution.attemptedSources ?? [],
+    },
+  };
+
+  const result = await db
+    .update(discogRecordings)
+    .set({
+      metadata: nextMetadata,
+      updatedAt: new Date(),
+    })
+    .where(eq(discogRecordings.id, recording.id));
+
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
  * Get tracks for a release
  */
 export async function getTracksForRelease(
   releaseId: string
 ): Promise<(typeof discogTracks.$inferSelect)[]> {
-  if (!(await hasDiscogTracksTable())) {
-    return [];
-  }
-
   return db
     .select()
     .from(discogTracks)
@@ -842,6 +1014,7 @@ export interface TrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
 
@@ -865,10 +1038,6 @@ export async function getTracksForReleaseWithProviders(
 ): Promise<TracksWithProvidersResult> {
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
-
-  if (!(await hasDiscogTracksTable())) {
-    return { tracks: [], total: 0, hasMore: false };
-  }
 
   // Get total count for pagination
   const [countResult] = await db
@@ -897,31 +1066,26 @@ export async function getTracksForReleaseWithProviders(
 
   // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
-  let trackProviderLinks: ProviderLink[] = [];
-  let releaseProviderLinks: ProviderLink[] = [];
-
-  if (await hasProviderLinksTable()) {
-    [trackProviderLinks, releaseProviderLinks] = await Promise.all([
-      db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'track'),
-            inArray(providerLinks.trackId, trackIds)
-          )
-        ),
-      db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release'),
-            eq(providerLinks.releaseId, releaseId)
-          )
-        ),
-    ]);
-  }
+  const [trackProviderLinks, releaseProviderLinks] = await Promise.all([
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'track'),
+          inArray(providerLinks.trackId, trackIds)
+        )
+      ),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, releaseId)
+        )
+      ),
+  ]);
 
   // Group links by track ID
   const linksByTrack = new Map<string, ProviderLink[]>();
@@ -947,6 +1111,7 @@ export async function getTracksForReleaseWithProviders(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    metadata: track.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByTrack.get(track.id) ?? [],
       releaseProviderLinks
@@ -958,4 +1123,441 @@ export async function getTracksForReleaseWithProviders(
     total,
     hasMore: offset + limit < total,
   };
+}
+
+// ============================================================================
+// Recording & Release-Track Functions (new model)
+// ============================================================================
+
+export interface UpsertRecordingInput {
+  creatorProfileId: string;
+  title: string;
+  slug: string;
+  isrc?: string | null;
+  durationMs?: number | null;
+  isExplicit?: boolean;
+  previewUrl?: string | null;
+  audioUrl?: string | null;
+  audioFormat?: string | null;
+  lyrics?: string | null;
+  sourceType?: ReleaseSourceType;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Upsert a recording (canonical audio entity).
+ * Conflict resolution: (creatorProfileId, slug).
+ * Falls back on ISRC collision by nulling ISRC.
+ */
+export async function upsertRecording(
+  input: UpsertRecordingInput
+): Promise<DiscogRecording> {
+  const now = new Date();
+
+  const insertData: NewDiscogRecording = {
+    creatorProfileId: input.creatorProfileId,
+    title: input.title,
+    slug: input.slug,
+    isrc: input.isrc ?? null,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    lyrics: input.lyrics ?? null,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const baseSet = {
+    title: input.title,
+    isrc: input.isrc ?? null,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    ...('lyrics' in input ? { lyrics: input.lyrics ?? null } : {}),
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
+
+  try {
+    const [result] = await db
+      .insert(discogRecordings)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
+        set: baseSet,
+      })
+      .returning();
+
+    return result;
+  } catch (error) {
+    if (
+      !isUniqueConstraintViolation(
+        error,
+        'discog_recordings_creator_isrc_unique'
+      )
+    ) {
+      throw error;
+    }
+
+    // ISRC collision — another recording for this creator already has this ISRC.
+    // Store without ISRC; the existing recording is the canonical one.
+    const [result] = await db
+      .insert(discogRecordings)
+      .values({ ...insertData, isrc: null })
+      .onConflictDoUpdate({
+        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
+        set: { ...baseSet, isrc: null },
+      })
+      .returning();
+
+    return result;
+  }
+}
+
+export interface UpsertReleaseTrackInput {
+  releaseId: string;
+  recordingId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber?: number;
+  isExplicit?: boolean;
+  sourceType?: ReleaseSourceType;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Upsert a release track (recording's appearance on a release).
+ * Conflict resolution: (releaseId, discNumber, trackNumber).
+ */
+export async function upsertReleaseTrack(
+  input: UpsertReleaseTrackInput
+): Promise<DiscogReleaseTrack> {
+  const now = new Date();
+  const discNumber = input.discNumber ?? 1;
+  const fallbackSlug = `${input.slug}-${discNumber}-${input.trackNumber}`;
+
+  const insertData: NewDiscogReleaseTrack = {
+    releaseId: input.releaseId,
+    recordingId: input.recordingId,
+    title: input.title,
+    slug: input.slug,
+    trackNumber: input.trackNumber,
+    discNumber,
+    isExplicit: input.isExplicit ?? false,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const baseSet = {
+    recordingId: input.recordingId,
+    title: input.title,
+    slug: input.slug,
+    isExplicit: input.isExplicit ?? false,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
+
+  try {
+    const [result] = await db
+      .insert(discogReleaseTracks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [
+          discogReleaseTracks.releaseId,
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber,
+        ],
+        set: baseSet,
+      })
+      .returning();
+
+    return result;
+  } catch (error) {
+    if (
+      !isUniqueConstraintViolation(
+        error,
+        'discog_release_tracks_release_slug_unique'
+      )
+    ) {
+      throw error;
+    }
+
+    // Slug collision within release — use fallback slug
+    const [result] = await db
+      .insert(discogReleaseTracks)
+      .values({ ...insertData, slug: fallbackSlug })
+      .onConflictDoUpdate({
+        target: [
+          discogReleaseTracks.releaseId,
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber,
+        ],
+        set: { ...baseSet, slug: fallbackSlug },
+      })
+      .returning();
+
+    return result;
+  }
+}
+
+/**
+ * Update lyrics on a recording by ID.
+ */
+export async function updateRecordingLyrics(
+  recordingId: string,
+  lyrics: string
+): Promise<void> {
+  await db
+    .update(discogRecordings)
+    .set({ lyrics, updatedAt: new Date() })
+    .where(eq(discogRecordings.id, recordingId));
+}
+
+/**
+ * Get a recording by slug within a creator's profile.
+ */
+export async function getRecordingBySlug(
+  creatorProfileId: string,
+  slug: string
+): Promise<DiscogRecording | null> {
+  const [recording] = await db
+    .select()
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.slug, slug)
+      )
+    )
+    .limit(1);
+
+  return recording ?? null;
+}
+
+/** Release track with recording data and provider links */
+export interface ReleaseTrackWithProviders {
+  id: string;
+  releaseId: string;
+  recordingId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber: number;
+  isExplicit: boolean;
+  // Recording fields (denormalized for display)
+  durationMs: number | null;
+  isrc: string | null;
+  previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
+  metadata: Record<string, unknown> | null;
+  providerLinks: ProviderLink[];
+}
+
+export interface ReleaseTracksWithProvidersResult {
+  tracks: ReleaseTrackWithProviders[];
+  total: number;
+  hasMore: boolean;
+}
+
+/**
+ * Get release tracks for a release with recording data and provider links.
+ * Joins discog_release_tracks → discog_recordings, resolves provider links.
+ */
+export async function getReleaseTracksForReleaseWithProviders(
+  releaseId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<ReleaseTracksWithProvidersResult> {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+
+  // Get total count
+  const [countResult] = await db
+    .select({ count: drizzleSql<number>`COUNT(*)` })
+    .from(discogReleaseTracks)
+    .where(eq(discogReleaseTracks.releaseId, releaseId));
+
+  const total = Number(countResult?.count ?? 0);
+
+  if (total === 0) {
+    return { tracks: [], total: 0, hasMore: false };
+  }
+
+  // Fetch paginated release tracks joined with recordings
+  const rows = await db
+    .select({
+      rt: discogReleaseTracks,
+      rec: discogRecordings,
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(eq(discogReleaseTracks.releaseId, releaseId))
+    .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber)
+    .limit(limit)
+    .offset(offset);
+
+  if (rows.length === 0) {
+    return { tracks: [], total, hasMore: false };
+  }
+
+  // Fetch provider links for release_tracks and release-level links
+  const releaseTrackIds = rows.map(r => r.rt.id);
+  let rtProviderLinks: ProviderLink[] = [];
+  let releaseProviderLinks: ProviderLink[] = [];
+
+  [rtProviderLinks, releaseProviderLinks] = await Promise.all([
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release_track'),
+          inArray(providerLinks.releaseTrackId, releaseTrackIds)
+        )
+      ),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, releaseId)
+        )
+      ),
+  ]);
+
+  // Group links by release track ID
+  const linksByReleaseTrack = new Map<string, ProviderLink[]>();
+  for (const link of rtProviderLinks) {
+    if (!link.releaseTrackId) continue;
+    const existing = linksByReleaseTrack.get(link.releaseTrackId) ?? [];
+    existing.push(link);
+    linksByReleaseTrack.set(link.releaseTrackId, existing);
+  }
+
+  // Combine tracks with recordings and provider links
+  const tracks: ReleaseTrackWithProviders[] = rows.map(({ rt, rec }) => ({
+    id: rt.id,
+    releaseId: rt.releaseId,
+    recordingId: rt.recordingId,
+    title: rt.title,
+    slug: rt.slug,
+    trackNumber: rt.trackNumber,
+    discNumber: rt.discNumber,
+    isExplicit: rt.isExplicit,
+    durationMs: rec.durationMs,
+    isrc: rec.isrc,
+    previewUrl: rec.previewUrl,
+    audioUrl: rec.audioUrl,
+    audioFormat: rec.audioFormat,
+    metadata: rec.metadata ?? null,
+    providerLinks: resolveTrackProviderLinks(
+      linksByReleaseTrack.get(rt.id) ?? [],
+      releaseProviderLinks
+    ),
+  }));
+
+  return {
+    tracks,
+    total,
+    hasMore: offset + limit < total,
+  };
+}
+
+/**
+ * Get track summaries from release_tracks + recordings (new model).
+ * Falls back to discog_tracks if release_tracks is empty.
+ */
+export async function getReleaseTrackSummariesForReleases(
+  releaseIds: string[]
+): Promise<Map<string, TrackSummary>> {
+  if (releaseIds.length === 0) {
+    return new Map();
+  }
+
+  const summaries = await db
+    .select(trackSummarySelectColumns())
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(inArray(discogReleaseTracks.releaseId, releaseIds))
+    .groupBy(discogReleaseTracks.releaseId);
+
+  const summaryMap = new Map<string, TrackSummary>();
+  for (const row of summaries) {
+    summaryMap.set(row.releaseId, rowToTrackSummary(row));
+  }
+
+  // Fall back to old table for any releases not found in new model
+  if (summaryMap.size < releaseIds.length) {
+    const missingIds = releaseIds.filter(id => !summaryMap.has(id));
+    if (missingIds.length > 0) {
+      const fallback = await getTrackSummariesForReleases(missingIds);
+      for (const [id, summary] of fallback) {
+        summaryMap.set(id, summary);
+      }
+    }
+  }
+
+  return summaryMap;
+}
+
+/**
+ * Aggregate genres across all releases for a creator profile and update
+ * the profile's genres with the top 3 most frequent genres.
+ */
+export async function syncProfileGenresFromReleases(
+  creatorProfileId: string
+): Promise<void> {
+  const releases = await db
+    .select({ genres: discogReleases.genres })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        drizzleSql`${discogReleases.genres} IS NOT NULL`
+      )
+    );
+
+  // Count frequency of each genre across all releases
+  const genreCounts = new Map<string, number>();
+  for (const release of releases) {
+    if (!release.genres) continue;
+    for (const genre of release.genres) {
+      const normalized = genre.toLowerCase();
+      genreCounts.set(normalized, (genreCounts.get(normalized) ?? 0) + 1);
+    }
+  }
+
+  // Sort by frequency (desc), then alphabetically for deterministic tiebreak
+  const topGenres = Array.from(genreCounts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([genre]) => genre);
+
+  // Don't overwrite existing genres if no release genres were found
+  if (topGenres.length === 0) {
+    return;
+  }
+
+  await db
+    .update(creatorProfiles)
+    .set({ genres: topGenres, updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, creatorProfileId));
 }

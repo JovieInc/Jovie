@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { campaignSettings } from '@/lib/db/schema/admin';
 import {
   type CampaignStep,
   campaignEnrollments,
@@ -361,6 +362,18 @@ export async function processCampaigns(): Promise<ProcessCampaignsResult> {
   const now = new Date();
 
   try {
+    // Check global campaign toggle — if disabled, skip all processing
+    const [settings] = await db
+      .select({ campaignsEnabled: campaignSettings.campaignsEnabled })
+      .from(campaignSettings)
+      .where(eq(campaignSettings.id, 1))
+      .limit(1);
+
+    if (settings && !settings.campaignsEnabled) {
+      logger.info('[Campaign Processor] Campaigns are disabled, skipping');
+      return result;
+    }
+
     const pendingEnrollments = await fetchPendingEnrollments(now);
     if (pendingEnrollments.length === 0) {
       return result;

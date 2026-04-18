@@ -1,10 +1,18 @@
 'use client';
 
 import { PanelRight } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { memo, type ReactNode, useCallback, useMemo } from 'react';
+import {
+  memo,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { APP_ROUTES } from '@/constants/routes';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
@@ -13,16 +21,16 @@ import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/Settings
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
 import { SettingsBillingSection } from '@/features/dashboard/organisms/SettingsBillingSection';
-import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/features/dashboard/organisms/SettingsContactsSection';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
+import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/SettingsSmsAccessSection';
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -47,35 +55,97 @@ interface SettingsSectionGroup {
 
 interface SettingsSidebarProps {
   readonly groups: ReadonlyArray<SettingsSectionGroup>;
+  readonly activeSectionId?: string;
+  readonly useRouteLinks?: boolean;
 }
 
-const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
-  <aside className='h-fit'>
-    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
-      {groups.map(group => (
-        <div key={group.id} className='mb-2.5 last:mb-0'>
-          <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
-            {group.label}
-          </p>
-          <nav aria-label={`${group.label} settings`}>
-            <ul className='space-y-0.5'>
-              {group.sections.map(section => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
-                    className='flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-                  >
-                    {section.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      ))}
-    </div>
-  </aside>
-));
+function getFocusedSettingsHref(sectionId: string): string {
+  switch (sectionId) {
+    case 'account':
+      return APP_ROUTES.SETTINGS_APPEARANCE;
+    case 'billing':
+      return APP_ROUTES.SETTINGS_BILLING;
+    case 'data-privacy':
+      return APP_ROUTES.SETTINGS_DATA_PRIVACY;
+    case 'artist-profile':
+      return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
+    case 'contacts':
+      return APP_ROUTES.SETTINGS_CONTACTS;
+    case 'touring':
+      return APP_ROUTES.SETTINGS_TOURING;
+    case 'audience-tracking':
+      return APP_ROUTES.SETTINGS_AUDIENCE;
+    case 'admin':
+      return APP_ROUTES.SETTINGS_ADMIN;
+    case 'analytics':
+      return `${APP_ROUTES.SETTINGS}#analytics`;
+    case 'payments':
+      return `${APP_ROUTES.SETTINGS}#payments`;
+    default:
+      return APP_ROUTES.SETTINGS;
+  }
+}
+
+const SettingsSidebar = memo(
+  ({
+    groups,
+    activeSectionId,
+    useRouteLinks = false,
+  }: SettingsSidebarProps) => (
+    <aside className='h-fit'>
+      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
+        {groups.map(group => (
+          <div key={group.id} className='mb-2 last:mb-0'>
+            <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+              {group.label}
+            </p>
+            <nav aria-label={`${group.label} settings`}>
+              <ul className='space-y-1'>
+                {group.sections.map(section => {
+                  const isActive = section.id === activeSectionId;
+                  const href = useRouteLinks
+                    ? getFocusedSettingsHref(section.id)
+                    : `#${section.id}`;
+                  return (
+                    <li key={section.id}>
+                      {useRouteLinks ? (
+                        <Link
+                          href={href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            isActive
+                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+                          )}
+                        >
+                          {section.title}
+                        </Link>
+                      ) : (
+                        <a
+                          href={href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            isActive
+                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+                          )}
+                        >
+                          {section.title}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+        ))}
+      </div>
+    </aside>
+  )
+);
 
 SettingsSidebar.displayName = 'SettingsSidebar';
 
@@ -92,7 +162,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[10px] border border-subtle/55 bg-surface-0 px-4 py-3.5 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
+      className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
         <p className='text-[14px] font-[510] text-primary-token'>
@@ -117,33 +187,29 @@ export function SettingsPolished({
   isAdmin = false,
 }: SettingsPolishedProps) {
   const router = useRouter();
+  const [activeHashSectionId, setActiveHashSectionId] = useState<
+    string | undefined
+  >(undefined);
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
-  const isStripeConnectEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
-  );
+  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
 
   const renderAccountSection = useCallback(
-    () => (
-      <div className='space-y-0'>
-        {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <AccountSettingsSection isGrowth={isGrowth} />
-        ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
-                Account settings unavailable
-              </h3>
-              <p className='text-[13px] text-secondary'>
-                Clerk is not configured (missing publishable key). Set
-                NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-              </p>
-            </div>
-          </DashboardCard>
-        )}
-      </div>
-    ),
+    () =>
+      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+        <AccountSettingsSection isGrowth={isGrowth} />
+      ) : (
+        <div className='text-center py-4'>
+          <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
+            Account settings unavailable
+          </h3>
+          <p className='text-[13px] text-secondary'>
+            Clerk is not configured (missing publishable key). Set
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+          </p>
+        </div>
+      ),
     [isGrowth]
   );
 
@@ -189,18 +255,13 @@ export function SettingsPolished({
       {
         id: 'artist-profile',
         title: 'Artist Profile',
-        description: 'Photo, display name, username, and branding.',
+        description: 'Photo, display name, username, and profile details.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsArtistProfileSection
               artist={artist}
               onArtistUpdate={onArtistUpdate}
               onRefresh={() => router.refresh()}
-            />
-            <SettingsBrandingSection
-              artist={artist}
-              onArtistUpdate={onArtistUpdate}
-              isPro={isPro}
             />
           </div>
         ),
@@ -236,8 +297,14 @@ export function SettingsPolished({
         description:
           'Fan verification, opt-in preferences, and conversion pixel tracking.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsAudienceSection />
+            {isPro && (
+              <SettingsSmsAccessSection
+                smsSubscriberCount={0}
+                alreadyRequested={false}
+              />
+            )}
             <SettingsAdPixelsSection isPro={isPro} />
           </div>
         ),
@@ -253,9 +320,9 @@ export function SettingsPolished({
         ? [
             {
               id: 'admin',
-              title: 'Admin',
+              title: 'General',
               description:
-                'Platform administration: waitlist, campaigns, and system settings.',
+                'Dev toolbar, waitlist controls, campaign targeting, and admin quick links.',
               render: () => <SettingsAdminSection />,
             },
           ]
@@ -293,27 +360,61 @@ export function SettingsPolished({
     [sectionGroups]
   );
 
-  // When focusing a single section, show just that section
-  if (focusSection) {
-    const section = allSections.find(s => s.id === focusSection);
-    if (!section) {
-      return (
-        <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
-          <SettingsErrorState message='This settings section could not be found.' />
-        </div>
-      );
-    }
+  useEffect(() => {
+    if (focusSection) return;
 
+    const syncActiveSection = () => {
+      const nextHash = globalThis.location.hash.replace(/^#/, '');
+      setActiveHashSectionId(nextHash || undefined);
+    };
+
+    syncActiveSection();
+    globalThis.addEventListener('hashchange', syncActiveSection);
+
+    return () => {
+      globalThis.removeEventListener('hashchange', syncActiveSection);
+    };
+  }, [focusSection]);
+
+  if (
+    focusSection &&
+    !allSections.some(section => section.id === focusSection)
+  ) {
     return (
       <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
-        <SettingsSection
-          id={section.id}
-          title={section.title}
-          description={section.description}
-        >
-          {section.render()}
-        </SettingsSection>
-        {focusSection === 'artist-profile' && <MobileProfilePanelTrigger />}
+        <SettingsErrorState message='This settings section could not be found.' />
+      </div>
+    );
+  }
+
+  if (focusSection) {
+    const section = allSections.find(item => item.id === focusSection)!;
+
+    return (
+      <div
+        className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+        data-testid='settings-polished'
+      >
+        <div className='lg:sticky lg:top-4 lg:self-start'>
+          <SettingsSidebar
+            groups={sectionGroups}
+            activeSectionId={focusSection}
+            useRouteLinks
+          />
+        </div>
+
+        <div className='space-y-5 pb-5 sm:pb-6'>
+          <SettingsSection
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+          {focusSection === 'artist-profile' ? (
+            <MobileProfilePanelTrigger />
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -321,24 +422,27 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-5xl gap-7 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-10'
+      className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
       data-testid='settings-polished'
     >
-      <div className='lg:sticky lg:top-5 lg:self-start'>
-        <SettingsSidebar groups={sectionGroups} />
+      <div className='lg:sticky lg:top-4 lg:self-start'>
+        <SettingsSidebar
+          groups={sectionGroups}
+          activeSectionId={activeHashSectionId}
+        />
       </div>
 
-      <div className='space-y-10'>
+      <div className='space-y-4'>
         {sectionGroups.map(group => (
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
-            className='px-1'
+            className='px-0.5'
           >
-            <h3 className='mb-5 px-1 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <h3 className='mb-2 px-1 text-[12px] font-[590] tracking-[-0.012em] text-secondary-token'>
               {group.label}
             </h3>
-            <div className='space-y-8'>
+            <div className='space-y-3'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

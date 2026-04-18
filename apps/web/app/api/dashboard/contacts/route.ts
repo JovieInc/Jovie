@@ -4,6 +4,8 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import type { DashboardContact } from '@/types/contacts';
 
 const NO_STORE_HEADERS = {
@@ -90,7 +92,12 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(contacts, { headers: NO_STORE_HEADERS });
-  } catch {
+  } catch (error) {
+    logger.error('[contacts] Failed to load contacts:', error);
+    await captureError('Dashboard contacts fetch failed', error, {
+      route: '/api/dashboard/contacts',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to load contacts' },
       { status: 500, headers: NO_STORE_HEADERS }

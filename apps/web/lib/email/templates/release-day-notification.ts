@@ -23,6 +23,8 @@ export interface ReleaseDayNotificationData {
   slug: string;
   /** Streaming links for the release */
   streamingLinks: Array<{ providerId: string; url: string }>;
+  /** Subscriber's name for personalized greeting */
+  subscriberName?: string | null;
 }
 
 /**
@@ -62,15 +64,24 @@ export function getReleaseDayNotificationSubject(
 export function getReleaseDayNotificationText(
   data: ReleaseDayNotificationData
 ): string {
-  const { artistName, releaseTitle, username, slug, streamingLinks } = data;
+  const {
+    artistName,
+    releaseTitle,
+    username,
+    slug,
+    streamingLinks,
+    subscriberName,
+  } = data;
   const releaseUrl = buildReleaseUrl(username, slug);
+  const safeName = subscriberName?.replaceAll(/[\r\n\t]/g, '').trim();
+  const greeting = safeName ? `Hey ${safeName}, ` : '';
 
   const linksList = streamingLinks
     .slice(0, 4)
     .map(link => `- ${getProviderLabel(link.providerId)}: ${link.url}`)
     .join('\n');
 
-  return `${artistName} just dropped new music
+  return `${greeting}${artistName} just dropped new music
 
 "${releaseTitle}" is out now.
 
@@ -97,12 +108,14 @@ export function getReleaseDayNotificationHtml(
     username,
     slug,
     streamingLinks,
+    subscriberName,
   } = data;
   const releaseUrl = buildReleaseUrl(username, slug);
 
   // Escape user-provided values to prevent XSS
   const safeArtistName = escapeHtml(artistName);
   const safeReleaseTitle = escapeHtml(releaseTitle);
+  const safeSubscriberName = subscriberName ? escapeHtml(subscriberName) : null;
   const safeArtworkUrl = artworkUrl ? escapeHtml(artworkUrl) : null;
 
   // Build streaming link buttons
@@ -159,6 +172,7 @@ export function getReleaseDayNotificationHtml(
           <!-- Main Content -->
           <tr>
             <td style="padding: 16px 32px 24px;">
+              ${safeSubscriberName ? `<p style="margin: 0 0 4px; font-size: 15px; color: #666; text-align: center;">Hey ${safeSubscriberName},</p>` : ''}
               <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 600; color: #000; text-align: center;">
                 ${safeArtistName} just dropped new music
               </h1>
@@ -203,6 +217,44 @@ export function getReleaseDayNotificationHtml(
 }
 
 /**
+ * Build List-Unsubscribe headers for release day notification emails.
+ * Includes RFC 8058 one-click unsubscribe (required by Gmail/Yahoo for bulk senders).
+ *
+ * When subscriberId is provided, generates a signed one-click URL.
+ * Falls back to profile manage-notifications URL when subscriber info is unavailable.
+ */
+export function getReleaseDayUnsubscribeHeaders(
+  username: string,
+  subscriberId?: string,
+  email?: string
+): Record<string, string> {
+  const manageUrl = buildManageNotificationsUrl(username);
+
+  if (subscriberId && email) {
+    const {
+      buildOneClickUnsubscribeUrl,
+    } = require('@/lib/email/one-click-unsubscribe-token');
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
+    const oneClickUrl = buildOneClickUnsubscribeUrl(
+      baseUrl,
+      subscriberId,
+      email
+    );
+
+    if (oneClickUrl) {
+      return {
+        'List-Unsubscribe': `<${oneClickUrl}>, <${manageUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      };
+    }
+  }
+
+  return {
+    'List-Unsubscribe': `<${manageUrl}>`,
+  };
+}
+
+/**
  * Get complete email content for a release day notification
  */
 export function getReleaseDayNotificationEmail(
@@ -212,5 +264,6 @@ export function getReleaseDayNotificationEmail(
     subject: getReleaseDayNotificationSubject(data),
     text: getReleaseDayNotificationText(data),
     html: getReleaseDayNotificationHtml(data),
+    headers: getReleaseDayUnsubscribeHeaders(data.username),
   };
 }

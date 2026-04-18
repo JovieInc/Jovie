@@ -5,24 +5,18 @@
  * DeeplinksGrid (scroll-driven phone) to avoid code duplication.
  */
 
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
 export const MOCK_ARTIST = {
-  name: 'Tim White',
-  handle: 'timwhite',
-  image:
-    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
+  name: TIM_WHITE_PROFILE.name,
+  handle: TIM_WHITE_PROFILE.handle,
+  image: TIM_WHITE_PROFILE.avatarSrc,
   isVerified: true,
 } as const;
-
-export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-primary-token shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 export const FALLBACK_CITY = 'Los Angeles';
@@ -121,38 +115,41 @@ export const MOCK_TOUR_DATES = [
 
 function ListenContent() {
   const dsps = [
-    { key: 'spotify', label: 'Spotify' },
-    { key: 'apple_music', label: 'Apple Music' },
-    { key: 'youtube', label: 'YouTube' },
+    { name: 'Spotify', action: 'Play' },
+    { name: 'Apple Music', action: 'Listen' },
+    { name: 'YouTube Music', action: 'Watch' },
   ] as const;
   return (
-    <div className='flex h-full flex-col justify-center gap-2'>
+    <div className='flex h-full flex-col justify-center gap-3'>
       {dsps.map(dsp => (
-        <SmartLinkProviderButton
-          key={dsp.key}
-          label={dsp.label}
-          iconPath={DSP_LOGO_CONFIG[dsp.key]?.iconPath}
-          className='px-3 py-2.5 text-[13px] bg-surface-2 border border-subtle ring-0 backdrop-blur-none hover:bg-hover'
-        />
+        <div
+          key={dsp.name}
+          className='flex items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'
+        >
+          <span className='text-[12px] font-medium text-primary-token'>
+            {dsp.name}
+          </span>
+          <span className='text-[10px] text-tertiary-token'>{dsp.action}</span>
+        </div>
       ))}
     </div>
   );
 }
 
-function TipContent() {
+function PayContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {([3, 5, 10] as const).map((amount, i) => (
+        {([5, 10, 20] as const).map((amount, i) => (
           <div
             key={amount}
-            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-[999px] text-center ${
               i === 1
-                ? 'border-default bg-surface-2 text-primary-token shadow-sm'
-                : 'border-subtle bg-surface-1 text-primary-token'
+                ? 'bg-surface-2 text-primary-token shadow-sm'
+                : 'bg-surface-1 text-primary-token'
             }`}
           >
             <span
@@ -176,7 +173,7 @@ function TourContent() {
   const show = MOCK_TOUR_DATES[0];
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-surface-1 border border-subtle'>
+      <div className='flex w-full items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'>
         <div className='min-w-0'>
           <p className='text-[13px] font-medium text-primary-token truncate'>
             {show.venue}
@@ -187,47 +184,36 @@ function TourContent() {
           {show.date}
         </span>
       </div>
-      <button
-        type='button'
-        className='text-[12px] font-medium text-tertiary-token hover:text-secondary-token transition-colors'
-      >
+      <span className='text-[12px] font-medium text-tertiary-token'>
         See more dates
-      </button>
+      </span>
     </div>
   );
 }
 
 function ProfileContent() {
-  const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
-    <div className='flex h-full flex-col justify-center gap-4'>
-      <button
-        type='button'
-        className={PHONE_CTA_CLASS}
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.05) 100%)',
-          borderColor: 'rgba(255,255,255,0.08)',
-        }}
-      >
-        Turn on notifications
-      </button>
-      <div
-        className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
-        style={{
-          backgroundColor: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(255,255,255,0.05)',
-        }}
-      >
-        {platforms.map(p => (
-          <span
-            key={p}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token'
-            style={{ backgroundColor: 'rgba(255,255,255,0.015)' }}
-          >
-            <SocialIcon platform={p} size={18} aria-hidden />
-          </span>
-        ))}
+    <div className='flex h-full flex-col justify-center gap-3'>
+      {/* Horizontal release card — album art left, action right */}
+      <div className='flex items-center gap-3 rounded-full bg-surface-1 p-2.5'>
+        <div
+          className='h-14 w-14 shrink-0 overflow-hidden rounded-lg shadow-sm'
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(113,112,255,0.3) 0%, rgba(113,112,255,0.08) 100%)',
+          }}
+        />
+        <div className='min-w-0 flex-1'>
+          <p className='text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary-token'>
+            Out now
+          </p>
+          <p className='text-[13px] font-semibold text-primary-token truncate'>
+            New Single
+          </p>
+        </div>
+        <span className='shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
+          Listen
+        </span>
       </div>
     </div>
   );
@@ -236,10 +222,10 @@ function ProfileContent() {
 /** Pre-built mode content keyed by mode ID. */
 export const MODE_CONTENT: Record<string, React.ReactNode> = {
   listen: <ListenContent />,
-  tip: <TipContent />,
+  pay: <PayContent />,
   tour: <TourContent />,
   profile: <ProfileContent />,
 };
 
 /** Mode IDs in display order. */
-export const MODE_IDS = ['profile', 'tour', 'tip', 'listen'] as const;
+export const MODE_IDS = ['profile', 'tour', 'pay', 'listen'] as const;

@@ -37,8 +37,7 @@ test.describe('Pricing Page', () => {
     await expect(page).toHaveTitle(/Pricing|Jovie/);
 
     // Check main heading
-    const heading = page.locator('h1');
-    await expect(heading).toBeVisible();
+    await expect(page.locator('h1')).toHaveText('Pricing');
 
     // Check that pricing tiers are visible
     await expect(page.getByText('Free').first()).toBeVisible();
@@ -46,15 +45,11 @@ test.describe('Pricing Page', () => {
   });
 
   test('has working call-to-action buttons', async ({ page }) => {
-    const freeTierCta = page.getByRole('link', { name: 'Launch for Free' });
+    const freeTierCta = page.getByRole('link', { name: 'Get started' }).first();
     await expect(freeTierCta).toBeVisible();
     await expect(freeTierCta).toHaveAttribute('href', /\/signup/);
 
-    const foundingMemberCta = page.getByRole('link', {
-      name: 'Choose Founding Member',
-    });
-    await expect(foundingMemberCta).toBeVisible();
-    await expect(foundingMemberCta).toHaveAttribute('href', /\/signup/);
+    await expect(page.getByText('Compare all features').first()).toBeVisible();
   });
 
   test('shows pricing tier details', async ({ page }) => {

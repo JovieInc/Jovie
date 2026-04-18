@@ -1,15 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { PaySelector } from '@/components/molecules/PaySelector';
 
-describe('TipSelector', () => {
+describe('PaySelector', () => {
   it('uses primary foreground token for the Venmo CTA and icon', () => {
     const onContinue = vi.fn();
 
-    render(<TipSelector onContinue={onContinue} paymentLabel='Venmo' />);
+    render(<PaySelector onContinue={onContinue} paymentLabel='Venmo' />);
 
     const continueButton = screen.getByRole('button', {
-      name: /Continue with Venmo for \$5 tip/i,
+      name: /Continue with Venmo for \$10/i,
     });
 
     expect(continueButton).toHaveClass('text-btn-primary-foreground');
@@ -21,15 +21,15 @@ describe('TipSelector', () => {
   it('continues with the selected amount', () => {
     const onContinue = vi.fn();
 
-    render(<TipSelector onContinue={onContinue} paymentLabel='Venmo' />);
+    render(<PaySelector onContinue={onContinue} paymentLabel='Venmo' />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: /Select \$7 tip amount/i })
+      screen.getByRole('button', { name: /Select \$20 tip amount/i })
     );
     fireEvent.click(
-      screen.getByRole('button', { name: /Continue with Venmo for \$7 tip/i })
+      screen.getByRole('button', { name: /Continue with Venmo for \$20/i })
     );
 
-    expect(onContinue).toHaveBeenCalledWith(7);
+    expect(onContinue).toHaveBeenCalledWith(20);
   });
 });

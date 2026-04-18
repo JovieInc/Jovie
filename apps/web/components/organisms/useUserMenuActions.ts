@@ -89,7 +89,6 @@ export function useUserMenuActions({
 
   const handleProfile = () => navigateTo(profileUrl);
   const handleSettings = () => navigateTo(settingsUrl);
-
   const handleSignOut = async () => {
     if (derivedLoading.signOut) return;
 

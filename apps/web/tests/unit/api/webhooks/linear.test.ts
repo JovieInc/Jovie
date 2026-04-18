@@ -54,7 +54,10 @@ describe('POST /api/webhooks/linear', () => {
   });
 
   it('returns deduplicated response when a recent dispatch exists', async () => {
-    mockAcquireRecentDispatch.mockResolvedValue(false);
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: false,
+      reason: 'duplicate',
+    });
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
     const payload = {
@@ -87,12 +90,60 @@ describe('POST /api/webhooks/linear', () => {
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
   });
 
+  it('returns 503 when webhook dedupe backend is unavailable', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: false,
+      reason: 'backend_unavailable',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      createdAt: '2026-03-10T00:00:00.000Z',
+      updatedFrom: { stateId: 'old' },
+      data: {
+        id: 'issue_123',
+        updatedAt: '2026-03-10T00:00:01.000Z',
+        stateId: 'new',
+        state: { name: 'Todo' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      headers: {
+        'linear-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Webhook dedupe unavailable',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Linear webhook dedupe backend unavailable',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/webhooks/linear',
+        issueId: 'issue_123',
+      })
+    );
+  });
+
   it('returns 502 when the GitHub dispatch times out', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
 
-    mockAcquireRecentDispatch.mockResolvedValue(true);
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
     mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 10000)
+      new ServerFetchTimeoutError('timed out', 10000, 'Linear dispatch')
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
@@ -134,5 +185,51 @@ describe('POST /api/webhooks/linear', () => {
         timeoutMs: 10000,
       })
     );
+  });
+
+  it('does not retry the GitHub dispatch POST', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      })
+    );
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      createdAt: '2026-03-10T00:00:00.000Z',
+      updatedFrom: { stateId: 'old' },
+      data: {
+        id: 'issue_123',
+        updatedAt: '2026-03-10T00:00:01.000Z',
+        stateId: 'new',
+        state: { name: 'Todo' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      headers: {
+        'linear-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        timeoutMs: 10000,
+      })
+    );
+    expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 });

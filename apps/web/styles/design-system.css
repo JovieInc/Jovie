@@ -17,13 +17,35 @@
    THEME INPUTS - The only 3 variables needed
    ============================================ */
 :root {
+  /* Public shell semantic aliases — preserve current public surface values while
+     centralizing the contract used by marketing and legal layouts. */
+  --public-shell-header-offset: var(--linear-header-height);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+  --public-shell-border: var(--color-border-default);
+  --public-shell-content-max: var(--linear-content-max);
+  --public-content-max-landing: 1280px;
+  --public-content-max-page: 1200px;
+  --public-content-max-prose: 680px;
+  --app-shell-content-max-wide: 84rem;
+  --app-shell-content-max-reading: 56rem;
+  --app-shell-content-max-form: 50rem;
+  --profile-shell-max-width: 430px;
+  --profile-shell-header-max-width: 38rem;
+  --profile-shell-card-radius: 30px;
+  --profile-card-radius: 28px;
+  --profile-inner-radius: 26px;
+  --profile-drawer-radius-mobile: 24px;
+  --profile-drawer-radius-desktop: 20px;
+  --profile-action-radius: 14px;
+
   /* Core Theme Inputs */
-  --theme-base-hue: 272;
-  /* Neutral foundation hue (blue-gray) */
+  --theme-base-hue: 282;
+  /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
   --theme-base-chroma: 0.015;
   /* Very low chroma for neutrals */
-  --theme-accent-hue: 271;
-  /* Brand accent hue (purple) */
+  --theme-accent-hue: 282;
+  /* Brand accent hue — aligned with base hue per Linear refresh */
   --theme-accent-chroma: 0.18;
   /* Vibrant accent saturation */
   --theme-contrast: 65;
@@ -59,14 +81,14 @@
      --bg-surface-2: Cards and panels
      --bg-surface-3: Interactive / elevated */
   /* prettier-ignore */
-  --color-bg-base: #f7f8f9;
+  --color-bg-base: #f5f5f5;
   /* Sidebar bg */
   /* prettier-ignore */
-  --color-bg-surface-0: #f7f8f9;
+  --color-bg-surface-0: #f5f5f5;
   /* Page bg */
   /* prettier-ignore */
-  --color-bg-surface-1: var(--linear-bg-surface-0);
-  /* Elevated surfaces — single source of truth via linear token */
+  --color-bg-surface-1: var(--linear-app-content-surface);
+  /* App shell canvas in light mode */
   /* prettier-ignore */
   --color-bg-surface-2: #f2f3f5;
   /* Cards */
@@ -74,7 +96,7 @@
   --color-bg-surface-3: #ebecef;
   /* Nested / hover */
 
-  --color-bg-page: #f7f8f9;
+  --color-bg-page: #f5f5f5;
   /* Same as base */
   --color-bg-hover: rgba(0, 0, 0, 0.04);
   /* Hover overlay */
@@ -84,21 +106,18 @@
   /* Same as surface-3 */
   --color-bg-active: #ebecef;
   /* Same as surface-3 */
+  --color-bg-primary: lch(98.94% 0.5 282);
+  --color-bg-secondary: lch(95.94% 0.5 282);
+  /* Linear March 2026 exact — was lch(93.797% 1.529 282), too dark/saturated */
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
-  --color-text-primary-token: oklch(10% 0 0);
-  --color-text-secondary-token: oklch(
-    40% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    50% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    60% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-primary-token: lch(9.894% 0 282);
+  --color-text-secondary-token: lch(19.788% 1.25 282);
+  --color-text-tertiary-token: lch(34% 1.25 282);
+  --color-text-quaternary-token: lch(65.3% 1.25 282);
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -109,19 +128,35 @@
   --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
 
   /* Border system - semi-transparent for flexibility */
-  --color-border-subtle: oklch(0% 0 0 / 6%);
-  --color-border-default: oklch(0% 0 0 / 10%);
-  --color-border-strong: oklch(0% 0 0 / 18%);
+  --color-border-subtle: oklch(0% 0 0 / 5%);
+  --color-border-default: oklch(0% 0 0 / 8%);
+  --color-border-strong: oklch(0% 0 0 / 15%);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
-  --color-accent: #7170ff;
-  /* #7170ff — Linear exact */
-  --color-accent-hover: #828fff;
-  /* Linear: --color-accent-hover */
-  --color-accent-active: #5a59e6;
-  --color-accent-subtle: lch(92% 20 288.421);
+  /* Accent palette rotation */
+  --color-accent-gray: #7f7f85;
+  --color-accent-gray-subtle: #efeff2;
+  --color-accent-blue: #2563ff;
+  --color-accent-blue-subtle: #edf3ff;
+  --color-accent-purple: #8b1eff;
+  --color-accent-purple-subtle: #f3ebff;
+  --color-accent-pink: #d61a7f;
+  --color-accent-pink-subtle: #fde9f4;
+  --color-accent-red: #f3122d;
+  --color-accent-red-subtle: #ffeaee;
+  --color-accent-orange: #ff9800;
+  --color-accent-orange-subtle: #fff3e6;
+  --color-accent-green: #2f9e44;
+  --color-accent-green-subtle: #ecf8ee;
+  --color-accent-teal: #0f9b8e;
+  --color-accent-teal-subtle: #e8f7f5;
+
+  /* Default product accent uses the palette purple */
+  --color-accent: var(--color-accent-purple);
+  --color-accent-hover: #9a46ff;
+  --color-accent-active: #7612df;
+  --color-accent-subtle: var(--color-accent-purple-subtle);
   --color-accent-foreground: oklch(100% 0 0);
 
   /* Primary button - high contrast */
@@ -170,9 +205,73 @@
   /* Inset divider shadow (used for section separators) */
   --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
 
+  /* Popover/dropdown shadow — the only floating surface with visible depth */
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.08);
+
   /* Button inset shadow */
   --shadow-button-inset:
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
+
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #efeff3;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 18% 14%,
+      rgba(255, 255, 255, 0.76),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 82% 12%,
+      rgba(255, 255, 255, 0.42),
+      transparent 18%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.54) 0%,
+      rgba(239, 239, 243, 0.12) 44%,
+      rgba(227, 228, 234, 0.28) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.84);
+  --profile-stage-glow-b: rgba(226, 228, 235, 0.72);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(247, 247, 249, 0.92)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.78);
+  --profile-panel-shadow:
+    0 24px 60px rgba(15, 17, 24, 0.1), 0 8px 22px rgba(15, 17, 24, 0.05);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.08) 24%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(248, 248, 250);
+  --profile-drawer-shadow:
+    0 -10px 24px rgba(12, 12, 18, 0.06), 0 -24px 56px rgba(12, 12, 18, 0.14);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.48),
+    rgba(255, 255, 255, 0.06) 40%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.7);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.84);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.96);
+  --profile-pearl-border: rgba(255, 255, 255, 0.74);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 10px 24px rgba(15, 17, 24, 0.08);
+  --profile-pearl-primary-bg: rgba(12, 12, 15, 0.94);
+  --profile-pearl-primary-fg: rgba(255, 255, 255, 0.98);
+  --profile-composer-bg: rgba(255, 255, 255, 0.78);
+  --profile-composer-border: rgba(255, 255, 255, 0.8);
+  --profile-composer-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 18px 42px rgba(15, 17, 24, 0.12);
+  --profile-dock-bg: rgba(247, 247, 249, 0.78);
+  --profile-dock-border: rgba(255, 255, 255, 0.82);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 18px 42px rgba(15, 17, 24, 0.12);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -195,10 +294,10 @@
   /* Dark mode surfaces — matched to Linear's exact Hex values */
   --color-bg-base: #08090a;
   /* sidebar/page bg */
-  --color-bg-surface-0: #101012;
-  /* primary app surface */
-  --color-bg-surface-1: var(--linear-bg-surface-2);
-  /* cards/panels — single source of truth via linear token */
+  --color-bg-surface-0: #0f1011;
+  /* primary app surface — matches --linear-bg-surface-0 */
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  /* Shared card surface inside the dark app shell */
   --color-bg-surface-2: #23252a;
   /* inputs, elevated */
   --color-bg-surface-3: #2a2c32;
@@ -209,12 +308,14 @@
   /* Same as base */
   --color-bg-hover: rgba(255, 255, 255, 0.04);
   /* Row/item hover */
-  --color-bg-elevated: #101012;
+  --color-bg-elevated: #0f1011;
   /* Same as surface-0 */
   --color-bg-input: #191b1f;
   /* Same as surface-1 */
   --color-bg-active: #23252a;
   /* Same as surface-2 */
+  --color-bg-primary: lch(9.894% 0.5 282);
+  --color-bg-secondary: lch(14.44% 0.5 282);
   --color-bg-button: #2a2c32;
   /* Same as surface-3 */
   --color-bg-tooltip: #2a2c32;
@@ -233,16 +334,16 @@
      --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
      --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
      --content-color:         #6b6f76               = content/meta text */
-  --color-text-primary-token: lch(100% 0 272);
-  /* Pure white — Linear exact */
-  --color-text-secondary-token: lch(90.65% 1.35 272);
+  --color-text-primary-token: lch(100% 0 282);
+  /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
+  --color-text-secondary-token: lch(90.65% 1.35 282);
   /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(62.6% 1.35 272);
+  --color-text-tertiary-token: lch(68% 1.35 282);
   /* #969799 — Linear exact */
   --color-text-quaternary-token: #62666d;
   /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
-  --color-text-disabled-token: oklch(28% 0.006 272);
-  --color-text-tooltip: lch(100% 0 272);
+  --color-text-disabled-token: oklch(28% 0.006 282);
+  --color-text-tooltip: lch(100% 0 282);
   /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
@@ -253,18 +354,35 @@
      Subtle:  rgba(255,255,255,0.05) — card borders, dividers
      Default: rgba(255,255,255,0.08) — frame borders, input borders
      Strong:  rgba(255,255,255,0.10) — panel outlines */
-  --color-border-subtle: rgba(255, 255, 255, 0.05);
-  --color-border-default: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-default: rgba(255, 255, 255, 0.07);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
-  --color-accent: #7170ff;
-  /* #7170ff — Linear exact */
-  --color-accent-hover: #828fff;
-  --color-accent-active: #5a59e6;
-  --color-accent-subtle: lch(20% 30 288.421);
+  /* Accent palette rotation */
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #4d7dff;
+  --color-accent-blue-subtle: rgb(37 99 255 / 0.18);
+  --color-accent-purple: #9b4dff;
+  --color-accent-purple-subtle: rgb(139 30 255 / 0.18);
+  --color-accent-pink: #ea4a9c;
+  --color-accent-pink-subtle: rgb(214 26 127 / 0.18);
+  --color-accent-red: #ff4d5f;
+  --color-accent-red-subtle: rgb(243 18 45 / 0.18);
+  --color-accent-orange: #ffab2e;
+  --color-accent-orange-subtle: rgb(255 152 0 / 0.18);
+  --color-accent-green: #43b85c;
+  --color-accent-green-subtle: rgb(47 158 68 / 0.18);
+  --color-accent-teal: #22b8a7;
+  --color-accent-teal-subtle: rgb(15 155 142 / 0.18);
+
+  /* Default product accent uses the palette purple */
+  --color-accent: var(--color-accent-purple);
+  --color-accent-hover: #b06bff;
+  --color-accent-active: #8a37f4;
+  --color-accent-subtle: var(--color-accent-purple-subtle);
 
   /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
   --color-btn-primary-bg: #e6e6e6;
@@ -315,12 +433,71 @@
     rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
     rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
   --shadow-divider: rgba(255, 255, 255, 0.05) 0px -0.5px 0px 0px inset;
+  /* Popover/dropdown shadow — ring + deep depth for dark backgrounds */
+  --shadow-popover:
+    0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-button-inset:
     rgba(0, 0, 0, 0) 0px 8px 2px 0px,
     rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
     rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
     rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #050608;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 50% 12%,
+      rgba(255, 255, 255, 0.09),
+      transparent 20%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(18, 20, 26, 0.18) 0%,
+      rgba(9, 10, 14, 0.68) 54%,
+      rgba(5, 6, 8, 0.92) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
+  --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(14, 16, 20, 0.96),
+    rgba(10, 12, 16, 0.94)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-panel-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02) 20%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-shadow:
+    0 -10px 26px rgba(0, 0, 0, 0.2), 0 -24px 68px rgba(0, 0, 0, 0.38);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.12);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
+  --profile-pearl-border: rgba(255, 255, 255, 0.16);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
+  --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
+  --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
+  --profile-composer-bg: rgba(255, 255, 255, 0.08);
+  --profile-composer-border: rgba(255, 255, 255, 0.1);
+  --profile-composer-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.28);
+  --profile-dock-bg: rgba(18, 20, 26, 0.76);
+  --profile-dock-border: rgba(255, 255, 255, 0.08);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 20px 44px rgba(0, 0, 0, 0.32);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -442,7 +619,7 @@
   --color-text-quaternary-token: oklch(
     55% var(--theme-base-chroma) var(--theme-base-hue)
   );
-  --color-text-disabled-token: oklch(40% 0.006 272);
+  --color-text-disabled-token: oklch(40% 0.006 282);
 
   /* Borders — much stronger */
   --color-border-subtle: oklch(100% 0 0 / 15%);
@@ -451,7 +628,7 @@
 
   /* Surfaces — more separation between layers */
   --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-elevated: lch(8% 0.7 272);
+  --color-bg-elevated: lch(8% 0.7 282);
 
   /* Interactive states — more visible */
   --color-interactive-hover: rgba(255, 255, 255, 0.08);
@@ -593,42 +770,42 @@
    ============================================ */
 :root {
   /* Success */
-  --color-success: oklch(65% 0.18 145);
-  --color-success-subtle: oklch(95% 0.05 145);
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
   --color-success-foreground: oklch(100% 0 0);
 
   /* Warning */
-  --color-warning: oklch(75% 0.15 80);
-  --color-warning-subtle: oklch(95% 0.05 80);
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
   --color-warning-foreground: oklch(20% 0 0);
 
   /* Error/Destructive */
-  --color-error: oklch(60% 0.2 25);
-  --color-error-subtle: oklch(95% 0.05 25);
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
   --color-error-foreground: oklch(100% 0 0);
 
   /* Info */
-  --color-info: oklch(60% 0.15 240);
-  --color-info-subtle: oklch(95% 0.05 240);
+  --color-info: var(--color-accent-blue);
+  --color-info-subtle: var(--color-accent-blue-subtle);
   --color-info-foreground: oklch(100% 0 0);
 }
 
 :root.dark {
   /* Success - brighter in dark mode */
-  --color-success: oklch(70% 0.18 145);
-  --color-success-subtle: oklch(20% 0.08 145);
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
 
   /* Warning */
-  --color-warning: oklch(80% 0.15 80);
-  --color-warning-subtle: oklch(20% 0.08 80);
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
 
   /* Error */
-  --color-error: oklch(70% 0.2 25);
-  --color-error-subtle: oklch(20% 0.08 25);
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
 
   /* Info */
-  --color-info: oklch(70% 0.15 240);
-  --color-info-subtle: oklch(20% 0.08 240);
+  --color-info: var(--color-accent-blue);
+  --color-info-subtle: var(--color-accent-blue-subtle);
 }
 
 /* ============================================
@@ -639,20 +816,13 @@
    All have ~same perceived brightness
 */
 :root {
-  --accent-conv: oklch(55% 0.2 285);
-  /* Conversion - purple */
-  --accent-analytics: oklch(65% 0.15 230);
-  /* Analytics - blue */
-  --accent-speed: oklch(65% 0.2 145);
-  /* Speed - green */
-  --accent-beauty: oklch(75% 0.15 70);
-  /* Beauty - amber */
-  --accent-seo: oklch(60% 0.2 25);
-  /* SEO - red */
-  --accent-links: oklch(60% 0.2 300);
-  /* Links - violet */
-  --accent-pro: oklch(65% 0.15 180);
-  /* Pro - teal */
+  --accent-conv: var(--color-accent-purple);
+  --accent-analytics: var(--color-accent-blue);
+  --accent-speed: var(--color-accent-green);
+  --accent-beauty: var(--color-accent-pink);
+  --accent-seo: var(--color-accent-red);
+  --accent-links: var(--color-accent-teal);
+  --accent-pro: var(--color-accent-orange);
 }
 
 /* ============================================
@@ -680,7 +850,8 @@
        --font-weight-bold: 700 */
   --font-weight-normal: 400;
   /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
-  --font-weight-book: 400;
+  --font-weight-book: 450;
+  /* Linear's "book" weight — their default UI weight (confirmed from live extraction) */
   /* Alias for normal */
   --font-weight-medium: 510;
   /* Linear: --font-weight-medium = 510 */
@@ -776,12 +947,12 @@
   --radius-none: 0;
   --radius-xs: 2px;
   /* Tags/badges — extracted: 2px on issue labels */
-  --radius-sm: 4px;
-  /* Sidebar items, buttons (Linear: 4px border-radius on buttons) */
+  --radius-sm: 8px;
+  /* Sidebar items, buttons */
   --radius-md: 6px;
   /* Input fields — extracted: 6px on inputs & sidebar buttons */
-  --radius-default: 4px;
-  /* Buttons — Linear uses 4px (extracted 2026-03-16) */
+  --radius-default: 8px;
+  /* Buttons */
   --radius-lg: 8px;
   /* Cards, menus — extracted: 8px on marketing cards */
   --radius-xl: 12px;
@@ -859,61 +1030,68 @@
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base: #f5f5f5 = rgb(245,245,245) */
-  --sidebar-background: 245 245 245;
-  /* Matches base */
+  --sidebar-background: 247 248 248;
+  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
-  --sidebar-accent: 237 237 237;
-  /* Slightly darker neutral for hover */
-  --sidebar-accent-foreground: 12 12 12;
-  --sidebar-border: 229 229 229;
-  /* Neutral border */
+  --sidebar-accent: 242 243 245;
+  /* Linear: --linear-app-sidebar-accent-rgb */
+  --sidebar-accent-active: 236 238 241;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
+  --sidebar-accent-foreground: 18 18 20;
+  --sidebar-border: 0 0 0 / 0.06;
+  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 115 115 115;
-  /* Neutral muted */
-  --sidebar-muted-foreground: 140 140 140;
-  /* Neutral muted text */
-  --sidebar-surface: 245 245 245;
-  /* Matches base */
-  --sidebar-surface-hover: 237 237 237;
-  /* Neutral hover */
+  --sidebar-muted: 112 116 124;
+  /* Linear: --linear-app-sidebar-muted-rgb */
+  --sidebar-muted-foreground: 112 116 124;
+  --sidebar-surface: 247 248 248;
+  /* Matches sidebar background */
+  --sidebar-surface-hover: 242 243 245;
+  /* Matches sidebar accent */
   --sidebar-input-background: 255 255 255;
-  --sidebar-input-border: 229 229 229;
-  --sidebar-item-foreground: 90 90 95;
-  --sidebar-item-icon: 115 115 120;
-  --sidebar-accent-active: 230 230 232;
+  --sidebar-input-border: 0 0 0 / 0.06;
+  --sidebar-item-foreground: 88 90 96;
+  /* Linear: --linear-app-sidebar-item-foreground-rgb */
+  --sidebar-item-icon: 122 125 132;
+  /* Linear: --linear-app-sidebar-item-icon-rgb */
+  --sidebar-accent-active: 236 238 241;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Matches new bg-base: rgb(8,9,10) extracted from Linear */
-  --sidebar-background: 8 9 10;
-  /* rgb(8,9,10) - matches bg-base */
+  /* Keep the sidebar on the darker shell canvas so the framed main pane reads above it. */
+  --sidebar-background: var(--linear-app-sidebar-background-rgb);
+  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 227 228 229;
-  /* Linear: lch(90.421 1 272) = #E3E4E5 */
+  /* Linear: --linear-app-sidebar-foreground-rgb */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.02;
-  /* Hover bg — Linear: rgba(255,255,255,0.02) */
+  --sidebar-accent: 255 255 255 / 0.03;
+  /* Linear: --linear-app-sidebar-accent-rgb */
+  --sidebar-accent-active: 255 255 255 / 0.05;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 227 228 229;
-  --sidebar-border: 255 255 255 / 0.05;
+  --sidebar-border: 255 255 255 / 0.06;
+  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 98 102 109;
-  /* Section headers — Linear: rgb(98,102,109) */
-  --sidebar-muted-foreground: 98 102 109;
-  --sidebar-surface: 17 17 17;
-  /* Matches bg-base */
-  --sidebar-surface-hover: 255 255 255 / 0.02;
-  /* Hover — matches sidebar-accent */
+  --sidebar-muted: 138 143 152;
+  /* Linear: --linear-app-sidebar-muted-rgb */
+  --sidebar-muted-foreground: 138 143 152;
+  --sidebar-surface: var(--linear-app-sidebar-background-rgb);
+  /* Matches sidebar background */
+  --sidebar-surface-hover: 255 255 255 / 0.04;
+  /* Matches sidebar accent */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 208 214 224;
-  /* Nav text — Linear: rgb(208,214,224) */
-  --sidebar-item-icon: 98 102 109;
-  /* Nav icons — Linear: rgb(98,102,109) */
-  --sidebar-accent-active: 255 255 255 / 0.04;
-  /* Active bg — Linear: rgba(255,255,255,0.04) */
+  --sidebar-item-foreground: 214 218 226;
+  /* Linear: --linear-app-sidebar-item-foreground-rgb */
+  --sidebar-item-icon: 116 120 128;
+  /* Linear: --linear-app-sidebar-item-icon-rgb */
+  --sidebar-accent-active: 255 255 255 / 0.06;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 /* ============================================
@@ -1019,6 +1197,11 @@
 
 [data-theme="linear"],
 .linear-marketing {
+  /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
+  font-family: var(--font-body);
+  --marketing-font-display: var(--font-display);
+  --marketing-font-body: var(--font-body);
+
   /* Map Linear text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);
   --color-text-secondary-token: var(--linear-text-secondary);
@@ -1047,4 +1230,19 @@
   /* Map Linear page bg and focus ring */
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
+}
+
+/* Marketing typography: headings and buttons use Satoshi (display font) */
+.linear-marketing h1,
+.linear-marketing h2,
+.linear-marketing h3,
+.linear-marketing h4 {
+  font-family: var(--marketing-font-display);
+}
+
+.linear-marketing button,
+.linear-marketing [role="button"],
+.linear-marketing a[class*="btn"] {
+  font-family: var(--marketing-font-display);
+  letter-spacing: -0.01em;
 }

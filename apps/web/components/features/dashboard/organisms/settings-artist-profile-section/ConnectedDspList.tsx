@@ -15,6 +15,7 @@ import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/features/dashboard/atoms/DspConnectionPill';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { env } from '@/lib/env-client';
 import {
   type DspMatch,
   queryKeys,
@@ -50,6 +51,9 @@ const PROVIDER_LABELS: Record<DspProviderId, string> = {
   deezer: 'Deezer',
   amazon_music: 'Amazon Music',
   musicbrainz: 'MusicBrainz',
+  genius: 'Genius',
+  discogs: 'Discogs',
+  allmusic: 'AllMusic',
 };
 
 interface ArtistSelection {
@@ -79,6 +83,7 @@ async function connectProvider(
       spotifyArtistId: artist.id,
       spotifyArtistUrl: artist.url,
       artistName: artist.name,
+      forceInlineImport: env.IS_E2E,
     });
   }
   return connectAppleMusicArtist({

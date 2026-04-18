@@ -3,6 +3,7 @@
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { useAvatarMutation } from '@/lib/queries';
@@ -93,18 +94,18 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'success') {
     return (
-      <div className='rounded-xl border border-success/30 bg-success-subtle p-4'>
+      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>Profile photo updated</span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   if (state === 'error') {
     return (
-      <div className='rounded-xl border border-error/30 bg-error-subtle p-4'>
+      <ContentSurfaceCard className='border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))] p-4'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-2 text-error'>
             <X className='h-4 w-4' />
@@ -119,7 +120,7 @@ export function ChatAvatarUploadCard() {
             Retry
           </button>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -133,47 +134,53 @@ export function ChatAvatarUploadCard() {
         className='hidden'
         tabIndex={-1}
       />
-      <button
-        type='button'
-        onClick={handleClick}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        disabled={state === 'uploading'}
-        className={cn(
-          'w-full rounded-xl border-2 border-dashed p-8 text-center transition-colors',
-          isDragOver
-            ? 'border-accent bg-accent/10'
-            : 'border-subtle bg-surface-1 hover:border-accent/50 hover:bg-surface-2',
-          state === 'uploading' && 'pointer-events-none opacity-60'
-        )}
-      >
-        <div className='flex flex-col items-center gap-3'>
-          {state === 'uploading' ? (
-            <>
-              <Loader2 className='h-8 w-8 animate-spin text-accent' />
-              <span className='text-sm text-secondary-token'>Uploading...</span>
-            </>
-          ) : (
-            <>
-              <ImagePlus
-                className={cn(
-                  'h-8 w-8',
-                  isDragOver ? 'text-accent' : 'text-tertiary-token'
-                )}
-              />
-              <div>
-                <span className='text-sm font-medium text-primary-token'>
-                  Drop your photo here or click to upload
-                </span>
-                <p className='mt-1 text-xs text-tertiary-token'>
-                  JPEG, PNG, WebP, or HEIC
-                </p>
-              </div>
-            </>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3'>
+        <button
+          type='button'
+          onClick={handleClick}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          disabled={state === 'uploading'}
+          className={cn(
+            'w-full rounded-[8px] border border-dashed p-8 text-center transition-colors',
+            isDragOver
+              ? 'border-accent bg-accent/10'
+              : 'border-(--linear-app-frame-seam) bg-surface-0 hover:border-accent/50 hover:bg-surface-1',
+            state === 'uploading' && 'pointer-events-none opacity-60'
           )}
-        </div>
-      </button>
+        >
+          <div className='flex flex-col items-center gap-3'>
+            {state === 'uploading' ? (
+              <>
+                <Loader2 className='h-8 w-8 animate-spin text-accent' />
+                <span className='text-sm text-secondary-token'>
+                  Uploading...
+                </span>
+              </>
+            ) : (
+              <>
+                <span className='flex h-10 w-10 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'>
+                  <ImagePlus
+                    className={cn(
+                      'h-5 w-5',
+                      isDragOver ? 'text-accent' : 'text-tertiary-token'
+                    )}
+                  />
+                </span>
+                <div>
+                  <span className='text-sm font-medium text-primary-token'>
+                    Drop your photo here or click to upload
+                  </span>
+                  <p className='mt-1 text-xs text-tertiary-token'>
+                    JPEG, PNG, WebP, or HEIC
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </button>
+      </ContentSurfaceCard>
     </>
   );
 }

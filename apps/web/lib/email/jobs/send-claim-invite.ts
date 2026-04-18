@@ -6,8 +6,9 @@
 
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-
 import type { DbOrTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
+import { campaignSettings } from '@/lib/db/schema/admin';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enrollInCampaign } from '@/lib/email/campaigns/enrollment';
 import {
@@ -15,6 +16,10 @@ import {
   getClaimInviteEmail,
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import {
+  formatFounderSender,
+  getSenderPolicy,
+} from '@/lib/notifications/sender-policy';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
@@ -66,6 +71,25 @@ export async function processSendClaimInviteJob(
   jobPayload: unknown
 ): Promise<SendClaimInviteResult> {
   const payload = sendClaimInvitePayloadSchema.parse(jobPayload);
+
+  // Check global campaign toggle — skip sending if disabled
+  const [settings] = await db
+    .select({ campaignsEnabled: campaignSettings.campaignsEnabled })
+    .from(campaignSettings)
+    .where(eq(campaignSettings.id, 1))
+    .limit(1);
+
+  if (settings && !settings.campaignsEnabled) {
+    logger.info('Campaigns disabled, skipping claim invite send', {
+      inviteId: payload.inviteId,
+    });
+    return {
+      inviteId: payload.inviteId,
+      email: '',
+      status: 'skipped',
+      detail: 'Campaigns disabled',
+    };
+  }
 
   // Fetch the invite
   const [invite] = await tx
@@ -208,11 +232,14 @@ export async function processSendClaimInviteJob(
   };
 
   const emailContent = getClaimInviteEmail(templateData);
+  const founderSender = getSenderPolicy('founder');
 
   // Send via Resend (using singleton provider)
   const emailProvider = getEmailProvider();
   const result = await emailProvider.sendEmail({
     to: invite.email,
+    from: formatFounderSender(),
+    replyTo: founderSender.replyToEmail,
     subject: emailContent.subject,
     text: emailContent.text,
     html: emailContent.html,

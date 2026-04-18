@@ -14,11 +14,12 @@ describe('profile registry', () => {
     expect(profileModes).toEqual([
       'profile',
       'listen',
-      'tip',
+      'pay',
       'subscribe',
       'about',
       'contact',
       'tour',
+      'releases',
     ]);
   });
 
@@ -30,7 +31,7 @@ describe('profile registry', () => {
   it('returns typed metadata for known modes', () => {
     expect(getProfileModeDefinition('listen')).toMatchObject({
       mode: 'listen',
-      subtitle: 'Choose a Service',
+      subtitle: 'Listen now',
       pathSegment: 'listen',
     });
     expect(getProfileModeDefinition('tour').shell.showBackButton).toBe(true);

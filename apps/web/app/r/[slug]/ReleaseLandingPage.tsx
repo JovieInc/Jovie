@@ -3,30 +3,57 @@
 /**
  * ReleaseLandingPage Component
  *
- * A public-facing landing page for release smart links.
- * Shows release artwork, title, artist info, and streaming platform buttons.
- * Includes right-click context menu on artwork for downloading at multiple sizes.
+ * Uses the same visual shell as artist profiles: full-width artwork hero,
+ * menu button top-right, streaming platform buttons below.
  */
 
-import Image from 'next/image';
+import { Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
+import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
+import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
+import { SmartLinkAudioPreview } from '@/features/release/SmartLinkAudioPreview';
+import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
-import type { ProviderKey } from '@/lib/discography/types';
-import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
+import {
+  SMART_LINK_MENU_ICON_CLASS,
+  SMART_LINK_MENU_ITEM_CLASS,
+  SmartLinkShell,
+} from '@/features/release/SmartLinkShell';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import type {
+  PreviewSource,
+  PreviewVerification,
+  ProviderConfidence,
+  ProviderKey,
+} from '@/lib/discography/types';
+import { buildReleaseShareContext } from '@/lib/share/context';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
+import {
+  appendUTMParamsToUrl,
+  extractUTMParams,
+  type PartialUTMParams,
+} from '@/lib/utm';
 
 interface Provider {
   key: ProviderKey;
   label: string;
   accent: string;
   url: string | null;
+  confidence?: ProviderConfidence;
+}
+
+export interface FeaturedArtist {
+  readonly name: string;
+  readonly handle: string | null;
 }
 
 interface ReleaseLandingPageProps
@@ -35,32 +62,39 @@ interface ReleaseLandingPageProps
       readonly title: string;
       readonly artworkUrl: string | null;
       readonly releaseDate: string | null;
+      readonly previewUrl?: string | null;
+      readonly isrc?: string | null;
+      readonly previewVerification?: PreviewVerification;
+      readonly previewSource?: PreviewSource;
     };
     readonly artist: {
       readonly name: string;
       readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
+    readonly featuredArtists?: FeaturedArtist[];
     readonly providers: Provider[];
-    /** Pre-generated artwork sizes for download context menu */
+    readonly credits?: SmartLinkCreditGroup[];
     readonly artworkSizes?: Record<string, string> | null;
-    /** Whether the artist allows artwork downloads on public pages */
     readonly allowDownloads?: boolean;
-    /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
-    /** Optional tracking context for smartlink click analytics */
     readonly tracking?: {
       readonly contentType: 'release' | 'track';
       readonly contentId: string;
       readonly smartLinkSlug?: string | null;
     };
-    /** UTM params captured from incoming request and passed to outbound links */
     readonly utmParams?: PartialUTMParams;
-    /** Optional profile-claim CTA details for unclaimed creators */
+    readonly parentRelease?: {
+      readonly title: string;
+      readonly url: string;
+    } | null;
     readonly claimBanner?: {
       readonly profileId: string;
       readonly username: string;
     } | null;
+    /** URL to the promo download gate page, shown when promo files exist */
+    readonly downloadUrl?: string | null;
+    readonly initialMenuOpen?: boolean;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -90,15 +124,14 @@ function SmartLinkClaimBanner({
   const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
-    <div className='mt-4 rounded-xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+    <div className='rounded-2xl bg-surface-1 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-foreground text-xs font-medium'>
             Is this your music?
           </p>
           <p className='text-muted-foreground mt-1 text-2xs leading-relaxed'>
-            Claim this profile to unlock SmartLink analytics and manage your
-            releases.
+            Claim this profile to unlock analytics and manage your releases.
           </p>
           <Link
             href={signupUrl}
@@ -108,7 +141,6 @@ function SmartLinkClaimBanner({
             <Icon name='ArrowRight' className='h-3 w-3' aria-hidden='true' />
           </Link>
         </div>
-
         <button
           type='button'
           onClick={handleDismiss}
@@ -122,202 +154,330 @@ function SmartLinkClaimBanner({
   );
 }
 
+function SmartLinkArtistLine({
+  artist,
+  featuredArtists,
+}: Readonly<{
+  artist: { name: string; handle: string | null };
+  featuredArtists?: FeaturedArtist[];
+}>) {
+  const hasFeatured = featuredArtists && featuredArtists.length > 0;
+  const featuredArtistKeyCounts = new Map<string, number>();
+  const getFeaturedArtistKey = (name: string, handle: string | null) => {
+    const base = handle ?? name;
+    const count = featuredArtistKeyCounts.get(base) ?? 0;
+    featuredArtistKeyCounts.set(base, count + 1);
+    return count === 0 ? base : `${base}-${count + 1}`;
+  };
+
+  const primaryName = artist.handle ? (
+    <Link
+      href={`/${artist.handle}`}
+      className='text-white/70 transition-colors hover:text-white/90'
+    >
+      {artist.name}
+    </Link>
+  ) : (
+    <span className='text-white/70'>{artist.name}</span>
+  );
+
+  if (!hasFeatured) {
+    return (
+      <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+        {primaryName}
+      </p>
+    );
+  }
+
+  return (
+    <p className='mt-1 text-[14px] font-[450] [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
+      {primaryName}
+      <span className='text-white/40'> feat. </span>
+      {featuredArtists.map((fa, i) => (
+        <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
+          {i > 0 && (
+            <span className='text-white/40'>
+              {i === featuredArtists.length - 1 ? ' & ' : ', '}
+            </span>
+          )}
+          {fa.handle ? (
+            <Link
+              href={`/${fa.handle}`}
+              className='text-white/70 transition-colors hover:text-white/90'
+            >
+              {fa.name}
+            </Link>
+          ) : (
+            <span className='text-white/70'>{fa.name}</span>
+          )}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 export function ReleaseLandingPage({
   release,
   artist,
+  featuredArtists,
   providers,
+  credits,
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
   tracking,
   utmParams = {},
+  parentRelease = null,
   claimBanner = null,
+  downloadUrl = null,
+  initialMenuOpen = false,
 }: Readonly<ReleaseLandingPageProps>) {
-  const formattedDate = release.releaseDate
-    ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
+  const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [creditsOpen, setCreditsOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(initialMenuOpen);
+  }, [initialMenuOpen]);
+
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
+  const resolvedUtmParams = useMemo(() => {
+    if (globalThis.window === undefined) {
+      return utmParams;
+    }
+
+    const currentUtmParams = extractUTMParams(
+      new URLSearchParams(globalThis.location.search)
+    );
+
+    return Object.keys(currentUtmParams).length > 0
+      ? currentUtmParams
+      : utmParams;
+  }, [utmParams]);
+  // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
+  const hasCredits = credits?.some(group => group.entries.length > 0);
+  const shareSlug = tracking?.smartLinkSlug ?? 'release';
+  const sharePathname = artist.handle
+    ? `/${artist.handle}/${shareSlug}`
+    : tracking?.smartLinkSlug
+      ? `/r/${tracking.smartLinkSlug}`
+      : undefined;
+  const shareContext = useMemo(
+    () =>
+      buildReleaseShareContext({
+        username: artist.handle ?? 'release',
+        slug: shareSlug,
+        title: release.title,
+        artistName: artist.name,
+        artworkUrl: release.artworkUrl,
+        pathname: sharePathname,
+        storyQueryParams: artist.handle
+          ? undefined
+          : {
+              slug: shareSlug,
+              title: release.title,
+              artistName: artist.name,
+              pathname: sharePathname ?? `/r/${shareSlug}`,
+              artworkUrl: release.artworkUrl,
+            },
+      }),
+    [
+      artist.handle,
+      artist.name,
+      release.artworkUrl,
+      release.title,
+      sharePathname,
+      shareSlug,
+    ]
+  );
+  const hasPreview = Boolean(release.previewUrl);
+  const shouldShowPreview =
+    hasPreview &&
+    (release.previewVerification == null ||
+      release.previewVerification === 'verified' ||
+      release.previewVerification === 'fallback');
 
   const handleProviderClick = useCallback(
     (providerKey: ProviderKey) => {
       if (!artist.handle || !tracking?.contentId || !tracking?.contentType)
         return;
-      const payload = {
-        handle: artist.handle,
-        linkType: 'listen',
-        target: providerKey,
-        source: 'link',
-        context: {
-          contentType: tracking.contentType,
-          contentId: tracking.contentId,
-          provider: providerKey,
-          smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+      postJsonBeacon(
+        '/api/track',
+        {
+          handle: artist.handle,
+          linkType: 'listen',
+          target: providerKey,
+          source: 'link',
+          context: {
+            contentType: tracking.contentType,
+            contentId: tracking.contentId,
+            provider: providerKey,
+            smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+          },
         },
-      };
-
-      const body = JSON.stringify(payload);
-
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: 'application/json' });
-        navigator.sendBeacon('/api/track', blob);
-        return;
-      }
-
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => {
-        // Ignore tracking errors
-      });
+        () => {}
+      );
     },
     [artist.handle, tracking]
   );
 
   return (
-    <div className='h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
-      </div>
-
-      <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
-        {/* Content container — fills space between top padding and footer */}
-        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
-          {/* Artwork + Info — pinned at top, never scrolls */}
-          <div className='shrink-0'>
-            {/* Release Artwork */}
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={sizes}
-              allowDownloads={allowDownloads}
-            >
-              <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={`${release.title} artwork`}
-                    fill
-                    className='object-cover'
-                    sizes='272px'
-                    priority
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='text-muted-foreground h-16 w-16'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
-              </div>
-            </AlbumArtworkContextMenu>
-
-            {/* Release Info */}
-            <div className='mt-4 text-center'>
-              <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-                {release.title}
-              </h1>
-              {artist.handle ? (
-                <Link
-                  href={`/${artist.handle}`}
-                  className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-                >
-                  {artist.name}
-                </Link>
-              ) : (
-                <p className='text-muted-foreground mt-1 text-sm'>
-                  {artist.name}
-                </p>
-              )}
-              {formattedDate && (
-                <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
-                  {formattedDate}
-                </p>
-              )}
-
-              {claimBanner && (
-                <SmartLinkClaimBanner
-                  profileId={claimBanner.profileId}
-                  username={claimBanner.username}
-                />
-              )}
+    <SmartLinkShell
+      artworkUrl={release.artworkUrl}
+      artworkAlt={`${release.title} artwork`}
+      onMenuOpen={() => setMenuOpen(true)}
+      artworkWrapper={
+        allowDownloads
+          ? img => (
+              <AlbumArtworkContextMenu
+                title={release.title}
+                sizes={sizes}
+                allowDownloads={allowDownloads}
+              >
+                <div className='relative h-full w-full'>{img}</div>
+              </AlbumArtworkContextMenu>
+            )
+          : undefined
+      }
+      heroOverlay={
+        <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+          <div className='min-w-0 flex-1'>
+            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+              {release.title}
+            </h1>
+            <SmartLinkArtistLine
+              artist={artist}
+              featuredArtists={featuredArtists}
+            />
+          </div>
+          {shouldShowPreview ? (
+            <div className='mb-1 ml-3 shrink-0'>
+              <SmartLinkAudioPreview
+                contentId={tracking?.contentId ?? release.title}
+                title={release.title}
+                artistName={artist.name}
+                artworkUrl={release.artworkUrl}
+                previewUrl={release.previewUrl ?? null}
+                isrc={release.isrc}
+                previewVerification={release.previewVerification}
+                previewSource={release.previewSource}
+              />
             </div>
+          ) : null}
+        </div>
+      }
+    >
+      {/* Content — streaming buttons (scrollable) */}
+      <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
+        <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
+          {claimBanner && (
+            <SmartLinkClaimBanner
+              profileId={claimBanner.profileId}
+              username={claimBanner.username}
+            />
+          )}
+
+          <div className='space-y-2'>
+            {clickableProviders.map(provider => {
+              const logoConfig = DSP_LOGO_CONFIG[provider.key];
+              return (
+                <SmartLinkProviderButton
+                  key={provider.key}
+                  href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
+                  onClick={() => handleProviderClick(provider.key)}
+                  label={logoConfig?.name ?? provider.label}
+                  iconPath={logoConfig?.iconPath}
+                />
+              );
+            })}
           </div>
 
-          {/* Streaming Platform Buttons — scrolls independently when overflowing */}
-          <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 py-1'>
-              {clickableProviders.map(provider => {
-                const logoConfig = DSP_LOGO_CONFIG[provider.key];
-
-                return (
-                  <SmartLinkProviderButton
-                    key={provider.key}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
+          {clickableProviders.length === 0 && (
+            <div className='rounded-2xl bg-surface-1 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
+              <Icon
+                name='Music'
+                className='text-muted-foreground mx-auto h-8 w-8'
+                aria-hidden='true'
+              />
+              <p className='text-muted-foreground mt-2 text-sm'>
+                No streaming links available yet.
+              </p>
             </div>
-
-            {/* "Use this sound" CTA for short-form video platforms */}
-            {soundsUrl && (
-              <div className='pt-1'>
-                <Link
-                  href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
-                >
-                  <Icon
-                    name='Sparkles'
-                    className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
-                    aria-hidden='true'
-                  />
-                  <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
-                    Use this sound
-                  </span>
-                </Link>
-              </div>
-            )}
-
-            {/* Empty state if no providers */}
-            {clickableProviders.length === 0 && (
-              <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
-                <Icon
-                  name='Music'
-                  className='text-muted-foreground mx-auto h-8 w-8'
-                  aria-hidden='true'
-                />
-                <p className='text-muted-foreground mt-2 text-sm'>
-                  No streaming links available yet.
-                </p>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 pt-3 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
+        {/* Footer — always pinned at bottom */}
+        <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
+          <SmartLinkPoweredByFooter />
+        </div>
+      </div>
+
+      {/* Menu drawer */}
+      <ProfileDrawerShell
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        title='Menu'
+        dataTestId='release-landing-menu-drawer'
+      >
+        <div className='flex flex-col gap-0.5'>
+          <button
+            type='button'
+            className={SMART_LINK_MENU_ITEM_CLASS}
+            onClick={() => {
+              setMenuOpen(false);
+              setShareOpen(true);
+            }}
           >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
-      </main>
-    </div>
+            <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
+            Share
+          </button>
+          {hasCredits ? (
+            <button
+              type='button'
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => {
+                setMenuOpen(false);
+                setCreditsOpen(true);
+              }}
+            >
+              <Users className={SMART_LINK_MENU_ICON_CLASS} />
+              Credits
+            </button>
+          ) : null}
+          {soundsUrl ? (
+            <Link
+              href={appendUTMParamsToUrl(soundsUrl, resolvedUtmParams)}
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => setMenuOpen(false)}
+            >
+              <Sparkles className={SMART_LINK_MENU_ICON_CLASS} />
+              Use this sound
+            </Link>
+          ) : null}
+        </div>
+      </ProfileDrawerShell>
+
+      <ProfileDrawerShell
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title='Share'
+        subtitle='Share this release'
+      >
+        <PublicShareActionList
+          context={shareContext}
+          onActionComplete={() => setShareOpen(false)}
+        />
+      </ProfileDrawerShell>
+
+      {/* Credits drawer */}
+      <ReleaseCreditsDrawer
+        open={creditsOpen}
+        onOpenChange={setCreditsOpen}
+        credits={credits}
+      />
+    </SmartLinkShell>
   );
 }

@@ -50,6 +50,13 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/db/schema/admin', () => ({
+  campaignSettings: {
+    id: 'id',
+    campaignsEnabled: 'campaigns_enabled',
+  },
+}));
+
 // Mock schema tables as plain objects with column references
 vi.mock('@/lib/db/schema/email-engagement', () => ({
   campaignEnrollments: {
@@ -249,6 +256,13 @@ function setupProcessingMocks(options: {
   const emailSuppressionRows = options.emailSuppressionRows ?? [];
 
   // Track call order for db.select()
+  // Call sequence:
+  //   1. campaignSettings check (campaigns_enabled)
+  //   2. fetchPendingEnrollments
+  //   3. batchFetchClaimStatus
+  //   4. batchFetchEngagements
+  //   5. batchFetchClaimInvites (via innerJoin)
+  //   6. batchFetchEmailSuppressions
   let selectCallCount = 0;
   mockDbSelect.mockImplementation(() => {
     selectCallCount++;
@@ -262,22 +276,33 @@ function setupProcessingMocks(options: {
       .fn()
       .mockReturnValue({ where: mockInnerJoinWhere });
 
-    const mockLimit = vi.fn().mockResolvedValue(enrollments);
+    const mockLimit = vi.fn().mockImplementation(() => {
+      // First call: campaignSettings check — return enabled
+      if (callNum === 1) {
+        return Promise.resolve([{ campaignsEnabled: true }]);
+      }
+      // Second call: fetchPendingEnrollments
+      return Promise.resolve(enrollments);
+    });
     const mockWhere = vi.fn().mockImplementation(() => {
-      // First select call is fetchPendingEnrollments (has .limit())
+      // First select call is campaignSettings check (has .limit())
       if (callNum === 1) {
         return { limit: mockLimit };
       }
-      // Second is batchFetchClaimStatus (returns claimed profile rows)
+      // Second select call is fetchPendingEnrollments (has .limit())
       if (callNum === 2) {
+        return { limit: mockLimit };
+      }
+      // Third is batchFetchClaimStatus (returns claimed profile rows)
+      if (callNum === 3) {
         return Promise.resolve(claimedIds.map(id => ({ id })));
       }
-      // Third is batchFetchEngagements
-      if (callNum === 3) {
+      // Fourth is batchFetchEngagements
+      if (callNum === 4) {
         return Promise.resolve(engagementRows);
       }
-      // Fifth is batchFetchEmailSuppressions
-      if (callNum === 5) {
+      // Sixth is batchFetchEmailSuppressions
+      if (callNum === 6) {
         return Promise.resolve(emailSuppressionRows);
       }
       return Promise.resolve([]);

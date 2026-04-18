@@ -7,8 +7,13 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  tipCheckoutLimiter,
+} from '@/lib/rate-limit';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -37,6 +42,22 @@ function getPlatformFeePercent(): number {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit by IP (public endpoint, no auth required)
+    const ip = getClientIP(req);
+    const rateLimitResult = await tipCheckoutLimiter.limit(ip);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many checkout requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const parsed = createCheckoutSchema.safeParse(body);
 
@@ -49,13 +70,15 @@ export async function POST(req: NextRequest) {
 
     const { profileId, amountCents, handle } = parsed.data;
 
-    // Look up the artist profile
+    // Look up the artist profile (including Stripe Connect fields)
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
         displayName: creatorProfiles.displayName,
         username: creatorProfiles.username,
         isPublic: creatorProfiles.isPublic,
+        stripeAccountId: creatorProfiles.stripeAccountId,
+        stripePayoutsEnabled: creatorProfiles.stripePayoutsEnabled,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
@@ -102,29 +125,55 @@ export async function POST(req: NextRequest) {
       metadata: {
         handle: handle.toLowerCase(),
         profile_id: profileId,
+        platform_fee_cents: String(platformFeeCents),
         source: 'tip_checkout',
       },
       success_url: `${baseUrl}/${handle}/tip/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/${handle}/tip`,
     };
 
-    // Check if Stripe Connect direct transfers should be used
-    // This is a future feature gated behind a feature flag
-    const connectEnabled = await checkGate(
-      null,
-      FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED,
-      false
-    );
-
-    if (connectEnabled) {
-      // Future: look up stripe_account_id from profile and add transfer_data
-      // sessionParams.payment_intent_data.transfer_data = {
-      //   destination: stripeAccountId,
-      // };
-      // sessionParams.payment_intent_data.application_fee_amount = platformFeeCents;
-      logger.info('Stripe Connect enabled but no account configured', {
-        profileId,
-      });
+    // Route tip directly to creator's Stripe Connect account when available
+    if (
+      FEATURE_FLAGS.STRIPE_CONNECT_ENABLED &&
+      profile.stripeAccountId &&
+      profile.stripePayoutsEnabled
+    ) {
+      try {
+        // Verify account is still active before routing money
+        const account = await stripe.accounts.retrieve(profile.stripeAccountId);
+        if (
+          account.charges_enabled &&
+          account.payouts_enabled &&
+          !account.requirements?.currently_due?.length
+        ) {
+          sessionParams.payment_intent_data!.transfer_data = {
+            destination: profile.stripeAccountId,
+          };
+          sessionParams.payment_intent_data!.application_fee_amount =
+            platformFeeCents;
+          logger.info('Stripe Connect: routing tip to creator account', {
+            profileId,
+            stripeAccountId: profile.stripeAccountId,
+            platformFeeCents,
+          });
+        } else {
+          logger.warn(
+            'Stripe Connect: account not fully active, falling back to platform',
+            {
+              profileId,
+              stripeAccountId: profile.stripeAccountId,
+              chargesEnabled: account.charges_enabled,
+              payoutsEnabled: account.payouts_enabled,
+              currentlyDue: account.requirements?.currently_due,
+            }
+          );
+        }
+      } catch (error) {
+        logger.warn(
+          'Stripe Connect: failed to verify account, falling back to platform',
+          { profileId, error }
+        );
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);

@@ -1,47 +1,32 @@
+import { cn } from '@/lib/utils';
+
 interface PhoneFrameProps {
   readonly children: React.ReactNode;
+  readonly className?: string;
 }
 
-export function PhoneFrame({ children }: PhoneFrameProps) {
+export function PhoneFrame({ children, className }: PhoneFrameProps) {
   return (
     <div
-      className='relative mx-auto flex flex-col items-center'
-      style={{ width: 280, height: 580 }}
+      className={cn(
+        'relative mx-auto flex h-[592px] w-[282px] flex-col items-center',
+        className
+      )}
     >
       {/* Outer bezel */}
       <div
-        className='relative h-full w-full overflow-hidden rounded-[40px] p-[4px]'
+        className='relative h-full w-full overflow-hidden rounded-[2rem] p-px'
         style={{
-          backgroundColor: 'var(--linear-bg-surface-1)',
+          backgroundColor:
+            'color-mix(in oklab, var(--linear-bg-surface-1) 92%, var(--linear-bg-page))',
           boxShadow: [
             '0 0 0 1px var(--linear-border-default)',
-            '0 8px 40px rgba(0,0,0,0.45)',
-            '0 24px 80px rgba(0,0,0,0.35)',
+            '0 0 0 3px rgba(255,255,255,0.015)',
+            '0 12px 34px rgba(0,0,0,0.34)',
+            '0 24px 56px rgba(0,0,0,0.2)',
           ].join(', '),
         }}
       >
-        {/* Shine border overlay — Linear's glass edge effect */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-[40px]'
-          style={{
-            border: '1px solid rgb(56, 59, 63)',
-            borderRadius: '40px',
-            zIndex: 5,
-          }}
-        />
-
-        {/* Top edge highlight — Linear-style glass reflection */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-px'
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.12) 70%, transparent)',
-            zIndex: 6,
-          }}
-        />
-
         {/* Notch */}
         <div
           aria-hidden='true'
@@ -56,7 +41,7 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
 
         {/* Inner screen */}
         <div
-          className='relative h-full w-full overflow-hidden rounded-[36px]'
+          className='relative h-full w-full overflow-hidden rounded-[1.9rem]'
           style={{ backgroundColor: 'var(--linear-bg-page)' }}
         >
           {children}

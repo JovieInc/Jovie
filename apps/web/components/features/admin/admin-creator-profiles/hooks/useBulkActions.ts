@@ -24,6 +24,10 @@ export interface BulkActionsParams {
     id: string,
     featured: boolean
   ) => Promise<{ success: boolean }>;
+  toggleMarketing: (
+    id: string,
+    optOut: boolean
+  ) => Promise<{ success: boolean }>;
   deleteCreatorOrUser: (id: string) => Promise<{ success: boolean }>;
   clearSelection: () => void;
 }
@@ -32,9 +36,52 @@ export interface BulkActions {
   handleBulkVerify: () => Promise<void>;
   handleBulkUnverify: () => Promise<void>;
   handleBulkFeature: () => Promise<void>;
+  handleBulkUnfeature: () => Promise<void>;
   handleBulkRefreshMusicFetch: () => Promise<void>;
+  handleBulkEnableMarketing: () => Promise<void>;
+  handleBulkDisableMarketing: () => Promise<void>;
   handleBulkDelete: () => Promise<void>;
   handleClearSelection: () => void;
+}
+
+/**
+ * Shared helper: executes an action on each selected profile, toasts results,
+ * then clears selection and refreshes.
+ */
+export async function executeBulkAction({
+  profiles,
+  selectedIds,
+  action,
+  successLabel,
+  failureLabel,
+  clearSelection,
+  refresh,
+}: {
+  profiles: AdminCreatorProfileRow[];
+  selectedIds: Set<string>;
+  action: (profile: AdminCreatorProfileRow) => Promise<{ success: boolean }>;
+  successLabel: string;
+  failureLabel: string;
+  clearSelection: () => void;
+  refresh: () => void;
+}): Promise<void> {
+  const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
+  if (selectedProfiles.length === 0) return;
+
+  const results = await Promise.all(selectedProfiles.map(action));
+  const failedCount = results.filter(r => !r.success).length;
+
+  if (failedCount > 0) {
+    toast.error(
+      `Failed to ${failureLabel} ${failedCount} creator${failedCount > 1 ? 's' : ''}`
+    );
+  } else {
+    toast.success(
+      `${successLabel} ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
+    );
+  }
+  clearSelection();
+  refresh();
 }
 
 export function useBulkActions({
@@ -43,68 +90,97 @@ export function useBulkActions({
   confirmBulkDelete,
   toggleVerification,
   toggleFeatured,
+  toggleMarketing,
   deleteCreatorOrUser,
   clearSelection,
 }: BulkActionsParams): BulkActions {
   const router = useRouter();
   const { mutateAsync: bulkRefresh } = useAdminBulkRefreshMutation();
+  const refresh = useCallback(() => router.refresh(), [router]);
 
-  const handleBulkVerify = useCallback(async () => {
-    const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleVerification(p.id, true))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to verify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-    clearSelection();
-    router.refresh();
-  }, [profiles, selectedIds, toggleVerification, clearSelection, router]);
+  const handleBulkVerify = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleVerification(p.id, true),
+        successLabel: 'Verified',
+        failureLabel: 'verify',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleVerification, clearSelection, refresh]
+  );
 
-  const handleBulkUnverify = useCallback(async () => {
-    const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleVerification(p.id, false))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to unverify ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-    clearSelection();
-    router.refresh();
-  }, [profiles, selectedIds, toggleVerification, clearSelection, router]);
+  const handleBulkUnverify = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleVerification(p.id, false),
+        successLabel: 'Unverified',
+        failureLabel: 'unverify',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleVerification, clearSelection, refresh]
+  );
 
-  const handleBulkFeature = useCallback(async () => {
-    const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
-    const results = await Promise.all(
-      selectedProfiles.map(p => toggleFeatured(p.id, true))
-    );
-    const failedCount = results.filter(r => !r.success).length;
-    if (failedCount > 0) {
-      toast.error(
-        `Failed to feature ${failedCount} creator${failedCount > 1 ? 's' : ''}`
-      );
-    } else {
-      toast.success(
-        `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
-      );
-    }
-    clearSelection();
-    router.refresh();
-  }, [profiles, selectedIds, toggleFeatured, clearSelection, router]);
+  const handleBulkFeature = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleFeatured(p.id, true),
+        successLabel: 'Featured',
+        failureLabel: 'feature',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleFeatured, clearSelection, refresh]
+  );
+
+  const handleBulkUnfeature = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleFeatured(p.id, false),
+        successLabel: 'Unfeatured',
+        failureLabel: 'unfeature',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleFeatured, clearSelection, refresh]
+  );
+
+  const handleBulkEnableMarketing = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleMarketing(p.id, false),
+        successLabel: 'Enabled marketing for',
+        failureLabel: 'enable marketing for',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleMarketing, clearSelection, refresh]
+  );
+
+  const handleBulkDisableMarketing = useCallback(
+    () =>
+      executeBulkAction({
+        profiles,
+        selectedIds,
+        action: p => toggleMarketing(p.id, true),
+        successLabel: 'Disabled marketing for',
+        failureLabel: 'disable marketing for',
+        clearSelection,
+        refresh,
+      }),
+    [profiles, selectedIds, toggleMarketing, clearSelection, refresh]
+  );
 
   const handleBulkRefreshMusicFetch = useCallback(async () => {
     const selectedProfileIds = profiles
@@ -128,11 +204,11 @@ export function useBulkActions({
       }
 
       clearSelection();
-      router.refresh();
+      refresh();
     } catch {
       // Error toast handled by mutation's onError callback
     }
-  }, [profiles, selectedIds, clearSelection, router, bulkRefresh]);
+  }, [profiles, selectedIds, clearSelection, refresh, bulkRefresh]);
 
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
@@ -153,9 +229,8 @@ export function useBulkActions({
       toast.success(
         `Deleted ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
       );
-      // Clear selection after successful deletion
       clearSelection();
-      router.refresh();
+      refresh();
     }
   }, [
     profiles,
@@ -163,7 +238,7 @@ export function useBulkActions({
     confirmBulkDelete,
     deleteCreatorOrUser,
     clearSelection,
-    router,
+    refresh,
   ]);
 
   const handleClearSelection = useCallback(() => {
@@ -174,7 +249,10 @@ export function useBulkActions({
     handleBulkVerify,
     handleBulkUnverify,
     handleBulkFeature,
+    handleBulkUnfeature,
     handleBulkRefreshMusicFetch,
+    handleBulkEnableMarketing,
+    handleBulkDisableMarketing,
     handleBulkDelete,
     handleClearSelection,
   };

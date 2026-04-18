@@ -18,7 +18,7 @@ export function MobileProfileDrawer({ onOpen }: MobileProfileDrawerProps) {
       type='button'
       aria-label='Open profile panel'
       onClick={onOpen}
-      className='flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 lg:hidden'
+      className='flex h-8 w-8 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) lg:hidden'
     >
       <PanelRight className='size-4 text-secondary-token' />
     </button>

@@ -3,7 +3,6 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -81,13 +80,10 @@ async function attemptClerkRollback(
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const profileFetchTimer = 'db:dashboard-profile:getProfileByClerkId';
-      console.time(profileFetchTimer);
       const userProfile = await dashboardQuery(
         () => getProfileByClerkId(clerkUserId),
         'User profile fetch'
       );
-      console.timeEnd(profileFetchTimer);
 
       if (!userProfile) {
         return NextResponse.json(
@@ -134,63 +130,52 @@ export async function PUT(req: Request) {
         avatarUrl,
         usernameUpdate,
       } = parsedRequest;
-
-      // Gate pro-only settings behind plan entitlements
-      const settings = dbProfileUpdates.settings as
-        | Record<string, unknown>
-        | undefined;
-      if (settings?.hide_branding === true) {
-        try {
-          const entitlements = await getCurrentUserEntitlements();
-          if (!entitlements.canRemoveBranding) {
-            return NextResponse.json(
-              {
-                error:
-                  'Removing branding requires a Pro plan. Upgrade to unlock this feature.',
-              },
-              { status: 403, headers: NO_STORE_HEADERS }
-            );
-          }
-        } catch {
-          return NextResponse.json(
-            { error: 'Unable to verify plan status. Please try again.' },
-            { status: 503, headers: NO_STORE_HEADERS }
-          );
-        }
-      }
+      const currentProfileRecord = await getProfileByClerkId(clerkUserId);
+      const currentProfile = currentProfileRecord?.profile ?? null;
+      const effectiveDisplayNameForUserUpdate =
+        displayNameForUserUpdate &&
+        displayNameForUserUpdate !== currentProfile?.displayName
+          ? displayNameForUserUpdate
+          : undefined;
+      const effectiveAvatarUrl =
+        avatarUrl && avatarUrl !== currentProfile?.avatarUrl
+          ? avatarUrl
+          : undefined;
+      const effectiveUsernameUpdate =
+        usernameUpdate && usernameUpdate !== currentProfile?.username
+          ? usernameUpdate
+          : undefined;
 
       if (process.env.NODE_ENV === 'test') {
         return handleTestProfileUpdate({
           clerkUserId,
-          usernameUpdate,
-          displayNameForUserUpdate,
-          avatarUrl,
+          dbProfileUpdates,
+          usernameUpdate: effectiveUsernameUpdate,
+          displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
+          avatarUrl: effectiveAvatarUrl,
         });
       }
 
       const usernameGuard = await guardUsernameUpdate(
         clerkUserId,
-        usernameUpdate
+        effectiveUsernameUpdate
       );
       if (usernameGuard instanceof NextResponse) return usernameGuard;
 
-      const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
+      const clerkUpdates = buildClerkUpdates(effectiveDisplayNameForUserUpdate);
       const { clerkSyncFailed, rollback } = await syncClerkProfile({
         clerkUserId,
         clerkUpdates,
-        avatarUrl,
+        avatarUrl: effectiveAvatarUrl,
       });
 
       let updateResult;
       try {
-        const updateProfileTimer = 'db:dashboard-profile:updateProfileRecords';
-        console.time(updateProfileTimer);
         updateResult = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
-          displayNameForUserUpdate,
+          displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
         });
-        console.timeEnd(updateProfileTimer);
       } catch (error) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
         throw error;
@@ -202,24 +187,22 @@ export async function PUT(req: Request) {
 
       const { updatedProfile, oldUsernameNormalized } = updateResult;
 
-      const syncSocialLinksTimer =
-        'db:dashboard-profile:syncSocialLinksFromPrimaryMusicUrls';
-      console.time(syncSocialLinksTimer);
-      await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
-        spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
-        appleMusicUrl: dbProfileUpdates.appleMusicUrl as
-          | string
-          | null
-          | undefined,
-        youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
-      });
-      console.timeEnd(syncSocialLinksTimer);
-
-      await finalizeProfileResponse({
-        updatedProfile,
-        oldUsernameNormalized,
-        clerkUserId,
-      });
+      // Run independent post-update operations in parallel.
+      await Promise.all([
+        syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
+          spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
+          appleMusicUrl: dbProfileUpdates.appleMusicUrl as
+            | string
+            | null
+            | undefined,
+          youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
+        }),
+        finalizeProfileResponse({
+          updatedProfile,
+          oldUsernameNormalized,
+          clerkUserId,
+        }),
+      ]);
 
       const responseProfile = addAvatarCacheBust(updatedProfile);
 

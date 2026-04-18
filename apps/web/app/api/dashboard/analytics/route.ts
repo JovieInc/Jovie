@@ -50,9 +50,6 @@ function isView(value: string): value is DashboardAnalyticsView {
 
 export async function GET(request: Request) {
   try {
-    // Authenticate the user. RLS session setup is handled inside
-    // getUserDashboardAnalytics via a transaction, so we only need the
-    // Clerk user ID here — no separate withDbSession call required.
     const userId = await requireAuth();
 
     // Parse query parameters
@@ -70,8 +67,6 @@ export async function GET(request: Request) {
     // Clamp date range to user's plan retention limit.
     // Cache the entitlement lookup (5 min TTL) to avoid repeated billing
     // round-trips on every analytics fetch.
-    const entitlementsTimer = 'db:dashboard-analytics:entitlementsRange';
-    console.time(entitlementsTimer);
     const retentionDays = await cacheQuery(
       `analytics-retention:${userId}`,
       async () => {
@@ -85,8 +80,9 @@ export async function GET(request: Request) {
       },
       { ttlSeconds: 5 * 60 }
     );
-    const range = clampRange(rawRange, retentionDays);
-    console.timeEnd(entitlementsTimer);
+    // null = unlimited (Max tier), skip clamping
+    const range =
+      retentionDays === null ? rawRange : clampRange(rawRange, retentionDays);
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
@@ -94,8 +90,6 @@ export async function GET(request: Request) {
       await invalidateCache(key);
     }
 
-    const analyticsTimer = 'db:dashboard-analytics:getUserDashboardAnalytics';
-    console.time(analyticsTimer);
     const payload = await cacheQuery(
       key,
       async () => {
@@ -110,7 +104,6 @@ export async function GET(request: Request) {
       },
       { ttlSeconds: 60 }
     );
-    console.timeEnd(analyticsTimer);
 
     return NextResponse.json(payload, {
       status: 200,
@@ -136,6 +129,7 @@ export async function GET(request: Request) {
         {
           profile_views: 0,
           unique_users: 0,
+          tip_link_visits: 0,
           top_cities: [],
           top_countries: [],
           top_referrers: [],

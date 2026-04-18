@@ -63,12 +63,12 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] rounded-4xl bg-surface-2 p-2 shadow-card-elevated ring-1 ring-subtle transform transition-transform hover:scale-[1.02] duration-300'>
+        <div className='relative w-[280px] rounded-[28px] border border-(--linear-app-frame-seam) bg-surface-1 p-2 transition-transform duration-300 hover:scale-[1.01]'>
           {/* Top notch */}
-          <div className='absolute w-20 h-3 bg-surface-2 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
+          <div className='absolute left-1/2 top-2 z-10 h-3 w-20 -translate-x-1/2 rounded-b-[10px] bg-surface-1'></div>
 
           <div
-            className='bg-surface-1 rounded-3xl overflow-hidden relative'
+            className='relative overflow-hidden rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-0'
             style={{ height: '500px' }}
           >
             {/* Status Bar Mockup */}
@@ -81,11 +81,11 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
             >
               <div className='w-full h-full overflow-y-auto'>
                 <StaticArtistPage
+                  presentation='compact-preview'
                   mode='profile'
                   artist={artist}
                   socialLinks={previewSocialLinks}
                   subtitle=''
-                  showTipButton={false}
                   showBackButton={false}
                   contacts={[]}
                   showFooter={false}
@@ -100,7 +100,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       {/* Profile URL and Actions */}
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
-          <code className='text-[11px] bg-surface-2 px-2 py-1 rounded text-secondary-token'>
+          <code className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-1 text-[11px] text-secondary-token'>
             {BASE_URL}/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton

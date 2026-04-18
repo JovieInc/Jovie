@@ -18,6 +18,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-display-utils';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
@@ -74,7 +75,7 @@ function SidebarSuggestionItem({
       <span className='font-[510]'>{option.name}</span>
       <span className='text-xs text-tertiary-token'>{option.hint}</span>
       {active && (
-        <span className='ml-auto hidden text-xs text-tertiary-token sm:inline'>
+        <span className='ml-auto max-sm:hidden text-xs text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -142,7 +143,10 @@ export function SidebarLinkInput({
   });
 
   return (
-    <div ref={refs.setReference} className='relative'>
+    <div
+      ref={refs.setReference}
+      className={cn('relative', LINEAR_SURFACE.drawerCard, 'p-2')}
+    >
       <Input
         ref={urlInputRef}
         type='url'
@@ -175,7 +179,7 @@ export function SidebarLinkInput({
         autoCapitalize='none'
         autoCorrect='off'
         autoComplete='off'
-        className='h-8 text-[13px]'
+        className='h-9 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-[13px]'
         aria-label='Add link'
         autoFocus
       />
@@ -185,7 +189,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-default bg-surface-1 py-1 shadow-card-elevated'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-popover'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >
@@ -206,7 +210,7 @@ export function SidebarLinkInput({
         <button
           type='button'
           onClick={handleAdd}
-          className='mt-1 flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-[13px] transition-colors hover:bg-surface-3'
+          className='mt-2 flex w-full items-center gap-2 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-[13px] transition-colors hover:bg-surface-1'
         >
           <SocialIcon
             platform={detectedLink.platform.icon}

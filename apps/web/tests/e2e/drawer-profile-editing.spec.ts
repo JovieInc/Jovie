@@ -19,23 +19,17 @@
 
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser } from '../helpers/clerk-auth';
+import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
   setupPageMonitoring,
   waitForHydration,
 } from './utils/smoke-test-utils';
 
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
-
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  return (
-    username.length > 0 &&
-    (password.length > 0 || username.includes('+clerk_test')) &&
-    process.env.CLERK_TESTING_SETUP_SUCCESS === 'true'
-  );
-}
+const TEST_PRESS_PHOTO_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8s6sAAAAASUVORK5CYII=';
+const PROFILE_DRAWER_SCROLL_REGION_TEST_ID =
+  'profile-contact-tabbed-card-scroll-region';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab rendering
@@ -61,7 +55,7 @@ test.describe('Profile drawer — tab rendering', () => {
     // All four tabs must be visible — if any tab crashes during render the
     // segment control would be absent or replaced by an error boundary.
     for (const label of ['Social', 'Music', 'Earn', 'About']) {
-      await expect(page.getByRole('button', { name: label })).toBeVisible({
+      await expect(page.getByRole('tab', { name: label })).toBeVisible({
         timeout: 30_000,
       });
     }
@@ -81,7 +75,7 @@ test.describe('Profile drawer — tab rendering', () => {
     });
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: 'Music' }).click();
+    await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(500);
 
     const body = await page.evaluate(() =>
@@ -97,13 +91,186 @@ test.describe('Profile drawer — tab rendering', () => {
     });
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: 'About' }).click();
+    await page.getByRole('tab', { name: 'About' }).click();
     await page.waitForTimeout(500);
 
     const body = await page.evaluate(() =>
       document.body.innerText.toLowerCase()
     );
     expect(body).not.toMatch(/application error|something went wrong/);
+  });
+
+  test('About tab scrolls to lower settings content on desktop', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('tab', { name: 'About' }).click();
+    await page.waitForTimeout(500);
+
+    const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);
+    const lowerSettingsControl = page
+      .getByText('Show releases older than 90 days')
+      .first();
+
+    await expect(scrollRegion).toBeVisible({ timeout: 30_000 });
+    await expect(lowerSettingsControl).toBeVisible({ timeout: 30_000 });
+
+    const regionMetrics = await scrollRegion.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+    }));
+    expect(regionMetrics.scrollHeight).toBeGreaterThan(
+      regionMetrics.clientHeight
+    );
+
+    const regionBox = await scrollRegion.boundingBox();
+    const beforeBox = await lowerSettingsControl.boundingBox();
+    expect(regionBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect((beforeBox?.y ?? 0) + (beforeBox?.height ?? 0)).toBeGreaterThan(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0)
+    );
+
+    await scrollRegion.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await page.waitForTimeout(250);
+
+    const afterScrollTop = await scrollRegion.evaluate(
+      element => element.scrollTop
+    );
+    expect(afterScrollTop).toBeGreaterThan(regionMetrics.scrollTop);
+
+    const afterBox = await lowerSettingsControl.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect((afterBox?.y ?? 0) + (afterBox?.height ?? 0)).toBeLessThanOrEqual(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0) + 2
+    );
+  });
+
+  test('About tab scrolls to lower settings content on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('tab', { name: 'About' }).click();
+    await page.waitForTimeout(500);
+
+    const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);
+    const lowerSettingsControl = page
+      .getByText('Show releases older than 90 days')
+      .first();
+
+    await expect(scrollRegion).toBeVisible({ timeout: 30_000 });
+    await expect(lowerSettingsControl).toBeVisible({ timeout: 30_000 });
+
+    const regionMetrics = await scrollRegion.evaluate(element => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+    }));
+    expect(regionMetrics.scrollHeight).toBeGreaterThan(
+      regionMetrics.clientHeight
+    );
+
+    const regionBox = await scrollRegion.boundingBox();
+    const beforeBox = await lowerSettingsControl.boundingBox();
+    expect(regionBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect((beforeBox?.y ?? 0) + (beforeBox?.height ?? 0)).toBeGreaterThan(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0)
+    );
+
+    await scrollRegion.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await page.waitForTimeout(250);
+
+    const afterScrollTop = await scrollRegion.evaluate(
+      element => element.scrollTop
+    );
+    expect(afterScrollTop).toBeGreaterThan(regionMetrics.scrollTop);
+
+    const afterBox = await lowerSettingsControl.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect((afterBox?.y ?? 0) + (afterBox?.height ?? 0)).toBeLessThanOrEqual(
+      (regionBox?.y ?? 0) + (regionBox?.height ?? 0) + 2
+    );
+  });
+
+  test('About tab uploads and deletes a press photo', async ({ page }) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Press photo upload/delete runs in the full suite only'
+    );
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await waitForHydration(page);
+
+    await page.getByRole('tab', { name: 'About' }).click();
+    await page.waitForTimeout(500);
+
+    const deleteButtons = page.getByRole('button', {
+      name: 'Delete press photo',
+    });
+    const initialCount = await deleteButtons.count();
+
+    test.skip(
+      initialCount >= 6,
+      'Test user already has the maximum press photos'
+    );
+
+    await expect(page.getByText('Press Photos')).toBeVisible({
+      timeout: 30_000,
+    });
+
+    const fileName = `e2e-press-photo-${Date.now().toString(36)}.png`;
+    await page.getByRole('button', { name: 'Choose File' }).setInputFiles({
+      name: fileName,
+      mimeType: 'image/png',
+      buffer: Buffer.from(TEST_PRESS_PHOTO_PNG_BASE64, 'base64'),
+    });
+
+    await expect(page.getByAltText(fileName)).toBeVisible({ timeout: 60_000 });
+    await expect
+      .poll(async () => deleteButtons.count(), { timeout: 60_000 })
+      .toBe(initialCount + 1);
+
+    const uploadedPhotoCard = page
+      .locator('div')
+      .filter({ has: page.getByAltText(fileName) })
+      .filter({
+        has: page.getByRole('button', { name: 'Delete press photo' }),
+      })
+      .first();
+
+    await uploadedPhotoCard
+      .getByRole('button', { name: 'Delete press photo' })
+      .click();
+
+    await expect(page.getByAltText(fileName)).toHaveCount(0, {
+      timeout: 60_000,
+    });
+    await expect
+      .poll(async () => deleteButtons.count(), { timeout: 60_000 })
+      .toBe(initialCount);
   });
 
   test('rapid tab switching does not trigger React errors', async ({
@@ -137,7 +304,7 @@ test.describe('Profile drawer — tab rendering', () => {
     // Click through all tabs 3× rapidly — exercises the tab state machine
     for (let round = 0; round < 3; round++) {
       for (const tab of ['Social', 'Music', 'Earn', 'About']) {
-        await page.getByRole('button', { name: tab }).click();
+        await page.getByRole('tab', { name: tab }).click();
         await page.waitForTimeout(120);
       }
     }
@@ -173,7 +340,7 @@ test.describe('Profile drawer — enriched link data', () => {
     });
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: 'Music' }).click();
+    await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(1_000);
 
     // The test user is seeded with a Spotify link in seed-test-data.ts.
@@ -199,7 +366,7 @@ test.describe('Profile drawer — enriched link data', () => {
     });
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: 'Social' }).click();
+    await page.getByRole('tab', { name: 'Social' }).click();
     await page.waitForTimeout(500);
 
     // Whether empty or populated, the social tab must not crash
@@ -235,7 +402,7 @@ test.describe('Profile drawer — link add and remove', () => {
     await waitForHydration(page);
 
     // Switch to Social tab — SidebarLinkInput is visible here
-    await page.getByRole('button', { name: 'Social' }).click();
+    await page.getByRole('tab', { name: 'Social' }).click();
     await page.waitForTimeout(500);
 
     // Find the link input (placeholder or aria label pattern)
@@ -278,7 +445,7 @@ test.describe('Profile drawer — link add and remove', () => {
     await waitForHydration(page);
 
     // Check Music tab for any removable DSP link
-    await page.getByRole('button', { name: 'Music' }).click();
+    await page.getByRole('tab', { name: 'Music' }).click();
     await page.waitForTimeout(1_000);
 
     // Swipe-to-reveal on mobile OR hover dropdown on desktop exposes delete

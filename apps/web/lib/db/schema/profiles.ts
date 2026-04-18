@@ -17,12 +17,16 @@ import {
   claimInviteStatusEnum,
   contactChannelEnum,
   contactRoleEnum,
+  creatorDistributionEventTypeEnum,
+  creatorDistributionPlatformEnum,
   creatorTypeEnum,
   ingestionSourceTypeEnum,
   ingestionStatusEnum,
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,
+  profileClaimRoleEnum,
+  profileOwnershipActionEnum,
 } from './enums';
 // eslint-disable-next-line import/no-cycle -- mutual FK references between profiles and waitlist tables
 import { waitlistEntries } from './waitlist';
@@ -41,6 +45,21 @@ export interface NotificationPreferences {
   // Profile updates
   enrichmentComplete?: boolean;
   newReleaseDetected?: boolean;
+}
+
+export interface DiscoveredPixelPlatform {
+  detected: true;
+  pixelIds: string[];
+}
+
+export interface DiscoveredPixels {
+  facebook?: DiscoveredPixelPlatform;
+  tiktok?: DiscoveredPixelPlatform;
+  google?: DiscoveredPixelPlatform;
+}
+
+export interface CreatorDistributionEventMetadata {
+  [key: string]: unknown;
 }
 
 /**
@@ -70,6 +89,10 @@ export interface FitScoreBreakdown {
   hasContactEmail?: number;
   /** Has paid verification on social platforms (Twitter/X, Instagram, Facebook, Threads) - max 10 points */
   paidVerification?: number;
+  /** SoundCloud Pro/Pro Unlimited/Next Pro subscription (music-specific paid, stronger signal) - max 10 points */
+  soundcloudPro?: number;
+  /** Has tracking pixels on link-in-bio (Facebook, TikTok, Google) - max 5 points */
+  hasTrackingPixels?: number;
   /** Metadata about the scoring */
   meta?: {
     calculatedAt: string;
@@ -80,6 +103,7 @@ export interface FitScoreBreakdown {
     alternativeDspPlatforms?: string[];
     dspPlatformCount?: number;
     paidVerificationPlatforms?: string[];
+    soundcloudProTier?: string;
   };
 }
 
@@ -88,6 +112,9 @@ export const creatorProfiles = pgTable(
   'creator_profiles',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // @deprecated — ownership now tracked via userProfileClaims join table.
+    // Kept for backward compatibility during migration. Will be removed once
+    // all consumers are migrated to use userProfileClaims/activeProfileId.
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -102,6 +129,8 @@ export const creatorProfiles = pgTable(
     usernameNormalized: text('username_normalized').notNull(),
     displayName: text('display_name'),
     bio: text('bio'),
+    careerHighlights: text('career_highlights'),
+    targetPlaylists: text('target_playlists').array(),
     venmoHandle: text('venmo_handle'),
     avatarUrl: text('avatar_url'),
     spotifyUrl: text('spotify_url'),
@@ -122,6 +151,8 @@ export const creatorProfiles = pgTable(
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),
     marketingOptOut: boolean('marketing_opt_out').default(false),
+    // @deprecated — claimed status now derived from userProfileClaims.
+    // Kept for backward compatibility during migration.
     isClaimed: boolean('is_claimed').default(false),
     claimToken: text('claim_token'),
     claimedAt: timestamp('claimed_at'),
@@ -132,11 +163,11 @@ export const creatorProfiles = pgTable(
       .default(false)
       .notNull(),
     displayNameLocked: boolean('display_name_locked').default(false).notNull(),
+    usernameLockedAt: timestamp('username_locked_at'),
     ingestionStatus: ingestionStatusEnum('ingestion_status')
       .default('idle')
       .notNull(),
     lastIngestionError: text('last_ingestion_error'),
-    lastLoginAt: timestamp('last_login_at'),
     profileViews: integer('profile_views').default(0),
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
@@ -156,6 +187,9 @@ export const creatorProfiles = pgTable(
     fitScore: integer('fit_score'),
     fitScoreBreakdown: jsonb('fit_score_breakdown').$type<FitScoreBreakdown>(),
     fitScoreUpdatedAt: timestamp('fit_score_updated_at'),
+    // Tracking pixel detection from link-in-bio pages
+    discoveredPixels: jsonb('discovered_pixels').$type<DiscoveredPixels>(),
+    discoveredPixelsAt: timestamp('discovered_pixels_at'),
     // Spotify enrichment data
     genres: text('genres').array(),
     location: text('location'),
@@ -168,7 +202,6 @@ export const creatorProfiles = pgTable(
     outreachChannel: outreachChannelEnum('outreach_channel'),
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
-    outreachPriority: integer('outreach_priority'),
     // Stripe Connect fields for Express onboarding
     stripeAccountId: text('stripe_account_id'),
     stripeOnboardingComplete: boolean('stripe_onboarding_complete')
@@ -177,6 +210,8 @@ export const creatorProfiles = pgTable(
     stripePayoutsEnabled: boolean('stripe_payouts_enabled')
       .default(false)
       .notNull(),
+    nextTaskNumber: integer('next_task_number').default(1).notNull(),
+    smsAccessRequestedAt: timestamp('sms_access_requested_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -196,26 +231,13 @@ export const creatorProfiles = pgTable(
     )
       .on(table.usernameNormalized)
       .where(drizzleSql`username_normalized IS NOT NULL`),
-    oneClaimedProfilePerUser: uniqueIndex(
-      'idx_creator_profiles_one_claimed_per_user'
-    )
-      .on(table.userId)
-      .where(drizzleSql`is_claimed = true`),
-    // Index for GTM prioritization - sort unclaimed profiles by fit score
-    fitScoreUnclaimedIndex: index('idx_creator_profiles_fit_score_unclaimed')
-      .on(table.fitScore, table.id)
-      .where(drizzleSql`is_claimed = false`),
-    userIdClaimedIndex: index('idx_creator_profiles_user_id_claimed').on(
-      table.userId,
-      table.isClaimed
-    ),
-    userIdCreatedAtIndex: index('idx_creator_profiles_user_id_created_at').on(
-      table.userId,
-      table.createdAt
+    // Index for GTM prioritization - sort profiles by fit score (unclaimed = no claims row)
+    fitScoreIndex: index('idx_creator_profiles_fit_score').on(
+      table.fitScore,
+      table.id
     ),
     // Performance index: Outreach dashboard filtering
     outreachStatusIndex: index('idx_creator_profiles_outreach_status').on(
-      table.isClaimed,
       table.outreachStatus,
       table.createdAt
     ),
@@ -240,6 +262,10 @@ export const creatorContacts = pgTable(
     preferredChannel: contactChannelEnum('preferred_channel'),
     isActive: boolean('is_active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
+    forwardInboxEmails: boolean('forward_inbox_emails')
+      .notNull()
+      .default(false),
+    autoMarkRead: boolean('auto_mark_read').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -343,6 +369,8 @@ export const profilePhotos = pgTable(
     height: integer('height'),
     processedAt: timestamp('processed_at'),
     errorMessage: text('error_message'),
+    photoType: text('photo_type').notNull().default('avatar'),
+    sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -353,6 +381,11 @@ export const profilePhotos = pgTable(
     ),
     ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(
       table.ingestionOwnerUserId
+    ),
+    typeStatusIdx: index('idx_profile_photos_type').on(
+      table.creatorProfileId,
+      table.photoType,
+      table.status
     ),
   })
 );
@@ -402,6 +435,86 @@ export const creatorClaimInvites = pgTable(
   })
 );
 
+// User-to-profile ownership claims (many-to-many with roles)
+export const userProfileClaims = pgTable(
+  'user_profile_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    role: profileClaimRoleEnum('role').notNull().default('owner'),
+    claimedAt: timestamp('claimed_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Each profile can only be claimed once (one owner/manager/viewer at a time per profile)
+    uniqueProfile: uniqueIndex('idx_user_profile_claims_unique_profile').on(
+      table.creatorProfileId
+    ),
+    userIdx: index('idx_user_profile_claims_user_id').on(table.userId),
+  })
+);
+
+// Audit log for ownership changes
+export const profileOwnershipLog = pgTable(
+  'profile_ownership_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    action: profileOwnershipActionEnum('action').notNull(),
+    performedBy: uuid('performed_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    reason: text('reason'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    profileIdx: index('idx_profile_ownership_log_profile').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
+export const creatorDistributionEvents = pgTable(
+  'creator_distribution_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    platform: creatorDistributionPlatformEnum('platform').notNull(),
+    eventType: creatorDistributionEventTypeEnum('event_type').notNull(),
+    metadata: jsonb('metadata')
+      .$type<CreatorDistributionEventMetadata>()
+      .notNull()
+      .default({}),
+    dedupeKey: text('dedupe_key'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    profilePlatformCreatedIdx: index(
+      'idx_creator_distribution_events_profile_platform_created'
+    ).on(table.creatorProfileId, table.platform, table.createdAt),
+    profileEventCreatedIdx: index(
+      'idx_creator_distribution_events_profile_event_created'
+    ).on(table.creatorProfileId, table.eventType, table.createdAt),
+    dedupeKeyUnique: uniqueIndex(
+      'creator_distribution_events_dedupe_key_unique'
+    )
+      .on(table.dedupeKey)
+      .where(drizzleSql`dedupe_key IS NOT NULL`),
+  })
+);
+
 // Schema validations
 export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
@@ -430,6 +543,12 @@ export const insertCreatorClaimInviteSchema =
   createInsertSchema(creatorClaimInvites);
 export const selectCreatorClaimInviteSchema =
   createSelectSchema(creatorClaimInvites);
+export const insertCreatorDistributionEventSchema = createInsertSchema(
+  creatorDistributionEvents
+);
+export const selectCreatorDistributionEventSchema = createSelectSchema(
+  creatorDistributionEvents
+);
 
 // Types
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
@@ -453,3 +572,24 @@ export type NewCreatorProfileAttribute =
 
 export type CreatorClaimInvite = typeof creatorClaimInvites.$inferSelect;
 export type NewCreatorClaimInvite = typeof creatorClaimInvites.$inferInsert;
+
+export type CreatorDistributionEvent =
+  typeof creatorDistributionEvents.$inferSelect;
+export type NewCreatorDistributionEvent =
+  typeof creatorDistributionEvents.$inferInsert;
+
+export type UserProfileClaim = typeof userProfileClaims.$inferSelect;
+export type NewUserProfileClaim = typeof userProfileClaims.$inferInsert;
+
+export type ProfileOwnershipLog = typeof profileOwnershipLog.$inferSelect;
+export type NewProfileOwnershipLog = typeof profileOwnershipLog.$inferInsert;
+
+export const insertUserProfileClaimSchema =
+  createInsertSchema(userProfileClaims);
+export const selectUserProfileClaimSchema =
+  createSelectSchema(userProfileClaims);
+
+export const insertProfileOwnershipLogSchema =
+  createInsertSchema(profileOwnershipLog);
+export const selectProfileOwnershipLogSchema =
+  createSelectSchema(profileOwnershipLog);

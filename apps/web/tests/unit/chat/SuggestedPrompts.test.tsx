@@ -4,17 +4,40 @@ import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  it('renders default prompts when first-session mode is off', () => {
+  it('renders default prompts', () => {
     const onSelect = vi.fn();
-    const { getByText, queryByText } = fastRender(
+    const { getByText, getByTestId, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
 
-    expect(getByText('Change profile photo')).toBeTruthy();
-    expect(queryByText('Preview my profile')).toBeNull();
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
+    expect(getByText('Preview profile')).toBeTruthy();
+    expect(getByText('Change photo')).toBeTruthy();
+    expect(getByText('Release link')).toBeTruthy();
+
+    // First-session suggestions should not appear in default mode
+    expect(queryByText('Getting paid')).toBeNull();
   });
 
-  it('renders first-session prompts with release title personalization', () => {
+  it('renders a grid layout when requested', () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = fastRender(
+      <SuggestedPrompts onSelect={onSelect} layout='grid' />
+    );
+
+    expect(getByTestId('suggested-prompts-grid')).toBeTruthy();
+  });
+
+  it('renders a flat layout when requested', () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = fastRender(
+      <SuggestedPrompts onSelect={onSelect} layout='flat' />
+    );
+
+    expect(getByTestId('suggested-prompts-flat')).toBeTruthy();
+  });
+
+  it('renders first-session prompts including all suggestions', () => {
     const onSelect = vi.fn();
     const { getByRole } = fastRender(
       <SuggestedPrompts
@@ -24,10 +47,38 @@ describe('SuggestedPrompts', () => {
       />
     );
 
+    // First-session suggestions
     expect(
-      getByRole('button', { name: 'Set up a link for “Midnight Drive”' })
+      getByRole('button', {
+        name: 'Link \u201CMidnight Drive\u201D',
+      })
     ).toBeTruthy();
-    expect(getByRole('button', { name: 'Preview my profile' })).toBeTruthy();
-    expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Preview profile' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Getting paid' })).toBeTruthy();
+  });
+
+  it('calls onSelect with prompt when clicked', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByText('Preview profile').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Preview my profile.');
+  });
+
+  it('renders pitch and feedback actions for returning users with advanced tools', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        canUseAdvancedTools
+        latestReleaseTitle='Midnight Drive'
+      />
+    );
+
+    expect(
+      getByRole('button', {
+        name: 'Pitches for “Midnight Drive”',
+      })
+    ).toBeTruthy();
+    expect(getByRole('button', { name: 'Share feedback' })).toBeTruthy();
   });
 });

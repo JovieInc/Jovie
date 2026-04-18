@@ -1,7 +1,11 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/utils';
+
+type DrawerPropertyRowStyle = CSSProperties & {
+  gridTemplateColumns: string;
+};
 
 export interface DrawerPropertyRowProps {
   readonly label: ReactNode;
@@ -19,7 +23,7 @@ export interface DrawerPropertyRowProps {
 export function DrawerPropertyRow({
   label,
   value,
-  labelWidth = 76,
+  labelWidth,
   size = 'md',
   align = 'center',
   interactive = false,
@@ -32,21 +36,26 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[22px] gap-2 rounded-[7px] px-1.5 py-0.5',
-      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
-      value: 'text-[11px] leading-[14px]',
+      container: 'min-h-[22px] gap-2 rounded-[6px] px-1 py-px',
+      label: 'text-[11px] leading-[15px] tracking-normal',
+      value: 'text-[12px] leading-[16px] tracking-normal',
     },
     md: {
-      container: 'min-h-[24px] gap-2 rounded-[7px] px-1.5 py-0.5',
-      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
-      value: 'text-[11.5px] leading-[15px]',
+      container: 'min-h-[24px] gap-2 rounded-[6px] px-1 py-0.5',
+      label: 'text-[11px] leading-[15px] tracking-normal',
+      value: 'text-[12px] leading-[16px] tracking-normal',
     },
   } as const;
 
   const styles = sizeClasses[size];
 
-  const gridStyle = useMemo(
-    () => ({ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }),
+  const gridStyle = useMemo<DrawerPropertyRowStyle>(
+    () => ({
+      gridTemplateColumns:
+        typeof labelWidth === 'number'
+          ? `${labelWidth}px minmax(0, 1fr)`
+          : 'var(--drawer-inspector-label-width, 92px) minmax(0, 1fr)',
+    }),
     [labelWidth]
   );
 
@@ -55,18 +64,18 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid w-full text-left transition-[background-color,box-shadow,border-color] duration-150',
+        'grid w-full text-left transition-[background-color] duration-150',
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&
-          'cursor-pointer border border-transparent hover:border-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'cursor-pointer hover:bg-surface-1/80 focus-visible:bg-surface-1/80 focus-visible:outline-none',
         className
       )}
       style={gridStyle}
     >
       <span
         className={cn(
-          'font-[510] uppercase text-tertiary-token',
+          'font-[500] text-quaternary-token',
           styles.label,
           labelClassName
         )}
@@ -75,7 +84,7 @@ export function DrawerPropertyRow({
       </span>
       <span
         className={cn(
-          'min-w-0 text-secondary-token',
+          'min-w-0 font-[460] text-primary-token',
           styles.value,
           valueClassName
         )}

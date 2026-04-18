@@ -5,6 +5,7 @@ import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
+import { shouldBypassImageOptimization } from '@/lib/utils/dsp-images';
 
 export interface AvatarProps {
   /** Avatar image source URL */
@@ -36,8 +37,8 @@ export interface AvatarProps {
   readonly priority?: boolean;
   /** Image quality */
   readonly quality?: number;
-  /** Fallback image URL */
-  readonly fallbackSrc?: string;
+  /** Responsive browser size hints for Next.js image selection */
+  readonly sizes?: string;
   /** Custom className */
   readonly className?: string;
   /** Custom styling */
@@ -143,8 +144,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     verified = false,
     priority = false,
     quality = 85,
-
-    fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
+    sizes,
     className,
     style,
   },
@@ -163,6 +163,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     return BLUR_DATA_URLS[96] || BLUR_DATA_URLS[48];
   }, [width]);
   const initials = generateInitials(name);
+  const unoptimized = src ? shouldBypassImageOptimization(src) : false;
 
   // Map avatar size to a sensible badge size
   const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
@@ -183,14 +184,17 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           className={cn(
             sizeClass,
             roundedClass,
-            'flex items-center justify-center bg-surface-2 text-secondary-token',
+            'flex items-center justify-center bg-surface-2 text-white',
             BORDER_RING,
             'shadow-sm transition-colors duration-200'
           )}
           aria-hidden='true'
         >
           <span
-            className={cn('font-medium leading-none select-none', textSize)}
+            className={cn(
+              'font-medium leading-none select-none text-white',
+              textSize
+            )}
           >
             {initials}
           </span>
@@ -227,7 +231,8 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           quality={quality}
           placeholder='blur'
           blurDataURL={blurDataURL}
-          sizes={`${width}px`}
+          sizes={sizes ?? `${width}px`}
+          unoptimized={unoptimized}
           className={cn(
             'object-cover object-center transition-opacity duration-300 ease-out',
             isLoaded ? 'opacity-100' : 'opacity-0'

@@ -16,6 +16,14 @@
 
 Music creation is easier than ever, but attention and monetization are harder than ever. Creators drive traffic to a static link-in-bio page that treats every fan the same, then rely on occasional email/SMS blasts that quickly lose engagement. The result: low subscriber capture, weak conversion to merch/tickets, and no systematic way to identify and cultivate high-value fans.
 
+## Problems We're Solving
+
+| Problem | Summary | Deep Dive |
+|---------|---------|-----------|
+| The MySpace Problem | Link-in-bio pages are cluttered and unfocused. More customization = worse conversion. | [Read →](/blog/the-myspace-problem) |
+| The Friday Problem | Artists release in bursts, not rhythms. Algorithms reward consistency but most artists can't sustain it alone. | [Read →](/blog/the-friday-problem) |
+| The Contact Problem | Team members change but contact points don't. Opportunities leak to stale emails artists can't see. | [Read →](/blog/the-contact-problem) |
+
 ## Solution
 
 Jovie is an AI growth engine for music creators. It turns a creator's link in bio into a personalized funnel that identifies high-value fans and routes each visitor to the next best action—streaming, subscribing, merch, or tickets—then follows up automatically to increase lifetime value.

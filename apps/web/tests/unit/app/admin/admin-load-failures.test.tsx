@@ -1,9 +1,17 @@
 import { screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminOutreachPage from '@/app/app/(shell)/admin/outreach/page';
+import { OutreachOverviewPanel } from '@/components/features/admin/outreach/OutreachOverviewPanel';
 import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: () => <input data-testid='search-input' />,
+}));
+
+vi.mock('@/hooks/useSearchUrlSync', () => ({
+  useSearchUrlSync: () => {},
+}));
 
 vi.mock('sonner', () => ({
   toast: {
@@ -31,7 +39,7 @@ describe('admin load failures', () => {
     vi.clearAllMocks();
   });
 
-  it('shows inline message when leads fail to load without firing a toast', async () => {
+  it('shows error state when leads fail to load without firing a toast', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: false, json: async () => ({}) });
@@ -41,11 +49,7 @@ describe('admin load failures', () => {
     renderWithQueryClient(<LeadTable />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Unable to load leads right now. Try again in a moment.'
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
     });
 
     expect(toast.error).not.toHaveBeenCalled();
@@ -58,7 +62,7 @@ describe('admin load failures', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { toast } = await import('sonner');
-    renderWithQueryClient(<AdminOutreachPage />);
+    renderWithQueryClient(<OutreachOverviewPanel />);
 
     await waitFor(() => {
       expect(

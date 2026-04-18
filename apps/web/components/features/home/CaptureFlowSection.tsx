@@ -19,7 +19,7 @@ export function CaptureFlowSection() {
                 First visit
               </p>
               <h3 className='text-lg font-medium text-primary-token mb-2'>
-                Capture their email or SMS
+                Get their email or SMS
               </h3>
               <p className='text-sm text-secondary-token'>
                 Before they see your links, they subscribe. No more anonymous

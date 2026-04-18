@@ -32,7 +32,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 describe('entitlement state transitions', () => {
-  it('tracks free -> pro -> growth transitions without stale values', async () => {
+  it('tracks free -> pro -> max transitions without stale values', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_transition' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'transition@example.com' },
@@ -71,7 +71,7 @@ describe('entitlement state transitions', () => {
           email: 'transition@example.com',
           isAdmin: false,
           isPro: true,
-          plan: 'growth',
+          plan: 'max',
           stripeCustomerId: 'cus_1',
           stripeSubscriptionId: 'sub_1',
         },
@@ -79,21 +79,21 @@ describe('entitlement state transitions', () => {
 
     const free = await getCurrentUserEntitlements();
     const pro = await getCurrentUserEntitlements();
-    const growth = await getCurrentUserEntitlements();
+    const max = await getCurrentUserEntitlements();
 
     expect(free.plan).toBe('free');
     expect(free.isPro).toBe(false);
-    expect(free.aiDailyMessageLimit).toBe(25);
+    expect(free.aiDailyMessageLimit).toBe(10);
 
     expect(pro.plan).toBe('pro');
     expect(pro.isPro).toBe(true);
     expect(pro.hasAdvancedFeatures).toBe(false);
     expect(pro.aiDailyMessageLimit).toBe(100);
 
-    expect(growth.plan).toBe('growth');
-    expect(growth.isPro).toBe(true);
-    expect(growth.hasAdvancedFeatures).toBe(true);
-    expect(growth.aiDailyMessageLimit).toBe(500);
+    expect(max.plan).toBe('max');
+    expect(max.isPro).toBe(true);
+    expect(max.hasAdvancedFeatures).toBe(true);
+    expect(max.aiDailyMessageLimit).toBe(500);
   });
 
   it('tracks downgrade to free when subscription is no longer active', async () => {
@@ -111,7 +111,7 @@ describe('entitlement state transitions', () => {
           email: 'downgrade@example.com',
           isAdmin: false,
           isPro: true,
-          plan: 'growth',
+          plan: 'max',
           stripeCustomerId: 'cus_2',
           stripeSubscriptionId: 'sub_2',
         },
@@ -123,7 +123,7 @@ describe('entitlement state transitions', () => {
           email: 'downgrade@example.com',
           isAdmin: false,
           isPro: false,
-          plan: 'growth',
+          plan: 'max',
           stripeCustomerId: 'cus_2',
           stripeSubscriptionId: null,
         },
@@ -132,7 +132,7 @@ describe('entitlement state transitions', () => {
     const beforeCancel = await getCurrentUserEntitlements();
     const afterCancel = await getCurrentUserEntitlements();
 
-    expect(beforeCancel.plan).toBe('growth');
+    expect(beforeCancel.plan).toBe('max');
     expect(beforeCancel.contactsLimit).toBeNull();
 
     expect(afterCancel.plan).toBe('free');

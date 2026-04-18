@@ -1,56 +1,51 @@
-import { auth } from '@clerk/nextjs/server';
+import { Button } from '@jovie/ui';
+import { XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout } from '@/features/auth';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 
-export default async function UserCreationFailedPage() {
-  const { userId } = await auth();
-
-  // If somehow resolved, redirect to dashboard
-  if (!userId) {
-    redirect(APP_ROUTES.SIGNIN);
-  }
-
+export default function UserCreationFailedPage() {
   return (
-    <div className='flex min-h-screen items-center justify-center p-4'>
-      <div className='max-w-md space-y-6 text-center'>
-        <div className='space-y-2'>
-          <h1 className='text-2xl font-bold'>Account Setup Error</h1>
-          <p className='text-muted-foreground'>
-            We&apos;re having trouble setting up your account. This is usually
-            temporary.
-          </p>
-        </div>
-
-        <div className='space-y-4'>
-          <p className='text-sm text-muted-foreground'>
-            Our team has been notified and is working to resolve this issue.
-            Please try again in a few minutes.
-          </p>
-
-          <div className='flex flex-col gap-2'>
-            <Link
-              href='/app'
-              className='inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
-            >
-              Try Again
-            </Link>
-
-            <a
-              href='mailto:support@jov.ie?subject=Account%20Setup%20Error'
-              className='inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-8 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
-            >
-              Contact Support
-            </a>
+    <AuthLayout
+      formTitle='Account setup error'
+      showFooterPrompt={false}
+      showLogoutButton={false}
+    >
+      <div className={cn('w-full px-6 py-7 text-center', AUTH_SURFACE.card)}>
+        <div className='w-full space-y-5 text-center'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[oklch(65%_0.2_25_/_0.3)] bg-[oklch(65%_0.2_25_/_0.1)]'>
+            <XCircle
+              className='h-5 w-5 text-[oklch(65%_0.2_25)]'
+              aria-hidden='true'
+            />
           </div>
-        </div>
 
-        <p className='text-xs text-muted-foreground'>
-          Error Code: USER_CREATION_FAILED
-        </p>
+          <p className={cn(FORM_LAYOUT.hint, 'mt-0')}>
+            We&apos;re having trouble setting up your account. This is usually
+            temporary. Our team has been notified and is working to resolve this
+            issue. Please try again in a few minutes.
+          </p>
+
+          <div className='flex flex-col gap-2 sm:flex-row'>
+            <Button asChild className='flex-1'>
+              <Link href={APP_ROUTES.DASHBOARD}>Try again</Link>
+            </Button>
+            <Button asChild variant='secondary' className='flex-1'>
+              <a href='mailto:support@jov.ie?subject=Account%20Setup%20Error'>
+                Contact support
+              </a>
+            </Button>
+          </div>
+
+          <p className='text-[11px] text-tertiary-token'>
+            Error code: USER_CREATION_FAILED
+          </p>
+        </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

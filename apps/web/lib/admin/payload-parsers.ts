@@ -1,5 +1,14 @@
 import { type NextRequest } from 'next/server';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertValidUuid(value: string, fieldName: string): void {
+  if (!UUID_RE.test(value)) {
+    throw new TypeError(`${fieldName} must be a valid UUID`);
+  }
+}
+
 function parseBooleanField(
   value: FormDataEntryValue | null,
   fieldName: string,
@@ -53,6 +62,14 @@ async function parseRequestBody<T>(
   return parseFormData(formData);
 }
 
+function safeParseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new TypeError('profileIds must be valid JSON');
+  }
+}
+
 // ============================================================================
 // TOGGLE PAYLOADS (Single boolean field)
 // ============================================================================
@@ -81,6 +98,8 @@ function createToggleParser<TKey extends string>(
           throw new TypeError(`profileId and ${fieldName} are required`);
         }
 
+        assertValidUuid(payload.profileId, 'profileId');
+
         return {
           profileId: payload.profileId,
           [fieldName]: payload[fieldName],
@@ -91,9 +110,11 @@ function createToggleParser<TKey extends string>(
         const profileId = formData.get('profileId');
         const fieldValue = formData.get(fieldName);
 
-        if (typeof profileId !== 'string' || profileId.length === 0) {
+        if (typeof profileId !== 'string' || profileId.trim().length === 0) {
           throw new TypeError('profileId is required');
         }
+
+        assertValidUuid(profileId, 'profileId');
 
         const boolValue = parseBooleanField(
           fieldValue,
@@ -151,9 +172,11 @@ export async function parseDeletePayload(
     json => {
       const payload = json as { profileId?: string };
 
-      if (!payload.profileId) {
+      if (!payload.profileId || typeof payload.profileId !== 'string') {
         throw new TypeError('profileId is required');
       }
+
+      assertValidUuid(payload.profileId, 'profileId');
 
       return {
         profileId: payload.profileId,
@@ -163,9 +186,11 @@ export async function parseDeletePayload(
     formData => {
       const profileId = formData.get('profileId');
 
-      if (typeof profileId !== 'string' || profileId.length === 0) {
+      if (typeof profileId !== 'string' || profileId.trim().length === 0) {
         throw new TypeError('profileId is required');
       }
+
+      assertValidUuid(profileId, 'profileId');
 
       return {
         profileId,
@@ -225,7 +250,7 @@ function createBulkParser<TKey extends string>(
           throw new TypeError('profileIds is required');
         }
 
-        const parsed = JSON.parse(profileIdsRaw) as unknown;
+        const parsed = safeParseJson(profileIdsRaw);
         if (!isStringArray(parsed)) {
           throw new TypeError('profileIds must be an array');
         }
@@ -271,3 +296,93 @@ export type BulkRefreshPayload = {
 };
 
 export const parseBulkRefreshPayload = createBulkParser();
+
+// ============================================================================
+// BAN / UNBAN PAYLOADS
+// ============================================================================
+
+export type BanPayload = {
+  userId: string;
+  reason: string;
+};
+
+export async function parseBanPayload(
+  request: NextRequest
+): Promise<BanPayload> {
+  return parseRequestBody(
+    request,
+    json => {
+      const payload = json as { userId?: string; reason?: string };
+
+      if (!payload.userId || typeof payload.userId !== 'string') {
+        throw new TypeError('userId is required');
+      }
+      if (
+        !payload.reason ||
+        typeof payload.reason !== 'string' ||
+        payload.reason.trim().length === 0
+      ) {
+        throw new TypeError('reason is required');
+      }
+
+      assertValidUuid(payload.userId, 'userId');
+
+      return {
+        userId: payload.userId,
+        reason: payload.reason.trim(),
+      };
+    },
+    formData => {
+      const userId = formData.get('userId');
+      const reason = formData.get('reason');
+
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        throw new TypeError('userId is required');
+      }
+      if (typeof reason !== 'string' || reason.trim().length === 0) {
+        throw new TypeError('reason is required');
+      }
+
+      assertValidUuid(userId, 'userId');
+
+      return {
+        userId,
+        reason: reason.trim(),
+      };
+    }
+  );
+}
+
+export type UnbanPayload = {
+  userId: string;
+};
+
+export async function parseUnbanPayload(
+  request: NextRequest
+): Promise<UnbanPayload> {
+  return parseRequestBody(
+    request,
+    json => {
+      const payload = json as { userId?: string };
+
+      if (!payload.userId || typeof payload.userId !== 'string') {
+        throw new TypeError('userId is required');
+      }
+
+      assertValidUuid(payload.userId, 'userId');
+
+      return { userId: payload.userId };
+    },
+    formData => {
+      const userId = formData.get('userId');
+
+      if (typeof userId !== 'string' || userId.trim().length === 0) {
+        throw new TypeError('userId is required');
+      }
+
+      assertValidUuid(userId, 'userId');
+
+      return { userId };
+    }
+  );
+}

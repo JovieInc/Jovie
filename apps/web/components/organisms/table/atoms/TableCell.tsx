@@ -27,14 +27,14 @@ export function TableCell({
     <Component
       className={cn(
         // Base styles with line-clamp instead of truncate
-        'border-b border-subtle px-4 py-2 text-[13px] leading-[1.35] text-secondary-token',
+        'border-b border-subtle px-3 py-0.5 align-middle text-[13px] leading-[1.35] text-secondary-token',
         'line-clamp-1 overflow-hidden text-ellipsis',
         // Width
         width,
         // Alignment
         alignmentClasses[align],
         // Responsive hiding
-        hideOnMobile && 'hidden md:table-cell',
+        hideOnMobile && 'max-md:hidden md:table-cell',
         // Custom classes
         className
       )}

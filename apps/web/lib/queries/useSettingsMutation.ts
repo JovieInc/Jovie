@@ -30,7 +30,6 @@ export type SettingsUpdateInput = {
       marketing_emails?: boolean;
       email_notifications?: boolean;
       push_notifications?: boolean;
-      hide_branding?: boolean;
       exclude_self_from_analytics?: boolean;
       require_double_opt_in?: boolean;
     };
@@ -99,8 +98,6 @@ export function useUpdateSettingsMutation(
         // Show appropriate success message based on what was updated
         if (variables.updates.theme) {
           handleMutationSuccess('Theme preference saved');
-        } else if (variables.updates.settings?.hide_branding !== undefined) {
-          handleMutationSuccess('Branding settings saved');
         } else if (
           variables.updates.settings?.exclude_self_from_analytics !== undefined
         ) {
@@ -122,8 +119,6 @@ export function useUpdateSettingsMutation(
       // Show appropriate error message based on what was attempted
       if (variables.updates.theme) {
         handleMutationError(error, 'Failed to save theme preference');
-      } else if (variables.updates.settings?.hide_branding !== undefined) {
-        handleMutationError(error, 'Failed to save branding settings');
       } else if (
         variables.updates.settings?.exclude_self_from_analytics !== undefined
       ) {
@@ -221,36 +216,6 @@ export function useNotificationSettingsMutation() {
     updateNotifications,
     /** Async variant for use with try/catch rollback patterns */
     updateNotificationsAsync,
-    isPending: mutation.isPending,
-    isError: mutation.isError,
-    error: mutation.error,
-  };
-}
-
-/**
- * Convenience hook specifically for branding settings.
- *
- * @example
- * ```tsx
- * const { updateBranding, isPending } = useBrandingSettingsMutation();
- * updateBranding(true); // Hide branding
- * ```
- */
-export function useBrandingSettingsMutation() {
-  const mutation = useUpdateSettingsMutation();
-
-  return {
-    updateBranding: (hideBranding: boolean) => {
-      mutation.mutate({
-        updates: { settings: { hide_branding: hideBranding } },
-      });
-    },
-    /** Async variant for use with try/catch rollback patterns */
-    updateBrandingAsync: (hideBranding: boolean) => {
-      return mutation.mutateAsync({
-        updates: { settings: { hide_branding: hideBranding } },
-      });
-    },
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

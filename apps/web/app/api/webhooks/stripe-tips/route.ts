@@ -7,6 +7,7 @@ import { tips } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { processTipCompleted } from '@/lib/services/tips/process-tip-completed';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -84,12 +85,22 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     : null;
 
   if (!handle && !profileId) {
-    logger.warn(
+    // No creator identifier in metadata — tip cannot be attributed.
+    // Log as critical error (not just warn) so the team can investigate and
+    // manually reconcile. Still return (200) to stop Stripe retries since
+    // retrying won't produce a handle that was never set.
+    // Fire-and-forget — don't let telemetry failure bubble into a 500
+    const rawEmail = session.customer_details?.email ?? session.customer_email;
+    void captureCriticalError(
       'Tip checkout completed without handle or profile_id metadata',
+      new Error('Missing creator metadata on tip checkout session'),
       {
+        route: '/api/webhooks/stripe-tips',
         session_id: session.id,
+        amount: session.amount_total,
+        customer_email_domain: rawEmail?.split('@')[1] ?? null,
       }
-    );
+    ).catch(() => {});
     return;
   }
 
@@ -165,6 +176,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     session_id: session.id,
     tipper_email: tipperEmail,
   });
+
+  // Process fan data pipeline: audience upsert + thank-you email.
+  // Only runs when `inserted` is truthy (not a duplicate), providing idempotency.
+  // Wrapped in try/catch so failures don't cause 500 → Stripe retries.
+  if (tipperEmail) {
+    try {
+      const result = await processTipCompleted({
+        profileId: creatorProfileId,
+        email: tipperEmail,
+        name: tipperName,
+        amountCents: session.amount_total ?? 0,
+        source: 'tip',
+        metadata: { paymentIntentId, checkoutSessionId: session.id },
+      });
+
+      if (result.errors.length > 0) {
+        logger.warn('Tip post-processing had errors', {
+          tip_id: inserted.id,
+          errors: result.errors,
+        });
+      }
+    } catch (error) {
+      logger.error('Tip post-processing threw unexpectedly', {
+        tip_id: inserted.id,
+        error,
+      });
+    }
+  }
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {

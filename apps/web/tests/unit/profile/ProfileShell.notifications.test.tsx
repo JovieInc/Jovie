@@ -5,14 +5,12 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { renderWithQueryClient } from '../../utils/test-utils';
 
-const { routerPushMock, useSearchParamsMock } = vi.hoisted(() => ({
+const { routerPushMock } = vi.hoisted(() => ({
   routerPushMock: vi.fn(),
-  useSearchParamsMock: vi.fn(() => new URLSearchParams()),
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
-  useSearchParams: () => useSearchParamsMock(),
+  usePathname: () => window.location.pathname,
   useRouter: () => ({
     push: routerPushMock,
     replace: vi.fn(),
@@ -53,10 +51,10 @@ describe('ProfileShell notification trigger', () => {
     vi.clearAllMocks();
     routerPushMock.mockReset();
     window.localStorage.clear();
-    useSearchParamsMock.mockReturnValue(new URLSearchParams('mode=tip'));
+    window.history.replaceState(null, '', '/testartist?mode=pay');
   });
 
-  it('routes bell clicks from tip mode to subscribe mode when there are no active subscriptions', () => {
+  it('routes bell clicks from pay mode to subscribe mode when there are no active subscriptions', () => {
     renderWithQueryClient(
       <ProfileShell
         artist={makeArtist()}
@@ -66,16 +64,16 @@ describe('ProfileShell notification trigger', () => {
       />
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /subscribe to notifications/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /get notified/i }));
 
     expect(routerPushMock).toHaveBeenCalledWith('/testartist?mode=subscribe');
   });
 
   it('propagates the source search param when clicking the notification bell', () => {
-    useSearchParamsMock.mockReturnValue(
-      new URLSearchParams('mode=tip&source=someSource')
+    window.history.replaceState(
+      null,
+      '',
+      '/testartist?mode=pay&source=someSource'
     );
 
     renderWithQueryClient(
@@ -87,9 +85,7 @@ describe('ProfileShell notification trigger', () => {
       />
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /subscribe to notifications/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /get notified/i }));
 
     expect(routerPushMock).toHaveBeenCalledWith(
       '/testartist?mode=subscribe&source=someSource'

@@ -15,24 +15,23 @@ const STATUS_STYLES: Record<
 > = {
   suggested: {
     label: 'Suggested',
-    className:
-      'border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400',
-    dotClassName: 'bg-blue-500',
+    className: 'border-info/20 bg-surface-1 text-info',
+    dotClassName: 'bg-info',
   },
   confirmed: {
     label: 'Confirmed',
-    className: 'border-green-500/25 bg-green-500/10 text-success',
-    dotClassName: 'bg-green-500',
+    className: 'border-success/20 bg-surface-1 text-success',
+    dotClassName: 'bg-success',
   },
   auto_confirmed: {
     label: 'Auto-confirmed',
-    className: 'border-green-500/25 bg-green-500/10 text-success',
-    dotClassName: 'bg-green-500',
+    className: 'border-success/20 bg-surface-1 text-success',
+    dotClassName: 'bg-success',
   },
   rejected: {
     label: 'Rejected',
-    className: 'border-subtle bg-surface-0 text-tertiary-token',
-    dotClassName: 'bg-(--linear-text-tertiary)',
+    className: 'border-subtle bg-surface-1 text-tertiary-token',
+    dotClassName: 'bg-tertiary-token',
   },
 };
 

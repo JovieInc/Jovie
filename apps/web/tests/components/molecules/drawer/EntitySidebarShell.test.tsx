@@ -10,7 +10,7 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 
 describe('EntitySidebarShell', () => {
   it('keeps header, identity area, and tabs together in a sticky top rail', () => {
-    const { container } = render(
+    render(
       <EntitySidebarShell
         isOpen
         ariaLabel='Details drawer'
@@ -22,11 +22,58 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const stickyRail = container.querySelector('.sticky.top-0');
-    expect(stickyRail).toBeInTheDocument();
-    expect(stickyRail).toContainElement(screen.getByText('Release details'));
-    expect(stickyRail).toContainElement(screen.getByText('Header content'));
-    expect(stickyRail).toContainElement(screen.getByText('Tab controls'));
+    // The first DrawerSurfaceCard with variant='card' is the sticky header rail
+    const stickyRailCard = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-variant="card"]');
+    expect(stickyRailCard).toBeInTheDocument();
+    expect(stickyRailCard).toContainElement(
+      screen.getByText('Release details')
+    );
+    expect(stickyRailCard).toContainElement(screen.getByText('Header content'));
+    expect(stickyRailCard).toContainElement(screen.getByText('Tab controls'));
+    expect(stickyRailCard).not.toContainElement(
+      screen.getByText('Body content')
+    );
     expect(screen.getByText('Body content')).toBeInTheDocument();
+  });
+
+  it('does not render a sticky rail card when minimal mode hides all top chrome', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Add release drawer'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+      >
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.getByTestId('right-drawer').querySelector('[data-variant="card"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps a flat footer outside the card surface when requested', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Add release drawer'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        footerSurface='flat'
+        footer={<button type='button'>Create Release</button>}
+      >
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    const footerButton = screen.getByRole('button', { name: 'Create Release' });
+    expect(footerButton.parentElement).not.toHaveAttribute(
+      'data-variant',
+      'card'
+    );
+    expect(footerButton.parentElement).toHaveClass('px-3', 'py-2.5');
   });
 });

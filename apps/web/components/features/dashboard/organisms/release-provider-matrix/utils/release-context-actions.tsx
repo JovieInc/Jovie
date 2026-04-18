@@ -1,11 +1,13 @@
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 interface GetReleaseContextMenuItemsOptions {
   release: ReleaseViewModel;
   onEdit: (release: ReleaseViewModel) => void;
   onCopy: (path: string, label: string, testId: string) => Promise<string>;
+  onDelete?: (releaseId: string) => void;
+  canGenerateAlbumArt?: boolean;
+  onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   artistName?: string | null;
   isSmartLinkLocked?: (releaseId: string) => boolean;
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null;
@@ -17,18 +19,28 @@ interface GetReleaseContextMenuItemsOptions {
  *
  * Delegates to the canonical `buildReleaseActions` builder.
  */
-export function getReleaseContextMenuItems({
+export async function getReleaseContextMenuItems({
   release,
   onEdit,
   onCopy,
+  onDelete,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   artistName,
   isSmartLinkLocked,
   getSmartLinkLockReason,
-}: GetReleaseContextMenuItemsOptions): ContextMenuItemType[] {
+}: GetReleaseContextMenuItemsOptions): Promise<ContextMenuItemType[]> {
+  const { buildReleaseActions } = await import(
+    '@/features/dashboard/organisms/releases/release-actions'
+  );
+
   return buildReleaseActions({
     release,
     onEdit,
     onCopy,
+    onDelete,
+    canGenerateAlbumArt,
+    onGenerateAlbumArt,
     artistName,
     isSmartLinkLocked,
     getSmartLinkLockReason,

@@ -11,13 +11,44 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { users } from './auth';
 import {
+  leadAttributionStatusEnum,
   leadDiscoverySourceEnum,
   leadOutreachRouteEnum,
   leadOutreachStatusEnum,
+  leadRampModeEnum,
+  leadSourcePlatformEnum,
   leadStatusEnum,
 } from './enums';
 import { creatorProfiles } from './profiles';
+
+export interface LeadSignalSnapshot {
+  verified: boolean | null;
+  hasPaidTier: boolean | null;
+  hasSpotifyLink: boolean;
+  hasInstagram: boolean;
+  musicToolsDetected: string[];
+  allLinks: unknown[];
+  hasTrackingPixels: boolean;
+  trackingPixelPlatforms: string[];
+  discoveryQuery: string | null;
+  sourcePlatform: 'linktree' | 'beacons' | 'laylo';
+}
+
+export interface LeadGuardrailThresholds {
+  minimumSampleSize: number;
+  increaseClaimClickRate: number;
+  holdClaimClickRateFloor: number;
+  pauseClaimClickRateFloor: number;
+  maxBounceComplaintRate: number;
+  maxUnsubscribeRate: number;
+  maxProviderFailureRate: number;
+}
+
+export interface LeadFunnelEventMetadata {
+  [key: string]: unknown;
+}
 
 // Lead discovery pipeline — discovered Linktree profiles
 export const leads = pgTable(
@@ -28,6 +59,11 @@ export const leads = pgTable(
     linktreeUrl: text('linktree_url').notNull(),
     discoverySource: leadDiscoverySourceEnum('discovery_source').notNull(),
     discoveryQuery: text('discovery_query'),
+    sourcePlatform: leadSourcePlatformEnum('source_platform')
+      .default('linktree')
+      .notNull(),
+    sourceHandle: text('source_handle'),
+    sourceUrl: text('source_url'),
 
     // Extracted data (cached from Linktree scrape)
     displayName: text('display_name'),
@@ -46,7 +82,13 @@ export const leads = pgTable(
       .array()
       .default([])
       .notNull(),
+    hasTrackingPixels: boolean('has_tracking_pixels').default(false).notNull(),
+    trackingPixelPlatforms: text('tracking_pixel_platforms')
+      .array()
+      .default([])
+      .notNull(),
     allLinks: jsonb('all_links'),
+    signalSnapshot: jsonb('signal_snapshot').$type<LeadSignalSnapshot>(),
 
     // Scoring
     fitScore: integer('fit_score'),
@@ -93,7 +135,19 @@ export const leads = pgTable(
     outreachQueuedAt: timestamp('outreach_queued_at'),
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
+    firstContactedAt: timestamp('first_contacted_at'),
+    lastContactedAt: timestamp('last_contacted_at'),
+    signupUserId: uuid('signup_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    signupAt: timestamp('signup_at'),
+    paidAt: timestamp('paid_at'),
+    paidSubscriptionId: text('paid_subscription_id'),
+    attributionStatus: leadAttributionStatusEnum('attribution_status')
+      .default('unattributed')
+      .notNull(),
 
+    scrapeAttempts: integer('scrape_attempts').default(0).notNull(),
     scrapedAt: timestamp('scraped_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -115,6 +169,10 @@ export const leads = pgTable(
     ),
     outreachStatusIndex: index('idx_leads_outreach_status').on(
       table.outreachStatus
+    ),
+    signupUserIdIndex: index('idx_leads_signup_user_id').on(table.signupUserId),
+    attributionStatusIndex: index('idx_leads_attribution_status').on(
+      table.attributionStatus
     ),
   })
 );
@@ -138,6 +196,22 @@ export const leadPipelineSettings = pgTable('lead_pipeline_settings', {
   queryBudgetResetsAt: timestamp('query_budget_resets_at'),
   lastDiscoveryQueryIndex: integer('last_discovery_query_index')
     .default(0)
+    .notNull(),
+  dailySendCap: integer('daily_send_cap').default(10).notNull(),
+  maxPerHour: integer('max_per_hour').default(5).notNull(),
+  rampMode: leadRampModeEnum('ramp_mode').default('manual').notNull(),
+  guardrailsEnabled: boolean('guardrails_enabled').default(true).notNull(),
+  guardrailThresholds: jsonb('guardrail_thresholds')
+    .$type<LeadGuardrailThresholds>()
+    .default({
+      minimumSampleSize: 30,
+      increaseClaimClickRate: 0.06,
+      holdClaimClickRateFloor: 0.03,
+      pauseClaimClickRateFloor: 0.03,
+      maxBounceComplaintRate: 0.03,
+      maxUnsubscribeRate: 0.05,
+      maxProviderFailureRate: 0.1,
+    })
     .notNull(),
   dmTemplate: text('dm_template').default(
     "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}"
@@ -163,6 +237,64 @@ export const discoveryKeywords = pgTable(
   })
 );
 
+export const leadFunnelEvents = pgTable(
+  'lead_funnel_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leadId: uuid('lead_id')
+      .notNull()
+      .references(() => leads.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    channel: text('channel'),
+    provider: text('provider'),
+    campaignKey: text('campaign_key'),
+    variantKey: text('variant_key'),
+    metadata: jsonb('metadata').$type<LeadFunnelEventMetadata>(),
+    occurredAt: timestamp('occurred_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    leadEventTypeUniqueIndex: uniqueIndex(
+      'idx_lead_funnel_events_lead_event_type_unique'
+    ).on(table.leadId, table.eventType),
+    leadOccurredAtIndex: index('idx_lead_funnel_events_lead_occurred_at').on(
+      table.leadId,
+      table.occurredAt
+    ),
+    eventTypeOccurredAtIndex: index(
+      'idx_lead_funnel_events_type_occurred_at'
+    ).on(table.eventType, table.occurredAt),
+  })
+);
+
+export const leadSearchResults = pgTable(
+  'lead_search_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    query: text('query').notNull(),
+    normalizedResultUrl: text('normalized_result_url').notNull(),
+    sourcePlatform: leadSourcePlatformEnum('source_platform')
+      .default('linktree')
+      .notNull(),
+    firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    timesSeen: integer('times_seen').default(1).notNull(),
+    lastRank: integer('last_rank'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    queryUrlUnique: uniqueIndex('idx_lead_search_results_query_url').on(
+      table.query,
+      table.normalizedResultUrl
+    ),
+    sourcePlatformSeenIndex: index('idx_lead_search_results_source_seen').on(
+      table.sourcePlatform,
+      table.lastSeenAt
+    ),
+  })
+);
+
 // Schema validations
 export const insertLeadSchema = createInsertSchema(leads);
 export const selectLeadSchema = createSelectSchema(leads);
@@ -176,6 +308,12 @@ export const insertDiscoveryKeywordSchema =
   createInsertSchema(discoveryKeywords);
 export const selectDiscoveryKeywordSchema =
   createSelectSchema(discoveryKeywords);
+export const insertLeadFunnelEventSchema = createInsertSchema(leadFunnelEvents);
+export const selectLeadFunnelEventSchema = createSelectSchema(leadFunnelEvents);
+export const insertLeadSearchResultSchema =
+  createInsertSchema(leadSearchResults);
+export const selectLeadSearchResultSchema =
+  createSelectSchema(leadSearchResults);
 
 // Types
 export type Lead = typeof leads.$inferSelect;
@@ -186,3 +324,7 @@ export type NewLeadPipelineSettings = typeof leadPipelineSettings.$inferInsert;
 
 export type DiscoveryKeyword = typeof discoveryKeywords.$inferSelect;
 export type NewDiscoveryKeyword = typeof discoveryKeywords.$inferInsert;
+export type LeadFunnelEvent = typeof leadFunnelEvents.$inferSelect;
+export type NewLeadFunnelEvent = typeof leadFunnelEvents.$inferInsert;
+export type LeadSearchResult = typeof leadSearchResults.$inferSelect;
+export type NewLeadSearchResult = typeof leadSearchResults.$inferInsert;

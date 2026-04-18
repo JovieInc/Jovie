@@ -1,8 +1,10 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 import {
   type ProfileIdentityFields,
   type ProfilePreviewLinkViewModel,
@@ -10,28 +12,36 @@ import {
   type ProfileSaveState,
 } from './contracts';
 import { getProfileMode, getProfileModeDefinition } from './registry';
+import type { PublicRelease } from './releases/types';
 
 interface BuildProfilePublicViewModelInput {
   readonly mode: string | null | undefined;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
-  readonly showTipButton?: boolean;
+  readonly showPayButton?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes?: AvatarSize[];
   readonly allowPhotoDownloads?: boolean;
+  readonly pressPhotos?: PressPhoto[];
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
+  readonly showShopButton?: boolean;
+  readonly profileSettings?: {
+    readonly showOldReleases?: boolean;
+  } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly showFooter?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
   readonly showNotificationButton?: boolean;
   readonly subtitle?: string;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export function buildProfilePublicViewModel({
@@ -39,22 +49,27 @@ export function buildProfilePublicViewModel({
   artist,
   socialLinks,
   contacts,
-  showTipButton = false,
+  showPayButton = false,
   autoOpenCapture,
   enableDynamicEngagement = false,
   latestRelease,
+  profileSettings,
+  featuredPlaylistFallback,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  pressPhotos = [],
   subscribeTwoStep = false,
   genres,
   tourDates = [],
   visitTrackingToken,
   showSubscriptionConfirmedBanner = true,
+  showShopButton = false,
   showFooter,
   showBackButton,
   showTourButton,
   showNotificationButton,
   subtitle,
+  releases,
 }: BuildProfilePublicViewModelInput): ProfilePublicViewModel {
   const resolvedMode = getProfileMode(mode);
   const definition = getProfileModeDefinition(resolvedMode);
@@ -65,8 +80,8 @@ export function buildProfilePublicViewModel({
     socialLinks,
     contacts,
     subtitle: subtitle ?? definition.subtitle,
-    showTipButton,
-    isTipModeActive: resolvedMode === 'tip',
+    showPayButton,
+    isPayModeActive: resolvedMode === 'pay',
     showBackButton: showBackButton ?? definition.shell.showBackButton,
     showTourButton: showTourButton ?? definition.shell.showTourButton,
     isTourModeActive: resolvedMode === 'tour',
@@ -78,11 +93,16 @@ export function buildProfilePublicViewModel({
     latestRelease,
     photoDownloadSizes,
     allowPhotoDownloads,
+    pressPhotos,
     subscribeTwoStep,
     genres,
     tourDates,
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
+    showShopButton,
+    profileSettings,
+    featuredPlaylistFallback,
+    releases,
   };
 }
 
@@ -95,7 +115,10 @@ export function buildProfileIdentityFields(
     name: artist.name,
     tagline: artist.tagline ?? '',
     imageUrl: artist.image_url ?? '',
-    hideBranding: Boolean(artist.settings?.hide_branding),
+    location: artist.location ?? '',
+    hometown: artist.hometown ?? '',
+    careerHighlights: artist.career_highlights ?? '',
+    targetPlaylists: artist.target_playlists?.join(', ') ?? '',
     profilePath: `/${artist.handle}`,
   };
 }

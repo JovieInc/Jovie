@@ -4,7 +4,7 @@ import { Button, type ButtonProps } from '@jovie/ui';
 import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
+import { track, useFeatureFlag } from '@/lib/analytics';
 import { useCheckoutMutation } from '@/lib/queries';
 
 interface UpgradeButtonProps {
@@ -26,18 +26,13 @@ export function UpgradeButton({
   const checkoutMutation = useCheckoutMutation();
 
   // Check if direct upgrade is enabled
-  const directUpgradeEnabled = useFeatureFlag(
-    FEATURE_FLAGS.BILLING_UPGRADE_DIRECT,
-    false
-  );
+  const directUpgradeEnabled = useFeatureFlag('BILLING_UPGRADE_DIRECT');
 
   const handleClick = () => {
     // Track upgrade button click
     track('upgrade_button_clicked', {
       flow_type:
-        directUpgradeEnabled && priceId
-          ? 'direct_checkout'
-          : 'billing_remove_branding',
+        directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
       price_id: priceId || null,
       feature_flag_enabled: directUpgradeEnabled,
     });
@@ -74,11 +69,11 @@ export function UpgradeButton({
         }
       );
     } else {
-      // Traditional flow - redirect to billing remove-branding route
+      // Traditional flow - redirect to pricing
       track('pricing_page_redirect', {
         flow_type: 'traditional',
       });
-      router.push(APP_ROUTES.BILLING_REMOVE_BRANDING);
+      router.push(APP_ROUTES.PRICING);
     }
   };
 

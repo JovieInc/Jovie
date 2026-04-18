@@ -50,7 +50,7 @@ export function StepCard({
     >
       {/* Connection line */}
       {showConnectionLine && (
-        <div className='absolute left-1/2 top-8 hidden h-px w-full -translate-x-1/2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30 md:block' />
+        <div className='absolute left-1/2 top-8 max-md:hidden h-px w-full -translate-x-1/2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30' />
       )}
 
       <div className='relative'>

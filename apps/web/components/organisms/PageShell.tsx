@@ -1,9 +1,19 @@
+import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { cn } from '@/lib/utils';
 
 export interface PageShellProps {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
+  readonly toolbar?: ReactNode;
+  readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
+  readonly frame?: 'none' | 'content-container';
+  readonly contentPadding?: 'none' | 'compact' | 'default';
+  readonly scroll?: 'panel' | 'page';
   readonly className?: string;
+  readonly surfaceClassName?: string;
+  readonly contentClassName?: string;
+  readonly 'data-testid'?: string;
 }
 
 /**
@@ -42,29 +52,47 @@ export interface PageShellProps {
  * }
  * ```
  */
-export function PageShell({ children, className }: PageShellProps) {
+export function PageShell({
+  children,
+  toolbar,
+  maxWidth = 'full',
+  frame = 'none',
+  contentPadding = 'none',
+  scroll = 'panel',
+  className,
+  surfaceClassName,
+  contentClassName,
+  'data-testid': testId,
+}: PageShellProps) {
   return (
-    <div
-      className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-primary-token',
-        className
-      )}
+    <AppShellContentPanel
+      toolbar={toolbar}
+      maxWidth={maxWidth}
+      frame={frame}
+      contentPadding={contentPadding}
+      scroll={scroll}
+      className={className}
+      surfaceClassName={surfaceClassName}
+      contentClassName={contentClassName}
+      data-testid={testId}
     >
       {children}
-    </div>
+    </AppShellContentPanel>
   );
 }
 
 export interface PageHeaderProps {
   readonly title: string;
   readonly description?: string;
-  readonly action?: React.ReactNode;
-  readonly breadcrumbs?: React.ReactNode;
+  readonly action?: ReactNode;
+  readonly breadcrumbs?: ReactNode;
   /** Mobile sidebar trigger for dashboard pages */
-  readonly mobileSidebarTrigger?: React.ReactNode;
+  readonly mobileSidebarTrigger?: ReactNode;
   /** Desktop sidebar trigger for dashboard pages */
-  readonly sidebarTrigger?: React.ReactNode;
+  readonly sidebarTrigger?: ReactNode;
   readonly className?: string;
+  readonly titleClassName?: string;
+  readonly subtitleClassName?: string;
 }
 
 /**
@@ -98,6 +126,8 @@ export function PageHeader({
   mobileSidebarTrigger,
   sidebarTrigger,
   className,
+  titleClassName,
+  subtitleClassName,
 }: PageHeaderProps) {
   return (
     <ContentSectionHeader
@@ -111,19 +141,23 @@ export function PageHeader({
       }
       subtitle={
         description ? (
-          <span className='hidden truncate sm:block'>{description}</span>
+          <span className='max-sm:hidden truncate'>{description}</span>
         ) : undefined
       }
       actions={action}
+      variant='plain'
+      density='compact'
       actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}
       bodyClassName='min-w-0'
+      titleClassName={titleClassName}
+      subtitleClassName={subtitleClassName}
     />
   );
 }
 
 export interface PageContentProps {
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   readonly className?: string;
   /** If true, removes default padding */
   readonly noPadding?: boolean;

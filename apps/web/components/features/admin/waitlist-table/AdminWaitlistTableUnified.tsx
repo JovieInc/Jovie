@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type RowSelectionState,
-} from '@tanstack/react-table';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
@@ -14,7 +10,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
@@ -63,21 +59,15 @@ export function AdminWaitlistTableUnified({
   const internalSelection = useRowSelection(rowIds);
 
   // Use external selection if provided, otherwise use internal
-  const {
-    selectedIds,
-    headerCheckboxState,
-    toggleSelect,
-    toggleSelectAll,
-    setSelection,
-  } = externalSelection
-    ? {
-        selectedIds: externalSelection.selectedIds,
-        headerCheckboxState: externalSelection.headerCheckboxState,
-        toggleSelect: externalSelection.toggleSelect,
-        toggleSelectAll: externalSelection.toggleSelectAll,
-        setSelection: internalSelection.setSelection, // Keep internal for compatibility
-      }
-    : internalSelection;
+  const { selectedIds, headerCheckboxState, toggleSelect, toggleSelectAll } =
+    externalSelection
+      ? {
+          selectedIds: externalSelection.selectedIds,
+          headerCheckboxState: externalSelection.headerCheckboxState,
+          toggleSelect: externalSelection.toggleSelect,
+          toggleSelectAll: externalSelection.toggleSelectAll,
+        }
+      : internalSelection;
 
   // Row selection state for TanStack Table
   const rowSelection = useMemo(() => {
@@ -91,31 +81,6 @@ export function AdminWaitlistTableUnified({
   const headerCheckboxStateRef = useRef(headerCheckboxState);
   // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
-
-  const handleRowSelectionChange = useCallback(
-    (
-      updaterOrValue:
-        | RowSelectionState
-        | ((old: RowSelectionState) => RowSelectionState)
-    ) => {
-      const newSelection =
-        typeof updaterOrValue === 'function'
-          ? updaterOrValue(rowSelection)
-          : updaterOrValue;
-
-      // Convert TanStack RowSelectionState (object) to Set of selected IDs
-      const newSelectedIds = new Set(
-        Object.entries(newSelection)
-          .filter(([, selected]) => selected)
-          .map(([id]) => id)
-      );
-
-      // Directly update selection state with new Set
-      // This handles individual row selections efficiently in a single update
-      setSelection(newSelectedIds);
-    },
-    [rowSelection, setSelection]
-  );
 
   // Helper to copy to clipboard with toast feedback
   const safeCopyToClipboard = useCallback((text: string, label: string) => {
@@ -236,7 +201,7 @@ export function AdminWaitlistTableUnified({
 
   // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-white/[0.02]';
+    return 'group bg-transparent hover:bg-(--linear-row-hover)';
   }, []);
 
   // Render unified table with optional grouping
@@ -263,9 +228,8 @@ export function AdminWaitlistTableUnified({
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
-      className='text-[13px]'
+      className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
       rowSelection={rowSelection}
-      onRowSelectionChange={handleRowSelectionChange}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={onLoadMore}

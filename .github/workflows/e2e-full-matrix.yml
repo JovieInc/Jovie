@@ -50,7 +50,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
@@ -67,18 +67,20 @@ jobs:
             pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
           else
             # Exclude nightly tests (they run daily in nightly-e2e-tests.yml)
-            pnpm playwright test --ignore-snapshots --ignore='tests/e2e/nightly/**' --project=${{ matrix.browser }} --reporter=line
+            pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Upload Playwright Report on Failure
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-full-${{ matrix.browser }}-report-${{ github.run_id }}
           path: apps/web/playwright-report/
@@ -86,11 +88,21 @@ jobs:
 
       - name: Upload Test Results on Failure
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
           path: apps/web/test-results/
           retention-days: 7
+
+      - name: Cleanup Clerk E2E test users
+        if: always()
+        continue-on-error: true
+        run: |
+          cd apps/web
+          pnpm tsx scripts/cleanup-e2e-users.ts --force
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
 
       - name: Cleanup Neon branch
         if: always()

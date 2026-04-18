@@ -1,7 +1,7 @@
 'use client';
 
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ShieldCheck } from 'lucide-react';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
@@ -24,24 +24,32 @@ export function SettingsNotificationsSection({
   });
 
   return (
-    <ContentSurfaceCard className='overflow-hidden bg-surface-0/95'>
-      <ContentSectionHeader
-        title='Notifications'
-        subtitle='Control how subscriber confirmation behaves in Jovie.'
-        className='min-h-0 px-4 py-3.5'
-      />
-      <div className='border-t border-subtle/60 px-4 py-2.5'>
-        <SettingsToggleRow
-          title='Double opt-in email confirmation'
-          description='Subscriber emails use double opt-in by default to prevent spam. On Growth, you can disable this if you use a separate provider (for example, Mailchimp or webhooks).'
-          checked={checked}
-          onCheckedChange={handleToggle}
-          disabled={isPending || !isGrowth}
-          ariaLabel='Toggle double opt-in email confirmation'
-          gated={!isGrowth}
-          gatePlanName='Growth'
-        />
+    <SettingsPanel
+      title='Verification'
+      description='Choose how email confirmation works before fan notifications begin.'
+    >
+      <div className='px-4 py-4 sm:px-5'>
+        {isGrowth ? (
+          <SettingsToggleRow
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            checked={checked}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Toggle double opt-in email confirmation'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            gatePlanName='Growth'
+            gateFeatureContext='Double opt-in confirmation'
+          />
+        )}
       </div>
-    </ContentSurfaceCard>
+    </SettingsPanel>
   );
 }

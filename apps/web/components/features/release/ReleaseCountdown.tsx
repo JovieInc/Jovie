@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface TimeLeft {
   days: number;
@@ -38,14 +38,24 @@ function getTimeLeft(targetDate: Date): TimeLeft {
 
 interface ReleaseCountdownProps {
   readonly releaseDate: Date;
+  /** Compact inline mode: "Drops in 14d 3h 22m" on one line */
+  readonly compact?: boolean;
+  /** Label shown above the countdown (default: "Drops in") */
+  readonly label?: string;
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
 
-export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
+export function ReleaseCountdown({
+  releaseDate,
+  compact = false,
+  label = 'Drops in',
+}: ReleaseCountdownProps) {
   const router = useRouter();
   // Initialize with null to avoid hydration mismatch (server/client time differences)
   const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
+  // Guard to prevent infinite router.refresh() loop when ISR cache returns stale page
+  const hasRefreshed = useRef(false);
 
   useEffect(() => {
     // Compute initial time on client to avoid hydration mismatch
@@ -54,7 +64,10 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
 
     // Check immediately in case release time passed during SSR/hydration
     if (initialTimeLeft.total <= 0) {
-      router.refresh();
+      if (!hasRefreshed.current) {
+        hasRefreshed.current = true;
+        router.refresh();
+      }
       return;
     }
 
@@ -66,7 +79,10 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
       // This ensures users see the correct UI state without manual refresh
       if (newTimeLeft.total <= 0) {
         clearInterval(timer);
-        router.refresh();
+        if (!hasRefreshed.current) {
+          hasRefreshed.current = true;
+          router.refresh();
+        }
       }
     }, UPDATE_INTERVAL_MS);
 
@@ -78,11 +94,42 @@ export function ReleaseCountdown({ releaseDate }: ReleaseCountdownProps) {
     return null;
   }
 
+  if (compact) {
+    return (
+      <div className='flex items-baseline gap-3 tabular-nums'>
+        {timeLeft.days > 0 && (
+          <span>
+            <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+              {timeLeft.days}
+            </span>
+            <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+              D
+            </span>
+          </span>
+        )}
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.hours}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            H
+          </span>
+        </span>
+        <span>
+          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
+            {timeLeft.minutes}
+          </span>
+          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            M
+          </span>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className='text-center'>
-      <p className='text-xs uppercase tracking-widest text-white/40'>
-        Drops in
-      </p>
+      <p className='text-xs uppercase tracking-widest text-white/40'>{label}</p>
       <div className='mt-2 flex items-center justify-center gap-3'>
         {timeLeft.days > 0 && (
           <div className='flex flex-col items-center'>

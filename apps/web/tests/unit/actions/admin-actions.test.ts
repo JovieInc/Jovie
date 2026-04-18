@@ -9,18 +9,22 @@ const {
   mockDbUpdate,
   mockDbSelect,
   mockDbDelete,
+  mockDbInsert,
   mockRevalidatePath,
   mockInvalidateProfileCache,
   mockEnqueueMusicFetchEnrichmentJob,
+  mockEnqueueDspArtistDiscoveryJob,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbDelete: vi.fn(),
+  mockDbInsert: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
   mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
+  mockEnqueueDspArtistDiscoveryJob: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,6 +48,17 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/lib/ingestion/jobs', () => ({
   enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
+  enqueueDspArtistDiscoveryJob: mockEnqueueDspArtistDiscoveryJob,
+  fireDspDiscovery: (params: {
+    creatorProfileId: string;
+    spotifyArtistId: string;
+  }) => {
+    void mockEnqueueDspArtistDiscoveryJob({
+      creatorProfileId: params.creatorProfileId,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
+    }).catch(() => {});
+  },
 }));
 
 vi.mock('@/constants/routes', () => ({
@@ -54,8 +69,50 @@ vi.mock('@/constants/routes', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  desc: vi.fn((col: unknown) => ({ desc: col })),
   eq: vi.fn((_col: unknown, val: unknown) => ({ eq: val })),
   inArray: vi.fn((_col: unknown, val: unknown) => ({ inArray: val })),
+}));
+
+vi.mock('@/lib/auth/status-checker', () => ({
+  checkUserStatus: vi.fn().mockReturnValue({ isBlocked: false }),
+}));
+
+vi.mock('@/lib/auth/clerk-sync', () => ({
+  syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runLegacyDbTransaction: vi.fn(
+    async (fn: (tx: unknown) => Promise<unknown>) => {
+      // Pass a mock transaction that delegates to the db mock
+      const { db } = await import('@/lib/db');
+      return fn(db);
+    }
+  ),
+}));
+
+vi.mock('@/lib/db/schema/admin', () => ({
+  adminAuditLog: {
+    adminUserId: 'adminAuditLog.adminUserId',
+    targetUserId: 'adminAuditLog.targetUserId',
+    action: 'adminAuditLog.action',
+    createdAt: 'adminAuditLog.createdAt',
+    metadata: 'adminAuditLog.metadata',
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -71,12 +128,34 @@ function createUpdateChain(returningResult: unknown[] = []) {
   return { set, where, returning };
 }
 
-/** Creates a chain: .from() → .where() */
+/** Creates a chain: .from() → .where() → .limit() (also thenable without .limit()) */
 function createSelectChain(result: unknown[] = []) {
-  const where = vi.fn().mockResolvedValue(result);
+  const limit = vi.fn().mockResolvedValue(result);
+  const where = vi
+    .fn()
+    .mockReturnValue(Object.assign(Promise.resolve(result), { limit }));
   const from = vi.fn().mockReturnValue({ where });
   mockDbSelect.mockReturnValue({ from });
-  return { from, where };
+  return { from, where, limit };
+}
+
+/**
+ * Sets up mockDbSelect to handle N sequential calls, each returning
+ * different results. Used when an action calls db.select() multiple times
+ * (e.g. requireAdmin lookup + action-specific query).
+ */
+function createMultiSelectChain(results: unknown[][]) {
+  let callIndex = 0;
+  mockDbSelect.mockImplementation(() => {
+    const result = results[callIndex] ?? [];
+    callIndex++;
+    const limit = vi.fn().mockResolvedValue(result);
+    const where = vi
+      .fn()
+      .mockReturnValue(Object.assign(Promise.resolve(result), { limit }));
+    const from = vi.fn().mockReturnValue({ where });
+    return { from };
+  });
 }
 
 /** Creates a chain for delete: .where() */
@@ -91,11 +170,17 @@ vi.mock('@/lib/db', () => ({
     update: mockDbUpdate,
     select: mockDbSelect,
     delete: mockDbDelete,
+    insert: mockDbInsert,
   },
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'users.id' },
+  users: {
+    id: 'users.id',
+    clerkId: 'users.clerkId',
+    userStatus: 'users.userStatus',
+    deletedAt: 'users.deletedAt',
+  },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -103,6 +188,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     id: 'creatorProfiles.id',
     username: 'creatorProfiles.username',
     usernameNormalized: 'creatorProfiles.usernameNormalized',
+  },
+  userProfileClaims: {
+    userId: 'userProfileClaims.userId',
+    creatorProfileId: 'userProfileClaims.creatorProfileId',
   },
 }));
 
@@ -128,6 +217,13 @@ describe('admin/actions.ts', () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockIsAdmin.mockResolvedValue(true);
     mockInvalidateProfileCache.mockResolvedValue(undefined);
+    // requireAdmin() now does a db.select() to check admin's ban status.
+    // Default: return an active admin user. Tests that need different select
+    // results should call createSelectChain/createMultiSelectChain after this.
+    createSelectChain([{ userStatus: 'active', deletedAt: null }]);
+    // Default insert mock (for audit log writes)
+    const values = vi.fn().mockResolvedValue(undefined);
+    mockDbInsert.mockReturnValue({ values });
   });
 
   // =========================================================================
@@ -283,9 +379,13 @@ describe('admin/actions.ts', () => {
         },
       ];
 
-      createSelectChain(profiles);
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }], // requireAdmin lookup
+        profiles, // action's select
+      ]);
 
       mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue('job-id');
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('discovery-job-id');
 
       const { bulkRerunCreatorIngestionAction } = await import(
         '@/app/app/(shell)/admin/actions'
@@ -299,6 +399,7 @@ describe('admin/actions.ts', () => {
 
       expect(result).toEqual({ queuedCount: 2 });
       expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(2);
+      expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledTimes(2);
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
@@ -642,14 +743,32 @@ describe('admin/actions.ts', () => {
   // deleteCreatorOrUserAction
   // =========================================================================
   describe('deleteCreatorOrUserAction', () => {
-    it('soft-deletes a claimed creator (has userId)', async () => {
-      // First call: select to get profile
-      createSelectChain([{ userId: 'user_abc', username: 'claimed_user' }]);
-
-      // Second call: update for soft delete
-      const updateWhere = vi.fn().mockResolvedValue(undefined);
-      const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-      mockDbUpdate.mockReturnValue({ set: updateSet });
+    it('deletes a claimed creator profile without affecting the user', async () => {
+      // requireAdmin lookup, then profile lookup, then claims check
+      const adminLimit = vi
+        .fn()
+        .mockResolvedValue([{ userStatus: 'active', deletedAt: null }]);
+      const adminWhere = vi
+        .fn()
+        .mockReturnValue(
+          Object.assign(
+            Promise.resolve([{ userStatus: 'active', deletedAt: null }]),
+            { limit: adminLimit }
+          )
+        );
+      const adminFrom = vi.fn().mockReturnValue({ where: adminWhere });
+      const profileWhere = vi
+        .fn()
+        .mockResolvedValue([{ username: 'claimed_user' }]);
+      const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+      const claimsLimit = vi.fn().mockResolvedValue([{ userId: 'other_user' }]);
+      const claimsWhere = vi.fn().mockReturnValue({ limit: claimsLimit });
+      const claimsFrom = vi.fn().mockReturnValue({ where: claimsWhere });
+      mockDbSelect
+        .mockReturnValueOnce({ from: adminFrom })
+        .mockReturnValueOnce({ from: profileFrom })
+        .mockReturnValueOnce({ from: claimsFrom });
+      createDeleteChain();
 
       const { deleteCreatorOrUserAction } = await import(
         '@/app/app/(shell)/admin/actions'
@@ -658,22 +777,38 @@ describe('admin/actions.ts', () => {
       const fd = makeFormData({ profileId: 'p1' });
       await deleteCreatorOrUserAction(fd);
 
-      expect(mockDbSelect).toHaveBeenCalled();
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(updateSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          deletedAt: expect.any(Date),
-          updatedAt: expect.any(Date),
-        })
-      );
-      // Hard delete should NOT be called
-      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockDbSelect).toHaveBeenCalledTimes(3);
+      expect(mockDbDelete).toHaveBeenCalled();
+      // User should NOT be soft-deleted
+      expect(mockDbUpdate).not.toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
-    it('hard-deletes an unclaimed creator (no userId)', async () => {
-      // Profile has no userId
-      createSelectChain([{ userId: null, username: 'unclaimed_user' }]);
+    it('deletes an unclaimed creator profile', async () => {
+      // requireAdmin lookup, then profile lookup, then claims check (no claims)
+      const adminLimit = vi
+        .fn()
+        .mockResolvedValue([{ userStatus: 'active', deletedAt: null }]);
+      const adminWhere = vi
+        .fn()
+        .mockReturnValue(
+          Object.assign(
+            Promise.resolve([{ userStatus: 'active', deletedAt: null }]),
+            { limit: adminLimit }
+          )
+        );
+      const adminFrom = vi.fn().mockReturnValue({ where: adminWhere });
+      const profileWhere = vi
+        .fn()
+        .mockResolvedValue([{ username: 'unclaimed_user' }]);
+      const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+      const claimsLimit = vi.fn().mockResolvedValue([]);
+      const claimsWhere = vi.fn().mockReturnValue({ limit: claimsLimit });
+      const claimsFrom = vi.fn().mockReturnValue({ where: claimsWhere });
+      mockDbSelect
+        .mockReturnValueOnce({ from: adminFrom })
+        .mockReturnValueOnce({ from: profileFrom })
+        .mockReturnValueOnce({ from: claimsFrom });
       createDeleteChain();
 
       const { deleteCreatorOrUserAction } = await import(
@@ -688,7 +823,10 @@ describe('admin/actions.ts', () => {
     });
 
     it('throws when profile is not found', async () => {
-      createSelectChain([]);
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }], // requireAdmin lookup
+        [], // action's select — empty = not found
+      ]);
 
       const { deleteCreatorOrUserAction } = await import(
         '@/app/app/(shell)/admin/actions'

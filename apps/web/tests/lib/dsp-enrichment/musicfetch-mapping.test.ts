@@ -100,11 +100,11 @@ const SPOTIFY_URL = 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we';
 const SIGNAL = 'musicfetch_artist_lookup';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// extractMusicFetchLinks — all 11 platforms
+// extractMusicFetchLinks — streaming DSP platforms only
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('extractMusicFetchLinks', () => {
-  it('extracts all 11 expected platforms when all services are present', () => {
+  it('extracts all 9 expected streaming platforms when all services are present', () => {
     const artistData = makeFullArtistResult();
     const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
 
@@ -119,14 +119,15 @@ describe('extractMusicFetchLinks', () => {
     expect(platformIds).toContain('amazon_music');
     expect(platformIds).toContain('tidal');
     expect(platformIds).toContain('deezer');
-    expect(platformIds).toContain('instagram');
-    expect(platformIds).toContain('tiktok');
+    // instagram and tiktok are category 'video', not included in streaming link mappings
+    expect(platformIds).not.toContain('instagram');
+    expect(platformIds).not.toContain('tiktok');
   });
 
-  it('produces exactly 11 links (no duplicates) when all services are present', () => {
+  it('produces exactly 9 links (no duplicates) when all services are present', () => {
     const artistData = makeFullArtistResult();
     const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
-    expect(links).toHaveLength(11);
+    expect(links).toHaveLength(9);
   });
 
   it('always includes Spotify using the provided spotifyUrl even if not in services', () => {
@@ -204,13 +205,34 @@ describe('extractMusicFetchLinks', () => {
     expect(platformIds).toContain('spotify');
     expect(platformIds).toContain('apple_music');
     expect(platformIds).toContain('deezer');
-    expect(platformIds).toContain('instagram');
+    // instagram is category 'video', not included in streaming link mappings
+    expect(platformIds).not.toContain('instagram');
     expect(platformIds).toContain('tidal');
     expect(platformIds).toContain('soundcloud');
     expect(platformIds).toContain('youtube');
     expect(links.find(l => l.platformId === 'apple_music')?.url).toBe(
       'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music'
     );
+  });
+
+  it('maps corrected canonical service keys such as soundcloud and netease', () => {
+    const artistData = makeFullArtistResult({
+      services: {
+        soundcloud: { url: 'https://soundcloud.com/testartist' },
+        netease: { url: 'https://music.163.com/artist?id=123' },
+        soundCloud: { url: 'https://soundcloud.com/legacy-testartist' },
+        netEase: { url: 'https://music.163.com/artist?id=999' },
+      },
+    });
+
+    const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
+    const platformIds = links
+      .map(link => link.platformId)
+      .filter(
+        platformId => platformId === 'soundcloud' || platformId === 'netease'
+      );
+
+    expect(platformIds).toEqual(['soundcloud', 'netease']);
   });
 
   it('deduplicates links when the same URL appears twice', () => {

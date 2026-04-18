@@ -14,7 +14,7 @@ import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 
 interface DeleteCreatorDialogProps
   extends Readonly<{
@@ -99,7 +99,7 @@ export function DeleteCreatorDialog({
 
         {/* Items list */}
         <ContentSurfaceCard className='bg-surface-1 p-4'>
-          <p className='mb-3 text-xs font-medium uppercase tracking-wider text-tertiary-token'>
+          <p className='mb-3 text-[13px] font-medium tracking-normal text-secondary-token'>
             Data to be deleted
           </p>
           <ul className='space-y-2'>

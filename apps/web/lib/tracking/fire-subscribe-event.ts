@@ -8,7 +8,10 @@
 
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { checkBoolean } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
@@ -64,23 +67,32 @@ export async function fireSubscribeCAPIEvent(
     // Collect all pixel configs to forward to
     const pixelConfigs: Array<{ config: PlatformConfig; label: string }> = [];
 
-    // 1. Creator's own Facebook pixel
-    const [creatorConfig] = await db
-      .select()
+    // 1. Creator's own Facebook pixel (only if plan grants canAccessAdPixels)
+    const [creatorResult] = await db
+      .select({ pixels: creatorPixels, plan: users.plan })
       .from(creatorPixels)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, creatorPixels.profileId)
+      )
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorPixels.profileId, opts.creatorProfileId))
       .limit(1);
 
     if (
-      creatorConfig?.facebookPixelId &&
-      creatorConfig?.facebookAccessToken &&
-      creatorConfig?.facebookEnabled
+      creatorResult &&
+      checkBoolean(creatorResult.plan, 'canAccessAdPixels') &&
+      creatorResult.pixels.facebookPixelId &&
+      creatorResult.pixels.facebookAccessToken &&
+      creatorResult.pixels.facebookEnabled
     ) {
-      const decryptedToken = decryptPII(creatorConfig.facebookAccessToken);
+      const decryptedToken = decryptPII(
+        creatorResult.pixels.facebookAccessToken
+      );
       if (decryptedToken) {
         pixelConfigs.push({
           config: {
-            pixelId: creatorConfig.facebookPixelId,
+            pixelId: creatorResult.pixels.facebookPixelId,
             accessToken: decryptedToken,
             enabled: true,
           },

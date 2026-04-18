@@ -12,6 +12,18 @@ export type AudienceAction = {
   emoji?: string;
   platform?: string;
   timestamp?: string;
+  eventType?: string;
+  verb?: string;
+  confidence?: string;
+  sourceKind?: string;
+  sourceLabel?: string;
+  sourceLinkId?: string;
+  sourceLinkCode?: string;
+  objectType?: string;
+  objectId?: string;
+  objectLabel?: string;
+  properties?: Record<string, unknown>;
+  context?: Record<string, unknown>;
 };
 
 export type AudienceReferrer = { url: string; timestamp?: string };
@@ -51,3 +63,42 @@ export type AudienceMember = {
   deviceType: string | null;
   lastSeenAt: string | null;
 };
+
+export type AudienceSourceGroup = {
+  id: string;
+  creatorProfileId: string;
+  name: string;
+  sourceType: string;
+  destinationKind: string;
+  destinationId: string | null;
+  destinationUrl: string | null;
+  utmParams: Record<string, string | undefined>;
+  metadata: Record<string, unknown>;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AudienceSourceLink = {
+  id: string;
+  creatorProfileId: string;
+  sourceGroupId: string | null;
+  code: string;
+  name: string;
+  sourceType: string;
+  destinationKind: string;
+  destinationId: string | null;
+  destinationUrl: string;
+  utmParams: Record<string, string | undefined>;
+  metadata: Record<string, unknown>;
+  scanCount: number;
+  lastScannedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type {
+  AudienceEventSentence,
+  AudienceEventSentenceToken,
+} from '@/lib/audience/activity-types';

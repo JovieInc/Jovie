@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy } from 'lucide-react';
+import { CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
@@ -30,11 +30,13 @@ import {
   WAITLIST_CSV_FILENAME_PREFIX,
   waitlistCSVColumns,
 } from '@/lib/admin/csv-configs/waitlist';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import {
   QueryErrorBoundary,
   useAdminWaitlistInfiniteQuery,
+  useApproveWaitlistMutation,
+  useDisapproveWaitlistMutation,
   useUpdateWaitlistStatusMutation,
 } from '@/lib/queries';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
@@ -99,8 +101,10 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     },
   });
 
-  // TanStack Query mutation for updating waitlist status
+  // TanStack Query mutations for waitlist status changes
   const updateStatusMutation = useUpdateWaitlistStatusMutation();
+  const approveMutation = useApproveWaitlistMutation();
+  const disapproveMutation = useDisapproveWaitlistMutation();
 
   // Row selection
   const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
@@ -148,8 +152,52 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
           }
         },
       },
+      {
+        label: 'Approve',
+        icon: <CheckCircle className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const eligible = selectedEntries.filter(
+            e => e.status === 'new' || e.status === 'invited'
+          );
+          if (eligible.length === 0) {
+            toast.info(
+              'No entries eligible for approval (must have status "new" or "invited")'
+            );
+            return;
+          }
+          await Promise.all(
+            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+          );
+          toast.success(
+            `Approved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
+          );
+          clearSelection();
+        },
+      },
+      {
+        label: 'Disapprove',
+        icon: <XCircle className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const eligible = selectedEntries.filter(
+            e => e.status === 'invited' || e.status === 'claimed'
+          );
+          if (eligible.length === 0) {
+            toast.info(
+              'No entries eligible for disapproval (must be invited or claimed)'
+            );
+            return;
+          }
+          await Promise.all(
+            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+          );
+          toast.success(
+            `Disapproved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
+          );
+          clearSelection();
+        },
+      },
     ];
-  }, [entries, selectedIds, clearSelection]);
+  }, [entries, selectedIds, clearSelection, approveEntry]);
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
@@ -194,15 +242,29 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   const handleItemMove = useCallback(
-    async (itemId: string, _fromColumnId: string, toColumnId: string) => {
+    async (itemId: string, fromColumnId: string, toColumnId: string) => {
       try {
-        await updateStatusMutation.mutateAsync({
-          entryId: itemId,
-          status: toColumnId as 'new' | 'invited' | 'claimed',
-        });
-
-        // The UI will update optimistically via the KanbanBoard component
-        // Cache invalidation is handled by the mutation
+        if (toColumnId === 'claimed') {
+          // Use proper approval flow — updates users.userStatus, activeProfileId,
+          // profile fields, and invalidates proxy cache
+          await approveMutation.mutateAsync({ entryId: itemId });
+        } else if (toColumnId === 'new') {
+          // Use proper disapproval flow — reverts user status and profile
+          await disapproveMutation.mutateAsync({ entryId: itemId });
+        } else if (fromColumnId === 'claimed' && toColumnId === 'invited') {
+          // Block claimed→invited: no backend path to partially revert approval.
+          // Admin should move to New first, then to Invited if needed.
+          toast.error(
+            'Move claimed entries to New first, then to Invited if needed.'
+          );
+          return;
+        } else {
+          // Transitional status updates (e.g. new→invited) use simple status update
+          await updateStatusMutation.mutateAsync({
+            entryId: itemId,
+            status: toColumnId as 'new' | 'invited' | 'claimed',
+          });
+        }
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
         toast.error('Failed to update status', {
@@ -211,13 +273,14 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         });
       }
     },
-    [updateStatusMutation]
+    [approveMutation, disapproveMutation, updateStatusMutation]
   );
 
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
         testId='admin-waitlist-table'
+        className='rounded-none border-0'
         toolbar={
           <>
             {/* Bulk actions toolbar (shows when rows selected) */}
@@ -311,6 +374,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               getItemId={entry => entry.id}
               onItemMove={handleItemMove}
               cardHeight={200}
+              className='bg-(--linear-app-content-surface)'
               emptyState={
                 <div className='text-center text-secondary-token'>
                   <p className='text-sm font-medium text-primary-token'>

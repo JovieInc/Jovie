@@ -12,7 +12,7 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { useCreateInviteMutation } from '@/lib/queries';
 import { normalizeEmail } from '@/lib/utils/email';
 
@@ -114,7 +114,7 @@ export function SendInviteDialog({
       <DialogBody>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {/* Profile info */}
-          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-surface-0 p-3'>
+          <ContentSurfaceCard className='flex items-center gap-3 rounded-lg bg-surface-0 p-3'>
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
@@ -161,7 +161,10 @@ export function SendInviteDialog({
 
           {/* Error message */}
           {error && (
-            <DrawerSurfaceCard className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'
+            >
               <Icon
                 name='XCircle'
                 className='h-3.5 w-3.5 text-destructive shrink-0'
@@ -172,7 +175,10 @@ export function SendInviteDialog({
 
           {/* Success message */}
           {success && (
-            <DrawerSurfaceCard className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'
+            >
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'

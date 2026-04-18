@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -15,7 +15,7 @@ async function getAuthenticatedUserProfile(): Promise<{
   usernameNormalized: string;
   excludeSelf: boolean;
 } | null> {
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getOptionalAuth();
   if (!clerkUserId) return null;
 
   const [row] = await db
@@ -25,7 +25,7 @@ async function getAuthenticatedUserProfile(): Promise<{
       settings: creatorProfiles.settings,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 

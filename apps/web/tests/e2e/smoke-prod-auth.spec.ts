@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -12,17 +13,13 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * 2. Dashboard loads with real data (not empty state)
  * 3. Navigation between key tabs works
  *
- * Max ~30s total. No golden path, no content gate, no admin tests.
+ * Max ~2min total. No golden path, no content gate, no admin tests.
  *
  * @production-smoke
  */
 
-// Run unauthenticated initially — we sign in during the test
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/**
- * Check if production auth credentials are available
- */
 function hasProdAuthCredentials(): boolean {
   const email =
     process.env.E2E_PROD_USER_EMAIL ||
@@ -45,11 +42,143 @@ function getProdCredentials() {
       process.env.E2E_PROD_USER_PASSWORD ||
       process.env.E2E_CLERK_USER_PASSWORD ||
       '',
+    verificationCode: process.env.E2E_PROD_USER_CODE || '',
   };
 }
 
+async function waitForClerk(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+      undefined,
+      {
+        timeout: 30_000,
+      }
+    )
+    .catch(() => {
+      // Clerk may not be available in all environments.
+    });
+}
+
+async function getIdentifierInput(page: Page) {
+  return page
+    .locator(
+      'input[name="identifier"], input[type="email"], input[autocomplete="email"]'
+    )
+    .first();
+}
+
+async function getSubmitButton(page: Page) {
+  return page
+    .locator(
+      [
+        'button[type="submit"]',
+        'button:has-text("Continue")',
+        'button:has-text("Sign in")',
+        'button:has-text("Verify")',
+      ].join(', ')
+    )
+    .first();
+}
+
+type SignInResult =
+  | 'authenticated'
+  | 'verification-required'
+  | 'signin-form-unavailable'
+  | 'unknown';
+
+type SignInNextStep = 'redirected' | 'password' | 'email_code' | 'unknown';
+
+async function detectNextStep(page: Page): Promise<SignInNextStep> {
+  return page
+    .waitForFunction(
+      () => {
+        if (window.location.pathname.startsWith('/app')) return 'redirected';
+        if (
+          document.querySelector(
+            'input[name="password"], input[type="password"]'
+          )
+        ) {
+          return 'password';
+        }
+        if (
+          document.querySelector(
+            'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+          )
+        ) {
+          return 'email_code';
+        }
+        return false;
+      },
+      undefined,
+      { timeout: 15_000 }
+    )
+    .then(handle => handle.jsonValue() as Promise<SignInNextStep>)
+    .catch(() => 'unknown');
+}
+
+async function signInViaRenderedFlow(
+  page: Page,
+  credentials: ReturnType<typeof getProdCredentials>
+): Promise<SignInResult> {
+  const identifierInput = await getIdentifierInput(page);
+  const hasIdentifierInput = await identifierInput
+    .isVisible({ timeout: 15_000 })
+    .catch(() => false);
+
+  if (!hasIdentifierInput) {
+    if (page.url().includes('/app')) {
+      return 'authenticated';
+    }
+    return 'signin-form-unavailable';
+  }
+
+  await identifierInput.fill(credentials.email);
+  await (await getSubmitButton(page)).click();
+
+  const nextStep = await detectNextStep(page);
+
+  if (nextStep === 'redirected') {
+    return 'authenticated';
+  }
+
+  if (nextStep === 'password') {
+    const passwordInput = page
+      .locator('input[name="password"], input[type="password"]')
+      .first();
+    await expect(passwordInput).toBeVisible({ timeout: 10_000 });
+    await passwordInput.fill(credentials.password);
+    await (await getSubmitButton(page)).click();
+    await page.waitForURL(url => url.pathname.startsWith('/app'), {
+      timeout: 30_000,
+    });
+    return 'authenticated';
+  }
+
+  if (nextStep === 'email_code') {
+    if (!credentials.verificationCode) {
+      return 'verification-required';
+    }
+
+    const codeInput = page
+      .locator(
+        'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+      )
+      .first();
+    await expect(codeInput).toBeVisible({ timeout: 10_000 });
+    await codeInput.fill(credentials.verificationCode);
+    await (await getSubmitButton(page)).click();
+    await page.waitForURL(url => url.pathname.startsWith('/app'), {
+      timeout: 30_000,
+    });
+    return 'authenticated';
+  }
+
+  return 'unknown';
+}
+
 test.describe('Production Auth Smoke @production-smoke', () => {
-  test.setTimeout(120_000); // 2 min total budget
+  test.setTimeout(120_000);
 
   test.beforeEach(async () => {
     if (!hasProdAuthCredentials()) {
@@ -58,80 +187,32 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   });
 
   test('sign-in works and dashboard loads', async ({ page }) => {
-    const { email, password } = getProdCredentials();
+    const credentials = getProdCredentials();
 
-    // Navigate to sign-in page
-    await page.goto('/signin', {
+    await page.goto(APP_ROUTES.SIGNIN, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
+    await waitForClerk(page);
 
-    // Wait for Clerk to load
-    await page
-      .waitForFunction(() => !!(window as any).Clerk?.loaded, {
-        timeout: 30_000,
-      })
-      .catch(() => {
-        // Clerk may not be available in all environments
-      });
+    const result = await signInViaRenderedFlow(page, credentials);
 
-    // Look for email input field (Clerk renders this)
-    const emailInput = page.locator(
-      'input[name="identifier"], input[type="email"], input[autocomplete="email"]'
-    );
-    const hasEmailInput = await emailInput
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false);
-
-    if (!hasEmailInput) {
-      // Clerk may have rendered differently or user is already signed in
-      const url = page.url();
-      if (url.includes('/app') || url.includes('/dashboard')) {
-        // Already authenticated — verify dashboard loaded
-        await waitForHydration(page);
-        const main = page.locator('main').first();
-        await expect(
-          main,
-          'Dashboard main content should be visible'
-        ).toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-        return;
-      }
-      // If neither sign-in form nor dashboard, something is wrong
+    if (result === 'verification-required') {
+      test.skip(
+        true,
+        'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
+      );
+      return;
+    }
+    if (result === 'signin-form-unavailable') {
       test.skip(true, 'Clerk sign-in form not available');
       return;
     }
 
-    // Fill in credentials
-    await emailInput.first().fill(email);
-
-    // Submit email
-    const continueButton = page.locator(
-      'button[type="submit"], button:has-text("Continue")'
-    );
-    await continueButton.first().click();
-
-    // Wait for password field
-    const passwordInput = page.locator(
-      'input[name="password"], input[type="password"]'
-    );
-    await expect(passwordInput.first()).toBeVisible({ timeout: 10_000 });
-
-    await passwordInput.first().fill(password);
-
-    // Submit password
-    await continueButton.first().click();
-
-    // Wait for redirect to dashboard
-    await page.waitForURL(url => url.pathname.includes('/app'), {
-      timeout: 30_000,
-    });
+    expect(result).toBe('authenticated');
 
     await waitForHydration(page);
 
-    // Verify dashboard has real content (not empty state or error)
     const main = page.locator('main').first();
     await expect(main, 'Dashboard should be visible after sign-in').toBeVisible(
       {
@@ -145,57 +226,45 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       'Dashboard should have real content (not empty)'
     ).toBeGreaterThan(30);
 
-    // Verify no error page
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
   });
 
   test('dashboard tab navigation works', async ({ page }) => {
-    const { email, password } = getProdCredentials();
+    const credentials = getProdCredentials();
 
-    // Navigate directly to dashboard — if already authenticated this will work
-    await page.goto('/app/dashboard/profile', {
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
 
-    // If redirected to sign-in, sign in first
-    if (page.url().includes('/signin') || page.url().includes('/sign-in')) {
-      const emailInput = page.locator(
-        'input[name="identifier"], input[type="email"]'
-      );
-      const hasForm = await emailInput
-        .first()
-        .isVisible({ timeout: 15_000 })
-        .catch(() => false);
+    if (
+      page.url().includes(APP_ROUTES.SIGNIN) ||
+      page.url().includes('/sign-in')
+    ) {
+      await waitForClerk(page);
 
-      if (!hasForm) {
+      const result = await signInViaRenderedFlow(page, credentials);
+
+      if (result === 'verification-required') {
+        test.skip(
+          true,
+          'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
+        );
+        return;
+      }
+      if (result === 'signin-form-unavailable') {
         test.skip(true, 'Sign-in form not available for tab navigation test');
         return;
       }
 
-      await emailInput.first().fill(email);
-      await page
-        .locator('button[type="submit"], button:has-text("Continue")')
-        .first()
-        .click();
-      const passwordInput = page.locator('input[type="password"]');
-      await expect(passwordInput.first()).toBeVisible({ timeout: 10_000 });
-      await passwordInput.first().fill(password);
-      await page
-        .locator('button[type="submit"], button:has-text("Continue")')
-        .first()
-        .click();
-      await page.waitForURL(url => url.pathname.includes('/app'), {
-        timeout: 30_000,
-      });
+      expect(result).toBe('authenticated');
     }
 
     await waitForHydration(page);
 
-    // Navigate between 2 key tabs to verify routing works
-    const tabs = ['/app/dashboard/audience', '/app/dashboard/releases'];
+    const tabs = [APP_ROUTES.DASHBOARD_AUDIENCE, APP_ROUTES.DASHBOARD_RELEASES];
 
     for (const tabPath of tabs) {
       await page.goto(tabPath, {
@@ -206,11 +275,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       await waitForHydration(page);
 
       const currentUrl = page.url();
-      // Verify we didn't get redirected to an error page
-      expect(currentUrl).not.toContain('/signin');
+      expect(currentUrl).not.toContain(APP_ROUTES.SIGNIN);
       expect(currentUrl).not.toContain('/sign-in');
 
-      // Verify main content area exists
       const main = page.locator('main').first();
       const mainVisible = await main
         .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })

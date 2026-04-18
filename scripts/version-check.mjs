@@ -5,10 +5,10 @@
  * Validates:
  * - CalVer aligns with current UTC calendar month/year
  * - All package versions match version.json
- * - CHANGELOG has [Unreleased] and latest release equals current version
+ * - CHANGELOG latest release equals current version
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,9 +42,13 @@ if (!parsed) {
 
 for (const rel of [
   'package.json',
-  'apps/web/package.json',
-  'apps/should-i-make/package.json',
-  'packages/ui/package.json',
+  ...['apps', 'packages']
+    .flatMap(scope =>
+      readdirSync(join(ROOT, scope), { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => `${scope}/${entry.name}/package.json`)
+    )
+    .sort(),
 ]) {
   const version = JSON.parse(readFileSync(join(ROOT, rel), 'utf-8')).version;
   if (version !== currentVersion) {
@@ -54,10 +58,14 @@ for (const rel of [
   }
 }
 
-const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
-if (!/## \[Unreleased\]/.test(changelog)) {
-  errors.push('CHANGELOG.md is missing "## [Unreleased]".');
+const versionFile = readFileSync(join(ROOT, 'VERSION'), 'utf-8').trim();
+if (versionFile !== currentVersion) {
+  errors.push(
+    `VERSION (${versionFile}) does not match version.json (${currentVersion}).`
+  );
 }
+
+const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
 
 const releaseMatches = [
   ...changelog.matchAll(

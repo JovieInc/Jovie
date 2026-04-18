@@ -1,19 +1,26 @@
 import { toISOStringOrFallback } from '@/lib/utils/date';
+import {
+  derivePreviewState,
+  getProviderConfidence,
+  summarizeProviderConfidence,
+} from './audio-qa';
 import type { ProviderKey, TrackViewModel } from './types';
-import { buildSmartLinkPath } from './utils';
+import { buildTrackDeepLinkPath } from './utils';
 
 export interface ProviderLinkInput {
   providerId: string;
   sourceType?: string | null;
   updatedAt?: Date | string | null;
   url: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function mapProviderLinksToViewModel(
   providerLinks: ProviderLinkInput[],
   providerLabels: Record<ProviderKey, string>,
   profileHandle: string,
-  slug: string
+  releaseSlug: string,
+  trackSlug: string
 ): TrackViewModel['providers'] {
   return Object.entries(providerLabels)
     .map(([key, label]) => {
@@ -30,7 +37,15 @@ function mapProviderLinksToViewModel(
         url,
         source,
         updatedAt: toISOStringOrFallback(match?.updatedAt),
-        path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
+        confidence: getProviderConfidence(match),
+        path: url
+          ? buildTrackDeepLinkPath(
+              profileHandle,
+              releaseSlug,
+              trackSlug,
+              providerKey
+            )
+          : '',
         isPrimary: ['spotify', 'apple_music', 'youtube'].includes(providerKey),
       };
     })
@@ -40,6 +55,8 @@ function mapProviderLinksToViewModel(
 export function mapTrackToViewModel(params: {
   track: {
     id: string;
+    releaseTrackId?: string;
+    recordingId?: string;
     releaseId: string;
     title: string;
     slug: string;
@@ -51,19 +68,34 @@ export function mapTrackToViewModel(params: {
     previewUrl: string | null;
     audioUrl: string | null;
     audioFormat: string | null;
+    metadata?: Record<string, unknown> | null;
     providerLinks: ProviderLinkInput[];
   };
   providerLabels: Record<ProviderKey, string>;
   profileHandle: string;
+  releaseSlug: string;
 }): TrackViewModel {
-  const { track, providerLabels, profileHandle } = params;
+  const { track, providerLabels, profileHandle, releaseSlug } = params;
+  const previewState = derivePreviewState({
+    audioUrl: track.audioUrl,
+    previewUrl: track.previewUrl,
+    metadata: track.metadata,
+    providerLinks: track.providerLinks,
+  });
 
   return {
     id: track.id,
+    releaseTrackId: track.releaseTrackId,
+    recordingId: track.recordingId,
     releaseId: track.releaseId,
+    releaseSlug,
     title: track.title,
     slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
+    smartLinkPath: buildTrackDeepLinkPath(
+      profileHandle,
+      releaseSlug,
+      track.slug
+    ),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -72,10 +104,14 @@ export function mapTrackToViewModel(params: {
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    previewSource: previewState.previewSource,
+    previewVerification: previewState.previewVerification,
+    providerConfidenceSummary: summarizeProviderConfidence(track.providerLinks),
     providers: mapProviderLinksToViewModel(
       track.providerLinks,
       providerLabels,
       profileHandle,
+      releaseSlug,
       track.slug
     ),
   };

@@ -10,7 +10,7 @@ import {
 import {
   useNotificationStatusQuery,
   useUnsubscribeNotificationsMutation,
-} from '@/lib/queries';
+} from '@/lib/queries/useNotificationStatusQuery';
 import type {
   NotificationChannel,
   NotificationContactValues,
@@ -29,6 +29,7 @@ type ControllerParams = {
   artistId: string;
   artistHandle: string;
   notificationsEnabled: boolean;
+  smsEnabled?: boolean;
   onError: (message: string) => void;
   onSuccess: (message: string) => void;
 };
@@ -128,6 +129,7 @@ export function useProfileNotificationsController({
   artistHandle,
   artistId,
   notificationsEnabled,
+  smsEnabled = false,
   onError,
   onSuccess,
 }: ControllerParams) {
@@ -140,8 +142,9 @@ export function useProfileNotificationsController({
       if (!notificationsEnabled) return 'idle';
       return hasInitialStoredContacts ? 'checking' : 'done';
     });
-  // Default channel based on stored contacts: if user has email but not sms, default to email
+  // Default channel based on stored contacts and SMS availability
   const [channel, setChannel] = useState<NotificationChannel>(() => {
+    if (!smsEnabled) return 'email';
     if (storedContacts?.email && !storedContacts?.sms) return 'email';
     return 'sms';
   });
@@ -459,6 +462,7 @@ export function useProfileNotificationsController({
     openSubscription,
     registerInputFocus,
     setChannel,
+    smsEnabled,
     setState,
     setSubscribedChannels,
     setSubscriptionDetails,

@@ -4,6 +4,8 @@ import { env } from '@/lib/env-server';
 interface SpotifyPreSaveState {
   releaseId: string;
   trackId: string | null;
+  /** Release-track ID (new model) — replaces trackId for new pre-saves */
+  releaseTrackId?: string | null;
   username: string;
   slug: string;
   ts: number;

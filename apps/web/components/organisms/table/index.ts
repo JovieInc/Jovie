@@ -48,6 +48,8 @@ export type { AudienceCreatedAtCellProps } from './atoms/AudienceCreatedAtCell';
 export { AudienceCreatedAtCell } from './atoms/AudienceCreatedAtCell';
 export type { AudienceDeviceCellProps } from './atoms/AudienceDeviceCell';
 export { AudienceDeviceCell } from './atoms/AudienceDeviceCell';
+export type { AudienceEngagementCellProps } from './atoms/AudienceEngagementCell';
+export { AudienceEngagementCell } from './atoms/AudienceEngagementCell';
 export type { AudienceIdentificationIndicatorProps } from './atoms/AudienceIdentificationIndicator';
 export { AudienceIdentificationIndicator } from './atoms/AudienceIdentificationIndicator';
 export type { AudienceIntentScoreCellProps } from './atoms/AudienceIntentScoreCell';
@@ -212,11 +214,17 @@ export { useTableState } from './hooks/useTableState';
 // Utilities & Hooks
 // =============================================================================
 
+export { createMultiFieldFilterFn } from './utils/createMultiFieldFilterFn';
 export type {
   SelectionColumnOptions,
   SelectionColumnRenderers,
 } from './utils/createSelectionColumnFactory';
 export { createSelectionColumnFactory } from './utils/createSelectionColumnFactory';
+export {
+  isFormElement,
+  resolveTableNavAction,
+  type TableNavAction,
+} from './utils/tableKeyMap';
 export { useTableGrouping } from './utils/useTableGrouping';
 
 // =============================================================================

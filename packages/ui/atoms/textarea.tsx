@@ -7,11 +7,11 @@ import { cn } from '../lib/utils';
 
 const textareaVariants = cva(
   [
-    'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3 py-2',
-    'text-[13px] ring-offset-background',
-    'placeholder:text-tertiary-token',
+    'flex w-full rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2',
+    'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary)',
+    'placeholder:text-(--linear-text-tertiary)',
     'hover:border-(--linear-border-default)',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus',
+    'focus-visible:outline-none focus-visible:border-(--color-accent)',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-all duration-normal ease-interactive',
     'min-h-[80px]',
@@ -21,9 +21,9 @@ const textareaVariants = cva(
       variant: {
         default: '',
         error:
-          'border-destructive hover:border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
+          'border-(--linear-error) hover:border-(--linear-error) focus-visible:border-(--linear-error)',
         success:
-          'border-success hover:border-success focus-visible:ring-success focus-visible:border-success',
+          'border-success hover:border-success focus-visible:border-success',
       },
       textareaSize: {
         sm: 'px-2 py-1.5 text-xs min-h-[60px]',

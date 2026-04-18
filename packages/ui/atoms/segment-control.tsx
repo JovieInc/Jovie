@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const segmentControlVariants = cva(
-  'inline-flex items-center rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5 shadow-none',
+  'inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 shadow-none',
   {
     variants: {
       variant: {
@@ -17,7 +17,7 @@ const segmentControlVariants = cva(
       size: {
         sm: 'p-0.5',
         md: 'p-1',
-        lg: 'p-1.5',
+        lg: 'p-1',
       },
     },
     defaultVariants: {
@@ -29,20 +29,19 @@ const segmentControlVariants = cva(
 
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-[calc(var(--linear-app-control-radius)-1px)] font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
-    'border border-transparent',
+    'relative rounded-full border border-transparent bg-transparent font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
-    'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-secondary)',
+    'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token',
     // Active state
-    'data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary) data-[state=active]:shadow-[0_1px_0_rgba(255,255,255,0.02)]',
+    'data-[state=active]:border-subtle data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token data-[state=active]:shadow-none',
   ],
   {
     variants: {
       size: {
-        sm: 'h-[26px] px-2 text-[12px]',
-        md: 'h-[30px] px-2.5 text-[13px]',
+        sm: 'h-7 px-2.5 text-[12px]',
+        md: 'h-[28px] px-2.5 text-[13px]',
         lg: 'h-9 px-4 text-sm',
       },
     },
@@ -149,11 +148,20 @@ export function SegmentControl<T extends string = string>({
           </Tabs.Trigger>
         ))}
       </Tabs.List>
+      {options.map(option => (
+        <Tabs.Content
+          key={`${option.value}-panel`}
+          value={option.value}
+          forceMount
+          className='hidden'
+          aria-hidden='true'
+        />
+      ))}
     </Tabs.Root>
   );
 }
 
-// Also export Tabs primitives for advanced use cases
-export { Tabs };
 export * as TabsRoot from '@radix-ui/react-tabs';
 export * as TabsPrimitive from '@radix-ui/react-tabs';
+// Also export Tabs primitives for advanced use cases
+export { Tabs };

@@ -96,7 +96,7 @@ export function ProfileMockup({
   return (
     <figure
       aria-label='Profile preview showing adaptive CTA behavior'
-      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-[inset_0_0_0_1px_var(--linear-panel-ring)] font-sans'
+      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-panel-ring font-sans'
     >
       <style>{`
         @keyframes ctaFill {
@@ -229,7 +229,7 @@ export function ProfileMockup({
         <div className='mt-2 text-center text-[11px] text-tertiary-token transition-opacity duration-500'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
-            : 'New visitor · email / sms capture'}
+            : 'New visitor · email / sms notification opt-in'}
         </div>
       </div>
     </figure>

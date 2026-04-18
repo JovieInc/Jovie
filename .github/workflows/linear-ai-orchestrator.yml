@@ -228,13 +228,10 @@ jobs:
             RESPONSE=$(curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
-              -d "$(cat <<JSON
-          {
-            \"query\": \"query IssueForPlanGate($issueId: String!) { issue(id: $issueId) { identifier title state { name type } comments(first: 50) { nodes { body user { name displayName } } } } }\",
-            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
-          }
-          JSON
-          )")
+              -d "$(jq -cn --arg issueId "$ISSUE_ID" '{
+                query: "query IssueForPlanGate($issueId: String!) { issue(id: $issueId) { identifier title state { name type } comments(first: 50) { nodes { body user { name displayName } } } } }",
+                variables: { issueId: $issueId }
+              }')")
 
             HAS_ERRORS=$(echo "$RESPONSE" | jq -r '.errors != null')
             if [[ "$HAS_ERRORS" == "true" ]]; then
@@ -345,7 +342,7 @@ jobs:
           git checkout -b "$BRANCH_NAME"
 
       - name: Run Claude Code for implementation
-        uses: anthropics/claude-code-action@cd77b50d2b0808657f8e6774085c8bf54484351c # v1
+        uses: anthropics/claude-code-action@39431830520a7ae6c0c572f11a7707e7043325e3 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -442,28 +439,25 @@ jobs:
             curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
-              -d "$(cat <<JSON
-            {
-              \"query\": \"mutation AssignIssue($issueId: String!, $assigneeId: String!) { issueUpdate(id: $issueId, input: { assigneeId: $assigneeId }) { success } }\",
-              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"assigneeId\": \"${LINEAR_CODEX_ASSIGNEE_ID}\" }
-            }
-            JSON
-            )" > /dev/null
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg assigneeId "$LINEAR_CODEX_ASSIGNEE_ID" \
+                '{
+                  query: "mutation AssignIssue($issueId: String!, $assigneeId: String!) { issueUpdate(id: $issueId, input: { assigneeId: $assigneeId }) { success } }",
+                  variables: { issueId: $issueId, assigneeId: $assigneeId }
+                }')" > /dev/null
           fi
 
           curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(cat <<JSON
-          {
-            \"query\": \"mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
-            \"variables\": {
-              \"issueId\": \"${ISSUE_ID}\",
-              \"body\": \"Codex automation picked up ${ISSUE_IDENTIFIER}. Working branch: ${BRANCH_NAME}. PR will be auto-opened after push.\"
-            }
-          }
-          JSON
-          )" > /dev/null
+            -d "$(jq -cn \
+              --arg issueId "$ISSUE_ID" \
+              --arg body "Codex automation picked up ${ISSUE_IDENTIFIER}. Working branch: ${BRANCH_NAME}. PR will be auto-opened after push." \
+              '{
+                query: "mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
+                variables: { issueId: $issueId, body: $body }
+              }')" > /dev/null
 
   sync_linear_in_review:
     name: Sync Linear to In Review
@@ -491,13 +485,10 @@ jobs:
           ISSUE_DATA=$(curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(cat <<JSON
-          {
-            \"query\": \"query IssueStateTargets($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }\",
-            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
-          }
-          JSON
-          )")
+            -d "$(jq -cn --arg issueId "$ISSUE_ID" '{
+              query: "query IssueStateTargets($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }",
+              variables: { issueId: $issueId }
+            }')")
 
           REVIEW_STATE_ID=$(echo "$ISSUE_DATA" | jq -r '
             .data.issue.team.states.nodes
@@ -509,13 +500,13 @@ jobs:
             curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
-              -d "$(cat <<JSON
-            {
-              \"query\": \"mutation SetIssueReview($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }\",
-              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"stateId\": \"${REVIEW_STATE_ID}\" }
-            }
-            JSON
-            )" > /dev/null
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg stateId "$REVIEW_STATE_ID" \
+                '{
+                  query: "mutation SetIssueReview($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
+                  variables: { issueId: $issueId, stateId: $stateId }
+                }')" > /dev/null
           fi
 
           PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url // empty')
@@ -527,13 +518,10 @@ jobs:
           curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(cat <<JSON
-          {
-            \"query\": \"mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
-            \"variables\": {
-              \"issueId\": \"${ISSUE_ID}\",
-              \"body\": \"Automated PR opened for ${ISSUE_IDENTIFIER}: ${PR_URL}\"
-            }
-          }
-          JSON
-          )" > /dev/null
+            -d "$(jq -cn \
+              --arg issueId "$ISSUE_ID" \
+              --arg body "Automated PR opened for ${ISSUE_IDENTIFIER}: ${PR_URL}" \
+              '{
+                query: "mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
+                variables: { issueId: $issueId, body: $body }
+              }')" > /dev/null

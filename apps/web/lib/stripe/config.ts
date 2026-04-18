@@ -4,11 +4,8 @@
  * This file contains the centralized mapping of Stripe price IDs to internal plan names.
  * Only used on the server side for security.
  *
- * Pricing Tiers:
- * - Free: $0 (no Stripe subscription)
- * - Founding: $9/mo (early supporter pricing, locked in for life)
- * - Pro: $39/mo or $348/yr (save 2 months)
- * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
+ * Pricing tiers and amounts are defined in lib/config/plan-prices.ts (single source of truth).
+ * Free tier has no Stripe subscription.
  */
 
 import 'server-only';
@@ -18,7 +15,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
-export type PlanType = 'free' | 'founding' | 'pro' | 'growth';
+export type PlanType = 'free' | 'pro' | 'max';
 
 // Price mapping interface
 interface PriceMapping {
@@ -34,14 +31,6 @@ interface PriceMapping {
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
     // All tiers from centralized PRICING config
-    {
-      priceId: PRICING.founding.monthly.priceId || '',
-      plan: PRICING.founding.monthly.entitlementPlan,
-      amount: PRICING.founding.monthly.amount,
-      currency: 'usd',
-      interval: PRICING.founding.monthly.interval,
-      description: PRICING.founding.monthly.label,
-    },
     {
       priceId: PRICING.pro.monthly.priceId || '',
       plan: PRICING.pro.monthly.entitlementPlan,
@@ -59,20 +48,20 @@ const buildPriceMappings = (): Record<string, PriceMapping> => {
       description: PRICING.pro.annual.label,
     },
     {
-      priceId: PRICING.growth.monthly.priceId || '',
-      plan: PRICING.growth.monthly.entitlementPlan,
-      amount: PRICING.growth.monthly.amount,
+      priceId: PRICING.max.monthly.priceId || '',
+      plan: PRICING.max.monthly.entitlementPlan,
+      amount: PRICING.max.monthly.amount,
       currency: 'usd',
-      interval: PRICING.growth.monthly.interval,
-      description: PRICING.growth.monthly.label,
+      interval: PRICING.max.monthly.interval,
+      description: PRICING.max.monthly.label,
     },
     {
-      priceId: PRICING.growth.annual.priceId || '',
-      plan: PRICING.growth.annual.entitlementPlan,
-      amount: PRICING.growth.annual.amount,
+      priceId: PRICING.max.annual.priceId || '',
+      plan: PRICING.max.annual.entitlementPlan,
+      amount: PRICING.max.annual.amount,
       currency: 'usd',
-      interval: PRICING.growth.annual.interval,
-      description: PRICING.growth.annual.label,
+      interval: PRICING.max.annual.interval,
+      description: PRICING.max.annual.label,
     },
   ];
 
@@ -118,12 +107,12 @@ export function getAvailablePricing() {
   return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
 }
 
-export function isGrowthPlanEnabled(): boolean {
-  return publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+export function isMaxPlanEnabled(): boolean {
+  return publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 }
 
-export function isGrowthPriceId(priceId: string): boolean {
-  return getPlanFromPriceId(priceId) === 'growth';
+export function isMaxPriceId(priceId: string): boolean {
+  return getPlanFromPriceId(priceId) === 'max';
 }
 
 /**
@@ -143,11 +132,7 @@ export function validateStripeConfig(): {
     missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
   }
 
-  // Founding tier is the primary paid product — must be configured
-  if (!env.STRIPE_PRICE_FOUNDING_MONTHLY) {
-    missingVars.push('STRIPE_PRICE_FOUNDING_MONTHLY');
-  }
-
+  // Pro tier is the primary paid product — must be configured
   if (!env.STRIPE_PRICE_PRO_MONTHLY) {
     missingVars.push('STRIPE_PRICE_PRO_MONTHLY');
   }

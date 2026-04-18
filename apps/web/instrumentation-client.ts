@@ -33,7 +33,15 @@ import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
  * Export the router transition capture for Next.js App Router.
  * This is used by Next.js to track client-side navigation.
  */
-export const onRouterTransitionStart = captureRouterTransitionStart;
+export function onRouterTransitionStart(
+  ...args: Parameters<typeof captureRouterTransitionStart>
+) {
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
+    return;
+  }
+
+  captureRouterTransitionStart(...args);
+}
 
 /**
  * Initialize Sentry with the appropriate SDK variant based on the current route.
@@ -46,6 +54,17 @@ export const onRouterTransitionStart = captureRouterTransitionStart;
  * the module synchronously exportable.
  */
 (async function initializeSentryClient(): Promise<void> {
+  // Skip Sentry in dev — adds bundle overhead with no benefit locally.
+  // Cast needed: Next.js narrows NODE_ENV to "production" | "test" in client instrumentation.
+  if ((process.env.NODE_ENV as string) !== 'production') {
+    return;
+  }
+
+  // CI preview health checks should not emit client monitoring traffic.
+  if (process.env.NEXT_PUBLIC_CI === 'true') {
+    return;
+  }
+
   // Skip initialization if not in a browser environment
   if (typeof window === 'undefined') {
     return;
@@ -82,7 +101,7 @@ export const onRouterTransitionStart = captureRouterTransitionStart;
   } catch (error) {
     // Silently fail Sentry initialization to avoid breaking the app
     // In production, this would be caught by the global error handler
-    if (process.env.NODE_ENV === 'development') {
+    if ((process.env.NODE_ENV as string) !== 'production') {
       console.error('[Sentry] Failed to initialize SDK:', error);
     }
   }

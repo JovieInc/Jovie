@@ -1,8 +1,14 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { type DbOrTransaction } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/musicfetch-enrichment';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { captureError } from '@/lib/error-tracking';
+import {
+  isMusicfetchInvalidServicesError,
+  MusicfetchBudgetExceededError,
+  MusicfetchRequestError,
+} from '@/lib/musicfetch/errors';
 import { logger } from '@/lib/utils/logger';
 import {
   beaconsPayloadSchema,
@@ -56,6 +62,20 @@ export function determineJobFailure(error: unknown): {
     return { message: error.message, reason: 'rate_limited' };
   }
 
+  if (
+    error instanceof MusicfetchBudgetExceededError ||
+    (error instanceof MusicfetchRequestError && error.statusCode === 429)
+  ) {
+    return { message: error.message, reason: 'rate_limited' };
+  }
+
+  if (
+    error instanceof MusicfetchRequestError &&
+    isMusicfetchInvalidServicesError(error)
+  ) {
+    return { message: error.message, reason: 'permanent' };
+  }
+
   const message =
     error instanceof Error ? error.message : 'Unknown ingestion error';
   return { message, reason: 'transient' };
@@ -65,6 +85,10 @@ export function determineJobFailure(error: unknown): {
  * Extract hostname from a job's payload URL.
  */
 function getJobHost(job: typeof ingestionJobs.$inferSelect): string | null {
+  if (job.jobType === 'musicfetch_enrichment') {
+    return 'provider:musicfetch';
+  }
+
   const payloadUrl =
     typeof job.payload === 'object' && job.payload !== null
       ? (job.payload as Record<string, unknown>).sourceUrl
@@ -93,7 +117,10 @@ async function getProcessingHostCounts(
   tx: DbOrTransaction
 ): Promise<Map<string, number>> {
   const processingJobs = await tx
-    .select({ payload: ingestionJobs.payload })
+    .select({
+      jobType: ingestionJobs.jobType,
+      payload: ingestionJobs.payload,
+    })
     .from(ingestionJobs)
     .where(eq(ingestionJobs.status, 'processing'));
 
@@ -118,6 +145,7 @@ const JOB_TYPE_TO_SCHEMA_MAP = {
   import_tiktok: tiktokPayloadSchema,
   import_twitter: twitterPayloadSchema,
   send_claim_invite: sendClaimInvitePayloadSchema,
+  musicfetch_enrichment: musicFetchEnrichmentPayloadSchema,
 } as const;
 
 /**
@@ -134,6 +162,14 @@ export function getCreatorProfileIdFromJob(
   return parsed.success ? parsed.data.creatorProfileId : null;
 }
 
+function shouldRetryJob(
+  job: Pick<typeof ingestionJobs.$inferSelect, 'attempts' | 'maxAttempts'>,
+  reason: JobFailureReason
+): boolean {
+  const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  return reason !== 'permanent' && job.attempts < maxAttempts;
+}
+
 /**
  * Handle job failure with retry logic.
  */
@@ -144,7 +180,7 @@ export async function handleIngestionJobFailure(
 ): Promise<void> {
   const { message, reason } = determineJobFailure(error);
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
+  const shouldRetry = shouldRetryJob(job, reason);
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
@@ -316,8 +352,8 @@ export async function failJob(
   options: { reason?: JobFailureReason } = {}
 ): Promise<void> {
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
   const reason = options.reason ?? 'transient';
+  const shouldRetry = shouldRetryJob(job, reason);
 
   if (shouldRetry) {
     const backoffMs = calculateBackoff(job.attempts, reason);

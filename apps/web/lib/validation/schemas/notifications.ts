@@ -104,6 +104,62 @@ export const verifyEmailOtpSchema = z.object({
 export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
 
 // =============================================================================
+// Update Subscriber Name Schema
+// =============================================================================
+
+/**
+ * Schema for updating a subscriber's name after signup.
+ * Identified by artist_id + email (no auth required — fan just subscribed).
+ */
+export const updateSubscriberNameSchema = z.object({
+  artist_id: uuidSchema,
+  email: z.string().email(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(100, 'Name is too long'),
+});
+
+export type UpdateSubscriberNameInput = z.infer<
+  typeof updateSubscriberNameSchema
+>;
+
+// =============================================================================
+// Update Subscriber Birthday Schema
+// =============================================================================
+
+/**
+ * Schema for updating a subscriber's birthday after signup.
+ * Identified by artist_id + email (no auth required — fan just subscribed).
+ * Birthday stored as YYYY-MM-DD (ISO date); legacy MM-DD also accepted.
+ */
+export const updateSubscriberBirthdaySchema = z.object({
+  artist_id: uuidSchema,
+  email: z.string().email().max(254),
+  birthday: z
+    .string()
+    .regex(
+      /^(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2})$/,
+      'Birthday must be in YYYY-MM-DD or MM-DD format'
+    )
+    .refine(
+      value => {
+        const parts = value.split('-').map(Number);
+        const mm = parts.length === 3 ? parts[1] : parts[0];
+        const dd = parts.length === 3 ? parts[2] : parts[1];
+        const maxDay = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mm];
+        return dd <= maxDay;
+      },
+      { message: 'Invalid day for the given month' }
+    ),
+});
+
+export type UpdateSubscriberBirthdayInput = z.infer<
+  typeof updateSubscriberBirthdaySchema
+>;
+
+// =============================================================================
 // Unsubscribe Schema
 // =============================================================================
 

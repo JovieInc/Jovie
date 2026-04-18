@@ -39,7 +39,7 @@ describe('generateFooterHTML', () => {
     expect(html).toContain(`utm_artist=${mockArtist.handle}`);
   });
 
-  it('returns empty string when branding is hidden', async () => {
+  it('still includes branding when legacy hidden-branding data exists', async () => {
     const artistWithHiddenBranding: Artist = {
       ...mockArtist,
       settings: { hide_branding: true },
@@ -47,7 +47,7 @@ describe('generateFooterHTML', () => {
 
     const html = await generateFooterHTML({ artist: artistWithHiddenBranding });
 
-    expect(html).toBe('');
+    expect(html).toContain('Jovie');
   });
 
   it('includes waitlist link when feature flag is enabled', async () => {

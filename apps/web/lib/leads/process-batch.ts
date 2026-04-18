@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
@@ -6,8 +6,11 @@ import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
 } from './constants';
-import { pipelineLog } from './pipeline-logger';
+import { recordLeadFunnelEvent } from './funnel-events';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { qualifyLead } from './qualify';
+
+const MAX_SCRAPE_ATTEMPTS = 3;
 
 export interface BatchResult {
   total: number;
@@ -55,7 +58,10 @@ async function processOneLead(
 ): Promise<'qualified' | 'disqualified' | 'error'> {
   try {
     const [lead] = await db
-      .select({ linktreeUrl: leads.linktreeUrl })
+      .select({
+        linktreeUrl: leads.linktreeUrl,
+        discoveryQuery: leads.discoveryQuery,
+      })
       .from(leads)
       .where(eq(leads.id, leadId))
       .limit(1);
@@ -72,6 +78,7 @@ async function processOneLead(
       .update(leads)
       .set({
         status: qualification.status,
+        sourcePlatform: qualification.sourcePlatform,
         displayName: qualification.displayName,
         bio: qualification.bio,
         avatarUrl: qualification.avatarUrl,
@@ -83,7 +90,21 @@ async function processOneLead(
         hasInstagram: qualification.hasInstagram,
         instagramHandle: qualification.instagramHandle,
         musicToolsDetected: qualification.musicToolsDetected,
+        hasTrackingPixels: qualification.hasTrackingPixels,
+        trackingPixelPlatforms: qualification.trackingPixelPlatforms,
         allLinks: qualification.allLinks,
+        signalSnapshot: {
+          verified: qualification.isLinktreeVerified,
+          hasPaidTier: qualification.hasPaidTier,
+          hasSpotifyLink: qualification.hasSpotifyLink,
+          hasInstagram: qualification.hasInstagram,
+          musicToolsDetected: qualification.musicToolsDetected,
+          allLinks: qualification.allLinks,
+          hasTrackingPixels: qualification.hasTrackingPixels,
+          trackingPixelPlatforms: qualification.trackingPixelPlatforms,
+          discoveryQuery: lead.discoveryQuery,
+          sourcePlatform: qualification.sourcePlatform,
+        },
         fitScore: qualification.fitScore,
         fitScoreBreakdown: qualification.fitScoreBreakdown,
         disqualificationReason: qualification.disqualificationReason,
@@ -95,6 +116,22 @@ async function processOneLead(
       })
       .where(eq(leads.id, leadId));
 
+    await recordLeadFunnelEvent(
+      {
+        leadId,
+        eventType:
+          qualification.status === 'qualified' ? 'qualified' : 'disqualified',
+        metadata: {
+          disqualificationReason: qualification.disqualificationReason,
+          fitScore: qualification.fitScore,
+          hasTrackingPixels: qualification.hasTrackingPixels,
+          trackingPixelPlatforms: qualification.trackingPixelPlatforms,
+          musicToolsDetected: qualification.musicToolsDetected,
+        },
+      },
+      { idempotent: true }
+    );
+
     return qualification.status;
   } catch (error) {
     pipelineLog('qualify', 'Lead qualification failed', {
@@ -105,6 +142,50 @@ async function processOneLead(
       route: 'leads/process-batch',
       contextData: { leadId },
     });
+
+    // Increment scrape attempts and auto-disqualify after MAX_SCRAPE_ATTEMPTS
+    try {
+      const [updated] = await db
+        .update(leads)
+        .set({
+          scrapeAttempts: drizzleSql`${leads.scrapeAttempts} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, leadId))
+        .returning({ scrapeAttempts: leads.scrapeAttempts });
+
+      if (updated && updated.scrapeAttempts >= MAX_SCRAPE_ATTEMPTS) {
+        await db
+          .update(leads)
+          .set({
+            status: 'disqualified',
+            disqualificationReason: 'scrape_failed',
+            disqualifiedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(leads.id, leadId));
+        await recordLeadFunnelEvent(
+          {
+            leadId,
+            eventType: 'disqualified',
+            metadata: {
+              disqualificationReason: 'scrape_failed',
+            },
+          },
+          { idempotent: true }
+        );
+        pipelineWarn('qualify', 'Lead disqualified after max scrape attempts', {
+          leadId,
+          attempts: updated.scrapeAttempts,
+        });
+      }
+    } catch (updateError) {
+      await captureError('Failed to update scrape attempts', updateError, {
+        route: 'leads/process-batch',
+        contextData: { leadId },
+      });
+    }
+
     return 'error';
   }
 }

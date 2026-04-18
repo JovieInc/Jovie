@@ -43,7 +43,7 @@ export async function approveWaitlistEntryInTx(
 
   if (!entry) return { outcome: 'not_found' };
 
-  if (entry.status !== 'new') {
+  if (entry.status !== 'new' && entry.status !== 'invited') {
     return { outcome: 'already_processed', status: entry.status };
   }
 
@@ -99,7 +99,8 @@ export async function approveWaitlistEntryInTx(
       isClaimed: true,
       isPublic: true,
       claimedAt: now,
-      onboardingCompletedAt: now,
+      // onboardingCompletedAt intentionally NOT set — user must complete onboarding
+      // to choose their handle, upload avatar, connect Spotify, etc.
       updatedAt: now,
     })
     .where(eq(creatorProfiles.id, profile.id));
@@ -111,7 +112,11 @@ export async function approveWaitlistEntryInTx(
 
   await tx
     .update(users)
-    .set({ userStatus: 'active', updatedAt: now })
+    .set({
+      userStatus: 'active',
+      activeProfileId: profile.id,
+      updatedAt: now,
+    })
     .where(eq(users.id, user.id));
 
   return {
@@ -182,7 +187,11 @@ export async function disapproveWaitlistEntryInTx(
   if (user) {
     await tx
       .update(users)
-      .set({ userStatus: 'waitlist_pending', updatedAt: now })
+      .set({
+        userStatus: 'waitlist_pending',
+        activeProfileId: profile ? null : undefined,
+        updatedAt: now,
+      })
       .where(eq(users.id, user.id));
   }
 

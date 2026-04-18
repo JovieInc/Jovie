@@ -14,6 +14,7 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
 
 interface ReleaseFieldsProps {
   readonly releaseDate: string | undefined;
+  readonly revealDate?: string;
   readonly releaseType?: string;
   readonly totalTracks?: number;
   readonly platformCount?: number;
@@ -21,6 +22,7 @@ interface ReleaseFieldsProps {
 
 export function ReleaseFields({
   releaseDate,
+  revealDate,
   releaseType,
   totalTracks,
   platformCount,
@@ -33,9 +35,7 @@ export function ReleaseFields({
     parts.push(`${totalTracks} ${totalTracks === 1 ? 'track' : 'tracks'}`);
   }
   if (platformCount != null && platformCount > 0) {
-    parts.push(
-      `${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}`
-    );
+    parts.push(`${platformCount} ${platformCount === 1 ? 'DSP' : 'DSPs'}`);
   }
 
   return (
@@ -43,15 +43,21 @@ export function ReleaseFields({
       <p className='text-[11.5px] leading-[15px] text-secondary-token'>
         {releaseDate ? (
           <>
-            <span className='font-[500] text-tertiary-token'>Released</span>{' '}
+            <span className='font-[500] text-quaternary-token'>Released</span>{' '}
             {formatReleaseDate(releaseDate)}
           </>
         ) : (
           <span className='text-tertiary-token'>No release date</span>
         )}
       </p>
+      {revealDate && (
+        <p className='text-[10.5px] leading-[14px] text-quaternary-token'>
+          <span className='font-[500]'>Reveals</span>{' '}
+          {formatReleaseDate(revealDate)}
+        </p>
+      )}
       {parts.length > 0 && (
-        <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-tertiary-token'>
+        <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-quaternary-token'>
           {parts.join(' · ')}
         </p>
       )}

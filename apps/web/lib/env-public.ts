@@ -1,3 +1,13 @@
+function getRuntimeHtmlDatasetValue(
+  key: 'clerkMock' | 'clerkProxyDisabled'
+): string | undefined {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+
+  return document.documentElement.dataset[key] || undefined;
+}
+
 /**
  * Public environment variables with lazy access.
  *
@@ -14,7 +24,19 @@ export const publicEnv = {
     return process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined;
   },
   get NEXT_PUBLIC_CLERK_MOCK() {
-    return process.env.NEXT_PUBLIC_CLERK_MOCK || undefined;
+    return (
+      process.env.NEXT_PUBLIC_CLERK_MOCK ||
+      getRuntimeHtmlDatasetValue('clerkMock')
+    );
+  },
+  get NEXT_PUBLIC_CLERK_PROXY_URL() {
+    return process.env.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
+  },
+  get NEXT_PUBLIC_CLERK_PROXY_DISABLED() {
+    return (
+      process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED ||
+      getRuntimeHtmlDatasetValue('clerkProxyDisabled')
+    );
   },
   get NEXT_PUBLIC_APP_URL() {
     // Single domain architecture: app routes are at jov.ie/app/*
@@ -49,6 +71,15 @@ export const publicEnv = {
   get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
     return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN || undefined;
   },
+  get NEXT_PUBLIC_FEATURE_MAX_PLAN() {
+    return process.env.NEXT_PUBLIC_FEATURE_MAX_PLAN || undefined;
+  },
+  get NEXT_PUBLIC_E2E_MODE() {
+    return process.env.NEXT_PUBLIC_E2E_MODE || undefined;
+  },
+  get NEXT_PUBLIC_DEMO_RECORDING() {
+    return process.env.NEXT_PUBLIC_DEMO_RECORDING || undefined;
+  },
   get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
     return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
   },
@@ -74,5 +105,9 @@ export const publicEnv = {
   },
   get NEXT_PUBLIC_SENTRY_CSP_REPORT_URI() {
     return process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI || undefined;
+  },
+  // Instantly.ai / Leadsy tracking pixel
+  get NEXT_PUBLIC_INSTANTLY_PIXEL_ID() {
+    return process.env.NEXT_PUBLIC_INSTANTLY_PIXEL_ID || undefined;
   },
 } as const;

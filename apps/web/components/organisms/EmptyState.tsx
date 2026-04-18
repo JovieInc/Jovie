@@ -23,6 +23,7 @@ type PrimaryAction =
       rel?: string;
       variant?: ButtonProps['variant'];
       ariaLabel?: string;
+      prefetch?: boolean;
       /** Keyboard shortcut to display (e.g., "N then I" or "Ctrl+N") */
       shortcut?: string;
     };
@@ -34,6 +35,7 @@ type SecondaryAction =
       target?: React.HTMLAttributeAnchorTarget;
       rel?: string;
       ariaLabel?: string;
+      prefetch?: boolean;
     }
   | {
       label: string;
@@ -65,7 +67,7 @@ const variantStyles: Record<
   default: {
     iconWrapper: 'text-tertiary-token',
     heading: 'text-secondary-token',
-    description: 'text-tertiary-token',
+    description: 'text-secondary-token',
   },
   search: {
     iconWrapper: 'text-sky-600 dark:text-sky-300',
@@ -138,6 +140,7 @@ export function EmptyState({
         <Button asChild variant={action.variant ?? 'primary'} size={buttonSize}>
           <Link
             href={action.href}
+            prefetch={action.prefetch ?? false}
             target={action.target}
             rel={action.rel}
             aria-label={action.ariaLabel ?? action.label}
@@ -168,6 +171,7 @@ export function EmptyState({
         <Button asChild variant='outline' size={buttonSize}>
           <Link
             href={secondaryAction.href}
+            prefetch={secondaryAction.prefetch ?? false}
             target={secondaryAction.target}
             rel={secondaryAction.rel}
             aria-label={secondaryAction.ariaLabel ?? secondaryAction.label}
@@ -196,14 +200,14 @@ export function EmptyState({
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
       className={cn(
-        'flex flex-1 flex-col items-center justify-center px-4 py-12 text-center',
+        'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
         className
       )}
     >
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-surface-1/30',
+            'mb-3 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1',
             styles.iconWrapper
           )}
           aria-hidden='true'

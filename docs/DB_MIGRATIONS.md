@@ -18,10 +18,10 @@ This repo uses **Drizzle Kit** for schema migrations against **Neon Postgres**.
 
 ## Commands (canonical)
 
-From `apps/web/package.json`:
+Run these commands from the repo root:
 
 - Generate: `pnpm --filter=@jovie/web run drizzle:generate`
-- Migrate (local via Doppler): `pnpm --filter=@jovie/web run drizzle:migrate`
+- Migrate (local via Doppler): `pnpm run db:web:migrate`
 - Validate migration invariants: `pnpm --filter=@jovie/web run migration:validate`
 - Enforce linear history policy: `pnpm --filter=@jovie/web run migration:guard`
 - Check drift: `pnpm --filter=@jovie/web run drizzle:check`

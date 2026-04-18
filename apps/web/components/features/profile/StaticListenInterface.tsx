@@ -14,16 +14,17 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
+import type { ProfileRenderMode } from './contracts';
 
 interface StaticListenInterfaceProps {
   readonly artist: Artist;
   readonly handle: string;
   readonly dspsOverride?: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }
 
 /**
@@ -39,11 +40,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   handle,
   dspsOverride,
   enableDynamicEngagement = false,
+  renderMode = 'interactive',
 }: StaticListenInterfaceProps) {
-  const enableDevicePriority = useFeatureGate(
-    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-    false
-  );
+  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   const dsps = useMemo(() => {
     const countryCode =
@@ -78,6 +77,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   // No sanitization needed - this removes the ~70KB isomorphic-dompurify dependency.
 
   const handleDSPClick = async (dsp: AvailableDSP) => {
+    if (renderMode !== 'interactive') {
+      return;
+    }
+
     if (isLoading) return;
 
     setIsLoading(true);
@@ -145,12 +148,14 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
     }
   };
 
+  const isPreview = renderMode === 'preview';
+
   return (
     <div className='w-full max-w-sm'>
       {/* DSP Buttons */}
       <div className='space-y-3'>
         {availableDSPs.length === 0 ? (
-          <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm text-center'>
+          <div className='rounded-2xl border border-subtle bg-surface-1 p-5 shadow-sm text-center'>
             <p className='text-sm text-secondary-token'>
               Streaming links aren&apos;t available for this profile yet.
             </p>
@@ -164,10 +169,18 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             return (
               <SmartLinkProviderButton
                 key={dsp.key}
-                onClick={() => handleDSPClick(dsp)}
+                onClick={() => {
+                  void handleDSPClick(dsp);
+                }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 iconPath={logoConfig?.iconPath}
-                className={isSelected || isLoading ? 'opacity-60' : undefined}
+                className={
+                  isPreview
+                    ? 'pointer-events-none opacity-88'
+                    : isSelected || isLoading
+                      ? 'opacity-60'
+                      : undefined
+                }
               />
             );
           })

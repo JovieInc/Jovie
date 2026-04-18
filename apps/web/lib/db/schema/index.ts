@@ -8,21 +8,34 @@
 // Admin
 export {
   type AdminAuditLog,
+  type AdminSystemSettings,
   adminAuditLog,
+  adminSystemSettings,
   type CampaignSettings,
   campaignSettings,
   insertAdminAuditLogSchema,
+  insertAdminSystemSettingsSchema,
   insertCampaignSettingsSchema,
   type NewAdminAuditLog,
+  type NewAdminSystemSettings,
   type NewCampaignSettings,
   selectAdminAuditLogSchema,
+  selectAdminSystemSettingsSchema,
   selectCampaignSettingsSchema,
 } from './admin';
 
-// Analytics (Clicks, Audience, Tips)
+// Analytics (Clicks, Audience, Tips, Blocks)
 export {
+  type AudienceAction,
+  type AudienceBlock,
   type AudienceMember,
+  type AudienceSourceGroup,
+  type AudienceSourceLink,
+  audienceActions,
+  audienceBlocks,
   audienceMembers,
+  audienceSourceGroups,
+  audienceSourceLinks,
   type ClickEvent,
   clickEvents,
   type DailyProfileView,
@@ -30,16 +43,22 @@ export {
   FAN_NOTIFICATION_CONTENT_TYPES,
   type FanNotificationContentType,
   type FanNotificationPreferences,
+  insertAudienceBlockSchema,
   insertClickEventSchema,
   insertNotificationSubscriptionSchema,
   insertTipSchema,
+  type NewAudienceAction,
+  type NewAudienceBlock,
   type NewAudienceMember,
+  type NewAudienceSourceGroup,
+  type NewAudienceSourceLink,
   type NewClickEvent,
   type NewDailyProfileView,
   type NewNotificationSubscription,
   type NewTip,
   type NotificationSubscription,
   notificationSubscriptions,
+  selectAudienceBlockSchema,
   selectClickEventSchema,
   selectNotificationSubscriptionSchema,
   selectTipSchema,
@@ -55,7 +74,6 @@ export {
   type NewIngestAuditLog,
   selectIngestAuditLogSchema,
 } from './audit';
-
 // Auth & Users
 export {
   insertUserSchema,
@@ -67,7 +85,6 @@ export {
   userSettings,
   users,
 } from './auth';
-
 // Billing (Stripe, Audit)
 export {
   type BillingAuditLog,
@@ -81,7 +98,6 @@ export {
   selectStripeWebhookEventSchema,
   stripeWebhookEvents,
 } from './billing';
-
 // Chat (Conversations, Messages, Audit)
 export {
   type ChatAuditLog,
@@ -100,8 +116,7 @@ export {
   selectChatConversationSchema,
   selectChatMessageSchema,
 } from './chat';
-
-// Content (Providers, Releases, Tracks)
+// Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
   type ArtistRole,
@@ -109,25 +124,35 @@ export {
   artists,
   type ContentSlugRedirect,
   contentSlugRedirects,
+  type DiscogRecording,
   type DiscogRelease,
+  type DiscogReleaseTrack,
   type DiscogTrack,
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
   insertArtistSchema,
   insertContentSlugRedirectSchema,
+  insertDiscogRecordingSchema,
   insertDiscogReleaseSchema,
+  insertDiscogReleaseTrackSchema,
   insertDiscogTrackSchema,
   insertProviderLinkSchema,
   insertProviderSchema,
+  insertRecordingArtistSchema,
   insertReleaseArtistSchema,
   insertSmartLinkTargetSchema,
   insertTrackArtistSchema,
   type NewArtist,
   type NewContentSlugRedirect,
+  type NewDiscogRecording,
   type NewDiscogRelease,
+  type NewDiscogReleaseTrack,
   type NewDiscogTrack,
   type NewProvider,
   type NewProviderLink,
+  type NewRecordingArtist,
   type NewReleaseArtist,
   type NewSmartLinkTarget,
   type NewTrackArtist,
@@ -135,15 +160,20 @@ export {
   type ProviderLink,
   providerLinks,
   providers,
+  type RecordingArtist,
   type ReleaseArtist,
+  recordingArtists,
   releaseArtists,
   type SmartLinkTarget,
   selectArtistSchema,
   selectContentSlugRedirectSchema,
+  selectDiscogRecordingSchema,
   selectDiscogReleaseSchema,
+  selectDiscogReleaseTrackSchema,
   selectDiscogTrackSchema,
   selectProviderLinkSchema,
   selectProviderSchema,
+  selectRecordingArtistSchema,
   selectReleaseArtistSchema,
   selectSmartLinkTargetSchema,
   selectTrackArtistSchema,
@@ -151,7 +181,6 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
-
 // DSP Bio Sync (Bio update pushes to DSPs)
 export {
   type DspBioSyncMetadata,
@@ -161,40 +190,41 @@ export {
   type NewDspBioSyncRequest,
   selectDspBioSyncRequestSchema,
 } from './dsp-bio-sync';
-
+// DSP Catalog Scan (Discography mismatch detection)
+export {
+  type DspCatalogMismatch,
+  type DspCatalogScan,
+  dspCatalogMismatches,
+  dspCatalogScans,
+  insertDspCatalogMismatchSchema,
+  insertDspCatalogScanSchema,
+  type NewDspCatalogMismatch,
+  type NewDspCatalogScan,
+  selectDspCatalogMismatchSchema,
+  selectDspCatalogScanSchema,
+} from './dsp-catalog-scan';
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export {
-  type DspArtistEnrichment,
   type DspArtistMatch,
   type DspExternalUrls,
   type DspImageUrls,
   type DspMatchConfidenceBreakdown,
-  dspArtistEnrichment,
   dspArtistMatches,
   type FanReleaseNotification,
   fanReleaseNotifications,
-  insertDspArtistEnrichmentSchema,
   insertDspArtistMatchSchema,
   insertFanReleaseNotificationSchema,
-  insertReleaseSyncStatusSchema,
   insertSocialLinkSuggestionSchema,
-  type NewDspArtistEnrichment,
   type NewDspArtistMatch,
   type NewFanReleaseNotification,
-  type NewReleaseSyncStatus,
   type NewSocialLinkSuggestion,
-  type ReleaseSyncStatus,
-  releaseSyncStatus,
   type SocialLinkSuggestion,
   type SocialSuggestionConfidenceBreakdown,
-  selectDspArtistEnrichmentSchema,
   selectDspArtistMatchSchema,
   selectFanReleaseNotificationSchema,
-  selectReleaseSyncStatusSchema,
   selectSocialLinkSuggestionSchema,
   socialLinkSuggestions,
 } from './dsp-enrichment';
-
 // Email Engagement (Opens, Clicks, Drip Campaigns)
 export {
   type CampaignEnrollment,
@@ -225,11 +255,16 @@ export {
   audienceDeviceTypeEnum,
   audienceIntentLevelEnum,
   audienceMemberTypeEnum,
+  catalogMismatchStatusEnum,
+  catalogMismatchTypeEnum,
+  catalogScanStatusEnum,
   chatMessageRoleEnum,
   claimInviteStatusEnum,
   contactChannelEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
+  creatorDistributionEventTypeEnum,
+  creatorDistributionPlatformEnum,
   creatorTypeEnum,
   currencyCodeEnum,
   deliveryStatusEnum,
@@ -237,6 +272,10 @@ export {
   dspBioSyncMethodEnum,
   dspBioSyncStatusEnum,
   dspMatchStatusEnum,
+  inboxEmailCategoryEnum,
+  inboxOutboundSentByEnum,
+  inboxThreadPriorityEnum,
+  inboxThreadStatusEnum,
   ingestionJobStatusEnum,
   ingestionSourceTypeEnum,
   ingestionStatusEnum,
@@ -245,23 +284,34 @@ export {
   insightRunStatusEnum,
   insightStatusEnum,
   insightTypeEnum,
+  leadAttributionStatusEnum,
   leadDiscoverySourceEnum,
   leadOutreachRouteEnum,
   leadOutreachStatusEnum,
+  leadRampModeEnum,
+  leadSourcePlatformEnum,
   leadStatusEnum,
   linkTypeEnum,
+  metadataSubmissionIssueStatusEnum,
+  metadataSubmissionStatusEnum,
   notificationChannelEnum,
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,
   pixelEventTypeEnum,
   pixelForwardStatusEnum,
+  playlistStatusEnum,
+  profileClaimRoleEnum,
+  profileOwnershipActionEnum,
   providerKindEnum,
   providerLinkOwnerEnum,
   referralCommissionStatusEnum,
   referralStatusEnum,
   releaseNotificationStatusEnum,
   releaseNotificationTypeEnum,
+  releaseTaskAssigneeTypeEnum,
+  releaseTaskPriorityEnum,
+  releaseTaskStatusEnum,
   scraperStrategyEnum,
   senderStatusEnum,
   socialAccountStatusEnum,
@@ -270,6 +320,8 @@ export {
   subscriptionPlanEnum,
   subscriptionStatusEnum,
   suppressionReasonEnum,
+  taskAgentStatusEnum,
+  taskAssigneeKindEnum,
   themeModeEnum,
   tipStatusEnum,
   userStatusLifecycleEnum,
@@ -285,6 +337,32 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Identity (Cross-platform artist identity links)
+export {
+  type ArtistIdentityLink,
+  artistIdentityLinks,
+  insertArtistIdentityLinkSchema,
+  type NewArtistIdentityLink,
+  selectArtistIdentityLinkSchema,
+} from './identity';
+// Inbox (Inbound emails, Threads, Outbound routing replies)
+export {
+  type EmailThread,
+  emailThreads,
+  type InboundEmail,
+  inboundEmails,
+  insertEmailThreadSchema,
+  insertInboundEmailSchema,
+  insertOutboundReplySchema,
+  type NewEmailThread,
+  type NewInboundEmail,
+  type NewOutboundReply,
+  type OutboundReply,
+  outboundReplies,
+  selectEmailThreadSchema,
+  selectInboundEmailSchema,
+  selectOutboundReplySchema,
+} from './inbox';
 // Ingestion
 export {
   type IngestionJob,
@@ -307,25 +385,55 @@ export {
   selectAiInsightSchema,
   selectInsightGenerationRunSchema,
 } from './insights';
+// Investor Portal (investors.jov.ie)
+export {
+  type InvestorLink,
+  type InvestorSettings,
+  type InvestorView,
+  insertInvestorLinkSchema,
+  insertInvestorSettingsSchema,
+  insertInvestorViewSchema,
+  investorLinks,
+  investorSettings,
+  investorStageEnum,
+  investorViews,
+  type NewInvestorLink,
+  type NewInvestorSettings,
+  type NewInvestorView,
+  selectInvestorLinkSchema,
+  selectInvestorSettingsSchema,
+  selectInvestorViewSchema,
+} from './investors';
 // Leads (Discovery Pipeline)
 export {
   type DiscoveryKeyword,
   discoveryKeywords,
   insertDiscoveryKeywordSchema,
+  insertLeadFunnelEventSchema,
   insertLeadPipelineSettingsSchema,
   insertLeadSchema,
+  insertLeadSearchResultSchema,
   type Lead,
+  type LeadFunnelEvent,
+  type LeadGuardrailThresholds,
   type LeadPipelineSettings,
+  type LeadSearchResult,
+  type LeadSignalSnapshot,
+  leadFunnelEvents,
   leadPipelineSettings,
+  leadSearchResults,
   leads,
   type NewDiscoveryKeyword,
   type NewLead,
+  type NewLeadFunnelEvent,
   type NewLeadPipelineSettings,
+  type NewLeadSearchResult,
   selectDiscoveryKeywordSchema,
+  selectLeadFunnelEventSchema,
   selectLeadPipelineSettingsSchema,
   selectLeadSchema,
+  selectLeadSearchResultSchema,
 } from './leads';
-
 // Links (Social, Wrapped, Signed)
 export {
   type DashboardIdempotencyKey,
@@ -352,7 +460,34 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
-
+export {
+  insertMetadataSubmissionArtifactSchema,
+  insertMetadataSubmissionIssueSchema,
+  insertMetadataSubmissionRequestSchema,
+  insertMetadataSubmissionSnapshotSchema,
+  insertMetadataSubmissionTargetSchema,
+  type MetadataSubmissionArtifact,
+  type MetadataSubmissionIssue,
+  type MetadataSubmissionRequest,
+  type MetadataSubmissionSnapshot,
+  type MetadataSubmissionSnapshotData,
+  type MetadataSubmissionTarget,
+  metadataSubmissionArtifacts,
+  metadataSubmissionIssues,
+  metadataSubmissionRequests,
+  metadataSubmissionSnapshots,
+  metadataSubmissionTargets,
+  type NewMetadataSubmissionArtifact,
+  type NewMetadataSubmissionIssue,
+  type NewMetadataSubmissionRequest,
+  type NewMetadataSubmissionSnapshot,
+  type NewMetadataSubmissionTarget,
+  selectMetadataSubmissionArtifactSchema,
+  selectMetadataSubmissionIssueSchema,
+  selectMetadataSubmissionRequestSchema,
+  selectMetadataSubmissionSnapshotSchema,
+  selectMetadataSubmissionTargetSchema,
+} from './metadata-submissions';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
@@ -368,50 +503,99 @@ export {
   selectCreatorPixelSchema,
   selectPixelEventSchema,
 } from './pixels';
-
+// Playlists (Jovie-curated playlists)
+export {
+  insertJoviePlaylistSchema,
+  insertJoviePlaylistTrackSchema,
+  type JoviePlaylist,
+  type JoviePlaylistTrack,
+  joviePlaylists,
+  joviePlaylistTracks,
+  type NewJoviePlaylist,
+  type NewJoviePlaylistTrack,
+  selectJoviePlaylistSchema,
+  selectJoviePlaylistTrackSchema,
+} from './playlists';
 // Pre-save campaigns (Spotify, Apple Music)
 export {
   type NewPreSaveToken,
   type PreSaveToken,
   preSaveTokens,
 } from './pre-save';
-
+// Product Update Subscribers
+export {
+  insertProductUpdateSubscriberSchema,
+  type NewProductUpdateSubscriber,
+  type ProductUpdateSubscriber,
+  productUpdateSubscribers,
+  selectProductUpdateSubscriberSchema,
+} from './product-update-subscribers';
 // Creator Profiles
 export {
   type CreatorAvatarCandidate,
   type CreatorClaimInvite,
   type CreatorContact,
+  type CreatorDistributionEvent,
+  type CreatorDistributionEventMetadata,
   type CreatorProfile,
   type CreatorProfileAttribute,
   creatorAvatarCandidates,
   creatorClaimInvites,
   creatorContacts,
+  creatorDistributionEvents,
   creatorProfileAttributes,
   creatorProfiles,
   type FitScoreBreakdown,
   insertCreatorAvatarCandidateSchema,
   insertCreatorClaimInviteSchema,
   insertCreatorContactSchema,
+  insertCreatorDistributionEventSchema,
   insertCreatorProfileAttributeSchema,
   insertCreatorProfileSchema,
+  insertProfileOwnershipLogSchema,
   insertProfilePhotoSchema,
+  insertUserProfileClaimSchema,
   type NewCreatorAvatarCandidate,
   type NewCreatorClaimInvite,
   type NewCreatorContact,
+  type NewCreatorDistributionEvent,
   type NewCreatorProfile,
   type NewCreatorProfileAttribute,
+  type NewProfileOwnershipLog,
   type NewProfilePhoto,
+  type NewUserProfileClaim,
   type NotificationPreferences,
+  // Profile ownership audit log
+  type ProfileOwnershipLog,
   type ProfilePhoto,
+  profileOwnershipLog,
   profilePhotos,
   selectCreatorAvatarCandidateSchema,
   selectCreatorClaimInviteSchema,
   selectCreatorContactSchema,
+  selectCreatorDistributionEventSchema,
   selectCreatorProfileAttributeSchema,
   selectCreatorProfileSchema,
+  selectProfileOwnershipLogSchema,
   selectProfilePhotoSchema,
+  selectUserProfileClaimSchema,
+  // User-profile claims (ownership)
+  type UserProfileClaim,
+  userProfileClaims,
 } from './profiles';
-
+// Promo Downloads
+export {
+  insertPromoDownloadEventSchema,
+  insertPromoDownloadSchema,
+  type NewPromoDownload,
+  type NewPromoDownloadEvent,
+  type PromoDownload,
+  type PromoDownloadEvent,
+  promoDownloadEvents,
+  promoDownloads,
+  selectPromoDownloadEventSchema,
+  selectPromoDownloadSchema,
+} from './promo-downloads';
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,
@@ -430,7 +614,24 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
-
+// Release Tasks (Templates, Template Items, Tasks)
+export {
+  insertReleaseTaskSchema,
+  insertReleaseTaskTemplateItemSchema,
+  insertReleaseTaskTemplateSchema,
+  type NewReleaseTask,
+  type NewReleaseTaskTemplate,
+  type NewReleaseTaskTemplateItem,
+  type ReleaseTask,
+  type ReleaseTaskTemplate,
+  type ReleaseTaskTemplateItem,
+  releaseTasks,
+  releaseTaskTemplateItems,
+  releaseTaskTemplates,
+  selectReleaseTaskSchema,
+  selectReleaseTaskTemplateItemSchema,
+  selectReleaseTaskTemplateSchema,
+} from './release-tasks';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,
@@ -451,7 +652,6 @@ export {
   selectCreatorSendingReputationSchema,
   selectEmailSendAttributionSchema,
 } from './sender';
-
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export {
   type CategorySubscription,
@@ -482,7 +682,15 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
-// Tip Audience (Fan email capture from tips)
+// Tasks
+export {
+  insertTaskSchema,
+  type NewTask,
+  selectTaskSchema,
+  type Task,
+  tasks,
+} from './tasks';
+// Tip Audience (Fan notifications from tips)
 export {
   insertTipAudienceSchema,
   type NewTipAudienceMember,

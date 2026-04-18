@@ -1,5 +1,3 @@
-import { DrawerSectionHeading } from './DrawerSectionHeading';
-
 export interface StatTileProps {
   readonly label: string;
   readonly value: string;
@@ -8,14 +6,14 @@ export interface StatTileProps {
 
 export function StatTile({ label, value, hint }: StatTileProps) {
   return (
-    <div className='space-y-1.5'>
-      <DrawerSectionHeading as='p' className='text-[10.5px] tracking-[0.08em]'>
+    <div className='space-y-0.5'>
+      <p className='text-[11.5px] font-[510] tracking-normal text-secondary-token'>
         {label}
-      </DrawerSectionHeading>
-      <p className='tabular-nums text-[18px] font-[510] leading-none tracking-[-0.022em] text-primary-token'>
+      </p>
+      <p className='tabular-nums text-[14px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
         {value}
       </p>
-      {hint && <p className='text-[12px] text-secondary-token'>{hint}</p>}
+      {hint && <p className='text-[10px] text-tertiary-token'>{hint}</p>}
     </div>
   );
 }

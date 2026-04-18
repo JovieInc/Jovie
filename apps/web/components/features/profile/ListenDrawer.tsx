@@ -1,12 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
-import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
-import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
+import { ProfileDrawerShell } from './ProfileDrawerShell';
 import { StaticListenInterface } from './StaticListenInterface';
 
 interface ListenDrawerProps {
@@ -50,54 +48,20 @@ export function ListenDrawer({
   }, [open]);
 
   return (
-    <Drawer.Root open={open} onOpenChange={handleOpenChange}>
-      <Drawer.Portal>
-        <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
-        <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
-          style={{
-            backgroundColor: 'var(--liquid-glass-bg)',
-            backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            WebkitBackdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            borderColor: 'var(--liquid-glass-border)',
-            boxShadow: 'var(--liquid-glass-shadow-elevated)',
-          }}
-          aria-describedby={undefined}
-        >
-          {/* Specular highlight gradient — top edge light refraction */}
-          <div
-            className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-2xl'
-            style={{ background: 'var(--liquid-glass-highlight)' }}
-          />
-
-          {/* Drag handle */}
-          <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
-
-          <button
-            type='button'
-            onClick={() => handleOpenChange(false)}
-            className='absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
-            aria-label='Close'
-          >
-            <X size={18} />
-          </button>
-
-          <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
-            Listen on
-          </Drawer.Title>
-
-          <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-            <div className='flex justify-center'>
-              <StaticListenInterface
-                artist={artist}
-                handle={artist.handle}
-                dspsOverride={dsps}
-                enableDynamicEngagement={enableDynamicEngagement}
-              />
-            </div>
-          </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+    <ProfileDrawerShell
+      open={open}
+      onOpenChange={handleOpenChange}
+      title='Listen everywhere'
+      subtitle={`Stream ${artist.name} on your favorite platform.`}
+    >
+      <div className='flex justify-center'>
+        <StaticListenInterface
+          artist={artist}
+          handle={artist.handle}
+          dspsOverride={dsps}
+          enableDynamicEngagement={enableDynamicEngagement}
+        />
+      </div>
+    </ProfileDrawerShell>
   );
 }

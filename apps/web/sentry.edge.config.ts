@@ -4,12 +4,23 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
-import { getBaseServerConfig } from '@/lib/sentry/config';
+import {
+  createBeforeSendHook,
+  getBaseServerConfig,
+  isNonProductionServerNoise,
+} from '@/lib/sentry/config';
 
 const baseConfig = getBaseServerConfig();
 
 Sentry.init({
   ...baseConfig,
+
+  beforeSend: createBeforeSendHook(event => {
+    if (isNonProductionServerNoise(event)) {
+      return null;
+    }
+    return event;
+  }),
 
   // Suppress known non-actionable errors
   ignoreErrors: [
@@ -19,6 +30,9 @@ Sentry.init({
     /Clerk: (?:auth\(\)|currentUser\(\)|clerkClient\(\)).+only supported/,
     // Node.js TransformStream internal bug — not application code.
     /transformAlgorithm is not a function/,
+    /TimeoutError: page\.waitForFunction/i,
+    /TimeoutError: locator\.waitFor/i,
+    /toHaveURL/,
   ],
 
   // AI Agent Monitoring: Explicit for edge runtime (not auto-enabled like Node)

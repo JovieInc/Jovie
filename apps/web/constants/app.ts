@@ -1,22 +1,7 @@
-import { BASE_URL, APP_URL as DOMAINS_APP_URL } from './domains';
+export { APP_URL, APP_URL as DASHBOARD_URL, BASE_URL } from './domains';
 
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
-
-/**
- * APP_URL - The app/dashboard domain (jov.ie)
- * Use this for:
- * - Dashboard/app routes
- * - Marketing pages
- * - Auth-related URLs
- * - Email links to app features
- *
- * For profile URLs (jov.ie), use BASE_URL instead.
- */
-export const APP_URL = DOMAINS_APP_URL;
-
-// Re-export domain URLs for convenience
-export { BASE_URL, DOMAINS_APP_URL as DASHBOARD_URL };
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
 export const COUNTRY_CODE_COOKIE = 'jv_country';
@@ -66,7 +51,7 @@ export const LEGAL = {
 
 export const COPYRIGHT_YEAR = new Date().getFullYear();
 export const getCopyrightText = (year?: number) =>
-  `© ${year ?? COPYRIGHT_YEAR} ${LEGAL_ENTITY_NAME}`;
+  `© ${year ?? COPYRIGHT_YEAR}`;
 
 // Re-export from canonical source for backward compatibility
 export { SOCIAL_PLATFORMS, type SocialPlatform } from './platforms';
@@ -74,15 +59,40 @@ export type DSP = keyof typeof DSPS;
 
 // Global platform popularity ordering (lower index = more popular)
 // Used for initial/default ordering when personalized ranking is unavailable.
+// Streaming DSPs are listed first, followed by social platforms.
 export const GLOBAL_PLATFORM_POPULARITY = [
   'spotify',
   'apple_music',
   'youtube',
   'youtube_music',
-  'instagram',
-  'tiktok',
   'soundcloud',
   'bandcamp',
+  'deezer',
+  'tidal',
+  'amazon_music',
+  'amazon',
+  'pandora',
+  'napster',
+  'audiomack',
+  'yandex',
+  'qq_music',
+  'netease',
+  'jio_saavn',
+  'line_music',
+  'kkbox',
+  'flo',
+  'gaana',
+  'joox',
+  'awa',
+  'audius',
+  'trebel',
+  'beatport',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iheartradio',
+  'instagram',
+  'tiktok',
   'x',
   'twitter',
   'facebook',
@@ -101,12 +111,18 @@ export const popularityIndex = (pid: string): number => {
 };
 
 const REGIONAL_DSP_POPULARITY: Record<string, readonly string[]> = {
-  BR: ['spotify', 'youtube', 'apple_music', 'soundcloud'],
-  DE: ['spotify', 'apple_music', 'youtube', 'soundcloud'],
-  IN: ['youtube', 'spotify', 'apple_music', 'soundcloud'],
-  JP: ['youtube', 'apple_music', 'spotify', 'soundcloud'],
-  MX: ['spotify', 'youtube', 'apple_music', 'soundcloud'],
-  US: ['spotify', 'apple_music', 'youtube', 'soundcloud'],
+  BR: ['spotify', 'youtube', 'apple_music', 'deezer', 'soundcloud'],
+  CN: ['qq_music', 'netease', 'youtube', 'spotify', 'apple_music'],
+  DE: ['spotify', 'apple_music', 'youtube', 'deezer', 'soundcloud'],
+  IN: ['youtube', 'spotify', 'jio_saavn', 'gaana', 'apple_music'],
+  JP: ['youtube', 'apple_music', 'spotify', 'line_music', 'awa'],
+  KR: ['youtube', 'spotify', 'apple_music', 'flo', 'kkbox'],
+  MX: ['spotify', 'youtube', 'apple_music', 'deezer', 'soundcloud'],
+  NG: ['boomplay', 'audiomack', 'spotify', 'apple_music', 'youtube'],
+  RU: ['yandex', 'spotify', 'youtube', 'apple_music', 'soundcloud'],
+  SA: ['anghami', 'spotify', 'apple_music', 'youtube', 'deezer'],
+  TW: ['kkbox', 'spotify', 'apple_music', 'youtube', 'line_music'],
+  US: ['spotify', 'apple_music', 'youtube', 'amazon_music', 'soundcloud'],
 };
 
 export const geoAwarePopularityIndex = (

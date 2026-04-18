@@ -47,7 +47,6 @@ export type {
   DspArtistDiscoveryPayload,
   DspArtistDiscoveryResult,
   // Re-exported from DB schema
-  DspArtistEnrichment,
   DspArtistMatch,
   DspExternalUrls,
   DspImageUrls,
@@ -66,10 +65,8 @@ export type {
   MusicBrainzArtist,
   MusicBrainzRecording,
   MusicBrainzRelation,
-  NewDspArtistEnrichment,
   NewDspArtistMatch,
   NewFanReleaseNotification,
-  NewReleaseSyncStatus,
   NewSocialLinkSuggestion,
   // Notification types
   NotificationCategory,
@@ -77,7 +74,6 @@ export type {
   NotificationPreferences,
   ReleaseNotificationStatus,
   ReleaseNotificationType,
-  ReleaseSyncStatus,
   ScoredArtistMatch,
   SocialLinkSuggestion,
   SocialPlatform,

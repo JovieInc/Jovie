@@ -6,28 +6,129 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Instagram, Link2, Mail, Music2, Share2, Twitter } from 'lucide-react';
+import { Link2, Mail, Music2, Share2 } from 'lucide-react';
+import React from 'react';
 import { toast } from 'sonner';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
-import type {
-  ContextMenuAction,
-  ContextMenuItemType,
-} from '@/components/organisms/table';
+import type { ContextMenuItemType } from '@/components/organisms/table';
+import { copyToClipboard } from '@/hooks/useClipboard';
+import { captureError } from '@/lib/error-tracking';
 import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
 
-const UTM_PRESET_ICONS = {
-  Instagram,
+const UTM_PRESET_LUCIDE_ICONS = {
   Music2,
-  Twitter,
   Mail,
 } as const;
 
+const UTM_PRESET_PLATFORM_ICONS: Record<string, string> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  instagram: 'instagram',
+  twitter: 'twitter',
+  facebook: 'facebook',
+  youtube: 'youtube',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  discord: 'discord',
+  reddit: 'reddit',
+  snapchat: 'snapchat',
+  threads: 'threads',
+  telegram: 'telegram',
+  line: 'line',
+  rumble: 'rumble',
+  soundcloud: 'soundcloud',
+  patreon: 'patreon',
+  onlyfans: 'onlyfans',
+  quora: 'quora',
+  viber: 'viber',
+};
+
 function resolvePresetIcon(preset: UTMPreset) {
-  return (
-    UTM_PRESET_ICONS[preset.icon as keyof typeof UTM_PRESET_ICONS] ?? Link2
+  const source = preset.params.utm_source?.trim().toLowerCase() ?? '';
+  const iconKey =
+    typeof preset.icon === 'string' ? preset.icon.trim().toLowerCase() : '';
+  const platformKey =
+    UTM_PRESET_PLATFORM_ICONS[source] ?? UTM_PRESET_PLATFORM_ICONS[iconKey];
+
+  if (platformKey) {
+    return React.createElement(SocialIcon, {
+      platform: platformKey,
+      className: 'h-4 w-4',
+    });
+  }
+
+  const LucideIcon =
+    UTM_PRESET_LUCIDE_ICONS[
+      preset.icon as keyof typeof UTM_PRESET_LUCIDE_ICONS
+    ] ?? Link2;
+
+  return React.createElement(LucideIcon, { className: 'h-4 w-4' });
+}
+
+function createUTMShareContextItems(params: {
+  smartLinkUrl: string;
+  context: UTMContext;
+  onCopied?: (presetId: string) => void;
+}): ContextMenuItemType[] {
+  const { smartLinkUrl, context, onCopied } = params;
+
+  return getDefaultQuickPresets().map(
+    (preset): ContextMenuItemType => ({
+      id: `utm-share-${preset.id}`,
+      label: preset.label,
+      icon: resolvePresetIcon(preset),
+      onClick: async () => {
+        const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+        if (copied) {
+          onCopied?.(preset.id);
+        }
+      },
+    })
   );
+}
+
+function createUTMShareActionItems(params: {
+  smartLinkUrl: string;
+  context: UTMContext;
+  onCopied?: (presetId: string) => void;
+}): TableActionMenuItem[] {
+  const { smartLinkUrl, context, onCopied } = params;
+
+  return getDefaultQuickPresets().map(preset => ({
+    id: `utm-share-${preset.id}`,
+    label: preset.label,
+    icon: resolvePresetIcon(preset),
+    onClick: async () => {
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
+        onCopied?.(preset.id);
+      }
+    },
+  }));
+}
+
+function createUTMShareDropdownActionItems(params: {
+  smartLinkUrl: string;
+  context: UTMContext;
+  onCopied?: (presetId: string) => void;
+}): CommonDropdownItem[] {
+  const { smartLinkUrl, context, onCopied } = params;
+
+  return getDefaultQuickPresets().map(preset => ({
+    type: 'action' as const,
+    id: `utm-share-${preset.id}`,
+    label: preset.label,
+    icon: resolvePresetIcon(preset),
+    onClick: async () => {
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
+        onCopied?.(preset.id);
+      }
+    },
+  }));
 }
 
 /**
@@ -37,23 +138,33 @@ async function copyUTMUrl(params: {
   url: string;
   preset: UTMPreset;
   context: UTMContext;
-}) {
+}): Promise<boolean> {
   const result = buildUTMUrl({
     url: params.url,
     params: params.preset.params,
     context: params.context,
   });
-  try {
-    await navigator.clipboard.writeText(result.url);
+  const copied = await copyToClipboard(result.url);
+
+  if (copied) {
     toast.success(`Copied with ${params.preset.label} UTM`, {
       description: 'Link includes tracking parameters',
     });
-  } catch (error) {
-    console.error('Failed to copy UTM link', error);
-    toast.error('Could not copy UTM link', {
-      description: 'Please try again or copy manually.',
-    });
+    return true;
   }
+
+  captureError(
+    'Failed to copy UTM link',
+    new Error('UTM clipboard copy failed'),
+    {
+      presetId: params.preset.id,
+      utmSource: params.preset.params.utm_source ?? '',
+    }
+  );
+  toast.error('Could not copy UTM link', {
+    description: 'Please try again or copy manually.',
+  });
+  return false;
 }
 
 /**
@@ -78,66 +189,42 @@ export function buildUTMContext(params: {
 /**
  * Generate UTM share items for ContextMenuItemType[] (used in table context menus).
  *
- * Returns a separator followed by quick preset actions.
+ * Returns a single submenu item containing the quick presets.
  */
 export function getUTMShareContextMenuItems(params: {
   smartLinkUrl: string;
   context: UTMContext;
   onCopied?: (presetId: string) => void;
 }): ContextMenuItemType[] {
-  const { smartLinkUrl, context, onCopied } = params;
-  const quickPresets = getDefaultQuickPresets();
+  const submenuItems = createUTMShareContextItems(params);
 
-  if (quickPresets.length === 0) return [];
+  if (submenuItems.length === 0) return [];
 
-  const items: ContextMenuItemType[] = [{ type: 'separator' }];
-
-  for (const preset of quickPresets) {
-    const action: ContextMenuAction = {
-      id: `utm-share-${preset.id}`,
-      label: `Copy for ${preset.label}`,
-      onClick: () => {
-        void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
-          onCopied?.(preset.id);
-        });
-      },
-    };
-    items.push(action);
-  }
-
-  return items;
+  return [
+    {
+      id: 'utm-share-submenu',
+      label: 'Copy with UTM',
+      icon: React.createElement(Share2, { className: 'h-4 w-4' }),
+      items: submenuItems,
+    },
+  ];
 }
 
 /**
  * Generate UTM share items as TableActionMenuItem[] (used in legacy table row menus).
  *
- * Returns a separator followed by a submenu containing quick preset actions.
+ * Returns a single submenu containing the quick preset actions.
  */
 export function getUTMShareActionMenuItems(params: {
   smartLinkUrl: string;
   context: UTMContext;
   onCopied?: (presetId: string) => void;
 }): TableActionMenuItem[] {
-  const { smartLinkUrl, context, onCopied } = params;
-  const quickPresets = getDefaultQuickPresets();
+  const children = createUTMShareActionItems(params);
 
-  if (quickPresets.length === 0) return [];
-
-  const children: TableActionMenuItem[] = quickPresets.map(preset => ({
-    id: `utm-share-${preset.id}`,
-    label: preset.label,
-    onClick: () => {
-      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
-        onCopied?.(preset.id);
-      });
-    },
-  }));
+  if (children.length === 0) return [];
 
   return [
-    {
-      id: 'separator',
-      label: '',
-    },
     {
       id: 'utm-share-submenu',
       label: 'Copy with UTM',
@@ -150,32 +237,18 @@ export function getUTMShareActionMenuItems(params: {
 /**
  * Generate UTM share items as CommonDropdownItem[] (used in sidebar/drawer menus).
  *
- * Returns a separator followed by a single submenu item containing UTM presets.
+ * Returns a single submenu item containing UTM presets.
  */
 export function getUTMShareDropdownItems(params: {
   smartLinkUrl: string;
   context: UTMContext;
   onCopied?: (presetId: string) => void;
 }): CommonDropdownItem[] {
-  const { smartLinkUrl, context, onCopied } = params;
-  const quickPresets = getDefaultQuickPresets();
+  const submenuItems = createUTMShareDropdownActionItems(params);
 
-  if (quickPresets.length === 0) return [];
-
-  const submenuItems: CommonDropdownItem[] = quickPresets.map(preset => ({
-    type: 'action' as const,
-    id: `utm-share-${preset.id}`,
-    label: preset.label,
-    icon: resolvePresetIcon(preset),
-    onClick: () => {
-      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
-        onCopied?.(preset.id);
-      });
-    },
-  }));
+  if (submenuItems.length === 0) return [];
 
   return [
-    { type: 'separator', id: 'sep-utm' },
     {
       type: 'submenu',
       id: 'utm-share-submenu',

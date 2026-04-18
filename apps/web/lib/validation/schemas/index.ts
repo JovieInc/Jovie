@@ -218,9 +218,11 @@ export {
   type UnsubscribeInput,
   type UnsubscribeMethod,
   type UpdateContentPreferencesInput,
+  type UpdateSubscriberNameInput,
   unsubscribeMethodSchema,
   unsubscribeSchema,
   updateContentPreferencesSchema,
+  updateSubscriberNameSchema,
   type VerifyEmailOtpInput,
   verifyEmailOtpSchema,
 } from './notifications';

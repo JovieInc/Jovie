@@ -114,7 +114,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
           { status: 403 }
         );
       }
-      const redirectUrl = new URL(APP_ROUTES.DASHBOARD_OVERVIEW, request.url);
+      const redirectUrl = new URL(APP_ROUTES.DASHBOARD, request.url);
       return NextResponse.redirect(redirectUrl);
     }
 

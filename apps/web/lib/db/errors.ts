@@ -65,7 +65,17 @@ export function unwrapPgError(error: unknown, depth = 0): PgErrorFields {
  * while the actual PG message (e.g. "column X does not exist") is on `.cause`.
  */
 export function getDeepErrorMessage(error: unknown): string {
-  if (!error || typeof error !== 'object') return String(error ?? '');
+  if (error == null) return '';
+  if (typeof error === 'string') return error;
+  if (
+    typeof error === 'number' ||
+    typeof error === 'boolean' ||
+    typeof error === 'bigint'
+  )
+    return String(error);
+  if (typeof error === 'symbol') return error.toString();
+  if (typeof error === 'function') return error.name || 'Function';
+  // error is narrowed to `object` at this point
 
   const messages: string[] = [];
   let current: unknown = error;
@@ -81,7 +91,9 @@ export function getDeepErrorMessage(error: unknown): string {
     depth++;
   }
 
-  return messages.join(' | ');
+  if (messages.length > 0) return messages.join(' | ');
+  if (error instanceof Error) return error.message;
+  return JSON.stringify(error);
 }
 
 export function isUniqueViolation(

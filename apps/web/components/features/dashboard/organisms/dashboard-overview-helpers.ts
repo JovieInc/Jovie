@@ -4,38 +4,38 @@
  */
 
 const TASK_CONTAINER_BASE =
-  'group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-[background-color,border-color] duration-150';
+  'group flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1 transition-[background-color,border-color,color] duration-100';
 const TASK_INDICATOR_BASE =
-  'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-[560]';
+  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-[560]';
 const TASK_LABEL_BASE =
-  'text-[13px] leading-[18px] tracking-[-0.01em] text-primary-token';
+  'text-[12.5px] leading-[15px] tracking-[-0.01em] text-primary-token';
 
 /**
  * Get the container class for a completed setup task item.
  */
 export function getCompletedTaskContainerClass(): string {
-  return TASK_CONTAINER_BASE;
+  return `${TASK_CONTAINER_BASE} bg-surface-0/75`;
 }
 
 /**
  * Get the container class for an incomplete setup task item.
  */
 export function getIncompleteTaskContainerClass(): string {
-  return `${TASK_CONTAINER_BASE} hover:bg-surface-0`;
+  return `${TASK_CONTAINER_BASE} hover:border-(--linear-app-frame-seam) hover:bg-surface-0/60`;
 }
 
 /**
  * Get the indicator circle class for a completed setup task.
  */
 export function getCompletedTaskIndicatorClass(): string {
-  return `${TASK_INDICATOR_BASE} bg-emerald-500/12 text-emerald-500`;
+  return `${TASK_INDICATOR_BASE} bg-emerald-500/14 text-emerald-500`;
 }
 
 /**
  * Get the indicator circle class for an incomplete setup task.
  */
 export function getIncompleteTaskIndicatorClass(): string {
-  return `${TASK_INDICATOR_BASE} border border-subtle text-tertiary-token`;
+  return `${TASK_INDICATOR_BASE} border border-subtle bg-(--linear-app-content-surface) text-tertiary-token`;
 }
 
 /**

@@ -8,6 +8,7 @@ import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
@@ -156,6 +157,23 @@ function buildDropdownItems({
     }
   );
 
+  // Only show Cookie Settings in GDPR-regulated regions, matching footer behavior
+  const ccRequired =
+    typeof document === 'undefined'
+      ? undefined
+      : document.cookie
+          .split(';')
+          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
+  if (ccRequired && ccRequired.split('=')[1]?.trim() !== '0') {
+    learnMoreItems.push({
+      type: 'action',
+      id: 'cookie-settings',
+      label: 'Cookie Settings',
+      onClick: () =>
+        globalThis.dispatchEvent(new CustomEvent('jv:cookie:open')),
+    });
+  }
+
   const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',
     id: 'learn-more',
@@ -198,7 +216,7 @@ function buildDropdownItems({
     });
   }
 
-  // Add feedback and sign out
+  // Add feedback, delete account, and sign out
   items.push(
     {
       type: 'action',
@@ -278,28 +296,36 @@ export function UserButton({
   if (!isLoaded || !user) {
     if (trigger) {
       return (
-        <CommonDropdown
-          variant='dropdown'
-          items={[]}
-          trigger={trigger}
-          align='start'
-          open={isMenuOpen}
-          onOpenChange={setIsMenuOpen}
-          disabled
-          contentClassName='w-[220px]'
-        />
+        <div data-testid='user-button-loading' className='contents'>
+          <CommonDropdown
+            variant='dropdown'
+            items={[]}
+            trigger={trigger}
+            align='start'
+            open={isMenuOpen}
+            onOpenChange={setIsMenuOpen}
+            disabled
+            contentClassName='w-[220px]'
+          />
+        </div>
       );
     }
 
     return showUserInfo ? (
-      <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
+      <div
+        data-testid='user-button-loading'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1'
+      >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         <div className='flex-1'>
           <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
-      <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
+      <div
+        data-testid='user-button-loading'
+        className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none'
+      />
     );
   }
 
@@ -364,7 +390,7 @@ export function UserButton({
     ));
 
   return (
-    <>
+    <div data-testid='user-button-loaded' className='contents'>
       <CommonDropdown
         variant='dropdown'
         items={dropdownItems}
@@ -379,6 +405,6 @@ export function UserButton({
         onClose={() => setIsFeedbackOpen(false)}
         onSubmit={handleFeedbackSubmit}
       />
-    </>
+    </div>
   );
 }

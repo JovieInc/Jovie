@@ -14,6 +14,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { setAllEnrichmentStatuses } from '@/lib/dsp-enrichment/enrichment-status';
 import {
   extractMusicFetchLinks,
   type MusicFetchProfileFieldState,
@@ -30,6 +31,7 @@ import {
 } from '@/lib/dsp-enrichment/providers/spotify';
 import { captureError } from '@/lib/error-tracking';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { logger } from '@/lib/utils/logger';
 import { uploadRemoteAvatar } from './avatar';
 
@@ -220,8 +222,9 @@ function buildEnrichmentUpdates(
 
   // Genres, followers, popularity from Spotify
   if (artist?.genres && artist.genres.length > 0) {
-    profileUpdates.genres = artist.genres;
-    result.genres = artist.genres;
+    const cappedGenres = artist.genres.slice(0, 3);
+    profileUpdates.genres = cappedGenres;
+    result.genres = cappedGenres;
   }
   if (artist?.followers) {
     profileUpdates.spotifyFollowers = artist.followers.total;
@@ -280,6 +283,18 @@ export async function enrichProfileFromDsp(
   spotifyArtistId: string,
   spotifyUrl: string
 ): Promise<EnrichedProfileData> {
+  // Block enrichment for blacklisted Spotify artist IDs
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  if (isBlacklistedSpotifyId(spotifyArtistId)) {
+    return {
+      name: null,
+      imageUrl: null,
+      bio: null,
+      genres: [],
+      followers: null,
+    };
+  }
+
   const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
@@ -317,6 +332,9 @@ export async function enrichProfileFromDsp(
   if (!profile) {
     throw new Error('Profile not found');
   }
+
+  // Set all enrichment sub-statuses to 'enriching' at the start
+  await setAllEnrichmentStatuses(db, profile.id, 'enriching');
 
   const result: EnrichedProfileData = {
     name: profile.displayName,
@@ -385,6 +403,13 @@ export async function enrichProfileFromDsp(
       { profileId: profile.id, spotifyArtistId }
     );
   }
+
+  void refreshFeaturedPlaylistFallbackCandidate({
+    profileId: profile.id,
+    usernameNormalized: profile.usernameNormalized,
+    artistName: result.name ?? profile.displayName ?? profile.username,
+    artistSpotifyId: spotifyArtistId,
+  });
 
   return result;
 }

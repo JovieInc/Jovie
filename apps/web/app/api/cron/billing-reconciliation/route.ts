@@ -21,8 +21,8 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
-import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
@@ -99,13 +99,11 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
  * Daily cron job to reconcile billing status between DB and Stripe
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/billing-reconciliation',
+    cronSecret: CRON_SECRET,
+  });
+  if (authError) return authError;
 
   try {
     const result = await runReconciliation();
@@ -164,6 +162,7 @@ async function reconcileUsersWithSubscriptions(
   errors: string[]
 ): Promise<void> {
   let lastUserId: string | null = null;
+  let lastBatchWasFull = false;
   let batchCount = 0;
 
   while (batchCount < MAX_BATCHES) {
@@ -171,9 +170,12 @@ async function reconcileUsersWithSubscriptions(
 
     const batch = await fetchUserBatch(db, lastUserId);
     if (batch.length === 0) break;
+    lastBatchWasFull = batch.length === BATCH_SIZE;
 
     // Update cursor to last user in batch before parallel processing
-    lastUserId = batch.at(-1)!.id;
+    const lastUser = batch.at(-1);
+    if (!lastUser) break;
+    lastUserId = lastUser.id;
 
     // Process users with bounded concurrency to avoid Stripe rate limits
     for (
@@ -191,10 +193,21 @@ async function reconcileUsersWithSubscriptions(
     if (batch.length < BATCH_SIZE) break;
   }
 
-  if (batchCount >= MAX_BATCHES) {
+  if (batchCount >= MAX_BATCHES && lastBatchWasFull && lastUserId) {
+    const [remainingUsersResult] = await db
+      .select({
+        count: drizzleSql<number>`count(*)`,
+      })
+      .from(users)
+      .where(
+        drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
+      );
+    const estimatedRemainingUsers = Number(remainingUsersResult?.count ?? 0);
+
     await captureWarning('Billing reconciliation hit batch limit', undefined, {
       batchCount,
       usersChecked: stats.usersChecked,
+      estimatedRemainingUsers,
     });
   }
 }
@@ -285,16 +298,16 @@ async function repairProUserWithoutSubscription(user: {
 
     if (activeSubscription) {
       // They have an active subscription - link it
-      await runLegacyDbTransaction(async tx => {
-        await tx
-          .update(users)
-          .set({
-            stripeSubscriptionId: activeSubscription.id,
-            billingUpdatedAt: new Date(),
-            billingVersion: drizzleSql`${users.billingVersion} + 1`,
-          })
-          .where(eq(users.id, user.id));
-        await tx.insert(billingAuditLog).values({
+      await db
+        .update(users)
+        .set({
+          stripeSubscriptionId: activeSubscription.id,
+          billingUpdatedAt: new Date(),
+          billingVersion: drizzleSql`${users.billingVersion} + 1`,
+        })
+        .where(eq(users.id, user.id));
+      try {
+        await db.insert(billingAuditLog).values({
           userId: user.id,
           eventType: 'reconciliation_fix',
           previousState: { stripeSubscriptionId: null },
@@ -304,24 +317,30 @@ async function repairProUserWithoutSubscription(user: {
             reason: 'linked_active_subscription',
           },
         });
-      });
+      } catch (auditError) {
+        await captureCriticalError(
+          'Billing audit log insert failed after user update',
+          auditError,
+          { userId: user.id, eventType: 'reconciliation_fix' }
+        );
+      }
 
       return { mismatches: 1, fixed: 1 };
     }
   }
 
   // No active subscription found - they shouldn't be Pro
-  await runLegacyDbTransaction(async tx => {
-    await tx
-      .update(users)
-      .set({
-        isPro: false,
-        stripeSubscriptionId: null,
-        billingUpdatedAt: new Date(),
-        billingVersion: drizzleSql`${users.billingVersion} + 1`,
-      })
-      .where(eq(users.id, user.id));
-    await tx.insert(billingAuditLog).values({
+  await db
+    .update(users)
+    .set({
+      isPro: false,
+      stripeSubscriptionId: null,
+      billingUpdatedAt: new Date(),
+      billingVersion: drizzleSql`${users.billingVersion} + 1`,
+    })
+    .where(eq(users.id, user.id));
+  try {
+    await db.insert(billingAuditLog).values({
       userId: user.id,
       eventType: 'reconciliation_fix',
       previousState: { stripeSubscriptionId: null },
@@ -331,7 +350,13 @@ async function repairProUserWithoutSubscription(user: {
         reason: 'no_active_subscription',
       },
     });
-  });
+  } catch (auditError) {
+    await captureCriticalError(
+      'Billing audit log insert failed after user update',
+      auditError,
+      { userId: user.id, eventType: 'reconciliation_fix' }
+    );
+  }
 
   return { mismatches: 1, fixed: 1 };
 }

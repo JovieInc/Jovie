@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetSessionContext = vi.fn();
@@ -8,6 +9,10 @@ const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: mockGetSessionContext,
+}));
+
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -21,16 +26,32 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
+const mockGetDashboardShellData = vi.fn().mockResolvedValue({
+  selectedProfile: null,
+});
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: vi.fn().mockResolvedValue({}),
+  getDashboardShellData: (...args: unknown[]) =>
+    mockGetDashboardShellData(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  loadReleaseMatrix: vi.fn().mockResolvedValue([]),
   checkAppleMusicConnection: vi.fn().mockResolvedValue({
     connected: false,
     artistName: null,
     artistId: null,
   }),
+}));
+
+vi.mock('@/lib/queries/server', () => ({
+  getQueryClient: vi.fn(() => ({
+    prefetchQuery: vi.fn().mockResolvedValue(undefined),
+  })),
+  getDehydratedState: vi.fn(() => null),
+}));
+
+vi.mock('@/lib/queries/HydrateClient', () => ({
+  HydrateClient: ({ children }: { children: ReactNode }) => children,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -47,16 +68,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses display name for app root tab title when available', async () => {
-    mockGetSessionContext.mockResolvedValue({
-      user: { id: 'user-id' },
-      profile: { displayName: 'Ada' },
-    });
-
+  it('uses the static dashboard title for the app root', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Ada | Jovie');
+    expect(metadata.title).toBe('Home | Jovie');
   });
 
   it('falls back to dashboard title when profile display name is missing', async () => {
@@ -88,5 +104,15 @@ describe('dashboard metadata generation', () => {
     });
 
     expect(metadata.title).toBe('Thread | Jovie');
+  });
+
+  it('home page renders the same chat client as /app/chat (AGENTS.md #16)', async () => {
+    const { DeferredChatPageClient } = await import(
+      '@/app/app/(shell)/chat/DeferredChatPageClient'
+    );
+    const homePage = await import('@/app/app/(shell)/page');
+
+    const result = await homePage.default();
+    expect(result.props.children.type).toBe(DeferredChatPageClient);
   });
 });

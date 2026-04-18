@@ -5,18 +5,10 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
-import { alignment } from '../table.styles';
-
 /**
  * Checkbox state types
  */
 export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
-
-// Shared checkbox styling for consistent appearance (uses design tokens)
-const CHECKBOX_STYLES = cn(
-  alignment.checkboxSize,
-  'rounded-[4px] border border-subtle bg-surface-0 text-secondary-token shadow-none transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
-);
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
@@ -73,18 +65,20 @@ function TanStackHeaderCheckbox({
   return (
     <div
       className='relative flex h-5 w-5 items-center justify-center'
+      role='presentation'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
     >
       <Checkbox
         aria-label='Select all rows'
-        checked={normalizedState === 'checked'}
-        indeterminate={normalizedState === 'indeterminate'}
+        checked={
+          normalizedState === 'indeterminate'
+            ? 'indeterminate'
+            : normalizedState === 'checked'
+        }
         onCheckedChange={onToggleSelectAll}
-        className={CHECKBOX_STYLES}
       />
     </div>
   );
@@ -103,11 +97,11 @@ function TanStackRowCheckbox({
   return (
     <div
       className='relative flex h-5 w-5 items-center justify-center'
+      role='presentation'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
     >
       <span
         className={cn(
@@ -130,7 +124,6 @@ function TanStackRowCheckbox({
           }
           checked={isChecked}
           onCheckedChange={onToggleSelect}
-          className={CHECKBOX_STYLES}
         />
       </div>
     </div>
@@ -152,8 +145,8 @@ function LegacyCheckboxCell({
   return (
     <Component
       className={cn(
-        'w-14 border-b border-subtle px-4 py-3 text-center',
-        isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
+        'w-12 border-b border-subtle px-3 py-2 align-middle text-center',
+        isHeader && 'sticky z-20 bg-surface-1',
         !isHeader && 'group-hover:bg-transparent',
         className
       )}
@@ -176,12 +169,11 @@ function LegacyCheckboxCell({
           )}
         >
           <Checkbox
-            checked={checked}
+            checked={checked ? true : indeterminate ? 'indeterminate' : false}
             onCheckedChange={(value: boolean | 'indeterminate') =>
               onChange(value === true)
             }
             aria-label={ariaLabel}
-            indeterminate={indeterminate}
           />
         </div>
       </div>

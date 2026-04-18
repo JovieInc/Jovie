@@ -1,25 +1,34 @@
 import {
+  Activity,
   Banknote,
+  Briefcase,
+  Cable,
   CalendarDays,
-  Download,
+  CheckSquare,
+  FolderKanban,
   HandCoins,
   Home,
   IdCard,
   Image as ImageIcon,
+  LayoutDashboard,
+  Lock,
   MailCheck,
-  MessageSquare,
   Music,
   PieChart,
-  Search,
-  Send,
   Settings,
+  Share2,
   ShieldCheck,
   SquarePen,
   UserCircle,
-  UserPlus,
   Users,
 } from 'lucide-react';
 
+import {
+  ADMIN_NAV_REGISTRY,
+  ADMIN_PRIMARY_WORKSPACE_IDS,
+  ADMIN_SETTINGS_TOOL_IDS,
+  type AdminWorkspaceId,
+} from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 
 import type { NavItem } from './types';
@@ -48,24 +57,24 @@ export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
     name: 'Releases',
-    href: APP_ROUTES.RELEASES,
+    href: APP_ROUTES.DASHBOARD_RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
   },
   {
+    name: 'Tasks',
+    href: APP_ROUTES.TASKS,
+    id: 'tasks',
+    icon: CheckSquare,
+    description: 'Track release work and general artist operations',
+  },
+  {
     name: 'Audience',
-    href: APP_ROUTES.AUDIENCE,
+    href: APP_ROUTES.DASHBOARD_AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
-  },
-  {
-    name: 'Earnings',
-    href: APP_ROUTES.DASHBOARD_EARNINGS,
-    id: 'earnings',
-    icon: HandCoins,
-    description: 'QR codes, tip links, and payout settings',
   },
 ];
 
@@ -80,17 +89,31 @@ export const settingsNavItem: NavItem = {
 export const userSettingsNavigation: NavItem[] = [
   {
     name: 'Account',
-    href: APP_ROUTES.SETTINGS,
+    href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
     icon: ShieldCheck,
   },
   {
-    name: 'Billing',
+    name: 'Billing & Subscription',
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     icon: Banknote,
   },
+  {
+    name: 'Data & Privacy',
+    href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
+    id: 'data-privacy',
+    icon: Lock,
+  },
 ];
+
+/** Payments settings item — feature-gated, included conditionally */
+export const paymentsNavItem: NavItem = {
+  name: 'Payments',
+  href: APP_ROUTES.SETTINGS_PAYMENTS,
+  id: 'payments',
+  icon: HandCoins,
+};
 
 /** Artist-level settings: profile, links, branding, tracking */
 export const artistSettingsNavigation: NavItem[] = [
@@ -113,6 +136,12 @@ export const artistSettingsNavigation: NavItem[] = [
     icon: CalendarDays,
   },
   {
+    name: 'Analytics',
+    href: APP_ROUTES.SETTINGS_ANALYTICS,
+    id: 'analytics',
+    icon: PieChart,
+  },
+  {
     name: 'Audience & Tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
     id: 'audience-tracking',
@@ -120,91 +149,58 @@ export const artistSettingsNavigation: NavItem[] = [
   },
 ];
 
+/** Admin settings item — shown only to admin users */
+export const adminSettingsNavItem: NavItem = {
+  name: 'Admin',
+  href: APP_ROUTES.SETTINGS_ADMIN,
+  id: 'admin-settings',
+  icon: Settings,
+};
+
 /** Combined settings navigation (all items flat) */
 export const settingsNavigation: NavItem[] = [
   ...userSettingsNavigation,
   ...artistSettingsNavigation,
 ];
 
-export const adminNavigation: NavItem[] = [
-  {
-    name: 'Dashboard',
-    href: APP_ROUTES.ADMIN,
-    id: 'admin_overview',
-    icon: ShieldCheck,
-    description: 'Internal metrics and operations',
-  },
-  {
-    name: 'Leads',
-    href: APP_ROUTES.ADMIN_LEADS,
-    id: 'admin_leads',
-    icon: Search,
-    description: 'Discover, qualify, and action growth leads',
-  },
-  {
-    name: 'Outreach',
-    href: APP_ROUTES.ADMIN_OUTREACH,
-    id: 'admin_outreach',
-    icon: MailCheck,
-    description: 'Run and review outreach workflows',
-  },
-  {
-    name: 'Campaigns',
-    href: APP_ROUTES.ADMIN_CAMPAIGNS,
-    id: 'admin_campaigns',
-    icon: Send,
-    description: 'Manage creator claim campaigns',
-  },
-  {
-    name: 'Waitlist',
-    href: APP_ROUTES.ADMIN_WAITLIST,
-    id: 'admin_waitlist',
-    icon: UserPlus,
-    description: 'Review and manage waitlist signups',
-  },
-  {
-    name: 'Creators',
-    href: APP_ROUTES.ADMIN_CREATORS,
-    id: 'admin_creators',
-    icon: Users,
-    description: 'Manage creator profiles and verification',
-  },
-  {
-    name: 'Ingest',
-    href: APP_ROUTES.ADMIN_INGEST,
-    id: 'admin_ingest',
-    icon: Download,
-    description: 'Manually ingest creator profiles',
-  },
-  {
-    name: 'Users',
-    href: APP_ROUTES.ADMIN_USERS,
-    id: 'admin_users',
-    icon: UserCircle,
-    description: 'Review signed up users and billing status',
-  },
-  {
-    name: 'Feedback',
-    href: APP_ROUTES.ADMIN_FEEDBACK,
-    id: 'admin_feedback',
-    icon: MessageSquare,
-    description: 'Review user feedback',
-  },
-  {
-    name: 'Activity',
-    href: APP_ROUTES.ADMIN_ACTIVITY,
-    id: 'admin_activity',
-    icon: PieChart,
-    description: 'Review recent system and creator activity',
-  },
-  {
-    name: 'Screenshots',
-    href: APP_ROUTES.ADMIN_SCREENSHOTS,
-    id: 'admin_screenshots',
-    icon: ImageIcon,
-    description: 'View generated UI screenshots',
-  },
-];
+const adminIconById = {
+  overview: LayoutDashboard,
+  people: Users,
+  growth: FolderKanban,
+  platform_connections: Cable,
+  activity: Activity,
+  investors: Briefcase,
+  screenshots: ImageIcon,
+  share_studio: Share2,
+} as const;
+
+function buildAdminNavigationItems(
+  ids: readonly AdminWorkspaceId[]
+): NavItem[] {
+  return ids.map(id => {
+    const item = ADMIN_NAV_REGISTRY.find(entry => entry.id === id);
+
+    if (!item) {
+      throw new Error(`Missing admin navigation registry item for "${id}"`);
+    }
+
+    return {
+      name: item.label,
+      href: item.href,
+      id: `admin_${item.id}`,
+      icon: adminIconById[item.id],
+      description: item.description,
+    };
+  });
+}
+
+export const adminNavigation: NavItem[] = buildAdminNavigationItems(
+  ADMIN_PRIMARY_WORKSPACE_IDS
+);
+
+export const adminSettingsNavigation: NavItem[] = buildAdminNavigationItems(
+  ADMIN_SETTINGS_TOOL_IDS
+);
 
 export interface AdminNavSection {
   label: string;
@@ -213,30 +209,20 @@ export interface AdminNavSection {
 
 export const adminNavigationSections: AdminNavSection[] = [
   {
-    label: 'Growth',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_leads')!,
-      adminNavigation.find(item => item.id === 'admin_outreach')!,
-      adminNavigation.find(item => item.id === 'admin_campaigns')!,
-      adminNavigation.find(item => item.id === 'admin_ingest')!,
-    ],
+    label: 'Workspaces',
+    items: adminNavigation,
+  },
+];
+
+export const adminSettingsNavigationSections: AdminNavSection[] = [
+  {
+    // Settings keeps quick links to the primary workspaces alongside utilities.
+    label: 'Workspaces',
+    items: adminNavigation,
   },
   {
-    label: 'Data',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_waitlist')!,
-      adminNavigation.find(item => item.id === 'admin_creators')!,
-      adminNavigation.find(item => item.id === 'admin_users')!,
-      adminNavigation.find(item => item.id === 'admin_feedback')!,
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      adminNavigation.find(item => item.id === 'admin_overview')!,
-      adminNavigation.find(item => item.id === 'admin_activity')!,
-      adminNavigation.find(item => item.id === 'admin_screenshots')!,
-    ],
+    label: 'Utilities',
+    items: adminSettingsNavigation,
   },
 ];
 
@@ -261,4 +247,7 @@ export const mobilePrimaryNavigation: NavItem[] = [
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = [settingsNavItem];
+export const mobileExpandedNavigation: NavItem[] = [
+  primaryNavigation.find(i => i.id === 'tasks')!,
+  settingsNavItem,
+];

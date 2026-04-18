@@ -1,86 +1,136 @@
 'use client';
 
-import { Calendar, MapPin } from 'lucide-react';
-import Link from 'next/link';
+import { ChevronRight, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
-import { Drawer } from 'vaul';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import { useId, useState } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import {
+  type TourDateWithProximity,
+  useTourDateProximity,
+} from '@/hooks/useTourDateProximity';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
-import { calculateDistanceMiles } from '@/lib/geo';
-import { cn } from '@/lib/utils';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
-import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
-
-const NEARBY_MILES_THRESHOLD = 50;
+import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
+import { ProfileDrawerShell } from './ProfileDrawerShell';
 
 interface TourModePanelProps {
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
 }
 
-interface TourDateWithProximity {
-  readonly date: TourDateViewModel;
-  readonly distanceMiles: number | null;
-  readonly isNearby: boolean;
+function getTicketStatusClassName(
+  ticketStatus: TourDateViewModel['ticketStatus'],
+  canBuyTickets: boolean
+): string {
+  if (ticketStatus === 'sold_out') {
+    return 'text-[rgb(118,114,255)]';
+  }
+  return canBuyTickets ? 'text-white/62' : 'text-white/34';
 }
 
-const monthDayFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-});
+function getTicketStatusLabel(
+  ticketStatus: TourDateViewModel['ticketStatus'],
+  canBuyTickets: boolean
+): string {
+  if (ticketStatus === 'sold_out') return 'Sold out';
+  if (canBuyTickets) return 'Tickets';
+  return 'No tickets';
+}
+
+/** Date box showing month + day stacked vertically, formatted in UTC to avoid timezone shift */
+function DateBox({ date }: { readonly date: string }) {
+  const parsedDate = new Date(date);
+  const monthLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(parsedDate);
+  const dayLabel = new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(parsedDate);
+
+  return (
+    <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-[12px] border border-white/6'>
+      <span className='text-[0.7rem] font-[600] uppercase tracking-[0.06em] text-white/44'>
+        {monthLabel}
+      </span>
+      <span className='text-[1.2rem] font-[700] leading-tight text-white/80'>
+        {dayLabel}
+      </span>
+    </div>
+  );
+}
 
 function TourDateRow({
+  artistHandle,
   date,
   distanceMiles,
   showNearbyBadge,
 }: {
+  readonly artistHandle: string;
   readonly date: TourDateViewModel;
   readonly distanceMiles: number | null;
   readonly showNearbyBadge: boolean;
 }) {
-  const parsedDate = new Date(date.startDate);
   const location = formatLocationString([date.city, date.region, date.country]);
   const canBuyTickets =
     Boolean(date.ticketUrl) &&
     date.ticketStatus !== 'cancelled' &&
     date.ticketStatus !== 'sold_out';
+  const handleTicketClick = useTourDateTicketClick(
+    artistHandle,
+    date.id,
+    date.ticketUrl
+  );
+  const ticketStatusClassName = getTicketStatusClassName(
+    date.ticketStatus,
+    canBuyTickets
+  );
+  const ticketStatusLabel = getTicketStatusLabel(
+    date.ticketStatus,
+    canBuyTickets
+  );
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 px-3 py-3'>
-      <div className='flex items-center justify-between gap-3'>
-        <div className='min-w-0'>
-          <div className='flex items-center gap-2'>
-            <p className='truncate text-sm font-[var(--font-weight-medium)] text-primary-token'>
-              {location}
-            </p>
-            {showNearbyBadge && (
-              <span className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs text-secondary-token'>
-                <MapPin className='h-3 w-3' />
-                {distanceMiles === null
-                  ? 'Nearby'
-                  : `${Math.round(distanceMiles)} mi`}
-              </span>
-            )}
-          </div>
-          <p className='mt-1 text-xs text-tertiary-token'>
-            {monthDayFormatter.format(parsedDate)} · {date.venueName}
+    <div className='flex items-center gap-3 border-t border-white/6 py-3 first:border-t-0'>
+      <DateBox date={date.startDate} />
+
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[0.95rem] font-[600] tracking-[-0.02em] text-white'>
+          {date.venueName}
+        </p>
+        <p className='mt-0.5 truncate text-[0.85rem] text-white/44'>
+          {location}
+        </p>
+        {showNearbyBadge && (
+          <p className='mt-1 inline-flex items-center gap-1 text-[0.78rem] font-medium text-white/54'>
+            <MapPin className='h-3 w-3' />
+            {distanceMiles === null
+              ? 'In your area'
+              : `${Math.round(distanceMiles)} mi away`}
           </p>
-        </div>
+        )}
+      </div>
+
+      <div className='shrink-0'>
         {canBuyTickets ? (
-          <Link
-            href={date.ticketUrl as string}
+          <a
+            href={date.ticketUrl ?? undefined}
+            onClick={handleTicketClick}
             target='_blank'
             rel='noopener noreferrer'
-            className='rounded-full bg-accent px-3 py-1.5 text-xs font-[var(--font-weight-medium)] text-white transition-colors hover:bg-accent/90'
+            className={`inline-flex items-center rounded-full border border-white/12 px-3 py-1 text-[0.82rem] font-[590] tracking-[-0.01em] transition-opacity hover:opacity-80 ${ticketStatusClassName}`}
           >
-            Tickets
-          </Link>
+            {ticketStatusLabel}
+          </a>
         ) : (
-          <span className='rounded-full bg-surface-2 px-3 py-1.5 text-xs text-tertiary-token'>
-            {date.ticketStatus === 'sold_out' ? 'Sold out' : 'No tickets'}
+          <span
+            className={`inline-flex items-center rounded-full border border-white/6 px-3 py-1 text-[0.82rem] font-[590] tracking-[-0.01em] ${ticketStatusClassName}`}
+          >
+            {ticketStatusLabel}
           </span>
         )}
       </div>
@@ -88,66 +138,199 @@ function TourDateRow({
   );
 }
 
+/** Section header in small caps */
+function SectionLabel({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <p className='mb-2 text-[0.76rem] font-[600] uppercase tracking-[0.06em] text-white/34'>
+      {children}
+    </p>
+  );
+}
+
+/** Collapsible disclosure for other cities */
+function OtherCitiesDisclosure({
+  count,
+  expanded,
+  onToggle,
+  children,
+  listId,
+}: {
+  readonly count: number;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+  readonly children: React.ReactNode;
+  readonly listId: string;
+}) {
+  return (
+    <div>
+      <button
+        type='button'
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={listId}
+        className='flex w-full items-center justify-between py-3 text-[0.85rem] font-[590] text-white/48 transition-colors hover:text-white/62 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(24,24,28)]'
+      >
+        <span>
+          {count} {count === 1 ? 'event' : 'events'} in other cities
+        </span>
+        <ChevronRight
+          className={`h-4 w-4 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+        />
+      </button>
+      {expanded && (
+        <div
+          id={listId}
+          className='animate-in fade-in slide-in-from-top-1 duration-200'
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TourDatesContent({
   artist,
   nearby,
-  remaining,
+  allDates,
+  hasLocation,
+  isLocationLoading,
 }: {
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
-  readonly remaining: TourDateWithProximity[];
+  readonly allDates: TourDateWithProximity[];
+  readonly hasLocation: boolean;
+  readonly isLocationLoading: boolean;
 }) {
-  if (nearby.length === 0 && remaining.length === 0) {
+  const [showAllDates, setShowAllDates] = useState(false);
+  const disclosureId = useId();
+
+  // State 3: No dates at all
+  if (allDates.length === 0) {
     return (
-      <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-center'>
-        <div className='mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>
-          <Calendar className='h-5 w-5 text-tertiary-token' />
-        </div>
-        <p className='mt-2 text-sm text-secondary-token'>
-          {artist.name} is not currently on tour. Get notified when dates are
-          announced.
+      <div className='space-y-4'>
+        <p className='text-[1.02rem] font-[600] tracking-[-0.02em] text-white'>
+          No upcoming events.
         </p>
-        <div className='mt-4 flex justify-center'>
-          <Link
-            href={`/${artist.handle}/notifications`}
-            className='inline-flex w-full items-center justify-center rounded-full bg-accent px-4 py-2.5 text-sm font-[var(--font-weight-medium)] text-white transition-colors hover:bg-accent/90'
-          >
-            Turn on notifications
-          </Link>
-        </div>
+        <ArtistNotificationsCTA
+          artist={artist}
+          forceExpanded
+          hideListenFallback
+          source='tour_drawer'
+        />
       </div>
     );
   }
 
+  // State 4 & 5: No geolocation or still loading
+  // While geo is loading OR denied, show all dates without Near You section.
+  // This prevents the jarring flip from "All Dates" to "No events near you" CTA.
+  if (!hasLocation || isLocationLoading) {
+    return (
+      <div>
+        <SectionLabel>All Dates</SectionLabel>
+        {allDates.map(item => (
+          <TourDateRow
+            key={item.date.id}
+            artistHandle={artist.handle}
+            date={item.date}
+            distanceMiles={item.distanceMiles}
+            showNearbyBadge={false}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // State 1: Has nearby dates
+  if (nearby.length > 0) {
+    return (
+      <div className='space-y-5'>
+        <section>
+          <SectionLabel>Events near you</SectionLabel>
+          {nearby.map(item => (
+            <TourDateRow
+              key={`nearby-${item.date.id}`}
+              artistHandle={artist.handle}
+              date={item.date}
+              distanceMiles={item.distanceMiles}
+              showNearbyBadge
+            />
+          ))}
+        </section>
+
+        <section>
+          <SectionLabel>All Dates</SectionLabel>
+          {allDates.map(item => (
+            <TourDateRow
+              key={item.date.id}
+              artistHandle={artist.handle}
+              date={item.date}
+              distanceMiles={item.distanceMiles}
+              showNearbyBadge={false}
+            />
+          ))}
+        </section>
+      </div>
+    );
+  }
+
+  // State 2 & 2b: No nearby dates, but dates exist (CONVERSION STATE)
   return (
-    <div className='space-y-3'>
-      {nearby.map(item => (
-        <TourDateRow
-          key={item.date.id}
-          date={item.date}
-          distanceMiles={item.distanceMiles}
-          showNearbyBadge
-        />
-      ))}
-
-      {nearby.length > 0 && remaining.length > 0 && (
-        <div className='flex items-center gap-2 px-1 py-2'>
-          <div className='h-px flex-1 bg-subtle' />
-          <span className='text-2xs uppercase tracking-wide text-tertiary-token'>
-            All upcoming dates
-          </span>
-          <div className='h-px flex-1 bg-subtle' />
+    <div className='space-y-4'>
+      <section>
+        <p className='text-[1.02rem] font-[600] tracking-[-0.02em] text-white'>
+          No events near you.
+        </p>
+        <div className='mt-4'>
+          <ArtistNotificationsCTA
+            artist={artist}
+            forceExpanded
+            hideListenFallback
+            source='tour_drawer'
+          />
         </div>
-      )}
+      </section>
 
-      {remaining.map(item => (
-        <TourDateRow
-          key={item.date.id}
-          date={item.date}
-          distanceMiles={item.distanceMiles}
-          showNearbyBadge={false}
-        />
-      ))}
+      <OtherCitiesDisclosure
+        count={allDates.length}
+        expanded={showAllDates}
+        onToggle={() => setShowAllDates(prev => !prev)}
+        listId={disclosureId}
+      >
+        {allDates.map(item => (
+          <TourDateRow
+            key={item.date.id}
+            artistHandle={artist.handle}
+            date={item.date}
+            distanceMiles={item.distanceMiles}
+            showNearbyBadge={false}
+          />
+        ))}
+      </OtherCitiesDisclosure>
+    </div>
+  );
+}
+
+export function TourDrawerContent({
+  artist,
+  tourDates,
+}: Readonly<{
+  readonly artist: Artist;
+  readonly tourDates: TourDateViewModel[];
+}>) {
+  const { location, isLoading } = useUserLocation();
+  const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
+
+  return (
+    <div data-testid='tour-drawer-content'>
+      <TourDatesContent
+        artist={artist}
+        nearby={nearbyDates}
+        allDates={allDates}
+        hasLocation={location !== null}
+        isLocationLoading={isLoading}
+      />
     </div>
   );
 }
@@ -158,93 +341,43 @@ export function TourModePanel({
 }: Readonly<TourModePanelProps>) {
   const isMobile = useBreakpointDown('md');
   const router = useRouter();
-  const { location } = useUserLocation();
+  const hasNoDates = tourDates.length === 0;
 
-  const { nearbyDates, remainingDates } = useMemo(() => {
-    const withDistance: TourDateWithProximity[] = tourDates.map(date => {
-      if (location && date.latitude != null && date.longitude != null) {
-        const distanceMiles = calculateDistanceMiles(location, {
-          latitude: date.latitude,
-          longitude: date.longitude,
-        });
+  if (hasNoDates) {
+    if (!isMobile) {
+      return <TourDrawerContent artist={artist} tourDates={tourDates} />;
+    }
 
-        return {
-          date,
-          distanceMiles,
-          isNearby: distanceMiles <= NEARBY_MILES_THRESHOLD,
-        };
-      }
-
-      return {
-        date,
-        distanceMiles: null,
-        isNearby: false,
-      };
-    });
-
-    const nearbyDates = withDistance
-      .filter(item => item.isNearby)
-      .sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0));
-
-    const remainingDates = withDistance
-      .filter(item => !item.isNearby)
-      .sort(
-        (a, b) =>
-          new Date(a.date.startDate).getTime() -
-          new Date(b.date.startDate).getTime()
-      );
-
-    return { nearbyDates, remainingDates };
-  }, [tourDates, location]);
-
-  const showSummaryHeader = tourDates.length > 0;
-
-  const content = (
-    <div className='space-y-4'>
-      {showSummaryHeader && (
-        <p className='text-sm text-secondary-token'>
-          {tourDates.length} upcoming{' '}
-          {tourDates.length === 1 ? 'show' : 'shows'}
-        </p>
-      )}
-      <TourDatesContent
-        artist={artist}
-        nearby={nearbyDates}
-        remaining={remainingDates}
-      />
-    </div>
-  );
+    return (
+      <ProfileDrawerShell
+        open
+        onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
+        title='Tour Dates'
+        dataTestId='tour-drawer'
+      >
+        <TourDrawerContent artist={artist} tourDates={tourDates} />
+      </ProfileDrawerShell>
+    );
+  }
 
   if (!isMobile) {
     return (
       <div className='max-h-[min(62vh,560px)] overflow-y-auto pr-1'>
-        {content}
+        <TourDrawerContent artist={artist} tourDates={tourDates} />
       </div>
     );
   }
 
   return (
-    <Drawer.Root
+    <ProfileDrawerShell
       open
       onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
+      title='Tour Dates'
+      contentClassName='bg-[rgb(24,24,28)] border-white/8'
+      bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
+      dataTestId='tour-drawer'
     >
-      <Drawer.Portal>
-        <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
-        <Drawer.Content
-          className={cn(
-            'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
-          )}
-          aria-describedby={undefined}
-        >
-          <div className='mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-quaternary-token/40' />
-          <Drawer.Title className='px-6 pb-2 pt-4 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
-            {artist.name} tour dates
-          </Drawer.Title>
-          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-            {content}
-          </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+      <TourDrawerContent artist={artist} tourDates={tourDates} />
+    </ProfileDrawerShell>
   );
 }

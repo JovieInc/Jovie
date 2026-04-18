@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Smoke Test Playwright Configuration
  *
- * Focused config for the 4 required smoke test files that gate production deploys.
+ * Focused config for the highest-signal smoke test files that gate production deploys.
  * Optimized for speed: higher parallelism, shorter timeouts, no video recording.
  *
  * Usage:
@@ -18,13 +18,20 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
   extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
 }
 
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
+
 export default defineConfig({
   testDir: './tests/e2e',
-  // Only include the 4 required smoke test files
+  // Keep this lane limited to the highest-signal unauthenticated/public/auth flows.
   testMatch: [
     'smoke-public.spec.ts',
     'golden-path.spec.ts',
-    'content-gate.spec.ts',
+    'signup-funnel.smoke.spec.ts',
     'smoke-auth.spec.ts',
   ],
   fullyParallel: true,
@@ -43,7 +50,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: 'off',
     navigationTimeout: 60_000,
@@ -76,10 +83,10 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
           },
-          url: 'http://localhost:3100',
+          url: managedWebServerUrl.origin,
           reuseExistingServer: true,
           timeout: 300000,
           stdout: 'pipe',

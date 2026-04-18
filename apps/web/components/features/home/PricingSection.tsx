@@ -6,46 +6,73 @@ import { Container } from '@/components/site/Container';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
-  'Get live fast with a smart artist profile',
-  'Build your email list and prove demand',
-  'Start building an owned audience',
+  'Launch unlimited smart links',
+  'Build a release-ready artist profile',
+  'See core audience and click activity',
 ] as const;
 
-const FOUNDING_OUTCOMES = [
-  'Own and export your full fan list',
-  'See richer analytics and export contacts',
-  'Support bigger release campaigns without extra tools',
+const PRO_OUTCOMES = [
+  'Send paid release notifications to fans',
+  'Unlock deeper audience intelligence',
+  'Run every release from one branded home',
+] as const;
+
+const FREE_FEATURE_PREVIEW = [
+  'Unlimited smart links',
+  'Public artist profile page',
+  'Basic analytics (30 days)',
+] as const;
+
+const PRO_FEATURE_PREVIEW = [
+  'Release notifications',
+  'Advanced analytics & geographic insights',
+  'Contact export',
 ] as const;
 
 export function PricingSection() {
   const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
-  const foundingPlan = ENTITLEMENT_REGISTRY.founding.marketing;
+  const proPlan = ENTITLEMENT_REGISTRY.pro.marketing;
+  const freeIncludes = freePlan.features.filter(feature =>
+    FREE_FEATURE_PREVIEW.includes(
+      feature as (typeof FREE_FEATURE_PREVIEW)[number]
+    )
+  );
+  const proIncludes = proPlan.features.filter(feature =>
+    PRO_FEATURE_PREVIEW.includes(
+      feature as (typeof PRO_FEATURE_PREVIEW)[number]
+    )
+  );
 
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
+    <section
+      id='pricing'
+      className='section-spacing-linear relative overflow-hidden bg-page'
+    >
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
-            <Badge variant='outline' size='xl'>
-              Pricing
-            </Badge>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Simple pricing.
-            </h2>
-            <p className='max-w-md marketing-lead-linear text-secondary-token'>
-              Get live for free. Upgrade for deeper analytics and full control.
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro reveal-on-scroll'>
+            <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
+                Simple pricing.
+              </h2>
+            </div>
+            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
+              Start free with smart links and your artist profile. Upgrade when
+              you want release notifications, deeper audience intelligence, and
+              stronger fan ownership.
             </p>
           </div>
 
           <div
-            className='reveal-on-scroll mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-2'
+            className='homepage-section-stack reveal-on-scroll mx-auto grid max-w-[58rem] grid-cols-1 gap-4 md:grid-cols-2 md:gap-5'
             data-delay='80'
           >
             <div
-              className='relative flex flex-col rounded-xl p-8'
+              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
+                boxShadow: 'var(--linear-shadow-card)',
               }}
             >
               <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
@@ -58,11 +85,10 @@ export function PricingSection() {
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Get live, build your email list, and prove it works — then
-                decide.
+                Smart links, your artist profile, and the core launch surface.
               </p>
 
-              <ul className='mt-8 flex flex-1 flex-col gap-3'>
+              <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -74,12 +100,12 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+              <div className='mt-5 rounded-[0.9rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  {freePlan.features.slice(0, 4).join(' • ')}
+                  {freeIncludes.join(' • ')}
                 </p>
               </div>
 
@@ -87,16 +113,17 @@ export function PricingSection() {
                 asChild
                 variant='secondary'
                 size='xl'
-                className='mt-8 w-full'
+                className='mt-7 w-full'
               >
                 <Link href='/signup?plan=free'>Launch for Free</Link>
               </Button>
             </div>
 
             <div
-              className='relative flex flex-col overflow-hidden rounded-xl p-8'
+              className='relative flex h-full flex-col overflow-hidden rounded-[1rem] p-6 md:p-7'
               style={{
-                backgroundColor: 'var(--linear-bg-surface-0)',
+                background:
+                  'linear-gradient(180deg, color-mix(in oklab, var(--linear-bg-surface-0) 78%, rgba(113,112,255,0.16)) 0%, var(--linear-bg-surface-0) 36%)',
                 border: '1px solid var(--linear-pricing-accent-border)',
                 boxShadow:
                   'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-pricing-accent-shadow)',
@@ -112,7 +139,7 @@ export function PricingSection() {
               />
               <div className='flex items-center justify-between'>
                 <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
-                  {foundingPlan.displayName}
+                  {proPlan.displayName}
                 </p>
                 <Badge variant='default' size='lg'>
                   Limited time
@@ -120,17 +147,17 @@ export function PricingSection() {
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-primary-token'>
-                  ${foundingPlan.price?.monthly ?? 0}
+                  ${proPlan.price?.monthly ?? 0}
                 </span>
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Unlock deeper analytics, remove branding, and scale once your
-                profile is working.
+                Release notifications, audience intelligence, contact export,
+                and deeper fan ownership.
               </p>
 
-              <ul className='mt-8 flex flex-1 flex-col gap-3'>
-                {FOUNDING_OUTCOMES.map(feature => (
+              <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
+                {PRO_OUTCOMES.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-secondary-token'
@@ -141,15 +168,18 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+              <div
+                className='mt-5 rounded-[0.9rem] border border-subtle p-4'
+                style={{
+                  backgroundColor:
+                    'color-mix(in oklab, var(--linear-bg-surface-1) 95%, transparent)',
+                }}
+              >
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  {foundingPlan.features
-                    .filter(feature => !feature.endsWith('+'))
-                    .slice(0, 4)
-                    .join(' • ')}
+                  {proIncludes.join(' • ')}
                 </p>
               </div>
 
@@ -157,9 +187,9 @@ export function PricingSection() {
                 asChild
                 variant='accent'
                 size='xl'
-                className='mt-8 w-full'
+                className='mt-7 w-full text-[var(--linear-btn-primary-fg)] hover:text-[var(--linear-btn-primary-fg)]'
               >
-                <Link href='/signup?plan=founding'>Choose Founding Member</Link>
+                <Link href='/signup?plan=pro'>Choose Pro</Link>
               </Button>
             </div>
           </div>

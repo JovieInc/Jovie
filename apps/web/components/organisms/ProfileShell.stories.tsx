@@ -16,9 +16,7 @@ const mockArtist: Artist = {
   is_featured: false,
   marketing_opt_out: false,
   created_at: '2023-01-01T00:00:00Z',
-  settings: {
-    hide_branding: false,
-  },
+  settings: {},
 };
 
 const mockSocialLinks: LegacySocialLink[] = [
@@ -98,7 +96,7 @@ const meta: Meta<typeof ProfileShell> = {
     showSocialBar: {
       control: 'boolean',
     },
-    showTipButton: {
+    showPayButton: {
       control: 'boolean',
     },
     showBackButton: {
@@ -131,7 +129,7 @@ const meta: Meta<typeof ProfileShell> = {
     socialLinks: mockSocialLinks,
     subtitle: 'Music producer and songwriter',
     showSocialBar: true,
-    showTipButton: true,
+    showPayButton: true,
     showBackButton: false,
     showFooter: true,
     showNotificationButton: false,
@@ -249,11 +247,11 @@ export const WithWiderLayout: Story = {
   ),
 };
 
-// Story with no social bar or tip button
+// Story with no social bar or pay button
 export const MinimalControls: Story = {
   args: {
     showSocialBar: false,
-    showTipButton: false,
+    showPayButton: false,
   },
   render: args => (
     <ProfileShell {...args}>

@@ -93,11 +93,11 @@ export function AudienceTableHeader({
   return (
     <thead
       className={cn(
-        'sticky top-0 z-20 bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_var(--linear-border-subtle)]',
-        headerElevated && 'shadow-card shadow-black/10 dark:shadow-black/40'
+        'sticky top-0 z-20 bg-(--linear-app-content-surface) shadow-inset-divider',
+        headerElevated && 'shadow-inset-divider'
       )}
     >
-      <tr className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <tr className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
           <Checkbox
             aria-label='Select all'
@@ -174,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/50 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

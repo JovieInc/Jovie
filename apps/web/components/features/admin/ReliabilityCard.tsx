@@ -1,8 +1,15 @@
-import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  HardDrive,
+  Rocket,
+  Siren,
+} from 'lucide-react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminReliabilitySummary } from '@/lib/admin/overview';
+import type { AdminReliabilitySummary } from '@/lib/admin/types';
 
 interface ReliabilityCardProps {
   readonly summary: AdminReliabilitySummary;
@@ -15,7 +22,13 @@ type HealthTone = {
 };
 
 function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
-  if (summary.incidents24h >= 5 || summary.errorRatePercent >= 5) {
+  if (
+    summary.incidents24h >= 5 ||
+    summary.errorRatePercent >= 5 ||
+    !summary.redisAvailable ||
+    summary.deploymentAvailability === 'error' ||
+    summary.deploymentState === 'failure'
+  ) {
     return {
       label: 'Critical',
       labelClassName: 'text-error',
@@ -23,7 +36,12 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
     };
   }
 
-  if (summary.incidents24h >= 1 || summary.errorRatePercent >= 1) {
+  if (
+    summary.incidents24h >= 1 ||
+    summary.errorRatePercent >= 1 ||
+    summary.unresolvedSentryIssues24h > 0 ||
+    summary.deploymentState === 'in_progress'
+  ) {
     return {
       label: 'Needs attention',
       labelClassName: 'text-warning',
@@ -38,6 +56,20 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
   };
 }
 
+const DEPLOYMENT_STATE_LABELS: Record<string, string> = {
+  in_progress: 'In progress',
+  failure: 'Failed',
+  success: 'Healthy',
+};
+
+function getDeploymentLabel(summary: AdminReliabilitySummary): string {
+  if (summary.deploymentAvailability === 'not_configured')
+    return 'Not configured';
+  if (summary.deploymentAvailability === 'error') return 'Unavailable';
+  if (summary.deploymentState === null) return 'Unknown';
+  return DEPLOYMENT_STATE_LABELS[summary.deploymentState] ?? 'Unknown';
+}
+
 export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
   const tone = getHealthTone(summary);
   const errorRateLabel = `${summary.errorRatePercent.toFixed(2)}%`;
@@ -46,6 +78,9 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
       ? '—'
       : `${summary.p95LatencyMs.toFixed(0)}ms`;
   const incidentsLabel = summary.incidents24h.toLocaleString();
+  const sentryIssuesLabel = summary.unresolvedSentryIssues24h.toLocaleString();
+  const redisLabel = summary.redisAvailable ? 'Available' : 'Unavailable';
+  const deploymentLabel = getDeploymentLabel(summary);
   const lastIncidentLabel = summary.lastIncidentAt
     ? summary.lastIncidentAt.toISOString().slice(0, 10)
     : '—';
@@ -60,9 +95,9 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             {tone.label}
           </span>
         }
-        className='px-5 py-3'
+        className='px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='space-y-3 p-5 text-[12px] leading-[17px] text-secondary-token'>
+      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-[12px] leading-[17px] text-secondary-token'>
         <ContentMetricRow
           label='Error rate'
           value={errorRateLabel}
@@ -81,6 +116,38 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           icon={summary.incidents24h > 0 ? AlertTriangle : CheckCircle2}
           iconClassName={
             summary.incidents24h > 0 ? tone.iconClassName : 'text-success'
+          }
+        />
+        <ContentMetricRow
+          label='Sentry issues'
+          value={sentryIssuesLabel}
+          icon={summary.unresolvedSentryIssues24h > 0 ? Siren : CheckCircle2}
+          iconClassName={
+            summary.unresolvedSentryIssues24h > 0
+              ? tone.iconClassName
+              : 'text-success'
+          }
+        />
+        <ContentMetricRow
+          label='Redis'
+          value={redisLabel}
+          icon={summary.redisAvailable ? CheckCircle2 : HardDrive}
+          iconClassName={summary.redisAvailable ? 'text-success' : 'text-error'}
+        />
+        <ContentMetricRow
+          label='Deploys'
+          value={deploymentLabel}
+          icon={
+            summary.deploymentAvailability === 'available' &&
+            summary.deploymentState !== 'failure'
+              ? Rocket
+              : AlertTriangle
+          }
+          iconClassName={
+            summary.deploymentAvailability === 'available' &&
+            summary.deploymentState === 'success'
+              ? 'text-success'
+              : tone.iconClassName
           }
         />
 

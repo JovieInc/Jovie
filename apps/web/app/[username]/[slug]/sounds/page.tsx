@@ -8,40 +8,34 @@
  */
 
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import {
+  isVideoProviderKey,
   VIDEO_PROVIDER_CONFIG,
   VIDEO_PROVIDER_KEYS,
 } from '@/lib/discography/video-providers';
-import { trackServerEvent } from '@/lib/server-analytics';
-import { extractUTMParams } from '@/lib/utm';
-import { getContentBySlug, getCreatorByUsername } from '../_lib/data';
+import {
+  getContentBySlug,
+  getCreatorByUsername,
+  getFeaturedSmartLinkStaticParams,
+} from '../_lib/data';
+import { PreserveSearchRedirect } from '../PreserveSearchRedirect';
 import { SoundsLandingPage } from './SoundsLandingPage';
 
 export const revalidate = 300;
 
-interface PageProps {
-  readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+export async function generateStaticParams() {
+  return await getFeaturedSmartLinkStaticParams();
 }
 
-export default async function SoundsPage({
-  params,
-  searchParams,
-}: Readonly<PageProps>) {
+interface PageProps {
+  readonly params: Promise<{ username: string; slug: string }>;
+}
+
+export default async function SoundsPage({ params }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const allSearchParams = await searchParams;
-  const requestSearchParams = new URLSearchParams(
-    Object.entries(allSearchParams).flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map(v => [key, v]);
-      }
-      return typeof value === 'string' ? [[key, value]] : [];
-    })
-  );
-  const utmParams = extractUTMParams(requestSearchParams);
 
   if (!username || !slug) {
     notFound();
@@ -61,14 +55,16 @@ export default async function SoundsPage({
 
   // Filter to only video provider links
   const videoLinks = content.providerLinks.filter(link =>
-    (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+    isVideoProviderKey(link.providerId)
   );
 
   // No video links — redirect to the main smart link
   if (videoLinks.length === 0) {
-    const queryString = requestSearchParams.toString();
-    const suffix = queryString ? `?${queryString}` : '';
-    redirect(`/${creator.usernameNormalized}/${content.slug}${suffix}`);
+    return (
+      <PreserveSearchRedirect
+        href={`/${creator.usernameNormalized}/${content.slug}`}
+      />
+    );
   }
 
   // Build video provider data for the page
@@ -95,15 +91,6 @@ export default async function SoundsPage({
     } => p !== null
   );
 
-  // Track page view
-  void trackServerEvent('sounds_page_viewed', {
-    contentType: content.type,
-    contentId: content.id,
-    profileId: creator.id,
-    contentTitle: content.title,
-    videoProviderCount: videoLinks.length,
-  });
-
   const smartLinkPath = `/${creator.usernameNormalized}/${content.slug}`;
 
   return (
@@ -118,7 +105,11 @@ export default async function SoundsPage({
       }}
       videoProviders={videoProviders}
       smartLinkPath={smartLinkPath}
-      utmParams={utmParams}
+      tracking={{
+        contentType: content.type,
+        contentId: content.id,
+        smartLinkSlug: content.slug,
+      }}
     />
   );
 }
@@ -144,7 +135,12 @@ export async function generateMetadata({
   }
 
   const artistName = creator.displayName ?? creator.username;
-  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}/sounds`;
+  const hasVideoLinks = content.providerLinks.some(link =>
+    isVideoProviderKey(link.providerId)
+  );
+  const canonicalUrl = hasVideoLinks
+    ? `${BASE_URL}/${creator.usernameNormalized}/${content.slug}/sounds`
+    : `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
   const title = `Use "${content.title}" by ${artistName} — Create with this sound`;
   const description = `Create short-form videos with "${content.title}" by ${artistName}. Use this sound on TikTok, Instagram Reels, and YouTube Shorts.`;

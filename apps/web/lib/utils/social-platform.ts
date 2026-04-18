@@ -112,6 +112,23 @@ const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
 };
 
 /**
+ * Resolve the first meaningful path segment for a given host,
+ * skipping known non-handle prefixes like snapchat.com/add.
+ * Returns null when the URL cannot yield a handle.
+ */
+function resolveHandleSegment(host: string, segments: string[]): string | null {
+  const first = segments[0];
+  if (host.includes('snapchat.com') && first === 'add')
+    return segments[1] ?? null;
+  if (
+    host.includes('facebook.com') &&
+    (first === 'profile.php' || first === 'pages')
+  )
+    return null;
+  return first ?? null;
+}
+
+/**
  * Extract username/handle from a social media URL.
  *
  * This function attempts to parse a social media URL and extract the username
@@ -141,29 +158,19 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
 
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
-      if (config.hosts.includes(host)) {
-        const segments = url.pathname.split('/').filter(Boolean);
+      if (!config.hosts.includes(host)) continue;
 
-        // Skip known non-handle path prefixes for specific platforms
-        let seg = segments[0];
-        if (host.includes('snapchat.com') && seg === 'add') {
-          seg = segments[1];
-        } else if (
-          host.includes('facebook.com') &&
-          (seg === 'profile.php' || seg === 'pages')
-        ) {
-          return null; // Facebook legacy URLs don't have extractable handles
-        }
-        if (!seg) return null;
+      const segments = url.pathname.split('/').filter(Boolean);
+      const seg = resolveHandleSegment(host, segments);
+      if (!seg) return null;
 
-        // YouTube requires @ symbol, others allow it optionally
-        if (config.requiresAtSymbol) {
-          return seg.startsWith('@') ? seg.slice(1) : null;
-        }
-
-        // Strip @ symbol if present
-        return seg.replace(/^@/, '');
+      // YouTube requires @ symbol, others allow it optionally
+      if (config.requiresAtSymbol) {
+        return seg.startsWith('@') ? seg.slice(1) : null;
       }
+
+      // Strip @ symbol if present
+      return seg.replace(/^@/, '');
     }
 
     // Unsupported platform or unable to extract

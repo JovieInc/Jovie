@@ -2,26 +2,36 @@
 
 ## CRITICAL: Icon Library Standards
 
-**Purpose:** Enforce consistent icon usage across the Jovie codebase using standardized libraries.  
+**Purpose:** Enforce consistent icon usage across the Jovie codebase using standardized libraries.
 **Scope:** All AI-generated code must follow these icon usage patterns.
 
 ---
 
 ## **1. Icon Library Hierarchy**
 
-### **Heroicons v2 - General Purpose Icons (FIRST CHOICE)**
+### **Lucide React - General Purpose Icons (FIRST CHOICE)**
 
-Use `@heroicons/react` for ALL general-purpose UI icons:
+Use `lucide-react` for ALL general-purpose UI icons:
 
 ```typescript
-// ✅ CORRECT: Use Heroicons for general UI icons
-import { ChevronRightIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
-import { HeartIcon, StarIcon } from '@heroicons/react/24/solid';
+// ✅ CORRECT: Use Lucide React for general UI icons
+import { ChevronRight, X, Check } from 'lucide-react';
+import { Heart, Star } from 'lucide-react';
 
 // Navigation, actions, states, UI elements
-<ChevronRightIcon className="h-5 w-5" />
-<XMarkIcon className="h-4 w-4" />
-<CheckIcon className="h-5 w-5" />
+<ChevronRight className="h-5 w-5" />
+<X className="h-4 w-4" />
+<Check className="h-5 w-5" />
+```
+
+Or via the Icon wrapper component:
+
+```typescript
+// ✅ CORRECT: Use Icon wrapper (registry-based)
+import { Icon } from '@/components/atoms/Icon';
+
+<Icon name="ChevronRight" className="h-5 w-5" />
+<Icon name="X" className="h-4 w-4" />
 ```
 
 ### **SimpleIcons - Social Media, DSP, Brand Icons (SECOND CHOICE)**
@@ -39,7 +49,7 @@ Use the existing `SocialIcon` component for social media, DSPs, and brand icons:
 
 Only use custom SVGs for:
 - Jovie brand logos (`/brand/jovie-logo.svg`, `/brand/Jovie-Logo-Icon.svg`)
-- Unique UI elements that don't exist in Heroicons or SimpleIcons
+- Unique UI elements that don't exist in Lucide React or SimpleIcons
 
 ```typescript
 // ✅ ACCEPTABLE: Brand logos only
@@ -58,21 +68,21 @@ Only use custom SVGs for:
 ### **For IconButton Component**
 
 ```typescript
-// ✅ CORRECT: Use Heroicons with IconButton
-import { CogIcon } from '@heroicons/react/24/outline';
+// ✅ CORRECT: Use Lucide React with IconButton
+import { Settings } from 'lucide-react';
 
 <IconButton ariaLabel="Settings">
-  <CogIcon className="h-4 w-4" />
+  <Settings className="h-4 w-4" />
 </IconButton>
 ```
 
 ### **For IconBadge Component**
 
 ```typescript
-// ✅ CORRECT: Use Heroicons with IconBadge
-import { BoltIcon } from '@heroicons/react/24/outline';
+// ✅ CORRECT: Use Lucide React with IconBadge
+import { Bolt } from 'lucide-react';
 
-<IconBadge Icon={BoltIcon} colorVar="--color-yellow-500" />
+<IconBadge Icon={Bolt} colorVar="--color-yellow-500" />
 ```
 
 ### **For Social Media Icons**
@@ -104,8 +114,11 @@ import CustomIcon from './custom-icon.svg';
 import { siSpotify } from 'simple-icons';
 <svg><path d={siSpotify.path} /></svg>
 
-// ❌ DO NOT: Custom icons when Heroicons equivalent exists
-<CustomChevronIcon /> // Use ChevronRightIcon instead
+// ❌ DO NOT: Custom icons when Lucide React equivalent exists
+<CustomChevronIcon /> // Use ChevronRight instead
+
+// ❌ DO NOT: Import from @heroicons/react (not installed)
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 ```
 
 ---
@@ -119,15 +132,15 @@ When generating code that needs an icon:
    - NO → Continue to step 2
 
 2. **Is it a general UI icon (navigation, actions, states)?**
-   - YES → Use Heroicons from `@heroicons/react/24/outline` or `/24/solid`
+   - YES → Use Lucide React: `import { IconName } from 'lucide-react'`
    - NO → Continue to step 3
 
 3. **Is it the Jovie brand logo?**
    - YES → Use `/brand/jovie-logo.svg` or `/brand/Jovie-Logo-Icon.svg`
    - NO → Continue to step 4
 
-4. **Does an equivalent exist in Heroicons?**
-   - YES → Use Heroicons
+4. **Does an equivalent exist in Lucide React?**
+   - YES → Use Lucide React
    - NO → Ask user for clarification or approval for custom SVG
 
 ---
@@ -135,24 +148,24 @@ When generating code that needs an icon:
 ## **5. COMMON ICON MAPPINGS**
 
 ### **Navigation Icons**
-- Chevron/Arrow: `ChevronRightIcon`, `ArrowLeftIcon`
-- Menu: `Bars3Icon`
-- Home: `HomeIcon`
-- Back: `ArrowLeftIcon`
+- Chevron/Arrow: `ChevronRight`, `ChevronLeft`, `ArrowLeft`, `ArrowRight`
+- Menu: `Menu`
+- Home: `Home`
+- Back: `ArrowLeft`
 
 ### **Action Icons**
-- Add: `PlusIcon`
-- Delete: `TrashIcon`
-- Edit: `PencilIcon`
-- Share: `ShareIcon`
-- Search: `MagnifyingGlassIcon`
-- Settings: `CogIcon`
+- Add: `Plus`
+- Delete: `Trash`, `Trash2`
+- Edit: `Pencil`, `PencilLine`
+- Share: `Share`
+- Search: `Search`
+- Settings: `Settings`
 
 ### **State Icons**
-- Success: `CheckIcon`, `CheckCircleIcon`
-- Error: `XMarkIcon`, `XCircleIcon`
-- Warning: `ExclamationTriangleIcon`
-- Info: `InformationCircleIcon`
+- Success: `Check`, `CheckCircle`
+- Error: `X`, `XCircle`
+- Warning: `AlertTriangle`
+- Info: `Info`
 
 ### **Social/Brand Icons**
 - Music: `spotify`, `applemusic`, `soundcloud`, `bandcamp`
@@ -170,7 +183,7 @@ Use consistent sizing classes:
 
 ```typescript
 // ✅ CORRECT: Consistent sizing
-<ChevronRightIcon className="h-5 w-5" />
+<ChevronRight className="h-5 w-5" />
 <SocialIcon platform="spotify" className="h-4 w-4" />
 ```
 
@@ -180,12 +193,12 @@ Use consistent sizing classes:
 
 Before generating any icon-related code, verify:
 
-1. ✅ Using Heroicons for general UI icons?
-2. ✅ Using SocialIcon component for social/brand icons?
-3. ✅ No direct SVG imports for standard icons?
-4. ✅ No inline SVG for icons that exist in libraries?
-5. ✅ Proper sizing classes applied?
-6. ✅ Accessibility attributes included?
+1. Using Lucide React for general UI icons?
+2. Using SocialIcon component for social/brand icons?
+3. No direct SVG imports for standard icons?
+4. No inline SVG for icons that exist in libraries?
+5. Proper sizing classes applied?
+6. Accessibility attributes included?
 
 If any check fails, revise the code to comply with these standards.
 
@@ -193,10 +206,10 @@ If any check fails, revise the code to comply with these standards.
 
 ## **8. RESOURCES**
 
-- **Heroicons Browser**: [heroicons.com](https://heroicons.com)
+- **Lucide React Browser**: [lucide.dev](https://lucide.dev)
 - **SimpleIcons Browser**: [simpleicons.org](https://simpleicons.org)
 - **SocialIcon Component**: `components/atoms/SocialIcon.tsx`
+- **Icon Component**: `components/atoms/Icon.tsx`
 - **IconButton Component**: `components/atoms/IconButton.tsx`
 - **IconBadge Component**: `components/atoms/IconBadge.tsx`
 - **Full Documentation**: `docs/ICON_STANDARDS.md`
-

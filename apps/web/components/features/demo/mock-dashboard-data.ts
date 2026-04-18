@@ -8,8 +8,10 @@
 
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import type { CreatorProfile } from '@/lib/db/schema/profiles';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
 const now = new Date();
+const DEFAULT_PERSONA = INTERNAL_DJ_DEMO_PERSONA.profile;
 
 /**
  * Default demo profile fields. Can be overridden by a FeaturedCreator
@@ -19,31 +21,32 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   id: 'demo-profile',
   userId: 'demo-user-001',
   waitlistEntryId: null,
-  creatorType: 'artist',
-  username: 'timwhite',
-  usernameNormalized: 'timwhite',
-  displayName: 'Tim White',
-  bio: 'Artist',
-  venmoHandle: null,
-  avatarUrl:
-    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
-  spotifyUrl: 'https://open.spotify.com/artist/demo',
-  appleMusicUrl: null,
-  youtubeUrl: null,
-  spotifyId: null,
-  appleMusicId: null,
-  youtubeMusicId: null,
-  deezerId: null,
-  tidalId: null,
-  soundcloudId: null,
+  creatorType: DEFAULT_PERSONA.creatorType,
+  username: DEFAULT_PERSONA.handle,
+  usernameNormalized: DEFAULT_PERSONA.handle,
+  displayName: DEFAULT_PERSONA.displayName,
+  bio: DEFAULT_PERSONA.bio,
+  careerHighlights: null,
+  targetPlaylists: null,
+  venmoHandle: DEFAULT_PERSONA.venmoHandle,
+  avatarUrl: DEFAULT_PERSONA.avatarSrc,
+  spotifyUrl: DEFAULT_PERSONA.spotifyUrl,
+  appleMusicUrl: DEFAULT_PERSONA.appleMusicUrl,
+  youtubeUrl: DEFAULT_PERSONA.youtubeUrl,
+  spotifyId: DEFAULT_PERSONA.spotifyArtistId,
+  appleMusicId: DEFAULT_PERSONA.appleMusicArtistId,
+  youtubeMusicId: DEFAULT_PERSONA.youtubeMusicArtistId,
+  deezerId: DEFAULT_PERSONA.deezerArtistId,
+  tidalId: DEFAULT_PERSONA.tidalArtistId,
+  soundcloudId: DEFAULT_PERSONA.soundcloudArtistId,
   musicbrainzId: null,
-  bandsintownArtistName: null,
+  bandsintownArtistName: DEFAULT_PERSONA.bandsintownArtistName,
   bandsintownApiKey: null,
   isPublic: true,
   isVerified: true,
-  isFeatured: true,
+  isFeatured: DEFAULT_PERSONA.isFeaturedByDefault,
   marketingOptOut: false,
-  isClaimed: true,
+  isClaimed: DEFAULT_PERSONA.isClaimedByDefault,
   claimToken: null,
   claimedAt: now,
   claimTokenExpiresAt: null,
@@ -51,9 +54,9 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   claimedUserAgent: null,
   avatarLockedByUser: false,
   displayNameLocked: false,
+  usernameLockedAt: null,
   ingestionStatus: 'idle',
   lastIngestionError: null,
-  lastLoginAt: now,
   profileViews: 2_847,
   onboardingCompletedAt: now,
   settings: {},
@@ -69,20 +72,23 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   fitScore: null,
   fitScoreBreakdown: null,
   fitScoreUpdatedAt: null,
-  genres: ['Electronic', 'Dance'],
-  location: 'Los Angeles, CA',
-  activeSinceYear: 2021,
-  spotifyFollowers: 12_450,
-  spotifyPopularity: 62,
+  genres: [...DEFAULT_PERSONA.genres],
+  location: DEFAULT_PERSONA.location,
+  activeSinceYear: DEFAULT_PERSONA.activeSinceYear,
+  spotifyFollowers: DEFAULT_PERSONA.spotifyFollowers,
+  spotifyPopularity: DEFAULT_PERSONA.spotifyPopularity,
   ingestionSourcePlatform: null,
   outreachStatus: 'pending',
   outreachChannel: null,
   dmSentAt: null,
   dmCopy: null,
-  outreachPriority: null,
   stripeAccountId: null,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  nextTaskNumber: 1,
+  smsAccessRequestedAt: null,
+  discoveredPixels: null,
+  discoveredPixelsAt: null,
   createdAt: now,
   updatedAt: now,
 };
@@ -115,7 +121,7 @@ export function buildDemoProfile(creator?: {
 
 const DEMO_PROFILE = DEFAULT_DEMO_PROFILE;
 
-/** Default dashboard data using Tim White. */
+/** Default dashboard data using the internal Calvin Harris demo persona. */
 export const DEMO_DASHBOARD_DATA: DashboardData = {
   user: { id: 'demo-user-001' },
   creatorProfiles: [DEMO_PROFILE],

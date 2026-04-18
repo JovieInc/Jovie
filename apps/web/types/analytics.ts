@@ -27,6 +27,12 @@ export type AnalyticsLinkRow = {
   clicks: number;
 };
 
+export interface TourDateAnalyticsData {
+  ticketClicks: number;
+  topCities: AnalyticsCityRow[];
+  topReferrers: AnalyticsReferrerRow[];
+}
+
 export type DashboardAnalyticsResponse = {
   profile_views: number;
   unique_users?: number;
@@ -42,6 +48,7 @@ export type DashboardAnalyticsResponse = {
   total_clicks?: number;
   spotify_clicks?: number;
   social_clicks?: number;
+  tip_link_visits?: number;
   recent_clicks?: number;
   view?: DashboardAnalyticsView;
 };

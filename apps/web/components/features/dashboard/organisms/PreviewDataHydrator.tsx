@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -11,6 +12,30 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AvailableDSP } from '@/lib/dsp';
+import { getHometownFromSettings } from '@/types/db';
+
+const VALID_PLATFORM_TYPES = new Set([
+  'social',
+  'dsp',
+  'earnings',
+  'custom',
+  'websites',
+]);
+
+function toValidPlatformType(
+  raw: string | null | undefined
+): PreviewPanelLink['platformType'] {
+  if (raw && VALID_PLATFORM_TYPES.has(raw))
+    return raw as PreviewPanelLink['platformType'];
+  if (raw) {
+    Sentry.addBreadcrumb({
+      category: 'links',
+      message: `Unknown platformType sanitized: ${raw}`,
+      level: 'warning',
+    });
+  }
+  return undefined;
+}
 
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
@@ -22,14 +47,7 @@ function convertSocialLinksToPreviewLinks(
       title: link.displayText || link.platform,
       url: link.url,
       platform: link.platform,
-      platformType:
-        (link.platformType as
-          | 'social'
-          | 'dsp'
-          | 'earnings'
-          | 'custom'
-          | 'websites'
-          | undefined) ?? undefined,
+      platformType: toValidPlatformType(link.platformType),
       isVisible: link.isActive !== false,
     }));
 }
@@ -71,6 +89,9 @@ export function PreviewDataHydrator({
       avatarUrl: selectedProfile.avatarUrl ?? null,
       bio: selectedProfile.bio ?? null,
       genres: selectedProfile.genres ?? null,
+      location: selectedProfile.location ?? null,
+      hometown: getHometownFromSettings(selectedProfile.settings) ?? null,
+      activeSinceYear: selectedProfile.activeSinceYear ?? null,
       links: previewLinks,
       profilePath: `/${canonicalUsername}`,
       dspConnections: {

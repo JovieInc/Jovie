@@ -13,6 +13,7 @@ import {
 } from '@/lib/email/tracking';
 import { buildClaimInviteUnsubscribeUrl } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '../utils';
+import { resolveSafeFirstName } from './personalization';
 
 export interface ClaimInviteTemplateData {
   /** Creator's display name or username */
@@ -37,7 +38,7 @@ export interface ClaimInviteTemplateData {
  * Build the claim URL with token
  */
 export function buildClaimUrl(username: string, claimToken: string): string {
-  return `${getProfileUrl(username)}/claim?token=${encodeURIComponent(claimToken)}`;
+  return `${BASE_URL}/claim/${encodeURIComponent(claimToken)}`;
 }
 
 /**
@@ -51,7 +52,7 @@ export function buildPreviewUrl(username: string): string {
  * Generate the email subject line
  */
 export function getClaimInviteSubject(_data: ClaimInviteTemplateData): string {
-  return `Your ${APP_NAME} profile is ready to claim`;
+  return `I made you a ${APP_NAME} profile`;
 }
 
 /**
@@ -61,6 +62,7 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
   const { creatorName, username, claimToken, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
   const previewUrl = buildPreviewUrl(username);
+  const greetingName = resolveSafeFirstName(creatorName, username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
     : null;
@@ -69,27 +71,29 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
     ? `\n\nDon't want to receive these emails? Unsubscribe: ${unsubscribeUrl}`
     : '';
 
-  return `Hey ${creatorName},
+  const greeting = greetingName ? `${greetingName}!` : 'Ayyy!';
 
-We built you a ${APP_NAME} profile at ${BASE_URL}/${username}
+  return `${greeting}
 
-${APP_NAME} is a smart link-in-bio for musicians. Your profile is already set up with your links, music, and socials.
+What up. It's Tim White, artist and founder of ${APP_NAME}.
 
-Preview your profile: ${previewUrl}
+I got sick of sending fans to a generic Linktree page and losing people there, so I built something just for music acts.
 
-Claim it now (takes 30 seconds): ${claimUrl}
+Saw you're on Linktree, so I went ahead and made you a free ${APP_NAME} profile:
 
-Why claim?
-- Shorter, cleaner URL than Linktree (${BASE_URL}/${username})
-- Automatically syncs your latest releases
-- Capture fan emails and grow your audience
-- Free forever, no credit card required
+${previewUrl}
+
+Claim it here: ${claimUrl}
+
+No pressure to use it. But if you check it out, I'd really love your honest take.
+
+Even if you hate it, a quick reply with what felt off would be super helpful. I'm still shaping this with artists.
+
+P.S. If you claim it and message me, I'll get your profile verified.
 
 The claim link expires in 30 days.
 
-Questions? Just reply to this email.
-
-- The ${APP_NAME} Team
+Tim
 
 ---
 You received this because we created a profile for you based on your public music presence.
@@ -134,6 +138,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
   const { creatorName, username, claimToken, avatarUrl, recipientEmail } = data;
   const claimUrl = buildClaimUrl(username, claimToken);
   const previewUrl = buildPreviewUrl(username);
+  const greetingName = resolveSafeFirstName(creatorName, username);
   const unsubscribeUrl = recipientEmail
     ? buildClaimInviteUnsubscribeUrl(recipientEmail)
     : null;
@@ -150,7 +155,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
   const trackedPreviewUrl = wrapWithClickTracking(
     previewUrl,
     trackingPayload,
-    'preview'
+    'profile_preview'
   );
 
   // Generate open tracking pixel
@@ -160,6 +165,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
 
   // Escape user-provided values to prevent XSS
   const safeCreatorName = escapeHtml(creatorName);
+  const safeGreetingName = greetingName ? escapeHtml(greetingName) : null;
   const safeUsername = escapeHtml(username);
   const safeAvatarUrl = avatarUrl ? escapeHtml(avatarUrl) : null;
 
@@ -215,10 +221,16 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
           <tr>
             <td style="padding: 24px 40px;">
               <h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 600; color: #000; text-align: center;">
-                Hey ${safeCreatorName}
+                ${safeGreetingName ? `${safeGreetingName}!` : 'Ayyy!'}
               </h1>
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-                We built you a ${APP_NAME} profile. It's already set up with your links, music, and socials.
+                What up. It's Tim White, artist and founder of ${APP_NAME}.
+              </p>
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
+                I got sick of sending fans to a generic Linktree page and losing people there, so I built something just for music acts.
+              </p>
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
+                Saw you're on Linktree, so I went ahead and made you a free ${APP_NAME} profile.
               </p>
 
               <!-- Profile Preview Card -->
@@ -237,18 +249,18 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               </div>
 
               <p style="margin: 0 0 24px; font-size: 14px; color: #666; text-align: center;">
-                Takes 30 seconds. Free forever.
+                No pressure to use it. But if you check it out, I'd really love your honest take.
               </p>
 
-              <!-- Benefits -->
+              <p style="margin: 0 0 24px; font-size: 14px; color: #666; text-align: center;">
+                Even if you hate it, a quick reply with what felt off would be super helpful. I'm still shaping this with artists.
+              </p>
+
+              <!-- Founder Note -->
               <div style="border-top: 1px solid #eee; padding-top: 24px;">
-                <p style="margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #333;">Why ${APP_NAME}?</p>
-                <ul style="margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.8; color: #555;">
-                  <li>Shorter, cleaner URL than Linktree</li>
-                  <li>Automatically syncs your latest releases</li>
-                  <li>Capture fan emails and grow your audience</li>
-                  <li>Built specifically for musicians</li>
-                </ul>
+                <p style="margin: 0; font-size: 14px; line-height: 1.8; color: #555;">
+                  P.S. If you claim it and message me, I'll get your profile verified.
+                </p>
               </div>
             </td>
           </tr>
@@ -262,6 +274,9 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
                 You received this because we created a profile for you based on your public music presence.
                 <br>If this wasn't you, you can ignore this email.
+              </p>
+              <p style="margin: 16px 0 0; font-size: 12px; color: #666; text-align: center;">
+                Tim
               </p>
               ${unsubscribeSection}
             </td>

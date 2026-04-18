@@ -148,10 +148,10 @@ export async function GET(request: Request) {
       // DISTINCT ON forces the first ORDER BY key to match the distinct key;
       // the outer query then applies the user-requested sort and keyset cursor filter.
       const rowsResult = await tx.execute(drizzleSql`
-        SELECT id, email, phone, country_code AS "countryCode", created_at AS "createdAt", channel
+        SELECT id, email, phone, name, country_code AS "countryCode", created_at AS "createdAt", channel
         FROM (
           SELECT DISTINCT ON (COALESCE(phone, email))
-            id, email, phone, country_code, created_at, channel
+            id, email, phone, name, country_code, created_at, channel
           FROM notification_subscriptions
           WHERE creator_profile_id = ${profileId}
           ORDER BY COALESCE(phone, email), created_at DESC
@@ -165,6 +165,7 @@ export async function GET(request: Request) {
         id: string;
         email: string | null;
         phone: string | null;
+        name: string | null;
         countryCode: string | null;
         createdAt: Date | string;
         channel: string;

@@ -24,6 +24,10 @@ import {
   ReleaseCell,
   SmartLinkCell,
 } from '@/features/dashboard/organisms/releases/cells';
+import {
+  formatReleaseDate,
+  formatReleaseDateMonthYear,
+} from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -32,8 +36,11 @@ import { formatDuration } from '@/lib/utils/formatDuration';
 // Constants
 // ============================================================================
 
-/** Date format options for release date display */
-export const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
+export const DATE_FORMAT_OPTIONS = {
+  month: 'short',
+  year: 'numeric',
+} as const;
+
 export const DATE_TOOLTIP_FORMAT_OPTIONS = {
   year: 'numeric',
   month: 'long',
@@ -164,11 +171,20 @@ export function createActionsHeaderRenderer(
 // ============================================================================
 
 /** Creates a cell renderer for the release column */
-export function createReleaseCellRenderer(artistName?: string | null) {
+export function createReleaseCellRenderer(
+  artistName: string | null | undefined,
+  onOpen?: (release: ReleaseViewModel) => void
+) {
   return function ReleaseCellRenderer({
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
-    return <ReleaseCell release={row.original} artistName={artistName} />;
+    return (
+      <ReleaseCell
+        release={row.original}
+        artistName={artistName}
+        onSelect={onOpen}
+      />
+    );
   };
 }
 
@@ -177,7 +193,8 @@ export function createExpandableReleaseCellRenderer(
   artistName: string | null | undefined,
   isExpanded: (releaseId: string) => boolean,
   isLoading: (releaseId: string) => boolean,
-  onToggleExpansion: (release: ReleaseViewModel) => void
+  onToggleExpansion: (release: ReleaseViewModel) => void,
+  onOpen?: (release: ReleaseViewModel) => void
 ) {
   return function ExpandableReleaseCellRenderer({
     row,
@@ -197,7 +214,11 @@ export function createExpandableReleaseCellRenderer(
             onToggleExpansion(release);
           }}
         />
-        <ReleaseCell release={release} artistName={artistName} />
+        <ReleaseCell
+          release={release}
+          artistName={artistName}
+          onSelect={onOpen}
+        />
       </div>
     );
   };
@@ -249,7 +270,7 @@ export function createSmartLinkCellRenderer(
   };
 }
 
-/** Combined right column: smart link + year (responsive) */
+/** Combined right column: smart link + popularity + date */
 export function createRightMetaCellRenderer(
   isSmartLinkLocked?: (releaseId: string) => boolean,
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
@@ -258,16 +279,16 @@ export function createRightMetaCellRenderer(
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const rawYear = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear()
-      : null;
-    const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
-    const yearLabel = year === null ? '—' : String(year);
-    const yearTitle = year === null ? 'Unknown release year' : String(year);
+    const dateLabel = release.releaseDate
+      ? formatReleaseDateMonthYear(release.releaseDate)
+      : '—';
+    const yearTitle = release.releaseDate
+      ? formatReleaseDate(release.releaseDate)
+      : 'Unknown release date';
 
     return (
-      <div className='grid min-w-[252px] grid-cols-[minmax(168px,1fr)_12px_34px] items-center justify-end gap-x-2 text-[12px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[292px] lg:grid-cols-[minmax(204px,1fr)_14px_38px] lg:gap-x-2.5'>
-        <div className='min-w-0'>
+      <div className='flex items-center gap-2.5'>
+        <div className='max-lg:hidden min-w-0 flex-1'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
@@ -275,15 +296,13 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='flex w-[12px] items-center justify-center lg:w-[14px]'>
-          <PopularityIcon popularity={release.spotifyPopularity} />
-        </div>
+        <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='w-[34px] text-right tabular-nums text-[10px] font-[430] tracking-[0.01em] text-tertiary-token lg:w-[38px]'
+          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-[11px] font-[400] text-secondary-token'
           title={yearTitle}
         >
-          {yearLabel}
+          {dateLabel}
         </span>
       </div>
     );
@@ -487,10 +506,9 @@ export function renderStatsCell({
   row,
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
-  const rawYear = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
+  const dateStr = release.releaseDate
+    ? formatReleaseDateMonthYear(release.releaseDate)
     : null;
-  const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
     <div className='flex items-center gap-2 text-[13px] tabular-nums text-secondary-token'>
@@ -499,8 +517,8 @@ export function renderStatsCell({
         <PopularityIcon popularity={release.spotifyPopularity} />
       </div>
 
-      {/* Year - fixed width, right aligned */}
-      <span className='w-10 text-right'>{year ?? 'Unknown'}</span>
+      {/* Date - fixed width, right aligned */}
+      <span className='w-[60px] text-right text-[11px]'>{dateStr ?? '—'}</span>
     </div>
   );
 }

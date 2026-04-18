@@ -23,7 +23,7 @@ export function DashboardOverviewToolbar({
   }, [range]);
 
   return (
-    <div className='flex items-center justify-end gap-2'>
+    <div className='flex shrink-0 items-center justify-end gap-2 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <AppSegmentControl
         value={range}
         onValueChange={onRangeChange}
@@ -45,7 +45,7 @@ export function DashboardOverviewToolbar({
       />
 
       {rangeLabel ? (
-        <p className='hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-tertiary-token sm:block'>
+        <p className='max-sm:hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-tertiary-token'>
           {rangeLabel}
         </p>
       ) : null}

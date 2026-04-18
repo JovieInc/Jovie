@@ -17,6 +17,7 @@ export type ReleaseSidebarTrack = Pick<
   TrackViewModel,
   | 'id'
   | 'releaseId'
+  | 'releaseSlug'
   | 'title'
   | 'slug'
   | 'smartLinkPath'
@@ -28,6 +29,9 @@ export type ReleaseSidebarTrack = Pick<
   | 'previewUrl'
   | 'audioUrl'
   | 'audioFormat'
+  | 'previewSource'
+  | 'previewVerification'
+  | 'providerConfidenceSummary'
   | 'providers'
 >;
 
@@ -57,6 +61,8 @@ export interface ReleaseSidebarProps {
   >;
   /** Artist name to display in the sidebar header */
   readonly artistName?: string | null;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: Release) => void;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   /** Whether a release refresh operation is currently in progress */
@@ -98,12 +104,27 @@ export interface ReleaseSidebarProps {
    * Whether an ISRC rescan is currently in progress
    */
   readonly isRescanningIsrc?: boolean;
+  /** Persist release target playlists */
+  readonly onSaveTargetPlaylists?: (
+    releaseId: string,
+    playlists: string[]
+  ) => Promise<void>;
   /** Persist release lyrics in metadata */
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   /** Persist canvas status in metadata */
   readonly onCanvasStatusUpdate?: (
     releaseId: string,
     status: CanvasStatus
+  ) => Promise<void>;
+  /** Persist release-level UPC and label fields */
+  readonly onSaveMetadata?: (
+    releaseId: string,
+    values: { upc: string | null; label: string | null }
+  ) => Promise<void>;
+  /** Persist the release's primary ISRC */
+  readonly onSavePrimaryIsrc?: (
+    releaseId: string,
+    isrc: string | null
   ) => Promise<void>;
   /** Format lyrics for the specified platform */
   readonly onFormatLyrics?: (
@@ -129,20 +150,6 @@ export interface ReleaseSidebarProps {
   readonly tracksOverride?: ReleaseSidebarTrack[];
   /** Optional static analytics data used instead of the live sidebar API */
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
-  readonly onTrackClick?: (track: {
-    id: string;
-    title: string;
-    slug: string;
-    smartLinkPath: string;
-    trackNumber: number;
-    discNumber: number;
-    durationMs: number | null;
-    isrc: string | null;
-    isExplicit: boolean;
-    providers: Array<{ key: ProviderKey; label: string; url: string }>;
-    releaseId: string;
-    previewUrl?: string | null;
-    audioUrl?: string | null;
-    audioFormat?: string | null;
-  }) => void;
+  /** Disable live credits fetching for auth-free mirrors like /demo. */
+  readonly showCredits?: boolean;
 }

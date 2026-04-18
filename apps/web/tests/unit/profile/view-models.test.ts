@@ -15,8 +15,10 @@ const mockArtist: Artist = {
   name: 'Test Artist',
   image_url: 'https://example.com/avatar.jpg',
   tagline: 'Test tagline',
+  location: 'Austin, TX',
+  hometown: 'Tulsa, OK',
   theme: {},
-  settings: { hide_branding: true },
+  settings: { hometown: 'Tulsa, OK' },
   spotify_url: undefined,
   apple_music_url: undefined,
   youtube_url: undefined,
@@ -34,7 +36,18 @@ describe('profile view models', () => {
       artist: mockArtist,
       socialLinks: [],
       contacts: [],
-      showTipButton: true,
+      showPayButton: true,
+      featuredPlaylistFallback: {
+        artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+        confirmedAt: '2026-01-01T00:00:00.000Z',
+        discoveredAt: '2026-01-01T00:00:00.000Z',
+        imageUrl: null,
+        playlistId: '37i9dQZF1DZ06evO2SKVTu',
+        searchQuery: 'site:open.spotify.com/playlist "This Is Tim White"',
+        source: 'serp_html',
+        title: 'This Is Tim White',
+        url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
+      },
     });
 
     expect(viewModel.mode).toBe('tour');
@@ -42,6 +55,7 @@ describe('profile view models', () => {
     expect(viewModel.showBackButton).toBe(true);
     expect(viewModel.showNotificationButton).toBe(true);
     expect(viewModel.isTourModeActive).toBe(true);
+    expect(viewModel.featuredPlaylistFallback?.title).toBe('This Is Tim White');
   });
 
   it('normalizes profile identity fields for editors', () => {
@@ -51,7 +65,10 @@ describe('profile view models', () => {
       name: 'Test Artist',
       tagline: 'Test tagline',
       imageUrl: 'https://example.com/avatar.jpg',
-      hideBranding: true,
+      location: 'Austin, TX',
+      hometown: 'Tulsa, OK',
+      careerHighlights: '',
+      targetPlaylists: '',
       profilePath: '/testartist',
     });
   });

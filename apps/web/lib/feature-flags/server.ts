@@ -1,23 +1,45 @@
 import 'server-only';
-import Statsig from 'statsig-node';
+import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
-
-export {
-  FEATURE_FLAG_KEYS,
-  type FeatureFlagKey,
-  type FeatureFlagsBootstrap,
-  type SubscribeCTAVariant,
-} from './shared';
+import { logger } from '@/lib/utils/logger';
 
 import {
-  FEATURE_FLAG_KEYS,
-  type FeatureFlagKey,
-  type FeatureFlagsBootstrap,
+  STATSIG_GATE_KEYS,
+  type StatsigFeatureFlagsBootstrap,
+  type StatsigGateKey,
   type SubscribeCTAVariant,
 } from './shared';
 
+type StatsigClient = typeof import('statsig-node').default;
+
 let statsigInitialized = false;
-const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+let statsigClient: StatsigClient | null = null;
+let statsigImportFailed = false;
+let statsigInitPromise: Promise<void> | null = null;
+// Suppresses the "no secret" warning after the first call within a process lifetime.
+// Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
+let statsigWarnedNoSecret = false;
+const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
+
+async function getStatsigClient(): Promise<StatsigClient | null> {
+  if (statsigClient) {
+    return statsigClient;
+  }
+
+  if (statsigImportFailed) {
+    return null;
+  }
+
+  try {
+    const statsigModule = await import('statsig-node');
+    statsigClient = statsigModule.default;
+    return statsigClient;
+  } catch (error) {
+    statsigImportFailed = true;
+    logger.error('Statsig SDK is unavailable', error, 'Statsig');
+    return null;
+  }
+}
 
 /**
  * Initialize Statsig server SDK
@@ -25,25 +47,49 @@ const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
  */
 async function initializeStatsig(): Promise<void> {
   if (statsigInitialized || isE2ERuntime) return;
-
-  const serverSecret = env.STATSIG_SERVER_SECRET;
-  if (!serverSecret) {
-    console.warn(
-      '[Statsig] Server secret not configured - feature flags will use defaults'
-    );
+  if (statsigInitPromise) {
+    await statsigInitPromise;
     return;
   }
 
+  statsigInitPromise = (async () => {
+    const serverSecret = env.STATSIG_SERVER_SECRET;
+    if (!serverSecret) {
+      if (!statsigWarnedNoSecret) {
+        logger.warn(
+          '[Statsig] Server secret not configured - feature flags will use defaults'
+        );
+        statsigWarnedNoSecret = true;
+      }
+      return;
+    }
+
+    try {
+      const statsig = await getStatsigClient();
+      if (!statsig) {
+        return;
+      }
+
+      await statsig.initialize(serverSecret, {
+        environment: {
+          tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
+        },
+      });
+      statsigInitialized = true;
+      logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
+    } catch (error) {
+      logger.error(
+        '[Statsig] Failed to initialize server SDK',
+        error,
+        'Statsig'
+      );
+    }
+  })();
+
   try {
-    await Statsig.initialize(serverSecret, {
-      environment: {
-        tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
-      },
-    });
-    statsigInitialized = true;
-    console.log('[Statsig] Server SDK initialized');
-  } catch (error) {
-    console.error('[Statsig] Failed to initialize server SDK:', error);
+    await statsigInitPromise;
+  } finally {
+    statsigInitPromise = null;
   }
 }
 
@@ -56,7 +102,7 @@ async function initializeStatsig(): Promise<void> {
  */
 export async function checkGate(
   userId: string | null,
-  gateKey: FeatureFlagKey,
+  gateKey: StatsigGateKey,
   defaultValue = false
 ): Promise<boolean> {
   if (isE2ERuntime) {
@@ -70,7 +116,12 @@ export async function checkGate(
   }
 
   try {
-    const gate = Statsig.getFeatureGateSync(
+    const statsig = await getStatsigClient();
+    if (!statsig) {
+      return defaultValue;
+    }
+
+    const gate = statsig.getFeatureGateSync(
       { userID: userId ?? 'anonymous' },
       gateKey
     );
@@ -80,7 +131,7 @@ export async function checkGate(
     }
     return gate.value;
   } catch (error) {
-    console.error(`[Statsig] Error checking gate ${gateKey}:`, error);
+    logger.error(`[Statsig] Error checking gate ${gateKey}`, error, 'Statsig');
     return defaultValue;
   }
 }
@@ -100,15 +151,21 @@ export async function getExperiment(
   await initializeStatsig();
   if (!statsigInitialized) return {};
   try {
-    const experiment = await Statsig.getExperiment(
+    const statsig = await getStatsigClient();
+    if (!statsig) {
+      return {};
+    }
+
+    const experiment = await statsig.getExperiment(
       { userID: userId ?? 'anonymous' },
       experimentKey
     );
     return experiment.value;
   } catch (error) {
-    console.error(
-      `[Statsig] Error getting experiment ${experimentKey}:`,
-      error
+    logger.error(
+      `[Statsig] Error getting experiment ${experimentKey}`,
+      error,
+      'Statsig'
     );
     return {};
   }
@@ -123,7 +180,7 @@ export async function getSubscribeCTAVariant(
 ): Promise<SubscribeCTAVariant> {
   const config = await getExperiment(
     artistId,
-    FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
   );
   const variant = config.variant;
   if (variant === 'inline' || variant === 'two_step') return variant;
@@ -136,7 +193,7 @@ export async function getSubscribeCTAVariant(
  */
 export async function getFeatureFlagsBootstrap(
   userId: string | null
-): Promise<FeatureFlagsBootstrap> {
+): Promise<StatsigFeatureFlagsBootstrap> {
   if (isE2ERuntime) {
     return { gates: {} };
   }
@@ -146,7 +203,7 @@ export async function getFeatureFlagsBootstrap(
   const gates: Record<string, boolean> = {};
 
   // Evaluate all gates in parallel
-  const gateEntries = Object.entries(FEATURE_FLAG_KEYS);
+  const gateEntries = Object.entries(STATSIG_GATE_KEYS);
   const results = await Promise.all(
     gateEntries.map(async ([, gateKey]) => {
       const value = await checkGate(userId, gateKey, false);
@@ -167,7 +224,13 @@ export async function getFeatureFlagsBootstrap(
  */
 export async function shutdownStatsig(): Promise<void> {
   if (statsigInitialized) {
-    await Statsig.shutdown();
-    statsigInitialized = false;
+    const statsig = await getStatsigClient();
+    if (statsig) {
+      await statsig.shutdown();
+    }
   }
+  statsigInitialized = false;
+  statsigClient = null;
+  statsigImportFailed = false;
+  statsigInitPromise = null;
 }

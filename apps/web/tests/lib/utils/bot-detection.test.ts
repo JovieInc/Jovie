@@ -6,12 +6,9 @@
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import {
-  checkMetaASN,
-  checkRateLimit,
   createBotResponse,
   detectBot,
   getBotSafeHeaders,
-  isSuspiciousRequest,
 } from '@/lib/utils/bot-detection';
 
 // Helper to create mock NextRequest
@@ -213,6 +210,16 @@ describe('Bot Detection', () => {
       expect(result.userAgent).toBe(userAgent);
     });
 
+    it('should prefer an overridden user agent when provided', () => {
+      const request = createMockRequest('Header User Agent');
+
+      const result = detectBot(request, undefined, {
+        userAgent: 'Override User Agent',
+      });
+
+      expect(result.userAgent).toBe('Override User Agent');
+    });
+
     it('should handle empty user agent', () => {
       const request = createMockRequest('');
 
@@ -220,22 +227,6 @@ describe('Bot Detection', () => {
 
       expect(result.isBot).toBe(false);
       expect(result.userAgent).toBe('');
-    });
-  });
-
-  describe('checkMetaASN', () => {
-    it('should return false (currently disabled)', async () => {
-      const result = await checkMetaASN();
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('checkRateLimit', () => {
-    it('should return false (currently disabled)', async () => {
-      const result = await checkRateLimit('192.168.1.1', '/api/test');
-
-      expect(result).toBe(false);
     });
   });
 
@@ -260,48 +251,6 @@ describe('Bot Detection', () => {
       );
       expect(response.headers.get('Pragma')).toBe('no-cache');
       expect(response.headers.get('Expires')).toBe('0');
-    });
-  });
-
-  describe('isSuspiciousRequest', () => {
-    it('should flag curl requests', () => {
-      const request = createMockRequest('curl/7.88.1');
-
-      expect(isSuspiciousRequest(request)).toBe(true);
-    });
-
-    it('should flag wget requests', () => {
-      const request = createMockRequest('Wget/1.21.4');
-
-      expect(isSuspiciousRequest(request)).toBe(true);
-    });
-
-    it('should flag Python requests', () => {
-      const request = createMockRequest('python-requests/2.31.0');
-
-      expect(isSuspiciousRequest(request)).toBe(true);
-    });
-
-    it('should flag empty user agents', () => {
-      const request = createMockRequest('');
-
-      expect(isSuspiciousRequest(request)).toBe(true);
-    });
-
-    it('should not flag browser-based tools with Mozilla', () => {
-      const request = createMockRequest(
-        'Mozilla/5.0 (compatible; SomeBot/1.0)'
-      );
-
-      expect(isSuspiciousRequest(request)).toBe(false);
-    });
-
-    it('should not flag regular browsers', () => {
-      const request = createMockRequest(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
-      );
-
-      expect(isSuspiciousRequest(request)).toBe(false);
     });
   });
 

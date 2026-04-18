@@ -1,3 +1,17 @@
+// Hooks
+
+// Overflow Menu Trigger
+export {
+  OverflowMenuTrigger,
+  type OverflowMenuTriggerProps,
+} from './atoms/overflow-menu-trigger';
+export type {
+  TabOverflowOption,
+  UseTabOverflowOptions,
+  UseTabOverflowResult,
+} from './hooks';
+export { useTabOverflow } from './hooks';
+
 // Avatar
 
 // Alert Dialog
@@ -69,7 +83,6 @@ export type {
   CommonDropdownProps,
   CommonDropdownRadioGroup,
   CommonDropdownRadioItem,
-  CommonDropdownSelectProps,
   CommonDropdownSeparator,
   CommonDropdownSize,
   CommonDropdownSubmenu,

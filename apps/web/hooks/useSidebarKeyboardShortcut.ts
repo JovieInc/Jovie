@@ -17,7 +17,7 @@ export function useSidebarKeyboardShortcut(
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key.toLowerCase() === shortcutKey.toLowerCase() &&
+        event.key?.toLowerCase() === shortcutKey.toLowerCase() &&
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault();

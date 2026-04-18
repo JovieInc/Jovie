@@ -3,11 +3,8 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
@@ -16,45 +13,19 @@ import {
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import {
   useChatImageAttachments,
   useJovieChat,
-  useSuggestedProfiles,
+  useStickToBottom,
 } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
-import { TOOL_LABELS } from './types';
 
-/** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
-const SCROLL_THRESHOLD = 200;
-
-/**
- * Derives a user-friendly label from the last assistant message's active tool invocation.
- * Returns null when no tool is actively being called.
- */
-function getActiveToolLabel(
-  messages: Array<{ role: string; parts: MessagePart[] }>
-): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role !== 'assistant') continue;
-
-    for (let j = msg.parts.length - 1; j >= 0; j--) {
-      const part = msg.parts[j];
-      if (
-        part.type === 'tool-invocation' &&
-        part.toolInvocation?.state === 'call'
-      ) {
-        return TOOL_LABELS[part.toolInvocation.toolName] ?? 'Working on it...';
-      }
-    }
-    break;
-  }
-  return null;
-}
+/** Sentinel ID for the synthetic thinking placeholder */
+const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
+const VIRTUALIZATION_THRESHOLD = 12;
 
 export function JovieChat({
   profileId,
@@ -63,42 +34,16 @@ export function JovieChat({
   onConversationCreate,
   initialQuery,
   onTitleChange,
-  displayName,
   avatarUrl,
   username,
-  isFirstSession: isFirstSessionProp = false,
-  latestReleaseTitle: latestReleaseTitleProp = null,
+  displayName,
+  isFirstSession = false,
+  latestReleaseTitle,
 }: JovieChatProps) {
-  const { profileCompletion } = useDashboardData();
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-
-  // Suggested profiles carousel data — lifted here so we can hide
-  // the help text and suggested prompts while the carousel has items.
-  const shouldLoadSuggestedProfiles = Boolean(profileId) && !isFirstSessionProp;
-  const suggestedProfiles = useSuggestedProfiles(profileId, {
-    enabled: shouldLoadSuggestedProfiles,
-  });
-  const suggestionsReady = !suggestedProfiles.isLoading;
-  const detectedFirstSession = suggestionsReady
-    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
-    : null;
-  const isFirstSession =
-    detectedFirstSession === null
-      ? isFirstSessionProp
-      : isFirstSessionProp || detectedFirstSession;
-  const latestReleaseTitle =
-    latestReleaseTitleProp ??
-    suggestedProfiles.starterContext?.latestReleaseTitle ??
-    null;
-  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
-  const hasCarouselItems =
-    showSuggestedProfiles &&
-    !suggestedProfiles.isLoading &&
-    suggestedProfiles.total > 0;
-
+  // Track message IDs that were loaded from persistence to skip entrance animation
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const {
     input,
     setInput,
@@ -117,6 +62,7 @@ export function JovieChat({
     submitMessage,
     setChatError,
     isRateLimited,
+    stop,
   } = useJovieChat({
     profileId,
     artistContext,
@@ -124,6 +70,24 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
+
+  const followUpQuickActions = useMemo(
+    () => [
+      {
+        label: 'Summarize this thread',
+        prompt: 'Summarize this thread in three concise bullets.',
+      },
+      {
+        label: 'What should I do next?',
+        prompt: 'Based on this conversation, what should I do next?',
+      },
+      {
+        label: 'Turn it into a checklist',
+        prompt: 'Turn this conversation into a short checklist I can follow.',
+      },
+    ],
+    []
+  );
 
   // Image attachments for chat messages
   const {
@@ -140,7 +104,6 @@ export function JovieChat({
     disabled: isLoading || isSubmitting,
   });
 
-  // Open file picker for image attachments
   const openImagePicker = useCallback(() => {
     imageFileInputRef.current?.click();
   }, []);
@@ -153,7 +116,6 @@ export function JovieChat({
     [addFiles]
   );
 
-  // Handle clipboard paste for images
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       const imageFiles = Array.from(e.clipboardData.items)
@@ -168,7 +130,6 @@ export function JovieChat({
     [addFiles]
   );
 
-  // Submit with image attachments
   const handleSubmitWithImages = useCallback(
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
@@ -179,7 +140,7 @@ export function JovieChat({
     [handleSubmit, toFileUIParts, clearImages, isLoading, isSubmitting]
   );
 
-  // Notify parent when the conversation title changes (e.g. after auto-generation)
+  // Notify parent when the conversation title changes
   const prevTitleRef = useRef<string | null>(null);
   useEffect(() => {
     if (conversationTitle !== prevTitleRef.current) {
@@ -188,7 +149,7 @@ export function JovieChat({
     }
   }, [conversationTitle, onTitleChange]);
 
-  // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
+  // Auto-submit initialQuery on mount
   useEffect(() => {
     if (
       initialQuery &&
@@ -200,58 +161,95 @@ export function JovieChat({
     }
   }, [initialQuery, isLoadingConversation, submitMessage]);
 
-  // Virtualizer for chat messages
+  // Populate known message IDs from hydrated conversation to skip entrance animations
+  useEffect(() => {
+    if (messages.length > 0 && knownMessageIdsRef.current.size === 0) {
+      for (const m of messages) {
+        knownMessageIdsRef.current.add(m.id);
+      }
+    }
+  }, [messages]);
+
+  // ─── Synthetic thinking message (render-only) ───────────────────
+  // Append a placeholder when waiting for the AI to start responding.
+  // This is a displayMessages array, NOT a modification to the real messages.
+  const lastMessage = messages[messages.length - 1];
+  const displayMessages =
+    isLoading && lastMessage?.role === 'user'
+      ? [
+          ...messages,
+          {
+            id: THINKING_PLACEHOLDER_ID,
+            role: 'assistant' as const,
+            parts: [] as MessagePart[],
+            createdAt: new Date(),
+          },
+        ]
+      : messages;
+
+  // ─── Sticky scroll via ResizeObserver ────────────────────────────
+  const {
+    isStuckToBottom,
+    setStuckToBottom,
+    onScroll,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom({ messageCount: displayMessages.length });
+
+  // Virtualizer
   const virtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => messagesContainerRef.current,
+    count: displayMessages.length,
+    getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 80,
     overscan: 5,
     measureElement: el => el.getBoundingClientRect().height,
   });
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messages.length > 0) {
-      virtualizer.scrollToIndex(messages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
-    }
-  }, [messages.length, virtualizer]);
-
-  // Track scroll position to show/hide scroll-to-bottom button
-  const handleScroll = useCallback(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    setShowScrollToBottom(distanceFromBottom > SCROLL_THRESHOLD);
-  }, []);
+  const shouldVirtualizeMessages =
+    displayMessages.length > VIRTUALIZATION_THRESHOLD;
 
   const scrollToBottom = useCallback(() => {
-    if (messages.length > 0) {
-      virtualizer.scrollToIndex(messages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
+    if (displayMessages.length > 0) {
+      if (shouldVirtualizeMessages) {
+        virtualizer.scrollToIndex(displayMessages.length - 1, {
+          align: 'end',
+          behavior: 'smooth',
+        });
+      } else {
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          if (typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          } else {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }
+      setStuckToBottom(true);
     }
-  }, [messages.length, virtualizer]);
+  }, [
+    displayMessages.length,
+    scrollContainerRef,
+    setStuckToBottom,
+    shouldVirtualizeMessages,
+    virtualizer,
+  ]);
 
-  // Find the last assistant message index for streaming cursor
-  const lastAssistantIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') return i;
+  // Find the last real assistant message index for streaming cursor
+  let lastAssistantIndex = -1;
+  for (let i = displayMessages.length - 1; i >= 0; i--) {
+    if (
+      displayMessages[i].role === 'assistant' &&
+      displayMessages[i].id !== THINKING_PLACEHOLDER_ID
+    ) {
+      lastAssistantIndex = i;
+      break;
     }
-    return -1;
-  }, [messages]);
+  }
 
-  // Determine the active tool label for contextual loading state
   const isStreaming = status === 'streaming';
-  const activeToolLabel = useMemo(
-    () => (isLoading ? getActiveToolLabel(messages) : null),
-    [isLoading, messages]
-  );
-  const thinkingLabel = activeToolLabel ?? 'Thinking...';
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
@@ -270,6 +268,8 @@ export function JovieChat({
     onSubmit: handleSubmitWithImages,
     isLoading,
     isSubmitting,
+    isStreaming,
+    onStop: stop,
     onImageAttach: openImagePicker,
     isImageProcessing,
     pendingImages,
@@ -277,8 +277,22 @@ export function JovieChat({
     onPaste: handlePaste,
   } as const;
 
+  const greetingName = displayName?.trim() || username?.trim() || null;
+  let emptyStateHeading: string;
+  if (isFirstSession) {
+    emptyStateHeading = 'Welcome to Jovie';
+  } else if (greetingName) {
+    emptyStateHeading = `Welcome Back ${greetingName}`;
+  } else {
+    emptyStateHeading = 'Welcome Back';
+  }
+
   return (
-    <div ref={dropZoneRef} className='relative flex h-full flex-col'>
+    <div
+      ref={dropZoneRef}
+      className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
+      data-testid='chat-content'
+    >
       {/* Hidden file input for image attachments */}
       <input
         ref={imageFileInputRef}
@@ -309,38 +323,73 @@ export function JovieChat({
       </AnimatePresence>
 
       {hasMessages ? (
-        // Chat view - messages + input at bottom
-        <>
+        <div className='flex flex-1 flex-col overflow-hidden'>
           {/* Messages area */}
           <div
-            ref={messagesContainerRef}
-            className='relative flex-1 overflow-y-auto px-4 py-6'
-            onScroll={handleScroll}
+            ref={scrollContainerRef}
+            className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
+            onScroll={onScroll}
           >
-            <div
-              className='mx-auto max-w-[44rem]'
-              style={{
-                position: 'relative',
-                height: virtualizer.getTotalSize(),
-              }}
-            >
-              {virtualizer.getVirtualItems().map(virtualItem => {
-                const message = messages[virtualItem.index];
-                const index = virtualItem.index;
-                return (
-                  <div
-                    key={message.id}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`,
-                    }}
-                  >
-                    <div className='pb-7'>
+            {shouldVirtualizeMessages ? (
+              <div
+                ref={totalSizeRef}
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                style={{
+                  position: 'relative',
+                  height: Math.max(
+                    virtualizer.getTotalSize(),
+                    scrollContainerRef.current?.clientHeight ?? 0
+                  ),
+                }}
+              >
+                {virtualizer.getVirtualItems().map(virtualItem => {
+                  const message = displayMessages[virtualItem.index];
+                  const index = virtualItem.index;
+                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                  return (
+                    <div
+                      key={message.id}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div className='pb-4'>
+                        <ChatMessage
+                          id={message.id}
+                          role={message.role}
+                          parts={message.parts}
+                          isStreaming={
+                            isStreaming && index === lastAssistantIndex
+                          }
+                          isThinking={isThinking}
+                          avatarUrl={
+                            message.role === 'user' ? avatarUrl : undefined
+                          }
+                          profileId={profileId}
+                          skipEntrance={knownMessageIdsRef.current.has(
+                            message.id
+                          )}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                ref={totalSizeRef}
+                className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+              >
+                {displayMessages.map((message, index) => {
+                  const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                  return (
+                    <div key={message.id} className='pb-4'>
                       <ChatMessage
                         id={message.id}
                         role={message.role}
@@ -348,78 +397,47 @@ export function JovieChat({
                         isStreaming={
                           isStreaming && index === lastAssistantIndex
                         }
+                        isThinking={isThinking}
                         avatarUrl={
                           message.role === 'user' ? avatarUrl : undefined
                         }
                         profileId={profileId}
+                        skipEntrance={knownMessageIdsRef.current.has(
+                          message.id
+                        )}
                       />
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Loading indicator — rendered outside virtualizer since it's not a real message */}
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-              <div className='mx-auto max-w-[44rem] pb-7'>
-                <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
-                    <BrandLogo size={16} tone='auto' />
-                  </div>
-                  <div className='rounded-2xl bg-surface-1 px-5 py-3.5'>
-                    <div className='flex items-center gap-1.5'>
-                      <span
-                        className='flex items-center gap-1'
-                        aria-hidden='true'
-                      >
-                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.3s] motion-reduce:animate-none' />
-                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.15s] motion-reduce:animate-none' />
-                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
-                      </span>
-                      {activeToolLabel && (
-                        <span className='ml-2 text-xs font-medium tracking-wide text-tertiary-token'>
-                          {activeToolLabel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className='sr-only' aria-live='polite'>
-                    Jovie is {thinkingLabel.toLowerCase().replace(/\.{3}$/, '')}
-                  </span>
-                </div>
+                  );
+                })}
               </div>
             )}
 
             {/* Scroll to bottom button */}
             <ScrollToBottom
-              visible={showScrollToBottom}
+              visible={!isStuckToBottom}
               onClick={scrollToBottom}
             />
           </div>
 
-          <div className='px-4 pt-3'>
-            <div className='mx-auto max-w-2xl'>
-              <ChatUsageAlert />
-            </div>
+          <div className='px-4 pt-3 sm:px-5'>
+            <ChatUsageAlert />
           </div>
 
-          {/* Error display in chat view */}
+          {/* Error display */}
           {chatError && (
-            <div className='px-4 pb-3'>
-              <div className='mx-auto max-w-2xl'>
-                <ErrorDisplay
-                  chatError={chatError}
-                  onRetry={handleRetry}
-                  isLoading={isLoading}
-                  isSubmitting={isSubmitting}
-                />
-              </div>
+            <div className='px-4 pb-3 sm:px-5'>
+              <ErrorDisplay
+                chatError={chatError}
+                onRetry={handleRetry}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+              />
             </div>
           )}
 
           {/* Input at bottom */}
-          <div className='px-4 py-4'>
-            <div className='mx-auto max-w-2xl space-y-2'>
+          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className='mx-auto w-full max-w-[44rem]'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
                   Sending too fast. Please wait a second before your next
@@ -430,99 +448,55 @@ export function JovieChat({
                 {...chatInputProps}
                 placeholder='Ask a follow-up...'
                 variant='compact'
+                quickActions={followUpQuickActions}
+                onQuickActionSelect={handleSuggestedPrompt}
               />
             </div>
           </div>
-        </>
+        </div>
       ) : (
-        // Empty state - centered content with input pinned at bottom
-        <div className='flex flex-1 flex-col'>
-          {/* Centered content area */}
-          <div className='flex flex-1 flex-col items-center justify-center px-4'>
-            <div className='chat-stagger w-full max-w-2xl space-y-4'>
-              {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
-              {showSuggestedProfiles && (
-                <SuggestedProfilesCarousel
-                  suggestions={suggestedProfiles.suggestions}
-                  isLoading={suggestedProfiles.isLoading}
-                  currentIndex={suggestedProfiles.currentIndex}
-                  total={suggestedProfiles.total}
-                  next={suggestedProfiles.next}
-                  prev={suggestedProfiles.prev}
-                  confirm={suggestedProfiles.confirm}
-                  reject={suggestedProfiles.reject}
-                  isActioning={suggestedProfiles.isActioning}
-                  username={username}
-                  displayName={displayName}
-                  avatarUrl={avatarUrl}
-                />
-              )}
+        <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
+          <div className='flex min-h-full flex-col'>
+            {/* Top spacer — pushes input to optical center */}
+            <div className='flex-1' />
 
-              {/* Momentum card and help prompts are mutually exclusive:
-                 incomplete profile = show momentum card, complete = show help prompts */}
-              {!hasCarouselItems &&
-                (profileCompletion?.percentage ?? 0) < 100 && (
-                  <ProfileCompletionCard />
+            {/* Centered anchor: heading + input */}
+            <div className='mx-auto flex w-full max-w-[34rem] flex-col items-center gap-5'>
+              <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
+                {emptyStateHeading}
+              </h1>
+              <div className='w-full space-y-2.5'>
+                {isRateLimited && (
+                  <p
+                    className='text-center text-xs text-tertiary-token'
+                    aria-live='polite'
+                  >
+                    Sending too fast. Please wait a second before your next
+                    message.
+                  </p>
                 )}
-
-              {/* Show help text and prompts only when profile is complete */}
-              {!hasCarouselItems &&
-                (profileCompletion?.percentage ?? 0) >= 100 && (
-                  <>
-                    {isFirstSession ? (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        Welcome, {displayName ?? 'there'}. Your profile is live
-                        at{' '}
-                        <a
-                          href={
-                            username
-                              ? `https://jov.ie/${username}`
-                              : 'https://jov.ie'
-                          }
-                          target='_blank'
-                          rel='noreferrer'
-                          className='font-medium text-primary-token underline-offset-2 hover:underline'
-                        >
-                          {username ? `jov.ie/${username}` : 'jov.ie'}
-                        </a>{' '}
-                        .
-                      </p>
-                    ) : (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        What can I help you with?
-                      </p>
-                    )}
-
-                    <SuggestedPrompts
-                      onSelect={handleSuggestedPrompt}
-                      isFirstSession={isFirstSession}
-                      latestReleaseTitle={latestReleaseTitle}
-                    />
-                  </>
-                )}
+                <ChatUsageAlert />
+                <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+              </div>
             </div>
-          </div>
 
-          {/* Input pinned at bottom */}
-          <div className='px-4 pb-4 sm:pb-8'>
-            <div className='mx-auto w-full max-w-2xl space-y-3'>
-              {isRateLimited && (
-                <p className='text-xs text-tertiary-token' aria-live='polite'>
-                  Sending too fast. Please wait a second before your next
-                  message.
-                </p>
-              )}
-              <ChatUsageAlert />
-              <ChatInput {...chatInputProps} />
-
-              {/* Error display */}
+            {/* Bottom section — items flow below center, don't shift input */}
+            <div className='mx-auto flex w-full max-w-md flex-1 flex-col items-center pt-2'>
+              <SuggestedPrompts
+                onSelect={handleSuggestedPrompt}
+                isFirstSession={isFirstSession}
+                latestReleaseTitle={latestReleaseTitle}
+                layout='flat'
+              />
               {chatError && (
-                <ErrorDisplay
-                  chatError={chatError}
-                  onRetry={handleRetry}
-                  isLoading={isLoading}
-                  isSubmitting={isSubmitting}
-                />
+                <div className='mt-2.5 w-full'>
+                  <ErrorDisplay
+                    chatError={chatError}
+                    onRetry={handleRetry}
+                    isLoading={isLoading}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
               )}
             </div>
           </div>

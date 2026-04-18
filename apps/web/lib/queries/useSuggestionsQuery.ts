@@ -219,6 +219,7 @@ export function useSuggestionsQuery({
     },
     // Don't refetch on window focus since we're already polling
     refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
     staleTime: 1 * 60 * 1000, // 1 min
     gcTime: 10 * 60 * 1000, // 10 min
     refetchOnMount: false,

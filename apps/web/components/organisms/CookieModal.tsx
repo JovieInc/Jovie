@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -10,12 +11,12 @@ import {
   Switch,
 } from '@jovie/ui';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import {
   Dialog,
   DialogActions,
   DialogBody,
+  DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { APP_ROUTES } from '@/constants/routes';
@@ -48,27 +49,6 @@ const COOKIE_CATEGORIES: ReadonlyArray<{
   },
 ];
 
-const secondaryButtonStyle: CSSProperties = {
-  backgroundColor: 'var(--linear-bg-button)',
-  color: 'var(--linear-text-primary)',
-  border: '1px solid var(--linear-border-default)',
-  borderRadius: 'var(--linear-radius-sm)',
-  fontSize: '11px',
-  fontWeight: 'var(--linear-font-weight-medium)',
-  padding: '4px 10px',
-  height: '26px',
-};
-
-const primaryButtonStyle: CSSProperties = {
-  backgroundColor: 'var(--linear-btn-primary-bg)',
-  color: 'var(--linear-btn-primary-fg)',
-  borderRadius: 'var(--linear-radius-sm)',
-  fontSize: '11px',
-  fontWeight: 'var(--linear-font-weight-medium)',
-  padding: '4px 10px',
-  height: '26px',
-};
-
 interface CookieModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
@@ -91,34 +71,18 @@ function CookieCategories({
         return (
           <div
             key={category.id}
-            className='flex items-center justify-between last:border-0'
-            style={{
-              gap: '10px',
-              borderBottom: '1px solid var(--linear-border-subtle)',
-              padding: '8px 0',
-            }}
+            className='flex items-center justify-between gap-2.5 border-b border-subtle py-2 last:border-0'
           >
-            <div
-              className='min-w-0 flex-1'
-              style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}
-            >
+            <div className='flex min-w-0 flex-1 flex-col gap-px'>
               <span
                 id={titleId}
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  color: 'var(--linear-text-primary)',
-                }}
+                className='text-[11px] font-medium text-primary-token'
               >
                 {category.label}
               </span>
               <p
                 id={descId}
-                style={{
-                  fontSize: '11px',
-                  lineHeight: 1.4,
-                  color: 'var(--linear-text-secondary)',
-                }}
+                className='text-[11px] leading-snug text-secondary-token'
               >
                 {category.description}
               </p>
@@ -138,19 +102,11 @@ function CookieCategories({
         );
       })}
 
-      <p
-        className='text-center'
-        style={{
-          paddingTop: '8px',
-          fontSize: '10px',
-          color: 'var(--linear-text-tertiary)',
-        }}
-      >
+      <p className='pt-2 text-center text-[10px] text-tertiary-token'>
         For more details, see our{' '}
         <Link
           href={APP_ROUTES.LEGAL_COOKIES}
-          className='underline hover:opacity-80'
-          style={{ color: 'var(--linear-text-secondary)' }}
+          className='text-secondary-token underline hover:opacity-80'
         >
           Cookie Policy
         </Link>
@@ -160,10 +116,24 @@ function CookieCategories({
 }
 
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
-  const [settings, setSettings] = useState<Consent>({
-    essential: true,
-    analytics: false,
-    marketing: false,
+  const [settings, setSettings] = useState<Consent>(() => {
+    if (globalThis.window === undefined) {
+      return { essential: true, analytics: false, marketing: false };
+    }
+    try {
+      const saved = localStorage.getItem('jv_cc');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Consent;
+        return {
+          essential: true,
+          analytics: !!parsed.analytics,
+          marketing: !!parsed.marketing,
+        };
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return { essential: true, analytics: false, marketing: false };
   });
   const isMobile = useMediaQuery('(max-width: 639px)');
 
@@ -192,13 +162,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           hideClose
         >
           <SheetHeader className='pb-1'>
-            <SheetTitlePrimitive
-              style={{
-                fontSize: '13px',
-                fontWeight: 'var(--linear-font-weight-semibold)',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
+            <SheetTitlePrimitive className='text-[13px] font-semibold text-primary-token'>
               Cookie preferences
             </SheetTitlePrimitive>
             <SheetDescription className='sr-only'>
@@ -206,7 +170,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
             </SheetDescription>
           </SheetHeader>
 
-          <div style={{ marginTop: '4px' }}>
+          <div className='mt-1'>
             <CookieCategories
               settings={settings}
               onCheckedChange={handleCheckedChange}
@@ -214,22 +178,24 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           </div>
 
           <SheetFooter className='mt-4 flex-row gap-3'>
-            <button
+            <Button
               type='button'
+              variant='secondary'
+              size='sm'
               onClick={onClose}
-              className='flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-              style={secondaryButtonStyle}
+              className='flex-1'
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type='button'
+              variant='primary'
+              size='sm'
               onClick={save}
-              className='flex-1 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-              style={primaryButtonStyle}
+              className='flex-1'
             >
               Save preferences
-            </button>
+            </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -243,40 +209,27 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       size='xs'
       className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] sm:mx-auto sm:w-full'
     >
-      <DialogTitle
-        style={{
-          fontSize: '13px',
-          fontWeight: 'var(--linear-font-weight-semibold)',
-          color: 'var(--linear-text-primary)',
-        }}
-      >
+      <DialogTitle className='text-[13px] font-semibold text-primary-token'>
         Cookie preferences
       </DialogTitle>
+      <DialogDescription className='sr-only'>
+        Manage your cookie preferences
+      </DialogDescription>
 
-      <DialogBody style={{ marginTop: '8px' }}>
+      <DialogBody className='mt-2'>
         <CookieCategories
           settings={settings}
           onCheckedChange={handleCheckedChange}
         />
       </DialogBody>
 
-      <DialogActions style={{ marginTop: '12px' }}>
-        <button
-          type='button'
-          onClick={onClose}
-          className='transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-          style={secondaryButtonStyle}
-        >
+      <DialogActions className='mt-3'>
+        <Button type='button' variant='secondary' size='sm' onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type='button'
-          onClick={save}
-          className='transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-          style={primaryButtonStyle}
-        >
+        </Button>
+        <Button type='button' variant='primary' size='sm' onClick={save}>
           Save preferences
-        </button>
+        </Button>
       </DialogActions>
     </Dialog>
   );

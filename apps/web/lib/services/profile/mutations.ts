@@ -155,6 +155,7 @@ export async function incrementProfileViews(username: string): Promise<void> {
 
 /**
  * Flush accumulated view counts from Redis to the database.
+ * Retries up to 3 times with exponential backoff for transient Neon failures.
  */
 async function flushViewsToDatabase(
   normalizedUsername: string,
@@ -164,13 +165,36 @@ async function flushViewsToDatabase(
     ? Math.max(1, Math.trunc(count))
     : 1;
 
-  await db
-    .update(creatorProfiles)
-    .set({
-      profileViews: drizzleSql`coalesce(${creatorProfiles.profileViews}, 0) + ${sanitizedCount}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await db
+        .update(creatorProfiles)
+        .set({
+          profileViews: drizzleSql`coalesce(${creatorProfiles.profileViews}, 0) + ${sanitizedCount}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
+
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt < maxRetries) {
+        await new Promise(resolve =>
+          setTimeout(resolve, Math.pow(2, attempt) * 100)
+        );
+      }
+    }
+  }
+
+  captureWarning('Profile view flush failed after retries', {
+    username: normalizedUsername,
+    count: sanitizedCount,
+    maxRetries,
+    error: lastError?.message,
+  });
 }
 
 /**
@@ -207,9 +231,10 @@ async function incrementViewsDirectly(
     }
   }
 
-  captureError('Profile view increment failed', lastError, {
+  captureWarning('Profile view increment failed after retries', {
     username: normalizedUsername,
     maxRetries,
+    error: lastError?.message,
   });
 }
 

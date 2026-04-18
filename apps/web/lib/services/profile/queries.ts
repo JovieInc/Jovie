@@ -5,9 +5,10 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { getPressPhotosByProfileId } from '@/lib/db/queries/press-photos';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
@@ -16,10 +17,10 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
-import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
+import { logger } from '@/lib/utils/logger';
 import type {
   ProfileData,
   ProfileSocialLink,
@@ -68,6 +69,26 @@ const profileSelectColumns = {
   updatedAt: creatorProfiles.updatedAt,
 } as const;
 
+const legacyProfileSelectColumns = {
+  id: creatorProfiles.id,
+  userId: creatorProfiles.userId,
+  username: creatorProfiles.username,
+  usernameNormalized: creatorProfiles.usernameNormalized,
+  displayName: creatorProfiles.displayName,
+  bio: creatorProfiles.bio,
+  avatarUrl: creatorProfiles.avatarUrl,
+  venmoHandle: creatorProfiles.venmoHandle,
+  spotifyUrl: creatorProfiles.spotifyUrl,
+  appleMusicUrl: creatorProfiles.appleMusicUrl,
+  youtubeUrl: creatorProfiles.youtubeUrl,
+  isPublic: creatorProfiles.isPublic,
+  isVerified: creatorProfiles.isVerified,
+  isClaimed: creatorProfiles.isClaimed,
+  claimToken: creatorProfiles.claimToken,
+  createdAt: creatorProfiles.createdAt,
+  updatedAt: creatorProfiles.updatedAt,
+} as const;
+
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
 const MAX_CONTACTS = 50;
@@ -75,6 +96,15 @@ const MAX_CONTACTS = 50;
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
+const PROFILE_EDGE_CACHE_TIMEOUT_MS = 1500;
+const KNOWN_PROBE_USERNAMES = new Set([
+  '.env',
+  'phpmyadmin',
+  'wordpress',
+  'wp',
+  'wp-admin',
+  'xmlrpc.php',
+]);
 
 // Query timeout for public profile pages.
 // Neon cold starts can take 10-15s, so production needs enough headroom to
@@ -180,10 +210,14 @@ export async function getProfileSocialLinks(
     .limit(MAX_SOCIAL_LINKS);
 
   if (links.length === MAX_SOCIAL_LINKS) {
-    captureWarning('[profile-service] MAX_SOCIAL_LINKS limit hit', undefined, {
-      profileId,
-      count: links.length,
-    });
+    logger.warn(
+      'MAX_SOCIAL_LINKS limit hit',
+      {
+        profileId,
+        count: links.length,
+      },
+      'profile-service'
+    );
   }
 
   return links;
@@ -211,6 +245,8 @@ export async function getProfileContacts(
         email: creatorContacts.email,
         phone: creatorContacts.phone,
         preferredChannel: creatorContacts.preferredChannel,
+        forwardInboxEmails: creatorContacts.forwardInboxEmails,
+        autoMarkRead: creatorContacts.autoMarkRead,
         isActive: creatorContacts.isActive,
         sortOrder: creatorContacts.sortOrder,
         createdAt: creatorContacts.createdAt,
@@ -227,10 +263,14 @@ export async function getProfileContacts(
       .limit(MAX_CONTACTS);
 
     if (contacts.length === MAX_CONTACTS) {
-      captureWarning('[profile-service] MAX_CONTACTS limit hit', undefined, {
-        profileId,
-        count: contacts.length,
-      });
+      logger.warn(
+        'MAX_CONTACTS limit hit',
+        {
+          profileId,
+          count: contacts.length,
+        },
+        'profile-service'
+      );
     }
 
     return contacts;
@@ -244,8 +284,10 @@ export async function getProfileContacts(
       errorMessage.includes('does not exist') ||
       causeMessage.includes('does not exist')
     ) {
-      captureWarning(
-        '[profile-service] creator_contacts table does not exist, returning empty'
+      logger.warn(
+        'creator_contacts table does not exist, returning empty',
+        undefined,
+        'profile-service'
       );
       return [];
     }
@@ -271,11 +313,15 @@ export async function getProfileWithLinks(
   options?: { skipCache?: boolean }
 ): Promise<ProfileWithLinks | null> {
   const normalizedUsername = username.toLowerCase();
+  if (KNOWN_PROBE_USERNAMES.has(normalizedUsername)) {
+    return null;
+  }
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
-  const redis = getRedis();
+  const shouldUseRedis = !options?.skipCache;
+  const redis = shouldUseRedis ? getRedis() : null;
 
   // Try Redis cache first (unless explicitly skipped)
-  if (redis && !options?.skipCache) {
+  if (redis) {
     try {
       const cached = await redis.get<ProfileWithLinks>(cacheKey);
       if (cached) {
@@ -283,7 +329,7 @@ export async function getProfileWithLinks(
         return reviveProfileDates(cached);
       }
     } catch (error) {
-      captureWarning('[profile-service] Redis cache read failed', error);
+      logger.warn('Redis cache read failed', error, 'profile-service');
       // Fall through to database query
     }
   }
@@ -302,12 +348,13 @@ export async function getProfileWithLinks(
       ),
     ]);
   } catch (error) {
-    captureWarning(
-      '[profile-service] Profile query failed or timed out',
-      error,
+    logger.warn(
+      'Profile query failed or timed out',
       {
+        error,
         username: normalizedUsername,
-      }
+      },
+      'profile-service'
     );
     return null;
   }
@@ -320,7 +367,7 @@ export async function getProfileWithLinks(
         ex: PROFILE_CACHE_TTL_SECONDS,
       })
       .catch(error => {
-        captureWarning('[profile-service] Redis cache write failed', error);
+        logger.warn('Redis cache write failed', error, 'profile-service');
       });
   }
 
@@ -390,13 +437,56 @@ function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
   };
 }
 
-/**
- * Fetch profile data from the database with parallel queries.
- */
-async function fetchProfileFromDatabase(
+function buildProfileFallbackDefaults(
+  profile: typeof legacyProfileSelectColumns extends infer _T
+    ? {
+        id: string;
+        userId: string | null;
+        username: string;
+        usernameNormalized: string;
+        displayName: string | null;
+        bio: string | null;
+        avatarUrl: string | null;
+        venmoHandle: string | null;
+        spotifyUrl: string | null;
+        appleMusicUrl: string | null;
+        youtubeUrl: string | null;
+        isPublic: boolean | null;
+        isVerified: boolean | null;
+        isClaimed: boolean | null;
+        claimToken: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }
+    : never
+): ProfileWithUser {
+  return {
+    ...profile,
+    creatorType: 'artist',
+    spotifyId: null,
+    appleMusicId: null,
+    youtubeMusicId: null,
+    deezerId: null,
+    tidalId: null,
+    soundcloudId: null,
+    isFeatured: false,
+    marketingOptOut: false,
+    settings: {},
+    theme: {},
+    profileViews: 0,
+    genres: [],
+    location: null,
+    activeSinceYear: null,
+    spotifyPopularity: null,
+    userIsPro: false,
+    userClerkId: null,
+    userEmail: null,
+  };
+}
+
+async function selectProfileWithUser(
   normalizedUsername: string
-): Promise<ProfileWithLinks | null> {
-  // Step 1: Fetch profile first (single query with user JOIN)
+): Promise<ProfileWithUser | null> {
   const [profile] = await db
     .select({
       ...profileSelectColumns,
@@ -409,73 +499,116 @@ async function fetchProfileFromDatabase(
     .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
     .limit(1);
 
+  return profile ?? null;
+}
+
+async function selectProfileWithLegacyFallback(
+  normalizedUsername: string
+): Promise<ProfileWithUser | null> {
+  try {
+    return await selectProfileWithUser(normalizedUsername);
+  } catch (error) {
+    logger.warn(
+      'Falling back to legacy profile query',
+      {
+        error,
+        username: normalizedUsername,
+      },
+      'profile-service'
+    );
+
+    const [legacyProfile] = await db
+      .select(legacyProfileSelectColumns)
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+      .limit(1);
+
+    return legacyProfile ? buildProfileFallbackDefaults(legacyProfile) : null;
+  }
+}
+
+/**
+ * Fetch profile data from the database with parallel queries.
+ */
+async function fetchProfileFromDatabase(
+  normalizedUsername: string
+): Promise<ProfileWithLinks | null> {
+  // Step 1: Fetch profile first (single query with user JOIN)
+  const profile = await selectProfileWithLegacyFallback(normalizedUsername);
+
   if (!profile) return null;
 
-  // Step 2: Fetch related data using profile ID (3 parallel queries, no redundant JOINs)
-  const [linksResult, contactsResult, latestRelease] = await Promise.all([
-    // Social links - use profile ID directly (no JOIN to creatorProfiles needed)
-    db
-      .select({
-        id: socialLinks.id,
-        creatorProfileId: socialLinks.creatorProfileId,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-        url: socialLinks.url,
-        displayText: socialLinks.displayText,
-        clicks: socialLinks.clicks,
-        isActive: socialLinks.isActive,
-        sortOrder: socialLinks.sortOrder,
-        createdAt: socialLinks.createdAt,
-        updatedAt: socialLinks.updatedAt,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profile.id),
-          eq(socialLinks.isActive, true),
-          ne(socialLinks.state, 'rejected')
+  // Step 2: Fetch related data using profile ID (4 parallel queries, no redundant JOINs)
+  const [linksResult, contactsResult, latestRelease, pressPhotos] =
+    await Promise.all([
+      // Social links - use profile ID directly (no JOIN to creatorProfiles needed)
+      db
+        .select({
+          id: socialLinks.id,
+          creatorProfileId: socialLinks.creatorProfileId,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          displayText: socialLinks.displayText,
+          clicks: socialLinks.clicks,
+          isActive: socialLinks.isActive,
+          sortOrder: socialLinks.sortOrder,
+          createdAt: socialLinks.createdAt,
+          updatedAt: socialLinks.updatedAt,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profile.id),
+            eq(socialLinks.isActive, true),
+            ne(socialLinks.state, 'rejected')
+          )
         )
-      )
-      .orderBy(socialLinks.sortOrder)
-      .limit(MAX_SOCIAL_LINKS),
+        .orderBy(socialLinks.sortOrder)
+        .limit(MAX_SOCIAL_LINKS),
 
-    // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
-    db
-      .select({
-        id: creatorContacts.id,
-        creatorProfileId: creatorContacts.creatorProfileId,
-        role: creatorContacts.role,
-        customLabel: creatorContacts.customLabel,
-        personName: creatorContacts.personName,
-        companyName: creatorContacts.companyName,
-        territories: creatorContacts.territories,
-        email: creatorContacts.email,
-        phone: creatorContacts.phone,
-        preferredChannel: creatorContacts.preferredChannel,
-        isActive: creatorContacts.isActive,
-        sortOrder: creatorContacts.sortOrder,
-        createdAt: creatorContacts.createdAt,
-        updatedAt: creatorContacts.updatedAt,
-      })
-      .from(creatorContacts)
-      .where(
-        and(
-          eq(creatorContacts.creatorProfileId, profile.id),
-          eq(creatorContacts.isActive, true)
+      // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
+      db
+        .select({
+          id: creatorContacts.id,
+          creatorProfileId: creatorContacts.creatorProfileId,
+          role: creatorContacts.role,
+          customLabel: creatorContacts.customLabel,
+          personName: creatorContacts.personName,
+          companyName: creatorContacts.companyName,
+          territories: creatorContacts.territories,
+          email: creatorContacts.email,
+          phone: creatorContacts.phone,
+          preferredChannel: creatorContacts.preferredChannel,
+          forwardInboxEmails: creatorContacts.forwardInboxEmails,
+          autoMarkRead: creatorContacts.autoMarkRead,
+          isActive: creatorContacts.isActive,
+          sortOrder: creatorContacts.sortOrder,
+          createdAt: creatorContacts.createdAt,
+          updatedAt: creatorContacts.updatedAt,
+        })
+        .from(creatorContacts)
+        .where(
+          and(
+            eq(creatorContacts.creatorProfileId, profile.id),
+            eq(creatorContacts.isActive, true)
+          )
         )
-      )
-      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-      .limit(MAX_CONTACTS),
+        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+        .limit(MAX_CONTACTS),
 
-    // Latest release - still uses username (existing function)
-    getLatestReleaseByUsername(normalizedUsername),
-  ]);
+      // Latest release - still uses username (existing function)
+      getLatestReleaseByUsername(normalizedUsername),
+
+      getPressPhotosByProfileId(profile.id),
+    ]);
 
   return {
     ...profile,
     socialLinks: linksResult,
     contacts: contactsResult,
     latestRelease,
+    pressPhotos,
   };
 }
 
@@ -486,14 +619,16 @@ async function fetchProfileFromDatabase(
 export async function invalidateProfileEdgeCache(
   usernameNormalized: string
 ): Promise<void> {
-  const redis = getRedis();
+  const redis = getRedis({
+    signal: AbortSignal.timeout(PROFILE_EDGE_CACHE_TIMEOUT_MS),
+  });
   if (!redis) return;
 
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${usernameNormalized.toLowerCase()}`;
   try {
     await redis.del(cacheKey);
   } catch (error) {
-    captureWarning('[profile-service] Failed to invalidate edge cache', error);
+    logger.warn('Failed to invalidate edge cache', error, 'profile-service');
   }
 }
 
@@ -523,6 +658,31 @@ export async function getProfileSummary(
     .limit(1);
 
   return profile ?? null;
+}
+
+/**
+ * Get multiple profiles by username in a single query.
+ * Used for batch-resolving blog authors.
+ *
+ * @param usernames - Array of usernames to look up
+ * @returns Map from normalized username to ProfileData
+ */
+export async function getProfilesByUsernames(
+  usernames: string[]
+): Promise<Map<string, ProfileData>> {
+  const normalized = Array.from(
+    new Set(
+      usernames
+        .map(u => u?.trim().toLowerCase())
+        .filter((u): u is string => Boolean(u))
+    )
+  );
+  if (normalized.length === 0) return new Map();
+  const profiles = await db
+    .select(profileSelectColumns)
+    .from(creatorProfiles)
+    .where(inArray(creatorProfiles.usernameNormalized, normalized));
+  return new Map(profiles.map(p => [p.usernameNormalized, p]));
 }
 
 /**
@@ -602,7 +762,7 @@ export async function getTopProfilesForStaticGeneration(
 
   const profiles = await db
     .select({
-      username: creatorProfiles.username,
+      username: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
     .where(

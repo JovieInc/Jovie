@@ -1,5 +1,6 @@
 'use client';
 
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   Check,
   Copy,
@@ -17,12 +18,17 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useEarningsQuery } from '@/lib/queries';
+import { type TipperRow, useEarningsQuery } from '@/lib/queries';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
-import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
+import {
+  generateQrCodeDataUrl,
+  generateQrCodeSvg,
+  qrCodeDataUrlToBlob,
+} from '@/lib/utils/qr-code';
 
 // =============================================================================
 // Constants
@@ -30,6 +36,45 @@ import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
 
 const QR_DISPLAY_SIZE = 200;
 const QR_PRINT_SIZE = 1024;
+
+const tipperColumnHelper = createColumnHelper<TipperRow>();
+
+const tipperColumns = [
+  tipperColumnHelper.accessor('tipperName', {
+    header: 'Name',
+    size: 160,
+    cell: ({ getValue }) => (
+      <span className='text-primary-token'>{getValue() ?? 'Anonymous'}</span>
+    ),
+  }),
+  tipperColumnHelper.accessor('contactEmail', {
+    header: 'Email',
+    size: 200,
+    cell: ({ getValue }) => (
+      <span className='text-secondary-token'>{getValue() ?? '--'}</span>
+    ),
+  }),
+  tipperColumnHelper.accessor('amountCents', {
+    header: 'Amount',
+    size: 100,
+    meta: { align: 'right' },
+    cell: ({ getValue }) => (
+      <span className='text-right font-[510] tabular-nums text-primary-token'>
+        {formatCents(getValue())}
+      </span>
+    ),
+  }),
+  tipperColumnHelper.accessor('createdAt', {
+    header: 'Date',
+    size: 120,
+    meta: { align: 'right' },
+    cell: ({ getValue }) => (
+      <span className='text-right text-secondary-token'>
+        {formatDate(getValue())}
+      </span>
+    ),
+  }),
+];
 
 // =============================================================================
 // Helpers
@@ -67,10 +112,10 @@ const StatCard = memo(function StatCard({
   iconColor,
 }: StatCardProps) {
   return (
-    <ContentSurfaceCard className='p-4'>
+    <ContentSurfaceCard className='p-2.5'>
       <div className='flex items-center gap-2'>
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconBg}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg}`}
           aria-hidden='true'
         >
           <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
@@ -98,11 +143,11 @@ const QrPreview = memo(function QrPreview({
   if (isLoading || !dataUrl) {
     return (
       <div
-        className='flex items-center justify-center rounded-xl bg-white'
+        className='flex items-center justify-center rounded-lg bg-white'
         style={{ width: QR_DISPLAY_SIZE, height: QR_DISPLAY_SIZE }}
         aria-hidden='true'
       >
-        <div className='h-16 w-16 rounded-lg bg-gray-200 animate-pulse motion-reduce:animate-none' />
+        <div className='h-16 w-16 rounded-md bg-gray-200 animate-pulse motion-reduce:animate-none' />
       </div>
     );
   }
@@ -113,7 +158,7 @@ const QrPreview = memo(function QrPreview({
       alt='QR code for tip page'
       width={QR_DISPLAY_SIZE}
       height={QR_DISPLAY_SIZE}
-      className='rounded-xl'
+      className='rounded-lg'
       unoptimized
     />
   );
@@ -135,7 +180,7 @@ export function EarningsTab() {
 
   const tipUrl = useMemo(() => {
     if (!handle) return '';
-    return `${BASE_URL}/${handle}/tip`;
+    return `${BASE_URL}/${handle}/pay`;
   }, [handle]);
 
   // ── QR generation state ──────────────────────────
@@ -179,8 +224,7 @@ export function EarningsTab() {
     setIsDownloadingPng(true);
     try {
       const dataUrl = await generateQrCodeDataUrl(tipUrl, QR_PRINT_SIZE);
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
+      const blob = qrCodeDataUrlToBlob(dataUrl);
       downloadBlob(blob, `jovie-tip-${handle}.png`);
       notifications.success('PNG downloaded');
     } catch {
@@ -222,9 +266,9 @@ export function EarningsTab() {
   // ── Empty state ──────────────────────────────────
   if (!handle) {
     return (
-      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-16 text-center'>
+      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-12 text-center'>
         <div
-          className='flex h-12 w-12 items-center justify-center rounded-2xl border border-subtle bg-surface-0'
+          className='flex h-12 w-12 items-center justify-center rounded-xl bg-surface-0'
           aria-hidden='true'
         >
           <QrCode className='h-6 w-6 text-tertiary-token' />
@@ -244,18 +288,18 @@ export function EarningsTab() {
   const tippers = earnings?.tippers ?? [];
 
   return (
-    <div className='flex flex-col gap-6'>
+    <div className='flex flex-col gap-4'>
       {/* ── Earnings Stats ─────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         Revenue
       </p>
 
       {isEarningsLoading ? (
-        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           {[1, 2, 3].map(i => (
-            <ContentSurfaceCard key={i} className='space-y-2 p-4'>
+            <ContentSurfaceCard key={i} className='space-y-2 p-2.5'>
               <div className='flex items-center gap-2'>
-                <div className='h-7 w-7 rounded-lg skeleton' />
+                <div className='h-7 w-7 rounded-md skeleton' />
                 <div className='h-3 w-16 rounded-sm skeleton' />
               </div>
               <div className='h-7 w-20 rounded-md skeleton' />
@@ -263,130 +307,74 @@ export function EarningsTab() {
           ))}
         </div>
       ) : (
-        <dl className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+        <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           <StatCard
             label='Total revenue'
             value={formatCents(stats?.totalRevenueCents ?? 0)}
             icon={DollarSign}
-            iconBg='bg-success-subtle'
+            iconBg='bg-surface-1 border border-subtle'
             iconColor='text-success'
           />
           <StatCard
             label='Tips received'
             value={String(stats?.totalTips ?? 0)}
             icon={Hash}
-            iconBg='bg-info-subtle'
+            iconBg='bg-surface-1 border border-subtle'
             iconColor='text-info'
           />
           <StatCard
             label='Average tip'
             value={formatCents(stats?.averageTipCents ?? 0)}
             icon={TrendingUp}
-            iconBg='bg-accent-subtle'
-            iconColor='text-accent-token'
+            iconBg='bg-surface-1 border border-subtle'
+            iconColor='text-accent'
           />
         </dl>
       )}
 
       {/* ── Tippers Table ──────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         Recent tippers
       </p>
 
       <ContentSurfaceCard className='overflow-hidden'>
-        {isEarningsLoading && (
-          <div className='space-y-3 p-4'>
-            {[1, 2, 3].map(i => (
-              <div key={i} className='flex items-center gap-3'>
-                <div className='h-8 w-8 rounded-full skeleton' />
-                <div className='flex-1 space-y-1.5'>
-                  <div className='h-3 w-24 rounded-sm skeleton' />
-                  <div className='h-3 w-36 rounded-sm skeleton' />
-                </div>
-                <div className='h-4 w-12 rounded-sm skeleton' />
-              </div>
-            ))}
-          </div>
-        )}
-        {!isEarningsLoading && tippers.length === 0 && (
-          <div className='flex flex-col items-center gap-3 px-6 py-12 text-center'>
-            <div
-              className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0'
-              aria-hidden='true'
-            >
-              <Users className='h-5 w-5 text-tertiary-token' />
-            </div>
-            <p className='text-[13px] text-secondary-token'>
-              No tips yet. Share your tip link to get started.
-            </p>
-          </div>
-        )}
-        {!isEarningsLoading && tippers.length > 0 && (
-          <div className='overflow-x-auto'>
-            <table className='w-full text-left text-[13px]'>
-              <thead>
-                <tr className='border-b border-subtle'>
-                  <th className='px-4 py-3 text-[13px] font-[510] text-tertiary-token'>
-                    Name
-                  </th>
-                  <th className='px-4 py-3 text-[13px] font-[510] text-tertiary-token'>
-                    Email
-                  </th>
-                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-tertiary-token'>
-                    Amount
-                  </th>
-                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-tertiary-token'>
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {tippers.map(tipper => (
-                  <tr
-                    key={tipper.id}
-                    className='border-b border-subtle last:border-b-0 transition-colors hover:bg-surface-0'
-                  >
-                    <td className='px-4 py-3 text-primary-token'>
-                      {tipper.tipperName ?? 'Anonymous'}
-                    </td>
-                    <td className='px-4 py-3 text-secondary-token'>
-                      {tipper.contactEmail ?? '--'}
-                    </td>
-                    <td className='px-4 py-3 text-right font-[510] tabular-nums text-primary-token'>
-                      {formatCents(tipper.amountCents)}
-                    </td>
-                    <td className='px-4 py-3 text-right text-secondary-token'>
-                      {formatDate(tipper.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <UnifiedTable
+          data={tippers}
+          columns={tipperColumns as ColumnDef<TipperRow, unknown>[]}
+          isLoading={isEarningsLoading}
+          getRowId={row => row.id}
+          enableVirtualization={false}
+          emptyState={
+            <TableEmptyState
+              icon={<Users className='h-5 w-5' />}
+              title='No tips yet'
+              description='Share your tip link to get started.'
+            />
+          }
+        />
       </ContentSurfaceCard>
 
       {/* ── QR Code Card ───────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         QR Code
       </p>
 
-      <ContentSurfaceCard className='p-5 sm:p-6'>
-        <div className='flex items-center gap-2 mb-5'>
+      <ContentSurfaceCard className='p-3 sm:p-4'>
+        <div className='flex items-center gap-2 mb-4'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-subtle'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-1'
             aria-hidden='true'
           >
-            <QrCode className='h-3.5 w-3.5 text-accent-token' />
+            <QrCode className='h-3.5 w-3.5 text-accent' />
           </div>
           <h2 className='text-[13px] font-[510] text-primary-token'>
             Tip QR Code
           </h2>
         </div>
 
-        <div className='flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-8'>
+        <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
           {/* Preview */}
-          <div className='shrink-0 rounded-[14px] border border-subtle bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]'>
+          <div className='shrink-0 rounded-lg bg-white p-2'>
             <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
           </div>
 
@@ -403,7 +391,7 @@ export function EarningsTab() {
             </div>
 
             {/* Tip URL display */}
-            <DrawerSurfaceCard className='flex items-center gap-2 rounded-[10px] bg-surface-0 px-3 py-2.5'>
+            <DrawerSurfaceCard className='flex items-center gap-2 rounded-md bg-surface-0 px-2.5 py-2'>
               <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
                 {tipUrl}

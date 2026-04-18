@@ -1,11 +1,11 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { toString } from 'mdast-util-to-string';
 import { cache } from 'react';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
 import { visit } from 'unist-util-visit';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
+import { resolveAppContentPath } from '@/lib/filesystem-paths';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
 
 const slugifyHeading = (value: string): string => {
@@ -45,7 +45,7 @@ export async function getMarkdownDocument(
 export async function createMarkdownDocument(
   raw: string
 ): Promise<MarkdownDocument> {
-  const processor = remark().use(remarkHtml);
+  const processor = remark().use(remarkHtml, { sanitize: false });
   const ast = processor.parse(raw);
 
   const toc: TocEntry[] = [];
@@ -81,7 +81,7 @@ export async function createMarkdownDocument(
 async function getMarkdownDocumentUncached(
   relativePath: string
 ): Promise<MarkdownDocument> {
-  const absolutePath = path.join(process.cwd(), relativePath);
+  const absolutePath = resolveAppContentPath(relativePath);
   const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
   return createMarkdownDocument(raw);
@@ -89,7 +89,7 @@ async function getMarkdownDocumentUncached(
 
 const getMarkdownDocumentCached = cache(
   async (relativePath: string): Promise<MarkdownDocument> => {
-    const absolutePath = path.join(process.cwd(), relativePath);
+    const absolutePath = resolveAppContentPath(relativePath);
     const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
     return createMarkdownDocument(raw);

@@ -35,6 +35,7 @@ export type { HowItWorksSectionProps } from './HowItWorksSection';
 export { HowItWorksSection } from './HowItWorksSection';
 export type { ListenSectionProps } from './ListenSection';
 export { ListenSection } from './ListenSection';
+export { PaySection } from './PaySection';
 export { ProfileSection } from './ProfileSection';
 export type {
   ProfileNotificationsContextValue,
@@ -49,12 +50,23 @@ export {
   useProfileShell,
 } from './profile-shell';
 export type {
+  PublicSurfaceFooterProps,
+  PublicSurfaceHeaderProps,
+  PublicSurfaceShellProps,
+  PublicSurfaceStageProps,
+} from './public-surface';
+export {
+  PublicSurfaceFooter,
+  PublicSurfaceHeader,
+  PublicSurfaceShell,
+  PublicSurfaceStage,
+} from './public-surface';
+export type {
   HandleValidationState,
   SmartHandleInputProps,
 } from './SmartHandleInput';
 export { SmartHandleInput } from './SmartHandleInput';
 export { SocialBar } from './SocialBar';
-export { TipSection } from './TipSection';
 export type {
   UserButtonProps,
   UserDisplayInfo,

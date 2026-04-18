@@ -3,52 +3,62 @@
     "collect": {
       "numberOfRuns": 1,
       "staticDistDir": ".next",
-      "url": ["http://localhost:3000/", "http://localhost:3000/tim"]
+      "url": [
+        "http://localhost:3000/",
+        "http://localhost:3000/tim",
+        "http://localhost:3000/legal/privacy",
+        "http://localhost:3000/legal/terms",
+        "http://localhost:3000/legal/cookies"
+      ]
     },
     "assert": {
-      "preset": "lighthouse:no-pwa",
-      "assertions": {
-        "interactive": [
-          "warn",
-          {
-            "maxNumericValue": 2000
-          }
-        ],
-        "first-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 2500
-          }
-        ],
-        "largest-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 3000
-          }
-        ],
-        "cumulative-layout-shift": [
-          "warn",
-          {
-            "maxNumericValue": 0.1
-          }
-        ],
-        "total-blocking-time": [
-          "warn",
-          {
-            "maxNumericValue": 500
-          }
-        ],
-        "speed-index": [
-          "warn",
-          {
-            "maxNumericValue": 3000
-          }
-        ]
-      },
       "assertMatrix": [
         {
           "matchingUrlPattern": ".*",
+          "preset": "lighthouse:recommended",
           "assertions": {
+            "categories:pwa": [
+              "warn",
+              {
+                "minScore": 0.7
+              }
+            ],
+            "interactive": [
+              "warn",
+              {
+                "maxNumericValue": 2000
+              }
+            ],
+            "first-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 2500
+              }
+            ],
+            "largest-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "cumulative-layout-shift": [
+              "warn",
+              {
+                "maxNumericValue": 0.1
+              }
+            ],
+            "total-blocking-time": [
+              "warn",
+              {
+                "maxNumericValue": 500
+              }
+            ],
+            "speed-index": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
             "categories:performance": [
               "warn",
               {
@@ -66,7 +76,8 @@
               {
                 "minScore": 0.9
               }
-            ]
+            ],
+            "forced-reflow-insight": "warn"
           }
         }
       ]

@@ -24,7 +24,7 @@ import { uploadAvatarToBlob } from './useAvatarUploadMutation';
  * Profile settings update payload.
  */
 export interface ProfileSettingsUpdate {
-  hide_branding?: boolean;
+  hometown?: string | null;
 }
 
 /**
@@ -37,10 +37,18 @@ export interface ProfileUpdateInput {
     username?: string;
     avatarUrl?: string;
     bio?: string;
+    location?: string | null;
+    hometown?: string | null;
     // Music links (camelCase to match API validation schema)
     spotifyUrl?: string | null;
     appleMusicUrl?: string | null;
     youtubeUrl?: string | null;
+    // Genre tags
+    genres?: string[];
+    // Career highlights for AI-generated playlist pitches
+    careerHighlights?: string;
+    // Target Spotify playlists for pitch generation
+    targetPlaylists?: string[];
     // Settings object for feature flags
     settings?: ProfileSettingsUpdate;
   };
@@ -54,6 +62,8 @@ export interface ProfileData {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  location?: string | null;
+  settings?: Record<string, unknown> | null;
   creatorType: string | null;
   isPublic: boolean;
 }
@@ -73,7 +83,14 @@ export interface ProfileUpdateResponse {
 const updateProfileApi = createMutationFn<
   ProfileUpdateInput,
   ProfileUpdateResponse
->('/api/dashboard/profile', 'PUT');
+>(
+  '/api/dashboard/profile',
+  'PUT',
+  // Profile saves may fan out through Clerk sync and cache invalidation,
+  // so the default 10s mutation timeout can abort valid requests and cause
+  // autosave retries with duplicate writes during local/dev runs.
+  { timeout: 30_000 }
+);
 // ============================================================================
 // Profile Update Mutation
 // ============================================================================

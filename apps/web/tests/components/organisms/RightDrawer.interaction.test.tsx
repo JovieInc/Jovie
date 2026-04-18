@@ -47,9 +47,14 @@ describe('RightDrawer', () => {
 
     expect(aside).toHaveAttribute('aria-hidden', 'false');
     expect(aside).toHaveStyle({ width: '360px' });
+    expect(aside).not.toHaveClass('border-l');
+    expect(aside).not.toHaveClass('bg-surface-0');
+    expect(aside).not.toHaveClass('lg:border');
+    expect(aside).not.toHaveClass('shadow-[var(--linear-app-drawer-shadow)]');
+    expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 
-  it('calls keyboard handler only when focus is inside the drawer', () => {
+  it('handles Escape while open even when focus remains outside the drawer', () => {
     const onKeyDown = vi.fn();
 
     render(
@@ -67,15 +72,44 @@ describe('RightDrawer', () => {
     );
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onKeyDown).not.toHaveBeenCalled();
-
-    screen.getByRole('button', { name: 'Inside' }).focus();
-    fireEvent.keyDown(document, { key: 'Escape' });
-
     expect(onKeyDown).toHaveBeenCalledTimes(1);
     expect(onKeyDown).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'Escape' })
     );
+
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+
+    screen.getByRole('button', { name: 'Inside' }).focus();
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(2);
+    expect(onKeyDown).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'Enter' })
+    );
+  });
+
+  it('does not handle Escape when a modal dialog is open above the drawer', () => {
+    const onKeyDown = vi.fn();
+
+    render(
+      <>
+        <div role='dialog' aria-modal='true'>
+          Modal
+        </div>
+        <RightDrawer
+          isOpen={true}
+          width={360}
+          ariaLabel='Modal-aware drawer'
+          onKeyDown={onKeyDown}
+        >
+          <button type='button'>Inside</button>
+        </RightDrawer>
+      </>
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDown).not.toHaveBeenCalled();
   });
 
   it('renders context menu wrapper when context menu items are provided', () => {
@@ -109,7 +143,13 @@ describe('RightDrawer', () => {
     );
 
     const mobileAside = screen.getByLabelText('Responsive drawer');
-    expect(mobileAside).toHaveClass('fixed', 'inset-0', 'translate-x-full');
+    expect(mobileAside).toHaveClass(
+      'fixed',
+      'inset-0',
+      'translate-x-full',
+      'bg-(--linear-app-content-surface)',
+      'outline-none'
+    );
 
     rerender(
       <RightDrawer isOpen={true} width={360} ariaLabel='Responsive drawer'>
@@ -128,10 +168,12 @@ describe('RightDrawer', () => {
 
     const desktopAside = screen.getByLabelText('Responsive drawer');
     expect(desktopAside).toHaveClass(
-      'border-l',
       'transition-[width,opacity]',
-      'lg:rounded-l-[18px]',
-      'shadow-(--linear-shadow-card)'
+      'opacity-100'
+    );
+    expect(desktopAside).not.toHaveClass('lg:border');
+    expect(desktopAside).not.toHaveClass(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');

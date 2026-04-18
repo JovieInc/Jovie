@@ -7,12 +7,14 @@ const {
   mockDbSelect,
   mockDbInsert,
   mockEq,
+  mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
   mockEq: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('drizzle-orm', async importOriginal => {
@@ -43,6 +45,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));
 
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
+}));
+
 // Mock schema (just provide empty objects for the table references)
 vi.mock('@/lib/db/schema', () => ({
   users: {},
@@ -52,13 +58,13 @@ vi.mock('@/lib/db/schema', () => ({
 
 // Import module once at the top to avoid re-importing in each test
 import {
+  CanonicalUserState,
   canAccessApp,
   canAccessOnboarding,
   getRedirectForState,
   getWaitlistAccess,
   requiresRedirect,
   resolveUserState,
-  UserState,
 } from '@/lib/auth/gate';
 
 // Helper to create mock for the single JOIN query used by resolveUserState
@@ -85,20 +91,23 @@ const createSimpleQueryMock = (result: unknown[]) => ({
 describe('gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
   });
 
-  describe('UserState enum', () => {
+  describe('CanonicalUserState enum', () => {
     it('exports all expected user states', () => {
-      expect(UserState.UNAUTHENTICATED).toBe('UNAUTHENTICATED');
-      expect(UserState.NEEDS_DB_USER).toBe('NEEDS_DB_USER');
-      expect(UserState.NEEDS_WAITLIST_SUBMISSION).toBe(
+      expect(CanonicalUserState.UNAUTHENTICATED).toBe('UNAUTHENTICATED');
+      expect(CanonicalUserState.NEEDS_DB_USER).toBe('NEEDS_DB_USER');
+      expect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION).toBe(
         'NEEDS_WAITLIST_SUBMISSION'
       );
-      expect(UserState.WAITLIST_PENDING).toBe('WAITLIST_PENDING');
-      expect(UserState.NEEDS_ONBOARDING).toBe('NEEDS_ONBOARDING');
-      expect(UserState.ACTIVE).toBe('ACTIVE');
-      expect(UserState.BANNED).toBe('BANNED');
-      expect(UserState.USER_CREATION_FAILED).toBe('USER_CREATION_FAILED');
+      expect(CanonicalUserState.WAITLIST_PENDING).toBe('WAITLIST_PENDING');
+      expect(CanonicalUserState.NEEDS_ONBOARDING).toBe('NEEDS_ONBOARDING');
+      expect(CanonicalUserState.ACTIVE).toBe('ACTIVE');
+      expect(CanonicalUserState.BANNED).toBe('BANNED');
+      expect(CanonicalUserState.USER_CREATION_FAILED).toBe(
+        'USER_CREATION_FAILED'
+      );
     });
   });
 
@@ -108,7 +117,7 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.UNAUTHENTICATED);
+      expect(result.state).toBe(CanonicalUserState.UNAUTHENTICATED);
       expect(result.clerkUserId).toBeNull();
       expect(result.dbUserId).toBeNull();
       expect(result.redirectTo).toBe('/signin');
@@ -124,7 +133,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -137,8 +146,8 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.state).toBe(CanonicalUserState.BANNED);
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns BANNED for banned status', async () => {
@@ -150,7 +159,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'banned',
             isAdmin: false,
@@ -163,8 +172,8 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.state).toBe(CanonicalUserState.BANNED);
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns BANNED for suspended status', async () => {
@@ -176,7 +185,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'suspended',
             isAdmin: false,
@@ -189,8 +198,8 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.BANNED);
-      expect(result.redirectTo).toBe('/banned');
+      expect(result.state).toBe(CanonicalUserState.BANNED);
+      expect(result.redirectTo).toBe('/unavailable');
     });
 
     it('returns NEEDS_ONBOARDING when user has no profile', async () => {
@@ -203,7 +212,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -223,9 +232,9 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
-      expect(result.dbUserId).toBe('db-user-123');
+      expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
     it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
@@ -238,7 +247,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -258,7 +267,7 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(result.profileId).toBe('profile-123');
     });
 
@@ -272,7 +281,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'test@example.com',
             userStatus: 'active',
             isAdmin: false,
@@ -292,7 +301,7 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.ACTIVE);
+      expect(result.state).toBe(CanonicalUserState.ACTIVE);
       expect(result.redirectTo).toBeNull();
       expect(result.context.isPro).toBe(true);
       expect(result.profileId).toBe('profile-123');
@@ -313,7 +322,7 @@ describe('gate.ts', () => {
       mockDbSelect.mockReturnValue(
         createJoinQueryMock([
           {
-            id: 'db-user-123',
+            id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             email: 'admin@example.com',
             userStatus: 'active',
             isAdmin: true,
@@ -349,65 +358,81 @@ describe('gate.ts', () => {
 
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
-      expect(result.state).toBe(UserState.NEEDS_DB_USER);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_DB_USER);
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
     });
   });
 
   describe('getRedirectForState', () => {
     it('returns correct redirect for each state', () => {
-      expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
-      expect(getRedirectForState(UserState.NEEDS_DB_USER)).toBe(
+      expect(getRedirectForState(CanonicalUserState.UNAUTHENTICATED)).toBe(
+        '/signin'
+      );
+      expect(getRedirectForState(CanonicalUserState.NEEDS_DB_USER)).toBe(
         '/onboarding?fresh_signup=true'
       );
-      expect(getRedirectForState(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe('/waitlist');
+      expect(getRedirectForState(CanonicalUserState.WAITLIST_PENDING)).toBe(
         '/waitlist'
       );
-      expect(getRedirectForState(UserState.WAITLIST_PENDING)).toBe('/waitlist');
-      expect(getRedirectForState(UserState.NEEDS_ONBOARDING)).toBe(
+      expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
         '/onboarding?fresh_signup=true'
       );
-      expect(getRedirectForState(UserState.BANNED)).toBe('/banned');
-      expect(getRedirectForState(UserState.USER_CREATION_FAILED)).toBe(
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
+        '/unavailable'
+      );
+      expect(getRedirectForState(CanonicalUserState.USER_CREATION_FAILED)).toBe(
         '/error/user-creation-failed'
       );
-      expect(getRedirectForState(UserState.ACTIVE)).toBeNull();
+      expect(getRedirectForState(CanonicalUserState.ACTIVE)).toBeNull();
     });
   });
 
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', async () => {
-      expect(canAccessApp(UserState.ACTIVE)).toBe(true);
-      expect(canAccessApp(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(false);
-      expect(canAccessApp(UserState.WAITLIST_PENDING)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_ONBOARDING)).toBe(false);
-      expect(canAccessApp(UserState.BANNED)).toBe(false);
-      expect(canAccessApp(UserState.USER_CREATION_FAILED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.ACTIVE)).toBe(true);
+      expect(canAccessApp(CanonicalUserState.UNAUTHENTICATED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+        false
+      );
+      expect(canAccessApp(CanonicalUserState.WAITLIST_PENDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_ONBOARDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.BANNED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.USER_CREATION_FAILED)).toBe(false);
     });
   });
 
   describe('canAccessOnboarding', () => {
     it('returns true for NEEDS_ONBOARDING and ACTIVE states', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(canAccessOnboarding(UserState.ACTIVE)).toBe(true);
-      expect(canAccessOnboarding(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessOnboarding(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessOnboarding(UserState.BANNED)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
+        true
+      );
+      expect(canAccessOnboarding(CanonicalUserState.ACTIVE)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.UNAUTHENTICATED)).toBe(
+        false
+      );
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.BANNED)).toBe(false);
     });
   });
 
   describe('requiresRedirect', () => {
     it('returns false only for ACTIVE state', async () => {
-      expect(requiresRedirect(UserState.ACTIVE)).toBe(false);
-      expect(requiresRedirect(UserState.UNAUTHENTICATED)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_DB_USER)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(true);
-      expect(requiresRedirect(UserState.WAITLIST_PENDING)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(requiresRedirect(UserState.BANNED)).toBe(true);
-      expect(requiresRedirect(UserState.USER_CREATION_FAILED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.ACTIVE)).toBe(false);
+      expect(requiresRedirect(CanonicalUserState.UNAUTHENTICATED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_DB_USER)).toBe(true);
+      expect(
+        requiresRedirect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.WAITLIST_PENDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.BANNED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.USER_CREATION_FAILED)).toBe(
+        true
+      );
     });
   });
 

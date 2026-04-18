@@ -1,11 +1,16 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { cn } from '@/lib/utils';
+import { formatTimeAgo } from '@/lib/utils/audience';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { AudienceAction } from '@/types';
 
 export interface AudienceLastActionCellProps {
   readonly actions: AudienceAction[];
+  /** Optional last seen timestamp — shown as relative time after the action label */
+  readonly lastSeenAt?: string | null;
   readonly className?: string;
 }
 
@@ -22,29 +27,77 @@ function resolveActionIcon(label: string | null | undefined): string {
   return 'Sparkles';
 }
 
+function deriveActionLabel(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string | null {
+  if (renderedAction.kind === 'sentence') return renderedAction.text;
+  if (lastAction)
+    return capitalizeFirst(lastAction.label?.trim()) || 'Unknown action';
+  return null;
+}
+
+function deriveActionIcon(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string {
+  if (renderedAction.kind === 'sentence') return renderedAction.icon;
+  if (lastAction) return resolveActionIcon(lastAction.label);
+  return 'Clock';
+}
+
 export function AudienceLastActionCell({
   actions,
+  lastSeenAt,
   className,
 }: AudienceLastActionCellProps) {
-  if (!actions.length) {
+  const timeAgo = lastSeenAt ? formatTimeAgo(lastSeenAt) : null;
+
+  if (!actions.length && !timeAgo) {
     return null;
   }
 
   const lastAction = actions[0];
-  const actionLabel = lastAction.label?.trim() || 'Unknown action';
-  const iconName = resolveActionIcon(lastAction.label);
+  const renderedAction = lastAction
+    ? renderAudienceEventSentence(lastAction)
+    : { kind: 'empty' as const };
+  const actionLabel = deriveActionLabel(renderedAction, lastAction);
+  const iconName = deriveActionIcon(renderedAction, lastAction);
 
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 text-[13px] text-secondary-token',
+        'flex items-center gap-1.5 text-[13px] text-secondary-token min-w-0',
         className
       )}
     >
-      <span className='inline-flex h-5 w-5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'>
-        <Icon name={iconName} className='h-2.5 w-2.5' aria-hidden='true' />
-      </span>
-      <span className='truncate'>{actionLabel}</span>
+      <Icon
+        name={iconName}
+        className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
+        aria-hidden='true'
+      />
+      {actionLabel && (
+        <span className='truncate text-[12px]'>{actionLabel}</span>
+      )}
+      {timeAgo && (
+        <>
+          {actionLabel && (
+            <span
+              className='text-quaternary-token select-none shrink-0'
+              aria-hidden='true'
+            >
+              ·
+            </span>
+          )}
+          <span className='shrink-0 text-[11px] text-tertiary-token tabular-nums'>
+            {timeAgo}
+          </span>
+        </>
+      )}
     </div>
   );
 }

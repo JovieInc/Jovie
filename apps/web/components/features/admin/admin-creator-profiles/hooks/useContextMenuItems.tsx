@@ -57,9 +57,8 @@ export function useContextMenuItems({
     (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
       const items: ContextMenuItemType[] = [];
 
-      // Refresh ingest (if available)
-      const hasIngestStatus = Object.hasOwn(ingestRefreshStatuses, profile.id);
-      if (hasIngestStatus) {
+      // Refresh ingest — always available for all profiles
+      {
         const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
         items.push(
           {

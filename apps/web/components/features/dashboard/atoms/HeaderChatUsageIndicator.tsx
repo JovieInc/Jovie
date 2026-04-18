@@ -2,17 +2,27 @@
 
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { memo } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
 export const HeaderChatUsageIndicator = memo(
   function HeaderChatUsageIndicator() {
+    const pathname = usePathname();
     const isPassiveRuntime = env.IS_E2E;
-    const { data } = useChatUsageQuery({ enabled: !isPassiveRuntime });
+    const isDemoRoute = isDemoRoutePath(pathname);
+    const { data } = useChatUsageQuery({
+      enabled: !isPassiveRuntime && !isDemoRoute,
+    });
 
-    if (isPassiveRuntime || !data || (!data.isNearLimit && !data.isExhausted)) {
+    if (
+      isPassiveRuntime ||
+      isDemoRoute ||
+      !data ||
+      (!data.isNearLimit && !data.isExhausted)
+    ) {
       return null;
     }
 
@@ -33,7 +43,7 @@ export const HeaderChatUsageIndicator = memo(
         }
       >
         <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
-        <span className='hidden sm:inline'>Chat</span>
+        <span className='max-sm:hidden sm:inline'>Chat</span>
         <span className='tabular-nums'>{label}</span>
       </Link>
     );

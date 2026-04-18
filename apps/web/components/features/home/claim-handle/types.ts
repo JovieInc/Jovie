@@ -1,6 +1,12 @@
 export interface ClaimHandleFormProps {
   readonly onHandleChange?: (handle: string) => void;
-  readonly size?: 'default' | 'hero';
+  readonly size?: 'default' | 'hero' | 'display';
+  readonly submitButtonTestId?: string;
+  readonly hideHelperText?: boolean;
+  readonly submitTracking?: {
+    readonly eventName: 'landing_cta_claim_handle';
+    readonly section: 'final_cta';
+  };
 }
 
 export interface HandleAvailabilityState {

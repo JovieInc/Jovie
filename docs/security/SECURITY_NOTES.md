@@ -1,6 +1,6 @@
 # Security Posture Notes
 
-_Last reviewed: 2025-11-29_
+_Last reviewed: 2026-04-01_
 
 ## 1. Environment & secrets
 
@@ -26,16 +26,15 @@ _Last reviewed: 2025-11-29_
     - Do **not** add new real secrets under `env-backup/`.
     - If examples are needed, commit **redacted sample files** only, and keep real values in Vercel / 1Password / secret manager.
 
-- **URL encryption** ✅ **UPDATED 2025-12-22**
-  - Link wrapping now enforces strong encryption via `URL_ENCRYPTION_KEY` in `lib/utils/url-encryption.ts`.
-  - **Production/preview environments**: Application will fail to start if `URL_ENCRYPTION_KEY` is missing or using the default value.
-  - **Development environment**: Falls back to base64 encoding with a warning if the key is not set.
-  - **Key generation**: Generate a secure key with `openssl rand -base64 32` and add to your environment variables.
-  - **Implementation**:
-    - `encryptUrl()` uses AES-256-GCM encryption when a valid key is present
-    - `decryptUrl()` handles both encrypted and legacy base64-encoded URLs
-    - Module-level validation ensures production deployments never use weak encryption
-  - **Validation**: Runtime validation in `lib/env-server.ts` checks for the presence and security of `URL_ENCRYPTION_KEY` in production/preview environments.
+- **URL encryption** ✅ **UPDATED 2026-03-21**
+  - Link wrapping uses AES-256-GCM encryption with a versioned envelope (`v: 1`) via `encryptUrlRawKey()`/`decryptUrlRawKey()` in `lib/utils/url-encryption.server.ts`.
+  - The raw `URL_ENCRYPTION_KEY` (base64-encoded 32-byte key) is used directly as the AES key — no scrypt derivation — for fast encrypt/decrypt on the hot `/go/:shortId` redirect path.
+  - **Production/preview environments**: Application will fail to start if `URL_ENCRYPTION_KEY` is missing.
+  - **Development environment**: Falls back to a random key generated at startup (acceptable for dev).
+  - **Key generation**: `openssl rand -base64 32`
+  - **Legacy support**: `getWrappedLink()` detects legacy base64-encoded URLs (no `v` field) and falls back to `simpleDecryptUrl()`. A migration script (`scripts/migrate-wrapped-links.ts`) can re-encrypt all legacy rows.
+  - **Envelope format**: `{ v: 1, encrypted: hex, iv: hex, authTag: hex }` — the `v` field enables forward-compatible format changes.
+  - The original scrypt-based `encryptUrl()`/`decryptUrl()` remain available for other use cases (HMAC challenge tokens, etc.).
 
 ## 2. Input handling & validation
 
@@ -50,12 +49,11 @@ _Last reviewed: 2025-11-29_
   - **Social links:** `/api/dashboard/social-links` enforces profile ownership and rejects non-http(s) or malformed URLs.
   - **Email sync:** `/api/account/email` uses Zod and verifies against Clerk email addresses.
 
-- **Gaps / footguns**
-  - **Profile updates** (`/api/dashboard/profile`):
-    - Accepts a free-form `updates` object filtered only by `allowedFields`.
-    - No schema for lengths or patterns on `displayName`, `bio`, `creatorType`, `settings`, `theme`, `venmo_handle`, or the various profile URLs.
-  - **Tip creation** (`/api/create-tip-intent`):
-    - Reads `{ amount, handle }` directly from JSON, multiplies `amount` by 100, and passes both into Stripe metadata without range or format validation.
+- **Gaps / footguns** ✅ **UPDATED 2026-03-21**
+  - **Profile updates** (`/api/dashboard/profile`): Now fully validated with `ProfileUpdateSchema` (Zod).
+  - **Tip creation** (`/api/create-tip-intent`): Now validated with `tipIntentSchema` (Zod) + `amountToCents()` overflow protection.
+  - **Link wrapping** (`/api/wrap-link`): Now validated with Zod schemas (`wrapLinkPostSchema`, `wrapLinkPutSchema`, `wrapLinkDeleteSchema`) including SSRF-safe URL validation via `safeHttpUrlSchema`.
+  - **Max access** (`/api/max-access-request`): Now validated with Zod schema.
 
 - **Near-term hardening plan**
   - Add Zod schemas per route instead of ad-hoc checks:
@@ -161,9 +159,13 @@ _Last reviewed: 2025-11-29_
   - `env-backup/.env.*` and the committed `.env.local` are treated as historical snapshots; values must be assumed rotated/compromised.
   - Future changes should avoid adding new secrets to this directory; use redacted examples instead.
 
-- **Link encryption**
-  - Current link wrapping uses base64 obfuscation (`simpleEncryptUrl`), which does **not** provide real confidentiality if the DB is compromised.
-  - Future work: switch wrapped links to AES-GCM with a managed `URL_ENCRYPTION_KEY` (per environment), plus rotation and key management documented.
+- **Link encryption** ✅ **RESOLVED 2026-03-21**
+  - Link wrapping now uses AES-256-GCM with a versioned envelope. Legacy base64 rows are auto-detected and can be migrated with `scripts/migrate-wrapped-links.ts`.
+
+- **Contact obfuscation** (intentional — documented threat model)
+  - Contact emails/phones use base64 + char rotation for anti-scraping obfuscation. This is NOT cryptographic protection.
+  - Client-side decode is required for synchronous `mailto:`/`tel:` URI construction.
+  - A proper server-side encryption design (with proof-of-interaction) is deferred to a separate effort.
 
 - **Rate limiting**
   - Several endpoints (`/api/handle/check`, `/api/track`, `/api/wrap-link`) are intentionally light on rate limiting, per YC-style "do things that don’t scale".

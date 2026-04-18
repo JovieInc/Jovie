@@ -11,13 +11,14 @@ import type {
   ReleaseSidebarAnalytics,
   ReleaseSidebarTrack,
 } from '@/components/organisms/release-sidebar/types';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { AudienceMember } from '@/types';
 
 // ── Provider config (matches the shape ReleaseTable expects) ────────────────
 
 export const DEMO_PROVIDER_CONFIG: Record<
-  ProviderKey,
+  string,
   { label: string; accent: string }
 > = {
   spotify: { label: 'Spotify', accent: '#1DB954' },
@@ -42,366 +43,81 @@ export const DEMO_PROVIDER_CONFIG: Record<
 
 // Helper to create provider links
 function makeProviders(
-  keys: ProviderKey[],
-  slug: string
+  release: (typeof INTERNAL_DJ_DEMO_PERSONA.releases)[number]
 ): ReleaseViewModel['providers'] {
-  return keys.map((key, i) => ({
+  const entries = Object.entries(release.providerUrls) as Array<
+    [ProviderKey, string]
+  >;
+
+  return entries.map(([key, url], i) => ({
     key,
-    url: `https://${key}.example.com/${slug}`,
+    url,
     source: 'ingested' as const,
     updatedAt: '2026-02-01T00:00:00Z',
     label: DEMO_PROVIDER_CONFIG[key].label,
-    path: `/${slug}`,
+    path: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
     isPrimary: i < 3,
   }));
 }
 
 // ── Release view models ─────────────────────────────────────────────────────
 
-export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
-  {
+export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
+  INTERNAL_DJ_DEMO_PERSONA.releases.map(release => ({
     profileId: 'demo-profile',
-    id: 'rel-take-me-over',
-    title: 'Take Me Over',
-    artistNames: ['Tim White', 'Sora Vale'],
-    releaseDate: '2014-10-01',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
-    slug: 'take-me-over',
-    smartLinkPath: '/tim-white/take-me-over',
-    spotifyPopularity: 45,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 210_000,
-    primaryIsrc: 'USRC17300001',
-    genres: ['Trance', 'Progressive House'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
-      'take-me-over'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-never-say-a-word',
-    title: 'Never Say A Word',
-    artistNames: ['Tim White'],
-    releaseDate: '2024-01-15',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
-    slug: 'never-say-a-word',
-    smartLinkPath: '/tim-white/never-say-a-word',
-    spotifyPopularity: 38,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 225_000,
-    primaryIsrc: 'USRC17400002',
-    genres: ['Trance', 'Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer'],
-      'never-say-a-word'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-deep-end',
-    title: 'The Deep End',
-    artistNames: ['Tim White', 'Aria North', 'Sora Vale'],
-    releaseDate: '2017-02-10',
-    artworkUrl:
-      'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
-    slug: 'the-deep-end',
-    smartLinkPath: '/tim-white/the-deep-end',
-    spotifyPopularity: 52,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 198_000,
-    primaryIsrc: 'USRC17100003',
-    genres: ['Trance', 'Progressive House'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
-      'the-deep-end'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-01',
-    title: 'Night Drive',
-    artistNames: ['Sora Vale'],
-    releaseDate: '2026-02-18',
-    artworkUrl: undefined,
-    slug: 'night-drive',
-    smartLinkPath: '/soravale/night-drive',
-    spotifyPopularity: 72,
-    releaseType: 'album',
-    isExplicit: false,
-    upc: '0196871374828',
-    label: 'Sora Records',
-    totalTracks: 12,
-    totalDurationMs: 2_760_000,
-    primaryIsrc: 'USRC12345001',
-    genres: ['Indie Electronic', 'Synthwave'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
-      'night-drive'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-02',
-    title: 'Neon Nights',
-    artistNames: ['Sora Vale', 'Noah Grey'],
-    releaseDate: '2025-10-15',
-    artworkUrl: undefined,
-    slug: 'neon-nights',
-    smartLinkPath: '/soravale/neon-nights',
-    spotifyPopularity: 58,
-    releaseType: 'ep',
-    isExplicit: false,
-    upc: '0196871374829',
-    label: 'Sora Records',
-    totalTracks: 5,
-    totalDurationMs: 1_080_000,
-    primaryIsrc: 'USRC12345002',
-    genres: ['Indie Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'deezer'],
-      'neon-nights'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-03',
-    title: 'The Sound',
-    artistNames: ['Sora Vale'],
-    releaseDate: '2025-03-22',
-    artworkUrl: undefined,
-    slug: 'the-sound',
-    smartLinkPath: '/soravale/the-sound',
-    spotifyPopularity: 45,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 214_000,
-    primaryIsrc: 'USRC12345003',
-    genres: ['Synthwave', 'Ambient'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube'],
-      'the-sound'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-04',
-    title: 'Quiet Hours',
-    artistNames: ['Sora Vale'],
-    releaseDate: '2024-08-10',
-    artworkUrl: undefined,
-    slug: 'quiet-hours',
-    smartLinkPath: '/soravale/quiet-hours',
-    spotifyPopularity: 33,
-    releaseType: 'ep',
-    isExplicit: false,
-    totalTracks: 4,
-    totalDurationMs: 960_000,
-    primaryIsrc: 'USRC12345004',
-    genres: ['Ambient'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'soundcloud'],
-      'quiet-hours'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-05',
-    title: 'Static Skies',
-    artistNames: ['Sora Vale', 'Ivy Chen'],
-    releaseDate: '2026-01-30',
-    artworkUrl: undefined,
-    slug: 'static-skies',
-    smartLinkPath: '/soravale/static-skies',
-    spotifyPopularity: 15,
-    releaseType: 'album',
-    isExplicit: true,
-    totalTracks: 10,
-    totalDurationMs: 2_400_000,
-    primaryIsrc: 'USRC12345005',
-    genres: ['Indie Electronic', 'Experimental'],
-    providers: makeProviders(
-      ['spotify', 'youtube', 'amazon_music'],
-      'static-skies'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-06',
-    title: 'Afterglow (Deluxe)',
-    artistNames: ['Sora Vale'],
-    releaseDate: '2026-02-23',
-    artworkUrl: undefined,
-    slug: 'afterglow-deluxe',
-    smartLinkPath: '/soravale/afterglow-deluxe',
-    spotifyPopularity: 62,
-    releaseType: 'album',
-    isExplicit: false,
-    totalTracks: 14,
-    totalDurationMs: 3_120_000,
-    primaryIsrc: 'USRC12345006',
-    genres: ['Indie Electronic', 'Dream Pop'],
-    providers: makeProviders(
-      [
-        'spotify',
-        'apple_music',
-        'youtube',
-        'amazon_music',
-        'deezer',
-        'tidal',
-        'bandcamp',
-      ],
-      'afterglow-deluxe'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-07',
-    title: 'Midnight Express',
-    releaseDate: '2026-03-14',
-    artworkUrl: undefined,
-    slug: 'midnight-express',
-    smartLinkPath: '/soravale/midnight-express',
-    spotifyPopularity: null,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 198_000,
-    primaryIsrc: 'USRC12345007',
-    genres: ['Synthwave'],
-    providers: makeProviders(['spotify', 'apple_music'], 'midnight-express'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-08',
-    title: 'Solar Flare',
-    releaseDate: '2026-04-01',
-    artworkUrl: undefined,
-    slug: 'solar-flare',
-    smartLinkPath: '/soravale/solar-flare',
-    spotifyPopularity: null,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 226_000,
-    primaryIsrc: 'USRC12345008',
-    genres: ['Indie Electronic'],
-    providers: makeProviders(['spotify'], 'solar-flare'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-09',
-    title: 'Manual Sunset',
-    releaseDate: '2025-06-01',
-    artworkUrl: undefined,
-    slug: 'manual-sunset',
-    smartLinkPath: '/soravale/manual-sunset',
-    spotifyPopularity: 28,
-    releaseType: 'ep',
-    isExplicit: false,
-    totalTracks: 6,
-    totalDurationMs: 1_440_000,
-    primaryIsrc: 'USRC12345009',
-    genres: ['Ambient', 'Downtempo'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'soundcloud', 'bandcamp'],
-      'manual-sunset'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-10',
-    title: 'Echoes',
-    releaseDate: '2024-11-20',
-    artworkUrl: undefined,
-    slug: 'echoes',
-    smartLinkPath: '/soravale/echoes',
-    spotifyPopularity: 41,
-    releaseType: 'album',
-    isExplicit: false,
-    totalTracks: 8,
-    totalDurationMs: 1_920_000,
-    primaryIsrc: 'USRC12345010',
-    genres: ['Ambient', 'Indie Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'deezer', 'tidal'],
-      'echoes'
-    ),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-11',
-    title: 'First Light',
-    releaseDate: '2024-01-15',
-    artworkUrl: undefined,
-    slug: 'first-light',
-    smartLinkPath: '/soravale/first-light',
-    spotifyPopularity: 19,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 195_000,
-    primaryIsrc: 'USRC12345011',
-    genres: ['Synthwave'],
-    providers: makeProviders(['spotify', 'apple_music'], 'first-light'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-12',
-    title: 'Demo Tape Vol. 1',
-    releaseDate: '2023-06-20',
-    artworkUrl: undefined,
-    slug: 'demo-tape-vol-1',
-    smartLinkPath: '/soravale/demo-tape-vol-1',
-    spotifyPopularity: 8,
-    releaseType: 'ep',
-    isExplicit: false,
-    totalTracks: 3,
-    totalDurationMs: 720_000,
-    primaryIsrc: 'USRC12345012',
-    genres: ['Lo-Fi', 'Experimental'],
-    providers: makeProviders(['soundcloud', 'bandcamp'], 'demo-tape-vol-1'),
-  },
-  {
-    profileId: 'demo-profile',
-    id: 'rel-13',
-    title: 'Somewhere Between',
-    releaseDate: '2025-09-05',
-    artworkUrl: undefined,
-    slug: 'somewhere-between',
-    smartLinkPath: '/soravale/somewhere-between',
-    spotifyPopularity: 35,
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    totalDurationMs: 248_000,
-    primaryIsrc: 'USRC12345013',
-    genres: ['Dream Pop', 'Indie Electronic'],
-    providers: makeProviders(
-      ['spotify', 'apple_music', 'youtube', 'deezer'],
-      'somewhere-between'
-    ),
-  },
-];
+    id: release.id,
+    title: release.title,
+    artistNames: [...release.artistNames],
+    releaseDate: release.releaseDate,
+    status: 'released' as const,
+    artworkUrl: release.artworkUrl,
+    slug: release.slug,
+    smartLinkPath: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
+    spotifyPopularity: release.spotifyPopularity,
+    releaseType: release.releaseType,
+    isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),
+    totalTracks: release.totalTracks,
+    totalDurationMs: release.totalDurationMs,
+    upc: release.upc,
+    label: release.label ?? null,
+    primaryIsrc: release.primaryIsrc,
+    genres: [...release.genres],
+    providers: makeProviders(release),
+  }));
 
 function makeDemoTracks(
   release: ReleaseViewModel,
   count = Math.min(Math.max(release.totalTracks, 1), 6)
 ): ReleaseSidebarTrack[] {
+  const personaRelease = INTERNAL_DJ_DEMO_PERSONA.releases.find(
+    item => item.id === release.id
+  );
+  if (personaRelease?.tracks?.length) {
+    return personaRelease.tracks.slice(0, count).map(track => ({
+      id: `${release.id}-track-${track.trackNumber}`,
+      releaseId: release.id,
+      releaseSlug: release.slug,
+      title: track.title,
+      slug: track.slug,
+      smartLinkPath: `${release.smartLinkPath}/tracks/${track.trackNumber}`,
+      trackNumber: track.trackNumber,
+      discNumber: track.discNumber,
+      durationMs: track.durationMs,
+      isrc: track.isrc,
+      isExplicit: Boolean(track.isExplicit),
+      previewUrl: release.previewUrl ?? null,
+      audioUrl: null,
+      audioFormat: null,
+      providers: release.providers,
+    }));
+  }
+
   return Array.from({ length: count }, (_, index) => {
     const trackNumber = index + 1;
     return {
       id: `${release.id}-track-${trackNumber}`,
       releaseId: release.id,
+      releaseSlug: release.slug,
       title: count === 1 ? release.title : `${release.title} ${trackNumber}`,
       slug: `${release.slug}-track-${trackNumber}`,
       smartLinkPath: `${release.smartLinkPath}/tracks/${trackNumber}`,
@@ -572,6 +288,19 @@ const INTENT_TAGS: Record<string, string[]> = {
 };
 
 const DEMO_DEVICE_TYPES = ['mobile', 'desktop', 'tablet'] as const;
+const DEMO_AUDIENCE_BASE_TIME = new Date('2026-04-15T18:00:00.000Z');
+
+function getDeterministicPurchaseCount(index: number): number {
+  return index < 10 ? index % 3 : 0;
+}
+
+function getDeterministicTipAmountCents(index: number): number {
+  return index < 15 ? ((index * 347 + 116) % 2_000) + 100 : 0;
+}
+
+function getDeterministicTipCount(index: number): number {
+  return index < 15 ? (index % 4) + 1 : 0;
+}
 
 function makeAudienceMember(index: number): AudienceMember {
   const name = NAMES[index % NAMES.length];
@@ -596,7 +325,7 @@ function makeAudienceMember(index: number): AudienceMember {
 
   // Days ago for lastSeenAt
   const daysAgo = Math.floor(index * 0.7);
-  const lastSeen = new Date();
+  const lastSeen = new Date(DEMO_AUDIENCE_BASE_TIME);
   lastSeen.setDate(lastSeen.getDate() - daysAgo);
 
   return {
@@ -618,9 +347,9 @@ function makeAudienceMember(index: number): AudienceMember {
     email: hasEmail ? name : null,
     phone: index % 5 === 0 ? `+1555${String(1000 + index).slice(0, 4)}` : null,
     spotifyConnected: index % 3 === 0,
-    purchaseCount: index < 10 ? Math.floor(Math.random() * 3) : 0,
-    tipAmountTotalCents: index < 15 ? Math.floor(Math.random() * 2000) : 0,
-    tipCount: index < 15 ? Math.floor(Math.random() * 5) : 0,
+    purchaseCount: getDeterministicPurchaseCount(index),
+    tipAmountTotalCents: getDeterministicTipAmountCents(index),
+    tipCount: getDeterministicTipCount(index),
     tags: INTENT_TAGS[intentLevel ?? ''] ?? [],
     deviceType: DEMO_DEVICE_TYPES[index % 3],
     lastSeenAt: lastSeen.toISOString(),
@@ -628,6 +357,6 @@ function makeAudienceMember(index: number): AudienceMember {
 }
 
 export const DEMO_AUDIENCE_MEMBERS: AudienceMember[] = Array.from(
-  { length: 5 },
+  { length: 12 },
   (_, i) => makeAudienceMember(i)
 );

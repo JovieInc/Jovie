@@ -1,8 +1,9 @@
 'use client';
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
+import type { AdminLead } from './useAdminLeadsPrimitives';
 
 export type AdminUsersSort =
   | 'created_desc'
@@ -68,6 +69,9 @@ export interface AdminCreatorProfileRow {
   createdAt: Date | null;
   confidence?: number | null;
   ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed';
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
   lastIngestionError: string | null;
   socialLinks?: Array<{
     id: string;
@@ -167,6 +171,7 @@ export function useAdminUsersInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -212,6 +217,56 @@ export function useAdminCreatorsInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
+    ...PAGINATED_CACHE,
+  });
+}
+
+export type { AdminReleaseRow, AdminReleasesSort } from '@/lib/admin/releases';
+
+export function useAdminReleasesInfiniteQuery({
+  sort,
+  search,
+  pageSize = DEFAULT_PAGE_SIZE,
+  initialData,
+}: {
+  sort: import('@/lib/admin/releases').AdminReleasesSort;
+  search: string;
+  pageSize?: number;
+  initialData?: InfinitePage<import('@/lib/admin/releases').AdminReleaseRow>;
+}) {
+  return useInfiniteQuery<
+    InfinitePage<import('@/lib/admin/releases').AdminReleaseRow>
+  >({
+    queryKey: queryKeys.adminReleases.list({ sort, search, pageSize }),
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(pageSize),
+        sort,
+        q: search,
+      });
+      const page = await fetchPage<
+        import('@/lib/admin/releases').AdminReleaseRow
+      >(`/api/admin/releases?${params.toString()}`, signal);
+      return {
+        ...page,
+        rows: page.rows.map(row => ({
+          ...row,
+          releaseDate: parseDate(row.releaseDate),
+          createdAt: parseDate(row.createdAt),
+        })),
+      };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
+    initialData: initialData
+      ? { pages: [initialData], pageParams: [1] }
+      : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
@@ -251,6 +306,47 @@ export function useAdminWaitlistInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    placeholderData: keepPreviousData,
+    ...PAGINATED_CACHE,
+  });
+}
+
+export type AdminLeadsSortBy = 'createdAt' | 'fitScore';
+
+export function useLeadsInfiniteQuery({
+  sortBy = 'createdAt',
+  status,
+  search,
+  pageSize = DEFAULT_PAGE_SIZE,
+}: {
+  sortBy?: AdminLeadsSortBy;
+  status?: string;
+  search?: string;
+  pageSize?: number;
+}) {
+  return useInfiniteQuery<InfinitePage<AdminLead>>({
+    queryKey: queryKeys.admin.leads.list({ sortBy, pageSize, status, search }),
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(pageSize),
+        sortBy,
+        sortOrder: 'desc',
+      });
+      if (status) params.set('status', status);
+      if (search) params.set('search', search);
+
+      return fetchPage<AdminLead>(
+        `/api/admin/leads?${params.toString()}`,
+        signal
+      );
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }

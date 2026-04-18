@@ -33,7 +33,7 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
@@ -67,24 +67,24 @@ jobs:
             TOTAL_TESTS=$(jq -r '[.suites[].specs[]] | length' "$RESULTS_DIR/results.json")
             PASSED_TESTS=$(jq -r '[.suites[].specs[] | select(.outcome == "expected")] | length' "$RESULTS_DIR/results.json")
 
-            echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
-            echo "passed_tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
-            echo "failed_tests<<EOF" >> $GITHUB_OUTPUT
-            echo "$FAILED_TESTS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "total_tests=$TOTAL_TESTS" >> "$GITHUB_OUTPUT"
+            echo "passed_tests=$PASSED_TESTS" >> "$GITHUB_OUTPUT"
+            echo "failed_tests<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$FAILED_TESTS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
 
             if [ "$PASSED_TESTS" -lt "$TOTAL_TESTS" ]; then
-              echo "test_status=failed" >> $GITHUB_OUTPUT
+              echo "test_status=failed" >> "$GITHUB_OUTPUT"
             else
-              echo "test_status=passed" >> $GITHUB_OUTPUT
+              echo "test_status=passed" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "test_status=error" >> $GITHUB_OUTPUT
-            echo "failed_tests=Test results file not found" >> $GITHUB_OUTPUT
+            echo "test_status=error" >> "$GITHUB_OUTPUT"
+            echo "failed_tests=Test results file not found" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload test results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: synthetic-test-results

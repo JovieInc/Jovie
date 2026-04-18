@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -27,7 +28,7 @@ export const users = pgTable(
 
     isAdmin: boolean('is_admin').default(false).notNull(),
     isPro: boolean('is_pro').default(false),
-    plan: text('plan').default('free'), // 'free' | 'pro' | 'growth'
+    plan: text('plan').default('free'), // 'free' | 'trial' | 'pro' | 'max'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     stripePriceId: text('stripe_price_id'),
@@ -39,9 +40,16 @@ export const users = pgTable(
     welcomeFailedAt: timestamp('welcome_failed_at'),
     outboundSuppressedAt: timestamp('outbound_suppressed_at'),
     suppressionFailedAt: timestamp('suppression_failed_at'),
-    // Growth plan beta access request
+    // Max plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
+    // Reverse trial tracking
+    trialStartedAt: timestamp('trial_started_at'),
+    trialEndsAt: timestamp('trial_ends_at'),
+    trialConvertedAt: timestamp('trial_converted_at'),
+    trialNotificationsSent: integer('trial_notifications_sent').default(0),
+    // Active creator profile (FK added post-create to avoid circular dependency)
+    activeProfileId: uuid('active_profile_id'),
     // Referral tracking
     referredByCode: text('referred_by_code'), // The referral code used at signup
     deletedAt: timestamp('deleted_at'),
@@ -50,6 +58,9 @@ export const users = pgTable(
   },
   table => ({
     userStatusIdx: index('idx_users_user_status').on(table.userStatus),
+    activeProfileIdx: index('idx_users_active_profile_id')
+      .on(table.activeProfileId)
+      .where(drizzleSql`active_profile_id IS NOT NULL`),
   })
 );
 

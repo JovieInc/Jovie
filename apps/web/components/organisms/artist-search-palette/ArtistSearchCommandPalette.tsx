@@ -230,7 +230,10 @@ export function ArtistSearchCommandPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='overflow-hidden p-0 sm:max-w-[480px]' hideClose>
+      <DialogContent
+        className='overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover sm:max-w-[500px]'
+        hideClose
+      >
         <DialogPrimitive.Title className='sr-only'>
           {title || `Connect ${config.label}`}
         </DialogPrimitive.Title>
@@ -243,35 +246,37 @@ export function ArtistSearchCommandPalette({
           label={`Search ${config.label} artists`}
         >
           {/* Search input */}
-          <div
-            className='flex items-center gap-3 border-b border-subtle px-4 py-3'
-            style={{ borderBottomColor: `${config.accent}20` }}
-          >
+          <div className='border-b border-(--linear-app-frame-seam) px-4 py-3'>
             <div
-              className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg'
-              style={{
-                backgroundColor: `${config.accent}15`,
-                color: config.accent,
-              }}
+              className='flex items-center gap-3 rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'
+              style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.03)' }}
             >
-              <SocialIcon platform={config.platform} className='h-4 w-4' />
-            </div>
-            <Command.Input
-              ref={inputRef}
-              placeholder={config.placeholder}
-              className='flex-1 bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token'
-              onValueChange={(value: string) => search.search(value)}
-            />
-            {search.state === 'loading' && (
-              <Icon
-                name='Loader2'
-                className='h-4 w-4 animate-spin text-tertiary-token shrink-0'
+              <div
+                className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full'
+                style={{
+                  backgroundColor: `${config.accent}12`,
+                  color: config.accent,
+                }}
+              >
+                <SocialIcon platform={config.platform} className='h-4 w-4' />
+              </div>
+              <Command.Input
+                ref={inputRef}
+                placeholder={config.placeholder}
+                className='flex-1 bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token'
+                onValueChange={(value: string) => search.search(value)}
               />
-            )}
+              {search.state === 'loading' && (
+                <Icon
+                  name='Loader2'
+                  className='h-4 w-4 animate-spin text-tertiary-token shrink-0'
+                />
+              )}
+            </div>
           </div>
 
           {/* Results */}
-          <Command.List className='max-h-[300px] overflow-y-auto'>
+          <Command.List className='max-h-[300px] overflow-y-auto px-2 py-2'>
             {search.state === 'loading' && search.results.length === 0 && (
               <output
                 className='block p-3 space-y-2'
@@ -280,7 +285,7 @@ export function ArtistSearchCommandPalette({
                 {SKELETON_KEYS.map((key, index) => (
                   <div
                     key={key}
-                    className='flex items-center gap-3 px-4 py-2.5'
+                    className='flex items-center gap-3 rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-4 py-2.5'
                   >
                     <div className='w-10 h-10 rounded-full skeleton shrink-0' />
                     <div className='flex-1 space-y-1.5'>
@@ -332,8 +337,8 @@ export function ArtistSearchCommandPalette({
                     value={`${artist.name} ${artist.id}`}
                     onSelect={() => handleSelect(artist)}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors',
-                      'data-[selected=true]:bg-surface-2 hover:bg-surface-2/50'
+                      'mb-1 flex cursor-pointer items-center gap-3 rounded-[12px] border border-transparent px-4 py-2.5 transition-colors last:mb-0',
+                      'data-[selected=true]:border-(--linear-app-frame-seam) data-[selected=true]:bg-surface-1 hover:bg-surface-2/50'
                     )}
                   >
                     <ArtistResultImage
@@ -366,13 +371,13 @@ export function ArtistSearchCommandPalette({
           </Command.List>
 
           {/* Manual URL input */}
-          <div className='border-t border-subtle px-4 py-3'>
+          <div className='border-t border-(--linear-app-frame-seam) px-4 py-3'>
             <div className='flex items-center gap-2 text-xs text-tertiary-token mb-2'>
               <div className='flex-1 h-px bg-subtle' />
               <span>Or paste a link</span>
               <div className='flex-1 h-px bg-subtle' />
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
               <input
                 type='url'
                 value={manualUrl}
@@ -384,13 +389,15 @@ export function ArtistSearchCommandPalette({
                   }
                 }}
                 placeholder={config.manualPlaceholder}
-                className='flex-1 rounded-md border border-subtle bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus:border-primary/30 transition-colors'
+                data-testid='artist-search-manual-input'
+                className='flex-1 rounded-full border border-subtle bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token transition-colors focus:border-primary/30'
               />
               <button
                 type='button'
                 onClick={handleManualSubmit}
                 disabled={!manualUrl.trim()}
-                className='rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50'
+                data-testid='artist-search-manual-submit'
+                className='rounded-full px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50'
                 style={{ backgroundColor: config.accent }}
               >
                 Connect

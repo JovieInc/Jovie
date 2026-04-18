@@ -9,6 +9,12 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import {
+  resolveAudienceClickEventType,
+  resolveAudienceClickObjectType,
+  resolveAudienceClickVerb,
+} from '@/lib/audience/click-event-helpers';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -24,26 +30,12 @@ import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
-  trimHistory,
+  mergeAudienceTags,
 } from '../lib/audience-utils';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 type AudienceMemberRecord = {
   id: string;
@@ -54,6 +46,7 @@ type AudienceMemberRecord = {
   geoCountry: string | null;
   deviceType: string | null;
   spotifyConnected: boolean | null;
+  tags: string[] | null;
 };
 
 async function findAudienceMember(
@@ -73,6 +66,7 @@ async function findAudienceMember(
         geoCountry: audienceMembers.geoCountry,
         deviceType: audienceMembers.deviceType,
         spotifyConnected: audienceMembers.spotifyConnected,
+        tags: audienceMembers.tags,
       })
       .from(audienceMembers)
       .where(eq(audienceMembers.id, explicitId))
@@ -93,6 +87,7 @@ async function findAudienceMember(
       geoCountry: audienceMembers.geoCountry,
       deviceType: audienceMembers.deviceType,
       spotifyConnected: audienceMembers.spotifyConnected,
+      tags: audienceMembers.tags,
     })
     .from(audienceMembers)
     .where(
@@ -152,7 +147,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     const parsed = clickSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -243,6 +246,7 @@ export async function POST(request: NextRequest) {
     const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
+    const audienceTags = botDetection.isBot ? ['bot'] : [];
 
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);
@@ -271,6 +275,7 @@ export async function POST(request: NextRequest) {
             deviceType: normalizedDevice,
             referrerHistory: [],
             latestActions: [],
+            tags: audienceTags,
             createdAt: now,
             updatedAt: now,
           })
@@ -289,6 +294,7 @@ export async function POST(request: NextRequest) {
             geoCountry: audienceMembers.geoCountry,
             deviceType: audienceMembers.deviceType,
             spotifyConnected: audienceMembers.spotifyConnected,
+            tags: audienceMembers.tags,
           });
 
         if (inserted) {
@@ -303,21 +309,19 @@ export async function POST(request: NextRequest) {
         throw new Error('Unable to resolve audience member');
       }
 
-      const existingActions = Array.isArray(member.latestActions)
-        ? member.latestActions
-        : [];
-      const actionEntry = {
-        label: actionLabel ?? ACTION_LABELS[linkType] ?? 'interacted',
-        type: linkType,
-        platform: platform ?? linkType,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
-        timestamp: now.toISOString(),
-      };
-      const latestActions = trimHistory([actionEntry, ...existingActions], 5);
-      const actionCount = latestActions.length;
+      const existingActionCount = Array.isArray(member.latestActions)
+        ? member.latestActions.length
+        : 0;
+      const actionCount = Math.min(existingActionCount + 1, 5);
       const weight = getActionWeight(linkType);
-      const updatedScore = (member.engagementScore ?? 0) + weight;
-      const intentLevel = deriveIntentLevel(member.visits ?? 0, actionCount);
+      const tags = mergeAudienceTags(member.tags, audienceTags);
+      const isBotMember = tags.includes('bot');
+      const updatedScore = isBotMember
+        ? (member.engagementScore ?? 0)
+        : (member.engagementScore ?? 0) + weight;
+      const intentLevel = isBotMember
+        ? 'low'
+        : deriveIntentLevel(member.visits ?? 0, actionCount);
 
       const metadataWithTipValue =
         linkType === 'tip'
@@ -353,14 +357,36 @@ export async function POST(request: NextRequest) {
           updatedAt: now,
           engagementScore: updatedScore,
           intentLevel,
-          latestActions,
           deviceType: normalizedDevice,
           geoCity: city ?? member.geoCity ?? null,
           geoCountry: country ?? member.geoCountry ?? null,
+          tags,
           spotifyConnected:
             (member.spotifyConnected ?? false) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, member.id));
+
+      await recordAudienceEvent(tx, {
+        creatorProfileId: profileId,
+        audienceMemberId: member.id,
+        eventType: resolveAudienceClickEventType(linkType, metadata),
+        verb: resolveAudienceClickVerb(linkType),
+        confidence: 'observed',
+        sourceKind: null,
+        sourceLabel: undefined,
+        objectType: resolveAudienceClickObjectType(linkType, metadata),
+        objectId:
+          typeof metadataWithTipValue.contentId === 'string'
+            ? metadataWithTipValue.contentId
+            : linkId,
+        objectLabel:
+          actionLabel ??
+          (typeof metadataWithTipValue.target === 'string'
+            ? metadataWithTipValue.target
+            : platform),
+        platform,
+        properties: metadataWithTipValue,
+      });
     });
 
     return NextResponse.json(

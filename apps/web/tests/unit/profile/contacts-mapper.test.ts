@@ -46,6 +46,8 @@ function createContact(overrides: Record<string, unknown> = {}) {
     preferredChannel: 'email' as const,
     isActive: true,
     sortOrder: 0,
+    forwardInboxEmails: false,
+    autoMarkRead: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,
@@ -65,10 +67,12 @@ describe('toPublicContacts', () => {
     expect(result[0].channels[0].encoded).toBe(
       'encoded:email:john@booking.com'
     );
-    expect(result[0].primaryContactLabel).toBe('john@booking.com');
+    expect(result[0].primaryContactLabel).toBe('John Doe');
+    expect(result[0].companyLabel).toBe('Booking Agency');
+    expect(result[0].contactName).toBe('John Doe');
   });
 
-  it('falls back to phone as primary contact label when email is absent', () => {
+  it('keeps the contact name as the primary label when phone is the only channel', () => {
     const contacts = [
       createContact({
         email: null,
@@ -77,7 +81,7 @@ describe('toPublicContacts', () => {
     ];
     const result = toPublicContacts(contacts, 'Test Artist');
 
-    expect(result[0].primaryContactLabel).toBe('+1-555-0123');
+    expect(result[0].primaryContactLabel).toBe('John Doe');
   });
 
   it('converts a contact with both email and phone', () => {
@@ -175,7 +179,7 @@ describe('toPublicContacts', () => {
     expect(result[2].id).toBe('contact-2');
   });
 
-  it('builds secondary label from person name and company', () => {
+  it('maps company and contact labels independently', () => {
     const contacts = [
       createContact({
         personName: 'John Doe',
@@ -184,7 +188,8 @@ describe('toPublicContacts', () => {
     ];
     const result = toPublicContacts(contacts, 'Test Artist');
 
-    expect(result[0].secondaryLabel).toBe('John Doe @ Booking Agency');
+    expect(result[0].secondaryLabel).toBe('Booking Agency');
+    expect(result[0].primaryContactLabel).toBe('John Doe');
   });
 
   it('handles missing person name in secondary label', () => {
@@ -197,6 +202,7 @@ describe('toPublicContacts', () => {
     const result = toPublicContacts(contacts, 'Test Artist');
 
     expect(result[0].secondaryLabel).toBe('Booking Agency');
+    expect(result[0].primaryContactLabel).toBeUndefined();
   });
 
   it('handles missing company in secondary label', () => {
@@ -208,7 +214,8 @@ describe('toPublicContacts', () => {
     ];
     const result = toPublicContacts(contacts, 'Test Artist');
 
-    expect(result[0].secondaryLabel).toBe('John Doe');
+    expect(result[0].secondaryLabel).toBeUndefined();
+    expect(result[0].primaryContactLabel).toBe('John Doe');
   });
 
   it('omits secondary label when both name and company are null', () => {
@@ -229,6 +236,7 @@ describe('toPublicContacts', () => {
 
     expect(result[0].territorySummary).toBe('US, EU');
     expect(result[0].territoryCount).toBe(2);
+    expect(result[0].territories).toEqual(['US', 'EU']);
   });
 
   it('handles empty territories', () => {

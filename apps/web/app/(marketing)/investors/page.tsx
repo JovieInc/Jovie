@@ -1,46 +1,111 @@
 import type { Metadata } from 'next';
-import { DocPage } from '@/components/organisms/DocPage';
-import { Container } from '@/components/site/Container';
-import { APP_NAME, APP_URL } from '@/constants/app';
-import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
+import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
-const INVESTOR_MEMO_RELATIVE_PATH = 'content/investors/investor-memo.md';
+export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Investor Memo | ${APP_NAME}`,
-  description: `Investor memo for ${APP_NAME}`,
-  alternates: {
-    canonical: `${APP_URL}/investors`,
-  },
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: {
-      index: false,
-      follow: false,
-    },
-  },
+  title: 'Jovie Investor Overview',
+  robots: NOINDEX_ROBOTS,
 };
 
-export default async function InvestorsPage() {
-  const doc = await getMarkdownDocument(INVESTOR_MEMO_RELATIVE_PATH);
-  const toc = doc.toc.filter(entry => entry.level === 2);
-
+export default function InvestorsPage() {
   return (
-    <div className='bg-white dark:bg-[#0a0a0b]'>
-      <div className='py-16 sm:py-20'>
-        <Container size='lg'>
-          <DocPage
-            doc={{ ...doc, toc }}
-            hero={{
-              eyebrow: 'Investors',
-              title: 'Investor Memo',
-              description: 'Jovie (Angel Round)',
-            }}
-            pdfTitle='Investor Memo'
-          />
-        </Container>
+    <main className='bg-base px-6 py-16 text-primary-token sm:px-8 lg:px-12'>
+      <div className='mx-auto flex max-w-5xl flex-col gap-10'>
+        <section className='max-w-3xl space-y-5'>
+          <p className='text-sm font-medium tracking-tight text-muted-token'>
+            Investor overview
+          </p>
+          <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
+            Jovie turns creator traffic into measurable fan value
+          </h1>
+          <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
+            The private investor portal stays token-gated. This public page is a
+            high-level overview of the product thesis: capture the audience,
+            personalize the next action, and compound fan relationships from the
+            first profile visit onward.
+          </p>
+          <div className='flex flex-wrap gap-3'>
+            <Link
+              className='btn-linear-primary'
+              href={APP_ROUTES.SUPPORT}
+              prefetch={false}
+            >
+              Request Access
+            </Link>
+            <Link
+              className='btn-linear-secondary'
+              href={APP_ROUTES.AI}
+              prefetch={false}
+            >
+              Read The AI Brief
+            </Link>
+          </div>
+        </section>
+
+        <section className='grid gap-4 md:grid-cols-3'>
+          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            <h2 className='text-lg font-semibold'>Traffic choke point</h2>
+            <p className='mt-3 text-sm leading-7 text-secondary-token'>
+              Every marketing push already ends at the profile. Jovie upgrades
+              that page from a static link list into an adaptive funnel.
+            </p>
+          </article>
+          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            <h2 className='text-lg font-semibold'>Compounding data asset</h2>
+            <p className='mt-3 text-sm leading-7 text-secondary-token'>
+              Each click and capture event improves the next routing decision,
+              creating a system that gets smarter as creator traffic grows.
+            </p>
+          </article>
+          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            <h2 className='text-lg font-semibold'>Revenue paths</h2>
+            <p className='mt-3 text-sm leading-7 text-secondary-token'>
+              Launch routes cover subscription growth, listening conversion,
+              tipping, promo downloads, and context-aware release promotion.
+            </p>
+          </article>
+        </section>
+
+        <section className='grid gap-8 rounded-[2rem] border border-subtle bg-panel px-6 py-8 lg:grid-cols-[0.95fr_1.05fr]'>
+          <div className='space-y-4'>
+            <h2 className='text-2xl font-semibold tracking-tight'>Why now</h2>
+            <p className='text-sm leading-7 text-secondary-token'>
+              Music creation is cheap, distribution is crowded, and static
+              link-in-bio tooling does not adapt to fan context. Jovie sits at
+              the first-party surface where creators already own attention.
+            </p>
+          </div>
+          <div className='space-y-4'>
+            <h2 className='text-2xl font-semibold tracking-tight'>
+              Public materials
+            </h2>
+            <p className='text-sm leading-7 text-secondary-token'>
+              The full deck and detailed fundraising materials remain private.
+              These public links cover the product logic and launch-ready
+              creator experience without exposing gated investor data.
+            </p>
+            <div className='flex flex-wrap gap-3'>
+              <Link
+                className='btn-linear-secondary'
+                prefetch={false}
+                href={APP_ROUTES.BLOG_THE_CONTACT_PROBLEM}
+              >
+                Read The Thesis
+              </Link>
+              <Link
+                className='btn-linear-secondary'
+                href={APP_ROUTES.PRICING}
+                prefetch={false}
+              >
+                View Product Pricing
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

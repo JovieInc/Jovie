@@ -44,11 +44,19 @@ export const queryKeys = {
         'analytics',
         ...(range === undefined ? [] : [range]),
       ] as const,
+    monetizationSummary: () =>
+      [...queryKeys.dashboard.all, 'monetization-summary'] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
     socialLinks: (profileId?: string) =>
       [
         ...queryKeys.dashboard.all,
         'social-links',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+    pressPhotos: (profileId?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'press-photos',
         ...(profileId === undefined ? [] : [profileId]),
       ] as const,
     activityFeed: (profileId?: string, range?: string) =>
@@ -72,6 +80,17 @@ export const queryKeys = {
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
     socialLinks: (profileId: string) =>
       [...queryKeys.creators.all, 'social-links', profileId] as const,
+  },
+
+  // Admin releases
+  adminReleases: {
+    all: ['admin-releases'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminReleases.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
   },
 
   // Admin users
@@ -133,6 +152,8 @@ export const queryKeys = {
     all: ['spotify'] as const,
     artistSearch: (query: string, limit: number) =>
       [...queryKeys.spotify.all, 'artist-search', { query, limit }] as const,
+    falAnalysis: (artistId: string) =>
+      [...queryKeys.spotify.all, 'fal-analysis', artistId] as const,
   },
 
   // Apple Music search queries
@@ -159,6 +180,8 @@ export const queryKeys = {
         profileId,
         status ?? 'all',
       ] as const,
+    presence: (profileId: string) =>
+      [...queryKeys.dspEnrichment.all, 'presence', profileId] as const,
     matchDetail: (matchId: string) =>
       [...queryKeys.dspEnrichment.all, 'match', matchId] as const,
     status: (profileId: string) =>
@@ -175,8 +198,23 @@ export const queryKeys = {
   // Releases queries
   releases: {
     all: ['releases'] as const,
+    recent: (profileId: string) =>
+      [...queryKeys.releases.all, 'recent', profileId] as const,
+    /**
+     * Release matrix key. Filtering is client-side via filterReleases(),
+     * so filters are intentionally excluded from the key to avoid
+     * duplicate cache entries for identical server data.
+     */
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
+    /** For future server-side filtering. Not used by useReleasesQuery yet. */
+    matrixFiltered: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.releases.all,
+        'matrix',
+        profileId,
+        ...(filters ? [filters] : []),
+      ] as const,
     tracks: (releaseId: string) =>
       [...queryKeys.releases.all, 'tracks', releaseId] as const,
     dspStatus: (releaseId: string) =>
@@ -200,6 +238,8 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.tourDates.all, 'detail', id] as const,
     connection: (profileId: string) =>
       [...queryKeys.tourDates.all, 'connection', profileId] as const,
+    analytics: (tourDateId: string) =>
+      [...queryKeys.tourDates.all, 'analytics', tourDateId] as const,
   },
 
   // Handle/username availability queries
@@ -233,9 +273,8 @@ export const queryKeys = {
     leads: {
       all: () => [...queryKeys.admin.all, 'leads'] as const,
       list: (filters: {
-        page: number;
-        limit: number;
-        sortBy: 'createdAt' | 'fitScore';
+        sortBy: string;
+        pageSize: number;
         status?: string;
         search?: string;
       }) => [...queryKeys.admin.leads.all(), 'list', filters] as const,
@@ -286,6 +325,7 @@ export const queryKeys = {
   // Audience infinite scroll
   audience: {
     all: ['audience'] as const,
+    /** Includes sort, direction, segments, and view in the filters object for cache granularity. */
     members: (profileId: string, filters?: Record<string, unknown>) =>
       [
         ...queryKeys.audience.all,
@@ -302,10 +342,44 @@ export const queryKeys = {
       ] as const,
   },
 
+  // Release tasks
+  releaseTasks: {
+    all: ['release-tasks'] as const,
+    byRelease: (releaseId: string) =>
+      [...queryKeys.releaseTasks.all, 'release', releaseId] as const,
+    summary: (profileId: string) =>
+      [...queryKeys.releaseTasks.all, 'summary', profileId] as const,
+  },
+
+  tasks: {
+    all: ['tasks'] as const,
+    list: (profileId?: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.tasks.all,
+        'list',
+        ...(profileId === undefined ? [] : [profileId]),
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    detail: (taskId: string, profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'detail',
+        taskId,
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+    stats: (profileId?: string) =>
+      [
+        ...queryKeys.tasks.all,
+        'stats',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
+  },
+
   // Ad pixel settings
   pixels: {
     all: ['pixels'] as const,
     settings: () => [...queryKeys.pixels.all, 'settings'] as const,
+    health: () => [...queryKeys.pixels.all, 'health'] as const,
   },
 
   // Earnings / tipping data

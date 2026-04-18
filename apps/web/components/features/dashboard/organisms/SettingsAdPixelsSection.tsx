@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input, Switch } from '@jovie/ui';
+import { Badge, Button, Input, Switch } from '@jovie/ui';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import {
   type FormEvent,
@@ -9,23 +9,25 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
-import { usePixelSettingsMutation, usePixelSettingsQuery } from '@/lib/queries';
+import type { PlatformHealth } from '@/lib/queries';
+import {
+  usePixelHealthQuery,
+  usePixelSettingsMutation,
+  usePixelSettingsQuery,
+} from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
-const INPUT_CLASS =
-  'block w-full rounded-[8px] border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
-
 interface PlatformSectionProps {
   readonly platform: string;
+  readonly platformKey: TestPlatform;
   readonly description: string;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
@@ -40,10 +42,12 @@ interface PlatformSectionProps {
   readonly onPixelIdChange: (value: string) => void;
   readonly onTokenChange: (value: string) => void;
   readonly isConfigured: boolean;
+  readonly health?: PlatformHealth;
 }
 
 function PlatformSection({
   platform,
+  platformKey,
   description,
   pixelIdLabel,
   pixelIdPlaceholder,
@@ -58,6 +62,7 @@ function PlatformSection({
   onPixelIdChange,
   onTokenChange,
   isConfigured,
+  health,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
 
@@ -65,16 +70,20 @@ function PlatformSection({
     <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+          <h4 className='text-[13px] font-[510] text-primary-token'>
             {platform}
           </h4>
           <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
             {description}
           </p>
         </div>
-        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[11px] font-[560] uppercase tracking-[0.08em] text-secondary-token'>
-          {isConfigured ? 'Configured' : 'Not configured'}
-        </span>
+        <div className='flex shrink-0 items-center gap-2'>
+          <Badge variant='outline'>
+            {isConfigured ? 'Configured' : 'Not configured'}
+          </Badge>
+          <HealthIndicator health={health} />
+          <TestEventButton platform={platformKey} isConfigured={isConfigured} />
+        </div>
       </div>
 
       <a
@@ -91,7 +100,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -102,14 +111,14 @@ function PlatformSection({
             value={pixelIdValue}
             onChange={e => onPixelIdChange(e.target.value)}
             placeholder={pixelIdPlaceholder}
-            className={INPUT_CLASS}
+            className='text-[13px]'
           />
         </div>
 
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {tokenLabel}
           </label>
@@ -121,7 +130,7 @@ function PlatformSection({
               value={tokenValue}
               onChange={e => onTokenChange(e.target.value)}
               placeholder={tokenPlaceholder}
-              className={`${INPUT_CLASS} pr-10`}
+              className='pr-10 text-[13px]'
             />
             <button
               type='button'
@@ -144,6 +153,105 @@ function PlatformSection({
 
 // Token placeholder shown when a token is configured but not revealed
 const TOKEN_PLACEHOLDER = '••••••••';
+
+type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
+
+function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
+  if (!health) return null;
+
+  const config: Record<
+    HealthStatus,
+    { dot: string; color: string; label: string }
+  > = {
+    healthy: { dot: '\u25CF', color: 'text-green-500', label: 'Healthy' },
+    degraded: { dot: '\u25CF', color: 'text-yellow-500', label: 'Degraded' },
+    unhealthy: {
+      dot: '\u25CF',
+      color: 'text-red-500',
+      label: 'Check credentials',
+    },
+    inactive: {
+      dot: '\u25CB',
+      color: 'text-tertiary-token',
+      label: 'No events',
+    },
+  };
+
+  const { dot, color, label } = config[health.status];
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] font-[510] ${color}`}
+    >
+      <span aria-hidden='true'>{dot}</span>
+      {label}
+    </span>
+  );
+}
+
+type TestPlatform = 'facebook' | 'google' | 'tiktok';
+
+function TestEventButton({
+  platform,
+  isConfigured,
+}: {
+  readonly platform: TestPlatform;
+  readonly isConfigured: boolean;
+}) {
+  const [status, setStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleTest = useCallback(async () => {
+    setStatus('loading');
+    setErrorMessage(null);
+    try {
+      const response = await fetch('/api/dashboard/pixels/test-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStatus('success');
+      } else {
+        setStatus('error');
+        setErrorMessage(data.error || 'Unknown error');
+      }
+    } catch {
+      setStatus('error');
+      setErrorMessage('Network error');
+    }
+  }, [platform]);
+
+  if (!isConfigured) return null;
+
+  return (
+    <div className='inline-flex items-center gap-2'>
+      <Button
+        type='button'
+        variant='outline'
+        size='sm'
+        disabled={status === 'loading'}
+        onClick={handleTest}
+        className='h-7 px-2.5 text-[11px]'
+      >
+        {status === 'loading' ? 'Testing...' : 'Test'}
+      </Button>
+      {status === 'success' && (
+        <span className='text-[11px] font-[510] text-green-500'>
+          Event received
+        </span>
+      )}
+      {status === 'error' && errorMessage && (
+        <span className='text-[11px] font-[510] text-red-500'>
+          {errorMessage}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export interface SettingsAdPixelsSectionProps {
   readonly isPro?: boolean;
@@ -169,6 +277,9 @@ export function SettingsAdPixelsSection({
     isError,
     refetch,
   } = usePixelSettingsQuery({ enabled: isPro });
+
+  // Fetch pixel health status
+  const { data: healthData } = usePixelHealthQuery({ enabled: isPro });
 
   const [pixelData, setPixelData] = useState({
     facebookPixelId: '',
@@ -301,48 +412,32 @@ export function SettingsAdPixelsSection({
 
   if (!isPro) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <SettingsToggleRow
-              title='Pixel tracking'
-              description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-              checked={false}
-              onCheckedChange={() => {}}
-              ariaLabel='Pixel tracking'
-              gated
-            />
-          </ContentSurfaceCard>
+        <div className='px-4 py-4 sm:px-5'>
+          <SettingsToggleRow
+            gated
+            title='Pixel tracking'
+            description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+            gateFeatureContext='Pixel tracking'
+          />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   if (isLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
+        <div className='px-4 py-4 sm:px-5'>
           <PixelsSectionSkeleton />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
@@ -355,58 +450,44 @@ export function SettingsAdPixelsSection({
     );
   }
 
-  // Check if any pixels are configured
-  const hasAnyPixels =
-    existingSettings?.pixels?.facebookPixelId ||
-    existingSettings?.pixels?.googleMeasurementId ||
-    existingSettings?.pixels?.tiktokPixelId;
-
   return (
-    <form onSubmit={handlePixelSubmit} className='space-y-6'>
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+    <form onSubmit={handlePixelSubmit} className='space-y-4'>
+      <SettingsPanel
+        title='Pixel tracking'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        actions={
+          <div className='flex items-center gap-2'>
+            <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+              {pixelData.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <Switch
+              checked={pixelData.enabled}
+              onCheckedChange={checked => handleInputChange('enabled', checked)}
+              aria-label='Enable pixel tracking'
+            />
+          </div>
+        }
       >
-        <ContentSectionHeader
-          title='Pixel tracking'
-          subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          className='min-h-0 px-4 py-3'
-          actionsClassName='w-auto shrink-0'
-          actions={
-            <div className='flex items-center gap-2'>
-              <span className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
-                {pixelData.enabled ? 'Enabled' : 'Disabled'}
-              </span>
-              <Switch
-                checked={pixelData.enabled}
-                onCheckedChange={checked =>
-                  handleInputChange('enabled', checked)
-                }
-                aria-label='Enable pixel tracking'
-              />
-            </div>
-          }
-        />
-
-        <div className='space-y-3 px-4 py-3'>
-          {!hasAnyPixels && (
-            <ContentSurfaceCard className='bg-surface-0 px-6 py-5 text-center'>
-              <p className='text-[13px] leading-[18px] text-secondary-token'>
-                No tracking pixels configured yet. Add your first destination to
-                start tracking conversions.
-              </p>
-            </ContentSurfaceCard>
-          )}
-
+        <div className='space-y-3 px-4 py-4 sm:px-5'>
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.
             </p>
           </ContentSurfaceCard>
 
+          {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
+            <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+              <p className='text-[13px] font-[510] leading-[18px] text-primary-token'>
+                {healthData.aggregate.totalEventsThisWeek.toLocaleString()}{' '}
+                events forwarded this week &middot;{' '}
+                {healthData.aggregate.overallSuccessRate}% success rate
+              </p>
+            </ContentSurfaceCard>
+          )}
+
           <PlatformSection
             platform='Facebook Conversions API'
+            platformKey='facebook'
             description='Track profile views and link clicks in Meta Ads Manager.'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
@@ -424,6 +505,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.facebook
               )
             }
+            health={healthData?.platforms.facebook}
             onPixelIdChange={value =>
               handleInputChange('facebookPixelId', value)
             }
@@ -434,6 +516,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
+            platformKey='google'
             description='Send conversion events directly to your GA4 property.'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
@@ -451,6 +534,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.google
               )
             }
+            health={healthData?.platforms.google}
             onPixelIdChange={value =>
               handleInputChange('googleMeasurementId', value)
             }
@@ -459,6 +543,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='TikTok Events API'
+            platformKey='tiktok'
             description='Measure profile engagement and optimize TikTok campaigns.'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
@@ -476,6 +561,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.tiktok
               )
             }
+            health={healthData?.platforms.tiktok}
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)
@@ -490,7 +576,7 @@ export function SettingsAdPixelsSection({
             </p>
           </ContentSurfaceCard>
         </div>
-      </DashboardCard>
+      </SettingsPanel>
 
       <div className='flex items-center justify-end gap-3 pt-2'>
         <SettingsStatusPill status={saveStatus} />

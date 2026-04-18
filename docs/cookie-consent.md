@@ -6,15 +6,19 @@ Jovie uses a lightweight cookie consent system to comply with regional privacy l
 
 The banner is shown only for visitors detected in:
 
-- European Union, EEA and United Kingdom
+- European Union, EEA and United Kingdom (GDPR)
+- Brazil (LGPD)
+- South Korea (PIPA)
 - California, Colorado, Virginia, Connecticut and Utah (USA)
-- Quebec, Canada
+- Quebec, Canada (Law 25)
+
+For US and Canadian visitors, detection is state/province-level using Vercel's `x-vercel-ip-country-region` header. When the region cannot be determined, the banner is shown as a safe fallback.
 
 ## How it works
 
-1. **Edge middleware** detects the visitor's country and injects an `x-show-cookie-banner` header when consent is required.
-2. **CookieBanner** and **CookieModal** render on the client when this header is present and store preferences in a signed `jv_cc` cookie.
-3. Preferences last for 365 days and can be read with helpers in `lib/cookies/consent.ts`.
+1. **Middleware** (`proxy.ts`) detects the visitor's country and region via Vercel geo headers (`x-vercel-ip-country`, `x-vercel-ip-country-region`) and sets a `jv_cc_required` cookie (`1` or `0`).
+2. **CookieBannerSection** reads the `jv_cc_required` cookie on the client and shows the banner when required. **CookieModal** allows granular preference selection.
+3. Preferences are stored in the `jv_cc` cookie and last for 365 days. They can be read with helpers in `lib/cookies/consent.ts`.
 
 ## Helpers
 
@@ -27,6 +31,8 @@ import { readConsent, saveConsent } from '@/lib/cookies/consent';
 
 ## Legal
 
-- [GDPR](https://gdpr.eu/)
-- [CPRA](https://oag.ca.gov/privacy/ccpa)
-- [Law 25 Quebec](https://www.cai.gouv.qc.ca/)
+- [GDPR](https://gdpr.eu/) — EU/EEA + UK
+- [LGPD](https://www.gov.br/cidadania/pt-br/acesso-a-informacao/lgpd) — Brazil
+- [PIPA](https://www.privacy.go.kr/eng/index.do) — South Korea
+- [CPRA](https://oag.ca.gov/privacy/ccpa) — California
+- [Law 25 Quebec](https://www.cai.gouv.qc.ca/) — Quebec, Canada

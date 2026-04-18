@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { getFeaturedCreators } from '@/lib/featured-creators';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
  * Static fallback when no featured creators are in the DB.
@@ -8,9 +9,9 @@ import { getFeaturedCreators } from '@/lib/featured-creators';
  */
 const TIM_WHITE_FALLBACK: FeaturedCreator = {
   id: 'demo-tim-white',
-  handle: 'timwhite',
-  name: 'Tim White',
-  src: 'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
+  handle: TIM_WHITE_PROFILE.handle,
+  name: TIM_WHITE_PROFILE.name,
+  src: TIM_WHITE_PROFILE.avatarSrc,
   tagline: 'Artist',
   genres: ['Electronic', 'Dance'],
   latestReleaseTitle: 'Midnight Drive',

@@ -17,7 +17,7 @@ describe('ActionBarButton', () => {
     expect(button).toBeInTheDocument();
 
     const label = screen.getByText('Display');
-    expect(label).toHaveClass('hidden');
+    expect(label).toHaveClass('max-sm:hidden');
     expect(label).toHaveClass('sm:inline');
   });
 });

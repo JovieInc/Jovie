@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ProfileShell } from '@/components/organisms/profile-shell';
+import { ProfileShell } from '@/components/organisms/profile-shell/ProfileShell';
 import type { ProfileMode } from '@/features/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -10,19 +10,21 @@ import { Artist, LegacySocialLink } from '@/types/db';
 type ArtistPageShellProps = {
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly viewerCountryCode?: string | null;
   readonly contacts: PublicContact[];
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
   readonly mode?: ProfileMode;
-  readonly showTipButton?: boolean;
-  readonly isTipModeActive?: boolean;
+  readonly showPayButton?: boolean;
+  readonly isPayModeActive?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
   readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly maxWidthClass?: string;
   readonly showNotificationButton?: boolean;
+  readonly showShopButton?: boolean;
   /** Available download sizes for profile photo */
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
@@ -35,19 +37,21 @@ type ArtistPageShellProps = {
 const ArtistPageShell = React.memo(function ArtistPageShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   subtitle,
   children,
   showSocialBar = true,
   mode,
-  showTipButton = false,
-  isTipModeActive = false,
+  showPayButton = false,
+  isPayModeActive = false,
   showBackButton = false,
   showTourButton = false,
   isTourModeActive = false,
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
   showNotificationButton = false,
+  showShopButton = false,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   visitTrackingToken,
@@ -56,17 +60,19 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
     <ProfileShell
       artist={artist}
       socialLinks={socialLinks}
+      viewerCountryCode={viewerCountryCode}
       contacts={contacts}
       subtitle={subtitle}
       showSocialBar={showSocialBar}
       mode={mode}
-      showTipButton={showTipButton}
-      isTipModeActive={isTipModeActive}
+      showPayButton={showPayButton}
+      isPayModeActive={isPayModeActive}
       showBackButton={showBackButton}
       showTourButton={showTourButton}
       isTourModeActive={isTourModeActive}
       showFooter={showFooter}
       showNotificationButton={showNotificationButton}
+      showShopButton={showShopButton}
       maxWidthClass={maxWidthClass}
       backgroundPattern='gradient'
       showGradientBlurs={true}

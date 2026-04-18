@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  isRetryableTransportError,
+  ServerFetchTimeoutError,
+  serverFetch,
+} from '@/lib/http/server-fetch';
 
 describe('serverFetch', () => {
   afterEach(() => {
@@ -21,7 +25,10 @@ describe('serverFetch', () => {
     );
 
     await expect(
-      serverFetch('https://example.com/timeout', { timeoutMs: 10 })
+      serverFetch('https://example.com/timeout', {
+        timeoutMs: 10,
+        context: 'Timeout test',
+      })
     ).rejects.toEqual(expect.any(ServerFetchTimeoutError));
   });
 
@@ -38,7 +45,126 @@ describe('serverFetch', () => {
     );
 
     await expect(
-      serverFetch('https://example.com/timeout', { timeoutMs: 25 })
-    ).rejects.toMatchObject({ timeoutMs: 25 });
+      serverFetch('https://example.com/timeout', {
+        timeoutMs: 25,
+        context: 'Timeout metadata test',
+      })
+    ).rejects.toMatchObject({
+      timeoutMs: 25,
+      context: 'Timeout metadata test',
+    });
+  });
+
+  it('retries retryable HTTP responses and returns the eventual success response', async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 503,
+        body: {
+          cancel,
+        },
+      } as Response)
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/retry', {
+      context: 'Retryable status test',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries network failures and succeeds on a later attempt', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/network', {
+      context: 'Network retry test',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry non-retryable client errors', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('unauthorized', { status: 401 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/auth', {
+      context: 'Client error test',
+      retry: {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the final retryable response after exhausting retries without cancelling its body', async () => {
+    const firstCancel = vi.fn().mockResolvedValue(undefined);
+    const secondCancel = vi.fn().mockResolvedValue(undefined);
+    const finalResponse = new Response('still failing', { status: 503 });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 503,
+        body: {
+          cancel: firstCancel,
+        },
+      } as Response)
+      .mockResolvedValueOnce({
+        status: 503,
+        body: {
+          cancel: secondCancel,
+        },
+      } as Response)
+      .mockResolvedValueOnce(finalResponse);
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/unavailable', {
+      context: 'Retry exhaustion test',
+      retry: {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(firstCancel).toHaveBeenCalledTimes(1);
+    expect(secondCancel).toHaveBeenCalledTimes(1);
+    await expect(response.text()).resolves.toBe('still failing');
+  });
+
+  it('identifies timeout and network failures as transport-retryable', () => {
+    expect(
+      isRetryableTransportError(
+        new ServerFetchTimeoutError('timed out', 1000, 'Timeout test')
+      )
+    ).toBe(true);
+    expect(isRetryableTransportError(new TypeError('fetch failed'))).toBe(true);
+    expect(isRetryableTransportError(new Error('HTTP 503'))).toBe(false);
   });
 });

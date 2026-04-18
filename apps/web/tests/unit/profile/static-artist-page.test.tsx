@@ -1,246 +1,76 @@
-/**
- * Unit tests for StaticArtistPage mode rendering.
- *
- * Tests the different rendering modes (profile, listen, tip, subscribe)
- * and the helper functions (mapSocialPlatformToDSPKey, extractVenmoUsername).
- */
-
 import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Artist, LegacySocialLink } from '@/types/db';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Artist } from '@/types/db';
 
-// --- Mock all child components ---
-vi.mock('@/features/profile/ArtistPageShell', () => ({
-  ArtistPageShell: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) =>
-    React.createElement(
-      'div',
-      { 'data-testid': 'artist-page-shell' },
-      children
-    ),
-}));
+const compactPreviewMountIds: string[] = [];
 
-vi.mock('@/features/profile/artist-notifications-cta', () => ({
-  ArtistNotificationsCTA: (props: Record<string, unknown>) =>
-    React.createElement('div', { 'data-testid': 'notifications-cta' }),
-}));
+vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
+  ProfileCompactTemplate: (props: Record<string, unknown>) => {
+    const mountIdRef = React.useRef(
+      `compact-${(props.artist as Artist)?.id}-${compactPreviewMountIds.length + 1}`
+    );
+    if (!compactPreviewMountIds.includes(mountIdRef.current)) {
+      compactPreviewMountIds.push(mountIdRef.current);
+    }
 
-vi.mock('@/features/profile/LatestReleaseCard', () => ({
-  LatestReleaseCard: (props: Record<string, unknown>) =>
-    React.createElement('div', { 'data-testid': 'latest-release-card' }),
-}));
-
-vi.mock('@/features/profile/ProfilePrimaryCTA', () => ({
-  ProfilePrimaryCTA: (props: Record<string, unknown>) =>
-    React.createElement('div', { 'data-testid': 'profile-primary-cta' }),
-}));
-
-vi.mock('@/features/profile/StaticListenInterface', () => ({
-  StaticListenInterface: (props: Record<string, unknown>) =>
-    React.createElement('div', { 'data-testid': 'listen-interface' }),
-}));
-
-vi.mock('@/features/profile/VenmoTipSelector', () => ({
-  default: (props: Record<string, unknown>) =>
-    React.createElement('div', { 'data-testid': 'venmo-tip-selector' }),
-}));
-
-vi.mock('@/lib/dsp', () => ({
-  DSP_CONFIGS: {
-    spotify: {
-      name: 'Spotify',
-      color: '#1DB954',
-      textColor: '#fff',
-      logoSvg: '',
-    },
-    apple_music: {
-      name: 'Apple Music',
-      color: '#FA233B',
-      textColor: '#fff',
-      logoSvg: '',
-    },
+    return React.createElement('div', {
+      'data-testid': 'profile-compact-template',
+      'data-mode': props.mode,
+      'data-artist-name': (props.artist as Artist)?.name,
+      'data-show-subscription-confirmed-banner': String(
+        props.showSubscriptionConfirmedBanner
+      ),
+      'data-hide-more-menu': String(props.hideMoreMenu),
+      'data-mount-id': mountIdRef.current,
+    });
   },
-  getAvailableDSPs: vi.fn(() => []),
 }));
 
-// Mock useUserLocation so the geolocation API is never invoked in jsdom.
-// TourModePanel (imported by StaticArtistPage) calls navigator.geolocation
-// which is absent in jsdom — without this mock the hook's 5 s timeout races
-// against Vitest's 5 s testTimeout and causes the first test to fail.
-vi.mock('@/hooks/useUserLocation', () => ({
-  useUserLocation: () => ({ location: null, isLoading: false, error: null }),
-}));
-
-// Hoist the StaticArtistPage import to module level so the module graph is
-// resolved before any test starts. Importing inside the first test body
-// exhausts the 5 s testTimeout during the cold-start of the module tree
-// (TourModePanel → vaul Drawer, etc.).
-const { StaticArtistPage } = await import(
-  '@/features/profile/StaticArtistPage'
-);
-
-const mockArtist: Artist = {
-  id: 'artist-1',
-  owner_user_id: 'user-1',
+const mockArtist = {
+  id: 'test-id',
+  owner_user_id: 'owner-1',
+  spotify_id: 'spotify-test-id',
   handle: 'testartist',
-  spotify_id: 'spotify-123',
   name: 'Test Artist',
-  image_url: 'https://example.com/avatar.jpg',
-  tagline: 'Test tagline',
+  image_url: null,
+  tagline: null,
+  location: null,
+  hometown: null,
+  career_highlights: null,
+  target_playlists: null,
+  active_since_year: null,
+  genres: null,
+  settings: {},
   theme: {},
-  settings: { hide_branding: false },
-  spotify_url: 'https://open.spotify.com/artist/123',
-  apple_music_url: 'https://music.apple.com/artist/123',
-  youtube_url: undefined,
   published: true,
   is_verified: false,
   is_featured: false,
   marketing_opt_out: false,
-  created_at: '2024-01-01T00:00:00Z',
-};
+  created_at: '2024-01-01T00:00:00.000Z',
+} as unknown as Artist;
 
-const mockSocialLinks: LegacySocialLink[] = [
+const mockSocialLinks = [
   {
     id: 'link-1',
-    artist_id: 'artist-1',
+    artist_id: 'test-id',
     platform: 'spotify',
     url: 'https://open.spotify.com/artist/123',
-    clicks: 10,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 'link-2',
-    artist_id: 'artist-1',
-    platform: 'instagram',
-    url: 'https://instagram.com/testartist',
-    clicks: 5,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-];
-
-const mockVenmoLinks: LegacySocialLink[] = [
-  ...mockSocialLinks,
-  {
-    id: 'link-3',
-    artist_id: 'artist-1',
-    platform: 'venmo',
-    url: 'https://venmo.com/u/testartist',
     clicks: 0,
-    created_at: '2024-01-01T00:00:00Z',
+    created_at: '2024-01-01T00:00:00.000Z',
   },
 ];
 
 describe('StaticArtistPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   afterEach(() => {
+    compactPreviewMountIds.length = 0;
     cleanup();
   });
 
-  it('renders profile mode with primary CTA', () => {
-    render(
-      <StaticArtistPage
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Artist'
-        showTipButton={false}
-        showBackButton={false}
-      />
+  it('defaults to the full public profile presentation', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
     );
-
-    expect(screen.getByTestId('primary-cta')).toBeDefined();
-    expect(screen.getByTestId('profile-primary-cta')).toBeDefined();
-  });
-
-  it('renders listen mode with listen interface', () => {
-    render(
-      <StaticArtistPage
-        mode='listen'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Choose a Service'
-        showTipButton={false}
-        showBackButton={true}
-      />
-    );
-
-    expect(screen.getByTestId('listen-interface')).toBeDefined();
-  });
-
-  it('renders tip mode with venmo selector when venmo link exists', () => {
-    render(
-      <StaticArtistPage
-        mode='tip'
-        artist={mockArtist}
-        socialLinks={mockVenmoLinks}
-        contacts={[]}
-        subtitle='Tip with Venmo'
-        showTipButton={true}
-        showBackButton={true}
-      />
-    );
-
-    expect(screen.getByTestId('venmo-tip-selector')).toBeDefined();
-  });
-
-  it('renders tip mode with unavailable message when no venmo link', () => {
-    render(
-      <StaticArtistPage
-        mode='tip'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Tip with Venmo'
-        showTipButton={false}
-        showBackButton={true}
-      />
-    );
-
-    expect(screen.getByText(/Venmo tipping is not available/)).toBeDefined();
-  });
-
-  it('renders subscribe mode with notifications CTA', () => {
-    render(
-      <StaticArtistPage
-        mode='subscribe'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Get notified'
-        showTipButton={false}
-        showBackButton={true}
-      />
-    );
-
-    expect(screen.getByTestId('notifications-cta')).toBeDefined();
-  });
-
-  it('renders latest release card when in profile mode with release', () => {
-    const mockRelease = {
-      id: 'release-1',
-      creatorProfileId: 'profile-123',
-      title: 'Test Album',
-      releaseType: 'album',
-      artworkUrl: 'https://example.com/art.jpg',
-      releaseDate: new Date('2024-06-01'),
-      spotifyUrl: null,
-      appleMusicUrl: null,
-      youtubeUrl: null,
-      trackCount: 10,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
 
     render(
       <StaticArtistPage
@@ -249,40 +79,37 @@ describe('StaticArtistPage', () => {
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Artist'
-        showTipButton={false}
         showBackButton={false}
-        latestRelease={mockRelease as any}
       />
     );
 
-    expect(screen.getByTestId('latest-release-card')).toBeDefined();
+    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
   });
 
-  it('does not render latest release card when no release', () => {
+  it('renders the compact preview presentation when requested', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
     render(
       <StaticArtistPage
+        presentation='compact-preview'
         mode='profile'
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
         subtitle='Artist'
-        showTipButton={false}
         showBackButton={false}
-        latestRelease={null}
       />
     );
 
-    expect(screen.queryByTestId('latest-release-card')).toBeNull();
+    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
   });
 
-  it('does not render latest release in non-profile modes', () => {
-    const mockRelease = {
-      id: 'release-1',
-      title: 'Test Album',
-      releaseType: 'album',
-      artworkUrl: null,
-      releaseDate: null,
-    };
+  it('forwards mode to the live compact presentation by default', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
 
     render(
       <StaticArtistPage
@@ -290,132 +117,105 @@ describe('StaticArtistPage', () => {
         artist={mockArtist}
         socialLinks={mockSocialLinks}
         contacts={[]}
-        subtitle='Choose a Service'
-        showTipButton={false}
+        subtitle='Listen'
         showBackButton={true}
-        latestRelease={mockRelease as any}
       />
     );
 
-    expect(screen.queryByTestId('latest-release-card')).toBeNull();
-  });
-});
-
-describe('Platform DSP Mapping Logic', () => {
-  // Test the mapping logic replicated from the component
-  const PLATFORM_TO_DSP_MAPPINGS = [
-    { keywords: ['spotify'], dspKey: 'spotify' },
-    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
-    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-    { keywords: ['tidal'], dspKey: 'tidal' },
-    { keywords: ['deezer'], dspKey: 'deezer' },
-    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-    { keywords: ['pandora'], dspKey: 'pandora' },
-  ];
-
-  function mapSocialPlatformToDSPKey(
-    platform: string | undefined
-  ): string | null {
-    if (typeof platform !== 'string' || !platform) return null;
-    const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-    for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
-      if (
-        keywords.some(
-          keyword => normalized.includes(keyword) || normalized === keyword
-        )
-      ) {
-        return dspKey;
-      }
-    }
-    return null;
-  }
-
-  it.each([
-    ['spotify', 'spotify'],
-    ['Spotify', 'spotify'],
-    ['SPOTIFY', 'spotify'],
-    ['apple_music', 'apple_music'],
-    ['AppleMusic', 'apple_music'],
-    ['itunes', 'apple_music'],
-    ['youtube_music', 'youtube_music'],
-    ['YouTubeMusic', 'youtube_music'],
-    ['soundcloud', 'soundcloud'],
-    ['bandcamp', 'bandcamp'],
-    ['tidal', 'tidal'],
-    ['deezer', 'deezer'],
-    ['amazon_music', 'amazon_music'],
-    ['AmazonMusic', 'amazon_music'],
-    ['pandora', 'pandora'],
-  ])('maps "%s" to DSP key "%s"', (platform, expected) => {
-    expect(mapSocialPlatformToDSPKey(platform)).toBe(expected);
-  });
-
-  it('returns null for non-DSP platforms', () => {
-    expect(mapSocialPlatformToDSPKey('instagram')).toBeNull();
-    expect(mapSocialPlatformToDSPKey('twitter')).toBeNull();
-    expect(mapSocialPlatformToDSPKey('venmo')).toBeNull();
-    expect(mapSocialPlatformToDSPKey('tiktok')).toBeNull();
-  });
-
-  it('returns null for undefined/empty input', () => {
-    expect(mapSocialPlatformToDSPKey(undefined)).toBeNull();
-    expect(mapSocialPlatformToDSPKey('')).toBeNull();
-  });
-});
-
-describe('Venmo Username Extraction Logic', () => {
-  const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-  function extractVenmoUsername(url: string | null): string | null {
-    if (!url) return null;
-    try {
-      const u = new URL(url);
-      if (ALLOWED_VENMO_HOSTS.has(u.hostname)) {
-        const parts = u.pathname.split('/').filter(Boolean);
-        if (parts[0] === 'u' && parts[1]) return parts[1];
-        if (parts[0]) return parts[0];
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  it('extracts username from /u/username format', () => {
-    expect(extractVenmoUsername('https://venmo.com/u/testuser')).toBe(
-      'testuser'
-    );
-  });
-
-  it('extracts username from /username format', () => {
-    expect(extractVenmoUsername('https://venmo.com/testuser')).toBe('testuser');
-  });
-
-  it('works with www.venmo.com', () => {
-    expect(extractVenmoUsername('https://www.venmo.com/u/testuser')).toBe(
-      'testuser'
-    );
-  });
-
-  it('returns null for non-venmo hosts', () => {
-    expect(extractVenmoUsername('https://evil.com/u/testuser')).toBeNull();
     expect(
-      extractVenmoUsername('https://venmo.com.evil.com/u/testuser')
-    ).toBeNull();
+      screen.getByTestId('profile-compact-template').getAttribute('data-mode')
+    ).toBe('listen');
   });
 
-  it('returns null for null input', () => {
-    expect(extractVenmoUsername(null)).toBeNull();
+  it('forwards preview-only props to the compact presentation', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='tour'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Tour dates'
+        showBackButton={true}
+        showSubscriptionConfirmedBanner
+      />
+    );
+
+    const template = screen.getByTestId('profile-compact-template');
+    expect(template.getAttribute('data-mode')).toBe('tour');
+    expect(
+      template.getAttribute('data-show-subscription-confirmed-banner')
+    ).toBe('true');
   });
 
-  it('returns null for invalid URLs', () => {
-    expect(extractVenmoUsername('not-a-url')).toBeNull();
-    expect(extractVenmoUsername('')).toBeNull();
+  it('forwards demo chrome controls to the compact presentation', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+        hideMoreMenu
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-hide-more-menu',
+      'true'
+    );
   });
 
-  it('returns null for venmo.com with no path', () => {
-    expect(extractVenmoUsername('https://venmo.com/')).toBeNull();
+  it('remounts the active renderer when artist identity changes', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    const { rerender } = render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+      />
+    );
+
+    const firstMountId = screen
+      .getByTestId('profile-compact-template')
+      .getAttribute('data-mount-id');
+
+    rerender(
+      <StaticArtistPage
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          id: 'test-id-2',
+          handle: 'testartist-2',
+          name: 'Test Artist 2',
+        }}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+      />
+    );
+
+    const secondMountId = screen
+      .getByTestId('profile-compact-template')
+      .getAttribute('data-mount-id');
+
+    expect(firstMountId).not.toBe(secondMountId);
   });
 });

@@ -20,7 +20,7 @@ interface ProviderIconProps {
   readonly 'aria-label'?: string;
 }
 
-const PROVIDER_PLATFORM_MAP: Record<ProviderKey, string> = {
+const PROVIDER_PLATFORM_MAP: Record<string, string> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
   youtube: 'youtube',
@@ -39,6 +39,18 @@ const PROVIDER_PLATFORM_MAP: Record<ProviderKey, string> = {
   boomplay: 'boomplay',
   iheartradio: 'iheartradio',
   tiktok: 'tiktok',
+  netease: 'netease',
+  qq_music: 'qqmusic',
+  awa: 'awa',
+  audius: 'audius',
+  flo: 'flo',
+  gaana: 'gaana',
+  jio_saavn: 'jiosaavn',
+  joox: 'joox',
+  kkbox: 'kkbox',
+  line_music: 'linemusic',
+  trebel: 'trebel',
+  yandex: 'yandexmusic',
 };
 
 export function ProviderIcon({

@@ -8,18 +8,18 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-(--linear-bg-surface-2) text-(--linear-text-secondary) border border-(--linear-border-subtle)',
+          'bg-(--color-bg-primary) text-(--linear-text-primary) border border-(--color-border-strong)',
         secondary:
-          'bg-(--linear-bg-surface-1) text-(--linear-text-tertiary) border border-(--linear-border-subtle)',
-        destructive: 'bg-(--linear-error)/15 text-(--linear-error)',
+          'bg-(--color-bg-primary) text-(--linear-text-tertiary) border border-(--color-border-strong)',
+        destructive: 'bg-(--color-error-subtle) text-error',
         outline:
-          'border border-(--linear-border-default) text-(--linear-text-secondary) bg-transparent',
-        success: 'bg-(--linear-success)/15 text-(--linear-success)',
-        warning: 'bg-(--linear-warning)/15 text-(--linear-warning)',
+          'border border-(--color-border-default) text-(--linear-text-secondary) bg-transparent',
+        success: 'bg-(--color-success-subtle) text-success',
+        warning: 'bg-(--color-warning-subtle) text-warning',
         // Backwards-compat aliases
         primary:
-          'bg-(--linear-bg-surface-2) text-(--linear-text-secondary) border border-(--linear-border-subtle)',
-        error: 'bg-(--linear-error)/15 text-(--linear-error)',
+          'bg-(--color-bg-primary) text-(--linear-text-primary) border border-(--color-border-strong)',
+        error: 'bg-(--color-error-subtle) text-error',
       },
       size: {
         sm: 'px-1.5 py-0 text-[10px] leading-[18px]',

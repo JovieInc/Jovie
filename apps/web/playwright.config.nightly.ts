@@ -11,6 +11,12 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 }
 
 const isCI = !!process.env.CI;
+const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+const managedWebServerUrl = new URL(baseURL);
+if (!managedWebServerUrl.port) {
+  managedWebServerUrl.port = '3100';
+}
+const managedWebServerPort = managedWebServerUrl.port;
 
 /**
  * Nightly E2E Test Configuration
@@ -22,7 +28,12 @@ const isCI = !!process.env.CI;
  * Run with: pnpm exec playwright test --config=playwright.config.nightly.ts
  */
 export default defineConfig({
-  testDir: './tests/e2e/nightly',
+  testDir: './tests/e2e',
+  testMatch: [
+    '**/nightly/**/*.spec.ts',
+    '**/dashboard-pages-health.spec.ts',
+    '**/onboarding-completion.spec.ts',
+  ],
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
@@ -42,7 +53,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3100',
+    baseURL,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -98,10 +109,10 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: 'test',
-            PORT: '3100',
+            PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
           },
-          url: 'http://localhost:3100',
+          url: managedWebServerUrl.origin,
           reuseExistingServer: !isCI,
           timeout: 90000,
           stdout: 'pipe',

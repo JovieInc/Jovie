@@ -66,38 +66,36 @@ doppler configure get
 
 ### 4. Run Commands with Doppler
 
+Doppler is the canonical internal local workflow. The root wrapper commands already pin the correct `jovie-web/dev` scope for common web tasks.
+
 **Development server:**
+
 ```bash
-doppler run -- pnpm dev
+pnpm run dev:web:local
 ```
 
 **Type checking:**
+
 ```bash
-doppler run -- pnpm typecheck
+doppler run --project jovie-web --config dev -- pnpm typecheck
 ```
 
 **Tests:**
+
 ```bash
-doppler run -- pnpm test
+pnpm run test:web
+```
+
+**Database migrations:**
+
+```bash
+pnpm run db:web:migrate
 ```
 
 **Any command:**
+
 ```bash
-doppler run -- <your-command>
-```
-
-### 5. Update package.json Scripts (Optional)
-
-You can update `package.json` to use Doppler by default:
-
-```json
-{
-  "scripts": {
-    "dev": "doppler run -- turbo dev",
-    "build": "doppler run -- turbo build",
-    "test": "doppler run -- turbo test"
-  }
-}
+doppler run --project jovie-web --config dev -- <your-command>
 ```
 
 ## CI/CD Integration
@@ -234,8 +232,8 @@ doppler configure get
 # Reset to dev
 doppler setup --project jovie-web --config dev
 
-# Or use explicit config flag
-doppler run --config dev -- pnpm dev
+# Or use the repo wrapper command
+pnpm run dev:web:local
 ```
 
 ### Vercel Sync Not Working

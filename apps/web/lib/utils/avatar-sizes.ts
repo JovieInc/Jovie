@@ -13,8 +13,8 @@ export interface AvatarSize {
 
 /** Standard download size presets aligned to profile photo export UX */
 const SIZE_PRESETS = [
-  { key: 'medium', label: 'Medium (400 x 400)', dimension: 400 },
-  { key: 'large', label: 'Large (1000 x 1000)', dimension: 1000 },
+  { key: 'medium', label: 'Medium (512 x 512)', dimension: 512 },
+  { key: 'large', label: 'Large (1024 x 1024)', dimension: 1024 },
 ] as const;
 
 /**
@@ -45,8 +45,8 @@ function generateSizeVariants(sourceUrl: string): AvatarSize[] {
 
 const PRECOMPUTED_SIZE_KEYS: { key: string; sizeKey: string; label: string }[] =
   [
-    { key: 'large', sizeKey: '512', label: 'Large (512 x 512)' },
-    { key: 'medium', sizeKey: '256', label: 'Medium (256 x 256)' },
+    { key: 'large', sizeKey: '1024', label: 'Large (1024 x 1024)' },
+    { key: 'medium', sizeKey: '512', label: 'Medium (512 x 512)' },
     { key: 'small', sizeKey: '128', label: 'Small (128 x 128)' },
   ];
 

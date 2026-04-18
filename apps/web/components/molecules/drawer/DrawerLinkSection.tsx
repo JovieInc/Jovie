@@ -7,7 +7,7 @@ import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
-  'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-[7px] border border-transparent text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-surface-1 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
+  'h-6 w-6 flex items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[color] duration-150 hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */
@@ -27,6 +27,8 @@ export interface DrawerLinkSectionProps {
   /** The link list items */
   readonly children: ReactNode;
   readonly className?: string;
+  /** Whether to show the section heading (default true) */
+  readonly showHeading?: boolean;
 }
 
 /**
@@ -47,41 +49,52 @@ export function DrawerLinkSection({
   emptyStateTestId,
   children,
   className,
+  showHeading = true,
 }: DrawerLinkSectionProps) {
+  const showHeaderRow = showHeading || Boolean(headerActions) || Boolean(onAdd);
+
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex min-h-[40px] items-center justify-between gap-2 lg:min-h-0'>
-        <DrawerSectionHeading
-          as='h4'
-          className='min-w-0 flex-1 truncate text-[11px] tracking-[0.08em]'
-        >
-          {title}
-        </DrawerSectionHeading>
-        <div className='flex shrink-0 items-center gap-1 lg:gap-0.5'>
-          {headerActions}
-          {onAdd && (
-            <button
-              type='button'
-              onClick={onAdd}
-              className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
-              aria-label={addLabel}
-            >
-              <Plus className='h-4 w-4' />
-            </button>
+      {showHeaderRow && (
+        <div
+          className={cn(
+            'flex min-h-[32px] items-center gap-2 px-1 lg:min-h-0',
+            showHeading ? 'justify-between' : 'justify-end'
           )}
+        >
+          {showHeading ? (
+            <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
+              {title}
+            </DrawerSectionHeading>
+          ) : (
+            <span className='sr-only'>{title}</span>
+          )}
+          <div className='ml-auto flex shrink-0 items-center gap-0.5'>
+            {headerActions}
+            {onAdd && (
+              <button
+                type='button'
+                onClick={onAdd}
+                className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
+                aria-label={addLabel}
+              >
+                <Plus className='h-4 w-4' />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
         <DrawerEmptyState
           message={emptyMessage}
-          className='min-h-[96px]'
+          className='min-h-[72px]'
           testId={emptyStateTestId}
         />
       ) : (
-        <div className='-mx-5 lg:mx-0'>{children}</div>
+        <div>{children}</div>
       )}
     </div>
   );

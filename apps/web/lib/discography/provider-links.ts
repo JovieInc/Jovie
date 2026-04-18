@@ -1,6 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
 
+import {
+  buildSearchUrl as registryBuildSearchUrl,
+  STREAMING_DSP_KEYS,
+} from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
+import { buildSpotifyTrackUrl } from '@/lib/spotify';
+import { spotifyClient } from '@/lib/spotify/client';
 
 import {
   isMusicfetchAvailable,
@@ -48,23 +54,7 @@ export interface ResolveProviderLinksOptions {
   fetcher?: typeof fetch;
 }
 
-const DEFAULT_PROVIDERS: ProviderKey[] = [
-  'apple_music',
-  'spotify',
-  'youtube',
-  'soundcloud',
-  'deezer',
-  'amazon_music',
-  'tidal',
-  'pandora',
-  'napster',
-  'audiomack',
-  'qobuz',
-  'anghami',
-  'boomplay',
-  'iheartradio',
-  'tiktok',
-];
+const DEFAULT_PROVIDERS: ProviderKey[] = STREAMING_DSP_KEYS as ProviderKey[];
 
 const DEFAULT_APPLE_STOREFRONT = 'us';
 
@@ -80,49 +70,23 @@ export function buildSearchUrl(
   provider: ProviderKey,
   track: TrackDescriptor,
   options: { storefront?: string } = {}
-): string {
+): string | null {
   const query = buildSearchQuery(track);
-  const storefront = options.storefront ?? DEFAULT_APPLE_STOREFRONT;
-
-  switch (provider) {
-    case 'apple_music':
-      return `https://music.apple.com/${storefront}/search?term=${query}`;
-    case 'spotify':
-      return `https://open.spotify.com/search/${query}`;
-    case 'youtube':
-      return `https://music.youtube.com/search?q=${query}`;
-    case 'soundcloud':
-      return `https://soundcloud.com/search?q=${query}`;
-    case 'deezer':
-      return `https://www.deezer.com/search/${query}`;
-    case 'amazon_music':
-      return `https://music.amazon.com/search/${query}`;
-    case 'tidal':
-      return `https://tidal.com/search?q=${query}`;
-    case 'pandora':
-      return `https://www.pandora.com/search/${query}/tracks`;
-    case 'napster':
-      return `https://web.napster.com/search?query=${query}`;
-    case 'audiomack':
-      return `https://audiomack.com/search?q=${query}`;
-    case 'qobuz':
-      return `https://www.qobuz.com/search?q=${query}`;
-    case 'anghami':
-      return `https://play.anghami.com/search/${query}`;
-    case 'boomplay':
-      return `https://www.boomplay.com/search/default/${query}`;
-    case 'iheartradio':
-      return `https://www.iheart.com/search/?query=${query}`;
-    case 'tiktok':
-      return `https://www.tiktok.com/search?q=${query}`;
-    default:
-      return query;
-  }
+  return registryBuildSearchUrl(provider, decodeURIComponent(query), {
+    storefront: options.storefront ?? DEFAULT_APPLE_STOREFRONT,
+  });
 }
 
 export interface AppleMusicLookupResult {
   url: string;
   trackId: string | null;
+  previewUrl: string | null;
+}
+
+export interface SpotifyLookupResult {
+  url: string;
+  trackId: string;
+  previewUrl: string | null;
 }
 
 export interface DeezerLookupResult {
@@ -130,6 +94,8 @@ export interface DeezerLookupResult {
   trackId: string;
   albumUrl: string | null;
   albumId: string | null;
+  /** 30-second audio preview URL, or null if unavailable */
+  previewUrl: string | null;
 }
 
 /**
@@ -153,6 +119,7 @@ export async function lookupDeezerByIsrc(
       error?: { type: string; message: string };
       id?: number;
       link?: string;
+      preview?: string;
       album?: {
         id?: number;
         link?: string;
@@ -162,11 +129,17 @@ export async function lookupDeezerByIsrc(
     // Deezer returns error object instead of 404
     if (payload.error || !payload.id || !payload.link) return null;
 
+    // Normalize empty/non-string preview to null, validate HTTPS
+    const rawPreview =
+      typeof payload.preview === 'string' ? payload.preview.trim() : '';
+    const previewUrl = rawPreview?.startsWith('https://') ? rawPreview : null;
+
     return {
       url: payload.link,
       trackId: String(payload.id),
       albumUrl: payload.album?.link ?? null,
       albumId: payload.album?.id ? String(payload.album.id) : null,
+      previewUrl,
     };
   } catch (error) {
     Sentry.addBreadcrumb({
@@ -223,10 +196,16 @@ export async function lookupAppleMusicByIsrc(
       'itunes.apple.com',
       'music.apple.com'
     );
+    const previewUrl =
+      typeof match.previewUrl === 'string' &&
+      match.previewUrl.startsWith('https://')
+        ? match.previewUrl
+        : null;
 
     return {
       url: canonicalUrl,
       trackId,
+      previewUrl,
     };
   } catch (error) {
     Sentry.addBreadcrumb({
@@ -238,6 +217,49 @@ export async function lookupAppleMusicByIsrc(
         storefront,
         error: error instanceof Error ? error.message : String(error),
       },
+    });
+    return null;
+  }
+}
+
+export async function lookupSpotifyByIsrc(
+  isrc: string,
+  options: { market?: string } = {}
+): Promise<SpotifyLookupResult | null> {
+  const market = options.market ?? 'US';
+
+  try {
+    const payload = await spotifyClient.requestJson<{
+      tracks?: {
+        items?: Array<{
+          id: string;
+          preview_url: string | null;
+          external_urls?: { spotify?: string };
+        }>;
+      };
+    }>(
+      `/search?q=${encodeURIComponent('isrc:' + isrc)}&type=track&limit=1&market=${encodeURIComponent(market)}`
+    );
+
+    const match = payload.tracks?.items?.[0];
+    if (!match?.id) return null;
+
+    const previewUrl =
+      typeof match.preview_url === 'string' &&
+      match.preview_url.startsWith('https://')
+        ? match.preview_url
+        : null;
+
+    return {
+      url: match.external_urls?.spotify ?? buildSpotifyTrackUrl(match.id),
+      trackId: match.id,
+      previewUrl,
+    };
+  } catch (error) {
+    captureError('Spotify ISRC lookup failed', error, {
+      route: 'discography',
+      isrc,
+      market,
     });
     return null;
   }
@@ -378,9 +400,13 @@ export async function resolveProviderLinks(
   for (const provider of providers) {
     if (seenProviders.has(provider)) continue;
 
+    const searchUrl = buildSearchUrl(provider, track, { storefront });
+    // Skip providers without a search URL template (e.g. FLO, JOOX, LINE MUSIC)
+    if (!searchUrl) continue;
+
     links.push({
       provider,
-      url: buildSearchUrl(provider, track, { storefront }),
+      url: searchUrl,
       quality: 'search_fallback',
       discovered_from: 'search_url',
     });

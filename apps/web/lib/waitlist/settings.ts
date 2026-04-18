@@ -4,6 +4,44 @@ import { waitlistSettings } from '@/lib/db/schema/waitlist';
 
 const SETTINGS_ROW_ID = 1;
 
+// ---------------------------------------------------------------------------
+// In-memory cache for gate status
+// ---------------------------------------------------------------------------
+// The waitlist gate setting changes rarely (admin toggle). A short TTL avoids
+// hitting the DB on every middleware request while keeping propagation latency
+// under 30 seconds. Explicitly invalidated on settings update.
+// ---------------------------------------------------------------------------
+let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
+const _GATE_CACHE_TTL_MS = 30_000; // 30s — unused while gate is hardcoded off
+
+/**
+ * Check if the waitlist gate is enabled.
+ *
+ * Hardcoded to `false` — the waitlist gate is permanently disabled so all
+ * signups go straight to onboarding. The DB-backed toggle and surrounding
+ * infrastructure are preserved for future demand control (re-enable by
+ * restoring the DB-driven implementation below).
+ *
+ * Previous implementation (DB-backed, memory-cached):
+ *   if (_gateEnabledCache && Date.now() < _gateEnabledCache.expiresAt) {
+ *     return _gateEnabledCache.value;
+ *   }
+ *   const settings = await getWaitlistSettings();
+ *   _gateEnabledCache = { value: settings.gateEnabled, expiresAt: Date.now() + GATE_CACHE_TTL_MS };
+ *   return settings.gateEnabled;
+ */
+export async function isWaitlistGateEnabled(): Promise<boolean> {
+  return false;
+}
+
+/**
+ * Clear the in-memory gate cache. Called after admin settings update
+ * so the next request picks up the new value immediately.
+ */
+export function invalidateWaitlistGateCache(): void {
+  _gateEnabledCache = null;
+}
+
 export interface WaitlistGateSettings {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
@@ -35,7 +73,7 @@ async function ensureSettingsRow(): Promise<WaitlistGateSettings> {
     .insert(waitlistSettings)
     .values({
       id: SETTINGS_ROW_ID,
-      gateEnabled: true,
+      gateEnabled: false,
       autoAcceptEnabled: false,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
@@ -105,6 +143,7 @@ export async function updateWaitlistSettings(input: {
     .returning();
 
   if (!updated) throw new Error('Failed to update waitlist settings');
+  invalidateWaitlistGateCache();
   return updated;
 }
 

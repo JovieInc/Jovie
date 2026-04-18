@@ -7,13 +7,11 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
-import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
-  buildSeoFilename,
   SUPPORTED_IMAGE_MIME_TYPES_SET,
   type SupportedImageMimeType,
 } from '@/lib/images/config';
@@ -58,8 +56,8 @@ export function isSafeExternalHttpsUrl(input: string): boolean {
 /**
  * Copy an external avatar image to Vercel Blob storage.
  *
- * Performs validation, optimization (resize to 512x512, convert to AVIF),
- * and uploads to blob storage.
+ * Performs validation, optimization (resize up to 1536x1536 with no upscaling,
+ * convert to AVIF at quality 80), and uploads to blob storage.
  *
  * @param sourceUrl - External URL of the avatar image
  * @param handle - Creator handle (used in the blob path)
@@ -132,20 +130,19 @@ export async function copyAvatarToBlob(
 
     const optimized = await baseImage
       .resize({
-        width: 512,
-        height: 512,
+        width: 1536,
+        height: 1536,
         fit: 'cover',
         position: 'centre',
         withoutEnlargement: true,
       })
       .toColourspace('srgb')
-      .avif({ quality: 65, effort: 4 })
+      .avif({ quality: 80, effort: 4 })
       .toBuffer();
 
-    const path = `avatars/ingestion/${handle}/${buildSeoFilename({
-      originalFilename: 'avatar',
-      photoId: randomUUID(),
-    })}.avif`;
+    // Use a deterministic path keyed by handle so re-uploads overwrite
+    // the same blob instead of creating orphaned files at new UUID paths.
+    const path = `avatars/ingestion/${handle}/avatar.avif`;
 
     const blob = await uploadBlob(path, optimized, {
       access: 'public',

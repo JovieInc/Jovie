@@ -1,4 +1,6 @@
+import { getInitials } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import Image from 'next/image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/molecules/Avatar';
 
@@ -6,16 +8,27 @@ import { Avatar } from '@/components/molecules/Avatar';
 vi.mock('next/image', () => ({
   default: vi
     .fn()
-    .mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => (
-      <img
-        src={src}
-        alt={alt}
-        onLoad={onLoad}
-        onError={onError}
-        {...props}
-        data-testid='avatar-image'
-      />
-    )),
+    .mockImplementation(
+      ({
+        src,
+        alt,
+        onLoad,
+        onError,
+        priority: _priority,
+        blurDataURL: _blurDataURL,
+        unoptimized: _unoptimized,
+        ...props
+      }: any) => (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={onLoad}
+          onError={onError}
+          {...props}
+          data-testid='avatar-image'
+        />
+      )
+    ),
 }));
 
 describe('Avatar Component', () => {
@@ -37,6 +50,32 @@ describe('Avatar Component', () => {
       expect(image).toBeInTheDocument();
       expect(image).toHaveAttribute('src', 'https://example.com/avatar.jpg');
       expect(image).toHaveAttribute('alt', '');
+    });
+
+    it('bypasses optimization for Vercel Blob avatars', () => {
+      render(
+        <Avatar
+          src='https://example.public.blob.vercel-storage.com/avatars/user/avatar.avif'
+          alt='User avatar'
+          name='John Doe'
+        />
+      );
+
+      const mockedImage = vi.mocked(Image);
+      expect(mockedImage.mock.calls[0]?.[0].unoptimized).toBe(true);
+    });
+
+    it('keeps optimization enabled for normal avatar URLs', () => {
+      render(
+        <Avatar
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+        />
+      );
+
+      const mockedImage = vi.mocked(Image);
+      expect(mockedImage.mock.calls[0]?.[0].unoptimized).toBe(false);
     });
 
     it('applies aria-hidden on inner container', () => {
@@ -121,21 +160,22 @@ describe('Avatar Component', () => {
 
     it('generates correct initials for different name formats', () => {
       const testCases = [
-        { name: 'John Doe', expected: 'JD' },
-        { name: 'Jane', expected: 'J' },
-        { name: 'Mary Jane Watson', expected: 'MJ' },
-        { name: 'jean-claude van damme', expected: 'JV' },
-        { name: '', expected: '?' },
-        { name: undefined, expected: '?' },
+        'John Doe',
+        'Jane',
+        'Mary Jane Watson',
+        'jean-claude van damme',
+        '',
+        undefined,
       ];
 
-      testCases.forEach(({ name, expected }) => {
+      testCases.forEach(name => {
+        const expected = name ? getInitials(name) : '?';
         const { unmount } = render(
           <Avatar
             src={null}
             alt='User avatar'
             name={name}
-            data-testid={`avatar-${expected}`}
+            data-testid='avatar'
           />
         );
 

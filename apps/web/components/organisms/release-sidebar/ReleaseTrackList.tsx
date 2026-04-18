@@ -1,388 +1,250 @@
 'use client';
 
-import {
-  Badge,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Link2,
-  MoreHorizontal,
-  Pause,
-  Play,
-} from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { Pause, Play } from 'lucide-react';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { TruncatedText } from '@/components/atoms/TruncatedText';
-import {
-  DRAWER_SECTION_HEADING_CLASSNAME,
-  DrawerEmptyState,
-  DrawerInlineIconButton,
-  DrawerSection,
-  DrawerSurfaceCard,
-} from '@/components/molecules/drawer';
-import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
+import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import { useReleaseTracksQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
-import type { Release, ReleaseSidebarTrack } from './types';
+import type { Release } from './types';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 interface ReleaseTrackListProps {
   readonly release: Release;
-  readonly onTrackClick?: (track: ReleaseSidebarTrack) => void;
   readonly tracksOverride?: ReleaseSidebarTrack[];
+}
+
+interface TrackControlSource {
+  readonly id: string;
+  readonly title: string;
+  readonly audioUrl?: string;
+  readonly isrc?: string | null;
+  readonly releaseTitle?: string;
+  readonly artistName?: string;
+  readonly artworkUrl?: string | null;
+}
+
+function getTrackLabel(track: ReleaseSidebarTrack): string {
+  return track.discNumber > 1
+    ? `${track.discNumber}-${track.trackNumber}`
+    : String(track.trackNumber);
 }
 
 export function ReleaseTrackList({
   release,
-  onTrackClick,
   tracksOverride,
 }: ReleaseTrackListProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
-  const [isExpanded, setIsExpanded] = useState(true);
   const {
     data: fetchedTracks,
     isLoading,
     isFetching,
     isError: hasError,
-    refetch,
   } = useReleaseTracksQuery(
     release.id,
-    !tracksOverride && isExpanded && release.totalTracks > 0
+    !tracksOverride && release.totalTracks > 0
   );
   const tracks = tracksOverride ?? fetchedTracks;
 
-  const handleToggle = useCallback(async () => {
-    if (isExpanded) {
-      setIsExpanded(false);
-      return;
-    }
-
-    setIsExpanded(true);
-
-    if (!tracksOverride && hasError) {
-      await refetch();
-    }
-  }, [hasError, isExpanded, refetch, tracksOverride]);
+  let liveAnnouncement = '';
+  if (playbackState.playbackStatus === 'error') {
+    liveAnnouncement = 'Preview unavailable.';
+  } else if (
+    playbackState.playbackStatus === 'playing' &&
+    playbackState.trackTitle
+  ) {
+    liveAnnouncement = `Now playing ${playbackState.trackTitle}.`;
+  } else if (playbackState.playbackStatus === 'paused') {
+    liveAnnouncement = 'Playback paused.';
+  }
 
   if (release.totalTracks === 0) return null;
 
-  return (
-    <DrawerSection>
-      <button
-        type='button'
-        onClick={() => {
-          handleToggle().catch(() => {});
-        }}
-        aria-expanded={isExpanded}
-        aria-controls={`release-tracklist-${release.id}`}
-        className={cn(
-          DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-surface-1/75 hover:text-secondary-token focus-visible:bg-surface-1/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        )}
-      >
-        <span>Tracks ({release.totalTracks})</span>
-        {isExpanded ? (
-          <ChevronDown className='h-3.5 w-3.5' />
-        ) : (
-          <ChevronRight className='h-3.5 w-3.5' />
-        )}
-      </button>
-
-      {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-px'>
-          {(isLoading || (isFetching && !tracks)) && (
-            <div className='space-y-0.5'>
-              {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
-                .slice(0, Math.min(release.totalTracks, 6))
-                .map(id => (
-                  <DrawerSurfaceCard
-                    key={id}
-                    className='flex items-start gap-3 px-2.5 py-2'
-                  >
-                    <div className='w-7 shrink-0 pt-0.5'>
-                      <div className='ml-auto h-3.5 w-4 rounded skeleton' />
-                    </div>
-                    <div className='min-w-0 flex-1 space-y-1'>
-                      <div className='h-4 w-3/4 rounded skeleton' />
-                      <div className='h-3 w-1/3 rounded skeleton' />
-                    </div>
-                  </DrawerSurfaceCard>
-                ))}
+  if (isLoading || (isFetching && !tracks)) {
+    return (
+      <div className='space-y-1' data-testid='tracklist'>
+        {Array.from(
+          { length: Math.min(release.totalTracks, 6) },
+          (_, index) => `sk${index}`
+        ).map(id => (
+          <div
+            key={id}
+            className='flex items-center gap-3 rounded-[12px] px-1 py-2.5'
+            data-testid='release-track-skeleton'
+          >
+            <div className='h-8 w-8 rounded-full skeleton' />
+            <div className='min-w-0 flex-1 space-y-1.5'>
+              <div className='h-4 w-1/2 rounded skeleton' />
+              <div className='h-3 w-16 rounded skeleton' />
             </div>
-          )}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
-          {!isLoading && hasError && (
-            <DrawerEmptyState
-              className='min-h-[48px] px-3'
-              message='Failed to load tracks. Collapse and expand to retry.'
-              tone='error'
-            />
-          )}
+  if (hasError) {
+    return (
+      <DrawerEmptyState
+        className='min-h-[48px] px-0'
+        message='Failed to load tracks.'
+        tone='error'
+      />
+    );
+  }
 
-          {!isLoading && !hasError && tracks?.length === 0 && (
-            <DrawerEmptyState
-              className='min-h-[48px] px-3'
-              message='No track data available.'
-            />
-          )}
+  if (!tracks || tracks.length === 0) {
+    return (
+      <DrawerEmptyState
+        className='min-h-[48px] px-0'
+        message='No track data available.'
+      />
+    );
+  }
 
-          {!isLoading &&
-            !hasError &&
-            tracks &&
-            tracks.length > 0 &&
-            tracks.map(track => (
-              <TrackItem
-                key={track.id}
-                track={track}
-                onClick={onTrackClick}
-                playbackState={playbackState}
-                onToggleTrack={toggleTrack}
-              />
-            ))}
-        </div>
-      )}
-    </DrawerSection>
+  return (
+    <div className='space-y-1' data-testid='tracklist'>
+      <p className='sr-only' aria-live='polite'>
+        {liveAnnouncement}
+      </p>
+      {tracks.map((track, index) => (
+        <TrackListRow
+          key={track.id}
+          track={track}
+          release={release}
+          playbackState={playbackState}
+          onToggleTrack={toggleTrack}
+          isLastRow={index === tracks.length - 1}
+        />
+      ))}
+    </div>
   );
 }
 
-function TrackItem({
+function TrackListRow({
   track,
-  onClick,
+  release,
   playbackState,
   onToggleTrack,
+  isLastRow,
 }: {
   readonly track: ReleaseSidebarTrack;
-  readonly onClick?: (track: ReleaseSidebarTrack) => void;
+  readonly release: Release;
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
-    currentTime: number;
-    duration: number;
+    playbackStatus?: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
   };
-  readonly onToggleTrack: (track: {
-    id: string;
-    title: string;
-    audioUrl: string;
-  }) => Promise<void>;
+  readonly onToggleTrack: (track: TrackControlSource) => Promise<void>;
+  readonly isLastRow: boolean;
 }) {
-  const trackLabel =
-    track.discNumber > 1
-      ? `${track.discNumber}-${track.trackNumber}`
-      : String(track.trackNumber);
-
-  const handleClick = useCallback(() => {
-    onClick?.(track);
-  }, [onClick, track]);
-
-  const handleCopyIsrc = useCallback(() => {
-    if (track.isrc) {
-      navigator.clipboard.writeText(track.isrc).then(
-        () => toast.success('ISRC copied'),
-        () => toast.error('Failed to copy ISRC')
-      );
-    }
-  }, [track.isrc]);
-
-  const handleCopySmartLink = useCallback(() => {
-    const smartLinkUrl = `${getBaseUrl()}${track.smartLinkPath}`;
-    navigator.clipboard.writeText(smartLinkUrl).then(
-      () => toast.success('Smart link copied'),
-      () => toast.error('Failed to copy link')
-    );
-  }, [track.smartLinkPath]);
-
-  const streamingProviders = track.providers.filter(p => p.url);
-  const playableUrl = track.audioUrl ?? track.previewUrl;
+  const trackLabel = getTrackLabel(track);
+  const playableUrl = track.audioUrl ?? track.previewUrl ?? undefined;
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
-  const progressDuration = isActiveTrack ? playbackState.duration : 0;
-  const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
-  const progressPercent =
-    progressDuration > 0
-      ? Math.min(
-          100,
-          Math.max(0, (progressCurrentTime / progressDuration) * 100)
-        )
-      : 0;
+  const trackDuration =
+    track.durationMs == null ? null : formatDuration(track.durationMs);
 
   const handleTogglePlayback = useCallback(() => {
-    if (!playableUrl) return;
+    if (isActiveTrack) {
+      onToggleTrack({
+        id: track.id,
+        title: track.title,
+      }).catch(() => {
+        toast.error('Unable to control playback right now');
+      });
+      return;
+    }
+
+    if (!playableUrl) {
+      return;
+    }
 
     onToggleTrack({
       id: track.id,
       title: track.title,
       audioUrl: playableUrl,
+      isrc: track.isrc,
+      releaseTitle: release.title,
+      artistName: release.artistNames?.[0],
+      artworkUrl: release.artworkUrl,
     }).catch(() => {
       toast.error('Unable to play this track right now');
     });
-  }, [onToggleTrack, playableUrl, track.id, track.title]);
+  }, [
+    isActiveTrack,
+    onToggleTrack,
+    playableUrl,
+    release.artistNames,
+    release.artworkUrl,
+    release.title,
+    track.id,
+    track.isrc,
+    track.title,
+  ]);
+
+  function getControlLabel(): string {
+    if (!playableUrl && !isActiveTrack) {
+      return `No preview available for ${track.title}`;
+    }
+
+    return isTrackPlaying ? `Pause ${track.title}` : `Play ${track.title}`;
+  }
+
+  const controlLabel = getControlLabel();
+
+  let trackButtonContent: React.JSX.Element;
+  if (isActiveTrack && isTrackPlaying) {
+    trackButtonContent = <Pause className='h-3.5 w-3.5' aria-hidden='true' />;
+  } else if (isActiveTrack) {
+    trackButtonContent = (
+      <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
+    );
+  } else {
+    trackButtonContent = <span aria-hidden='true'>{trackLabel}</span>;
+  }
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
-      <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-tertiary-token'>
-        {trackLabel}.
-      </span>
+    <div
+      className={cn(
+        'flex items-center gap-3 py-2.5',
+        !isLastRow &&
+          'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)]'
+      )}
+      data-testid={`release-track-row-${track.id}`}
+    >
+      <button
+        type='button'
+        onClick={handleTogglePlayback}
+        disabled={!playableUrl && !isActiveTrack}
+        className={cn(
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-[510] tabular-nums transition-[background-color,color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          isActiveTrack
+            ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
+            : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token',
+          !playableUrl &&
+            !isActiveTrack &&
+            'cursor-not-allowed text-quaternary-token hover:bg-transparent hover:text-quaternary-token'
+        )}
+        aria-label={controlLabel}
+        data-testid={`release-track-control-${track.id}`}
+      >
+        {trackButtonContent}
+      </button>
 
       <div className='min-w-0 flex-1'>
-        <button
-          type='button'
-          onClick={handleClick}
-          className='w-full rounded-[6px] text-left focus-visible:outline-none'
-        >
-          <div className='flex items-center gap-1.5'>
-            <TruncatedText
-              lines={1}
-              className='text-[13.5px] font-[510] text-primary-token'
-              tooltipSide='top'
-            >
-              {track.title}
-            </TruncatedText>
-            {track.isExplicit && (
-              <Badge
-                variant='secondary'
-                className='shrink-0 bg-surface-1 px-1 py-0 text-[8px] text-tertiary-token'
-              >
-                E
-              </Badge>
-            )}
-          </div>
-
-          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
-            {track.durationMs != null && (
-              <span className='tabular-nums'>
-                {formatDuration(track.durationMs)}
-              </span>
-            )}
-            {track.isrc && (
-              <>
-                {track.durationMs != null && (
-                  <span className='text-quaternary-token'>|</span>
-                )}
-                <span className='font-mono text-[11px]'>{track.isrc}</span>
-              </>
-            )}
-          </div>
-        </button>
-
-        {playableUrl && (
-          <div className='mt-1.5 space-y-1'>
-            <div className='flex items-center gap-2'>
-              <button
-                type='button'
-                onClick={event => {
-                  event.stopPropagation();
-                  handleTogglePlayback();
-                }}
-                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-                aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
-              >
-                {isTrackPlaying ? (
-                  <Pause className='h-3 w-3' />
-                ) : (
-                  <Play className='h-3 w-3' />
-                )}
-              </button>
-              <div className='h-0.5 flex-1 rounded-full bg-surface-1'>
-                <div
-                  className='h-full rounded-full bg-(--linear-accent) transition-[width]'
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-            <p className='text-[10.5px] text-tertiary-token'>
-              {track.audioFormat
-                ? `Audio preview · ${track.audioFormat.toUpperCase()}`
-                : 'Audio preview'}
-            </p>
-          </div>
-        )}
+        <p className='truncate text-[12.5px] font-[510] leading-tight text-primary-token'>
+          {track.title}
+        </p>
       </div>
 
-      <TrackActionsMenu
-        track={track}
-        streamingProviders={streamingProviders}
-        onCopyIsrc={handleCopyIsrc}
-        onCopySmartLink={handleCopySmartLink}
-      />
+      {trackDuration ? (
+        <span className='shrink-0 text-[11px] tabular-nums text-tertiary-token'>
+          {trackDuration}
+        </span>
+      ) : null}
     </div>
-  );
-}
-
-function TrackActionsMenu({
-  track,
-  streamingProviders,
-  onCopyIsrc,
-  onCopySmartLink,
-}: {
-  readonly track: ReleaseSidebarTrack;
-  readonly streamingProviders: ReleaseSidebarTrack['providers'];
-  readonly onCopyIsrc: () => void;
-  readonly onCopySmartLink: () => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <DrawerInlineIconButton
-          aria-label={`Actions for ${track.title}`}
-          className='h-[22px] w-[22px] self-center group-hover:opacity-100'
-        >
-          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
-        </DrawerInlineIconButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-48'>
-        {track.isrc && (
-          <DropdownMenuItem onClick={onCopyIsrc}>
-            <Copy className='mr-2 h-3.5 w-3.5' />
-            Copy ISRC
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={onCopySmartLink}>
-          <Link2 className='mr-2 h-3.5 w-3.5' />
-          Copy smart link
-        </DropdownMenuItem>
-        {streamingProviders.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <ExternalLink className='mr-2 h-3.5 w-3.5' />
-                Open on platform
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {streamingProviders.map(
-                  (provider: ReleaseSidebarTrack['providers'][number]) => (
-                    <DropdownMenuItem
-                      key={provider.key}
-                      onClick={() =>
-                        globalThis.open(
-                          provider.url,
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                    >
-                      {PROVIDER_LABELS[provider.key] ?? provider.label}
-                    </DropdownMenuItem>
-                  )
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

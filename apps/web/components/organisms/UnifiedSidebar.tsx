@@ -25,10 +25,12 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
+  adminSettingsNavItem,
   artistSettingsNavigation,
+  paymentsNavItem,
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
@@ -36,8 +38,10 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
+import { ProfileSwitcher } from './ProfileSwitcher';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -111,7 +115,8 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
-  const { selectedProfile } = useDashboardData();
+  const { selectedProfile, isAdmin } = useDashboardData();
+  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
   const { data: cachedProfileData } = useDashboardProfileQuery();
@@ -127,9 +132,21 @@ function SettingsNavigation({
   // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
   // If cachedDisplayName is empty string, the user intentionally cleared it.
   const artistName =
-    cachedDisplayName != null
-      ? cachedDisplayName.trim() || undefined
-      : selectedProfile?.displayName?.trim() || undefined;
+    cachedDisplayName == null
+      ? selectedProfile?.displayName?.trim() || undefined
+      : cachedDisplayName.trim() || undefined;
+
+  // Build user settings items with conditional Payments
+  const userItems = useMemo(() => {
+    if (!isStripeConnectEnabled) return userSettingsNavigation;
+    // Insert Payments after Billing & Subscription
+    const billingIndex = userSettingsNavigation.findIndex(
+      i => i.id === 'billing'
+    );
+    const items = [...userSettingsNavigation];
+    items.splice(billingIndex + 1, 0, paymentsNavItem);
+    return items;
+  }, [isStripeConnectEnabled]);
 
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {
@@ -142,20 +159,31 @@ function SettingsNavigation({
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-3 overflow-hidden'
+      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-          General
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          Account
         </span>
-        <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
+        <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-          {artistName || 'Artist'}
+        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
+      {isAdmin && (
+        <div>
+          <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+            Administration
+          </span>
+          <SettingsNavGroup
+            items={[adminSettingsNavItem]}
+            pathname={pathname}
+          />
+        </div>
+      )}
     </nav>
   );
 }
@@ -166,66 +194,101 @@ function SidebarHeaderNav({
   isAdmin,
   isDashboardOrAdmin,
   profileHref,
+  hasMultipleProfiles,
+  isDemoRoute,
 }: Readonly<{
   isInSettings: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   profileHref: string | undefined;
+  hasMultipleProfiles: boolean;
+  isDemoRoute: boolean;
 }>) {
   return (
     <div className='flex w-full items-center'>
-      {isInSettings ? (
-        <Link
-          href={APP_ROUTES.DASHBOARD}
-          aria-label='Back to dashboard'
-          className={cn(
-            'inline-flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
-            'group-data-[collapsible=icon]:justify-center'
-          )}
-        >
-          <ArrowLeft
-            className='size-3 text-sidebar-item-icon/70'
-            aria-hidden='true'
-          />
-          <span className='truncate text-app tracking-tight text-sidebar-item-foreground/80 group-data-[collapsible=icon]:hidden'>
-            Back to app
-          </span>
-        </Link>
-      ) : (
-        <UserButton
-          profileHref={profileHref}
-          settingsHref={APP_ROUTES.SETTINGS}
-          trigger={
-            <button
-              type='button'
-              aria-label='Open workspace menu'
+      {(() => {
+        if (isInSettings) {
+          return (
+            <div className='flex w-full items-center gap-2'>
+              <Link
+                href={APP_ROUTES.DASHBOARD}
+                aria-label='Back to App'
+                className={cn(
+                  'inline-flex h-6 shrink-0 items-center gap-1 rounded-[8px] px-2 text-[12px] text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                  'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                )}
+              >
+                <ArrowLeft
+                  className='size-3.5 text-sidebar-item-icon'
+                  aria-hidden='true'
+                />
+                <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  Back to App
+                </span>
+              </Link>
+            </div>
+          );
+        }
+        if (isDemoRoute) {
+          return (
+            <div
               className={cn(
-                'flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size={13}
+                size={14}
                 tone='auto'
-                className='rounded-[4px] shrink-0'
+                rounded={false}
+                className='rounded-sm shrink-0'
               />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                {isAdmin ? 'Admin' : 'Jovie'}
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                Demo
               </span>
-              <ChevronDown
-                className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
-                aria-hidden='true'
-              />
-            </button>
-          }
-        />
-      )}
+            </div>
+          );
+        }
+        if (hasMultipleProfiles && !isAdmin) {
+          return <ProfileSwitcher />;
+        }
+        return (
+          <UserButton
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            trigger={
+              <button
+                type='button'
+                aria-label='Open workspace menu'
+                className={cn(
+                  'flex h-7 w-full items-center gap-1.5 rounded-[10px] px-2.5 transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                  'group-data-[collapsible=icon]:justify-center'
+                )}
+              >
+                <BrandLogo
+                  size={14}
+                  tone='auto'
+                  rounded={false}
+                  className='rounded-sm shrink-0'
+                />
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  {isAdmin ? 'Admin' : 'Jovie'}
+                </span>
+                <ChevronDown
+                  className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
+                  aria-hidden='true'
+                />
+              </button>
+            }
+          />
+        );
+      })()}
 
       {!isInSettings && isDashboardOrAdmin && (
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-6 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-item-icon/58 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3' />
         </Link>
@@ -242,11 +305,13 @@ function SidebarHeaderNav({
  * No footer — user menu lives in the header.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { isAdmin: isUserAdmin } = useDashboardData();
+  const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const pathname = usePathname();
+  const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
+  const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(isDashboardOrAdmin);
 
@@ -256,21 +321,28 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='offcanvas'
       className={cn(
         'bg-base',
-        '[--sidebar-width:244px]',
+        '[--sidebar-width:var(--linear-app-sidebar-width)]',
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-10 justify-center gap-0 border-b border-sidebar-border/35 px-2.5 py-0'>
+      <SidebarHeader
+        className={cn(
+          'relative justify-center gap-0 px-2.5',
+          'h-(--linear-app-header-height-compact) py-0.5'
+        )}
+      >
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
+          hasMultipleProfiles={hasMultipleProfiles}
+          isDemoRoute={isDemoRoute}
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
+      <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
               <DashboardNav />
@@ -281,19 +353,23 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/45 bg-sidebar/45 backdrop-blur-[1px]'>
-        <SidebarUpgradeBanner />
-        <SidebarInstallBanner />
+      {isInSettings ? null : (
+        <div className='mt-auto shrink-0'>
+          {isDemoRoute ? null : <SidebarUpgradeBanner />}
+          <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pb-3 pt-1'>
-          <span className='text-2xs text-sidebar-muted/80 select-none'>
-            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-              : ''}
-          </span>
+          {isUserAdmin && (
+            <div className='pl-2 pr-3.5 pb-2 pt-1'>
+              <span className='text-2xs text-sidebar-muted select-none'>
+                v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+                {process.env.NEXT_PUBLIC_BUILD_SHA
+                  ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                  : ''}
+              </span>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </Sidebar>
   );
 }

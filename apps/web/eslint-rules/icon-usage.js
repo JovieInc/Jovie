@@ -205,7 +205,11 @@ module.exports = {
             templateValue.includes('</svg>')
           ) {
             // Allow SVG in server-side templates (footer.ts, etc.)
-            const allowedServerFiles = ['footer.ts', 'email-template.ts'];
+            const allowedServerFiles = [
+              'footer.ts',
+              'email-template.ts',
+              'dsp-registry.ts',
+            ];
             if (allowedServerFiles.some(file => filename.includes(file))) {
               return;
             }

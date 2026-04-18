@@ -25,7 +25,10 @@ const baseDashboardData: DashboardData = {
     id: 'profile-1',
     displayName: 'Test Artist',
     username: 'testartist',
+    usernameNormalized: 'testartist',
     avatarUrl: 'https://example.com/avatar.jpg',
+    isPublic: true,
+    onboardingCompletedAt: new Date('2026-03-19T17:56:33.757Z'),
   } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
@@ -98,7 +101,7 @@ describe('ProfileCompletionRedirect', () => {
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
 
-  it('does not redirect when avatar URL is blank (avatar no longer required)', () => {
+  it('does NOT redirect when avatar URL is blank (avatar is soft requirement)', () => {
     mockReplace.mockClear();
     renderGuard({
       ...baseDashboardData,
@@ -152,5 +155,19 @@ describe('ProfileCompletionRedirect', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+  });
+
+  it('does NOT redirect admins when their profile is incomplete', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      isAdmin: true,
+      selectedProfile: {
+        ...baseDashboardData.selectedProfile!,
+        isPublic: false,
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

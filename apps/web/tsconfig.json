@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "target": "es2022",
     "lib": ["dom", "dom.iterable", "es2022"],
     "allowJs": true,
@@ -32,25 +33,45 @@
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
       "@jovie/ui": ["../../packages/ui"],
-      "@jovie/ui/*": ["../../packages/ui/*"]
+      "@jovie/ui/*": ["../../packages/ui/*"],
+      "@jovie/extension-contracts": ["../../packages/extension-contracts"],
+      "@jovie/extension-contracts/*": ["../../packages/extension-contracts/*"]
     }
   },
+  // Add new source directories here — files outside these paths won't be typechecked.
+  // Test/script files are typechecked separately via tsconfig.test.json.
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "data/**/*.ts",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "types/**/*.ts",
+    "types/**/*.d.ts",
+    "constants/**/*.ts",
+    "content/**/*.ts",
+    "contexts/**/*.ts",
+    "contexts/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "styles/**/*.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    ".next/dev/dev/types/**/*.ts",
     "tests/types/**/*.d.ts",
-    ".next/dev/types/**/*.ts"
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "sentry.server.config.ts",
+    "sentry.edge.config.ts",
+    "proxy.ts"
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions",
     // Next.js auto-generated validator file is noisy/unstable (unused @ts-expect-error); exclude for consistent typecheck.
     ".next/types/validator.ts",
-    "vitest.config.ts",
-    "vitest.config.fast.ts",
-    "**/*.stories.*",
-    "storybook-static"
+    "**/*.stories.*"
   ]
 }

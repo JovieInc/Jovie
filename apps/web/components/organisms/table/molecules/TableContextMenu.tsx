@@ -1,9 +1,21 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { type ReactNode, useMemo } from 'react';
+import type React from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  type MouseEventHandler,
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * A single action item in the context menu
@@ -21,11 +33,12 @@ export interface ContextMenuAction {
   readonly destructive?: boolean;
   /** Whether this action is disabled and cannot be clicked */
   readonly disabled?: boolean;
+  /** Optional trailing helper text */
+  readonly subText?: string;
 }
 
 /**
- * A submenu containing multiple actions
- * @deprecated Not yet fully supported - will be flattened to regular actions
+ * A submenu containing nested context menu items
  */
 export interface ContextMenuSubmenu {
   /** Unique identifier for the submenu */
@@ -34,8 +47,10 @@ export interface ContextMenuSubmenu {
   readonly label: string;
   /** Optional icon element to display before the label */
   readonly icon?: ReactNode;
-  /** Array of actions within this submenu */
-  readonly actions: ContextMenuAction[];
+  /** Array of nested items within this submenu */
+  readonly items: ContextMenuItemType[];
+  /** Whether this submenu is disabled */
+  readonly disabled?: boolean;
 }
 
 /**
@@ -53,13 +68,13 @@ export interface TableContextMenuProps {
   /** React children to wrap with context menu functionality */
   readonly children: ReactNode;
   /** Array of menu items to display in the context menu */
-  readonly items: ContextMenuItemType[];
+  readonly items?: ContextMenuItemType[];
+  /** Lazily resolve menu items when the context menu is opened */
+  readonly getItems?: () =>
+    | ContextMenuItemType[]
+    | Promise<ContextMenuItemType[]>;
   /** Whether the context menu is disabled */
   readonly disabled?: boolean;
-}
-
-function isAction(item: ContextMenuItemType): item is ContextMenuAction {
-  return 'onClick' in item && typeof item.onClick === 'function';
 }
 
 function isSeparator(item: ContextMenuItemType): item is { type: 'separator' } {
@@ -67,7 +82,151 @@ function isSeparator(item: ContextMenuItemType): item is { type: 'separator' } {
 }
 
 function isSubmenu(item: ContextMenuItemType): item is ContextMenuSubmenu {
-  return 'actions' in item && Array.isArray(item.actions);
+  return 'items' in item && Array.isArray(item.items);
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return typeof (value as PromiseLike<T>).then === 'function';
+}
+
+function resolveAsyncContextMenuItems(
+  promise: PromiseLike<ContextMenuItemType[]>,
+  targetGeneration: number,
+  setResolveGeneration: React.Dispatch<React.SetStateAction<number>>,
+  setResolvedItems: React.Dispatch<React.SetStateAction<ContextMenuItemType[]>>
+) {
+  void Promise.resolve(promise)
+    .then(loadedItems => {
+      setResolveGeneration(activeGeneration => {
+        if (activeGeneration === targetGeneration) {
+          setResolvedItems(loadedItems);
+        }
+        return activeGeneration;
+      });
+    })
+    .catch(error => {
+      setResolveGeneration(activeGeneration => {
+        if (activeGeneration === targetGeneration) {
+          logger.warn(
+            'Failed to resolve async context menu items',
+            error,
+            'TableContextMenu'
+          );
+          setResolvedItems([]);
+        }
+        return activeGeneration;
+      });
+    });
+}
+
+function normalizeContextMenuItems(
+  items: readonly ContextMenuItemType[]
+): ContextMenuItemType[] {
+  const normalized: ContextMenuItemType[] = [];
+
+  for (const item of items) {
+    if (isSeparator(item)) {
+      if (normalized.length === 0 || isSeparator(normalized.at(-1)!)) {
+        continue;
+      }
+
+      normalized.push(item);
+      continue;
+    }
+
+    if (isSubmenu(item)) {
+      const children = normalizeContextMenuItems(item.items);
+
+      if (children.length === 0) {
+        continue;
+      }
+
+      normalized.push({
+        ...item,
+        items: children,
+      });
+      continue;
+    }
+
+    normalized.push(item);
+  }
+
+  while (normalized.length > 0 && isSeparator(normalized.at(-1)!)) {
+    normalized.pop();
+  }
+
+  return normalized;
+}
+
+function toTableActionMenuItems(
+  items: readonly ContextMenuItemType[],
+  path = 'context'
+): TableActionMenuItem[] {
+  return normalizeContextMenuItems(items).map((item, index) => {
+    if (isSeparator(item)) {
+      return {
+        id: `separator-${path}-${index}`,
+        label: '',
+        onClick: () => {},
+      };
+    }
+
+    if (isSubmenu(item)) {
+      return {
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        disabled: item.disabled,
+        children: toTableActionMenuItems(item.items, `${path}-${item.id}`),
+      };
+    }
+
+    return {
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      onClick: item.onClick,
+      disabled: item.disabled,
+      variant: item.destructive ? ('destructive' as const) : undefined,
+      subText: item.subText,
+    };
+  });
+}
+
+function toCommonDropdownItems(
+  items: readonly ContextMenuItemType[],
+  path = 'context'
+): CommonDropdownItem[] {
+  return normalizeContextMenuItems(items).map((item, index) => {
+    if (isSeparator(item)) {
+      return {
+        type: 'separator' as const,
+        id: `sep-${path}-${index}`,
+      };
+    }
+
+    if (isSubmenu(item)) {
+      return {
+        type: 'submenu' as const,
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        disabled: item.disabled,
+        items: toCommonDropdownItems(item.items, `${path}-${item.id}`),
+      };
+    }
+
+    return {
+      type: 'action' as const,
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      onClick: item.onClick,
+      disabled: item.disabled,
+      variant: item.destructive ? ('destructive' as const) : undefined,
+      subText: item.subText,
+    };
+  });
 }
 
 /**
@@ -85,7 +244,7 @@ function isSubmenu(item: ContextMenuItemType): item is ContextMenuSubmenu {
  *       id: 'copy',
  *       label: 'Copy',
  *       icon: <CopyIcon />,
- *       actions: [
+ *       items: [
  *         { id: 'copy-id', label: 'Copy ID', onClick: () => copy(row.id) },
  *         { id: 'copy-name', label: 'Copy Name', onClick: () => copy(row.name) },
  *       ],
@@ -105,60 +264,93 @@ function isSubmenu(item: ContextMenuItemType): item is ContextMenuSubmenu {
 export function convertContextMenuItems(
   items: ContextMenuItemType[]
 ): TableActionMenuItem[] {
-  return items.map((item, index) => {
-    if (isSeparator(item)) {
-      return {
-        id: 'separator', // Must be exactly 'separator' for TableActionMenu to recognize it
-        label: '', // Empty label, will be rendered as separator component
-        onClick: () => {}, // Required by type, but unused for separators
-      };
-    }
-
-    if (isSubmenu(item)) {
-      // Submenus not yet fully supported - return as disabled placeholder
-      return {
-        id: item.id,
-        label: `${item.label} (submenu)`,
-        onClick: () => {},
-        disabled: true,
-      };
-    }
-
-    if (isAction(item)) {
-      return {
-        id: item.id,
-        label: item.label,
-        icon: item.icon,
-        onClick: item.onClick,
-        disabled: item.disabled,
-        variant: item.destructive ? ('destructive' as const) : undefined,
-      };
-    }
-
-    // Fallback (should never happen)
-    return {
-      id: `unknown-${index}`,
-      label: 'Unknown',
-      onClick: () => {},
-    };
-  });
+  return toTableActionMenuItems(items);
 }
 
 export function TableContextMenu({
   children,
   items,
+  getItems,
   disabled = false,
 }: TableContextMenuProps) {
-  // Memoize conversion to prevent recalculation on every render
-  const convertedItems = useMemo(() => convertContextMenuItems(items), [items]);
+  const [resolvedItems, setResolvedItems] = useState<ContextMenuItemType[]>(
+    items ?? []
+  );
+  const [, setResolveGeneration] = useState(0);
 
-  if (disabled || items.length === 0) {
+  useEffect(() => {
+    if (!getItems) {
+      setResolvedItems(items ?? []);
+    }
+  }, [getItems, items]);
+
+  const resolveItems = useCallback(() => {
+    if (!getItems) {
+      setResolveGeneration(current => current + 1);
+      setResolvedItems(items ?? []);
+      return;
+    }
+
+    const nextItems = getItems();
+
+    if (isPromiseLike(nextItems)) {
+      setResolvedItems([
+        {
+          id: 'loading',
+          label: 'Loading...',
+          onClick: () => {},
+          disabled: true,
+        },
+      ]);
+
+      setResolveGeneration(currentGeneration => {
+        const nextGeneration = currentGeneration + 1;
+        resolveAsyncContextMenuItems(
+          nextItems,
+          nextGeneration,
+          setResolveGeneration,
+          setResolvedItems
+        );
+        return nextGeneration;
+      });
+
+      return;
+    }
+
+    setResolveGeneration(current => current + 1);
+    setResolvedItems(nextItems);
+  }, [getItems, items]);
+
+  // Memoize conversion to prevent recalculation on every render
+  const convertedItems = useMemo(
+    () => convertContextMenuItems(resolvedItems),
+    [resolvedItems]
+  );
+
+  if (disabled || (!getItems && resolvedItems.length === 0)) {
     return <>{children}</>;
+  }
+
+  let triggerChild = children;
+
+  if (getItems && isValidElement(children)) {
+    const contextMenuChild = children as ReactElement<{
+      onContextMenuCapture?: MouseEventHandler<Element>;
+    }>;
+    const originalOnContextMenuCapture =
+      contextMenuChild.props.onContextMenuCapture;
+
+    triggerChild = cloneElement(contextMenuChild, {
+      onContextMenuCapture: event => {
+        originalOnContextMenuCapture?.(event);
+        resolveItems();
+      },
+    });
   }
 
   return (
     <TableActionMenu items={convertedItems} trigger='context'>
-      {children}
+      {triggerChild}
     </TableActionMenu>
   );
 }
@@ -170,44 +362,5 @@ export function TableContextMenu({
 export function convertToCommonDropdownItems(
   items: ContextMenuItemType[]
 ): CommonDropdownItem[] {
-  return items.map((item, index) => {
-    if (isSeparator(item)) {
-      return {
-        type: 'separator' as const,
-        id: `sep-${index}`,
-      };
-    }
-
-    if (isSubmenu(item)) {
-      // Submenus not yet fully supported - flatten to disabled item
-      return {
-        type: 'action' as const,
-        id: item.id,
-        label: `${item.label} (submenu)`,
-        icon: item.icon,
-        onClick: () => {},
-        disabled: true,
-      };
-    }
-
-    if (isAction(item)) {
-      return {
-        type: 'action' as const,
-        id: item.id,
-        label: item.label,
-        icon: item.icon,
-        onClick: item.onClick,
-        disabled: item.disabled,
-        variant: item.destructive ? ('destructive' as const) : undefined,
-      };
-    }
-
-    // Fallback
-    return {
-      type: 'action' as const,
-      id: `unknown-${index}`,
-      label: 'Unknown',
-      onClick: () => {},
-    };
-  });
+  return toCommonDropdownItems(items);
 }

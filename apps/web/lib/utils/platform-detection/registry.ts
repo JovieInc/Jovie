@@ -207,6 +207,26 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     icon: 'rumble',
     color: '85C742',
   }),
+  bandsintown: createPlatformInfo(
+    'bandsintown',
+    'https://www.bandsintown.com/a/artist-name',
+    {
+      name: 'Bandsintown',
+      category: 'websites',
+      icon: 'link',
+      color: '0F172A',
+    }
+  ),
+  wikidata: createPlatformInfo(
+    'wikidata',
+    'https://www.wikidata.org/wiki/Q42',
+    {
+      name: 'Wikidata',
+      category: 'websites',
+      icon: 'link',
+      color: '0F172A',
+    }
+  ),
   cameo: createPlatformInfo('cameo', 'https://cameo.com/username', {
     name: 'Cameo',
     category: 'social',
@@ -297,8 +317,10 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
+  { pattern: /(?:www\.)?bandsintown\.com/i, platformId: 'bandsintown' },
   { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
   { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
+  { pattern: /(?:www\.)?wikidata\.org/i, platformId: 'wikidata' },
   { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
 ];

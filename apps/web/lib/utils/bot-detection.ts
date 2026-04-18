@@ -15,6 +15,10 @@ export interface BotDetectionResult {
   asn?: number;
 }
 
+interface DetectBotOptions {
+  readonly userAgent?: string | null;
+}
+
 // Conservative bot detection - only block obvious crawlers on sensitive endpoints
 const META_USER_AGENTS = [
   'facebookexternalhit',
@@ -46,9 +50,11 @@ const KNOWN_CRAWLERS = [
  */
 export function detectBot(
   request: NextRequest,
-  endpoint?: string
+  endpoint?: string,
+  options: DetectBotOptions = {}
 ): BotDetectionResult {
-  const userAgent = request.headers.get('user-agent') || '';
+  const userAgent =
+    options.userAgent ?? (request.headers.get('user-agent') || '');
 
   // Check for Meta crawlers
   const isMeta = META_USER_AGENTS.some(agent =>
@@ -87,16 +93,6 @@ export function detectBot(
 }
 
 /**
- * Checks if IP belongs to Meta ASN
- */
-export async function checkMetaASN(): Promise<boolean> {
-  // In production, you'd query an IP-to-ASN service
-  // For demo, we'll just return false to avoid blocking legitimate users
-  // Note: IP parameter removed as it's not currently used
-  return false;
-}
-
-/**
  * Logs bot detection for monitoring
  */
 export async function logBotDetection(
@@ -113,26 +109,6 @@ export async function logBotDetection(
     level: blocked ? 'warning' : 'info',
     data: { ip, reason, blocked, endpoint },
   });
-}
-
-/**
- * Conservative rate limiting to avoid appearing like cloaking
- */
-
-export async function checkRateLimit(
-  ip: string,
-  endpoint: string
-): Promise<boolean> {
-  // Rate limiting is disabled in this version
-  // Always return false (not rate limited) for now
-  // Consider implementing with Redis/Upstash if needed
-  Sentry.addBreadcrumb({
-    category: 'rate-limit',
-    message: `Rate limit check (disabled)`,
-    level: 'info',
-    data: { ip, endpoint },
-  });
-  return false;
 }
 
 /**
@@ -159,33 +135,6 @@ export function createBotResponse(status: number = 204): Response {
       Expires: '0',
     },
   });
-}
-
-/**
- * Checks if request should be treated as suspicious
- */
-export function isSuspiciousRequest(request: NextRequest): boolean {
-  const userAgent = request.headers.get('user-agent') || '';
-
-  // Check for suspicious patterns
-  const suspiciousPatterns = [
-    // Empty or suspicious user agents
-    /^$/,
-    /curl/i,
-    /wget/i,
-    /python/i,
-    /bot/i,
-    /spider/i,
-    /crawler/i,
-    // But don't block legitimate tools that might be used by users
-  ];
-
-  // Only flag obviously suspicious requests
-  const hasSuspiciousUA =
-    suspiciousPatterns.some(pattern => pattern.test(userAgent)) &&
-    !userAgent.includes('Mozilla'); // Don't flag browser-based tools
-
-  return hasSuspiciousUA;
 }
 
 /**

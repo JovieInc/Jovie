@@ -8,18 +8,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
   DrawerButton,
+  DrawerCardActionBar,
   DrawerFormField,
-  DrawerMediaThumb,
+  DrawerSettingsToggle,
+  DrawerSurfaceCard,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { GenrePicker } from '@/components/molecules/GenrePicker';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { ReleaseFields } from '@/components/organisms/release-sidebar/ReleaseFields';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -31,65 +37,100 @@ const RELEASE_TYPE_OPTIONS = [
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 
-const PROVIDER_FIELDS = [
-  {
-    key: 'spotify',
-    label: 'Spotify',
-    placeholder: 'https://open.spotify.com/album/...',
-  },
-  {
-    key: 'apple_music',
-    label: 'Apple Music',
-    placeholder: 'https://music.apple.com/...',
-  },
-  {
-    key: 'youtube_music',
-    label: 'YouTube Music',
-    placeholder: 'https://music.youtube.com/...',
-  },
-  { key: 'tidal', label: 'Tidal', placeholder: 'https://tidal.com/...' },
-  {
-    key: 'amazon_music',
-    label: 'Amazon Music',
-    placeholder: 'https://music.amazon.com/...',
-  },
-  {
-    key: 'soundcloud',
-    label: 'SoundCloud',
-    placeholder: 'https://soundcloud.com/...',
-  },
-  { key: 'deezer', label: 'Deezer', placeholder: 'https://www.deezer.com/...' },
-] as const;
-
 export interface AddReleaseSidebarProps {
   readonly isOpen: boolean;
+  readonly artistName?: string | null;
   readonly onClose: () => void;
-  readonly onCreated: () => void;
+  readonly onCreated: (release: ReleaseViewModel) => void;
+  readonly onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
 }
 
 export function AddReleaseSidebar({
   isOpen,
+  artistName,
   onClose,
   onCreated,
+  onArtworkUploaded,
 }: AddReleaseSidebarProps) {
   const [title, setTitle] = useState('');
   const [releaseType, setReleaseType] = useState<ReleaseType>('single');
   const [releaseDate, setReleaseDate] = useState('');
-  const [artworkUrl, setArtworkUrl] = useState('');
-  const [providerUrls, setProviderUrls] = useState<Record<string, string>>({});
+  const [revealDate, setRevealDate] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [isExplicit, setIsExplicit] = useState(false);
+  const [stagedArtworkFile, setStagedArtworkFile] = useState<File | null>(null);
+  const [stagedArtworkPreviewUrl, setStagedArtworkPreviewUrl] = useState<
+    string | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const releaseTypeLabel =
+    RELEASE_TYPE_OPTIONS.find(option => option.value === releaseType)?.label ??
+    'Single';
+
+  // Show reveal date field when release date is in the future
+  const isFutureRelease = useMemo(() => {
+    if (!releaseDate) return false;
+    return new Date(releaseDate) > new Date();
+  }, [releaseDate]);
+
+  // Auto-calculate reveal date default (30 days before release)
+  const autoRevealDate = useMemo(() => {
+    if (!releaseDate || !isFutureRelease) return '';
+    const rd = new Date(releaseDate);
+    rd.setDate(rd.getDate() - 30);
+    const now = new Date();
+    const effective = rd > now ? rd : now;
+    return effective.toISOString().split('T')[0];
+  }, [releaseDate, isFutureRelease]);
+
+  // Auto-set reveal date when release date changes (only if user hasn't manually set one)
+  const [revealDateManuallySet, setRevealDateManuallySet] = useState(false);
+  useEffect(() => {
+    if (!revealDateManuallySet && autoRevealDate) {
+      setRevealDate(autoRevealDate);
+    }
+  }, [autoRevealDate, revealDateManuallySet]);
+
+  const replaceStagedArtworkPreview = useCallback((nextUrl: string | null) => {
+    setStagedArtworkPreviewUrl(nextUrl);
+  }, []);
 
   const resetForm = useCallback(() => {
     setTitle('');
     setReleaseType('single');
     setReleaseDate('');
-    setArtworkUrl('');
-    setProviderUrls({});
-  }, []);
+    setRevealDate('');
+    setRevealDateManuallySet(false);
+    setGenres([]);
+    setIsExplicit(false);
+    setStagedArtworkFile(null);
+    replaceStagedArtworkPreview(null);
+  }, [replaceStagedArtworkPreview]);
 
-  const handleProviderUrlChange = useCallback((key: string, value: string) => {
-    setProviderUrls(prev => ({ ...prev, [key]: value }));
-  }, []);
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen, resetForm]);
+
+  useEffect(() => {
+    return () => {
+      if (stagedArtworkPreviewUrl) {
+        URL.revokeObjectURL(stagedArtworkPreviewUrl);
+      }
+    };
+  }, [stagedArtworkPreviewUrl]);
+
+  const handleArtworkStage = useCallback(
+    async (file: File) => {
+      const previewUrl = URL.createObjectURL(file);
+      setStagedArtworkFile(file);
+      replaceStagedArtworkPreview(previewUrl);
+      return previewUrl;
+    },
+    [replaceStagedArtworkPreview]
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
@@ -103,17 +144,64 @@ export function AddReleaseSidebar({
         title: title.trim(),
         releaseType,
         releaseDate: releaseDate || null,
-        artworkUrl: artworkUrl.trim() || null,
-        providerUrls,
+        revealDate: revealDate || null,
+        genres,
+        isExplicit,
       });
 
-      if (result.success) {
-        toast.success(result.message);
-        resetForm();
-        onCreated();
-        onClose();
-      } else {
+      if (!result.success) {
         toast.error(result.message);
+        return;
+      }
+
+      if (!result.release || !result.releaseId) {
+        toast.error('Release created, but the editor could not be opened.');
+        return;
+      }
+
+      const releaseId = result.releaseId;
+      const artworkFile = stagedArtworkFile;
+      const createdRelease = result.release;
+
+      toast.success(result.message);
+      resetForm();
+      onCreated(createdRelease);
+      onClose();
+
+      if (artworkFile) {
+        void (async () => {
+          const formData = new FormData();
+          formData.append('file', artworkFile);
+
+          try {
+            const response = await fetch(
+              `/api/images/artwork/upload?releaseId=${encodeURIComponent(releaseId)}`,
+              {
+                method: 'POST',
+                body: formData,
+              }
+            );
+
+            if (!response.ok) {
+              const error = await response
+                .json()
+                .catch(() => ({ message: 'Upload failed' }));
+              throw new Error(error.message ?? 'Failed to upload artwork');
+            }
+
+            const uploadResult = (await response.json()) as {
+              artworkUrl?: string;
+            };
+
+            if (uploadResult.artworkUrl) {
+              onArtworkUploaded?.(createdRelease.id, uploadResult.artworkUrl);
+            }
+          } catch {
+            toast.warning(
+              'Release created, but artwork upload failed. You can retry from the release drawer.'
+            );
+          }
+        })();
       }
     } catch {
       toast.error('Failed to create release. Please try again.');
@@ -121,63 +209,48 @@ export function AddReleaseSidebar({
       setIsSubmitting(false);
     }
   }, [
-    title,
-    releaseType,
-    releaseDate,
-    artworkUrl,
-    providerUrls,
-    resetForm,
-    onCreated,
+    genres,
+    isExplicit,
     onClose,
+    onCreated,
+    onArtworkUploaded,
+    releaseDate,
+    revealDate,
+    releaseType,
+    resetForm,
+    stagedArtworkFile,
+    title,
   ]);
 
   const handleClose = useCallback(() => {
+    if (isSubmitting) {
+      return;
+    }
+
     resetForm();
     onClose();
-  }, [resetForm, onClose]);
+  }, [isSubmitting, onClose, resetForm]);
 
   return (
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Add release'
       data-testid='add-release-sidebar'
-      title='Add Release'
+      scrollStrategy='shell'
       onClose={handleClose}
-      entityHeader={
-        <EntityHeaderCard
-          image={
-            <DrawerMediaThumb
-              src={artworkUrl.trim() || undefined}
-              alt='New release artwork'
-              sizeClassName='h-10 w-10'
-              sizes='40px'
-              fallback={
-                <Icon
-                  name='Disc3'
-                  className='h-5 w-5 text-tertiary-token'
-                  aria-hidden='true'
-                />
-              }
-            />
-          }
-          title={title || 'New Release'}
-          subtitle={
-            RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
-            'Single'
-          }
-          className='gap-2'
-        />
-      }
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      footerSurface='flat'
       footer={
         <DrawerButton
-          tone='primary'
-          className='w-full'
+          tone='secondary'
+          className='h-8 w-full justify-center border-white bg-white text-black hover:border-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:border-white disabled:bg-white disabled:text-black/55 disabled:opacity-100'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
           {isSubmitting ? (
             <>
-              <LoadingSpinner size='sm' tone='inverse' className='mr-2' />
+              <LoadingSpinner size='sm' className='mr-2' />
               Creating...
             </>
           ) : (
@@ -185,79 +258,165 @@ export function AddReleaseSidebar({
           )}
         </DrawerButton>
       }
+      entityHeader={
+        <DrawerSurfaceCard
+          variant='card'
+          className='overflow-hidden'
+          testId='add-release-header-card'
+        >
+          <div className='p-3'>
+            <EntityHeaderCard
+              eyebrow='Release preview'
+              image={
+                <AvatarUploadable
+                  src={stagedArtworkPreviewUrl}
+                  alt={title ? `${title} artwork` : 'New release artwork'}
+                  name={title || 'Untitled'}
+                  size='2xl'
+                  rounded='md'
+                  uploadable
+                  onUpload={handleArtworkStage}
+                  showHoverOverlay
+                />
+              }
+              title={title || 'Untitled'}
+              subtitle={
+                artistName ? <span>{artistName}</span> : 'No artist selected'
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={[]}
+                  onClose={handleClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+              meta={
+                <ReleaseFields
+                  releaseDate={releaseDate || undefined}
+                  releaseType={releaseType}
+                  totalTracks={releaseType === 'single' ? 1 : undefined}
+                />
+              }
+              className='min-w-0 flex-1'
+              bodyClassName='pr-9'
+              data-testid='entity-header-card'
+            />
+          </div>
+        </DrawerSurfaceCard>
+      }
     >
-      <div className='space-y-5'>
-        <DrawerFormField label='Title' htmlFor='release-title'>
-          <Input
-            id='release-title'
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder='My New Release'
-            autoFocus
-          />
-        </DrawerFormField>
-
-        <DrawerFormField label='Release Type' htmlFor='release-type'>
-          <Select
-            value={releaseType}
-            onValueChange={v => setReleaseType(v as ReleaseType)}
-          >
-            <SelectTrigger id='release-type'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RELEASE_TYPE_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </DrawerFormField>
-
-        <DrawerFormField label='Release Date' htmlFor='release-date'>
-          <Input
-            id='release-date'
-            type='date'
-            value={releaseDate}
-            onChange={e => setReleaseDate(e.target.value)}
-          />
-        </DrawerFormField>
-
-        <DrawerFormField label='Artwork URL (optional)' htmlFor='artwork-url'>
-          <Input
-            id='artwork-url'
-            type='url'
-            value={artworkUrl}
-            onChange={e => setArtworkUrl(e.target.value)}
-            placeholder='https://example.com/artwork.jpg'
-          />
-        </DrawerFormField>
-
-        <div className='space-y-3'>
-          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
-            Platform Links (optional)
+      <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+        <div className='space-y-3.5 p-3' data-testid='add-release-details-card'>
+          <p className='text-[11px] font-[560] leading-none tracking-[-0.01em] text-tertiary-token'>
+            Details
           </p>
-          {PROVIDER_FIELDS.map(provider => (
-            <DrawerFormField
-              key={provider.key}
-              label={provider.label}
-              htmlFor={`provider-${provider.key}`}
-              className='space-y-1'
+
+          <DrawerFormField label='Title' htmlFor='release-title'>
+            <Input
+              id='release-title'
+              value={title}
+              onChange={event => setTitle(event.target.value)}
+              placeholder='My New Release'
+              autoFocus
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          <DrawerFormField label='Release Type' htmlFor='release-type'>
+            <Select
+              value={releaseType}
+              onValueChange={value => setReleaseType(value as ReleaseType)}
             >
+              <SelectTrigger
+                id='release-type'
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              >
+                <SelectValue>{releaseTypeLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {RELEASE_TYPE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DrawerFormField>
+
+          <DrawerFormField label='Release Date' htmlFor='release-date'>
+            <Input
+              id='release-date'
+              type='date'
+              value={releaseDate}
+              onChange={event => {
+                setReleaseDate(event.target.value);
+                setRevealDateManuallySet(false);
+              }}
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          {isFutureRelease && (
+            <DrawerFormField label='Reveal Date' htmlFor='reveal-date'>
               <Input
-                id={`provider-${provider.key}`}
-                type='url'
-                value={providerUrls[provider.key] ?? ''}
-                onChange={e =>
-                  handleProviderUrlChange(provider.key, e.target.value)
-                }
-                placeholder={provider.placeholder}
+                id='reveal-date'
+                type='date'
+                value={revealDate}
+                onChange={event => {
+                  setRevealDate(event.target.value);
+                  setRevealDateManuallySet(true);
+                }}
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
               />
+              <p className='mt-1 text-[11px] text-tertiary-token'>
+                Details hidden until this date (mystery page)
+              </p>
             </DrawerFormField>
-          ))}
+          )}
+
+          <DrawerFormField label='Genres'>
+            <GenrePicker
+              selected={genres}
+              onChange={setGenres}
+              trigger={
+                <button
+                  type='button'
+                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-[8px] border border-subtle bg-surface-0 px-3 py-1.5 text-left text-[12px] text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
+                >
+                  <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
+                    {genres.length > 0 ? (
+                      genres.map(genre => (
+                        <span
+                          key={genre}
+                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[11px] capitalize text-secondary-token'
+                        >
+                          {genre}
+                        </span>
+                      ))
+                    ) : (
+                      <span className='text-tertiary-token'>Add genres...</span>
+                    )}
+                  </span>
+                  <Icon
+                    name='ChevronDown'
+                    className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                </button>
+              }
+            />
+          </DrawerFormField>
+
+          <DrawerSettingsToggle
+            label='Explicit'
+            checked={isExplicit}
+            onCheckedChange={setIsExplicit}
+            ariaLabel='Mark release as explicit'
+          />
         </div>
-      </div>
+      </DrawerSurfaceCard>
     </EntitySidebarShell>
   );
 }

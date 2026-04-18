@@ -15,6 +15,7 @@ import {
 } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
@@ -60,8 +61,8 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
           set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
         });
     });
-    updateTag('dashboard-data');
-    revalidateTag('dashboard-data', 'max');
+    updateTag(CACHE_TAGS.DASHBOARD_DATA);
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
   } catch (error) {
     await captureError('setSidebarCollapsed failed', error, {
       route: 'dashboard/actions/settings',

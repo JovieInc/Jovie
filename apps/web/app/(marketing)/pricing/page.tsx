@@ -1,21 +1,27 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
-import { APP_NAME, APP_URL } from '@/constants/app';
-import { FinalCTASection } from '@/features/home/FinalCTASection';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import {
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,
 } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
+import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // SEO Metadata
+export const revalidate = false;
+
 export const metadata: Metadata = {
-  title: `Pricing - ${APP_NAME}`,
+  title: 'Pricing',
   description:
-    'Use Jovie for free with unlimited profiles. Upgrade to remove branding, unlock advanced analytics, and export contacts.',
+    'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
   keywords: [
     'Jovie pricing',
     'link in bio pricing',
@@ -26,15 +32,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
     description:
-      'Use Jovie for free with unlimited profiles. Upgrade for advanced features.',
-    url: `${APP_URL}/pricing`,
+      'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
+    url: `${BASE_URL}/pricing`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
     description:
-      'Use Jovie for free with unlimited profiles. Upgrade for advanced features.',
+      'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
   },
   robots: {
     index: true,
@@ -42,21 +48,20 @@ export const metadata: Metadata = {
   },
 };
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 // Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
-const PRICING_SCHEMA = JSON.stringify({
+const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
   description:
-    'Use Jovie for free with unlimited profiles. Upgrade for advanced features.',
-  url: `${APP_URL}/pricing`,
+    'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
+  url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
     itemListElement: getAllPlanIds()
-      .filter(planId => growthPlanEnabled || planId !== 'growth')
-      .filter(planId => planId !== 'founding')
+      .filter(planId => maxPlanEnabled || planId !== 'max')
       .map((planId, index) => {
         const plan = ENTITLEMENT_REGISTRY[planId];
         const price = plan.marketing.price?.monthly ?? 0;
@@ -81,18 +86,13 @@ const PRICING_SCHEMA = JSON.stringify({
         };
       }),
   },
-});
-
-// Shared styles for consistent structure - use min-height to prevent overflow on mobile
-const TIER_HEADER_MIN_HEIGHT = '148px';
+};
 
 interface PricingTierProps {
   readonly name: string;
-  readonly badge?: string;
   readonly billingLabel: string;
   readonly price: string;
   readonly priceSuffix?: string;
-  readonly foundingCallout?: string;
   readonly buttonLabel: string;
   readonly buttonHref: string;
   readonly buttonVariant: 'primary' | 'secondary';
@@ -102,11 +102,9 @@ interface PricingTierProps {
 
 function PricingTier({
   name,
-  badge,
   billingLabel,
   price,
   priceSuffix,
-  foundingCallout,
   buttonLabel,
   buttonHref,
   buttonVariant,
@@ -115,16 +113,15 @@ function PricingTier({
 }: PricingTierProps) {
   return (
     <div
-      className={`flex flex-col p-6 md:p-8 ${isHighlighted ? 'relative z-10 rounded-xl md:rounded-lg md:-my-px' : ''}`}
+      className='flex flex-col p-6 md:p-8'
       style={{
         backgroundColor: isHighlighted
           ? 'var(--linear-bg-surface-1)'
           : 'transparent',
-        boxShadow: isHighlighted ? 'var(--linear-shadow-card)' : 'none',
       }}
     >
-      {/* Header section - min-height for alignment, allows growth on mobile */}
-      <div style={{ minHeight: TIER_HEADER_MIN_HEIGHT }}>
+      {/* Header section */}
+      <div>
         {/* Billing label */}
         <div
           className='mb-3 md:mb-4'
@@ -136,8 +133,8 @@ function PricingTier({
           {billingLabel}
         </div>
 
-        {/* Plan name + badge */}
-        <div className='flex items-center gap-2 mb-4 md:mb-6'>
+        {/* Plan name */}
+        <div className='mb-4 md:mb-6'>
           <span
             style={{
               fontSize: 'var(--linear-h3-size)',
@@ -147,17 +144,6 @@ function PricingTier({
           >
             {name}
           </span>
-          {badge && (
-            <span
-              className='px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide'
-              style={{
-                backgroundColor: 'var(--linear-warning-subtle)',
-                color: 'var(--linear-warning)',
-              }}
-            >
-              {badge}
-            </span>
-          )}
         </div>
 
         {/* Price */}
@@ -182,41 +168,17 @@ function PricingTier({
             </span>
           )}
         </div>
-
-        {/* Founding Member callout */}
-        {foundingCallout && (
-          <div
-            className='mt-2 rounded-md px-2.5 py-1.5 text-[12px] inline-block'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-2)',
-              border: '1px solid var(--linear-border-subtle)',
-              color: 'var(--linear-text-secondary)',
-            }}
-          >
-            {foundingCallout}
-          </div>
-        )}
       </div>
 
       {/* CTA Button */}
       <Link
         href={buttonHref}
-        className='block w-full text-center mb-6 md:mb-8 transition-opacity hover:opacity-90'
-        style={{
-          fontSize: 'var(--linear-body-sm-size)',
-          fontWeight: 'var(--linear-font-weight-medium)',
-          height: 'var(--linear-button-height-sm)',
-          lineHeight: 'var(--linear-button-height-sm)',
-          borderRadius: 'var(--linear-radius-sm)',
-          backgroundColor:
-            buttonVariant === 'primary'
-              ? 'var(--linear-btn-primary-bg)'
-              : 'var(--linear-bg-button)',
-          color:
-            buttonVariant === 'primary'
-              ? 'var(--linear-btn-primary-fg)'
-              : 'var(--linear-text-primary)',
-        }}
+        prefetch={false}
+        className={`mt-6 mb-6 block w-full text-center md:mt-8 md:mb-8 ${
+          buttonVariant === 'primary'
+            ? 'public-action-primary'
+            : 'public-action-secondary'
+        }`}
       >
         {buttonLabel}
       </Link>
@@ -226,13 +188,12 @@ function PricingTier({
         {features.map(feature => (
           <li key={feature} className='flex items-start gap-3'>
             <Check
+              aria-label='Included'
               className='shrink-0 mt-0.5'
               style={{
                 width: '16px',
                 height: '16px',
-                color: isHighlighted
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-text-secondary)',
+                color: 'var(--linear-text-secondary)',
               }}
             />
             <span
@@ -252,46 +213,23 @@ function PricingTier({
 }
 
 export default function PricingPage() {
-  const founding = ENTITLEMENT_REGISTRY.founding;
-
   return (
-    <div className='min-h-screen'>
+    <MarketingPageShell>
       {/* Structured Data for SEO */}
-      <script type='application/ld+json'>{PRICING_SCHEMA}</script>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(PRICING_SCHEMA)}
+      </script>
 
-      <Container size='lg'>
+      <MarketingHero variant='centered'>
+        <h1 className='marketing-h1-linear text-primary-token'>Pricing</h1>
+      </MarketingHero>
+
+      <MarketingContainer width='page'>
         <div className='section-spacing-linear'>
-          {/* Header */}
-          <div className='text-center heading-gap-linear'>
-            <h1
-              className='text-3xl md:text-5xl lg:text-6xl'
-              style={{
-                fontWeight: 'var(--linear-font-weight-medium)',
-                lineHeight: 1.1,
-                letterSpacing: '-0.02em',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
-              Simple pricing. No Surprises.
-            </h1>
-            <p
-              className='mt-4 mx-auto max-w-lg'
-              style={{
-                fontSize: 'var(--linear-body-lg-size)',
-                lineHeight: 'var(--linear-body-lg-leading)',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              Start free with unlimited smartlinks. Upgrade when you&apos;re
-              ready to grow.
-            </p>
-          </div>
-
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
-            {/* Desktop: 2-3 columns, Mobile: stacked cards */}
             <div
-              className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
+              className={`grid grid-cols-1 ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-default)',
@@ -311,31 +249,37 @@ export default function PricingPage() {
               </div>
 
               {/* Pro Tier - Highlighted */}
-              <PricingTier
-                name={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
-                billingLabel='Billed monthly'
-                price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
-                priceSuffix='/month'
-                foundingCallout={`${founding.marketing.displayName}: $${founding.marketing.price!.monthly}/mo locked in`}
-                buttonLabel='Get started'
-                buttonHref='/signup?plan=pro'
-                buttonVariant='primary'
-                features={ENTITLEMENT_REGISTRY.pro.marketing.features}
-                isHighlighted
-              />
+              <div
+                className={
+                  maxPlanEnabled
+                    ? 'border-b md:border-b-0 md:border-r border-default'
+                    : ''
+                }
+              >
+                <PricingTier
+                  name={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
+                  billingLabel='Billed monthly'
+                  price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}`}
+                  priceSuffix='/month'
+                  buttonLabel='Get started'
+                  buttonHref='/signup?plan=pro'
+                  buttonVariant='primary'
+                  features={ENTITLEMENT_REGISTRY.pro.marketing.features}
+                  isHighlighted
+                />
+              </div>
 
-              {growthPlanEnabled && (
-                <div className='border-t md:border-t-0 md:border-l border-default'>
+              {maxPlanEnabled && (
+                <div>
                   <PricingTier
-                    name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
-                    badge='Early Access'
-                    billingLabel='Billed monthly'
-                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
+                    name={ENTITLEMENT_REGISTRY.max.marketing.displayName}
+                    billingLabel='Early Access · Billed monthly'
+                    price={`$${ENTITLEMENT_REGISTRY.max.marketing.price?.monthly ?? 0}`}
                     priceSuffix='/month'
                     buttonLabel='Request Early Access'
-                    buttonHref='/signup?plan=growth'
+                    buttonHref='/signup?plan=max'
                     buttonVariant='secondary'
-                    features={ENTITLEMENT_REGISTRY.growth.marketing.features}
+                    features={ENTITLEMENT_REGISTRY.max.marketing.features}
                   />
                 </div>
               )}
@@ -344,22 +288,55 @@ export default function PricingPage() {
 
           {/* Full Feature Comparison Chart */}
           <div className='mt-20'>
-            <h2
-              className='text-center text-2xl md:text-3xl mb-10'
-              style={{
-                fontWeight: 'var(--linear-font-weight-medium)',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
+            <h2 className='mb-10 text-center text-2xl font-medium tracking-tight text-primary-token md:text-3xl'>
               Compare all features
             </h2>
             <PricingComparisonChart />
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
 
-      {/* CTA Section */}
-      <FinalCTASection />
-    </div>
+      {/* Bottom CTA */}
+      <div
+        className='py-20 md:py-28'
+        style={{ borderTop: '1px solid var(--linear-border-subtle)' }}
+      >
+        <MarketingContainer width='page'>
+          <div className='text-center'>
+            <h2
+              className='text-2xl font-medium tracking-tight md:text-4xl'
+              style={{ color: 'var(--linear-text-primary)' }}
+            >
+              Built for artists. Ready when you are.
+            </h2>
+            <p
+              className='mt-4 mx-auto max-w-md'
+              style={{
+                fontSize: 'var(--linear-body-size)',
+                color: 'var(--linear-text-secondary)',
+              }}
+            >
+              Start with a free 14-day Pro trial. No credit card required.
+            </p>
+            <div className='mt-8 flex items-center justify-center gap-4'>
+              <Link
+                href='/signup'
+                prefetch={false}
+                className='public-action-primary'
+              >
+                Get started
+              </Link>
+              <Link
+                href='/'
+                prefetch={false}
+                className='public-action-secondary'
+              >
+                Learn more
+              </Link>
+            </div>
+          </div>
+        </MarketingContainer>
+      </div>
+    </MarketingPageShell>
   );
 }

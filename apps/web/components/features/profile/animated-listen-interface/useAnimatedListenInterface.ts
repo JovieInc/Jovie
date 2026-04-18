@@ -13,10 +13,9 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 import { detectPlatformFromUA } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
@@ -32,10 +31,7 @@ export function useAnimatedListenInterface(
   handle: string,
   enableDynamicEngagement: boolean
 ): UseAnimatedListenInterfaceReturn {
-  const enableDevicePriority = useFeatureGate(
-    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
-    false
-  );
+  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   const availableDSPs = useMemo(() => {
     const countryCode =

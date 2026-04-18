@@ -19,6 +19,10 @@ import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
+  derivePreviewState,
+  getProviderConfidence,
+} from '@/lib/discography/audio-qa';
+import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
@@ -230,6 +234,7 @@ export default async function ReleaseSmartLinkPage({
       label: PROVIDER_CONFIG[key].label,
       accent: PROVIDER_CONFIG[key].accent,
       url: link?.url ?? null,
+      confidence: link ? getProviderConfidence(link) : 'unknown',
     };
   }).filter(p => p.url); // Only show providers with URLs
 
@@ -243,11 +248,18 @@ export default async function ReleaseSmartLinkPage({
         label: PROVIDER_CONFIG[key].label,
         accent: PROVIDER_CONFIG[key].accent,
         url: link?.url ?? null,
+        confidence: link ? getProviderConfidence(link) : 'unknown',
       };
     })
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
+  const previewState = derivePreviewState({
+    audioUrl: null,
+    previewUrl: null,
+    metadata: null,
+    providerLinks: links,
+  });
 
   return (
     <ReleaseLandingPage
@@ -255,6 +267,8 @@ export default async function ReleaseSmartLinkPage({
         title: release.title,
         artworkUrl: release.artworkUrl ?? null,
         releaseDate: release.releaseDate?.toISOString() ?? null,
+        previewVerification: previewState.previewVerification,
+        previewSource: previewState.previewSource,
       }}
       artist={{
         name: creator.displayName ?? creator.username,
@@ -301,18 +315,30 @@ export async function generateMetadata({
   const artistName = creator.displayName ?? creator.username;
   const title = `${release.title} by ${artistName}`;
   const description = `Listen to "${release.title}" by ${artistName} on your favorite streaming platform.`;
+  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${release.slug}`;
+  const imageUrl = release.artworkUrl || `${BASE_URL}/og/default.png`;
+  const imageWidth = release.artworkUrl ? 640 : 1200;
+  const imageHeight = release.artworkUrl ? 640 : 630;
 
   return {
     title,
     description,
+    metadataBase: new URL(BASE_URL),
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
+      type: 'music.album',
+      url: canonicalUrl,
       title,
       description,
+      siteName: 'Jovie',
+      locale: 'en_US',
       images: [
         {
-          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
-          width: release.artworkUrl ? 640 : 1200,
-          height: release.artworkUrl ? 640 : 630,
+          url: imageUrl,
+          width: imageWidth,
+          height: imageHeight,
           alt: `${release.title} album artwork`,
         },
       ],
@@ -321,9 +347,11 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
+      creator: '@jovieapp',
+      site: '@jovieapp',
       images: [
         {
-          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
+          url: imageUrl,
           alt: `${release.title} album artwork`,
         },
       ],

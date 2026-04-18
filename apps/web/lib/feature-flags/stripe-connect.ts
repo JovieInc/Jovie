@@ -1,19 +1,17 @@
 import 'server-only';
 
-import { checkGate } from './server';
-import { FEATURE_FLAG_KEYS } from './shared';
+import { FEATURE_FLAGS } from './shared';
 
 /**
  * Check if Stripe Connect onboarding is enabled for a given user.
  *
- * Uses Statsig feature gate when configured, otherwise defaults to OFF.
- * The gate key is `stripe-connect-enabled`.
+ * Uses the code flag registry.
  *
  * @param userId - Clerk user ID (or null for anonymous)
  * @returns true if the feature is enabled
  */
-export async function isStripeConnectEnabled(
-  userId: string | null
+export function isStripeConnectEnabled(
+  _userId: string | null
 ): Promise<boolean> {
-  return checkGate(userId, FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED, false);
+  return Promise.resolve(FEATURE_FLAGS.STRIPE_CONNECT_ENABLED);
 }

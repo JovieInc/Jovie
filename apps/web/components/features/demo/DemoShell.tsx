@@ -48,6 +48,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { DemoTab } from './demo-types';
 
 interface DemoShellProps {
@@ -77,6 +78,7 @@ const TAB_LABEL: Record<DemoTab, string> = {
 };
 
 const VIEW_TABS = ['All Releases', 'Active', 'Backlog'] as const;
+const DEMO_ARTIST_NAME = INTERNAL_DJ_DEMO_PERSONA.profile.displayName;
 
 export function DemoShell({
   activeTab,
@@ -116,7 +118,7 @@ export function DemoShell({
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo size={14} className='rounded-sm' tone='auto' />
                       <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
-                        Sora Vale
+                        {DEMO_ARTIST_NAME}
                       </span>
                       <ChevronDown className='size-3 shrink-0 text-sidebar-item-icon opacity-60' />
                     </div>
@@ -138,7 +140,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='rounded-[2px] border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-sm border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -157,10 +159,10 @@ export function DemoShell({
                 </SidebarGroupContent>
               </SidebarGroup>
 
-              {/* Workspace section */}
+              {/* Artist section */}
               <SidebarGroup>
                 <SidebarGroupLabel className='text-2xs tracking-tight text-sidebar-item-icon px-2 [font-weight:var(--font-weight-nav)]'>
-                  Workspace
+                  Artist
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className='gap-0.5'>
@@ -215,10 +217,10 @@ export function DemoShell({
                       <SidebarMenuButton className='h-7'>
                         <BrandLogo
                           size={14}
-                          className='rounded-[3px]'
+                          className='rounded-sm'
                           tone='auto'
                         />
-                        <span className='font-medium'>Sora Vale</span>
+                        <span className='font-medium'>{DEMO_ARTIST_NAME}</span>
                       </SidebarMenuButton>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
@@ -319,7 +321,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm border border-default bg-surface-2 text-[13px] text-secondary-token transition-colors [font-weight:var(--font-weight-medium)] hover:bg-surface-3 hover:text-primary-token'
+                className='flex h-7 items-center justify-center rounded-sm bg-surface-2 text-[13px] text-secondary-token [font-weight:var(--font-weight-medium)]'
               >
                 Sign up for Jovie
               </a>
@@ -330,7 +332,9 @@ export function DemoShell({
           <>
             <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
               <div className='flex min-w-0 items-center gap-1 text-[13px]'>
-                <span className='truncate text-tertiary-token'>Sora Vale</span>
+                <span className='truncate text-tertiary-token'>
+                  {DEMO_ARTIST_NAME}
+                </span>
                 <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
                 <span className='truncate font-[510] text-primary-token'>
                   {TAB_LABEL[activeTab]}

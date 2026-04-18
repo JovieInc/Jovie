@@ -9,9 +9,9 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
@@ -49,14 +49,12 @@ export function AuthLayout({
   showLogoutButton = false,
   logoutRedirectUrl = '/signin',
 }: Readonly<AuthLayoutProps>) {
-  const [shouldSpinLogo, setShouldSpinLogo] = useState(false);
   const { isKeyboardVisible } = useMobileKeyboard();
-  const formRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLElement>(null);
 
   // Scroll form into view when keyboard appears on mobile
   useEffect(() => {
     if (isKeyboardVisible && formRef.current) {
-      // Slight delay to let keyboard fully appear
       const timer = setTimeout(() => {
         formRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -68,58 +66,20 @@ export function AuthLayout({
     return undefined;
   }, [isKeyboardVisible]);
 
-  // One-time idle-triggered spin
-  useEffect(() => {
-    if (!logoSpinDelayMs) return undefined;
-
-    let hasSpun = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const triggerSpin = () => {
-      if (hasSpun) return;
-      hasSpun = true;
-      setShouldSpinLogo(true);
-    };
-
-    const resetTimer = () => {
-      if (hasSpun) return;
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(triggerSpin, logoSpinDelayMs);
-    };
-
-    resetTimer();
-
-    const events: Array<keyof DocumentEventMap> = [
-      'pointerdown',
-      'keydown',
-      'mousemove',
-      'touchstart',
-      'focus',
-    ];
-
-    events.forEach(event =>
-      globalThis.addEventListener(event, resetTimer, { passive: true })
-    );
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event =>
-        globalThis.removeEventListener(event, resetTimer)
-      );
-    };
-  }, [logoSpinDelayMs]);
-
   return (
     <div
+      data-auth-shell
       className={cn(
         // Fixed positioning prevents iOS Safari rubber-band overscroll completely
         // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
-        'fixed inset-0 flex flex-col items-center bg-(--linear-bg-page) text-primary-token overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] bg-[#08090a] text-white [color-scheme:dark]',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
-        // Vertical padding - reduced on mobile, increases on larger screens
+        // Vertical padding - reduced on mobile, balanced on larger screens
         // Use smaller top padding when keyboard is visible
-        isKeyboardVisible ? 'pt-8 pb-4' : 'pt-[18vh] sm:pt-[20vh] pb-12',
+        isKeyboardVisible
+          ? 'pt-8 pb-4'
+          : 'pt-10 pb-10 sm:pt-14 sm:pb-12 lg:pt-16',
         // Safe area insets for notched devices (iPhone X+, Android with notches)
         'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
@@ -128,6 +88,13 @@ export function AuthLayout({
         'transition-[padding] duration-200 ease-out'
       )}
     >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0 overflow-hidden'
+      >
+        <div className='absolute left-1/2 top-[10%] h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-accent/8 blur-[140px] sm:h-[28rem] sm:w-[28rem]' />
+      </div>
+
       {/* Skip to main content link for keyboard users */}
       {showSkipLink && (
         <Link
@@ -142,13 +109,9 @@ export function AuthLayout({
         <div className='absolute top-4 right-4 z-50'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <CircleIconButton
-                size='sm'
-                variant='outline'
-                ariaLabel='Open menu'
-              >
+              <AppIconButton ariaLabel='Open menu' variant='ghost'>
                 <MoreHorizontal />
-              </CircleIconButton>
+              </AppIconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' sideOffset={8}>
               <SignOutButton redirectUrl={logoutRedirectUrl}>
@@ -159,68 +122,67 @@ export function AuthLayout({
         </div>
       ) : null}
 
-      {/* Logo container - fixed dimensions to prevent layout shift between screens */}
-      <div
-        className={cn(
-          'mb-8 h-8 w-8 flex items-center justify-center',
-          'transition-opacity duration-200 ease-out',
-          // Hide visually when keyboard visible or showLogo=false, but preserve space
-          (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
-        )}
-        aria-hidden={isKeyboardVisible || !showLogo}
-      >
-        <Link
-          href='/'
-          className={`block ${LINK_FOCUS_CLASSES}`}
-          aria-label='Go to homepage'
-          tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
-        >
-          <span
-            className={
-              shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
-            }
-          >
-            <BrandLogo size={32} tone='auto' priority />
-          </span>
-        </Link>
-      </div>
-
-      {/* Title - hide when keyboard is visible on mobile */}
-      {showFormTitle && formTitle && (
-        <h1
-          className={cn(
-            formTitleClassName,
-            'transition-all duration-200 ease-out',
-            isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
-          )}
-          aria-hidden={isKeyboardVisible}
-        >
-          {formTitle}
-        </h1>
-      )}
-
       {/* Form content - centered with mobile-optimized width */}
       <div
-        ref={formRef}
-        id='auth-form'
         className={cn(
-          `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10`,
-          // Smooth scroll target
-          'scroll-mt-4',
+          `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10 flex flex-col items-center`,
           // Allow step indicator to render without clipping
           'overflow-visible'
         )}
       >
-        {children}
+        {/* Logo container - inside form wrapper so it centers relative to the Clerk card */}
+        <div
+          className={cn(
+            'mb-6 h-6 w-6 flex items-center justify-center sm:mb-8',
+            'transition-opacity duration-200 ease-out',
+            // Hide visually when keyboard visible or showLogo=false, but preserve space
+            (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
+          )}
+          aria-hidden={isKeyboardVisible || !showLogo}
+        >
+          <Link
+            href='/'
+            className={`block ${LINK_FOCUS_CLASSES}`}
+            aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
+          >
+            <span className='inline-flex'>
+              <BrandLogo size={24} tone='auto' />
+            </span>
+          </Link>
+        </div>
+
+        {/* Title - hide when keyboard is visible on mobile */}
+        {showFormTitle && formTitle && (
+          <h1
+            className={cn(
+              formTitleClassName,
+              'transition-all duration-200 ease-out',
+              isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
+            )}
+            aria-hidden={isKeyboardVisible}
+          >
+            {formTitle}
+          </h1>
+        )}
+
+        <main
+          ref={formRef}
+          id='auth-form'
+          tabIndex={-1}
+          className='w-full scroll-mt-4'
+        >
+          {children}
+        </main>
       </div>
 
       {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}
       {showFooterPrompt && !isKeyboardVisible && (
-        <p className='mt-auto pt-8 text-[13px] font-[400] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
+        <p className='mt-auto pt-8 text-[13px] font-[400] text-[lch(68%_1.35_282)] text-center relative z-10 animate-in fade-in-0 duration-200'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-primary-token underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-white underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>

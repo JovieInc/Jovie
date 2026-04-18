@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-(--linear-radius-sm) flex items-center justify-center gap-(--linear-gap-buttons)',
+    'w-full rounded-full flex items-center justify-center gap-(--linear-gap-buttons)',
     'disabled:opacity-70 disabled:cursor-not-allowed',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
     // Mobile-optimized height matching Linear

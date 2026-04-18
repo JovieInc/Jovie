@@ -64,6 +64,10 @@ function buildErrorResponse(message: string): AdminSentryMetrics {
   };
 }
 
+function isExpectedSentryAuthError(message: string): boolean {
+  return message.startsWith('401 ') || message.startsWith('403 ');
+}
+
 function getCacheKey(orgSlug: string): string {
   return `admin:sentry:${orgSlug}`;
 }
@@ -170,7 +174,9 @@ export async function getAdminSentryMetrics(): Promise<AdminSentryMetrics> {
     return metrics;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    captureError('Error loading Sentry metrics', error, { message });
+    if (!isExpectedSentryAuthError(message)) {
+      captureError('Error loading Sentry metrics', error, { message });
+    }
     return buildErrorResponse(message);
   }
 }

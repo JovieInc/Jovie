@@ -3,8 +3,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import { MoreVertical } from 'lucide-react';
-
-import type { TableActionMenuProps } from './types';
+import type { TableActionMenuItem, TableActionMenuProps } from './types';
 import { isSeparatorItem } from './utils';
 
 /**
@@ -31,50 +30,42 @@ export function TableActionMenu({
   onOpenChange,
   children,
 }: TableActionMenuProps) {
-  // Convert TableActionMenu items to CommonDropdown items
-  const dropdownItems: CommonDropdownItem[] = items.map((item, index) => {
-    // Handle separator
-    if (isSeparatorItem(item.id)) {
-      return {
-        type: 'separator',
-        id: `separator-${index}`,
-      };
-    }
+  const toDropdownItems = (
+    menuItems: readonly TableActionMenuItem[],
+    path = 'menu'
+  ): CommonDropdownItem[] =>
+    menuItems.map((item, index) => {
+      if (isSeparatorItem(item.id)) {
+        return {
+          type: 'separator',
+          id: `${path}-separator-${index}`,
+        };
+      }
 
-    // Handle submenu item
-    if (item.children && item.children.length > 0) {
+      if (item.children && item.children.length > 0) {
+        return {
+          type: 'submenu',
+          id: item.id,
+          label: item.label,
+          icon: item.icon,
+          disabled: item.disabled,
+          items: toDropdownItems(item.children, `${path}-${item.id}`),
+        };
+      }
+
       return {
-        type: 'submenu',
+        type: 'action',
         id: item.id,
         label: item.label,
         icon: item.icon,
-        items: item.children.map(
-          (child): CommonDropdownItem => ({
-            type: 'action',
-            id: child.id,
-            label: child.label,
-            icon: child.icon,
-            onClick: child.onClick ?? (() => {}),
-            disabled: child.disabled,
-            variant: child.variant,
-            subText: child.subText,
-          })
-        ),
+        onClick: item.onClick ?? (() => {}),
+        disabled: item.disabled,
+        variant: item.variant,
+        subText: item.subText,
       };
-    }
+    });
 
-    // Handle action item
-    return {
-      type: 'action',
-      id: item.id,
-      label: item.label,
-      icon: item.icon,
-      onClick: item.onClick ?? (() => {}),
-      disabled: item.disabled,
-      variant: item.variant,
-      subText: item.subText,
-    };
-  });
+  const dropdownItems = toDropdownItems(items);
 
   // Context menu variant
   if (trigger === 'context' && children) {
@@ -110,7 +101,7 @@ export function TableActionMenu({
       align={align}
       open={open}
       onOpenChange={onOpenChange}
-      triggerClassName='ml-auto'
+      triggerClassName='ml-auto inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,color,box-shadow] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_74%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_74%,transparent)] focus-visible:ring-1 focus-visible:ring-focus'
     />
   );
 }

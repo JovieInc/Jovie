@@ -58,6 +58,9 @@ describe('CreatorProfileTableRow', () => {
               createdAt: new Date('2024-01-01T00:00:00.000Z'),
               ingestionStatus: 'idle',
               lastIngestionError: null,
+              location: null,
+              hometown: null,
+              activeSinceYear: null,
               socialLinks: [],
             }}
             rowNumber={1}

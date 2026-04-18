@@ -29,8 +29,6 @@ vi.mock('@/lib/entitlements/server', () => ({
   })),
 }));
 
-setupDatabaseBeforeAll();
-
 const REAL_LINKTREE_URL =
   process.env.REAL_LINKTREE_INGEST_URL ??
   'https://linktr.ee/itsmaggielindemann';
@@ -45,13 +43,17 @@ const shouldRunRealTest =
 
 let db: TestDb;
 
-beforeAll(() => {
-  const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
-  if (!connection) {
-    return;
-  }
-  db = connection;
-});
+if (shouldRunRealTest) {
+  setupDatabaseBeforeAll();
+
+  beforeAll(() => {
+    const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
+    if (!connection) {
+      return;
+    }
+    db = connection;
+  });
+}
 
 describe('Real Linktree ingest integration (no mocks for external APIs)', () => {
   it('is skipped unless RUN_REAL_LINKTREE_INGEST_TEST=1', () => {

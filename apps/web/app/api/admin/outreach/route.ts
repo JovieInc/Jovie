@@ -1,7 +1,19 @@
-import { and, asc, count, desc, eq, isNotNull } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+} from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
+import { campaignSettings } from '@/lib/db/schema/admin';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
@@ -9,13 +21,76 @@ import {
   captureWarning,
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  OUTREACH_QUEUE_CLAIM_TTL_MS,
+  processOutreachBatch,
+} from '@/lib/leads/outreach-batch';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export const runtime = 'nodejs';
 
-function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
+const queueOutreachBodySchema = z.object({
+  limit: z.number().int().min(1).max(100).default(10),
+});
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    { status, headers: NO_STORE_HEADERS }
+  );
+}
+
+async function requireAdminAccess() {
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated) {
+    return jsonError('Unauthorized', 401);
+  }
+
+  if (!entitlements.isAdmin) {
+    return jsonError('Forbidden', 403);
+  }
+
+  return null;
+}
+
+function getOutreachRouteWhereClause(
+  queue: 'email' | 'dm' | 'manual_review' | 'all'
+) {
+  switch (queue) {
+    case 'email':
+      return or(
+        eq(leads.outreachRoute, 'email'),
+        eq(leads.outreachRoute, 'both')
+      );
+    case 'dm':
+      return or(eq(leads.outreachRoute, 'dm'), eq(leads.outreachRoute, 'both'));
+    case 'manual_review':
+      return eq(leads.outreachRoute, 'manual_review');
+    case 'all':
+    default:
+      return isNotNull(leads.outreachRoute);
+  }
+}
+
+function getPendingEmailWhereClause(now = new Date()) {
+  const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
+
+  return and(
+    getOutreachRouteWhereClause('email'),
+    eq(leads.outreachStatus, 'pending'),
+    eq(leads.status, 'approved'),
+    eq(leads.emailInvalid, false),
+    isNotNull(leads.contactEmail),
+    isNotNull(leads.claimToken),
+    or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
+  );
+}
+
+function isMissingLeadSchemaColumnError(error: unknown): boolean {
   // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
   // the actual PG "column X does not exist" lives on .cause, not the outer error.
   const normalized = getDeepErrorMessage(error).toLowerCase();
@@ -27,7 +102,21 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
     normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist')
+    normalized.includes('column "music_tools_detected" does not exist') ||
+    normalized.includes('column "source_platform" does not exist') ||
+    normalized.includes('column "source_handle" does not exist') ||
+    normalized.includes('column "source_url" does not exist') ||
+    normalized.includes('column "has_tracking_pixels" does not exist') ||
+    normalized.includes('column "tracking_pixel_platforms" does not exist') ||
+    normalized.includes('column "signal_snapshot" does not exist') ||
+    normalized.includes('column "first_contacted_at" does not exist') ||
+    normalized.includes('column "last_contacted_at" does not exist') ||
+    normalized.includes('column "signup_user_id" does not exist') ||
+    normalized.includes('column "signup_at" does not exist') ||
+    normalized.includes('column "paid_at" does not exist') ||
+    normalized.includes('column "paid_subscription_id" does not exist') ||
+    normalized.includes('column "attribution_status" does not exist') ||
+    normalized.includes('column "scrape_attempts" does not exist')
   );
 }
 
@@ -35,18 +124,9 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
   }
 
   try {
@@ -66,13 +146,11 @@ export async function GET(request: NextRequest) {
     const { queue, sort, sortOrder, page, limit } = validated.data;
     const offset = (page - 1) * limit;
 
-    // Build filter conditions
-    const conditions = [isNotNull(leads.outreachRoute)];
-    if (queue !== 'all') {
-      conditions.push(eq(leads.outreachRoute, queue));
-    }
-
-    const whereClause = and(...conditions);
+    const whereClause = getOutreachRouteWhereClause(queue);
+    const pendingWhereClause =
+      queue === 'email'
+        ? getPendingEmailWhereClause()
+        : and(whereClause, eq(leads.outreachStatus, 'pending'));
 
     // Sort
     const sortColumn =
@@ -82,9 +160,10 @@ export async function GET(request: NextRequest) {
     // Query data and count in parallel
     let rows;
     let totalRow;
+    let pendingTotalRow;
 
     try {
-      [rows, [totalRow]] = await Promise.all([
+      [rows, [totalRow], [pendingTotalRow]] = await Promise.all([
         db
           .select()
           .from(leads)
@@ -93,19 +172,20 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset),
         db.select({ total: count() }).from(leads).where(whereClause),
+        db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     } catch (error) {
-      if (!isMissingLeadEnrichmentColumnError(error)) {
+      if (!isMissingLeadSchemaColumnError(error)) {
         throw error;
       }
 
       await captureWarning(
-        '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+        '[admin/outreach] leads schema columns missing; falling back to legacy select',
         error,
         { route: '/api/admin/outreach' }
       );
 
-      [rows, [totalRow]] = await Promise.all([
+      [rows, [totalRow], [pendingTotalRow]] = await Promise.all([
         db
           .select({
             id: leads.id,
@@ -157,6 +237,7 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset),
         db.select({ total: count() }).from(leads).where(whereClause),
+        db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     }
 
@@ -164,6 +245,7 @@ export async function GET(request: NextRequest) {
       {
         items: rows,
         total: totalRow?.total ?? 0,
+        pendingTotal: pendingTotalRow?.total ?? 0,
         page,
         limit,
       },
@@ -175,6 +257,100 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to list outreach leads') },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/outreach — Queue a limited batch of pending outreach emails.
+ */
+export async function POST(request: NextRequest) {
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const parsed = await parseJsonBody(request, {
+      route: 'POST /api/admin/outreach',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+
+    const validated = queueOutreachBodySchema.safeParse(parsed.data);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: validated.error.flatten() },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { limit } = validated.data;
+    const result = await processOutreachBatch(limit, {
+      ignorePipelineEnabled: true,
+    });
+
+    return NextResponse.json(
+      { ok: true, ...result },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    await captureError('Failed to queue outreach leads', error, {
+      route: '/api/admin/outreach',
+    });
+    return NextResponse.json(
+      { error: getSafeErrorMessage(error, 'Failed to queue outreach leads') },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * PATCH /api/admin/outreach — Toggle campaign settings (e.g. campaignsEnabled).
+ */
+export async function PATCH(request: NextRequest) {
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const parsed = await parseJsonBody(request, {
+      route: 'PATCH /api/admin/outreach',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+
+    const body = parsed.data as Record<string, unknown>;
+    if (typeof body.campaignsEnabled !== 'boolean') {
+      return jsonError('campaignsEnabled must be a boolean', 400);
+    }
+
+    await db
+      .update(campaignSettings)
+      .set({
+        campaignsEnabled: body.campaignsEnabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(campaignSettings.id, 1));
+
+    return NextResponse.json(
+      { ok: true, campaignsEnabled: body.campaignsEnabled },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    await captureError('Failed to update campaign settings', error, {
+      route: '/api/admin/outreach',
+    });
+    return NextResponse.json(
+      {
+        error: getSafeErrorMessage(error, 'Failed to update campaign settings'),
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

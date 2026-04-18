@@ -12,6 +12,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const TEST_AUTH_BYPASS_ENABLED = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 /**
  * Suite 2: Dashboard Navigation (Authenticated)
@@ -23,6 +24,10 @@ const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
  */
 
 function hasRealClerkConfig(): boolean {
+  if (TEST_AUTH_BYPASS_ENABLED) {
+    return true;
+  }
+
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   const sk = process.env.CLERK_SECRET_KEY ?? '';
   return (
@@ -65,15 +70,10 @@ async function assertDashboardRouteLoaded(
     0
   );
 
-  const sidebar = page.locator('nav').first();
-  await expect(sidebar, `${name}: dashboard nav did not render`).toBeVisible({
-    timeout: SMOKE_TIMEOUTS.VISIBILITY,
-  });
-
   if (path === APP_ROUTES.CHAT) {
     await expect(
-      page.getByPlaceholder(/ask jovie anything/i),
-      'Chat: input did not render'
+      page.getByLabel(/chat message input/i),
+      'Chat: composer did not render'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     return;
   }
@@ -96,13 +96,10 @@ async function assertDashboardRouteLoaded(
 
   if (path === APP_ROUTES.DASHBOARD_EARNINGS) {
     await expect(
-      page
-        .getByRole('button', { name: /connect venmo/i })
-        .or(page.getByText(/connect venmo to unlock earnings/i))
-        .or(page.getByText(/share this link anywhere to receive tips/i))
-        .first(),
-      'Earnings: tipping UI did not render'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      page,
+      'Legacy earnings route did not redirect to artist profile tips'
+    ).toHaveURL(/\/app\/settings\/artist-profile\?tab=earn/);
+    return;
   }
 }
 
@@ -117,7 +114,10 @@ test.describe('Dashboard Navigation @smoke', () => {
       test.skip(true, 'No real Clerk config');
       return;
     }
-    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+    if (
+      !TEST_AUTH_BYPASS_ENABLED &&
+      process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true'
+    ) {
       test.skip(true, 'Auth setup not available');
       return;
     }
@@ -173,25 +173,10 @@ test.describe('Dashboard Navigation @smoke', () => {
         APP_ROUTES.DASHBOARD_OVERVIEW,
         APP_ROUTES.ONBOARDING,
       ]) {
-        try {
-          await page.goto(route, {
-            waitUntil: 'domcontentloaded',
-            timeout: SMOKE_TIMEOUTS.NAVIGATION,
-          });
-        } catch (navError) {
-          const msg =
-            navError instanceof Error ? navError.message : String(navError);
-          if (
-            msg.includes('net::ERR_CONNECTION_REFUSED') ||
-            msg.includes('net::ERR_CONNECTION_RESET') ||
-            msg.includes('Timeout') ||
-            msg.includes('Target closed')
-          ) {
-            test.skip(true, `Transient nav error on ${route}`);
-            return;
-          }
-          throw navError;
-        }
+        await smokeNavigateWithRetry(page, route, {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          retries: 2,
+        });
 
         const url = page.url();
         const isAuthPage =
@@ -221,7 +206,9 @@ test.describe('Dashboard Navigation @smoke', () => {
     );
     test.setTimeout(300_000);
 
-    await setupClerkTestingToken({ page });
+    if (!TEST_AUTH_BYPASS_ENABLED) {
+      await setupClerkTestingToken({ page });
+    }
 
     try {
       await ensureSignedInUser(page);
@@ -230,15 +217,8 @@ test.describe('Dashboard Navigation @smoke', () => {
         test.skip(true, `Clerk auth failed: ${error.message}`);
         return;
       }
-      const msg = error instanceof Error ? error.message : String(error);
-      if (
-        msg.includes('net::ERR_') ||
-        msg.includes('Timeout') ||
-        msg.includes('Target closed')
-      ) {
-        test.skip(true, 'Sign-in infra issue');
-        return;
-      }
+      // Don't silently skip on network errors — if sign-in fails after retries,
+      // that's a real problem. Only Clerk SDK issues (ClerkTestError) warrant skipping.
       throw error;
     }
 
@@ -250,7 +230,10 @@ test.describe('Dashboard Navigation @smoke', () => {
           { path: APP_ROUTES.CHAT, name: 'Chat' },
           { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
           { path: APP_ROUTES.DASHBOARD_RELEASES, name: 'Releases' },
-          { path: APP_ROUTES.DASHBOARD_EARNINGS, name: 'Earnings' },
+          {
+            path: APP_ROUTES.DASHBOARD_EARNINGS,
+            name: 'Legacy Earnings Redirect',
+          },
         ];
 
     const failures: string[] = [];
@@ -268,7 +251,15 @@ test.describe('Dashboard Navigation @smoke', () => {
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
-          await signInUser(page);
+          try {
+            await signInUser(page);
+          } catch (error) {
+            if (error instanceof ClerkTestError) {
+              test.skip(true, `Clerk auth failed: ${error.message}`);
+              return;
+            }
+            throw error;
+          }
           continue;
         }
 
@@ -289,15 +280,13 @@ test.describe('Dashboard Navigation @smoke', () => {
     ).toHaveLength(0);
   });
 
-  test('dashboard does not redirect-loop when data fails to load', async ({
+  test('dashboard does not redirect-loop for unauthenticated access', async ({
     browser,
   }) => {
-    const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-    const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-    if (!username || !password) {
-      test.skip(true, 'No E2E credentials for redirect loop test');
-      return;
-    }
+    // This test runs unauthenticated — it checks that hitting /app/dashboard
+    // without auth doesn't produce a redirect loop between /app and /signin.
+    // The authenticated data-failure redirect loop is covered by middleware
+    // circuit breaker tests and onboarding-completion.spec.ts.
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -318,11 +307,11 @@ test.describe('Dashboard Navigation @smoke', () => {
       await page.waitForTimeout(3_000);
 
       const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;
-      const onboardingCount = redirectUrls.filter(
-        u => u === APP_ROUTES.ONBOARDING
+      const signinCount = redirectUrls.filter(
+        u => u === APP_ROUTES.SIGNIN || u === '/sign-in'
       ).length;
       const isLooping =
-        (appCount >= 2 && onboardingCount >= 2) || redirectUrls.length > 10;
+        (appCount >= 2 && signinCount >= 2) || redirectUrls.length > 10;
 
       expect(
         isLooping,

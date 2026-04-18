@@ -2,7 +2,9 @@ import {
   CalendarClock,
   ChartNoAxesCombined,
   CircleDollarSign,
+  Copy,
   CreditCard,
+  ExternalLink,
   Gauge,
   TrendingUp,
   Users,
@@ -12,23 +14,11 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
+import { formatPercent, formatUsd } from '@/lib/admin/format';
+import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface FunnelMetricsStripProps {
   readonly metrics: AdminFunnelMetrics;
-}
-
-function formatPercent(rate: number | null): string {
-  if (rate === null) return '—';
-  return `${(rate * 100).toFixed(1)}%`;
-}
-
-function formatUsd(value: number): string {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 1000 ? 0 : 2,
-  });
 }
 
 function formatRunway(months: number | null, stripeAvailable: boolean): string {
@@ -117,14 +107,14 @@ export function FunnelMetricsStrip({
   );
 
   return (
-    <div className='space-y-6' data-testid='funnel-metrics-strip'>
+    <div className='space-y-4' data-testid='funnel-metrics-strip'>
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeader
           title='Core KPIs'
           subtitle='Revenue, runway, and monetization health'
-          className='min-h-0 px-5 py-3'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-3'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           <MetricCard
             title='MRR'
             value={mrrDisplay}
@@ -183,6 +173,51 @@ export function FunnelMetricsStrip({
         </div>
       </ContentSurfaceCard>
 
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Instagram Activation'
+          subtitle='First-week bio-link adoption and activation'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        />
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
+          <MetricCard
+            title='Step Views'
+            value={metrics.instagramShareStepViews7d.toLocaleString('en-US')}
+            subtitle='Artists who reached the Instagram share step'
+            icon={Users}
+            iconClassName='text-info'
+          />
+          <MetricCard
+            title='Bio Copies'
+            value={metrics.instagramBioCopies7d.toLocaleString('en-US')}
+            subtitle='Tagged Instagram bio links copied'
+            icon={Copy}
+            iconClassName='text-primary-token'
+          />
+          <MetricCard
+            title='Open Rate'
+            value={formatPercent(metrics.instagramBioOpenRate7d)}
+            subtitle='Share step views that opened Instagram'
+            icon={ExternalLink}
+            iconClassName='text-accent'
+          />
+          <MetricCard
+            title='Activations'
+            value={metrics.instagramBioActivations7d.toLocaleString('en-US')}
+            subtitle='First Instagram-sourced visits within seven days'
+            icon={TrendingUp}
+            iconClassName='text-success'
+          />
+          <MetricCard
+            title='Activation Rate'
+            value={formatPercent(metrics.instagramBioActivationRate7d)}
+            subtitle='Share step views that activated'
+            icon={ChartNoAxesCombined}
+            iconClassName='text-success'
+          />
+        </div>
+      </ContentSurfaceCard>
+
       <ContentSurfaceCard
         className='overflow-hidden p-0'
         data-testid='yc-metrics-section'
@@ -190,9 +225,9 @@ export function FunnelMetricsStrip({
         <ContentSectionHeader
           title='YC metrics'
           subtitle='Benchmark gaps and operating signals'
-          className='min-h-0 px-5 py-3'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           <PlaceholderMetricCard
             title='Churn rate'
             description='Customer churn in the trailing 30 days.'

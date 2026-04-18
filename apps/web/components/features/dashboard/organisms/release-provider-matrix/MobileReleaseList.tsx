@@ -24,6 +24,8 @@ interface MobileReleaseListProps {
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
@@ -35,14 +37,14 @@ interface YearGroup {
 }
 
 /** Width of the revealed swipe action buttons (px) */
-const SWIPE_ACTIONS_WIDTH = 128;
+const SWIPE_ACTIONS_WIDTH = 192;
 
 function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
 
   for (const release of releases) {
     const rawYear = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear()
+      ? new Date(release.releaseDate).getUTCFullYear()
       : null;
     const year =
       rawYear !== null && !Number.isNaN(rawYear)
@@ -75,6 +77,8 @@ const SwipeActions = memo(function SwipeActions({
   release,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isLocked,
   lockReason,
 }: {
@@ -85,6 +89,8 @@ const SwipeActions = memo(function SwipeActions({
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isLocked: boolean;
   readonly lockReason?: SmartLinkLockReason;
 }) {
@@ -118,6 +124,20 @@ const SwipeActions = memo(function SwipeActions({
         <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
         <span className={mobileReleaseTokens.swipeActions.label}>Edit</span>
       </button>
+      {canGenerateAlbumArt && onGenerateAlbumArt ? (
+        <button
+          type='button'
+          onClick={() => onGenerateAlbumArt(release)}
+          className={cn(
+            mobileReleaseTokens.swipeActions.button,
+            mobileReleaseTokens.swipeActions.edit
+          )}
+          aria-label={`Generate Album Art For ${release.title}`}
+        >
+          <Icon name='Sparkles' className='h-4 w-4' aria-hidden='true' />
+          <span className={mobileReleaseTokens.swipeActions.label}>Art</span>
+        </button>
+      ) : null}
       <button
         type='button'
         onClick={handleCopy}
@@ -147,7 +167,7 @@ const SwipeActions = memo(function SwipeActions({
 
 function getReleaseYear(release: ReleaseViewModel): number | null {
   if (!release.releaseDate) return null;
-  const year = new Date(release.releaseDate).getFullYear();
+  const year = new Date(release.releaseDate).getUTCFullYear();
   return Number.isNaN(year) ? null : year;
 }
 
@@ -157,6 +177,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   artistName,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isSmartLinkLocked,
   getSmartLinkLockReason,
 }: {
@@ -168,6 +190,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     label: string,
     testId: string
   ) => Promise<string>;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
@@ -191,17 +215,20 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           release={release}
           onEdit={onEdit}
           onCopy={onCopy}
+          canGenerateAlbumArt={canGenerateAlbumArt}
+          onGenerateAlbumArt={onGenerateAlbumArt}
           isLocked={isLocked}
           lockReason={lockReason}
         />
       }
-      className='border-b border-subtle'
-      contentClassName='bg-base'
+      className='border-b border-(--linear-app-frame-seam) last:border-b-0'
+      contentClassName='bg-transparent'
     >
       <button
         type='button'
         onClick={() => onEdit(release)}
         className={mobileReleaseTokens.row.container}
+        data-testid={`mobile-release-row-${release.id}`}
       >
         {/* Title + subtitle stacked — artwork hidden on mobile for density */}
         <div className='min-w-0 flex-1'>
@@ -246,7 +273,10 @@ function YearGroupHeader({
   count,
 }: Readonly<{ year: string; count: number }>) {
   return (
-    <div className={mobileReleaseTokens.groupHeader}>
+    <div
+      className={mobileReleaseTokens.groupHeader}
+      data-testid={`mobile-release-group-${year}`}
+    >
       <span className={mobileReleaseTokens.groupHeaderTitle}>{year}</span>
       <span className={mobileReleaseTokens.groupHeaderCount}>{count}</span>
     </div>
@@ -270,6 +300,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   artistName,
   onEdit,
   onCopy,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   isSmartLinkLocked,
   getSmartLinkLockReason,
   groupByYear = false,
@@ -282,7 +314,10 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   if (yearGroups) {
     return (
       <SwipeToRevealGroup>
-        <div className='flex flex-col'>
+        <div
+          className={mobileReleaseTokens.list}
+          data-testid='mobile-release-list'
+        >
           {yearGroups.map(group => (
             <div key={group.year}>
               <YearGroupHeader
@@ -296,6 +331,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
                   artistName={artistName}
                   onEdit={onEdit}
                   onCopy={onCopy}
+                  canGenerateAlbumArt={canGenerateAlbumArt}
+                  onGenerateAlbumArt={onGenerateAlbumArt}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
                 />
@@ -309,7 +346,10 @@ export const MobileReleaseList = memo(function MobileReleaseList({
 
   return (
     <SwipeToRevealGroup>
-      <div className='flex flex-col'>
+      <div
+        className={mobileReleaseTokens.list}
+        data-testid='mobile-release-list'
+      >
         {releases.map(release => (
           <MobileReleaseRow
             key={release.id}
@@ -317,6 +357,8 @@ export const MobileReleaseList = memo(function MobileReleaseList({
             artistName={artistName}
             onEdit={onEdit}
             onCopy={onCopy}
+            canGenerateAlbumArt={canGenerateAlbumArt}
+            onGenerateAlbumArt={onGenerateAlbumArt}
             isSmartLinkLocked={isSmartLinkLocked}
             getSmartLinkLockReason={getSmartLinkLockReason}
           />

@@ -63,11 +63,12 @@ describe('usePlanGate', () => {
 
     expect(result.current.isPro).toBe(false);
     expect(result.current.plan).toBe('free');
-    expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
+    expect(result.current.canAccessTasksWorkspace).toBe(false);
+    expect(result.current.canGenerateReleasePlans).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
     expect(result.current.isError).toBe(false);
@@ -91,19 +92,20 @@ describe('usePlanGate', () => {
 
     expect(result.current.isPro).toBe(true);
     expect(result.current.plan).toBe('pro');
-    expect(result.current.canRemoveBranding).toBe(true);
     expect(result.current.canAccessAdPixels).toBe(true);
     expect(result.current.canFilterSelfFromAnalytics).toBe(true);
     expect(result.current.canAccessAdvancedAnalytics).toBe(true);
     expect(result.current.canExportContacts).toBe(true);
-    expect(result.current.analyticsRetentionDays).toBe(90);
+    expect(result.current.canAccessTasksWorkspace).toBe(true);
+    expect(result.current.canGenerateReleasePlans).toBe(false);
+    expect(result.current.analyticsRetentionDays).toBe(180);
     expect(result.current.contactsLimit).toBeNull();
   });
 
-  it('returns growth entitlements for a growth user', async () => {
+  it('returns max entitlements for a max user', async () => {
     mockBillingResponse({
       isPro: true,
-      plan: 'growth',
+      plan: 'max',
     });
 
     const { result } = renderHook(() => usePlanGate(), {
@@ -114,7 +116,7 @@ describe('usePlanGate', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.analyticsRetentionDays).toBe(365);
+    expect(result.current.analyticsRetentionDays).toBeNull();
     expect(result.current.contactsLimit).toBeNull();
   });
 

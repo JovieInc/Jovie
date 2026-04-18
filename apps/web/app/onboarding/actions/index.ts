@@ -4,15 +4,24 @@
 
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import {
+  clearPendingClaimContext,
+  readPendingClaimContext,
+} from '@/lib/claim/context';
+import {
+  claimPrebuiltProfileForUser,
+  ensureOnboardingUserRow,
+  reservePrebuiltProfileForUser,
+} from '@/lib/claim/finalize';
 import { withRetry } from '@/lib/db/client';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -20,9 +29,12 @@ import {
   createOnboardingError,
   OnboardingErrorCode,
   onboardingErrorToError,
+  unwrapDatabaseError,
 } from '@/lib/errors/onboarding';
+import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -32,6 +44,7 @@ import { profileIsPublishable } from './helpers';
 import {
   createProfileForExistingUser,
   createUserAndProfile,
+  deactivateOrphanedProfiles,
   fetchExistingProfile,
   fetchExistingUser,
   updateExistingProfile,
@@ -39,6 +52,73 @@ import {
 import { runBackgroundSyncOperations } from './sync';
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
+
+const POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS = 2_000;
+
+function isHandleUniqueViolation(error: unknown): boolean {
+  const unwrapped = unwrapDatabaseError(error);
+  const message = (
+    unwrapped.message || (error instanceof Error ? error.message : '')
+  ).toLowerCase();
+  const constraint = (unwrapped.constraint ?? '').toLowerCase();
+  const detail = (unwrapped.detail ?? '').toLowerCase();
+
+  if (unwrapped.code !== '23505' && !message.includes('duplicate')) {
+    return false;
+  }
+
+  return (
+    constraint.includes('creator_profiles_username_normalized_unique') ||
+    message.includes('username_normalized') ||
+    detail.includes('username_normalized') ||
+    detail.includes('username')
+  );
+}
+
+async function recoverConcurrentProfileClaim(
+  clerkUserId: string,
+  normalizedUsername: string
+): Promise<CompletionResult | null> {
+  return withDbSessionTx(async tx => {
+    const existingUser = await fetchExistingUser(tx, clerkUserId);
+    if (!existingUser) {
+      return null;
+    }
+
+    const existingProfile = await fetchExistingProfile(tx, existingUser.id);
+    if (!existingProfile) {
+      return null;
+    }
+
+    if (existingProfile.usernameNormalized !== normalizedUsername) {
+      return null;
+    }
+
+    return {
+      username: existingProfile.usernameNormalized,
+      status: 'complete',
+      profileId: existingProfile.id,
+    };
+  });
+}
+
+async function runBoundedPostOnboardingSideEffect(
+  context: string,
+  operation: () => Promise<void>,
+  contextData?: Record<string, string | null | undefined>
+): Promise<void> {
+  try {
+    await withTimeout(operation(), {
+      timeoutMs: POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS,
+      context,
+    });
+  } catch (error) {
+    await captureError(`${context} failed`, error, {
+      route: 'onboarding',
+      contextData,
+    });
+  }
+}
 
 export async function completeOnboarding({
   username,
@@ -51,9 +131,11 @@ export async function completeOnboarding({
   email?: string | null;
   redirectToDashboard?: boolean;
 }): Promise<CompletionResult> {
+  let pendingClaim: Awaited<ReturnType<typeof readPendingClaimContext>> = null;
+
   try {
     // Step 1: Authentication check
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       const error = createOnboardingError(
         OnboardingErrorCode.NOT_AUTHENTICATED,
@@ -104,7 +186,7 @@ export async function completeOnboarding({
     const clientIP = extractClientIP(headersList);
     const cookieHeader = headersList.get('cookie');
 
-    const clerkUser = await currentUser();
+    const clerkUser = await getCachedCurrentUser();
     const clerkIdentity = resolveClerkIdentity(clerkUser);
     const oauthAvatarUrl = clerkIdentity.avatarUrl;
 
@@ -121,6 +203,9 @@ export async function completeOnboarding({
 
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
+    pendingClaim = await readPendingClaimContext({
+      username: normalizedUsername,
+    });
 
     const userEmail = email ?? clerkIdentity.email ?? null;
 
@@ -133,6 +218,53 @@ export async function completeOnboarding({
         withDbSessionTx(
           async (tx, clerkUserId: string) => {
             const existingUser = await fetchExistingUser(tx, clerkUserId);
+
+            if (pendingClaim) {
+              const userRecord =
+                existingUser ??
+                (await (async () => {
+                  if (userEmail) {
+                    await ensureEmailAvailable(tx, clerkUserId, userEmail);
+                  }
+
+                  return ensureOnboardingUserRow(tx, {
+                    clerkUserId,
+                    userEmail,
+                  });
+                })());
+
+              const existingProfile = await fetchExistingProfile(
+                tx,
+                userRecord.id
+              );
+
+              if (
+                existingProfile?.isClaimed &&
+                existingProfile.id !== pendingClaim.creatorProfileId
+              ) {
+                throw new Error(
+                  `[PROFILE_CONFLICT] You already own @${existingProfile.usernameNormalized}.`
+                );
+              }
+
+              if (pendingClaim.mode === 'direct_profile') {
+                return reservePrebuiltProfileForUser(tx, {
+                  userId: userRecord.id,
+                  creatorProfileId: pendingClaim.creatorProfileId,
+                  expectedUsername: normalizedUsername,
+                  displayName: trimmedDisplayName,
+                });
+              }
+
+              return claimPrebuiltProfileForUser(tx, {
+                userId: userRecord.id,
+                creatorProfileId: pendingClaim.creatorProfileId,
+                expectedUsername: normalizedUsername,
+                displayName: trimmedDisplayName,
+                source: 'token_backed_onboarding',
+                finalizeOnboarding: true,
+              });
+            }
 
             // If the user record does not exist, the stored function will create both user + profile
             if (!existingUser) {
@@ -176,13 +308,24 @@ export async function completeOnboarding({
               existingProfile &&
               (needsPublish || handleChanged || needsClaim)
             ) {
-              return await updateExistingProfile(
+              const result = await updateExistingProfile(
                 tx,
                 existingProfile,
                 normalizedUsername,
                 trimmedDisplayName,
                 username
               );
+
+              // Deactivate orphaned unclaimed profiles to prevent stale public pages
+              if (result.profileId) {
+                await deactivateOrphanedProfiles(
+                  tx,
+                  existingUser.id,
+                  result.profileId
+                );
+              }
+
+              return result;
             }
 
             if (existingProfile) {
@@ -200,25 +343,84 @@ export async function completeOnboarding({
               await ensureEmailAvailable(tx, clerkUserId, userEmail);
             }
             await ensureHandleAvailable(tx, normalizedUsername, null);
-            return await createProfileForExistingUser(
+            const newProfile = await createProfileForExistingUser(
               tx,
               existingUser.id,
               normalizedUsername,
               trimmedDisplayName
             );
+
+            // Deactivate orphaned unclaimed profiles to prevent stale public pages
+            if (newProfile.profileId) {
+              await deactivateOrphanedProfiles(
+                tx,
+                existingUser.id,
+                newProfile.profileId
+              );
+            }
+
+            return newProfile;
           },
           { isolationLevel: 'serializable' }
         ),
       'completeOnboarding'
-    );
+    ).catch(async error => {
+      if (!isHandleUniqueViolation(error)) {
+        throw error;
+      }
 
-    await cacheHandleAvailability(completion.username, false);
+      const recovered = await recoverConcurrentProfileClaim(
+        userId,
+        normalizedUsername
+      );
 
-    // Immediately invalidate user state cache so middleware sees fresh state
-    // This prevents stale cache from causing redirect loops
-    await invalidateProxyUserStateCache(userId);
+      if (recovered) {
+        return recovered;
+      }
+
+      throw error;
+    });
+
+    if (pendingClaim?.mode === 'token_backed') {
+      await clearPendingClaimContext();
+    }
+
+    await Promise.allSettled([
+      runBoundedPostOnboardingSideEffect(
+        'cache_handle_availability',
+        () => cacheHandleAvailability(completion.username, false),
+        {
+          username: completion.username,
+        }
+      ),
+      // Immediately invalidate user state cache so middleware sees fresh state.
+      // This is best-effort because the completion cookie below also prevents
+      // redirect loops during the handoff to /app.
+      runBoundedPostOnboardingSideEffect(
+        'invalidate_proxy_user_state_cache',
+        () => invalidateProxyUserStateCache(userId),
+        {
+          userId,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'attribute_lead_signup',
+        () => attributeLeadSignupFromClerkUserId(userId).then(() => {}),
+        {
+          userId,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'invalidate_profile_cache',
+        () => invalidateProfileCache(completion.username),
+        {
+          username: completion.username,
+        }
+      ),
+    ]);
 
     // Step 7: Avatar upload (fire-and-forget, background processing)
+    const shouldFinalizeOnboarding = pendingClaim?.mode !== 'direct_profile';
     const profileId = completion.profileId;
     if (profileId && oauthAvatarUrl) {
       void handleBackgroundAvatarUpload(
@@ -229,27 +431,28 @@ export async function completeOnboarding({
     }
 
     // Step 8: Sync operations (parallel, fire-and-forget)
-    runBackgroundSyncOperations(userId, completion.username);
+    if (shouldFinalizeOnboarding) {
+      runBackgroundSyncOperations(userId, completion.username);
+    }
 
-    // ENG-002: Set completion cookie to prevent redirect loop race condition
-    // The proxy checks this cookie and bypasses needsOnboarding check for 30s
-    // This handles the race between transaction commit and proxy's DB read
-    // IMPORTANT: Always set this cookie on success, even when redirectToDashboard=false,
-    // because the user will navigate to dashboard after seeing the completion step
-    const cookieStore = await cookies();
-    cookieStore.set('jovie_onboarding_complete', '1', {
-      httpOnly: true,
-      secure: isSecureEnv(),
-      sameSite: 'lax',
-      maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
-      path: '/',
-    });
+    // Step 9: Activate 14-day Pro trial (fire-and-forget)
+    if (shouldFinalizeOnboarding) {
+      void import('./activate-trial').then(({ activateTrial }) =>
+        activateTrial(userId)
+      );
+    }
 
-    // Invalidate public profile cache so the profile page reflects the new isPublic state.
-    // Without this, a stale not_found result cached by unstable_cache would persist
-    // for up to 1 hour after onboarding completes (e.g., waitlist profiles that were
-    // previously visited while isPublic was false).
-    await invalidateProfileCache(completion.username);
+    if (shouldFinalizeOnboarding) {
+      // ENG-002: Set completion cookie to prevent redirect loop race condition
+      const cookieStore = await cookies();
+      cookieStore.set('jovie_onboarding_complete', '1', {
+        httpOnly: true,
+        secure: isSecureEnv(),
+        sameSite: 'lax',
+        maxAge: 120,
+        path: '/',
+      });
+    }
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete
@@ -261,6 +464,14 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    if (
+      pendingClaim &&
+      error instanceof Error &&
+      (error.message.includes('PROFILE_CONFLICT') ||
+        error.message.includes('CLAIM_NOT_FOUND'))
+    ) {
+      await clearPendingClaimContext();
+    }
     await captureError('completeOnboarding failed', error, {
       route: 'onboarding',
     });

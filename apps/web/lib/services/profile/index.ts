@@ -35,6 +35,7 @@ export {
   getProfileContacts,
   getProfileSocialLinks,
   getProfileSummary,
+  getProfilesByUsernames,
   getProfileWithLinks,
   getProfileWithUser,
   getTopProfilesForStaticGeneration,

@@ -59,6 +59,7 @@ export type ContactRole =
   | 'management'
   | 'press_pr'
   | 'brand_partnerships'
+  | 'music_collaboration'
   | 'fan_general'
   | 'other';
 
@@ -80,9 +81,12 @@ export interface AppUser {
   created_at: string;
 }
 
+export type ProfileClaimRole = 'owner' | 'manager' | 'viewer';
+
 export interface CreatorProfile {
   id: string;
-  user_id: string | null; // Nullable to support unclaimed profiles
+  /** @deprecated — ownership now tracked via user_profile_claims */
+  user_id: string | null;
   creator_type: CreatorType;
   username: string;
   display_name: string | null;
@@ -109,12 +113,16 @@ export interface CreatorProfile {
   is_featured: boolean;
   marketing_opt_out: boolean;
   // Claiming functionality
+  /** @deprecated — claimed status now derived from user_profile_claims */
   is_claimed: boolean;
   claim_token: string | null;
   claimed_at: string | null;
   // About / bio metadata
   location?: string | null;
   active_since_year?: number | null;
+  genres?: string[] | null;
+  career_highlights?: string | null;
+  target_playlists?: string[] | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -133,6 +141,11 @@ export interface CreatorProfile {
   updated_at: string;
 }
 
+export interface ArtistSettings extends Record<string, unknown> {
+  exclude_self_from_analytics?: boolean;
+  hometown?: string | null;
+}
+
 // Backwards compatibility - Artist interface mapped from CreatorProfile
 export interface Artist {
   id: string;
@@ -143,10 +156,7 @@ export interface Artist {
   image_url?: string; // maps to avatar_url
   tagline?: string; // maps to bio
   theme?: Record<string, unknown>;
-  settings?: {
-    hide_branding?: boolean;
-    exclude_self_from_analytics?: boolean;
-  };
+  settings?: ArtistSettings;
   spotify_url?: string;
   apple_music_url?: string;
   youtube_url?: string;
@@ -158,8 +168,11 @@ export interface Artist {
   soundcloud_id?: string;
   venmo_handle?: string;
   location?: string | null;
+  hometown?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
+  career_highlights?: string | null;
+  target_playlists?: string[] | null;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;
@@ -380,7 +393,7 @@ export function isPodcasterProfile(
 
 type CanonicalArtistProfileShape = {
   id: string;
-  userId: string | null;
+  ownerUserId?: string | null;
   username: string;
   displayName: string | null;
   bio: string | null;
@@ -396,8 +409,11 @@ type CanonicalArtistProfileShape = {
   soundcloudId?: string | null;
   venmoHandle?: string | null;
   location?: string | null;
+  hometown?: string | null;
   activeSinceYear?: number | null;
   genres?: string[] | null;
+  careerHighlights?: string | null;
+  targetPlaylists?: string[] | null;
   isPublic: boolean;
   isVerified: boolean;
   isFeatured: boolean;
@@ -407,21 +423,35 @@ type CanonicalArtistProfileShape = {
   createdAt: string;
 };
 
+export function getHometownFromSettings(
+  settings: Record<string, unknown> | null | undefined
+): string | null {
+  const hometown = settings?.hometown;
+  if (typeof hometown !== 'string') {
+    return null;
+  }
+
+  const trimmedHometown = hometown.trim();
+  return trimmedHometown ? trimmedHometown : null;
+}
+
 function mapCanonicalProfileToArtist(
   profile: CanonicalArtistProfileShape
 ): Artist {
+  const artistSettings = (profile.settings as ArtistSettings | null) ?? {};
+  const hometown =
+    profile.hometown ?? getHometownFromSettings(profile.settings);
+
   return {
     id: profile.id,
-    owner_user_id: profile.userId || '',
+    owner_user_id: profile.ownerUserId || '',
     handle: profile.username,
     spotify_id: profile.spotifyId || '',
     name: profile.displayName || profile.username,
     image_url: profile.avatarUrl || undefined,
     tagline: profile.bio || undefined,
     theme: profile.theme || undefined,
-    settings: (profile.settings as { hide_branding?: boolean }) || {
-      hide_branding: false,
-    },
+    settings: artistSettings,
     spotify_url: profile.spotifyUrl || undefined,
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
@@ -432,8 +462,11 @@ function mapCanonicalProfileToArtist(
     soundcloud_id: profile.soundcloudId || undefined,
     venmo_handle: profile.venmoHandle || undefined,
     location: profile.location ?? null,
+    hometown,
     active_since_year: profile.activeSinceYear ?? null,
     genres: profile.genres ?? null,
+    career_highlights: profile.careerHighlights ?? null,
+    target_playlists: profile.targetPlaylists ?? null,
     published: profile.isPublic,
     is_verified: profile.isVerified,
     is_featured: profile.isFeatured,
@@ -445,7 +478,7 @@ function mapCanonicalProfileToArtist(
 export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
   return mapCanonicalProfileToArtist({
     id: profile.id,
-    userId: profile.user_id,
+    ownerUserId: profile.user_id, // @deprecated — use user_profile_claims
     username: profile.username,
     displayName: profile.display_name,
     avatarUrl: profile.avatar_url,
@@ -459,8 +492,12 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     deezerId: profile.deezer_id,
     tidalId: profile.tidal_id,
     soundcloudId: profile.soundcloud_id,
+    venmoHandle: profile.venmo_handle,
     location: profile.location,
     activeSinceYear: profile.active_since_year,
+    genres: profile.genres,
+    careerHighlights: profile.career_highlights,
+    targetPlaylists: profile.target_playlists,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,
@@ -474,6 +511,16 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
 export function convertArtistToCreatorProfile(
   artist: Artist
 ): Partial<CreatorProfile> {
+  const settings =
+    artist.settings || artist.hometown !== undefined
+      ? {
+          ...(artist.settings ?? {}),
+          ...(artist.hometown !== undefined
+            ? { hometown: artist.hometown }
+            : {}),
+        }
+      : undefined;
+
   return {
     user_id: artist.owner_user_id,
     creator_type: 'artist',
@@ -485,11 +532,12 @@ export function convertArtistToCreatorProfile(
     apple_music_url: artist.apple_music_url,
     youtube_url: artist.youtube_url,
     spotify_id: artist.spotify_id,
+    career_highlights: artist.career_highlights ?? null,
     is_public: artist.published,
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
     marketing_opt_out: artist.marketing_opt_out,
-    settings: artist.settings,
+    settings,
     theme: artist.theme,
   };
 }
@@ -500,7 +548,7 @@ export function convertDrizzleCreatorProfileToArtist(
 ): Artist {
   return mapCanonicalProfileToArtist({
     id: profile.id,
-    userId: profile.userId,
+    ownerUserId: profile.userId, // @deprecated — use user_profile_claims
     username: profile.username,
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
@@ -518,6 +566,8 @@ export function convertDrizzleCreatorProfileToArtist(
     location: profile.location,
     activeSinceYear: profile.activeSinceYear,
     genres: profile.genres,
+    careerHighlights: profile.careerHighlights,
+    targetPlaylists: profile.targetPlaylists,
     isPublic: profile.isPublic ?? false,
     isVerified: profile.isVerified ?? false,
     isFeatured: profile.isFeatured ?? false,

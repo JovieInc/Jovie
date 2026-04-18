@@ -1,20 +1,54 @@
 'use client';
 
-import { Calendar, DollarSign } from 'lucide-react';
+import {
+  Calendar,
+  DollarSign,
+  Mail,
+  ShoppingBag,
+  UserRound,
+} from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
-import { ProfileNotificationsMenu } from '@/components/organisms/profile-notifications-menu';
-import { Container } from '@/components/site/Container';
-import { ArtistContactsButton } from '@/features/profile/artist-contacts-button';
+import {
+  PublicSurfaceFooter,
+  PublicSurfaceHeader,
+  PublicSurfaceShell,
+  PublicSurfaceStage,
+} from '@/components/organisms/public-surface';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
-import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+
+const PayDrawer = dynamic(
+  () =>
+    import('@/features/profile/PayDrawer').then(mod => ({
+      default: mod.PayDrawer,
+    })),
+  { ssr: false, loading: () => null }
+);
+
+const ProfileNotificationsMenu = dynamic(
+  () =>
+    import('@/components/organisms/profile-notifications-menu').then(mod => ({
+      default: mod.ProfileNotificationsMenu,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <ProfileNotificationsButton
+        hasActiveSubscriptions
+        notificationsState='idle'
+        onClick={() => {}}
+      />
+    ),
+  }
+);
+
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
@@ -24,18 +58,20 @@ import { useProfileShell } from './useProfileShell';
 export function ProfileShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   subtitle,
   children,
   showSocialBar = true,
   mode,
-  showTipButton = false,
-  isTipModeActive = false,
+  showPayButton = false,
+  isPayModeActive = false,
   showBackButton = false,
   showTourButton = false,
   isTourModeActive = false,
   showFooter = true,
   showNotificationButton = false,
+  showShopButton = false,
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
@@ -43,35 +79,38 @@ export function ProfileShell({
   allowPhotoDownloads = false,
   visitTrackingToken,
 }: ProfileShellProps) {
+  const isProfileRoot = !mode || mode === 'profile';
+  const isCompactMobileHeader = !isProfileRoot || showBackButton;
   const {
     handleNotificationsTrigger,
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    modeLinks,
     socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
+    viewerCountryCode,
     contacts,
     visitTrackingToken,
+    smsEnabled: false,
   });
 
   const isMobile = useBreakpointDown('md');
   const router = useRouter();
-  const [tipDrawerOpen, setTipDrawerOpen] = useState(false);
+  const [payDrawerOpen, setPayDrawerOpen] = useState(false);
 
-  // Fire tip_page_view pixel event when tip mode is active on page load
+  // Fire tip_page_view pixel event when pay mode is active on page load
   useEffect(() => {
-    if (!isTipModeActive) return;
+    if (!isPayModeActive) return;
     // @ts-expect-error - joviePixel is set by JoviePixel component
     if (globalThis.joviePixel?.track) {
       // @ts-expect-error - joviePixel is set by JoviePixel component
       globalThis.joviePixel.track('tip_page_view');
     }
-  }, [isTipModeActive]);
+  }, [isPayModeActive]);
 
-  // Extract venmo link from social links for the tip drawer
+  // Extract venmo link from social links for the pay drawer
   const venmoLink = useMemo(
     () => socialLinks.find(l => l.platform === 'venmo')?.url ?? null,
     [socialLinks]
@@ -80,7 +119,12 @@ export function ProfileShell({
     () => extractVenmoUsername(venmoLink),
     [venmoLink]
   );
-  const hasTipSupport = showTipButton && Boolean(venmoLink);
+  const hasPaySupport = showPayButton && Boolean(venmoLink);
+  const headerSocialLinks = useMemo(
+    () => prioritizedSocialLinks.slice(0, 2),
+    [prioritizedSocialLinks]
+  );
+  const hasContacts = contacts.length > 0;
   const availableDspPreferences = useMemo(
     () => toDSPPreferences(getCanonicalProfileDSPs(artist, socialLinks)),
     [artist, socialLinks]
@@ -96,6 +140,7 @@ export function ProfileShell({
     menuTriggerRef,
     openSubscription,
     state: notificationsState,
+    smsEnabled,
     subscribedChannels,
     subscriptionDetails,
   } = notificationsController;
@@ -122,6 +167,7 @@ export function ProfileShell({
           subscribedChannels={subscribedChannels}
           subscriptionDetails={subscriptionDetails}
           triggerRef={menuTriggerRef}
+          smsEnabled={smsEnabled}
         />
       );
     }
@@ -138,67 +184,50 @@ export function ProfileShell({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div
-        id='main-content'
-        className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
-        data-test='public-profile-root'
-      >
-        {backgroundPattern !== 'none' && (
-          <BackgroundPattern variant={backgroundPattern} />
-        )}
+      <div id='main-content' data-test='public-profile-root'>
+        <PublicSurfaceShell
+          backgroundPattern={backgroundPattern}
+          showGradientBlurs={showGradientBlurs}
+          className='min-h-dvh bg-[color:var(--profile-stage-bg)] text-primary-token font-medium tracking-tight md:min-h-dvh'
+        >
+          <div
+            className='pointer-events-none absolute inset-0 bg-[var(--profile-stage-overlay)]'
+            aria-hidden='true'
+          />
 
-        {showGradientBlurs && (
-          <>
-            <div className='absolute left-1/4 top-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
-            <div className='absolute bottom-1/4 right-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
-          </>
-        )}
-
-        <Container>
-          <div className='absolute left-4 top-4 z-20'>
-            <ProfileNavButton
-              showBackButton={showBackButton}
-              artistHandle={artist.handle}
-              hideBranding={Boolean(artist.settings?.hide_branding)}
-            />
-          </div>
-
-          <div className='absolute right-4 top-4 z-20 flex items-center gap-2'>
-            {renderNotificationControls()}
-          </div>
-
-          <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
-            <div className='flex flex-1 flex-col items-center px-4'>
-              <div
-                className={`${maxWidthClass} space-y-4 sm:space-y-5 md:space-y-6`}
-              >
-                <ArtistInfo
-                  artist={artist}
-                  subtitle={subtitle}
-                  photoDownloadSizes={photoDownloadSizes}
-                  allowPhotoDownloads={allowPhotoDownloads}
+          <PublicSurfaceStage>
+            <PublicSurfaceHeader
+              className='absolute inset-x-4 top-3.5 z-20 md:top-4'
+              leftSlot={
+                <ProfileNavButton
+                  showBackButton={showBackButton}
+                  artistHandle={artist.handle}
                 />
-                {children}
-                {/* Social bar with contacts and tip buttons inline */}
-                {(showSocialBar ||
-                  showTourButton ||
-                  hasTipSupport ||
-                  hasActiveSubscriptions) && (
-                  <div className='flex justify-center'>
-                    <div
-                      className='flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-1 py-1'
-                      data-testid='social-links'
-                    >
-                      {/* Mail (contacts) — left */}
-                      <ArtistContactsButton
-                        contacts={contacts}
-                        artistHandle={artist.handle}
-                        artistName={artist.name}
-                      />
-                      {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
-                      {(!mode || mode === 'profile') &&
-                        showSocialBar &&
-                        modeLinks.map(link => (
+              }
+              rightSlot={renderNotificationControls()}
+            />
+
+            <div className='relative z-10 flex min-h-full flex-1 flex-col pb-4 pt-12 sm:pb-6 sm:pt-14'>
+              <div className='flex flex-1 flex-col items-center px-4'>
+                <div
+                  className={`${maxWidthClass} flex min-h-full flex-1 flex-col`}
+                >
+                  <div
+                    className={`${
+                      isCompactMobileHeader
+                        ? 'space-y-3 sm:space-y-4 md:space-y-6'
+                        : 'space-y-4 sm:space-y-5 md:space-y-6'
+                    }`}
+                  >
+                    <div className='hidden md:flex md:justify-center'>
+                      <ArtistInfo
+                        artist={artist}
+                        subtitle={subtitle}
+                        photoDownloadSizes={photoDownloadSizes}
+                        allowPhotoDownloads={allowPhotoDownloads}
+                        nameSize='xl'
+                        bodyLayout='split'
+                        trailingContent={headerSocialLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -206,70 +235,134 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
-                      {/* Tour */}
-                      {showTourButton && (
+                        className='w-full max-w-(--profile-shell-header-max-width)'
+                      />
+                    </div>
+                    <ArtistInfo
+                      artist={artist}
+                      subtitle={subtitle}
+                      photoDownloadSizes={photoDownloadSizes}
+                      allowPhotoDownloads={allowPhotoDownloads}
+                      avatarSize={isCompactMobileHeader ? 'md' : 'lg'}
+                      nameSize={isCompactMobileHeader ? 'sm' : 'lg'}
+                      viewport='mobile'
+                      className={`md:hidden ${
+                        isCompactMobileHeader
+                          ? '!space-y-2 sm:!space-y-2.5'
+                          : '!space-y-2.5 sm:!space-y-3'
+                      }`}
+                    />
+                    <div
+                      data-testid='profile-content-stack'
+                      className={isCompactMobileHeader ? 'pt-1' : ''}
+                    >
+                      {children}
+                    </div>
+                  </div>
+
+                  {(showSocialBar ||
+                    showTourButton ||
+                    hasPaySupport ||
+                    hasContacts ||
+                    showShopButton) && (
+                    <PublicSurfaceFooter className='mt-auto pt-6 sm:pt-8'>
+                      <nav
+                        className='mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-full border border-[color:var(--profile-dock-border)] bg-[var(--profile-dock-bg)] px-2 py-2 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl sm:gap-3'
+                        aria-label='Profile Modes'
+                        data-testid='profile-mode-nav'
+                      >
                         <CircleIconButton
                           size='md'
-                          variant='ghost'
-                          ariaLabel='Tour dates'
-                          data-testid='tour-trigger'
-                          className={`border transition-[background-color,border-color,color] ${
-                            isTourModeActive
-                              ? 'border-subtle bg-surface-1 text-primary-token'
-                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          variant='pearl'
+                          ariaLabel='Profile'
+                          data-testid='profile-trigger'
+                          className={`transition-[background-color,color,box-shadow] ${
+                            !mode || mode === 'profile'
+                              ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
                           }`}
                           onClick={() => {
-                            router.push(`/${artist.handle}?mode=tour`);
+                            router.push(`/${artist.handle}`);
                           }}
                         >
-                          <Calendar className='h-4 w-4' aria-hidden='true' />
+                          <UserRound className='h-4 w-4' aria-hidden='true' />
                         </CircleIconButton>
-                      )}
-
-                      {/* Tip — right */}
-                      {hasTipSupport &&
-                        venmoLink &&
-                        (isMobile ? (
-                          <>
-                            <CircleIconButton
-                              size='md'
-                              variant='ghost'
-                              ariaLabel='Tip'
-                              data-testid='tip-trigger'
-                              className={`border transition-[background-color,border-color,color] ${
-                                isTipModeActive
-                                  ? 'border-subtle bg-surface-1 text-primary-token'
-                                  : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-                              }`}
-                              onClick={() => setTipDrawerOpen(true)}
-                            >
-                              <DollarSign
-                                className='h-4 w-4'
-                                aria-hidden='true'
-                              />
-                            </CircleIconButton>
-                            <TipDrawer
-                              open={tipDrawerOpen}
-                              onOpenChange={setTipDrawerOpen}
-                              artistName={artist.name}
-                              artistHandle={artist.handle}
-                              venmoLink={venmoLink}
-                              venmoUsername={venmoUsername}
-                            />
-                          </>
-                        ) : (
-                          /* Always reserve space for the tip button to prevent layout shift.
-                             When tip mode is active, render invisibly instead of not at all. */
+                        {hasContacts && (
                           <CircleIconButton
                             size='md'
-                            variant='ghost'
-                            ariaLabel='Tip'
-                            data-testid='tip-trigger'
-                            className={`border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token${isTipModeActive ? ' invisible' : ''}`}
-                            aria-hidden={isTipModeActive || undefined}
-                            tabIndex={isTipModeActive ? -1 : undefined}
+                            variant='pearl'
+                            ariaLabel='Contact'
+                            data-testid='contact-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              mode === 'contact'
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
                             onClick={() => {
-                              router.push(`/${artist.handle}?mode=tip`);
+                              router.push(`/${artist.handle}?mode=contact`);
+                            }}
+                          >
+                            <Mail className='h-4 w-4' aria-hidden='true' />
+                          </CircleIconButton>
+                        )}
+                        {showTourButton && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Tour Dates'
+                            data-testid='tour-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              isTourModeActive
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
+                            onClick={() => {
+                              router.push(`/${artist.handle}?mode=tour`);
+                            }}
+                          >
+                            <Calendar className='h-4 w-4' aria-hidden='true' />
+                          </CircleIconButton>
+                        )}
+
+                        {showShopButton && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Shop'
+                            data-testid='shop-trigger'
+                            className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            onClick={() => {
+                              window.open(
+                                `/${artist.handle}/shop`,
+                                '_blank',
+                                'noopener,noreferrer'
+                              );
+                            }}
+                          >
+                            <ShoppingBag
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                          </CircleIconButton>
+                        )}
+
+                        {hasPaySupport && venmoLink && (
+                          <CircleIconButton
+                            size='md'
+                            variant='pearl'
+                            ariaLabel='Pay'
+                            data-testid='pay-trigger'
+                            className={`transition-[background-color,color,box-shadow] ${
+                              isPayModeActive
+                                ? 'bg-[var(--profile-pearl-bg-active)] text-primary-token'
+                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                            }`}
+                            onClick={() => {
+                              if (isMobile) {
+                                setPayDrawerOpen(true);
+                                return;
+                              }
+                              router.push(`/${artist.handle}?mode=pay`);
                             }}
                           >
                             <DollarSign
@@ -277,26 +370,28 @@ export function ProfileShell({
                               aria-hidden='true'
                             />
                           </CircleIconButton>
-                        ))}
-                      {(!mode || mode === 'profile') &&
-                        showSocialBar &&
-                        prioritizedSocialLinks.map(link => (
-                          <SocialLinkComponent
-                            key={link.id}
-                            link={link}
-                            handle={artist.handle}
-                            artistName={artist.name}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                )}
+                        )}
+                      </nav>
+                    </PublicSurfaceFooter>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {showFooter && <ProfileFooter artist={artist} />}
-          </div>
-        </Container>
+              {hasPaySupport && venmoLink && isMobile ? (
+                <PayDrawer
+                  open={payDrawerOpen}
+                  onOpenChange={setPayDrawerOpen}
+                  artistName={artist.name}
+                  artistHandle={artist.handle}
+                  venmoLink={venmoLink}
+                  venmoUsername={venmoUsername}
+                />
+              ) : null}
+
+              {showFooter ? <ProfileFooter artist={artist} /> : null}
+            </div>
+          </PublicSurfaceStage>
+        </PublicSurfaceShell>
       </div>
     </ProfileNotificationsContext.Provider>
   );

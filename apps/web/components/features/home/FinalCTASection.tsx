@@ -1,64 +1,54 @@
-'use client';
-
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
     <section
-      className='relative z-10 overflow-hidden'
+      data-testid='final-cta-section'
+      className='section-glow section-glow-cta relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
         paddingTop: 'var(--linear-cta-section-pt)',
         paddingBottom: 'var(--linear-cta-section-pb)',
       }}
     >
-      <Container size='homepage'>
-        <div className='reveal-on-scroll relative mx-auto flex max-w-xl flex-col items-center text-center'>
+      {/* Orb glow behind headline */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
+        style={{
+          width: '600px',
+          height: '400px',
+          background:
+            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.3), transparent 65%)',
+          filter: 'blur(40px)',
+        }}
+      />
+      <MarketingContainer width='landing'>
+        <div className='reveal-on-scroll relative mx-auto max-w-[36rem] text-center'>
           <h2
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-primary-token'
           >
-            Your fans are waiting.
+            Claim your handle.
           </h2>
 
-          <p className='mt-5 max-w-md marketing-lead-linear text-secondary-token'>
-            Claim your handle and start growing today.
+          <p className='marketing-lead-linear mt-4 text-secondary-token'>
+            Your next release does the rest.
           </p>
 
-          {/* Form */}
-          <div className='mt-10 w-full'>
-            <div
-              id='final-cta-dock'
-              data-testid='final-cta-dock'
-              className='relative w-full overflow-hidden rounded-2xl p-2'
-              style={{
-                border: '1px solid var(--linear-border-default)',
-                boxShadow: 'var(--linear-shadow-card)',
-              }}
-            >
-              <ClaimHandleForm />
-            </div>
+          <div
+            data-testid='final-cta-form'
+            className='mx-auto mt-7 w-full max-w-[27rem]'
+          >
+            <ClaimHandleForm submitButtonTestId='final-cta-action' />
           </div>
 
-          {/* Trust signals */}
-          <div className='mt-6 flex items-center justify-center gap-4'>
-            <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              <span
-                aria-hidden='true'
-                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-              />{' '}
-              Live in 60 seconds
-            </p>
-            <span aria-hidden='true' className='text-quaternary-token'>
-              ·
-            </span>
-            <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              No credit card required
-            </p>
-          </div>
+          <p className='mt-5 text-[11px] tracking-[0.01em] text-quaternary-token'>
+            Be one of the first artists on Jovie.
+          </p>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

@@ -1,15 +1,20 @@
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-base'>
-      <Container className='flex min-h-screen items-center justify-center'>
+    <PublicPageShell mainClassName='bg-base'>
+      <MarketingContainer
+        data-testid='not-found'
+        width='page'
+        className='flex min-h-[calc(100vh-var(--public-shell-header-offset))] items-center justify-center py-16'
+      >
         <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
           {/* Error code — oversized, ghosted */}
           <div className='mb-8 select-none'>
             <span
-              className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.06]'
+              className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.34]'
               aria-hidden='true'
             >
               404
@@ -19,11 +24,11 @@ export default function NotFound() {
           {/* Content */}
           <div className='-mt-16 relative'>
             <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
-              Profile not found
+              Page not found
             </h1>
             <p className='text-[13px] text-tertiary-token leading-relaxed mb-8'>
-              The profile you&apos;re looking for doesn&apos;t exist or
-              isn&apos;t public.
+              The link you followed may be broken, or the page may have been
+              removed.
             </p>
 
             <Link
@@ -34,7 +39,7 @@ export default function NotFound() {
             </Link>
           </div>
         </div>
-      </Container>
-    </div>
+      </MarketingContainer>
+    </PublicPageShell>
   );
 }

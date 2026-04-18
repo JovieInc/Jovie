@@ -21,7 +21,7 @@ export function NewUpgradeTeaser() {
 
             {/* Heading */}
             <h3 className='text-center text-lg sm:text-xl font-semibold tracking-tight text-primary-token'>
-              Remove Jovie branding
+              Upgrade your release workflow
             </h3>
 
             {/* Pricing */}
@@ -39,7 +39,7 @@ export function NewUpgradeTeaser() {
                 variant='primary'
                 className='w-full justify-center gap-2 h-11 text-sm font-medium'
               >
-                <Link href={APP_ROUTES.BILLING_REMOVE_BRANDING}>
+                <Link href={APP_ROUTES.PRICING}>
                   Upgrade to Pro
                   <ArrowRight className='h-4 w-4' />
                 </Link>

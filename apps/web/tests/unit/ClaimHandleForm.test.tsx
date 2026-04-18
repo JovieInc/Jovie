@@ -1,16 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
-const { mockPush, mockPrefetch, mockFetch } = vi.hoisted(() => ({
+const { mockPush, mockPrefetch, mockFetch, mockTrack } = vi.hoisted(() => ({
   mockPush: vi.fn(),
   mockPrefetch: vi.fn(),
   mockFetch: vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ available: true }),
   }),
+  mockTrack: vi.fn(),
 }));
 
 // Mock dependencies
@@ -27,36 +26,25 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  track: mockTrack,
+}));
+
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
-function createTestQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-}
-
-function renderWithQueryClient(ui: ReactElement) {
-  const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
-}
-
 beforeEach(() => {
   mockPush.mockReset();
   mockPrefetch.mockReset();
   mockFetch.mockClear();
+  mockTrack.mockReset();
 });
 
 describe('ClaimHandleForm', () => {
   test('renders with proper accessibility attributes', () => {
-    renderWithQueryClient(<ClaimHandleForm />);
+    render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
@@ -67,7 +55,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('renders form element', () => {
-    renderWithQueryClient(<ClaimHandleForm />);
+    render(<ClaimHandleForm />);
 
     const form = document.querySelector('form');
     expect(form).toBeInTheDocument();
@@ -77,7 +65,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('shows claim button when handle is entered', () => {
-    renderWithQueryClient(<ClaimHandleForm />);
+    render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     fireEvent.change(input, { target: { value: 'testhandle' } });
@@ -88,7 +76,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('shows validation message for short handles', () => {
-    renderWithQueryClient(<ClaimHandleForm />);
+    render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     fireEvent.change(input, { target: { value: 'ab' } }); // Too short
@@ -99,8 +87,32 @@ describe('ClaimHandleForm', () => {
     ).toBeInTheDocument();
   });
 
+  test('shows validation message for handles with invalid characters', () => {
+    render(<ClaimHandleForm />);
+
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'test_handle' } });
+
+    expect(
+      screen.getByText(
+        /Handle can only contain lowercase letters, numbers, and hyphens/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  test('shows validation message for handles longer than 24 characters', () => {
+    render(<ClaimHandleForm />);
+
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'a'.repeat(25) } });
+
+    expect(
+      screen.getByText(/Handle must be no more than 24 characters/i)
+    ).toBeInTheDocument();
+  });
+
   test('does not inject inline animation styles (moved to globals.css)', () => {
-    renderWithQueryClient(<ClaimHandleForm />);
+    render(<ClaimHandleForm />);
 
     const styleTags = document.querySelectorAll('style');
     const styleContents = Array.from(styleTags)
@@ -110,5 +122,49 @@ describe('ClaimHandleForm', () => {
     // Only check for component-specific animation keyframes (not third-party CSS like Sonner)
     expect(styleContents).not.toContain('jv-shake');
     expect(styleContents).not.toContain('jv-available');
+  });
+
+  test('tracks landing claim submits when tracking is configured', () => {
+    render(
+      <ClaimHandleForm
+        submitTracking={{
+          eventName: 'landing_cta_claim_handle',
+          section: 'final_cta',
+        }}
+      />
+    );
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /choose your handle/i }),
+      {
+        target: { value: 'releasefanclub' },
+      }
+    );
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockTrack).toHaveBeenCalledWith('landing_cta_claim_handle', {
+      section: 'final_cta',
+      handle: 'releasefanclub',
+    });
+    expect(mockPush).toHaveBeenCalledWith(
+      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+    );
+  });
+
+  test('does not track claim submits when tracking is not configured', () => {
+    render(<ClaimHandleForm />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /choose your handle/i }),
+      {
+        target: { value: 'releasefanclub' },
+      }
+    );
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+
+    expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(
+      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+    );
   });
 });

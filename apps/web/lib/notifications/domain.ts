@@ -1,6 +1,6 @@
 import { and, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
-import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
+import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -213,6 +213,31 @@ async function upsertAudienceMember(
   });
 }
 
+async function upsertAudienceMemberBestEffort(
+  artist_id: string,
+  normalizedEmail: string,
+  ipAddress: string | null,
+  userAgent: string | null
+): Promise<void> {
+  try {
+    await upsertAudienceMember(
+      artist_id,
+      normalizedEmail,
+      ipAddress,
+      userAgent
+    );
+  } catch (error) {
+    void captureError(
+      'Notifications audience member upsert failed (best-effort)',
+      error,
+      {
+        artistId: artist_id,
+        email: normalizedEmail,
+      }
+    );
+  }
+}
+
 interface ArtistProfileResult {
   profile: {
     id: string;
@@ -290,7 +315,7 @@ async function sendSubscriptionConfirmationEmail(
   normalizedEmail: string,
   artistProfile: { displayName: string | null; username: string | null }
 ): Promise<Awaited<ReturnType<typeof sendNotification>>> {
-  const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
+  const profileUrl = `${BASE_URL.replace(/\/$/, '')}/${artistProfile.username}`;
   const artistName =
     artistProfile.displayName || artistProfile.username || 'this artist';
   const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;
@@ -432,7 +457,7 @@ function buildUpsertConfig(
   const set =
     channel === 'email'
       ? { ...emailVerifyFields, ipAddress, source }
-      : { confirmedAt: new Date(), ipAddress, source };
+      : { ipAddress, source };
 
   return { target, set };
 }
@@ -519,7 +544,7 @@ function buildSubscriptionValues(params: {
     ipAddress,
     source,
     preferences: defaultPreferences,
-    confirmedAt: shouldVerifyEmail ? null : new Date(),
+    confirmedAt: channel === 'sms' || shouldVerifyEmail ? null : new Date(),
     emailOtpHash: emailOtp?.otpHash,
     emailOtpExpiresAt: emailOtp?.otpExpiresAt,
     emailOtpLastSentAt: emailOtp ? new Date() : null,
@@ -546,7 +571,7 @@ async function firePostSubscribeActions({
 }): Promise<void> {
   if (dynamicEnabled && normalizedEmail) {
     const ua = getHeader(headers, 'user-agent') || null;
-    await upsertAudienceMember(
+    await upsertAudienceMemberBestEffort(
       artist_id,
       normalizedEmail,
       ipAddress ?? null,
@@ -603,6 +628,30 @@ export const subscribeToNotificationsDomain = async (
       country_code,
       city
     );
+
+    // Pro-gate SMS subscriptions (backend enforcement)
+    if (channel === 'sms' && !creatorIsPro) {
+      await trackSubscribeError({
+        artist_id,
+        error_type: 'sms_requires_pro',
+        source,
+      });
+      return buildSubscribeValidationError(
+        'SMS notifications are only available for Pro creators.'
+      );
+    }
+
+    // US-only guard for SMS channel
+    if (channel === 'sms' && country_code && country_code !== 'US') {
+      await trackSubscribeError({
+        artist_id,
+        error_type: 'sms_us_only',
+        source,
+      });
+      return buildSubscribeValidationError(
+        'SMS notifications are currently available in the US only.'
+      );
+    }
 
     const normalizedEmail =
       channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;

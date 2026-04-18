@@ -15,27 +15,23 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
   const handleDownloadPdf = () => {
     const previousTitle = document.title;
-    const nextTitle = `${pdfTitle} | ${APP_NAME}`;
-    document.title = nextTitle;
+    document.title = `${pdfTitle} | ${APP_NAME}`;
 
-    const restoreTitle = () => {
-      document.title = previousTitle;
-      globalThis.removeEventListener('afterprint', restoreTitle);
-    };
-
-    globalThis.addEventListener('afterprint', restoreTitle);
+    globalThis.addEventListener(
+      'afterprint',
+      () => {
+        document.title = previousTitle;
+      },
+      { once: true }
+    );
 
     globalThis.print?.();
-
-    setTimeout(() => {
-      restoreTitle();
-    }, 2000);
   };
 
   return (
     <div
       data-doc-toolbar
-      className='inline-flex items-center overflow-hidden rounded-lg border border-subtle bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-black/30 dark:shadow-none'
+      className='inline-flex items-center overflow-hidden rounded-lg border border-subtle bg-white dark:bg-black/30'
     >
       <Button
         type='button'

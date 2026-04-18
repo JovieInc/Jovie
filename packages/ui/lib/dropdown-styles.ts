@@ -15,9 +15,9 @@
  *   Content padding: p-0.5, Item: px-2 py-1 text-[12.5px] leading-[16px]
  *
  * Design tokens used:
- * - Border radius: rounded-lg (8px)
- * - Background: bg-surface-0 / dark:bg-surface-2 (elevated)
- * - Border: border-subtle (uses design token for both modes)
+ * - Border radius: rounded-(--linear-app-radius-menu) / rounded-(--linear-app-radius-item)
+ * - Background: bg-(--linear-bg-surface-0) (elevated)
+ * - Border: border-(--linear-border-default) (uses design token for both modes)
  * - Shadow: consistent across all variants
  * - Transition: duration-normal ease-interactive
  */
@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Shadow effect for elevated appearance
@@ -182,6 +182,12 @@ export const MENU_ITEM_DESTRUCTIVE =
   '[&_svg]:text-(--linear-error) hover:[&_svg]:text-(--linear-error) data-[highlighted]:[&_svg]:text-(--linear-error)';
 
 /**
+ * Selected/active item state for menus with current choices
+ */
+export const MENU_ITEM_SELECTED =
+  'bg-(--linear-bg-surface-1) text-(--linear-text-primary) [&_svg]:text-(--linear-text-primary)';
+
+/**
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
@@ -211,13 +217,13 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
+  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2.5 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -248,6 +254,45 @@ export const MENU_SEPARATOR_BASE =
 export const MENU_SHORTCUT_BASE =
   'ml-auto text-[10.5px] font-medium text-(--linear-text-tertiary)';
 
+/**
+ * Shared leading/trailing slots for structured menu rows
+ */
+export const MENU_LEADING_SLOT_BASE =
+  'flex h-4 w-4 shrink-0 items-center justify-center text-(--linear-text-tertiary)';
+
+export const MENU_TRAILING_SLOT_BASE =
+  'ml-auto inline-flex min-w-4 shrink-0 items-center justify-end gap-1 text-(--linear-text-tertiary)';
+
+/**
+ * Secondary line inside a structured menu row
+ */
+export const MENU_ITEM_DESCRIPTION_BASE =
+  'truncate text-[11px] leading-3 text-(--linear-text-tertiary)';
+
+/**
+ * Small count/status badge used in menu rows
+ */
+export const MENU_BADGE_BASE =
+  'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 text-[10.5px] font-medium tabular-nums text-(--linear-text-tertiary)';
+
+/**
+ * Search header and input styles shared by root menus and searchable submenus
+ */
+export const MENU_SEARCH_HEADER_BASE =
+  'border-b border-(--linear-border-subtle) px-2 py-2';
+
+export const MENU_SEARCH_INPUT_BASE =
+  'h-7 w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-7 pr-7 text-[12px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none focus-visible:border-(--linear-border-focus)';
+
+/**
+ * Empty and loading states inside menu surfaces
+ */
+export const MENU_EMPTY_STATE_BASE =
+  'px-3 py-6 text-center text-[12px] text-(--linear-text-tertiary)';
+
+export const MENU_LOADING_STATE_BASE =
+  'flex items-center justify-center px-3 py-6 text-(--linear-text-tertiary)';
+
 // ============================================================================
 // TRIGGER STYLES
 // ============================================================================
@@ -256,7 +301,7 @@ export const MENU_SHORTCUT_BASE =
  * Select trigger button styles
  */
 export const SELECT_TRIGGER_BASE =
-  'flex h-8 w-full items-center justify-between rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 ' +
+  'flex h-8 w-full items-center justify-between rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 ' +
   'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'transition-colors duration-normal ' +
@@ -270,11 +315,12 @@ export const SELECT_TRIGGER_BASE =
 // ============================================================================
 
 /**
- * Sub-menu content classes (no max-height constraint)
+ * Sub-menu content classes.
+ * Supports both DropdownMenu.SubContent and ContextMenu.SubContent Radix vars.
  */
 export const subMenuContentClasses = [
   DROPDOWN_CONTENT_BASE,
-  'max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto overflow-x-hidden',
+  'max-h-[min(var(--radix-dropdown-menu-content-available-height,var(--radix-context-menu-content-available-height,320px)),320px)] overflow-y-auto overflow-x-hidden',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   DROPDOWN_SLIDE_ANIMATIONS,
@@ -285,10 +331,10 @@ export const subMenuContentClasses = [
 // ============================================================================
 
 /**
- * Compact base — same surface/border/animation but tighter padding
+ * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Complete compact DropdownMenu content classes

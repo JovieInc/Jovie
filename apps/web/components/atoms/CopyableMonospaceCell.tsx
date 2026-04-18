@@ -51,11 +51,11 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
 
   const sizeClasses = {
     sm: {
-      button: 'h-5 gap-1 rounded-[6px] px-1 text-[10px]',
+      button: 'h-5 gap-1 rounded-full px-1 text-[10px]',
       icon: 'h-3 w-3',
     },
     md: {
-      button: 'h-6 gap-1 rounded-[7px] px-1 py-0.5 text-[11px]',
+      button: 'h-6 gap-1 rounded-full px-1 py-0.5 text-[11px]',
       icon: 'h-3 w-3',
     },
   } as const;

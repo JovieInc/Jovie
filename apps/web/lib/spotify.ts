@@ -174,7 +174,7 @@ export async function getSpotifyArtistAlbums(
     limit?: number;
     market?: string;
   } = {}
-): Promise<SpotifyAlbum[]> {
+): Promise<{ albums: SpotifyAlbum[]; total: number }> {
   const includeGroups = options.includeGroups ?? [
     'album',
     'single',
@@ -184,6 +184,7 @@ export async function getSpotifyArtistAlbums(
   const market = options.market ?? 'US';
 
   const albums: SpotifyAlbum[] = [];
+  let totalFromApi = 0;
   let offset = 0;
   let hasMore = true;
 
@@ -199,6 +200,7 @@ export async function getSpotifyArtistAlbums(
       const data = await spotifyClient.requestJson<SpotifyAlbumsResponse>(
         `/artists/${artistId}/albums?${params}`
       );
+      if (offset === 0) totalFromApi = data.total;
       albums.push(...data.items);
 
       if (data.next && albums.length < data.total) {
@@ -212,13 +214,13 @@ export async function getSpotifyArtistAlbums(
       }
     }
 
-    return albums;
+    return { albums, total: totalFromApi };
   } catch (error) {
     await captureError('Failed to fetch Spotify artist albums', error, {
       artistId,
       operation: 'getSpotifyArtistAlbums',
     });
-    return [];
+    return { albums: [], total: 0 };
   }
 }
 

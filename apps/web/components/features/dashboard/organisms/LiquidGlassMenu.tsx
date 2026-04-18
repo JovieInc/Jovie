@@ -115,7 +115,7 @@ function GlassHighlight({
     <div
       className={cn(
         'absolute inset-0 pointer-events-none',
-        rounded && 'rounded-2xl'
+        rounded && 'rounded-[10px]'
       )}
       style={
         subtle
@@ -136,7 +136,7 @@ function GlassBlur({
 }) {
   return (
     <div
-      className={cn('absolute inset-0', rounded && 'rounded-2xl')}
+      className={cn('absolute inset-0', rounded && 'rounded-[10px]')}
       style={intense ? GLASS_LAYER_STYLES.blur : GLASS_LAYER_STYLES.blurLight}
       aria-hidden='true'
     />
@@ -182,11 +182,11 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[510] transition-all duration-150',
+        'flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] transition-all duration-150',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
-          : 'text-secondary-token hover:text-primary-token hover:bg-bg-surface-2/50'
+          : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
       )}
     >
       <Icon
@@ -261,7 +261,7 @@ export function LiquidGlassMenu({
         {/* Expanded menu */}
         <div
           className={cn(
-            'relative z-50 mx-3 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
+            'relative z-50 mx-3 mb-2 overflow-hidden rounded-[12px] transition-all duration-300 ease-out',
             isExpanded ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
           )}
           style={{
@@ -291,7 +291,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div className='my-2 mx-1 border-t border-default/30' />
-                  <p className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                  <p className='px-3 py-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
                     Admin
                   </p>
                   {adminItems.map(item => (
@@ -311,7 +311,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:text-primary-token hover:bg-bg-surface-2/50 active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'
@@ -351,7 +351,7 @@ export function LiquidGlassMenu({
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl transition-all duration-150',
+                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-[8px] py-1.5 transition-all duration-150',
                   'active:scale-95',
                   active
                     ? 'text-primary-token'
@@ -389,7 +389,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl transition-all duration-150',
+              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-[8px] py-1.5 transition-all duration-150',
               'active:scale-95',
               isExpanded
                 ? 'text-primary-token'
@@ -413,7 +413,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl text-tertiary-token hover:text-secondary-token transition-all duration-150 active:scale-95'
+              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-[8px] py-1.5 text-tertiary-token transition-all duration-150 hover:text-secondary-token active:scale-95'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='text-[10px] leading-tight font-[510]'>

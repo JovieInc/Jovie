@@ -6,6 +6,8 @@ import type { ProviderKey } from '@/lib/discography/types';
 
 import { createMockRelease } from '@/tests/test-utils/factories';
 
+const mockFetchReleaseCreditsAction = vi.fn();
+
 // @jovie/ui: ReleaseSidebar uses SegmentControl; ReleaseDspLinks (real) uses
 // Button, Input, Label, Select*, SimpleTooltip.
 vi.mock('@jovie/ui', async () => {
@@ -185,6 +187,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
   ),
+  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
   DrawerSurfaceCard: ({
     children,
@@ -205,19 +208,46 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </div>
   ),
+  DrawerInspectorStack: ({
+    children,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    'data-testid'?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  DrawerInspectorCard: ({
+    children,
+    title,
+    actions,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    title: string;
+    actions?: React.ReactNode;
+    'data-testid'?: string;
+  }) => (
+    <section data-testid={testId}>
+      <h3>{title}</h3>
+      {actions}
+      {children}
+    </section>
+  ),
   DrawerTabs: ({
     value,
     onValueChange,
     options,
+    actions,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     options: Array<{ value: string; label: string }>;
+    actions?: React.ReactNode;
   }) => (
     <div>
       {options.map(option => (
         <button
           key={option.value}
+          data-testid={`drawer-tab-${option.value}`}
           type='button'
           aria-selected={value === option.value}
           role='tab'
@@ -226,6 +256,60 @@ vi.mock('@/components/molecules/drawer', () => ({
           {option.label}
         </button>
       ))}
+      {actions}
+    </div>
+  ),
+  DrawerSplitButton: ({
+    primaryAction,
+    menuItems,
+  }: {
+    primaryAction?: {
+      ariaLabel: string;
+      label?: string;
+      onClick: () => void;
+      testId?: string;
+    };
+    menuItems?: Array<{ id: string; label?: string; onClick?: () => void }>;
+  }) =>
+    !primaryAction && (!menuItems || menuItems.length === 0) ? null : (
+      <div data-testid='drawer-split-button'>
+        {primaryAction ? (
+          <button
+            type='button'
+            aria-label={primaryAction.ariaLabel}
+            onClick={primaryAction.onClick}
+            data-testid={primaryAction.testId}
+          >
+            {primaryAction.label ?? primaryAction.ariaLabel}
+          </button>
+        ) : null}
+        {menuItems?.map(item => (
+          <button
+            key={item.id}
+            type='button'
+            onClick={item.onClick}
+            data-testid={`drawer-split-menu-item-${item.id}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+    controls,
+    testId,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+    controls?: React.ReactNode;
+    testId?: string;
+  }) => (
+    <div data-testid={testId}>
+      {tabs}
+      {controls}
+      {children}
     </div>
   ),
 }));
@@ -235,7 +319,11 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
+  useReleaseHeaderParts: () => ({
+    headerLabel: '',
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
@@ -255,11 +343,20 @@ vi.mock('@/components/organisms/AvatarUploadable', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
   ReleaseFields: () => <div>Fields</div>,
 }));
+vi.mock('@/components/features/dashboard/release-tasks', () => ({
+  ReleaseTaskChecklist: () => <div>Tasks</div>,
+}));
 vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
   ReleaseTrackList: () => <div>Tracks</div>,
 }));
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div>Metadata</div>,
+}));
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: () => <div>Credits</div>,
+}));
+vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
+  ReleasePitchSection: () => <div>Pitch Section</div>,
 }));
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
@@ -270,6 +367,13 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
   TrackDetailPanel: () => <div>Track Detail</div>,
 }));
+vi.mock(
+  '@/components/organisms/release-sidebar/release-credits-action',
+  () => ({
+    fetchReleaseCreditsAction: (...args: unknown[]) =>
+      mockFetchReleaseCreditsAction(...args),
+  })
+);
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
   () => ({
@@ -293,9 +397,21 @@ vi.mock('sonner', () => ({
 vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareDropdownItems: () => [],
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareContextMenuItems: () => [],
+    getUTMShareDropdownItems: () => [],
+  };
+});
+vi.mock('@/lib/queries', () => ({
+  usePlanGate: () => ({
+    canAccessTasksWorkspace: true,
+    isLoading: false,
+  }),
 }));
 
 const { ReleaseSidebar } = await import(
@@ -308,12 +424,13 @@ const providerConfig = {
   youtube: { label: 'YouTube Music', accent: '#FF0000' },
 } as Record<ProviderKey, { label: string; accent: string }>;
 
-describe('ReleaseSidebar links tab interactions', () => {
+describe('ReleaseSidebar DSP card interactions', () => {
   const onAddDspLink = vi.fn().mockResolvedValue(undefined);
   const onRemoveDspLink = vi.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchReleaseCreditsAction.mockResolvedValue([]);
   });
 
   it('adds a DSP link with expected payload shape', async () => {
@@ -338,8 +455,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
+    expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
     const urlInput = screen.getByPlaceholderText(
@@ -372,8 +490,8 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
       screen.getByPlaceholderText('https://open.spotify.com/...'),
@@ -405,7 +523,10 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByTestId('drawer-tab-dsps'));
+    expect(
+      screen.queryByTestId('release-sidebar-add-dsp-link')
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
 
     expect(onRemoveDspLink).toHaveBeenCalledWith(release.id, 'spotify');

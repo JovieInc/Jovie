@@ -16,10 +16,20 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { and, count, desc, eq, isNotNull, or } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
@@ -33,6 +43,10 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  getConfirmedFeaturedPlaylistFallback,
+  getFeaturedPlaylistFallbackCandidate,
+} from '@/lib/profile/featured-playlist-fallback';
 
 // ============================================================================
 // Types
@@ -40,7 +54,12 @@ import { captureError } from '@/lib/error-tracking';
 
 export interface ProfileSuggestion {
   id: string;
-  type: 'dsp_match' | 'social_link' | 'avatar' | 'profile_ready';
+  type:
+    | 'dsp_match'
+    | 'social_link'
+    | 'avatar'
+    | 'playlist_fallback'
+    | 'profile_ready';
   platform: string;
   platformLabel: string;
   title: string;
@@ -63,8 +82,11 @@ export interface SuggestionsStarterContext {
 // ============================================================================
 
 export async function GET(request: Request) {
+  const oneYearAgo = new Date();
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -87,6 +109,7 @@ export async function GET(request: Request) {
         avatarUrl: creatorProfiles.avatarUrl,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -171,20 +194,33 @@ export async function GET(request: Request) {
             .limit(10),
 
       // Latest release for contextual starter prompts
+      // Use only recent releases so we don't suggest stale catalog items.
+      // Use releaseDate when available, with createdAt as fallback so manually
+      // entered releases without release dates still count as newest.
       db
-        .select({ title: discogReleases.title })
+        .select({
+          title: discogReleases.title,
+        })
         .from(discogReleases)
         .where(
           and(
             eq(discogReleases.creatorProfileId, profileId),
             or(
-              isNotNull(discogReleases.releaseDate),
-              isNotNull(discogReleases.createdAt)
+              and(
+                isNotNull(discogReleases.releaseDate),
+                gte(discogReleases.releaseDate, oneYearAgo)
+              ),
+              and(
+                isNull(discogReleases.releaseDate),
+                gte(discogReleases.createdAt, oneYearAgo)
+              )
             )
           )
         )
         .orderBy(
-          desc(discogReleases.releaseDate),
+          desc(
+            drizzleSql`COALESCE(${discogReleases.releaseDate}, ${discogReleases.createdAt})`
+          ),
           desc(discogReleases.createdAt)
         )
         .limit(1),
@@ -200,6 +236,18 @@ export async function GET(request: Request) {
     const filteredAvatars = avatarCandidates.filter(
       c => c.avatarUrl !== profile.avatarUrl
     );
+    const pendingPlaylistFallback = getFeaturedPlaylistFallbackCandidate(
+      profile.settings as Record<string, unknown> | null | undefined
+    );
+    const confirmedPlaylistFallback = getConfirmedFeaturedPlaylistFallback(
+      profile.settings as Record<string, unknown> | null | undefined
+    );
+    const dismissedPlaylistId =
+      typeof (profile.settings as Record<string, unknown> | null | undefined)
+        ?.featuredPlaylistFallbackDismissedId === 'string'
+        ? ((profile.settings as Record<string, unknown>)
+            .featuredPlaylistFallbackDismissedId as string)
+        : null;
 
     // Normalize into unified format
     const suggestions: ProfileSuggestion[] = [
@@ -230,6 +278,25 @@ export async function GET(request: Request) {
         externalUrl: suggestion.url,
         confidence: Number.parseFloat(suggestion.confidenceScore),
       })),
+
+      ...(pendingPlaylistFallback &&
+      confirmedPlaylistFallback?.playlistId !==
+        pendingPlaylistFallback.playlistId &&
+      dismissedPlaylistId !== pendingPlaylistFallback.playlistId
+        ? [
+            {
+              id: pendingPlaylistFallback.playlistId,
+              type: 'playlist_fallback' as const,
+              platform: 'spotify',
+              platformLabel: 'Spotify',
+              title: pendingPlaylistFallback.title,
+              subtitle: 'Official playlist fallback suggestion',
+              imageUrl: pendingPlaylistFallback.imageUrl,
+              externalUrl: pendingPlaylistFallback.url,
+              confidence: null,
+            },
+          ]
+        : []),
 
       // Avatar candidates last
       ...filteredAvatars.map(candidate => ({

@@ -1,0 +1,820 @@
+'use client';
+
+import { ArrowRight, Bell, CheckCircle2 } from 'lucide-react';
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
+import { OtpInput } from '@/features/auth/atoms/otp-input';
+import { useUserSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import {
+  useUpdateSubscriberBirthdayMutation,
+  useUpdateSubscriberNameMutation,
+} from '@/lib/queries/useNotificationStatusQuery';
+import type { Artist } from '@/types/db';
+import {
+  clearOtpConfirmTimeout,
+  noFontSynthesisStyle,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
+  SubscriptionFormSkeleton,
+  SubscriptionOtpResendAction,
+  SubscriptionPearlComposer,
+  subscriptionComposerFocusClassName,
+  subscriptionInputClassName,
+  subscriptionPrimaryActionClassName,
+  subscriptionSuccessTextClassName,
+  useSubscriptionErrorFeedback,
+} from './shared';
+import { useSubscriptionForm } from './useSubscriptionForm';
+
+type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
+type RevealVisualState = 'collapsed' | 'expanded' | 'submitting' | 'error';
+
+const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
+
+function getRevealVisualState(
+  step: Step,
+  isSubmitting: boolean,
+  hasError: boolean
+): RevealVisualState {
+  if (step === 'cta') return 'collapsed';
+  if (isSubmitting) return 'submitting';
+  if (hasError) return 'error';
+  return 'expanded';
+}
+
+function CircularSubmitButton({
+  onClick,
+  disabled,
+  submitting = false,
+}: {
+  readonly onClick: () => void;
+  readonly disabled: boolean;
+  readonly submitting?: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      disabled={disabled}
+      className={`${circularButtonClassName} relative`}
+      aria-label={submitting ? 'Submitting' : 'Submit'}
+    >
+      <span
+        className={`transition-opacity duration-200 ${submitting ? 'opacity-0' : 'opacity-100'}`}
+      >
+        <ArrowRight className='h-4 w-4' />
+      </span>
+      <span
+        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${submitting ? 'opacity-100' : 'opacity-0'}`}
+      >
+        <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none' />
+      </span>
+    </button>
+  );
+}
+
+function birthdayDigitsToStorage(digits: string): string {
+  const mm = digits.slice(0, 2);
+  const dd = digits.slice(2, 4);
+  const yyyy = digits.slice(4, 8);
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function isDrawerElement(element: Element | null): boolean {
+  return element?.closest('[data-testid="profile-menu-drawer"]') !== null;
+}
+
+interface BirthdayInputProps {
+  readonly value?: string;
+  readonly onChange?: (value: string) => void;
+  readonly onComplete?: (value: string) => void;
+  readonly onSubmit?: () => void;
+  readonly autoFocus?: boolean;
+  readonly disabled?: boolean;
+  readonly error?: boolean;
+}
+
+function formatBirthdayInput(value: string): string {
+  const digits = value.replaceAll(/[^\d]/g, '').slice(0, 8);
+  const month = digits.slice(0, 2);
+  const day = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  if (digits.length <= 2) return month;
+  if (digits.length <= 4) return `${month}/${day}`;
+  return `${month}/${day}/${year}`;
+}
+
+function BirthdayInput({
+  value = '',
+  onChange,
+  onComplete,
+  onSubmit,
+  autoFocus = true,
+  disabled = false,
+  error = false,
+}: Readonly<BirthdayInputProps>) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const formattedValue = formatBirthdayInput(value);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus();
+  }, [autoFocus]);
+
+  return (
+    <input
+      ref={inputRef}
+      data-testid='inline-birthday-input'
+      type='text'
+      inputMode='numeric'
+      disabled={disabled}
+      aria-invalid={error || undefined}
+      aria-label='Birthday'
+      placeholder='MM/DD/YYYY'
+      value={formattedValue}
+      onChange={event => {
+        const digits = event.target.value.replaceAll(/[^\d]/g, '').slice(0, 8);
+        onChange?.(digits);
+
+        if (digits.length === 8) {
+          onComplete?.(digits);
+        }
+      }}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onSubmit?.();
+        }
+      }}
+      className='h-12 w-full rounded-full bg-transparent px-2 text-center text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0'
+    />
+  );
+}
+
+interface InlineInputStepProps {
+  readonly inputRef?: React.RefObject<HTMLInputElement | null>;
+  readonly inputId: string;
+  readonly testId: string;
+  readonly label: string;
+  readonly type?: string;
+  readonly inputMode?: 'text' | 'email' | 'numeric';
+  readonly placeholder: string;
+  readonly value: string;
+  readonly onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  readonly onSubmit: () => void;
+  readonly onKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
+  readonly onFocus: () => void;
+  readonly onBlur: () => void;
+  readonly disabled: boolean;
+  readonly submitting?: boolean;
+  readonly isFocused: boolean;
+  readonly autoComplete?: string;
+  readonly maxLength?: number;
+  readonly ariaInvalid?: boolean;
+  readonly composerTestId?: string;
+}
+
+function InlineInputStep({
+  inputRef,
+  inputId,
+  testId,
+  label,
+  type = 'text',
+  inputMode = 'text',
+  placeholder,
+  value,
+  onChange,
+  onSubmit,
+  onKeyDown,
+  onFocus,
+  onBlur,
+  disabled,
+  submitting = false,
+  isFocused,
+  autoComplete,
+  maxLength,
+  ariaInvalid,
+  composerTestId,
+}: InlineInputStepProps) {
+  return (
+    <SubscriptionPearlComposer
+      dataTestId={composerTestId ?? `${testId}-composer`}
+      className={isFocused ? subscriptionComposerFocusClassName : ''}
+      action={
+        <CircularSubmitButton
+          onClick={onSubmit}
+          disabled={disabled}
+          submitting={submitting}
+        />
+      }
+    >
+      <div
+        className={`min-w-0 transition-opacity duration-200 ${submitting ? 'opacity-0' : 'opacity-100'}`}
+      >
+        <label htmlFor={inputId} className='sr-only'>
+          {label}
+        </label>
+        <input
+          ref={inputRef}
+          id={inputId}
+          data-testid={testId}
+          type={type}
+          inputMode={inputMode}
+          className={subscriptionInputClassName}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          aria-invalid={ariaInvalid}
+          autoComplete={autoComplete}
+          maxLength={maxLength}
+          style={noFontSynthesisStyle}
+        />
+      </div>
+    </SubscriptionPearlComposer>
+  );
+}
+
+interface StepPanelProps {
+  readonly active: boolean;
+  readonly children: React.ReactNode;
+  readonly panelId: string;
+}
+
+function StepPanel({ active, children, panelId }: Readonly<StepPanelProps>) {
+  return (
+    <div
+      className='step-stack-panel'
+      data-active={active ? 'true' : 'false'}
+      data-panel={panelId}
+      aria-hidden={active ? undefined : true}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface ProfileInlineNotificationsCTAProps {
+  readonly artist: Artist;
+  readonly onManageNotifications?: () => void;
+  readonly onRegisterReveal?: (reveal: () => void) => void;
+}
+
+export function ProfileInlineNotificationsCTA({
+  artist,
+  onManageNotifications,
+  onRegisterReveal,
+}: ProfileInlineNotificationsCTAProps) {
+  const {
+    emailInput,
+    error,
+    errorOrigin,
+    otpCode,
+    isSubmitting,
+    resendCooldownEnd,
+    isResending,
+    handleChannelChange,
+    handleEmailChange,
+    handleFieldBlur,
+    handleOtpChange,
+    handleSubscribe,
+    handleVerifyOtp,
+    handleResendOtp,
+    notificationsState,
+    notificationsEnabled,
+    openSubscription,
+    hydrationStatus,
+    subscribedChannels,
+  } = useSubscriptionForm({ artist });
+  const { showInlineErrorCopy, shouldShowDesktopTooltip } =
+    useSubscriptionErrorFeedback({
+      error,
+      errorOrigin,
+    });
+
+  const [step, setStep] = useState<Step>('cta');
+  const [nameInput, setNameInput] = useState('');
+  const [birthdayInput, setBirthdayInput] = useState('');
+  const [birthdayHintShown, setBirthdayHintShown] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const otpStepRef = useRef<HTMLDivElement>(null);
+  const birthdayStepRef = useRef<HTMLDivElement>(null);
+  const revealShellRef = useRef<HTMLDivElement>(null);
+  const inputId = useId();
+  const { user } = useUserSafe();
+  const prefersReducedMotion = useReducedMotion();
+  const lastInteractionWasKeyboardRef = useRef(false);
+  const suppressNextFocusOpenRef = useRef(false);
+
+  const nameMutation = useUpdateSubscriberNameMutation();
+  const birthdayMutation = useUpdateSubscriberBirthdayMutation();
+  const subscribedEmailRef = useRef<string>('');
+
+  const hasSubscriptions = Boolean(
+    subscribedChannels.email || subscribedChannels.sms
+  );
+  const isAlreadySubscribed =
+    notificationsState === 'success' && hasSubscriptions;
+  const revealVisualState = getRevealVisualState(
+    step,
+    isSubmitting,
+    Boolean(error)
+  );
+  const revealActive = step === 'cta' || step === 'email';
+
+  useEffect(() => {
+    if (isAlreadySubscribed) {
+      if (step === 'cta') {
+        setStep('done');
+      }
+      return;
+    }
+
+    if (step === 'done') {
+      setStep('cta');
+    }
+  }, [isAlreadySubscribed, step]);
+
+  useEffect(() => {
+    if (step === 'email' && notificationsState === 'pending_confirmation') {
+      setStep('otp');
+    }
+  }, [step, notificationsState]);
+
+  useEffect(() => {
+    if (
+      (step === 'email' || step === 'otp') &&
+      notificationsState === 'success'
+    ) {
+      subscribedEmailRef.current = emailInput.trim();
+      setStep('name');
+    }
+  }, [step, notificationsState, emailInput]);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const focusDelay = prefersReducedMotion ? 0 : 180;
+
+    if (step === 'email') {
+      timeoutId = globalThis.setTimeout(() => {
+        emailInputRef.current?.focus({ preventScroll: true });
+      }, focusDelay);
+    }
+
+    if (step === 'otp') {
+      timeoutId = globalThis.setTimeout(() => {
+        otpStepRef.current
+          ?.querySelector<HTMLInputElement>('input')
+          ?.focus({ preventScroll: true });
+      }, focusDelay);
+    }
+
+    if (step === 'name') {
+      timeoutId = globalThis.setTimeout(() => {
+        nameInputRef.current?.focus({ preventScroll: true });
+      }, focusDelay);
+    }
+
+    if (step === 'birthday') {
+      timeoutId = globalThis.setTimeout(() => {
+        birthdayStepRef.current
+          ?.querySelector<HTMLInputElement>('input')
+          ?.focus({ preventScroll: true });
+      }, focusDelay);
+    }
+
+    return () => {
+      if (timeoutId) {
+        globalThis.clearTimeout(timeoutId);
+      }
+    };
+  }, [prefersReducedMotion, step]);
+
+  useEffect(() => {
+    if (step !== 'email' || emailInput) return;
+    const primaryEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+    if (primaryEmail) handleEmailChange(primaryEmail);
+  }, [step, emailInput, user, handleEmailChange]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      lastInteractionWasKeyboardRef.current = event.key === 'Tab';
+    };
+    const handlePointerIntent = () => {
+      lastInteractionWasKeyboardRef.current = false;
+    };
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('pointerdown', handlePointerIntent);
+
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+      globalThis.removeEventListener('pointerdown', handlePointerIntent);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
+
+  const handleReveal = useCallback(() => {
+    openSubscription();
+    handleChannelChange('email');
+    setStep('email');
+    track('subscribe_step_reveal', {
+      handle: artist.handle,
+      source: 'profile_inline_cta',
+    });
+  }, [artist.handle, openSubscription, handleChannelChange]);
+
+  const handleManageNotifications = useCallback(() => {
+    if (!onManageNotifications) return;
+
+    suppressNextFocusOpenRef.current = true;
+    onManageNotifications();
+  }, [onManageNotifications]);
+
+  useEffect(() => {
+    onRegisterReveal?.(handleReveal);
+  }, [onRegisterReveal, handleReveal]);
+
+  const handleEmailSubmit = useCallback(() => {
+    void handleSubscribe();
+  }, [handleSubscribe]);
+
+  const handleNameSubmit = useCallback(async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
+      setStep('birthday');
+      return;
+    }
+    try {
+      await nameMutation.mutateAsync({
+        artistId: artist.id,
+        email: subscribedEmailRef.current,
+        name: trimmed,
+      });
+      track('name_capture_submitted', {
+        handle: artist.handle,
+        source: 'profile_inline_cta',
+      });
+    } catch {
+      // Best-effort — don't block the flow
+    }
+    setStep('birthday');
+  }, [nameInput, artist.id, artist.handle, nameMutation]);
+
+  const handleBirthdaySubmit = useCallback(async () => {
+    const digits = birthdayInput.replaceAll(/[^\d]/g, '');
+    if (digits.length < 8) {
+      if (!birthdayHintShown) {
+        setBirthdayHintShown(true);
+        return;
+      }
+      setStep('done');
+      return;
+    }
+    const stored = birthdayDigitsToStorage(digits);
+    try {
+      await birthdayMutation.mutateAsync({
+        artistId: artist.id,
+        email: subscribedEmailRef.current,
+        birthday: stored,
+      });
+      track('birthday_capture_submitted', {
+        handle: artist.handle,
+        source: 'profile_inline_cta',
+      });
+    } catch {
+      // Best-effort — don't block the flow
+    }
+    setStep('done');
+  }, [
+    birthdayInput,
+    birthdayHintShown,
+    artist.id,
+    artist.handle,
+    birthdayMutation,
+  ]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      if (step === 'email') handleEmailSubmit();
+      else if (step === 'name') handleNameSubmit();
+      else if (step === 'birthday') handleBirthdaySubmit();
+    },
+    [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
+  );
+
+  const handleRevealShellBlurCapture = useCallback(() => {
+    globalThis.setTimeout(() => {
+      if (step !== 'email') return;
+
+      const activeElement = document.activeElement;
+      if (revealShellRef.current?.contains(activeElement)) {
+        return;
+      }
+
+      if (!emailInput.trim() && !isSubmitting) {
+        setStep('cta');
+      }
+    }, 0);
+  }, [step, emailInput, isSubmitting]);
+
+  const handleManageButtonFocus = useCallback(() => {
+    if (!lastInteractionWasKeyboardRef.current) return;
+    if (suppressNextFocusOpenRef.current) return;
+
+    handleManageNotifications();
+  }, [handleManageNotifications]);
+
+  const handleManageButtonBlur = useCallback(
+    (event: React.FocusEvent<HTMLButtonElement>) => {
+      if (isDrawerElement(event.relatedTarget as Element | null)) {
+        return;
+      }
+
+      suppressNextFocusOpenRef.current = false;
+    },
+    []
+  );
+
+  const handleManageButtonKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+
+      event.preventDefault();
+      handleManageNotifications();
+    },
+    [handleManageNotifications]
+  );
+
+  if (hydrationStatus === 'checking') {
+    return <SubscriptionFormSkeleton />;
+  }
+
+  if (!notificationsEnabled) {
+    return null;
+  }
+
+  return (
+    <div
+      data-testid='profile-inline-cta'
+      data-ui='step-stack'
+      className='min-h-[116px]'
+    >
+      <div className='step-stack-track'>
+        <StepPanel active={revealActive} panelId='reveal'>
+          <div
+            ref={revealShellRef}
+            data-ui='cta-reveal'
+            data-visual-state={revealVisualState}
+            onBlurCapture={handleRevealShellBlurCapture}
+            style={
+              {
+                '--cta-reveal-min-height': '48px',
+                '--cta-reveal-border': 'transparent',
+                '--cta-reveal-border-active': 'transparent',
+                '--cta-reveal-surface': 'transparent',
+                '--cta-reveal-surface-active': 'transparent',
+                '--cta-reveal-shadow': 'none',
+                '--cta-reveal-shadow-active': 'none',
+              } as CSSProperties
+            }
+          >
+            <div className='cta-reveal-shell'>
+              <div className='cta-reveal-panel cta-reveal-panel--cta'>
+                <button
+                  type='button'
+                  onClick={handleReveal}
+                  className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+                  style={noFontSynthesisStyle}
+                >
+                  <Bell className='h-4 w-4' />
+                  Turn on notifications
+                </button>
+              </div>
+
+              <div className='cta-reveal-panel cta-reveal-panel--form'>
+                <InlineInputStep
+                  inputRef={emailInputRef}
+                  inputId={`${inputId}-email`}
+                  testId='inline-email-input'
+                  composerTestId='inline-email-input-composer'
+                  label='Email address'
+                  type='email'
+                  inputMode='email'
+                  placeholder='your@email.com'
+                  value={emailInput}
+                  onChange={e => handleEmailChange(e.target.value)}
+                  onSubmit={handleEmailSubmit}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => {
+                    setIsInputFocused(false);
+                    handleFieldBlur();
+                  }}
+                  disabled={isSubmitting}
+                  submitting={isSubmitting}
+                  isFocused={isInputFocused}
+                  ariaInvalid={error ? true : undefined}
+                  autoComplete='email'
+                  maxLength={254}
+                />
+              </div>
+            </div>
+
+            <SubscriptionFeedbackRail
+              message={
+                step === 'email' && error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : step === 'email' && isInputFocused ? (
+                  'No spam. Opt-out anytime.'
+                ) : null
+              }
+              sideAction={
+                step === 'email' && error && shouldShowDesktopTooltip ? (
+                  <SubscriptionDesktopErrorIndicator error={error} />
+                ) : null
+              }
+            />
+          </div>
+        </StepPanel>
+
+        <StepPanel active={step === 'otp'} panelId='otp'>
+          <div ref={otpStepRef}>
+            <SubscriptionPearlComposer
+              dataTestId='inline-otp-composer'
+              layout='stacked'
+              className='px-3 py-3'
+              action={
+                <CircularSubmitButton
+                  onClick={() => {
+                    handleVerifyOtp().catch(() => {});
+                  }}
+                  disabled={
+                    otpCode.length !== 6 || isSubmitting || Boolean(error)
+                  }
+                  submitting={isSubmitting}
+                />
+              }
+            >
+              <div className='px-2 py-2'>
+                <OtpInput
+                  value={otpCode}
+                  onChange={value => {
+                    handleOtpChange(value);
+                    if (confirmMessage) setConfirmMessage(null);
+                  }}
+                  onComplete={() => {
+                    if (!error) {
+                      handleVerifyOtp().catch(() => {});
+                    }
+                  }}
+                  autoFocus={step === 'otp'}
+                  aria-label='Enter 6-digit verification code'
+                  disabled={isSubmitting}
+                  error={Boolean(error)}
+                />
+              </div>
+            </SubscriptionPearlComposer>
+            <SubscriptionFeedbackRail
+              message={
+                error && showInlineErrorCopy ? (
+                  <span role='alert'>{error}</span>
+                ) : confirmMessage && !error ? (
+                  <span className={subscriptionSuccessTextClassName}>
+                    {confirmMessage}
+                  </span>
+                ) : (
+                  'Enter the 6-digit code we sent to your email.'
+                )
+              }
+              sideAction={
+                <>
+                  {error && shouldShowDesktopTooltip ? (
+                    <SubscriptionDesktopErrorIndicator error={error} />
+                  ) : null}
+                  <SubscriptionOtpResendAction
+                    resendCooldownEnd={resendCooldownEnd}
+                    isResending={isResending}
+                    onResend={() => {
+                      requestOtpResendConfirmation({
+                        handleResendOtp,
+                        confirmTimeoutRef,
+                        setConfirmMessage,
+                      });
+                    }}
+                  />
+                </>
+              }
+            />
+          </div>
+        </StepPanel>
+
+        <StepPanel active={step === 'name'} panelId='name'>
+          <InlineInputStep
+            inputRef={nameInputRef}
+            inputId={`${inputId}-name`}
+            testId='inline-name-input'
+            label='First name'
+            placeholder="What's your name?"
+            value={nameInput}
+            onChange={e => setNameInput(e.target.value)}
+            onSubmit={() => {
+              handleNameSubmit();
+            }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+            disabled={nameMutation.isPending}
+            isFocused={isInputFocused}
+            autoComplete='given-name'
+            maxLength={100}
+          />
+          <SubscriptionFeedbackRail />
+        </StepPanel>
+
+        <StepPanel active={step === 'birthday'} panelId='birthday'>
+          <div ref={birthdayStepRef}>
+            <SubscriptionPearlComposer
+              dataTestId='inline-birthday-composer'
+              layout='stacked'
+              className='px-3 py-3'
+            >
+              <div className='px-2 py-2'>
+                <BirthdayInput
+                  value={birthdayInput}
+                  onChange={value => {
+                    setBirthdayInput(value);
+                    if (birthdayHintShown) setBirthdayHintShown(false);
+                  }}
+                  onComplete={() => {
+                    handleBirthdaySubmit();
+                  }}
+                  onSubmit={() => {
+                    handleBirthdaySubmit();
+                  }}
+                  autoFocus={step === 'birthday'}
+                  disabled={birthdayMutation.isPending}
+                />
+              </div>
+            </SubscriptionPearlComposer>
+            <SubscriptionFeedbackRail
+              message={
+                birthdayHintShown ? (
+                  'Enter full date to save'
+                ) : (
+                  <span aria-hidden='true'>.</span>
+                )
+              }
+            />
+          </div>
+        </StepPanel>
+
+        <StepPanel active={step === 'done'} panelId='done'>
+          <button
+            type='button'
+            data-testid='inline-notifications-on-button'
+            onClick={handleManageNotifications}
+            onFocus={handleManageButtonFocus}
+            onBlur={handleManageButtonBlur}
+            onKeyDown={handleManageButtonKeyDown}
+            className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+            style={noFontSynthesisStyle}
+            aria-label='Manage notifications'
+            aria-haspopup='dialog'
+          >
+            <CheckCircle2
+              className='h-4 w-4 shrink-0 text-green-400'
+              aria-hidden='true'
+            />
+            <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
+              Notifications on
+            </span>
+          </button>
+          <SubscriptionFeedbackRail />
+        </StepPanel>
+      </div>
+    </div>
+  );
+}

@@ -1,8 +1,21 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Textarea,
+} from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
@@ -14,6 +27,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   convertToCommonDropdownItems,
+  createMultiFieldFilterFn,
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -32,11 +46,12 @@ import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/Dashboard
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
@@ -50,8 +65,6 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
-  renderFunnelCell,
-  renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
   renderProfileCell,
@@ -87,15 +100,15 @@ function AdminUserMobileCard({
   return (
     <ContentSurfaceCard
       as='article'
-      className='overflow-hidden bg-surface-0 p-0'
+      className='overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-0'
     >
-      <div className='flex items-start justify-between gap-3 border-b border-subtle px-4 py-3'>
+      <div className='flex items-start justify-between gap-3 px-3 py-2'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
           <input
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded-[4px] border-subtle bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
+            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
@@ -110,7 +123,7 @@ function AdminUserMobileCard({
         <TableActionMenu items={actionItems} align='end' />
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 px-4 py-3 text-[12px]'>
+      <div className='flex flex-wrap items-center gap-2 px-3 py-2 text-[12px]'>
         <Badge
           size='sm'
           variant={user.plan === 'pro' ? 'primary' : 'secondary'}
@@ -135,20 +148,46 @@ function AdminUserMobileCard({
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const { users: initialUsers, pageSize, total, search, sort } = props;
-  const [searchTerm, setSearchTerm] = useState(search);
+  const {
+    users: initialUsers,
+    pageSize,
+    total,
+    search,
+    sort,
+    basePath = APP_ROUTES.ADMIN_USERS,
+  } = props;
+  const router = useRouter();
+  const [filterTerm, setFilterTerm] = useState(search);
 
+  // Sync URL search param on initial load
   useEffect(() => {
-    setSearchTerm(search);
+    setFilterTerm(search);
   }, [search]);
 
+  // Debounced URL sync (no navigation, just replaceState)
+  useSearchUrlSync(filterTerm, basePath);
+
+  // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminUsersInfiniteQuery({
       sort,
-      search,
+      search: '',
       pageSize,
       initialData: { rows: initialUsers, total },
     });
+
+  // Client-side filter searches across name, email, handle, and clerk ID
+  const userFilterFn = useMemo(
+    () =>
+      createMultiFieldFilterFn<AdminUserRow>([
+        r => r.name,
+        r => r.email,
+        r => r.profileUsername,
+        r => r.clerkId,
+        r => r.plan,
+      ]),
+    []
+  );
 
   const users = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? initialUsers,
@@ -203,19 +242,17 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         }
       >
         <HeaderSearchAction
-          action={APP_ROUTES.ADMIN_USERS}
-          clearHref={`${APP_ROUTES.ADMIN_USERS}?sort=${sort}`}
-          searchValue={searchTerm}
-          onSearchValueChange={setSearchTerm}
+          alwaysOpen
+          searchValue={filterTerm}
+          onSearchValueChange={setFilterTerm}
           placeholder='Search by email, name, or handle'
           ariaLabel='Search users by email, name, or handle'
           submitAriaLabel='Search users'
-          hiddenInputs={[{ name: 'sort', value: sort }]}
           tooltipLabel='Search'
         />
       </DashboardHeaderActionGroup>
     ),
-    [searchTerm, sort]
+    [filterTerm]
   );
 
   useEffect(() => {
@@ -248,6 +285,83 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
   headerCheckboxStateRef.current = headerCheckboxState;
+
+  // Ban dialog state
+  const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);
+  const [banReason, setBanReason] = useState('');
+  const [banPending, setBanPending] = useState(false);
+  const [unbanTarget, setUnbanTarget] = useState<AdminUserRow | null>(null);
+  const [unbanPending, setUnbanPending] = useState(false);
+
+  const handleBanConfirm = useCallback(async () => {
+    if (!banTarget || !banReason.trim()) return;
+    setBanPending(true);
+    try {
+      const res = await fetch(APP_ROUTES.ADMIN_USERS_BAN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          userId: banTarget.id,
+          reason: banReason.trim(),
+        }),
+      });
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const data = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {};
+        throw new Error(
+          (data as { error?: string }).error ?? 'Failed to suspend user'
+        );
+      }
+      toast.success('User suspended');
+      setBanTarget(null);
+      setBanReason('');
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to suspend user'
+      );
+    } finally {
+      setBanPending(false);
+    }
+  }, [banTarget, banReason, router]);
+
+  const handleUnbanConfirm = useCallback(async () => {
+    if (!unbanTarget) return;
+    setUnbanPending(true);
+    try {
+      const res = await fetch(APP_ROUTES.ADMIN_USERS_UNBAN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ userId: unbanTarget.id }),
+      });
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const data = contentType.includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {};
+        throw new Error(
+          (data as { error?: string }).error ?? 'Failed to restore user'
+        );
+      }
+      toast.success('User restored');
+      setUnbanTarget(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to restore user'
+      );
+    } finally {
+      setUnbanPending(false);
+    }
+  }, [unbanTarget, router]);
 
   // Action callbacks — clipboard + toast logic lives here, builder is pure
   const actionCallbacks = useMemo<BuildAdminUserActionsCallbacks>(
@@ -284,6 +398,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       onOpenInClerk: (u: AdminUserRow) => {
         const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(u.clerkId)}`;
         globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
+      },
+      onBanUser: (u: AdminUserRow) => {
+        setBanTarget(u);
+        setBanReason('');
+      },
+      onUnbanUser: (u: AdminUserRow) => {
+        setUnbanTarget(u);
       },
     }),
     []
@@ -328,6 +449,21 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             clearSelection();
           } else {
             toast.error('Failed to copy emails');
+          }
+        },
+      },
+      {
+        label: 'Copy User IDs',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const ids = selectedUsers.map(u => u.id).filter(Boolean);
+          if (ids.length === 0) return;
+          const ok = await copyToClipboard(ids.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${ids.length} User ID(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy User IDs');
           }
         },
       },
@@ -393,14 +529,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 160,
       }),
 
-      // Funnel status column
-      columnHelper.accessor('userStatus', {
-        id: 'funnel',
-        header: 'Funnel',
-        cell: renderFunnelCell,
-        size: 140,
-      }),
-
       // Plan column
       columnHelper.accessor('plan', {
         id: 'plan',
@@ -409,19 +537,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 120,
       }),
 
-      // Status column
+      // Status column (combines lifecycle state + deleted detection)
       columnHelper.display({
         id: 'status',
         header: 'Status',
         cell: renderStatusCell,
-        size: 100,
-      }),
-
-      // Lifecycle column
-      columnHelper.display({
-        id: 'lifecycle',
-        header: 'Lifecycle',
-        cell: renderLifecycleCell,
         size: 120,
       }),
 
@@ -452,12 +572,22 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     [SelectHeader, SelectCell, ActionsCell]
   );
 
+  // Arrow keys update detail drawer when it's already open
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (selectedUser && users[index]) {
+        setSelectedUser(users[index]);
+      }
+    },
+    [selectedUser, users]
+  );
+
   // Get row className - highlight selected row, hover for others
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_2px_0_0_0_var(--linear-border-focus)]'
-        : 'group cursor-pointer hover:bg-(--linear-row-hover)',
+        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
+        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
     [selectedUser?.id]
   );
 
@@ -465,50 +595,46 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
+          <AdminTableHeader
+            title='Users'
+            subtitle='Review lifecycle state, profile completion, and suppression health.'
+          />
+          <AdminTableSubheader
+            start={
+              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()} users
+              </div>
+            }
+            end={
+              <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                <ExportCSVButton<AdminUserRow>
+                  getData={() => users}
+                  columns={usersCSVColumns}
+                  filename={USERS_CSV_FILENAME_PREFIX}
+                  disabled={users.length === 0}
+                  ariaLabel='Export users to CSV file'
+                  chrome='page-toolbar'
+                  iconOnly
+                  tooltipLabel='Export'
+                />
+              </div>
+            }
+          />
           <AdminTableShell
             testId='admin-users-content'
+            className='rounded-none border-0'
             toolbar={
-              <>
-                {/* Bulk actions toolbar (shows when rows selected) */}
-                <TableBulkActionsToolbar
-                  selectedCount={selectedCount}
-                  onClearSelection={clearSelection}
-                  actions={bulkActions}
-                />
-
-                {/* Main toolbar (always visible) */}
-                <AdminTableHeader
-                  title='Users'
-                  subtitle='Review lifecycle state, profile completion, and suppression health.'
-                />
-                <AdminTableSubheader
-                  start={
-                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                      {total.toLocaleString()} users
-                    </div>
-                  }
-                  end={
-                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                      <ExportCSVButton<AdminUserRow>
-                        getData={() => users}
-                        columns={usersCSVColumns}
-                        filename={USERS_CSV_FILENAME_PREFIX}
-                        disabled={users.length === 0}
-                        ariaLabel='Export users to CSV file'
-                        chrome='page-toolbar'
-                        iconOnly
-                        tooltipLabel='Export'
-                      />
-                    </div>
-                  }
-                />
-              </>
+              <TableBulkActionsToolbar
+                selectedCount={selectedCount}
+                onClearSelection={clearSelection}
+                actions={bulkActions}
+              />
             }
           >
             {() =>
               isMobile ? (
-                <div className='space-y-3 p-3'>
+                <div className='space-y-2 p-3'>
                   {users.length === 0 ? (
                     <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
@@ -517,7 +643,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>
-                          {search
+                          {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
@@ -556,6 +682,10 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   columns={columns}
                   rowSelection={rowSelection}
                   isLoading={false}
+                  globalFilter={filterTerm}
+                  onGlobalFilterChange={setFilterTerm}
+                  enableFiltering
+                  globalFilterFn={userFilterFn}
                   emptyState={
                     <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
@@ -564,7 +694,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>
-                          {search
+                          {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
@@ -574,10 +704,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   getRowId={row => row.id}
                   getRowClassName={getRowClassName}
                   onRowClick={handleRowClick}
+                  onFocusedRowChange={handleFocusedRowChange}
                   getContextMenuItems={getContextMenuItems}
                   enableVirtualization={true}
                   minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                  className='text-[13px]'
+                  className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
                   onLoadMore={() => {
@@ -598,6 +729,83 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           }
         />
       </div>
+
+      {/* Ban confirmation dialog with reason */}
+      <AlertDialog
+        open={banTarget !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setBanTarget(null);
+            setBanReason('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend user</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately prevent{' '}
+              {banTarget?.name ?? banTarget?.email ?? 'this user'} from
+              accessing Jovie.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='px-6 pb-2'>
+            <label
+              htmlFor='ban-reason'
+              className='text-sm font-medium text-primary-token mb-1.5 block'
+            >
+              Reason (required)
+            </label>
+            <Textarea
+              id='ban-reason'
+              placeholder='Why is this user being suspended?'
+              value={banReason}
+              onChange={e => setBanReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={banPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBanConfirm}
+              disabled={banPending || banReason.trim().length === 0}
+              variant='destructive'
+            >
+              {banPending ? 'Suspending...' : 'Suspend user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unban confirmation dialog */}
+      <AlertDialog
+        open={unbanTarget !== null}
+        onOpenChange={open => {
+          if (!open) setUnbanTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore user</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will restore access for{' '}
+              {unbanTarget?.name ?? unbanTarget?.email ?? 'this user'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unbanPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnbanConfirm}
+              disabled={unbanPending}
+              variant='primary'
+            >
+              {unbanPending ? 'Restoring...' : 'Restore user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </QueryErrorBoundary>
   );
 }

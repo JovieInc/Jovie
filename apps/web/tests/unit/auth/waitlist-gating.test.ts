@@ -5,7 +5,7 @@
  * - proxy.ts middleware (primary gate)
  * - lib/auth/proxy-state.ts (user state resolution)
  * - lib/auth/gate.ts (centralized auth gate)
- * - lib/auth/waitlist-config.ts (feature flag)
+ * - lib/waitlist/settings.ts (DB-backed gate check)
  *
  * ## Architecture Summary
  *
@@ -13,6 +13,9 @@
  * 1. Middleware (proxy.ts) - rewrites/redirects based on ProxyUserState
  * 2. Server auth gate (lib/auth/gate.ts) - resolveUserState() for pages
  * 3. API routes - individual auth() checks (no waitlist status check)
+ *
+ * The waitlist gate is controlled via the `gateEnabled` column in the
+ * `waitlist_settings` DB table (runtime toggle via admin panel).
  *
  * ## User States (userStatus column)
  * - waitlist_pending: submitted waitlist, awaiting approval
@@ -31,54 +34,7 @@
  *    - Max staleness: 2-5 minutes (Redis TTL)
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-// ============================================================================
-// Tests for waitlist-config.ts
-// ============================================================================
-
-describe('isWaitlistEnabled', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  it('returns true when WAITLIST_ENABLED is "true"', async () => {
-    process.env.WAITLIST_ENABLED = 'true';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(true);
-  });
-
-  it('returns false when WAITLIST_ENABLED is missing', async () => {
-    delete process.env.WAITLIST_ENABLED;
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is "false"', async () => {
-    process.env.WAITLIST_ENABLED = 'false';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is empty string', async () => {
-    process.env.WAITLIST_ENABLED = '';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is "TRUE" (case sensitive)', async () => {
-    process.env.WAITLIST_ENABLED = 'TRUE';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-});
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ============================================================================
 // Tests for status-checker.ts
@@ -87,16 +43,16 @@ describe('isWaitlistEnabled', () => {
 describe('checkUserStatus', () => {
   // Import directly since it has no server-only guard
   let checkUserStatus: typeof import('@/lib/auth/status-checker').checkUserStatus;
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
 
     // Mock server-only to prevent import error
-    vi.mock('server-only', () => ({}));
+    vi.doMock('server-only', () => ({}));
 
     // Mock database dependencies that gate.ts imports
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -112,7 +68,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -125,7 +81,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -138,7 +94,7 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: {
         id: 'id',
         email: 'email',
@@ -146,33 +102,33 @@ describe('checkUserStatus', () => {
       },
     }));
 
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
 
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
 
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
 
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
 
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
 
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -182,7 +138,7 @@ describe('checkUserStatus', () => {
     const statusModule = await import('@/lib/auth/status-checker');
     checkUserStatus = statusModule.checkUserStatus;
     const gateModule = await import('@/lib/auth/gate');
-    UserState = gateModule.UserState;
+    CanonicalUserState = gateModule.CanonicalUserState;
   });
 
   it('allows active users (no ban, no deletion)', () => {
@@ -194,20 +150,20 @@ describe('checkUserStatus', () => {
   it('blocks banned users', () => {
     const result = checkUserStatus('banned', null);
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
-    expect(result.redirectTo).toBe('/banned');
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
+    expect(result.redirectTo).toBe('/unavailable');
   });
 
   it('blocks suspended users', () => {
     const result = checkUserStatus('suspended', null);
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
   });
 
   it('blocks soft-deleted users', () => {
     const result = checkUserStatus('active', new Date());
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
   });
 
   it('blocks deleted users even with null status', () => {
@@ -238,13 +194,13 @@ describe('checkUserStatus', () => {
 describe('resolveProfileState', () => {
   let resolveProfileState: typeof import('@/lib/auth/profile-state-resolver').resolveProfileState;
   let isProfileComplete: typeof import('@/lib/auth/profile-state-resolver').isProfileComplete;
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -259,7 +215,7 @@ describe('resolveProfileState', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -271,7 +227,7 @@ describe('resolveProfileState', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -283,31 +239,31 @@ describe('resolveProfileState', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -318,7 +274,7 @@ describe('resolveProfileState', () => {
     resolveProfileState = mod.resolveProfileState;
     isProfileComplete = mod.isProfileComplete;
     const gateMod = await import('@/lib/auth/gate');
-    UserState = gateMod.UserState;
+    CanonicalUserState = gateMod.CanonicalUserState;
   });
 
   const completeProfile = {
@@ -334,14 +290,14 @@ describe('resolveProfileState', () => {
 
   it('returns ACTIVE for complete profile', () => {
     const result = resolveProfileState(completeProfile);
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
     expect(result.redirectTo).toBeNull();
     expect(result.profileId).toBe('profile-1');
   });
 
   it('returns NEEDS_ONBOARDING when profile is null', () => {
     const result = resolveProfileState(null);
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     expect(result.redirectTo).toContain('/onboarding');
   });
 
@@ -351,7 +307,7 @@ describe('resolveProfileState', () => {
       username: null,
       usernameNormalized: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile has no display name', () => {
@@ -359,7 +315,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       displayName: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile has blank display name', () => {
@@ -367,7 +323,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       displayName: '   ',
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns ACTIVE when profile has no avatar (avatar optional)', () => {
@@ -375,7 +331,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       avatarUrl: null,
     });
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
   });
 
   it('returns ACTIVE when profile has blank avatar (avatar optional)', () => {
@@ -383,7 +339,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       avatarUrl: '   ',
     });
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
   });
 
   it('returns NEEDS_ONBOARDING when onboarding not completed', () => {
@@ -391,7 +347,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       onboardingCompletedAt: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile is not public', () => {
@@ -399,7 +355,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       isPublic: false,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   describe('isProfileComplete', () => {
@@ -425,17 +381,8 @@ describe('resolveProfileState', () => {
       );
     });
 
-    it('returns true when missing avatarUrl (avatar optional)', () => {
-      expect(isProfileComplete({ ...completeProfile, avatarUrl: null })).toBe(
-        true
-      );
-    });
-
-    it('returns true when avatarUrl is whitespace-only (avatar optional)', () => {
-      expect(isProfileComplete({ ...completeProfile, avatarUrl: '  ' })).toBe(
-        true
-      );
-    });
+    // avatarUrl is NOT checked by isProfileComplete() — it's enforced
+    // client-side only by ProfileCompletionRedirect. See profile-completeness.ts.
   });
 });
 
@@ -542,7 +489,7 @@ describe('sanitizeRedirectUrl', () => {
 // ============================================================================
 
 describe('gate.ts utility functions', () => {
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
   let canAccessApp: typeof import('@/lib/auth/gate').canAccessApp;
   let canAccessOnboarding: typeof import('@/lib/auth/gate').canAccessOnboarding;
   let requiresRedirect: typeof import('@/lib/auth/gate').requiresRedirect;
@@ -551,8 +498,8 @@ describe('gate.ts utility functions', () => {
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -567,7 +514,7 @@ describe('gate.ts utility functions', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -579,7 +526,7 @@ describe('gate.ts utility functions', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -591,31 +538,31 @@ describe('gate.ts utility functions', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -623,7 +570,7 @@ describe('gate.ts utility functions', () => {
     }));
 
     const mod = await import('@/lib/auth/gate');
-    UserState = mod.UserState;
+    CanonicalUserState = mod.CanonicalUserState;
     canAccessApp = mod.canAccessApp;
     canAccessOnboarding = mod.canAccessOnboarding;
     requiresRedirect = mod.requiresRedirect;
@@ -632,81 +579,93 @@ describe('gate.ts utility functions', () => {
 
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', () => {
-      expect(canAccessApp(UserState.ACTIVE)).toBe(true);
+      expect(canAccessApp(CanonicalUserState.ACTIVE)).toBe(true);
     });
 
     it('returns false for all non-ACTIVE states', () => {
-      expect(canAccessApp(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(false);
-      expect(canAccessApp(UserState.WAITLIST_PENDING)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_ONBOARDING)).toBe(false);
-      expect(canAccessApp(UserState.BANNED)).toBe(false);
-      expect(canAccessApp(UserState.USER_CREATION_FAILED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.UNAUTHENTICATED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+        false
+      );
+      expect(canAccessApp(CanonicalUserState.WAITLIST_PENDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_ONBOARDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.BANNED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.USER_CREATION_FAILED)).toBe(false);
     });
   });
 
   describe('canAccessOnboarding', () => {
     it('returns true for NEEDS_ONBOARDING', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
+        true
+      );
     });
 
     it('returns true for ACTIVE (can revisit onboarding)', () => {
-      expect(canAccessOnboarding(UserState.ACTIVE)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.ACTIVE)).toBe(true);
     });
 
     it('returns false for waitlisted users', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        canAccessOnboarding(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.WAITLIST_PENDING)).toBe(
         false
       );
-      expect(canAccessOnboarding(UserState.WAITLIST_PENDING)).toBe(false);
     });
 
     it('returns false for banned users', () => {
-      expect(canAccessOnboarding(UserState.BANNED)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.BANNED)).toBe(false);
     });
   });
 
   describe('requiresRedirect', () => {
     it('returns false only for ACTIVE state', () => {
-      expect(requiresRedirect(UserState.ACTIVE)).toBe(false);
+      expect(requiresRedirect(CanonicalUserState.ACTIVE)).toBe(false);
     });
 
     it('returns true for all other states', () => {
-      expect(requiresRedirect(UserState.UNAUTHENTICATED)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(requiresRedirect(UserState.WAITLIST_PENDING)).toBe(true);
-      expect(requiresRedirect(UserState.BANNED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.UNAUTHENTICATED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.WAITLIST_PENDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.BANNED)).toBe(true);
     });
   });
 
   describe('getRedirectForState', () => {
     it('returns null for ACTIVE (no redirect needed)', () => {
-      expect(getRedirectForState(UserState.ACTIVE)).toBeNull();
+      expect(getRedirectForState(CanonicalUserState.ACTIVE)).toBeNull();
     });
 
     it('returns /signin for UNAUTHENTICATED', () => {
-      expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
+      expect(getRedirectForState(CanonicalUserState.UNAUTHENTICATED)).toBe(
+        '/signin'
+      );
     });
 
     it('returns /waitlist for waitlist states', () => {
-      expect(getRedirectForState(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe('/waitlist');
+      expect(getRedirectForState(CanonicalUserState.WAITLIST_PENDING)).toBe(
         '/waitlist'
       );
-      expect(getRedirectForState(UserState.WAITLIST_PENDING)).toBe('/waitlist');
     });
 
     it('returns /onboarding for onboarding states', () => {
-      const redirect = getRedirectForState(UserState.NEEDS_ONBOARDING);
+      const redirect = getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING);
       expect(redirect).toContain('/onboarding');
     });
 
-    it('returns /banned for BANNED state', () => {
-      expect(getRedirectForState(UserState.BANNED)).toBe('/banned');
+    it('returns /unavailable for BANNED state', () => {
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
+        '/unavailable'
+      );
     });
 
     it('returns error page for USER_CREATION_FAILED', () => {
-      expect(getRedirectForState(UserState.USER_CREATION_FAILED)).toBe(
+      expect(getRedirectForState(CanonicalUserState.USER_CREATION_FAILED)).toBe(
         '/error/user-creation-failed'
       );
     });
@@ -902,17 +861,17 @@ describe('cache invalidation contract', () => {
 });
 
 // ============================================================================
-// Tests for UserState enum completeness
+// Tests for CanonicalUserState enum completeness
 // ============================================================================
 
-describe('UserState enum', () => {
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+describe('CanonicalUserState enum', () => {
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/db', () => ({
+    vi.doMock('server-only', () => ({}));
+    vi.doMock('@/lib/db', () => ({
       db: {
         select: vi.fn().mockReturnThis(),
         from: vi.fn().mockReturnThis(),
@@ -927,7 +886,7 @@ describe('UserState enum', () => {
         set: vi.fn().mockReturnThis(),
       },
     }));
-    vi.mock('@/lib/db/schema/auth', () => ({
+    vi.doMock('@/lib/db/schema/auth', () => ({
       users: {
         id: 'id',
         clerkId: 'clerkId',
@@ -939,7 +898,7 @@ describe('UserState enum', () => {
         waitlistEntryId: 'waitlistEntryId',
       },
     }));
-    vi.mock('@/lib/db/schema/profiles', () => ({
+    vi.doMock('@/lib/db/schema/profiles', () => ({
       creatorProfiles: {
         id: 'id',
         userId: 'userId',
@@ -951,31 +910,31 @@ describe('UserState enum', () => {
         onboardingCompletedAt: 'onboardingCompletedAt',
       },
     }));
-    vi.mock('@/lib/db/schema/waitlist', () => ({
+    vi.doMock('@/lib/db/schema/waitlist', () => ({
       waitlistEntries: { id: 'id', email: 'email', status: 'status' },
     }));
-    vi.mock('@/lib/error-tracking', () => ({
+    vi.doMock('@/lib/error-tracking', () => ({
       captureError: vi.fn(),
       captureCriticalError: vi.fn(),
       captureWarning: vi.fn(),
     }));
-    vi.mock('@/lib/auth/cached', () => ({
+    vi.doMock('@/lib/auth/cached', () => ({
       getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
       getCachedCurrentUser: vi.fn().mockResolvedValue(null),
     }));
-    vi.mock('@/lib/auth/clerk-sync', () => ({
+    vi.doMock('@/lib/auth/clerk-sync', () => ({
       syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.mock('@/lib/utils/email', () => ({
+    vi.doMock('@/lib/utils/email', () => ({
       normalizeEmail: (e: string) => e.toLowerCase().trim(),
     }));
-    vi.mock('drizzle-orm', () => ({
+    vi.doMock('drizzle-orm', () => ({
       and: (...args: unknown[]) => args,
       eq: (a: unknown, b: unknown) => [a, b],
       isNull: (a: unknown) => a,
       ne: (a: unknown, b: unknown) => [a, b],
     }));
-    vi.mock('@sentry/nextjs', () => ({
+    vi.doMock('@sentry/nextjs', () => ({
       getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
@@ -983,22 +942,22 @@ describe('UserState enum', () => {
     }));
 
     const mod = await import('@/lib/auth/gate');
-    UserState = mod.UserState;
+    CanonicalUserState = mod.CanonicalUserState;
   });
 
   it('contains all expected states', () => {
-    expect(UserState.UNAUTHENTICATED).toBeDefined();
-    expect(UserState.NEEDS_DB_USER).toBeDefined();
-    expect(UserState.NEEDS_WAITLIST_SUBMISSION).toBeDefined();
-    expect(UserState.WAITLIST_PENDING).toBeDefined();
-    expect(UserState.NEEDS_ONBOARDING).toBeDefined();
-    expect(UserState.ACTIVE).toBeDefined();
-    expect(UserState.BANNED).toBeDefined();
-    expect(UserState.USER_CREATION_FAILED).toBeDefined();
+    expect(CanonicalUserState.UNAUTHENTICATED).toBeDefined();
+    expect(CanonicalUserState.NEEDS_DB_USER).toBeDefined();
+    expect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION).toBeDefined();
+    expect(CanonicalUserState.WAITLIST_PENDING).toBeDefined();
+    expect(CanonicalUserState.NEEDS_ONBOARDING).toBeDefined();
+    expect(CanonicalUserState.ACTIVE).toBeDefined();
+    expect(CanonicalUserState.BANNED).toBeDefined();
+    expect(CanonicalUserState.USER_CREATION_FAILED).toBeDefined();
   });
 
   it('has exactly 8 states', () => {
-    const stateValues = Object.values(UserState).filter(
+    const stateValues = Object.values(CanonicalUserState).filter(
       v => typeof v === 'string'
     );
     expect(stateValues).toHaveLength(8);

@@ -24,8 +24,6 @@ interface ProfileNavButtonProps {
   readonly showBackButton: boolean;
   /** The artist handle for back navigation */
   readonly artistHandle: string;
-  /** If true, creator has removed branding; hide upsell/claim CTA */
-  readonly hideBranding?: boolean;
   /** Additional class names */
   readonly className?: string;
   /** Optional loading state to show animated spinner on the logo */
@@ -40,7 +38,6 @@ interface ProfileNavButtonProps {
 export function ProfileNavButton({
   showBackButton,
   artistHandle,
-  hideBranding = false,
   className,
   loading = false,
 }: ProfileNavButtonProps) {
@@ -56,32 +53,23 @@ export function ProfileNavButton({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <CircleIconButton
-            size='xs'
-            variant='surface'
+            size='md'
+            variant='pearl'
             ariaLabel='Open profile menu'
             className={cn(
-              'group relative overflow-hidden backdrop-blur-md',
-              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90',
+              'group backdrop-blur-xl',
+              'transition-[opacity,transform,filter,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-95',
               className
             )}
           >
-            <div className='relative opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'>
-              <BrandLogo size={24} tone='auto' className='h-6 w-6' priority />
-              <BrandLogo
-                size={24}
-                tone='auto'
-                alt=''
-                aria-hidden
-                className={cn(
-                  'absolute inset-0 h-6 w-6',
-                  'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                  loading
-                    ? 'opacity-100 scale-100 animate-spin-slow'
-                    : 'opacity-0 scale-0 pointer-events-none'
-                )}
-                priority
-              />
-            </div>
+            <BrandLogo
+              size={22}
+              tone='auto'
+              className={cn(
+                'opacity-72 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+                loading && 'animate-pulse'
+              )}
+            />
           </CircleIconButton>
         </DropdownMenuTrigger>
 
@@ -116,11 +104,9 @@ export function ProfileNavButton({
             Copy profile link
           </DropdownMenuItem>
 
-          {hideBranding ? null : (
-            <DropdownMenuItem asChild>
-              <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem asChild>
+            <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
+          </DropdownMenuItem>
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Legal</DropdownMenuSubTrigger>
@@ -154,15 +140,15 @@ export function ProfileNavButton({
   return (
     <CircleIconButton
       asChild
-      size='xs'
-      variant='surface'
+      size='md'
+      variant='pearl'
       ariaLabel='Back to profile'
-      className={cn('backdrop-blur-md', className)}
+      className={cn('backdrop-blur-xl text-primary-token/76', className)}
     >
       <Link href={`/${artistHandle}`} data-testid='back-button'>
         <ArrowLeft
           className={cn(
-            'h-4 w-4 text-secondary-token',
+            'h-[17px] w-[17px] text-primary-token/78',
             'transition-all duration-300 ease-out',
             'animate-in fade-in zoom-in-90 slide-in-from-right-1 duration-300'
           )}

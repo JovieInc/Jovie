@@ -45,6 +45,9 @@ function createProfile(
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ingestionStatus: 'idle',
     lastIngestionError: null,
+    location: null,
+    hometown: null,
+    activeSinceYear: null,
     socialLinks: [],
     ...overrides,
   };
@@ -213,7 +216,7 @@ describe('CreatorActionsMenu interaction tests', () => {
     ).not.toBeInTheDocument();
   });
 
-  it.skip('hides delete action for featured creators (business rule not implemented)', async () => {
+  it('hides delete action for featured creators', async () => {
     const user = userEvent.setup();
 
     renderMenu(createProfile({ isFeatured: true }));

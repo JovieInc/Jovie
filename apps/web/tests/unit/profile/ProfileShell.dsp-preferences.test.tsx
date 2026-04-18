@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -88,7 +88,7 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
 }
 
 describe('ProfileShell DSP preferences', () => {
-  it('uses connected social DSPs for listening preference options when present', () => {
+  it('uses connected social DSPs for listening preference options when present', async () => {
     const socialLinks: LegacySocialLink[] = [
       {
         id: 'social-sc',
@@ -111,11 +111,14 @@ describe('ProfileShell DSP preferences', () => {
       </TooltipProvider>
     );
 
-    const options = screen
-      .getAllByRole('option')
-      .map(option => option.textContent);
-    expect(options).toContain('SoundCloud');
-    expect(options).not.toContain('Spotify');
-    expect(options).not.toContain('YouTube');
+    // ProfileNotificationsMenu is lazily loaded via dynamic(), wait for it to resolve
+    await waitFor(() => {
+      const options = screen
+        .getAllByRole('option')
+        .map(option => option.textContent);
+      expect(options).toContain('SoundCloud');
+      expect(options).not.toContain('Spotify');
+      expect(options).not.toContain('YouTube');
+    });
   });
 });

@@ -41,13 +41,13 @@ module.exports = {
     {
       path: '/[username]',
       timings: [
-        // Dynamic profile page - has database queries but should be cached
-        { metric: 'first-contentful-paint', budget: 3000 },
-        { metric: 'largest-contentful-paint', budget: 3500 },
-        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        // Gmail rule targets: 100ms perceived, 500ms hard budget
+        { metric: 'first-contentful-paint', budget: 800 },
+        { metric: 'largest-contentful-paint', budget: 1500 },
+        { metric: 'cumulative-layout-shift', budget: 0.05 },
         { metric: 'first-input-delay', budget: 100 },
-        // Higher TTFB budget for dynamic pages (DB queries on cache miss)
-        { metric: 'time-to-first-byte', budget: 2500 },
+        // Real-world TTFB is 80-150ms with Redis cache; budget includes Playwright overhead
+        { metric: 'time-to-first-byte', budget: 200 },
       ],
       resourceSizes: [
         { resourceType: 'script', budget: 1050 },
@@ -57,8 +57,83 @@ module.exports = {
         { resourceType: 'total', budget: 1200 },
       ],
     },
-    // NOTE: /app/dashboard routes require authentication
-    // To test authenticated routes, use doppler run with the dev server
-    // For now, testing public routes only (/, /[username])
+    {
+      path: '/app/dashboard/releases',
+      auth: true,
+      timings: [
+        // Authenticated dashboard page — must feel instant (Gmail rule)
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+        // Custom: time from navigation to skeleton disappearing / real content visible
+        { metric: 'skeleton-to-content', budget: 500 },
+      ],
+      resourceSizes: [
+        // Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
+        // Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
+        // Budgets set ~10% above baseline; tighten as we code-split.
+        { resourceType: 'script', budget: 2200 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 500 },
+        { resourceType: 'total', budget: 2800 },
+      ],
+    },
+    {
+      path: '/[username]/[slug]',
+      timings: [
+        // Smart link release page — same speed targets as profile pages
+        { metric: 'first-contentful-paint', budget: 800 },
+        { metric: 'largest-contentful-paint', budget: 1500 },
+        { metric: 'cumulative-layout-shift', budget: 0.05 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 200 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 1050 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 100 },
+        { resourceType: 'total', budget: 1200 },
+      ],
+    },
+    {
+      path: '/app/chat',
+      auth: true,
+      timings: [
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 2750 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 500 },
+        { resourceType: 'total', budget: 3100 },
+      ],
+    },
+    {
+      path: '/billing',
+      auth: true,
+      timings: [
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 2600 },
+        { resourceType: 'image', budget: 700 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 550 },
+        { resourceType: 'total', budget: 3300 },
+      ],
+    },
   ],
 };

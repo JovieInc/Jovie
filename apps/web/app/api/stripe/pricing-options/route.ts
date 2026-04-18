@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
-import { getAvailablePricing, isGrowthPlanEnabled } from '@/lib/stripe/config';
+import { getAvailablePricing, isMaxPlanEnabled } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -14,7 +14,7 @@ export const revalidate = 3600;
 export async function GET() {
   try {
     const options = getAvailablePricing().filter(
-      option => isGrowthPlanEnabled() || option.plan !== 'growth'
+      option => isMaxPlanEnabled() || option.plan !== 'max'
     );
 
     const pricingOptions = options.map(option => ({

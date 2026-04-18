@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChatMessageSkeleton > matches snapshot 1`] = `
+<div
+  aria-hidden="true"
+  class="mx-auto max-w-[44rem] space-y-4 px-4 py-6"
+>
+  <div
+    class="flex justify-end"
+  >
+    <div
+      class="max-w-[78%] rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-2 px-4 py-3.5"
+    >
+      <div
+        aria-hidden="true"
+        class="skeleton motion-reduce:animate-none rounded-lg h-4 w-40"
+      />
+    </div>
+  </div>
+  <div
+    class="flex justify-start"
+  >
+    <div
+      class="max-w-[78%] space-y-1.5"
+    >
+      <div
+        class="flex items-center gap-2 pl-0.5"
+      >
+        <div
+          aria-hidden="true"
+          class="skeleton motion-reduce:animate-none h-5.5 w-5.5 rounded-full"
+        />
+        <div
+          aria-hidden="true"
+          class="skeleton motion-reduce:animate-none rounded-sm h-3 w-8"
+        />
+      </div>
+      <div
+        class="space-y-2 rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5"
+      >
+        <div
+          aria-hidden="true"
+          class="skeleton motion-reduce:animate-none rounded-lg h-4 w-[85%]"
+        />
+        <div
+          aria-hidden="true"
+          class="skeleton motion-reduce:animate-none rounded-lg h-4 w-[70%]"
+        />
+        <div
+          aria-hidden="true"
+          class="skeleton motion-reduce:animate-none rounded-lg h-4 w-[45%]"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;

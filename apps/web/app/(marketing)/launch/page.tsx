@@ -1,41 +1,27 @@
 import type { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
+import { QueryProvider } from '@/components/providers/QueryProvider';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
+import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
+import {
+  buildOrganizationSchema,
+  buildSoftwareSchema,
+  buildWebsiteSchema,
+} from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { captureWarning } from '@/lib/error-tracking';
-import { getProfileByUsername } from '@/lib/services/profile';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
-
-/** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
-const getTimProfile = unstable_cache(
-  async () => {
-    try {
-      const profile = await getProfileByUsername('tim');
-      if (!profile) return null;
-      return {
-        name: profile.displayName ?? null,
-        tagline: profile.bio ?? null,
-        handle: profile.username,
-        avatarUrl: profile.avatarUrl ?? null,
-      };
-    } catch (error) {
-      void captureWarning('[launch] Failed to fetch /tim profile for mockup', {
-        error,
-      });
-      return null;
-    }
-  },
-  ['launch-tim-profile'],
-  { revalidate: 3600, tags: ['profile:tim'] }
-);
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Your Entire Music Career. One Intelligent Link.`;
@@ -69,13 +55,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     keywords,
-    authors: [{ name: APP_NAME, url: APP_URL }],
+    authors: [{ name: APP_NAME, url: BASE_URL }],
     creator: APP_NAME,
     publisher: APP_NAME,
     category: 'Music',
     classification: 'Business',
     formatDetection: { email: false, address: false, telephone: false },
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: APP_ROUTES.LAUNCH,
       languages: { 'en-US': APP_ROUTES.LAUNCH },
@@ -83,14 +69,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: `${APP_URL}${APP_ROUTES.LAUNCH}`,
+      url: `${BASE_URL}${APP_ROUTES.LAUNCH}`,
       title,
       description,
       siteName: APP_NAME,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
-          secureUrl: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
+          secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
@@ -104,7 +90,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           width: 1200,
           height: 630,
@@ -138,94 +124,25 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Helper to safely serialize JSON-LD with XSS protection
-const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
-
-const WEBSITE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: APP_NAME,
+const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: 'Jovie Link in Bio',
   description:
-    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
-  url: APP_URL,
-  inLanguage: 'en-US',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-      width: 512,
-      height: 512,
-    },
-  },
+    'Notify fans automatically and direct every visitor to the right listening destination with one focused profile.',
 });
 
-const SOFTWARE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: APP_NAME,
-  description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
-  url: APP_URL,
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    description: 'Free to start',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
-  author: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-  },
-});
+const SOFTWARE_SCHEMA = buildSoftwareSchema(
+  'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.'
+);
 
-const ORGANIZATION_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: APP_NAME,
+const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Inc',
-  url: APP_URL,
-  logo: {
-    '@type': 'ImageObject',
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-    width: 512,
-    height: 512,
-  },
-  image: `${APP_URL}/og/default.png`,
   description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
+    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    contactType: 'customer support',
-    url: `${APP_URL}/support`,
-  },
 });
 
 /* ─── Shared inline style helpers ─── */
-const WRAP = 'mx-auto max-w-[1100px] px-6';
+const WRAP = 'mx-auto w-full max-w-[1200px] px-6 sm:px-8 lg:px-10';
 
 const LOGOS = [
   'Spotify',
@@ -262,11 +179,9 @@ function Divider() {
   return <hr className='border-t border-subtle' />;
 }
 
-export default async function LaunchPage() {
-  const timProfile = await getTimProfile();
-
+export default function LaunchPage() {
   return (
-    <div className='relative min-h-screen'>
+    <MarketingPageShell>
       <AuthRedirectHandler />
 
       {/* Structured Data */}
@@ -277,64 +192,69 @@ export default async function LaunchPage() {
       {/* ═══ 1. HERO ═══ */}
       <section
         aria-labelledby='hero-heading'
-        className='relative pt-40 md:pt-48 lg:pt-52 pb-16 md:pb-20 lg:pb-24 overflow-hidden'
+        className='relative overflow-hidden'
       >
         <div
           className='hero-glow pointer-events-none absolute inset-0'
           aria-hidden='true'
         />
 
-        <div className={`${WRAP} relative`}>
-          <div className='flex flex-col items-center text-center'>
-            <h1 id='hero-heading' className='marketing-h1-linear max-w-[780px]'>
-              Your entire music career.{' '}
-              <span className='text-secondary-token'>
-                One intelligent link.
-              </span>
-            </h1>
+        <MarketingHero
+          variant='centered'
+          className='relative items-start pt-40 text-left md:pt-48 lg:pt-52'
+        >
+          <p className='marketing-kicker'>Launch</p>
+          <h1
+            id='hero-heading'
+            className='marketing-h1-linear mt-6 max-w-[11ch]'
+          >
+            Your entire music career.{' '}
+            <span className='text-secondary-token'>One intelligent link.</span>
+          </h1>
 
-            <p className='marketing-lead-linear mt-6 max-w-[520px] text-secondary-token'>
-              Import your Spotify, get smart links for every release, and a
-              link-in-bio that converts listeners into fans.
-            </p>
+          <p className='marketing-lead-linear mt-6 max-w-[34rem] text-secondary-token'>
+            Import your Spotify, get smart links for every release, and a
+            link-in-bio that converts listeners into fans.
+          </p>
 
-            <p className='mt-6 text-sm text-tertiary-token'>
-              Free forever. No credit card.
-            </p>
+          <p className='mt-6 text-sm text-tertiary-token'>
+            Free forever. No credit card.
+          </p>
 
-            <div className='mt-4 w-full max-w-[520px]'>
+          <div className='mt-4 w-full max-w-[520px]'>
+            <QueryProvider>
               <HeroSpotifySearch />
-            </div>
-
-            <a
-              href='#how-it-works'
-              className='mt-6 inline-flex items-center gap-1.5 text-sm text-tertiary-token hover:text-secondary-token transition-colors focus-ring rounded'
-            >
-              See how it works
-              <svg
-                width='12'
-                height='12'
-                viewBox='0 0 12 12'
-                fill='none'
-                className='mt-px'
-                aria-hidden='true'
-              >
-                <path
-                  d='M6 2.5v7M3 7l3 3 3-3'
-                  stroke='currentColor'
-                  strokeWidth='1.5'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                />
-              </svg>
-            </a>
+            </QueryProvider>
           </div>
-        </div>
+
+          <a
+            href='#how-it-works'
+            className='mt-6 inline-flex items-center gap-1.5 text-sm text-tertiary-token hover:text-secondary-token transition-colors focus-ring rounded'
+          >
+            See how it works
+            <svg
+              width='12'
+              height='12'
+              viewBox='0 0 12 12'
+              fill='none'
+              className='mt-px'
+              aria-hidden='true'
+            >
+              <path
+                d='M6 2.5v7M3 7l3 3 3-3'
+                stroke='currentColor'
+                strokeWidth='1.5'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+              />
+            </svg>
+          </a>
+        </MarketingHero>
       </section>
 
       {/* ═══ 2. LOGOS ═══ */}
       <div className='py-14 border-b border-subtle'>
-        <div className={WRAP}>
+        <MarketingContainer width='page'>
           <div className='flex items-center justify-between flex-wrap gap-6'>
             {LOGOS.map(name => (
               <span
@@ -345,7 +265,7 @@ export default async function LaunchPage() {
               </span>
             ))}
           </div>
-        </div>
+        </MarketingContainer>
       </div>
 
       {/* ═══ 3. THESIS ═══ */}
@@ -354,19 +274,19 @@ export default async function LaunchPage() {
         className='pt-32 pb-16'
         id='how-it-works'
       >
-        <div className={WRAP}>
+        <MarketingContainer width='page'>
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
             <span className='text-secondary-token'>
-              Paste one Spotify link. Get smart links, fan capture, and a
+              Paste one Spotify link. Get smart links, fan notifications, and a
               link-in-bio that converts &mdash; all in seconds.
             </span>
           </h2>
-        </div>
+        </MarketingContainer>
       </section>
 
       {/* ═══ 4. PILLARS ═══ */}
-      <div className={WRAP}>
+      <MarketingContainer width='page'>
         <div className='grid grid-cols-1 md:grid-cols-3 border-t border-subtle'>
           {[
             {
@@ -392,7 +312,7 @@ export default async function LaunchPage() {
               <div className='mb-4 font-mono tracking-wide text-xs text-tertiary-token'>
                 {item.num}
               </div>
-              <h3 className='font-medium mb-3 text-base tracking-tight leading-snug'>
+              <h3 className='font-medium mb-3 text-base tracking-tight leading-snug text-primary-token'>
                 {item.title}
               </h3>
               <p className='text-sm leading-relaxed text-secondary-token'>
@@ -401,7 +321,7 @@ export default async function LaunchPage() {
             </div>
           ))}
         </div>
-      </div>
+      </MarketingContainer>
 
       {/* ═══ 5. DYNAMIC PROFILES ═══ */}
       <div className={WRAP}>
@@ -429,7 +349,7 @@ export default async function LaunchPage() {
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '1.1', title: 'Adaptive CTA' },
-                { num: '1.2', title: 'Email + SMS Capture' },
+                { num: '1.2', title: 'Email + SMS Notifications' },
                 { num: '1.3', title: 'Streaming Preference Memory' },
                 { num: '1.4', title: 'Custom Domains' },
               ].map(sf => (
@@ -464,10 +384,9 @@ export default async function LaunchPage() {
       {/* ═══ 6. PROFILE MOCKUP ═══ */}
       <div className={`${WRAP} pb-16`}>
         <ProfileMockup
-          name={timProfile?.name}
-          tagline={timProfile?.tagline}
-          handle={timProfile?.handle}
-          avatarUrl={timProfile?.avatarUrl}
+          name={TIM_WHITE_PROFILE.name}
+          handle='tim'
+          avatarUrl={TIM_WHITE_PROFILE.avatarSrc}
         />
       </div>
 
@@ -645,9 +564,15 @@ export default async function LaunchPage() {
                           fontSize: '0.6rem',
                           padding: '0.1rem 0.35rem',
                           borderRadius: 2,
-                          background: 'rgba(74,222,128,0.06)',
-                          color: 'rgb(52 211 153)',
-                          opacity: r.badge === 'Pro' ? 0.4 : 0.7,
+                          background:
+                            r.badge === 'Pro'
+                              ? 'rgba(16,185,129,0.16)'
+                              : 'rgba(74,222,128,0.10)',
+                          color:
+                            r.badge === 'Pro'
+                              ? 'rgb(167 243 208)'
+                              : 'rgb(110 231 183)',
+                          opacity: 0.95,
                         }}
                       >
                         {r.badge}
@@ -760,9 +685,9 @@ export default async function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Sometimes you want a specific action &mdash; a tip jar at shows, a
-              contact page for industry, tour dates in your bio. Deeplinks point
-              directly to any view of your profile.
+              Sometimes you want a specific action &mdash; a pay page at shows,
+              a contact page for industry, tour dates in your bio. Deeplinks
+              point directly to any view of your profile.
             </p>
             <p className='marketing-lead-linear mt-4 max-w-[480px] !text-[0.95rem]'>
               Instagram allows 5 links. With deeplinks, each one goes straight
@@ -770,7 +695,7 @@ export default async function LaunchPage() {
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
-                { num: '3.1', title: '/tip' },
+                { num: '3.1', title: '/pay' },
                 { num: '3.2', title: '/tour' },
                 { num: '3.3', title: '/contact' },
                 { num: '3.4', title: '/listen' },
@@ -860,7 +785,7 @@ export default async function LaunchPage() {
                 {[
                   { label: 'New Music', url: 'jov.ie/tim' },
                   { label: 'Tour Dates', url: 'jov.ie/tim/tour' },
-                  { label: 'Tip Jar', url: 'jov.ie/tim/tip' },
+                  { label: 'Pay', url: 'jov.ie/tim/pay' },
                   { label: 'Booking', url: 'jov.ie/tim/contact' },
                   { label: 'Merch', url: 'jov.ie/tim/shop' },
                 ].map(link => (
@@ -908,7 +833,7 @@ export default async function LaunchPage() {
           className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px rounded-[10px] overflow-hidden'
           style={{ background: 'var(--linear-border-subtle)' }}
         >
-          {/* /tip */}
+          {/* /pay */}
           <div
             style={{
               background: 'var(--linear-bg-surface-0)',
@@ -922,7 +847,7 @@ export default async function LaunchPage() {
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
               </span>{' '}
-              /tip
+              /pay
             </div>
             <p
               className='mb-5'
@@ -932,8 +857,8 @@ export default async function LaunchPage() {
                 lineHeight: 1.5,
               }}
             >
-              Accept tips from fans with one tap. Print the QR code and put it
-              on your merch table at shows.
+              Accept payments from fans with one tap. Print the QR code and put
+              it on your merch table at shows.
             </p>
             <div
               className='rounded-md p-4'
@@ -944,7 +869,7 @@ export default async function LaunchPage() {
               }}
             >
               <div className='flex gap-2 mb-3'>
-                {['$3', '$5', '$10'].map(amt => (
+                {['$5', '$10', '$20'].map(amt => (
                   <div
                     key={amt}
                     className='flex-1 text-center py-2 font-semibold rounded'
@@ -964,7 +889,7 @@ export default async function LaunchPage() {
               <div
                 className='w-full py-2 rounded text-center font-medium mb-1'
                 style={{
-                  background: '#008CFF',
+                  background: '#005fcc',
                   color: 'white',
                   fontSize: '0.7rem',
                 }}
@@ -1424,9 +1349,9 @@ export default async function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Most artists have zero data on their visitors. Jovie captures
-              every interaction and scores each fan by engagement &mdash; so you
-              know who your real fans are.
+              Most artists have zero data on their visitors. Jovie tracks every
+              interaction and scores each fan by engagement &mdash; so you know
+              who your real fans are.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1463,7 +1388,7 @@ export default async function LaunchPage() {
           >
             {/* Sidebar */}
             <div
-              className='hidden md:block'
+              className='max-md:hidden'
               style={{
                 background: 'var(--linear-bg-surface-1)',
                 borderRight: '1px solid var(--linear-border-subtle)',
@@ -1514,9 +1439,9 @@ export default async function LaunchPage() {
                 className='uppercase tracking-wide px-4 pt-3 pb-1'
                 style={{
                   fontSize: '0.65rem',
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--linear-text-secondary)',
                   letterSpacing: '0.08em',
-                  opacity: 0.6,
+                  opacity: 0.92,
                 }}
               >
                 Admin
@@ -1665,7 +1590,7 @@ export default async function LaunchPage() {
                       intent: 'High',
                       status: 'Returning',
                       source: 'Spotify',
-                      action: 'Tipped $5',
+                      action: 'Paid $5',
                     },
                   ].map(row => (
                     <tr key={row.visitor}>
@@ -1783,8 +1708,7 @@ export default async function LaunchPage() {
               },
               {
                 val: '$100',
-                label:
-                  'lifetime value of each email subscriber you capture through Jovie',
+                label: 'lifetime value of each fan who opts in through Jovie',
                 source: 'Internal estimate based on direct-to-fan sales',
               },
             ].map(s => (
@@ -1868,7 +1792,7 @@ export default async function LaunchPage() {
               {[
                 'Static list of links — same for every visitor',
                 'No smart links — manually create each one',
-                'No fan capture — zero emails, zero SMS',
+                'No fan notifications — zero emails, zero SMS',
                 'No AI — write your own bios and press kits',
                 'Linktree branding on your page',
                 'No deeplinks — one link does one thing',
@@ -1898,17 +1822,17 @@ export default async function LaunchPage() {
               {[
                 'Adaptive CTA — subscribe or listen, per visitor',
                 'Smart links auto-created for every release',
-                'Email fan capture built in',
-                'AI assistant with 10 queries/mo',
+                'Fan notifications built in',
+                'AI assistant (25 msgs/day)',
                 'Your brand, your domain potential',
-                '/tip, /tour, /contact, /listen deeplinks included',
+                '/pay, /tour, /contact, /listen deeplinks included',
               ].map(item => (
                 <li
                   key={item}
                   className='flex items-start gap-3 py-2.5 text-sm text-secondary-token border-b border-white/[0.04]'
                 >
                   <span className='shrink-0 mt-0.5 text-xs' aria-hidden='true'>
-                    &check;
+                    ✓
                   </span>
                   {item}
                 </li>
@@ -1926,7 +1850,7 @@ export default async function LaunchPage() {
         </h2>
         <Link
           href={APP_ROUTES.LAUNCH_PRICING}
-          className='marketing-cta focus-ring mt-8 inline-block'
+          className='public-action-primary focus-ring mt-8'
         >
           View pricing
         </Link>
@@ -1945,18 +1869,21 @@ export default async function LaunchPage() {
             Your music deserves better than a stack of links.
           </h2>
           <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-            <Link href={APP_ROUTES.SIGNUP} className='marketing-cta focus-ring'>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='public-action-primary focus-ring'
+            >
               Get started free
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-surface-1 border border-subtle hover:bg-white/[0.04]'
+              className='public-action-secondary focus-ring'
             >
               Contact us
             </a>
           </div>
         </div>
       </section>
-    </div>
+    </MarketingPageShell>
   );
 }

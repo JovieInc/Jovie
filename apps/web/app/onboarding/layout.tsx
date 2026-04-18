@@ -1,18 +1,20 @@
-import { ClientProviders } from '@/components/providers/ClientProviders';
-import { publicEnv } from '@/lib/env-public';
+import '../(auth)/auth-utilities.css';
+import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
+import { resolveUserState } from '@/lib/auth/gate';
+import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 
 export const dynamic = 'force-dynamic';
 
-export default function OnboardingLayout({
+export default async function OnboardingLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  await resolveUserState();
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
-      {children}
-    </ClientProviders>
+    <ResolvedClientProviders>
+      <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+    </ResolvedClientProviders>
   );
 }

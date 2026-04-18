@@ -1,3 +1,4 @@
+import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 
 export interface HudStatusPillProps {
@@ -5,22 +6,22 @@ export interface HudStatusPillProps {
   readonly tone: 'good' | 'warning' | 'bad' | 'neutral';
 }
 
-const TONE_CLASSES: Record<HudStatusPillProps['tone'], string> = {
-  good: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
-  warning: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-  bad: 'border-red-500/40 bg-red-500/10 text-red-200',
-  neutral: 'border-white/15 bg-white/5 text-white/80',
-};
-
 export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
-  const classes = TONE_CLASSES[tone];
+  const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-4 py-1 text-sm font-semibold tracking-wide',
-        classes
+        'inline-flex items-center rounded-full border px-3.5 py-1 text-[11px] font-[560] uppercase tracking-[0.08em]'
       )}
+      style={{
+        borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--linear-app-frame-seam))`,
+        backgroundColor: accent.subtle,
+        color:
+          tone === 'neutral'
+            ? 'var(--color-text-secondary-token)'
+            : accent.solid,
+      }}
     >
       {label}
     </span>

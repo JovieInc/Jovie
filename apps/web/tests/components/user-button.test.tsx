@@ -19,11 +19,17 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
+  usePathname: vi.fn(() => '/app'),
 }));
 
 vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(),
   useClerk: vi.fn(),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: vi.fn(),
+  useAuthSafe: vi.fn(),
 }));
 
 // Mock Sonner toast
@@ -43,9 +49,9 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
   useBillingStatusQuery,
@@ -65,8 +71,8 @@ const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
 const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
 const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
 const mockUsePortalMutation = vi.mocked(usePortalMutation);
-const mockUseUser = vi.mocked(useUser);
-const mockUseClerk = vi.mocked(useClerk);
+const mockUseUserSafe = vi.mocked(useUserSafe);
+const mockUseAuthSafe = vi.mocked(useAuthSafe);
 const mockUseRouter = vi.mocked(useRouter);
 
 const originalLocation = window.location;
@@ -121,7 +127,7 @@ describe('UserButton billing actions', () => {
       isError: false,
     } as any);
 
-    mockUseUser.mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
       user: {
@@ -133,9 +139,19 @@ describe('UserButton billing actions', () => {
       } as any,
     });
 
-    mockUseClerk.mockReturnValue({
+    mockUseAuthSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_123',
+      sessionId: 'sess_123',
+      sessionClaims: null,
+      actor: null,
+      orgId: null,
+      orgRole: null,
+      orgSlug: null,
+      has: vi.fn(() => false),
+      getToken: vi.fn(async () => null),
       signOut: vi.fn(),
-      openUserProfile: vi.fn(),
     } as any);
 
     pushMock = vi.fn();
@@ -182,7 +198,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown menu to render
-    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
+    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -238,7 +254,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
+    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -286,7 +302,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
+    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -351,7 +367,7 @@ describe('UserButton billing actions', () => {
       error: null,
     } as any);
 
-    mockUseUser.mockReturnValue({
+    mockUseUserSafe.mockReturnValue({
       isLoaded: false,
       isSignedIn: false,
       user: null,

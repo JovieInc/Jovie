@@ -10,9 +10,10 @@ import {
   or,
   type SQL,
 } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
 import {
   buildCursorCondition,
   decodeCursor,
@@ -262,9 +263,39 @@ function parseMemberQueryParams(searchParams: SearchParams) {
 }
 
 /**
+ * Build the click-events aggregation subquery.
+ *
+ * Pre-aggregates streaming clicks and tip click values per audience member
+ * in a single pass, replacing per-row correlated subqueries that previously
+ * executed N times (once per result row). Scoped to a single creator profile
+ * to avoid full-table aggregation.
+ */
+function buildClickAggSubquery(tx: DbSessionTx, profileId: string) {
+  return tx
+    .select({
+      audienceMemberId: clickEvents.audienceMemberId,
+      streamingClicks:
+        drizzleSql<number>`COALESCE(COUNT(*) FILTER (WHERE ${clickEvents.linkType} = 'listen' AND ${clickEvents.isBot} = false), 0)`.as(
+          'streaming_clicks'
+        ),
+      tipClickValueCents:
+        drizzleSql<number>`COALESCE(SUM(CASE WHEN ${clickEvents.linkType} = 'tip' AND ${clickEvents.isBot} = false THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500) ELSE 0 END), 0)`.as(
+          'tip_click_value_cents'
+        ),
+    })
+    .from(clickEvents)
+    .where(eq(clickEvents.creatorProfileId, profileId))
+    .groupBy(clickEvents.audienceMemberId)
+    .as('click_agg');
+}
+
+/**
  * Build select fields for member query
  */
-function buildMemberSelectFields(includeDetails: boolean) {
+function buildMemberSelectFields(
+  includeDetails: boolean,
+  clickAgg: ReturnType<typeof buildClickAggSubquery>
+) {
   return {
     id: audienceMembers.id,
     type: audienceMembers.type,
@@ -293,27 +324,14 @@ function buildMemberSelectFields(includeDetails: boolean) {
     tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
       'tip_count'
     ),
-    ltvStreamingClicks: drizzleSql<number>`(
-      SELECT COALESCE(COUNT(*), 0)
-      FROM ${clickEvents}
-      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-        AND ${clickEvents.linkType} = 'listen'
-        AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-    )`.as('ltv_streaming_clicks'),
-    ltvTipClickValueCents: drizzleSql<number>`(
-      SELECT COALESCE(
-        SUM(
-          CASE
-            WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-              THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
-            ELSE 0
-          END
-        ),
-        0
-      )
-      FROM ${clickEvents}
-      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-    )`.as('ltv_tip_click_value_cents'),
+    ltvStreamingClicks:
+      drizzleSql<number>`COALESCE(${clickAgg.streamingClicks}, 0)`.as(
+        'ltv_streaming_clicks'
+      ),
+    ltvTipClickValueCents:
+      drizzleSql<number>`COALESCE(${clickAgg.tipClickValueCents}, 0)`.as(
+        'ltv_tip_click_value_cents'
+      ),
     ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
     ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
@@ -419,8 +437,12 @@ async function fetchMembersData(
     cursorCondition
   );
 
+  // Pre-aggregate click events per audience member in a single pass,
+  // avoiding per-row correlated subqueries (O(N) → O(1) subquery).
+  const clickAgg = buildClickAggSubquery(tx, selectedProfileId);
+
   const baseQuery = tx
-    .select(buildMemberSelectFields(includeDetails))
+    .select(buildMemberSelectFields(includeDetails, clickAgg))
     .from(audienceMembers)
     .innerJoin(
       creatorProfiles,
@@ -434,6 +456,7 @@ async function fetchMembersData(
         eq(tipAudience.email, audienceMembers.email)
       )
     )
+    .leftJoin(clickAgg, eq(clickAgg.audienceMemberId, audienceMembers.id))
     .where(whereClause);
 
   // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260).
@@ -447,13 +470,15 @@ async function fetchMembersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows.at(-1)!;
-    const rawSortVal = lastRow.lastSeenAt;
-    const sortValStr =
-      rawSortVal instanceof Date
-        ? rawSortVal.toISOString()
-        : String(rawSortVal ?? '');
-    nextCursor = encodeCursor(sortValStr, lastRow.id);
+    const lastRow = rows.at(-1);
+    if (lastRow) {
+      const rawSortVal = lastRow.lastSeenAt;
+      const sortValStr =
+        rawSortVal instanceof Date
+          ? rawSortVal.toISOString()
+          : String(rawSortVal ?? '');
+      nextCursor = encodeCursor(sortValStr, lastRow.id);
+    }
   }
 
   return {
@@ -584,9 +609,11 @@ async function _fetchSubscribersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows.at(-1)!;
-    const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
-    nextCursor = encodeCursor(sortValStr, lastRow.id);
+    const lastRow = rows.at(-1);
+    if (lastRow) {
+      const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
+      nextCursor = encodeCursor(sortValStr, lastRow.id);
+    }
   }
 
   const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
@@ -675,36 +702,19 @@ function buildDataPromise(
   });
 }
 
-export async function getAudienceServerData(params: {
-  userId: string;
-  selectedProfileId: string | null;
-  searchParams: SearchParams;
-  includeDetails?: boolean;
-  memberId?: string;
-  view?: AudienceView;
-  segments?: string[];
-}): Promise<AudienceServerData> {
-  noStore();
-
-  const {
-    userId: _userId,
-    selectedProfileId,
-    searchParams,
-    includeDetails = false,
-    memberId,
-    view = 'all',
-    segments,
-  } = params;
-
-  // Map view to internal mode
-  const mode: AudienceMode = 'members';
-
-  if (!selectedProfileId) {
-    return buildEmptyAudienceData(mode, view);
-  }
-
-  // All audience reads now go through authenticated RLS-protected sessions
-  // RLS bypass capability has been removed for security hardening
+/**
+ * Inner fetch function that runs inside withDbSessionTx.
+ * Separated from getAudienceServerData so unstable_cache can wrap it
+ * without conflicting with the noStore() that withDbSessionTx calls internally.
+ */
+async function fetchAudienceData(
+  selectedProfileId: string,
+  searchParams: SearchParams,
+  includeDetails: boolean,
+  memberId: string | undefined,
+  view: AudienceView,
+  segments: string[] | undefined
+): Promise<AudienceServerData> {
   return await withDbSessionTx(async (tx, clerkUserId) => {
     const data = await buildDataPromise(
       tx,
@@ -725,6 +735,77 @@ export async function getAudienceServerData(params: {
       totalAudienceCount: null,
     };
   });
+}
+
+export async function getAudienceServerData(params: {
+  userId: string;
+  selectedProfileId: string | null;
+  searchParams: SearchParams;
+  includeDetails?: boolean;
+  memberId?: string;
+  view?: AudienceView;
+  segments?: string[];
+}): Promise<AudienceServerData> {
+  const {
+    userId,
+    selectedProfileId,
+    searchParams,
+    includeDetails = false,
+    memberId,
+    view = 'all',
+    segments,
+  } = params;
+
+  // Map view to internal mode
+  const mode: AudienceMode = 'members';
+
+  if (!selectedProfileId) {
+    return buildEmptyAudienceData(mode, view);
+  }
+
+  // Build a stable cache key from all query parameters.
+  // Segments are sorted to ensure consistent key regardless of URL order.
+  const segmentsKey = segments
+    ? [...segments].sort((a, b) => a.localeCompare(b)).join(',')
+    : '';
+  const sp = (key: string): string => {
+    const v = searchParams[key];
+    return Array.isArray(v) ? (v[0] ?? '') : (v ?? '');
+  };
+  const cacheKeyParts: string[] = [
+    'audience-data',
+    userId,
+    selectedProfileId,
+    view,
+    includeDetails ? 'details' : 'summary',
+    memberId ?? '',
+    sp('sort'),
+    sp('direction'),
+    sp('page'),
+    sp('pageSize'),
+    sp('cursor'),
+    segmentsKey,
+  ];
+
+  return unstable_cache(
+    () =>
+      fetchAudienceData(
+        selectedProfileId,
+        searchParams,
+        includeDetails,
+        memberId,
+        view,
+        segments
+      ),
+    cacheKeyParts,
+    {
+      revalidate: CACHE_TTL.MEDIUM, // 300 seconds (5 minutes)
+      tags: [
+        CACHE_TAGS.AUDIENCE_DATA,
+        createAudienceDataTag(selectedProfileId),
+      ],
+    }
+  )();
 }
 
 export function getAudienceUrlSearchParams(searchParams: SearchParams) {

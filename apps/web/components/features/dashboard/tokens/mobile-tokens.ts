@@ -6,22 +6,23 @@
  * spacing/typography can evolve consistently without inline class drift.
  */
 export const mobileReleaseTokens = {
+  list: 'overflow-hidden rounded-[16px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
   row: {
     container:
-      'flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50',
+      'flex w-full items-center gap-3 px-4 py-3 text-left transition-[background-color,border-color] active:bg-surface-0 focus-visible:outline-none focus-visible:bg-surface-0',
     title: 'text-[14px] font-[590] leading-tight text-primary-token',
     subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'shrink-0 rounded-full px-1.5 py-px text-[10px] font-[510] leading-[16px] uppercase tracking-[0.08em]',
+      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[10px] font-[510] leading-none tracking-normal',
     year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
     dot: 'text-[10px] text-quaternary-token',
   },
   groupHeader:
-    'sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2',
-  groupHeaderTitle: 'text-[13px] font-[590] text-primary-token',
+    'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
+  groupHeaderTitle: 'text-[12px] font-[590] text-primary-token',
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {
     container:
@@ -32,9 +33,10 @@ export const mobileReleaseTokens = {
   swipeActions: {
     button:
       'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
-    label: 'text-[10px] font-[510] tracking-[0.08em]',
-    edit: 'bg-indigo-500 active:bg-indigo-600',
-    link: 'bg-sky-500 active:bg-sky-600',
-    locked: 'bg-neutral-400 opacity-60',
+    label: 'text-[10px] font-[510] tracking-normal',
+    edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
+    link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
+    locked:
+      'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-accent-gray))] opacity-75',
   },
 } as const;

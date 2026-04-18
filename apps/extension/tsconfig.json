@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "types": [],
+    "tsBuildInfoFile": ".cache/tsbuildinfo",
+    "paths": {
+      "@jovie/extension-contracts": ["../../packages/extension-contracts"],
+      "@jovie/extension-contracts/*": ["../../packages/extension-contracts/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
+}

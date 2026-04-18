@@ -25,7 +25,7 @@ import { CreatorActionsMenu } from '@/features/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/features/admin/creator-actions-menu/CreatorActionsMenuContent';
 import { TableRowActions } from '@/features/admin/table/TableRowActions';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -226,7 +226,7 @@ function CreatorProfileTableRowComponent({
     <tr
       className={cn(
         getRowClassName(isChecked, isSelected),
-        'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+        'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-inset-ring-focus'
       )}
       onClick={() => onRowClick(profile.id)}
       onKeyDown={event =>
@@ -254,7 +254,7 @@ function CreatorProfileTableRowComponent({
           </span>
           <div
             className={cn(
-              'absolute inset-0 transition-opacity',
+              'absolute inset-0 flex items-center justify-center transition-opacity',
               isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
             )}
           >
@@ -262,7 +262,6 @@ function CreatorProfileTableRowComponent({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-subtle bg-surface-1 text-(--linear-border-focus) data-[state=checked]:border-(--linear-border-focus) data-[state=checked]:bg-(--linear-border-focus) data-[state=checked]:text-white'
             />
           </div>
         </div>
@@ -297,12 +296,12 @@ function CreatorProfileTableRowComponent({
           </div>
         </div>
       </td>
-      <td className='px-4 py-2.5 align-middle hidden lg:table-cell'>
+      <td className='px-4 py-2.5 align-middle max-lg:hidden lg:table-cell'>
         <div className='flex max-w-[230px] justify-start overflow-hidden'>
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
+      <td className='max-md:hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td

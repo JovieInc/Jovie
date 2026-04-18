@@ -33,6 +33,16 @@ const TRACKING_VISITS_PER_HOUR = parseIntEnv(
   50000
 );
 
+const ALBUM_ART_GENERATION_DAILY_LIMIT = parseIntEnv(
+  env.ALBUM_ART_GENERATION_DAILY_LIMIT,
+  6
+);
+
+const ALBUM_ART_GENERATION_BURST_LIMIT = parseIntEnv(
+  env.ALBUM_ART_GENERATION_BURST_LIMIT,
+  2
+);
+
 // ============================================================================
 // Rate Limiter Configurations
 // ============================================================================
@@ -61,6 +71,26 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'artwork_upload',
     analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Album art generation: expensive image model calls, per user */
+  albumArtGeneration: {
+    name: 'Album Art Generation',
+    limit: ALBUM_ART_GENERATION_DAILY_LIMIT,
+    window: '1 d',
+    prefix: 'album_art_generation',
+    analytics: true,
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Album art generation burst: prevents rapid repeated image fanout */
+  albumArtGenerationBurst: {
+    name: 'Album Art Generation Burst',
+    limit: ALBUM_ART_GENERATION_BURST_LIMIT,
+    window: '1 m',
+    prefix: 'album_art_generation_burst',
+    analytics: true,
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** General API: 100 requests per minute per IP */
@@ -120,6 +150,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Tip checkout: 30 sessions per hour per IP - public endpoint, higher limit for shared IPs */
+  tipCheckout: {
+    name: 'Tip Checkout',
+    limit: 30,
+    window: '1 h',
+    prefix: 'tip_checkout',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Admin Operations
   // ---------------------------------------------------------------------------
@@ -142,6 +181,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Admin outreach: 10 per hour per admin - bulk external API calls */
+  adminOutreach: {
+    name: 'Admin Outreach',
+    limit: 10,
+    window: '1 h',
+    prefix: 'admin:outreach',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** Admin creator ingest: 10 per minute per admin - heavy ingestion job */
   adminCreatorIngest: {
     name: 'Admin Creator Ingest',
@@ -149,6 +197,15 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'admin:creator-ingest',
     analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Deploy promote: 1 request per minute globally */
+  deployPromote: {
+    name: 'Deploy Promote',
+    limit: 1,
+    window: '1 m',
+    prefix: 'admin:deploy-promote',
+    analytics: false,
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -241,6 +298,15 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 m',
     prefix: 'general',
+    analytics: false,
+  } satisfies RateLimitConfig,
+
+  /** Changelog subscribe: 1 request per 10 seconds per IP */
+  changelogSubscribe: {
+    name: 'Changelog Subscribe',
+    limit: 1,
+    window: '10 s',
+    prefix: 'changelog:subscribe',
     analytics: false,
   } satisfies RateLimitConfig,
 
@@ -436,12 +502,12 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Growth): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyGrowth: {
-    name: 'AI Chat Daily (Growth)',
-    limit: ENTITLEMENT_REGISTRY.growth.limits.aiDailyMessageLimit,
+  /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
+  aiChatDailyMax: {
+    name: 'AI Chat Daily (Max)',
+    limit: ENTITLEMENT_REGISTRY.max.limits.aiDailyMessageLimit,
     window: '1 d',
-    prefix: 'ai:chat:daily:growth',
+    prefix: 'ai:chat:daily:max',
     analytics: true,
   } satisfies RateLimitConfig,
 

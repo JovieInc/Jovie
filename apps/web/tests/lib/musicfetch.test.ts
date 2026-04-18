@@ -13,9 +13,30 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 // Mock Sentry
+const mockAddBreadcrumb = vi.fn();
+const mockCaptureException = vi.fn();
+const mockStartSpan = vi.fn(
+  async (
+    _options: unknown,
+    callback: (span: {
+      setStatus: (status: unknown) => void;
+    }) => Promise<unknown>
+  ) =>
+    callback({
+      setStatus: vi.fn(),
+    })
+);
 vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
-  addBreadcrumb: vi.fn(),
+  addBreadcrumb: (breadcrumb: unknown) => mockAddBreadcrumb(breadcrumb),
+  captureException: (error: unknown, context?: unknown) =>
+    mockCaptureException(error, context),
+  startSpan: (
+    options: unknown,
+    callback: (span: {
+      setStatus: (status: unknown) => void;
+    }) => Promise<unknown>
+  ) => mockStartSpan(options, callback),
 }));
 
 // Mock circuit breaker
@@ -31,13 +52,71 @@ vi.mock('@/lib/discography/musicfetch-circuit-breaker', () => ({
   },
 }));
 
+const mockMusicfetchRequest = vi.fn();
+vi.mock('@/lib/musicfetch/resilient-client', () => {
+  class MusicfetchRequestError extends Error {
+    statusCode?: number;
+    retryAfterSeconds?: number;
+    details?: string;
+
+    constructor(
+      message: string,
+      statusCode?: number,
+      retryAfterSeconds?: number,
+      details?: string
+    ) {
+      super(message);
+      this.name = 'MusicfetchRequestError';
+      this.statusCode = statusCode;
+      this.retryAfterSeconds = retryAfterSeconds;
+      this.details = details;
+    }
+  }
+
+  class MusicfetchBudgetExceededError extends MusicfetchRequestError {
+    budgetScope: 'daily' | 'monthly' | 'backend_unavailable';
+
+    constructor(
+      message: string,
+      budgetScope: 'daily' | 'monthly' | 'backend_unavailable',
+      retryAfterSeconds?: number
+    ) {
+      super(message, 429, retryAfterSeconds);
+      this.name = 'MusicfetchBudgetExceededError';
+      this.budgetScope = budgetScope;
+    }
+  }
+
+  return {
+    musicfetchRequest: (...args: unknown[]) => mockMusicfetchRequest(...args),
+    isMusicfetchInvalidServicesError: (
+      error: Partial<{ statusCode: number; details: string; message: string }>
+    ) =>
+      error.statusCode === 400 &&
+      (error.details ?? error.message ?? '').includes(
+        'services - Invalid value'
+      ),
+    MusicfetchRequestError,
+    MusicfetchBudgetExceededError,
+  };
+});
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 let mockToken: string | undefined = 'test-token';
 
 describe('musicfetch client', () => {
   beforeEach(() => {
+    vi.resetModules();
     mockToken = 'test-token';
     mockExecute.mockReset();
     mockGetState.mockReturnValue('CLOSED');
+    mockMusicfetchRequest.mockReset();
+    mockAddBreadcrumb.mockReset();
+    mockCaptureException.mockReset();
+    mockStartSpan.mockClear();
   });
 
   describe('isMusicfetchConfigured', () => {
@@ -119,7 +198,7 @@ describe('musicfetch client', () => {
       expect(result!.links).toEqual({
         spotify: 'https://open.spotify.com/track/abc123',
         apple_music: 'https://music.apple.com/us/album/anti-hero/123',
-        youtube: 'https://music.youtube.com/watch?v=xyz',
+        youtube_music: 'https://music.youtube.com/watch?v=xyz',
         tidal: 'https://tidal.com/track/456',
         pandora: 'https://www.pandora.com/artist/taylor-swift/anti-hero',
         iheartradio: 'https://www.iheart.com/song/anti-hero-123',
@@ -193,6 +272,142 @@ describe('musicfetch client', () => {
       expect(result!.links).toEqual({
         spotify: 'https://open.spotify.com/track/abc',
       });
+    });
+  });
+
+  describe('fetchArtistBySpotifyUrl', () => {
+    it('requests MusicFetch with the corrected canonical service keys', async () => {
+      mockMusicfetchRequest.mockResolvedValue({
+        result: {
+          type: 'artist',
+          name: 'Test Artist',
+          services: {},
+        },
+      });
+
+      const { fetchArtistBySpotifyUrl, MUSICFETCH_ARTIST_LOOKUP_SERVICES } =
+        await import('@/lib/dsp-enrichment/providers/musicfetch');
+
+      await fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123');
+
+      const params = mockMusicfetchRequest.mock.calls[0]?.[1] as
+        | URLSearchParams
+        | undefined;
+
+      expect(params).toBeInstanceOf(URLSearchParams);
+      expect(params?.get('services')).toBeTruthy();
+
+      const requestedServices =
+        params?.get('services')?.split(',').filter(Boolean) ?? [];
+      expect(requestedServices.sort()).toEqual(
+        [...MUSICFETCH_ARTIST_LOOKUP_SERVICES].sort()
+      );
+      expect(requestedServices).not.toContain('soundCloud');
+      expect(requestedServices).not.toContain('netEase');
+      expect(requestedServices).not.toContain('telmoreMusik');
+      expect(requestedServices).not.toContain('napster');
+    });
+
+    it('returns null on a permanent 400 response', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 400', 400)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows invalid-service 400 responses instead of returning null', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch API error: 400 - services - Invalid value "soundCloud"',
+          400,
+          undefined,
+          'services - Invalid value "soundCloud"'
+        )
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('services - Invalid value');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a 429 without capturing it in Sentry', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 429', 429, 60)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('MusicFetch API error: 429');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows budget exhaustion without capturing it in Sentry', async () => {
+      const { MusicfetchBudgetExceededError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchBudgetExceededError(
+          'MusicFetch daily hard budget exhausted',
+          'daily',
+          3600
+        )
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toMatchObject({
+        name: 'MusicfetchBudgetExceededError',
+        budgetScope: 'daily',
+      });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows 500 errors for job retry handling', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 500', 500)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('MusicFetch API error: 500');
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
   });
 });

@@ -54,7 +54,11 @@ export function Dialog({
     >
       <UiDialogContent
         hideClose={hideClose}
-        className={cn(sizes[size], className)}
+        className={cn(
+          sizes[size],
+          'rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 shadow-popover',
+          className
+        )}
       >
         {children}
       </UiDialogContent>
@@ -66,7 +70,7 @@ export function DialogBody({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<'div'>) {
-  return <div {...props} className={cn('mt-6', className)} />;
+  return <div {...props} className={cn('mt-5', className)} />;
 }
 
 export function DialogActions({
@@ -77,7 +81,7 @@ export function DialogActions({
     <div
       {...props}
       className={cn(
-        'mt-8 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:flex-row sm:*:w-auto',
+        'mt-6 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:flex-row sm:*:w-auto',
         className
       )}
     />

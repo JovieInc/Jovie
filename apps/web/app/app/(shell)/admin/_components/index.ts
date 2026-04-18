@@ -3,6 +3,10 @@ export {
   AdminBraggingRightsSectionSkeleton,
 } from './AdminBraggingRightsSection';
 export {
+  AdminConversionFunnelSection,
+  AdminConversionFunnelSectionSkeleton,
+} from './AdminConversionFunnelSection';
+export {
   AdminKpiSection,
   AdminKpiSectionSkeleton,
 } from './AdminKpiSection';
@@ -14,6 +18,10 @@ export {
   AdminPlatformStatsSection,
   AdminPlatformStatsSectionSkeleton,
 } from './AdminPlatformStatsSection';
+export {
+  AdminScoreboardSection,
+  AdminScoreboardSectionSkeleton,
+} from './AdminScoreboardSection';
 export {
   AdminSentrySection,
   AdminSentrySectionSkeleton,

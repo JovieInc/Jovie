@@ -63,8 +63,8 @@ vi.mock('@/lib/db/client/retry', () => ({
 }));
 
 // Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
-vi.mock('@/lib/auth/waitlist-config', () => ({
-  isWaitlistEnabled: vi.fn().mockReturnValue(true),
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 // Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
@@ -131,7 +131,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'waitlist_pending',
                   profileId: null,
                   profileComplete: null,
@@ -159,7 +159,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'waitlist_approved',
                   profileId: null,
                   profileComplete: null,
@@ -187,7 +187,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'profile_claimed',
                   profileId: 'profile-123',
                   profileComplete: null, // onboardingCompletedAt is null
@@ -215,7 +215,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
@@ -248,7 +248,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
@@ -281,7 +281,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'waitlist_approved',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
@@ -309,7 +309,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'profile_claimed',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
@@ -337,7 +337,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'onboarding_incomplete',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
@@ -376,10 +376,10 @@ describe('proxy-state.ts', () => {
 
       const result = await getUserState('clerk_123');
 
-      // Should return safe fallback (require waitlist)
+      // Should return safe fallback (onboarding — waitlist gate is disabled)
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
@@ -441,8 +441,8 @@ describe('proxy-state.ts', () => {
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
-        needsWaitlist: true,
-        needsOnboarding: false,
+        needsWaitlist: false,
+        needsOnboarding: true,
         isActive: false,
         isBanned: false,
       });
@@ -474,7 +474,7 @@ describe('proxy-state.ts', () => {
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([
                 {
-                  dbUserId: 'db-user-123',
+                  dbUserId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),

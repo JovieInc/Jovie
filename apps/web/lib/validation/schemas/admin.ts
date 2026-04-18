@@ -140,12 +140,7 @@ export type WaitlistGoal = z.infer<typeof waitlistGoalSchema>;
 /**
  * Pricing plan enum values for waitlist submissions.
  */
-export const waitlistPlanValues = [
-  'free',
-  'branding',
-  'pro',
-  'growth',
-] as const;
+export const waitlistPlanValues = ['free', 'branding', 'pro', 'max'] as const;
 
 /**
  * Pricing plan validation schema.
@@ -164,8 +159,8 @@ export type WaitlistPlan = z.infer<typeof waitlistPlanSchema>;
  * Pre-instantiated to avoid per-request Zod schema construction overhead.
  */
 export const waitlistRequestSchema = z.object({
-  /** User's primary goal: streams, merch, or tickets */
-  primaryGoal: waitlistGoalSchema,
+  /** User's primary goal (optional — removed from onboarding flow) */
+  primaryGoal: waitlistGoalSchema.optional().nullable(),
   /** Primary social media profile URL */
   primarySocialUrl: httpUrlSchema,
   /** Optional Spotify profile URL */

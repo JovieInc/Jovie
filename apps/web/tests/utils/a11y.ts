@@ -21,4 +21,6 @@ export async function expectNoA11yViolations(
       .join('\n\n');
     expect.fail(`Accessibility violations found:\n\n${message}`);
   }
+
+  expect(violations).toHaveLength(0);
 }

@@ -38,9 +38,7 @@ export function ProfilePreview({
     image_url: avatarUrl || undefined,
     tagline: 'This is a preview of how your profile will appear to visitors',
     theme: {},
-    settings: {
-      hide_branding: false,
-    },
+    settings: {},
     spotify_url: undefined,
     apple_music_url: undefined,
     youtube_url: undefined,
@@ -67,14 +65,19 @@ export function ProfilePreview({
   }));
 
   return (
-    <div className={cn('w-full h-full overflow-hidden rounded-2xl', className)}>
+    <div
+      className={cn(
+        'h-full w-full overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam)',
+        className
+      )}
+    >
       <div className='relative h-full w-full'>
         <StaticArtistPage
+          presentation='compact-preview'
           mode='profile'
           artist={mockArtist}
           socialLinks={socialLinks}
           subtitle=''
-          showTipButton={false}
           showBackButton={false}
           contacts={[]}
           showFooter={false}

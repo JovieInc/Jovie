@@ -1,19 +1,20 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useProfileNotificationsController } from '@/components/organisms/hooks/useProfileNotificationsController';
 import {
   usePopstateReset,
   useProfileVisitTracking,
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
+import {
+  PROFILE_MODE_KEYS,
+  type ProfileMode,
+} from '@/features/profile/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { applyPublicProfileLinkCaps } from '@/lib/profile/social-link-limits';
-import {
-  detectSourcePlatform,
-  getContextAwareLinks,
-} from '@/lib/utils/context-aware-links';
+import { sortSocialLinksByGeoPopularity } from '@/lib/utils/context-aware-links';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import type { LegacySocialLink } from '@/types/db';
@@ -66,30 +67,149 @@ export interface UseProfileShellReturn {
   hasContacts: boolean;
 }
 
+const LOCATION_SEARCH_CHANGE_EVENT = 'jovie:location-search-change';
+const HISTORY_PATCHED = Symbol('jovie.location-search-patched');
+
+type PatchedHistoryMethod = History['pushState'] & {
+  [HISTORY_PATCHED]?: true;
+};
+
+function patchHistoryEvents() {
+  if (globalThis.history === undefined) {
+    return;
+  }
+
+  const { pushState, replaceState } = globalThis.history;
+  const patchedPushState = pushState as PatchedHistoryMethod;
+  const patchedReplaceState = replaceState as PatchedHistoryMethod;
+
+  if (
+    patchedPushState[HISTORY_PATCHED] &&
+    patchedReplaceState[HISTORY_PATCHED]
+  ) {
+    return;
+  }
+
+  const dispatchChange = () => {
+    globalThis.dispatchEvent(new Event(LOCATION_SEARCH_CHANGE_EVENT));
+  };
+
+  const nextPushState: PatchedHistoryMethod = function patchedPushState(
+    this: History,
+    ...args: Parameters<History['pushState']>
+  ) {
+    pushState.apply(this, args);
+    dispatchChange();
+  };
+
+  const nextReplaceState: PatchedHistoryMethod = function patchedReplaceState(
+    this: History,
+    ...args: Parameters<History['replaceState']>
+  ) {
+    replaceState.apply(this, args);
+    dispatchChange();
+  };
+
+  nextPushState[HISTORY_PATCHED] = true;
+  nextReplaceState[HISTORY_PATCHED] = true;
+  globalThis.history.pushState = nextPushState;
+  globalThis.history.replaceState = nextReplaceState;
+}
+
+function subscribeToLocationSearch(onStoreChange: () => void): () => void {
+  if (globalThis.location === undefined) {
+    return () => undefined;
+  }
+
+  patchHistoryEvents();
+  globalThis.addEventListener('popstate', onStoreChange);
+  globalThis.addEventListener(LOCATION_SEARCH_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    globalThis.removeEventListener('popstate', onStoreChange);
+    globalThis.removeEventListener(LOCATION_SEARCH_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function getLocationSearchSnapshot(): string {
+  if (globalThis.location === undefined) {
+    return '';
+  }
+
+  return globalThis.location.search;
+}
+
+function resolveModeFromSearch(
+  search: string,
+  fallbackMode: ProfileMode
+): ProfileMode {
+  if (!search) {
+    return fallbackMode;
+  }
+
+  const modeParam = new URLSearchParams(search).get('mode');
+  if (
+    modeParam &&
+    PROFILE_MODE_KEYS.includes(modeParam as (typeof PROFILE_MODE_KEYS)[number])
+  ) {
+    return modeParam as ProfileMode;
+  }
+
+  return fallbackMode;
+}
+
+function resolveSourceFromSearch(
+  search: string,
+  fallbackSource: string | null
+): string | null {
+  if (!search) {
+    return fallbackSource;
+  }
+
+  return new URLSearchParams(search).get('source') ?? fallbackSource;
+}
+
 export function useProfileShell({
   artist,
   socialLinks,
+  viewerCountryCode,
   contacts = [],
   visitTrackingToken,
+  modeOverride,
+  sourceOverride,
+  smsEnabled = false,
 }: Pick<
   ProfileShellProps,
-  'artist' | 'socialLinks' | 'contacts' | 'visitTrackingToken'
->): UseProfileShellReturn {
+  | 'artist'
+  | 'socialLinks'
+  | 'viewerCountryCode'
+  | 'contacts'
+  | 'visitTrackingToken'
+> & {
+  modeOverride?: ProfileMode;
+  sourceOverride?: string | null;
+  smsEnabled?: boolean;
+}): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-
-  // Memoize extracted search params to avoid downstream re-renders
-  // when unrelated URL parameters change
-  const { mode, source } = useMemo(
-    () => ({
-      mode: searchParams?.get('mode') ?? 'profile',
-      source: searchParams?.get('source') ?? null,
-    }),
-    [searchParams]
+  const locationSearch = useSyncExternalStore(
+    subscribeToLocationSearch,
+    getLocationSearchSnapshot,
+    () => ''
   );
+  const locationMode = useMemo(
+    () => resolveModeFromSearch(locationSearch, 'profile'),
+    [locationSearch]
+  );
+  const locationSource = useMemo(
+    () => resolveSourceFromSearch(locationSearch, null),
+    [locationSearch]
+  );
+
+  const mode = modeOverride ?? locationMode;
+  const source = sourceOverride ?? locationSource;
 
   // Notifications CTA is always enabled (previously gated by preview=1 param)
   const notificationsEnabled = true;
@@ -111,6 +231,7 @@ export function useProfileShell({
     artistHandle: artist.handle,
     artistId: artist.id,
     notificationsEnabled,
+    smsEnabled,
     onError: showError,
     onSuccess: showSuccess,
   });
@@ -173,6 +294,7 @@ export function useProfileShell({
       setSubscriptionDetails,
       openSubscription,
       registerInputFocus,
+      smsEnabled,
     }),
     [
       channel,
@@ -186,6 +308,7 @@ export function useProfileShell({
       setNotificationsState,
       setSubscribedChannels,
       setSubscriptionDetails,
+      smsEnabled,
       subscribedChannels,
       subscriptionDetails,
     ]
@@ -195,16 +318,8 @@ export function useProfileShell({
     const visibleLinks = socialLinks.filter(
       link => link.is_visible !== false && isSafePublicSocialLink(link)
     );
-
-    // Detect source platform from referrer or UTM params
-    const referrer = typeof document === 'undefined' ? '' : document.referrer;
-    const params = searchParams
-      ? new URLSearchParams(searchParams.toString())
-      : new URLSearchParams();
-    const sourcePlatform = detectSourcePlatform(referrer, params);
-
-    return getContextAwareLinks(visibleLinks, sourcePlatform);
-  }, [socialLinks, searchParams]);
+    return sortSocialLinksByGeoPopularity(visibleLinks, viewerCountryCode);
+  }, [socialLinks, viewerCountryCode]);
   const cappedLinks = useMemo(
     () => applyPublicProfileLinkCaps(socialNetworkLinks),
     [socialNetworkLinks]

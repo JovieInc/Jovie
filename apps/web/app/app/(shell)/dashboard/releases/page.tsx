@@ -1,96 +1,76 @@
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardData } from '../actions';
-import {
-  checkAppleMusicConnection,
-  checkSpotifyConnection,
-  loadReleaseMatrix,
-} from './actions';
-import { primaryProviderKeys, providerConfig } from './config';
+import { queryKeys } from '@/lib/queries';
+import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { getDashboardShellData } from '../actions';
+import { loadReleaseMatrix } from './actions';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
+import { ReleasesPageClient } from './ReleasesPageClient';
 
 export const runtime = 'nodejs';
 
+/**
+ * Releases page — client-first with shell-only server work.
+ *
+ * Auth check via getCachedAuth (Clerk JWT, no DB) runs first. The shared shell
+ * and /app route warm the release matrix cache ahead of navigation, so this
+ * page keeps warm transitions instant while still hydrating release data on
+ * direct visits, refreshes, and bookmarks.
+ */
 export default async function ReleasesPage() {
-  // Fetch dashboard data to verify authentication (actions handle their own auth via requireProfile)
-  const dashboardData = await getDashboardData();
-
-  // Handle unauthenticated users
-  if (!dashboardData.user?.id) {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
     redirect(
       `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
     );
   }
 
-  // Handle redirects for users who need onboarding
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
+  // Shell data is cached from the shell layout (same request) — resolves instantly.
+  const dashboardData = await getDashboardShellData(userId);
 
-  // Fetch releases outside allSettled so redirect() from requireProfile() can propagate
-  let releases: Awaited<ReturnType<typeof loadReleaseMatrix>> = [];
-  try {
-    releases = await loadReleaseMatrix();
-  } catch (error) {
-    throwIfRedirect(error);
-    void captureError('loadReleaseMatrix failed', error, {
-      route: APP_ROUTES.RELEASES,
-    });
-  }
-
-  // Use allSettled for connection checks — these don't redirect and degrade gracefully
-  const [spotifyResult, appleMusicResult] = await Promise.allSettled([
-    checkSpotifyConnection(),
-    checkAppleMusicConnection(),
-  ]);
-
-  const spotifyStatus =
-    spotifyResult.status === 'fulfilled'
-      ? spotifyResult.value
-      : { connected: false, spotifyId: null, artistName: null };
-  const appleMusicStatus =
-    appleMusicResult.status === 'fulfilled'
-      ? appleMusicResult.value
-      : { connected: false, artistName: null, artistId: null };
-
-  if (spotifyResult.status === 'rejected') {
-    void captureError('checkSpotifyConnection failed', spotifyResult.reason, {
-      route: APP_ROUTES.RELEASES,
-    });
-  }
-  if (appleMusicResult.status === 'rejected') {
+  if (dashboardData.dashboardLoadError) {
     void captureError(
-      'checkAppleMusicConnection failed',
-      appleMusicResult.reason,
-      {
-        route: APP_ROUTES.RELEASES,
-      }
+      'Dashboard data load failed on releases page',
+      dashboardData.dashboardLoadError,
+      { route: APP_ROUTES.DASHBOARD_RELEASES }
+    );
+    return (
+      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
     );
   }
 
-  // Read allow artwork downloads setting from profile settings
-  const profileSettings =
-    (dashboardData.selectedProfile?.settings as Record<string, unknown>) ?? {};
-  const allowArtworkDownloads =
-    (profileSettings.allowArtworkDownloads as boolean) ?? false;
-  const spotifyImportStatus =
-    (profileSettings.spotifyImportStatus as string) ?? 'idle';
+  if (dashboardData.needsOnboarding) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
+  const profileId = dashboardData.selectedProfile?.id;
+  if (profileId) {
+    const queryClient = getQueryClient();
+    try {
+      await queryClient.fetchQuery({
+        queryKey: queryKeys.releases.matrix(profileId),
+        queryFn: () => loadReleaseMatrix(profileId),
+      });
+    } catch (error) {
+      void captureError(
+        'Release matrix prefetch failed on releases page',
+        error,
+        {
+          route: APP_ROUTES.DASHBOARD_RELEASES,
+        }
+      );
+    }
+  }
+
   return (
-    <ReleasesClientBoundary>
-      <ReleasesExperience
-        releases={releases}
-        providerConfig={providerConfig}
-        primaryProviders={primaryProviderKeys}
-        spotifyConnected={spotifyStatus.connected}
-        spotifyArtistName={spotifyStatus.artistName}
-        appleMusicConnected={appleMusicStatus.connected}
-        appleMusicArtistName={appleMusicStatus.artistName}
-        allowArtworkDownloads={allowArtworkDownloads}
-        initialImporting={spotifyImportStatus === 'importing'}
-      />
-    </ReleasesClientBoundary>
+    <HydrateClient state={getDehydratedState()}>
+      <ReleasesClientBoundary>
+        <ReleasesPageClient />
+      </ReleasesClientBoundary>
+    </HydrateClient>
   );
 }

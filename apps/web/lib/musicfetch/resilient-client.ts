@@ -3,9 +3,11 @@ import 'server-only';
 import crypto from 'node:crypto';
 
 import { env } from '@/lib/env-server';
+import { reserveMusicfetchBudget } from '@/lib/musicfetch/budget-guard';
 import { createRateLimiter } from '@/lib/rate-limit/rate-limiter';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
+import { MusicfetchRequestError } from './errors';
 
 const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 const MAX_RETRY_ATTEMPTS = 3;
@@ -22,19 +24,19 @@ const requestRateLimiter = createRateLimiter({
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
 
-export class MusicfetchRequestError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode?: number,
-    public readonly retryAfterSeconds?: number
-  ) {
-    super(message);
-    this.name = 'MusicfetchRequestError';
-  }
-}
-
 interface MusicfetchRequestOptions {
   timeoutMs: number;
+}
+
+interface MusicfetchErrorBody {
+  error?: {
+    message?: string;
+    status?: number;
+  };
+  message?: string;
+  messages?: Array<{
+    message?: string;
+  }>;
 }
 
 function parseRetryAfterSeconds(value: string | null): number | undefined {
@@ -133,6 +135,23 @@ function wrapUnknownError(error: unknown): MusicfetchRequestError {
   );
 }
 
+function extractMusicfetchErrorDetail(bodyText: string): string | undefined {
+  const trimmed = bodyText.trim();
+  if (!trimmed) return undefined;
+
+  try {
+    const parsed = JSON.parse(trimmed) as MusicfetchErrorBody;
+    const detail =
+      parsed.error?.message ??
+      parsed.message ??
+      parsed.messages?.find(message => typeof message.message === 'string')
+        ?.message;
+    return detail?.trim() || trimmed.slice(0, 500);
+  } catch {
+    return trimmed.slice(0, 500);
+  }
+}
+
 async function handleHttpResponse<T>(
   response: Response,
   attempt: number
@@ -150,10 +169,16 @@ async function handleHttpResponse<T>(
     return { shouldRetry: true };
   }
 
+  const errorBody = await response.text().catch(() => '');
+  const details = extractMusicfetchErrorDetail(errorBody);
+
   throw new MusicfetchRequestError(
-    `MusicFetch API error: ${response.status}`,
+    details
+      ? `MusicFetch API error: ${response.status} - ${details}`
+      : `MusicFetch API error: ${response.status}`,
     response.status,
-    retryAfterSeconds
+    retryAfterSeconds,
+    details
   );
 }
 
@@ -183,6 +208,8 @@ async function requestWithRetries<T>(
         retryAfterSeconds
       );
     }
+
+    await reserveMusicfetchBudget();
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
@@ -216,6 +243,12 @@ async function requestWithRetries<T>(
 
   throw new MusicfetchRequestError('MusicFetch request failed after retries');
 }
+
+export {
+  isMusicfetchInvalidServicesError,
+  MusicfetchBudgetExceededError,
+  MusicfetchRequestError,
+} from './errors';
 
 export async function musicfetchRequest<T>(
   endpoint: string,

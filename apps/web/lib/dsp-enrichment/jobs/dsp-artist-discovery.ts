@@ -10,11 +10,11 @@
 
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
-import { discogTracks } from '@/lib/db/schema/content';
+import { discogRecordings } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -22,6 +22,7 @@ import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
 
+import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   convertAppleMusicToIsrcMatches,
   convertDeezerToIsrcMatches,
@@ -95,18 +96,18 @@ async function fetchLocalTracks(
 ): Promise<LocalTrackData[]> {
   const tracks = await tx
     .select({
-      id: discogTracks.id,
-      title: discogTracks.title,
-      isrc: discogTracks.isrc,
+      id: discogRecordings.id,
+      title: discogRecordings.title,
+      isrc: discogRecordings.isrc,
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .where(
       and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
-        drizzleSql`${discogTracks.isrc} IS NOT NULL`
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        drizzleSql`${discogRecordings.isrc} IS NOT NULL`
       )
     )
-    .orderBy(discogTracks.createdAt)
+    .orderBy(discogRecordings.createdAt)
     .limit(100);
 
   return tracks.map(t => ({
@@ -158,7 +159,7 @@ async function storeMatch(
   providerId: DspProviderId,
   match: ScoredArtistMatch,
   status: DspMatchStatus
-): Promise<string> {
+): Promise<string | null> {
   const now = new Date();
 
   const [result] = await tx
@@ -184,6 +185,7 @@ async function storeMatch(
       totalTracksChecked: match.totalTracksChecked,
       status,
       confirmedAt: status === 'auto_confirmed' ? now : null,
+      matchSource: 'isrc_discovery',
       createdAt: now,
       updatedAt: now,
     })
@@ -208,12 +210,17 @@ async function storeMatch(
         totalTracksChecked: match.totalTracksChecked,
         status,
         confirmedAt: status === 'auto_confirmed' ? now : null,
+        matchSource: 'isrc_discovery',
         updatedAt: now,
       },
+      where: or(
+        isNull(dspArtistMatches.matchSource),
+        ne(dspArtistMatches.matchSource, 'manual')
+      ),
     })
     .returning({ id: dspArtistMatches.id });
 
-  return result.id;
+  return result?.id ?? null;
 }
 
 // ============================================================================
@@ -370,8 +377,9 @@ async function discoverAppleMusicMatch(
     status
   );
 
-  // If auto-confirmed, update the creator profile and enqueue release enrichment
-  if (status === 'auto_confirmed') {
+  // If auto-confirmed and upsert succeeded (not blocked by manual match),
+  // update the creator profile and enqueue release enrichment
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
@@ -493,7 +501,7 @@ async function discoverDeezerMatch(
     matchingResult.bestMatch,
     status
   );
-  if (status === 'auto_confirmed') {
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ deezerId: matchingResult.bestMatch.externalArtistId })
@@ -616,7 +624,7 @@ async function discoverMusicBrainzMatch(
     creatorProfileId,
     status,
   });
-  if (status === 'auto_confirmed') {
+  if (status === 'auto_confirmed' && matchId) {
     await tx
       .update(creatorProfiles)
       .set({ musicbrainzId: matchingResult.bestMatch.externalArtistId })
@@ -733,12 +741,15 @@ export async function processDspArtistDiscoveryJob(
 
   if (!localArtist) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'failed');
     return result;
   }
   if (localTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
     result.errors.push(
       `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${localTracks.length})`
     );
+    // Not enough tracks is not a failure — it's expected for new artists
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'complete');
     return result;
   }
 
@@ -766,6 +777,9 @@ export async function processDspArtistDiscoveryJob(
         errors: result.errors,
       }
     );
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'failed');
+  } else {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'complete');
   }
 
   return result;

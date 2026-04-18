@@ -1,412 +1,155 @@
 'use client';
 
-import { Check, Zap } from 'lucide-react';
+import { BellRing, CheckCheck, Mail } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { Container } from '@/components/site/Container';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
-import { PhoneFrame } from './PhoneFrame';
+import { NumberedSection } from '@/components/marketing';
+import { ProductScreenshot } from './ProductScreenshot';
+import { RELEASES } from './releases-data';
 
-const RELEASES = [
+const SUB_ITEMS = [
   {
-    id: 'never-say-a-word',
-    title: 'Never Say A Word',
-    year: '2024',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
-    slug: 'tim/never-say-a-word',
-    isNew: true,
+    number: '1.1',
+    title: 'Smart Links',
+    description:
+      'Auto-generated for every release across Spotify, Apple Music, YouTube Music, and more.',
   },
   {
-    id: 'deep-end',
-    title: 'The Deep End',
-    year: '2017',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
-    slug: 'tim/the-deep-end',
-    isNew: false,
+    number: '1.2',
+    title: 'Release Notifications',
+    description:
+      'Fans get notified the minute new music drops — no manual sends, no scheduling.',
   },
   {
-    id: 'take-me-over',
-    title: 'Take Me Over',
-    year: '2014',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
-    slug: 'tim/take-me-over',
-    isNew: false,
+    number: '1.3',
+    title: 'Pre-saves',
+    description:
+      'Capture intent before release day and convert it into day-one streams.',
   },
-] as const;
+  {
+    number: '1.4',
+    title: 'Analytics',
+    description:
+      'See which platforms drive real engagement and where your listeners come from.',
+  },
+];
 
-const SMART_LINK_DSPS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'amazon_music',
-] as const;
+export function ReleasesSection() {
+  const activeRelease = RELEASES[0];
 
-const DSP_LABELS: Record<string, string> = {
-  apple_music: 'Apple Music',
-  youtube_music: 'YouTube Music',
-  amazon_music: 'Amazon Music',
-};
-
-const RELEASE_PROOF_POINTS = [
-  'Catalog sync',
-  'Smart links per release',
-  'Fan notifications',
-] as const;
-
-function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
   return (
-    <div
-      className='relative overflow-hidden rounded-xl md:rounded-2xl'
-      style={{
-        border: '1px solid var(--linear-border-subtle)',
-        backgroundColor: 'var(--linear-bg-surface-0)',
-        boxShadow: [
-          '0 0 0 1px rgba(255,255,255,0.03)',
-          '0 8px 40px rgba(0,0,0,0.35)',
-          '0 24px 80px rgba(0,0,0,0.25)',
-        ].join(', '),
-      }}
+    <NumberedSection
+      id='release'
+      sectionNumber='1.0'
+      sectionTitle='Release'
+      heading='Release day, automated.'
+      description='Jovie launches the page, matches every platform, and starts fan outreach the moment your song drops.'
+      subItems={SUB_ITEMS}
+      className='relative overflow-hidden bg-page'
     >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px'
-        style={{
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
-        }}
-      />
+      <div className='homepage-surface-card relative mt-4 overflow-hidden rounded-[1rem] p-3.5 sm:mt-5 sm:p-4 md:p-[1.15rem] lg:p-5'>
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-0 top-0 h-px'
+          style={{
+            background:
+              'linear-gradient(90deg, transparent, rgba(255,255,255,0.14) 32%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.14) 68%, transparent)',
+          }}
+        />
 
-      <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-5'>
-        <div className='flex gap-2'>
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
+        <div className='flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-3.5 py-2.75 sm:px-4'>
+          <div>
+            <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+              Release event
+            </p>
+            <p className='mt-1 text-sm font-medium text-primary-token'>
+              {activeRelease.title} is live across your catalog.
+            </p>
+          </div>
+
+          <div className='inline-flex items-center gap-2 rounded-full bg-emerald-500/12 px-3 py-1.5 text-sm font-medium text-emerald-300'>
+            <BellRing className='h-4 w-4' />
+            4,218 fans notified
+          </div>
         </div>
-        <div className='flex-1 text-center text-xs text-tertiary-token'>
-          Jovie - Releases
-        </div>
-        <div className='w-[52px]' />
-      </div>
 
-      <div
-        className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'
-        style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
-      >
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
-          Release
-        </span>
-        <span />
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
-          Smart link
-        </span>
-      </div>
-
-      {RELEASES.map((release, i) => {
-        const isActive = i === activeIndex;
-        return (
-          <div
-            key={release.id}
-            className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-3 transition-colors duration-300'
-            style={{
-              backgroundColor: isActive
-                ? 'rgba(255,255,255,0.035)'
-                : 'transparent',
-              borderBottom:
-                i < RELEASES.length - 1
-                  ? '1px solid var(--linear-border-subtle)'
-                  : undefined,
-            }}
-          >
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
-              <Image
-                src={release.artwork}
-                alt={release.title}
-                fill
-                className='object-cover'
-                sizes='40px'
+        <div className='mt-3.5 grid gap-3.5 lg:grid-cols-[minmax(0,1.08fr)_15.5rem] lg:items-start xl:grid-cols-[minmax(0,1.06fr)_16.25rem]'>
+          <div className='space-y-3'>
+            <div className='max-w-[42rem]'>
+              <ProductScreenshot
+                src='/product-screenshots/releases-dashboard-full.png'
+                alt='Jovie releases dashboard showing catalog with smart links'
+                width={2880}
+                height={1800}
+                title='Jovie - Release Flow'
+                priority
+                skipCheck
               />
             </div>
 
-            <div className='min-w-0'>
-              <div className='flex items-center gap-2'>
-                <p className='truncate text-sm font-medium text-primary-token'>
-                  {release.title}
-                </p>
-                {release.isNew && (
-                  <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
-                    New
-                  </span>
-                )}
-              </div>
-              <p className='text-xs text-tertiary-token'>
-                {release.type} - {release.year}
-              </p>
-            </div>
-
-            <div
-              className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-300'
-              style={{
-                backgroundColor: isActive
-                  ? 'rgba(255,255,255,0.07)'
-                  : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${isActive ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
-              }}
-            >
-              <svg
-                width='11'
-                height='11'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2.5'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                className='text-tertiary-token'
-                aria-hidden='true'
-              >
-                <path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' />
-                <path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' />
-              </svg>
-              <span
-                className='font-mono text-xs transition-colors duration-300'
-                style={{
-                  color: isActive
-                    ? 'var(--linear-text-secondary)'
-                    : 'var(--linear-text-tertiary)',
-                }}
-              >
-                jov.ie/{release.slug}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-
-      <div className='flex items-center justify-center px-5 py-3'>
-        <p className='text-xs text-quaternary-token'>
-          + every past and future release, automatically
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ReleasePhone({
-  release,
-}: {
-  readonly release: (typeof RELEASES)[number];
-}) {
-  return (
-    <PhoneFrame>
-      <div
-        className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-surface-1 px-3 py-1.5'
-        style={{ border: '1px solid var(--linear-border-subtle)' }}
-      >
-        <span className='truncate text-[10px] text-tertiary-token'>
-          jov.ie/{release.slug}
-        </span>
-      </div>
-
-      <div className='px-6 py-4'>
-        <div
-          className='relative aspect-square w-full overflow-hidden rounded-2xl'
-          style={{
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
-          }}
-        >
-          <Image
-            src={release.artwork}
-            alt={release.title}
-            fill
-            className='object-cover'
-            sizes='220px'
-          />
-        </div>
-      </div>
-
-      <div className='px-6 pb-4 text-center'>
-        <p className='text-[15px] font-semibold tracking-tight text-primary-token'>
-          {release.title}
-        </p>
-        <p className='mt-0.5 text-xs text-tertiary-token'>Tim White</p>
-      </div>
-
-      <div className='flex flex-col gap-2 px-5'>
-        {SMART_LINK_DSPS.map(key => {
-          const config = DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
-          if (!config) return null;
-          return (
-            <SmartLinkProviderButton
-              key={key}
-              label={DSP_LABELS[key] ?? 'Spotify'}
-              iconPath={config.iconPath}
-              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
-            />
-          );
-        })}
-      </div>
-
-      <div className='pb-3 pt-3 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
-          Powered by Jovie
-        </p>
-      </div>
-    </PhoneFrame>
-  );
-}
-
-export function ReleasesSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeRelease = RELEASES[activeIndex];
-
-  return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
-        style={{
-          width: '900px',
-          height: '700px',
-          borderRadius: '50%',
-          background:
-            'radial-gradient(ellipse at center, oklch(18% 0.02 265 / 0.12), transparent 65%)',
-        }}
-      />
-
-      <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll flex flex-col gap-5'>
-            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
-              <Zap className='h-3 w-3' aria-hidden='true' />
-              Automatic
-            </span>
-
-            <div className='grid gap-5 md:grid-cols-2 md:items-start md:gap-8'>
-              <h2 className='marketing-h2-linear text-primary-token'>
-                Every release gets a smart link and a built-in launch flow.
-              </h2>
-              <p className='max-w-md marketing-lead-linear text-secondary-token'>
-                Connect Spotify once. Jovie handles the rest — smart links,
-                release updates, and fan notifications.
-              </p>
-            </div>
-          </div>
-
-          <div
-            className='mt-8 flex flex-wrap gap-3 reveal-on-scroll'
-            data-delay='40'
-          >
-            {RELEASE_PROOF_POINTS.map(point => (
-              <span
-                key={point}
-                className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'
-              >
-                {point}
-              </span>
-            ))}
-          </div>
-
-          <div
-            className='mt-10 flex flex-wrap items-center gap-2 reveal-on-scroll'
-            data-delay='60'
-          >
-            {RELEASES.map((release, i) => (
-              <button
-                key={release.id}
-                type='button'
-                onClick={() => setActiveIndex(i)}
-                className='flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300'
-                style={{
-                  backgroundColor:
-                    i === activeIndex
-                      ? 'rgba(255,255,255,0.08)'
-                      : 'transparent',
-                  border: `1px solid ${i === activeIndex ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
-                  color:
-                    i === activeIndex
-                      ? 'var(--linear-text-primary)'
-                      : 'var(--linear-text-tertiary)',
-                }}
-              >
-                {release.isNew && (
-                  <span className='inline-block h-1.5 w-1.5 rounded-full bg-amber-400' />
-                )}
-                {release.title}
-                <span
-                  className='text-xs'
-                  style={{
-                    color:
-                      i === activeIndex
-                        ? 'var(--linear-text-tertiary)'
-                        : 'var(--linear-text-quaternary)',
-                  }}
-                >
-                  {release.year}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div
-            className='mt-8 flex flex-col gap-6 reveal-on-scroll lg:flex-row lg:items-start'
-            data-delay='120'
-          >
-            <div className='min-w-0 flex-1'>
-              <DashboardMockup activeIndex={activeIndex} />
-            </div>
-
-            <div className='hidden shrink-0 lg:block'>
-              <ReleasePhone release={activeRelease} />
-            </div>
-          </div>
-
-          <div
-            className='mt-8 flex flex-col justify-between gap-4 rounded-xl px-6 py-4 reveal-on-scroll sm:flex-row sm:items-center'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-0)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
-            data-delay='160'
-          >
-            <div className='flex items-start gap-3 sm:items-center'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                <Zap
-                  className='h-4 w-4 text-secondary-token'
-                  aria-hidden='true'
+            <div className='flex items-center gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-4 py-3 lg:hidden'>
+              <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-surface-2'>
+                <Image
+                  src={activeRelease.artwork}
+                  alt={activeRelease.title}
+                  fill
+                  sizes='48px'
+                  className='object-cover'
                 />
               </div>
-              <div>
+              <div className='min-w-0'>
                 <p className='text-sm font-medium text-primary-token'>
-                  Launch without rebuilding assets every release.
+                  Smart link live for {activeRelease.title}
                 </p>
-                <p className='text-xs text-tertiary-token'>
-                  Smart links, release pages, and fan notifications stay ready
-                  for every drop.
+                <p className='text-sm text-secondary-token'>
+                  Auto-matched across Spotify, Apple Music, and YouTube Music.
                 </p>
               </div>
             </div>
+          </div>
 
-            <div className='flex shrink-0 items-center gap-2'>
-              <span className='flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20'>
-                <Check
-                  className='h-3 w-3 text-emerald-400'
-                  aria-hidden='true'
-                />
-              </span>
-              <span className='text-sm font-medium text-emerald-400/90'>
-                4,218 fans notified
-              </span>
-              <span className='text-xs text-quaternary-token'>
-                captured from your profile
-              </span>
+          <div className='grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1'>
+            <div className='rounded-[0.9rem] border border-subtle bg-surface-1 p-3.5'>
+              <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                Paid release notifications
+              </p>
+              <p className='mt-2 text-[1.6rem] font-semibold tracking-tight text-primary-token'>
+                4,218
+              </p>
+              <p className='text-sm font-medium text-secondary-token'>
+                fans notified
+              </p>
+              <p className='mt-2 text-xs leading-5 text-tertiary-token'>
+                The minute the release is live, Jovie starts the outreach for
+                you.
+              </p>
+            </div>
+
+            <div className='rounded-[0.9rem] border border-subtle bg-surface-1 p-3.5'>
+              <div className='flex items-start gap-3'>
+                <span className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-300'>
+                  <Mail className='h-4 w-4' />
+                </span>
+                <div className='min-w-0'>
+                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                    Release email
+                  </p>
+                  <p className='mt-1 text-sm font-medium text-primary-token'>
+                    New release from Tim White
+                  </p>
+                  <p className='mt-1 text-sm leading-6 text-secondary-token'>
+                    {activeRelease.title} is out now. Fans already have the
+                    smart link in their inbox.
+                  </p>
+                  <div className='mt-2.5 inline-flex items-center gap-2 rounded-full bg-emerald-500/12 px-2.5 py-1 text-[11px] font-medium text-emerald-300'>
+                    <CheckCheck className='h-3 w-3' />
+                    Sent automatically by Jovie
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </Container>
-    </section>
+      </div>
+    </NumberedSection>
   );
 }

@@ -1,40 +1,17 @@
-import { getFeaturedCreators } from '@/lib/featured-creators';
-import {
-  FALLBACK_AVATARS,
-  fillWithFallbacks,
-} from './featured-creators-fallback';
-import { SeeItInActionCarousel } from './SeeItInActionCarousel';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FALLBACK_AVATARS } from './featured-creators-fallback';
+import { HomeLiveProofSection } from './HomeLiveProofSection';
 
-/**
- * Safe wrapper for SeeItInAction that catches errors during SSR.
- * Prevents the entire page from crashing if database fetch fails.
- * Falls back to static avatars if any error occurs.
- */
-export async function SeeItInActionSafe() {
-  try {
-    const dbCreators = await getFeaturedCreators();
-    const creators = fillWithFallbacks(dbCreators);
-    return <SeeItInActionCarousel creators={creators} />;
-  } catch (error) {
-    console.error('[Homepage] SeeItInAction failed:', error);
+interface SeeItInActionSafeProps {
+  readonly enabled?: boolean;
+}
 
-    if (typeof window === 'undefined') {
-      try {
-        const Sentry = await import('@sentry/nextjs');
-        Sentry.captureException(error, {
-          tags: {
-            context: 'homepage_see_it_in_action',
-            critical: 'true',
-          },
-          extra: {
-            message: 'Featured creators fetch failed, using fallback avatars',
-          },
-        });
-      } catch (sentryError) {
-        console.error('[Homepage] Failed to log to Sentry:', sentryError);
-      }
-    }
+export function SeeItInActionSafe({
+  enabled,
+}: Readonly<SeeItInActionSafeProps>) {
+  const showSection = enabled ?? FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION;
 
-    return <SeeItInActionCarousel creators={FALLBACK_AVATARS} />;
-  }
+  if (!showSection) return null;
+
+  return <HomeLiveProofSection creators={FALLBACK_AVATARS.slice(0, 3)} />;
 }

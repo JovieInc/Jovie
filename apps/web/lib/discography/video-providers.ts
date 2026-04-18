@@ -52,3 +52,11 @@ export const VIDEO_PROVIDER_KEYS: VideoProviderKey[] = [
   'instagram_reels',
   'youtube_shorts',
 ];
+
+/** Set for O(1) lookup of video provider keys */
+const VIDEO_PROVIDER_KEY_SET = new Set<string>(VIDEO_PROVIDER_KEYS);
+
+/** Type guard to check if a provider ID is a video provider key */
+export function isVideoProviderKey(key: string): key is VideoProviderKey {
+  return VIDEO_PROVIDER_KEY_SET.has(key);
+}

@@ -16,6 +16,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { UpgradeResult, UpgradeState } from '@/lib/sentry/lazy-replay';
 
+const UPGRADE_STATE_RETRY_DELAYS_MS = [500, 1500, 3000, 5000, 15000] as const;
+
 /**
  * Props for SentryDashboardProvider
  */
@@ -219,60 +221,66 @@ export function useSentryDashboardState(): {
   });
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-    let isChecking = false;
+    if (globalThis.window === undefined) {
+      return undefined;
+    }
 
-    const checkState = async (): Promise<void> => {
-      // Reentrancy guard: prevent concurrent invocations if the async import takes longer than the polling interval
-      if (isChecking) return;
-      isChecking = true;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
+    const runCheck = async (attempt = 0): Promise<void> => {
       try {
         const { getUpgradeState, isUpgraded } = await import(
           '@/lib/sentry/lazy-replay'
         );
 
         const upgradeState = getUpgradeState();
+        if (cancelled) {
+          return;
+        }
+
         setState({
           isFullSdkActive: isUpgraded(),
           upgradeState,
         });
 
-        // Stop polling once in a terminal state (not idle, checking, or upgrading)
-        if (
+        const isTerminalState =
           upgradeState !== 'idle' &&
           upgradeState !== 'checking' &&
-          upgradeState !== 'upgrading'
-        ) {
-          if (interval) clearInterval(interval);
+          upgradeState !== 'upgrading';
+
+        if (isTerminalState) {
+          return;
         }
+
+        const retryDelay =
+          UPGRADE_STATE_RETRY_DELAYS_MS[
+            Math.min(attempt, UPGRADE_STATE_RETRY_DELAYS_MS.length - 1)
+          ];
+        timeoutId = setTimeout(() => {
+          void runCheck(attempt + 1);
+        }, retryDelay);
       } catch {
+        if (cancelled) {
+          return;
+        }
+
         // If import fails, assume not upgraded
         setState({
           isFullSdkActive: false,
           upgradeState: 'failed',
         });
-        if (interval) clearInterval(interval);
-      } finally {
-        isChecking = false;
       }
     };
 
-    if (typeof window !== 'undefined') {
-      // Assign interval first so checkState can clear it if we're already in terminal state
-      interval = setInterval(() => {
-        checkState();
-      }, 500);
+    void runCheck();
 
-      // Also run immediately
-      checkState();
-
-      return () => {
-        if (interval) clearInterval(interval);
-      };
-    }
-
-    return undefined;
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   return {

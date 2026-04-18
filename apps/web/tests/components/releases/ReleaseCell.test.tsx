@@ -5,15 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
+let playbackState = { activeTrackId: null as string | null, isPlaying: false };
 
 beforeEach(() => {
   toggleTrack.mockClear();
+  playbackState = { activeTrackId: null, isPlaying: false };
 });
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
-    playbackState: { activeTrackId: null, isPlaying: false },
+    playbackState,
     toggleTrack,
+    seek: vi.fn(),
   }),
 }));
 
@@ -87,7 +90,10 @@ describe('ReleaseCell', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
-    expect(screen.getByText('Single')).toBeInTheDocument();
+    // Without a previewUrl the type renders as a colored dot with title, not text
+    const typeDot = screen.getByTitle('Single');
+    expect(typeDot).toBeInTheDocument();
+    expect(typeDot.className).toContain('shrink-0');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 
@@ -118,6 +124,49 @@ describe('ReleaseCell', () => {
       id: 'release-1',
       title: 'Skyline Dreams',
       audioUrl: 'https://cdn.example.com/preview.mp3',
+      releaseTitle: 'Skyline Dreams',
+      artistName: undefined,
+      artworkUrl: undefined,
     });
+  });
+
+  it('opens the release drawer when a primary select handler is provided', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <ReleaseCell
+        release={baseRelease}
+        artistName='Jovie Artist'
+        onSelect={onSelect}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Skyline Dreams' })
+    );
+
+    expect(onSelect).toHaveBeenCalledWith(baseRelease);
+  });
+
+  it('keeps the active preview control visible while playing', () => {
+    playbackState = { activeTrackId: 'release-1', isPlaying: true };
+
+    render(
+      <ReleaseCell
+        release={{
+          ...baseRelease,
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        }}
+        artistName='Jovie Artist'
+      />
+    );
+
+    const pauseButton = screen.getByRole('button', {
+      name: 'Pause Skyline Dreams',
+    });
+
+    expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
+    expect(pauseButton.className).toContain('opacity-100');
   });
 });

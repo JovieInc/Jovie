@@ -1,10 +1,15 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { setupDbSession } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { feedbackItems } from '@/lib/db/schema/feedback';
+import { preSaveTokens } from '@/lib/db/schema/pre-save';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -29,7 +34,7 @@ interface DeleteAccountBody {
  * Requires confirmation text "DELETE" in the request body.
  */
 export async function POST(request: Request) {
-  const { userId: clerkUserId } = await auth();
+  const { userId: clerkUserId } = await getCachedAuth();
   if (!clerkUserId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -118,10 +123,18 @@ export async function POST(request: Request) {
     // Delete creator profiles (cascades to links, contacts, analytics)
     await db.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
 
+    // Clean up orphaned user data (tables with onDelete: 'set null')
+    await db.delete(preSaveTokens).where(eq(preSaveTokens.userId, user.id));
+    await db.delete(feedbackItems).where(eq(feedbackItems.userId, user.id));
+    await db
+      .delete(emailSuppressions)
+      .where(eq(emailSuppressions.createdBy, user.id));
+
     // Invalidate handle availability cache so deleted usernames become available
     for (const profile of profiles) {
       if (profile.usernameNormalized) {
         await invalidateHandleCache(profile.usernameNormalized);
+        await invalidateProfileCache(profile.usernameNormalized);
       }
     }
 

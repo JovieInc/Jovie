@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Note: For tests using vi.hoisted(), we inline the mock creation.
 // For tests that don't need hoisting, use the shared utilities:
@@ -101,6 +101,8 @@ vi.mock('@/lib/validation/username', () => ({
   validateUsername: vi.fn(() => ({ isValid: true })),
 }));
 
+let routeModulePromise: Promise<typeof import('@/app/api/waitlist/route')>;
+
 // Helper to create a standard transaction mock
 // This pattern is also available in test-utils/db/drizzle-query-mock.ts
 function createTransactionMock(
@@ -135,9 +137,13 @@ function createTransactionMock(
 }
 
 describe('Waitlist API', () => {
+  beforeAll(() => {
+    process.env.DATABASE_URL = 'postgres://test@localhost/test';
+    routeModulePromise = import('@/app/api/waitlist/route');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     process.env.DATABASE_URL = 'postgres://test@localhost/test';
 
     // Set up default transaction mock
@@ -170,7 +176,7 @@ describe('Waitlist API', () => {
     it('returns 401 when not authenticated', async () => {
       mockAuth.mockResolvedValue({ userId: null });
 
-      const { GET } = await import('@/app/api/waitlist/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -184,7 +190,7 @@ describe('Waitlist API', () => {
         emailAddresses: [],
       });
 
-      const { GET } = await import('@/app/api/waitlist/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -210,7 +216,7 @@ describe('Waitlist API', () => {
         }),
       });
 
-      const { GET } = await import('@/app/api/waitlist/route');
+      const { GET } = await routeModulePromise;
       const response = await GET();
       const data = await response.json();
 
@@ -224,7 +230,7 @@ describe('Waitlist API', () => {
     it('returns 401 when not authenticated', async () => {
       mockAuth.mockResolvedValue({ userId: null });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -256,7 +262,7 @@ describe('Waitlist API', () => {
         }),
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -298,7 +304,7 @@ describe('Waitlist API', () => {
         }),
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,6 +320,64 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.status).toBe('new');
+    });
+
+    it('does not downgrade user status when re-submitting with a claimed entry', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_claimed' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'claimed@example.com' }],
+        fullName: 'Claimed User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+
+      // Existing entry with status 'claimed' (already approved)
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi
+              .fn()
+              .mockResolvedValue([{ id: 'entry_claimed', status: 'claimed' }]),
+          }),
+        }),
+      });
+
+      // Track insert calls to verify upsertUserAsPending is NOT called
+      const insertValuesCalls: unknown[] = [];
+      mockDbInsert.mockReturnValue({
+        values: vi.fn((arg: unknown) => {
+          insertValuesCalls.push(arg);
+          return {
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/claimeduser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe('claimed');
+
+      // upsertUserAsPending should NOT have been called — no insert with waitlist_pending
+      const pendingUpsert = insertValuesCalls.find(
+        (call: unknown) =>
+          typeof call === 'object' &&
+          call !== null &&
+          'userStatus' in call &&
+          (call as Record<string, unknown>).userStatus === 'waitlist_pending'
+      );
+      expect(pendingUpsert).toBeUndefined();
     });
 
     it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
@@ -362,7 +426,7 @@ describe('Waitlist API', () => {
         clerkId: 'clerk_auto',
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -417,7 +481,7 @@ describe('Waitlist API', () => {
         shouldAutoAccept: false,
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -473,7 +537,7 @@ describe('Waitlist API', () => {
         outcome: 'no_profile',
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -549,7 +613,7 @@ describe('Waitlist API', () => {
         }),
       });
 
-      const { POST } = await import('@/app/api/waitlist/route');
+      const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

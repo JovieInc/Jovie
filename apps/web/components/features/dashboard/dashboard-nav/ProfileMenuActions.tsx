@@ -63,7 +63,7 @@ export function ProfileMenuActions({
         id: 'retargeting-ads',
         label: 'Download Ads',
         icon: ImageDown,
-        onClick: () => router.push(APP_ROUTES.SETTINGS_RETARGETING_ADS),
+        onClick: () => router.push(APP_ROUTES.SETTINGS_AUDIENCE),
       },
       { type: 'separator' as const, id: 'sep' },
       {
@@ -83,8 +83,9 @@ export function ProfileMenuActions({
         <CommonDropdown
           variant='dropdown'
           size='compact'
-          align='start'
+          align='end'
           side='bottom'
+          sideOffset={4}
           items={items}
         />
       </SidebarMenuAction>

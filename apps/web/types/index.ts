@@ -7,6 +7,7 @@
 // Import and re-export SOCIAL_PLATFORMS from canonical source
 // (import needed for local use in isValidSocialPlatform, export for consumers)
 import { SOCIAL_PLATFORMS } from '@/constants/platforms';
+
 export { SOCIAL_PLATFORMS }; // NOSONAR - must import locally for isValidSocialPlatform
 
 // Import types for internal use
@@ -284,7 +285,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
-export type UserPlan = 'free' | 'founding' | 'pro' | 'growth';
+export type UserPlan = 'free' | 'trial' | 'founding' | 'pro' | 'max';
 
 export interface UserEntitlements {
   userId: string | null;
@@ -293,23 +294,42 @@ export interface UserEntitlements {
   isAdmin: boolean;
   // Plan info
   plan: UserPlan;
-  isPro: boolean; // true for founding, pro, or growth
-  hasAdvancedFeatures: boolean; // true for growth only
+  isPro: boolean; // true for trial, founding, pro, or max
+  hasAdvancedFeatures: boolean; // true for max only
+  // Trial info
+  isTrialing: boolean;
+  trialEndsAt: string | null; // ISO date string
+  trialDaysRemaining: number | null;
   // Feature gates
-  canRemoveBranding: boolean;
   canExportContacts: boolean;
   canAccessAdvancedAnalytics: boolean;
   canFilterSelfFromAnalytics: boolean;
   canAccessAdPixels: boolean;
   canBeVerified: boolean;
   aiCanUseTools: boolean;
+  canGenerateAlbumArt: boolean;
   canCreateManualReleases: boolean;
+  canAccessTasksWorkspace: boolean;
+  canGenerateReleasePlans: boolean;
+  canAccessMetadataSubmissionAgent: boolean;
   canAccessFutureReleases: boolean;
   canSendNotifications: boolean;
   canEditSmartLinks: boolean;
+  canAccessPreSave: boolean;
+  canAccessTipping: boolean;
+  canAccessUrlEncryption: boolean;
+  canAccessStripeConnect: boolean;
+  canAccessFanSubscriptions: boolean;
+  canAccessEmailCampaigns: boolean;
+  canAccessApiKeys: boolean;
+  canAccessTeamManagement: boolean;
+  canAccessWebhooks: boolean;
+  canAccessWhiteLabel: boolean;
+  canAccessAbTesting: boolean;
   // Limits
-  analyticsRetentionDays: number;
+  analyticsRetentionDays: number | null; // null = unlimited (Max tier)
   contactsLimit: number | null; // null = unlimited
   smartLinksLimit: number | null; // null = unlimited, 25 for free tier
   aiDailyMessageLimit: number;
+  aiPitchGenPerRelease: number | null;
 }

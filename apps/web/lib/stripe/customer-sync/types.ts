@@ -20,7 +20,7 @@ export interface UserBillingFields {
   isAdmin: boolean;
   /** Whether the user has an active Pro subscription */
   isPro: boolean | null;
-  /** The user's current plan: 'free' | 'pro' | 'growth' */
+  /** The user's current plan: 'free' | 'pro' | 'max' */
   plan: string | null;
   /** Stripe customer ID for billing operations */
   stripeCustomerId: string | null;
@@ -193,7 +193,7 @@ export interface FetchUserBillingDataWithAuthResult<
 export interface UpdateBillingStatusOptions {
   clerkUserId: string;
   isPro: boolean;
-  plan?: string; // 'free' | 'pro' | 'growth'
+  plan?: string; // 'free' | 'pro' | 'max'
   stripeCustomerId?: string;
   stripeSubscriptionId?: string | null;
   stripePriceId?: string | null;

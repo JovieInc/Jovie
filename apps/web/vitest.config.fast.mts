@@ -16,7 +16,7 @@ const realRoot = (() => {
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
-dotenv.config({ path: '.env.test' });
+dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 
 // Detect CI environment
 const isCI = process.env.CI === 'true';
@@ -35,7 +35,6 @@ const changedSuiteStabilityConfig = isChangedRun
       testTimeout: 12_000,
       hookTimeout: 12_000,
       teardownTimeout: 12_000,
-      singleFork: true,
     }
   : {};
 
@@ -46,6 +45,7 @@ const changedSuiteStabilityConfig = isChangedRun
  * Uses optimized setup file and aggressive performance settings.
  */
 export default defineConfig({
+  root: realRoot,
   plugins: [react()],
   // Allow Vite's @fs handler to serve files from the real path (handles
   // Windows short-name paths like TIMWHI~1 that contain spaces when expanded).
@@ -73,6 +73,7 @@ export default defineConfig({
     // Exclude slow test categories
     exclude: [
       'tests/e2e/**',
+      'tests/eval/**',
       'tests/audit/**',
       'tests/performance/**',
       'tests/integration/**',
@@ -85,6 +86,12 @@ export default defineConfig({
     // Performance optimizations
     // Use forks for better memory isolation (Vitest 4 style)
     pool: 'forks',
+    poolOptions: {
+      forks: {
+        isolate: true,
+        singleFork: isChangedRun,
+      },
+    },
     // CI stability: reduce memory pressure
     maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,
@@ -102,7 +109,7 @@ export default defineConfig({
     coverage: {
       enabled: false,
       provider: 'v8',
-      reporter: ['text', 'json', 'lcov'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
       exclude: [
         'node_modules/**',
@@ -146,6 +153,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^statsig-node$/,
+        replacement: path.resolve(__dirname, 'tests/__stubs__/statsig-node.js'),
+      },
+      {
         find: /^@\/app\/app\//,
         replacement: `${path.resolve(__dirname, './app/app')}/`,
       },
@@ -158,8 +169,12 @@ export default defineConfig({
         replacement: `${path.resolve(__dirname, './app/(marketing)')}/`,
       },
       {
+        find: /^@\/app\/\(shell\)\//,
+        replacement: `${path.resolve(__dirname, './app/app/(shell)')}/`,
+      },
+      {
         find: /^@\/app\//,
-        replacement: `${path.resolve(__dirname, './app/app')}/`,
+        replacement: `${path.resolve(__dirname, './app')}/`,
       },
       {
         find: /^@\/features\//,

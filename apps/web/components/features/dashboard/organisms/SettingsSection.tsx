@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { PageHeader } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
@@ -9,9 +10,9 @@ export interface SettingsSectionProps {
   readonly description?: string;
   readonly children: React.ReactNode;
   readonly className?: string;
-  readonly headerClassName?: string;
   readonly titleClassName?: string;
   readonly descriptionClassName?: string;
+  readonly headerAction?: React.ReactNode;
 }
 
 export function SettingsSection({
@@ -20,9 +21,9 @@ export function SettingsSection({
   description,
   children,
   className,
-  headerClassName,
   titleClassName,
   descriptionClassName,
+  headerAction,
 }: SettingsSectionProps) {
   const headingId = `${id}-heading`;
   const descriptionId = description ? `${id}-description` : undefined;
@@ -32,34 +33,31 @@ export function SettingsSection({
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn(
-        'scroll-mt-4 rounded-[11px] border border-subtle/55 bg-surface-0 px-4 py-4 sm:px-5',
-        className
-      )}
+      className={cn('scroll-mt-6', className)}
     >
-      <div className={cn('mb-3', headerClassName)}>
-        <h2
-          id={headingId}
-          className={cn(
-            'dashboard-heading text-[17px] font-[590] text-primary-token tracking-[-0.022em]',
-            titleClassName
-          )}
-        >
-          {title}
-        </h2>
-        {description ? (
-          <p
-            id={descriptionId}
-            className={cn(
-              'dashboard-body mt-1 text-[13px] text-secondary-token',
-              descriptionClassName
-            )}
-          >
-            {description}
-          </p>
-        ) : null}
+      <div
+        className={cn(
+          'flex items-center justify-between border-b border-subtle/80',
+          titleClassName
+        )}
+      >
+        <PageHeader
+          title={title}
+          description={description}
+          className='border-b-0'
+          titleClassName='text-[13px] font-[540]'
+          subtitleClassName='text-[12px] text-secondary-token'
+        />
+        {headerAction}
       </div>
-      {children}
+      <div
+        className={cn(
+          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          descriptionClassName
+        )}
+      >
+        {children}
+      </div>
     </section>
   );
 }

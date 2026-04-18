@@ -4,10 +4,10 @@
 
 'use server';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import type { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import type { CompletionResult, CreatorProfile } from './types';
 
@@ -89,6 +89,24 @@ export async function createProfileForExistingUser(
       });
     console.timeEnd(createProfileTimer);
 
+    // Set active_profile_id on the user so auth/session joins resolve correctly
+    if (profile?.id) {
+      await tx
+        .update(users)
+        .set({ activeProfileId: profile.id, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+
+      // Insert userProfileClaims row for canonical ownership tracking
+      await tx
+        .insert(userProfileClaims)
+        .values({
+          userId,
+          creatorProfileId: profile.id,
+          role: 'owner',
+        })
+        .onConflictDoNothing();
+    }
+
     return {
       username: profile?.usernameNormalized || normalizedUsername,
       status: 'created',
@@ -136,6 +154,14 @@ export async function updateExistingProfile(
       });
     console.timeEnd(updateProfileTimer);
 
+    // Set active_profile_id on the user so auth/session joins resolve correctly
+    if (profile.userId) {
+      await tx
+        .update(users)
+        .set({ activeProfileId: profile.id, updatedAt: new Date() })
+        .where(eq(users.id, profile.userId));
+    }
+
     return {
       username: updated?.usernameNormalized || normalizedUsername,
       status: 'updated',
@@ -177,6 +203,8 @@ export async function fetchExistingUser(
 
 /**
  * Fetches an existing profile for a user.
+ * Prefers claimed profiles to avoid operating on unclaimed pre-populated profiles
+ * when a claimed profile already exists.
  */
 export async function fetchExistingProfile(
   tx: DbTransaction,
@@ -189,6 +217,10 @@ export async function fetchExistingProfile(
       .select()
       .from(creatorProfiles)
       .where(eq(creatorProfiles.userId, userId))
+      .orderBy(
+        desc(creatorProfiles.isClaimed),
+        desc(creatorProfiles.onboardingCompletedAt)
+      )
       .limit(1);
     console.timeEnd(fetchProfileTimer);
 
@@ -199,4 +231,26 @@ export async function fetchExistingProfile(
     });
     throw error;
   }
+}
+
+/**
+ * Deactivates orphaned unclaimed profiles for a user.
+ * Called after a handle change to prevent stale public profiles from
+ * remaining visible at old URLs.
+ */
+export async function deactivateOrphanedProfiles(
+  tx: DbTransaction,
+  userId: string,
+  excludeProfileId: string
+): Promise<void> {
+  await tx
+    .update(creatorProfiles)
+    .set({ isPublic: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(creatorProfiles.userId, userId),
+        eq(creatorProfiles.isClaimed, false),
+        not(eq(creatorProfiles.id, excludeProfileId))
+      )
+    );
 }

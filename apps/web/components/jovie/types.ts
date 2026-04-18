@@ -1,3 +1,5 @@
+import type { ChatInsightSummary } from '@/types/insights';
+
 export interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -67,13 +69,128 @@ export interface SocialLinkToolResult {
   readonly originalUrl: string;
 }
 
+export interface ChatInsightsToolResult extends ChatInsightSummary {
+  readonly success: boolean;
+}
+
+export interface SocialLinkRemovalToolResult {
+  readonly success: boolean;
+  readonly linkId: string;
+  readonly platform: string;
+  readonly url: string;
+}
+
+export interface ChatAlbumArtCandidate {
+  readonly id: string;
+  readonly styleId: string;
+  readonly styleLabel: string;
+  readonly previewUrl: string;
+  readonly fullResUrl: string;
+}
+
+function isChatAlbumArtCandidate(
+  candidate: unknown
+): candidate is ChatAlbumArtCandidate {
+  return (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof (candidate as Record<string, unknown>).id === 'string' &&
+    typeof (candidate as Record<string, unknown>).styleId === 'string' &&
+    typeof (candidate as Record<string, unknown>).styleLabel === 'string' &&
+    typeof (candidate as Record<string, unknown>).previewUrl === 'string' &&
+    typeof (candidate as Record<string, unknown>).fullResUrl === 'string'
+  );
+}
+
+export type ChatAlbumArtToolResult =
+  | {
+      readonly success: false;
+      readonly retryable: boolean;
+      readonly error: string;
+    }
+  | {
+      readonly success: true;
+      readonly state: 'needs_release_target';
+      readonly releaseTitle: string | null;
+      readonly artistName: string;
+      readonly suggestedReleases: ReadonlyArray<{
+        readonly id: string;
+        readonly title: string;
+      }>;
+    }
+  | {
+      readonly success: true;
+      readonly state: 'generated';
+      readonly releaseId: string | null;
+      readonly releaseTitle: string;
+      readonly artistName: string;
+      readonly generationId: string;
+      readonly hasExistingArtwork: boolean;
+      readonly candidates: readonly ChatAlbumArtCandidate[];
+    };
+
+export function isChatAlbumArtToolResult(
+  result: unknown
+): result is ChatAlbumArtToolResult {
+  if (typeof result !== 'object' || result === null) {
+    return false;
+  }
+
+  const candidate = result as Record<string, unknown>;
+  if (candidate.success === false) {
+    return (
+      typeof candidate.retryable === 'boolean' &&
+      typeof candidate.error === 'string'
+    );
+  }
+
+  if (candidate.success !== true || typeof candidate.state !== 'string') {
+    return false;
+  }
+
+  if (candidate.state === 'needs_release_target') {
+    return (
+      (candidate.releaseTitle === null ||
+        typeof candidate.releaseTitle === 'string') &&
+      typeof candidate.artistName === 'string' &&
+      Array.isArray(candidate.suggestedReleases) &&
+      candidate.suggestedReleases.every(
+        release =>
+          typeof release === 'object' &&
+          release !== null &&
+          typeof (release as Record<string, unknown>).id === 'string' &&
+          typeof (release as Record<string, unknown>).title === 'string'
+      )
+    );
+  }
+
+  if (candidate.state === 'generated') {
+    return (
+      (candidate.releaseId === null ||
+        typeof candidate.releaseId === 'string') &&
+      typeof candidate.releaseTitle === 'string' &&
+      typeof candidate.artistName === 'string' &&
+      typeof candidate.generationId === 'string' &&
+      typeof candidate.hasExistingArtwork === 'boolean' &&
+      Array.isArray(candidate.candidates) &&
+      candidate.candidates.every(isChatAlbumArtCandidate)
+    );
+  }
+
+  return false;
+}
+
 export interface ToolInvocationPart {
   type: 'tool-invocation';
   toolInvocationId: string;
   toolName: string;
   state: 'call' | 'result' | 'partial-call';
   args?: Record<string, unknown>;
-  result?: Record<string, unknown>;
+  result?: Record<string, unknown> | ChatAlbumArtToolResult;
+  toolInvocation?: {
+    readonly toolName: string;
+    readonly state: string;
+  };
 }
 
 export function isToolInvocationPart(
@@ -121,13 +238,16 @@ export const TOOL_LABELS: Record<string, string> = {
   proposeAvatarUpload: 'Preparing photo upload...',
   proposeSocialLink: 'Adding link...',
   proposeSocialLinkRemoval: 'Removing link...',
+  showTopInsights: 'Checking your signals...',
   checkCanvasStatus: 'Checking canvas status...',
   suggestRelatedArtists: 'Finding related artists...',
+  generateAlbumArt: 'Generating album art...',
   generateCanvasPlan: 'Planning canvas video...',
   createPromoStrategy: 'Building promo strategy...',
   markCanvasUploaded: 'Updating canvas status...',
   createRelease: 'Creating release...',
   submitFeedback: 'Submitting feedback...',
+  generateReleasePitch: 'Generating pitches...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
@@ -155,12 +275,41 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Disc3',
+    label: 'Create a new release',
+    prompt: 'Help me create a new release.',
+    accent: 'green',
+  },
+  {
+    icon: 'Eye',
+    label: 'Preview profile',
+    prompt: 'Preview my profile.',
+    accent: 'purple',
+  },
+  {
     icon: 'Camera',
-    label: 'Change profile photo',
+    label: 'Change photo',
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
   },
+  {
+    icon: 'Link2',
+    label: 'Release link',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
+  },
 ] as const;
+
+/**
+ * Pitch generation suggestion shown only to paid-plan users.
+ * Personalized with latestReleaseTitle when available.
+ */
+export const PITCH_SUGGESTION: ChatSuggestion = {
+  icon: 'Music',
+  label: 'Generate pitches',
+  prompt: 'Generate playlist pitches for my latest release.',
+  accent: 'blue',
+};
 
 /**
  * Special feedback suggestion shown in both suggestion lists.
@@ -175,20 +324,26 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Disc3',
+    label: 'Create a new release',
+    prompt: 'Help me create a new release.',
+    accent: 'green',
+  },
+  {
     icon: 'Link2',
-    label: 'Set up a link for my latest release',
+    label: 'Release link',
     prompt: 'Set up a link for my latest release.',
     accent: 'blue',
   },
   {
     icon: 'Eye',
-    label: 'Preview my profile',
+    label: 'Preview profile',
     prompt: 'Preview my profile.',
     accent: 'purple',
   },
   {
     icon: 'DollarSign',
-    label: 'How do I get paid?',
+    label: 'Getting paid',
     prompt: 'How do I get paid?',
     accent: 'green',
   },

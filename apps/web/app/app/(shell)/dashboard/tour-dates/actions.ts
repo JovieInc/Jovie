@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -23,6 +23,8 @@ import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
 import { toISOStringOrNull, toISOStringSafe } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
@@ -30,30 +32,6 @@ import { getDashboardData } from '../actions';
 // ============================================================================
 // Types
 // ============================================================================
-
-type TicketStatus = 'available' | 'sold_out' | 'cancelled';
-
-export interface TourDateViewModel {
-  id: string;
-  profileId: string;
-  externalId: string | null;
-  provider: 'bandsintown' | 'songkick' | 'manual';
-  title: string | null;
-  startDate: string;
-  startTime: string | null;
-  timezone: string | null;
-  venueName: string;
-  city: string;
-  region: string | null;
-  country: string;
-  latitude: number | null;
-  longitude: number | null;
-  ticketUrl: string | null;
-  ticketStatus: TicketStatus;
-  lastSyncedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface BandsintownConnectionStatus {
   connected: boolean;
@@ -251,17 +229,7 @@ export async function loadUpcomingTourDates(
   profileId: string
 ): Promise<TourDateViewModel[]> {
   noStore();
-
-  const now = new Date();
-  const dates = await db
-    .select()
-    .from(tourDates)
-    .where(
-      and(eq(tourDates.profileId, profileId), gte(tourDates.startDate, now))
-    )
-    .orderBy(tourDates.startDate);
-
-  return dates.map(mapTourDateToViewModel);
+  return getUpcomingTourDatesForProfile(profileId);
 }
 
 /**

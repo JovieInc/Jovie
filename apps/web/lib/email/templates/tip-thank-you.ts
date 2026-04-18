@@ -7,6 +7,7 @@
 
 import { APP_NAME, LEGAL } from '@/constants/app';
 import { BASE_URL, getProfileUrl } from '@/constants/domains';
+import { buildOptInUrl } from '@/lib/email/opt-in-token';
 import { formatAmount } from '@/lib/utils/format-number';
 import { escapeHtml } from '../utils';
 
@@ -33,6 +34,8 @@ export interface TipThankYouTemplateData {
   unsubscribeToken?: string | null;
   /** Profile ID for opt-in CTA */
   profileId: string;
+  /** Recipient email for signed opt-in URL */
+  recipientEmail: string;
 }
 
 /**
@@ -61,14 +64,16 @@ export function getTipThankYouText(data: TipThankYouTemplateData): string {
     ? `${BASE_URL}/api/audience/unsubscribe?token=${encodeURIComponent(data.unsubscribeToken)}`
     : null;
 
+  const optInUrl = buildOptInUrl(data.recipientEmail, data.profileId);
+
   return `${greeting}
 
-Your ${amount} tip means the world to ${artistName}. Thank you for your support!
+Your ${amount} support means the world to ${artistName}. Thank you!
 
 Check out more from ${artistName}: ${profileUrl}
 
 ${musicSection.length > 0 ? `Listen to ${artistName}:\n${musicSection.join('\n')}\n` : ''}
-- The ${APP_NAME} Team
+${optInUrl ? `Want to hear about upcoming shows and new releases? Stay updated: ${optInUrl}\n` : ''}- The ${APP_NAME} Team
 
 ---
 ${unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : ''}
@@ -174,9 +179,9 @@ export function getTipThankYouHtml(data: TipThankYouTemplateData): string {
     : null;
   const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : null;
 
-  // Opt-in CTA URL
-  const optInUrl = `${BASE_URL}/api/audience/opt-in?email=${encodeURIComponent(data.profileId)}&profileId=${encodeURIComponent(profileId)}`;
-  const safeOptInUrl = escapeHtml(optInUrl);
+  // Opt-in CTA URL (HMAC-signed to prevent URL forgery)
+  const optInUrl = buildOptInUrl(data.recipientEmail, profileId);
+  const safeOptInUrl = optInUrl ? escapeHtml(optInUrl) : null;
 
   return `
 <!DOCTYPE html>
@@ -217,7 +222,7 @@ export function getTipThankYouHtml(data: TipThankYouTemplateData): string {
                 ${greeting}
               </p>
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-                Your ${amount} tip means the world to ${safeArtistName}. Thank you for your generous support.
+                Your ${amount} support means the world to ${safeArtistName}. Thank you for your generous support.
               </p>
 
               <!-- Profile Link -->
@@ -238,7 +243,9 @@ export function getTipThankYouHtml(data: TipThankYouTemplateData): string {
           <!-- Footer -->
           <tr>
             <td style="padding: 24px 40px; background-color: #f9f9f9; border-top: 1px solid #eee;">
-              <!-- Opt-in CTA -->
+              ${
+                safeOptInUrl
+                  ? `<!-- Opt-in CTA -->
               <div style="text-align: center; margin-bottom: 16px;">
                 <p style="margin: 0 0 8px; font-size: 13px; color: #666;">
                   Want to hear about upcoming shows and new releases?
@@ -246,7 +253,9 @@ export function getTipThankYouHtml(data: TipThankYouTemplateData): string {
                 <a href="${safeOptInUrl}" style="display: inline-block; padding: 8px 20px; border: 1px solid #ddd; color: #333; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500;">
                   Stay Updated
                 </a>
-              </div>
+              </div>`
+                  : ''
+              }
 
               ${
                 safeUnsubscribeUrl

@@ -1,22 +1,55 @@
+'use client';
+
 /**
  * ScheduledReleasePage Component
  *
- * Minimal "Coming Soon" page shown for unreleased content from free-plan
- * creators. No countdown, no "Notify Me" CTA, no release date display.
- * Matches the visual style of UnreleasedReleaseHero but stripped down.
+ * "Coming Soon" page for unreleased content from free-plan creators.
+ * Includes countdown timer, email notification signup (same OTP flow
+ * as artist profiles), and share button. Spotify/Apple pre-save stays
+ * flagged off — this is the email capture MVP.
  */
 
 import Link from 'next/link';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { useMemo } from 'react';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta';
+import { PublicShareMenu } from '@/features/share/PublicShareMenu';
+import { buildReleaseShareContext } from '@/lib/share/context';
+import type { Artist } from '@/types/db';
+import { ReleaseCountdown } from './ReleaseCountdown';
+import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
+import {
+  SmartLinkArtworkCard,
+  SmartLinkPageFrame,
+} from './SmartLinkPagePrimitives';
 
 interface ScheduledReleasePageProps {
   readonly release: {
+    readonly slug: string;
     readonly title: string;
     readonly artworkUrl: string | null;
+    readonly releaseDate: string;
   };
   readonly artist: {
+    readonly id: string;
     readonly name: string;
     readonly handle: string;
+    readonly avatarUrl: string | null;
+  };
+}
+
+function mapToArtistType(artist: ScheduledReleasePageProps['artist']): Artist {
+  return {
+    id: artist.id,
+    owner_user_id: '',
+    handle: artist.handle,
+    spotify_id: '',
+    name: artist.name,
+    image_url: artist.avatarUrl ?? undefined,
+    published: true,
+    is_verified: false,
+    is_featured: false,
+    marketing_opt_out: false,
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -24,64 +57,79 @@ export function ScheduledReleasePage({
   release,
   artist,
 }: ScheduledReleasePageProps) {
+  const artistData = useMemo(() => mapToArtistType(artist), [artist]);
+  const releaseDate = useMemo(
+    () => new Date(release.releaseDate),
+    [release.releaseDate]
+  );
+  const shareContext = useMemo(
+    () =>
+      buildReleaseShareContext({
+        username: artist.handle,
+        slug: release.slug,
+        title: release.title,
+        artistName: artist.name,
+        artworkUrl: release.artworkUrl,
+        pathname: `/${artist.handle}/${release.slug}`,
+      }),
+    [
+      artist.handle,
+      artist.name,
+      release.artworkUrl,
+      release.slug,
+      release.title,
+    ]
+  );
+
   return (
-    <div className='min-h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
-      </div>
+    <ReleaseNotificationsProvider artist={artistData}>
+      <SmartLinkPageFrame centered glowClassName='size-[30rem]'>
+        <SmartLinkArtworkCard
+          title={release.title}
+          artworkUrl={release.artworkUrl}
+          className='shadow-black/40'
+        />
 
-      <main className='relative z-10 flex min-h-dvh flex-col items-center px-6'>
-        <div className='min-h-6 flex-1' />
-
-        <div className='w-full max-w-[17rem]'>
-          {/* Release Artwork */}
-          <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
-            <ImageWithFallback
-              src={release.artworkUrl}
-              alt={`${release.title} artwork`}
-              fill
-              className='object-cover'
-              sizes='272px'
-              priority
-              fallbackVariant='release'
-            />
-          </div>
-
-          {/* Release Info */}
-          <div className='mt-4 text-center'>
-            <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-              {release.title}
-            </h1>
-            <Link
-              href={`/${artist.handle}`}
-              className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-            >
-              {artist.name}
-            </Link>
-          </div>
-
-          {/* Coming Soon */}
-          <div className='mt-5 rounded-xl bg-surface-1/50 p-4 text-center ring-1 ring-inset ring-white/[0.05]'>
-            <p className='text-muted-foreground text-sm font-medium'>
-              Coming Soon
-            </p>
-          </div>
+        {/* Release Info */}
+        <div className='mt-4 text-center'>
+          <h1 className='text-lg font-semibold leading-snug tracking-tight'>
+            {release.title}
+          </h1>
+          <Link
+            href={`/${artist.handle}`}
+            className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
+          >
+            {artist.name}
+          </Link>
         </div>
 
-        <div className='min-h-6 flex-1' />
+        {/* Countdown */}
+        <div className='mt-5 flex w-full items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.05] px-4 py-3 backdrop-blur-2xl empty:hidden'>
+          <ReleaseCountdown releaseDate={releaseDate} compact />
+        </div>
 
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
-          >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
-      </main>
-    </div>
+        {/* Notification signup — same email→OTP flow as profiles */}
+        <div className='mt-3 w-full'>
+          <ProfileInlineNotificationsCTA artist={artistData} />
+        </div>
+
+        {/* Share */}
+        <div className='mt-4'>
+          <PublicShareMenu
+            context={shareContext}
+            title='Share'
+            align='center'
+            trigger={
+              <button
+                type='button'
+                className='text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs transition-colors'
+              >
+                Share
+              </button>
+            }
+          />
+        </div>
+      </SmartLinkPageFrame>
+    </ReleaseNotificationsProvider>
   );
 }

@@ -3,6 +3,7 @@ import type { LegacySocialLink } from '@/types/db';
 
 export const MAX_PROFILE_LINKS = 6;
 export const MAX_MODE_LINKS = 4;
+export const MAX_HEADER_SOCIAL_LINKS = 4;
 
 type LinkGroup = 'mode' | 'social' | null;
 

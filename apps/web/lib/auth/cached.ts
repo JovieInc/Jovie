@@ -1,9 +1,54 @@
 import 'server-only';
 
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { headers } from 'next/headers';
 import { cache } from 'react';
-import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
+import {
+  buildDevTestAuthCurrentUser,
+  getCachedDevTestAuthSession,
+} from '@/lib/auth/dev-test-auth.server';
+
+type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
+
+interface NullAuthResult {
+  userId: null;
+  sessionId: null;
+  orgId: null;
+}
+
+const NULL_AUTH_RESULT: NullAuthResult = {
+  userId: null,
+  sessionId: null,
+  orgId: null,
+};
+
+function isMissingAuthRequestContext(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("can't detect usage of clerkmiddleware") ||
+    message.includes('clerkmiddleware') ||
+    message.includes('outside a request scope') ||
+    message.includes('only supported in app router') ||
+    message.includes('only supported in a route handler') ||
+    message.includes('only supported in a server component')
+  );
+}
+
+async function resolveCachedAuth() {
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return {
+      userId: bypassSession.clerkUserId,
+      sessionId: 'sess_test_bypass',
+      orgId: undefined,
+    };
+  }
+
+  return auth();
+}
 
 /**
  * Cached version of Clerk's auth() function.
@@ -24,23 +69,22 @@ import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
  * @returns The same AuthObject that Clerk's auth() returns
  */
 export const getCachedAuth = cache(async () => {
-  if (process.env.NODE_ENV === 'test') {
-    try {
-      const headerStore = await headers();
-      const testUserId = resolveTestBypassUserId(headerStore);
-      if (testUserId) {
-        return {
-          userId: testUserId,
-          sessionId: 'sess_test_bypass',
-          orgId: null,
-        };
-      }
-    } catch {
-      // Ignore missing request context in test-only paths.
-    }
-  }
+  return resolveCachedAuth();
+});
 
-  return auth();
+/**
+ * Cached auth helper for public/server-shared code paths.
+ * Returns a signed-out state when Clerk is invoked without request context.
+ */
+export const getOptionalAuth = cache(async () => {
+  try {
+    return await resolveCachedAuth();
+  } catch (error) {
+    if (isMissingAuthRequestContext(error)) {
+      return NULL_AUTH_RESULT;
+    }
+    throw error;
+  }
 });
 
 /**
@@ -64,5 +108,12 @@ export const getCachedAuth = cache(async () => {
  * @returns The same User object (or null) that Clerk's currentUser() returns
  */
 export const getCachedCurrentUser = cache(async () => {
+  const bypassSession = await getCachedDevTestAuthSession();
+  if (bypassSession) {
+    return buildDevTestAuthCurrentUser(
+      bypassSession
+    ) as unknown as NonNullable<CachedCurrentUser>;
+  }
+
   return currentUser();
 });

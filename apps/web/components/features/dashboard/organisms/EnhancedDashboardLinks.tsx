@@ -10,6 +10,7 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { getHometownFromSettings } from '@/types/db';
 import type { ArtistContext } from './grouped-links/types';
 import { useLinksPersistence } from './links/hooks/useLinksPersistence';
 import { useProfileEditor } from './links/hooks/useProfileEditor';
@@ -214,6 +215,9 @@ export function EnhancedDashboardLinks({
       avatarUrl: avatarUrl || null,
       bio: selectedProfile?.bio ?? null,
       genres: selectedProfile?.genres ?? null,
+      location: selectedProfile?.location ?? null,
+      hometown: getHometownFromSettings(selectedProfile?.settings) ?? null,
+      activeSinceYear: selectedProfile?.activeSinceYear ?? null,
       links: dashboardLinks,
       profilePath,
       dspConnections: {
@@ -231,6 +235,8 @@ export function EnhancedDashboardLinks({
     selectedProfile?.spotifyId,
     selectedProfile?.appleMusicId,
     selectedProfile?.settings,
+    selectedProfile?.location,
+    selectedProfile?.activeSinceYear,
     setPreviewData,
     username,
   ]);

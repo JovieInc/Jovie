@@ -1,4 +1,7 @@
-import { getCspImgSrcDomains } from '@/constants/platforms/cdn-domains';
+import {
+  getCspImgSrcDomains,
+  getCspMediaSrcDomains,
+} from '@/constants/platforms/cdn-domains';
 import { isDevelopment } from '@/lib/utils/platform-detection/environment';
 import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
 
@@ -42,6 +45,14 @@ const INLINE_SCRIPT_HASHES = {
    * Config: attribute='class', storageKey='jovie-theme', enableSystem=true
    */
   nextThemes: "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
+
+  /**
+   * @vercel/analytics inline script hash (locked at v1.6.1)
+   * The Analytics component injects an inline script via document.head at runtime.
+   * Hash may need updating when @vercel/analytics version changes.
+   * package.json range is ^1.5.0 — verify hash after any lockfile update.
+   */
+  vercelAnalytics: "'sha256-k844ZRfHq5VBCg5bFxVtnBCvPUU7TVV7m1sDHs/cJXk='",
 };
 
 /**
@@ -59,6 +70,10 @@ const STATIC_CSP_PARTS = {
   styleSrc: "style-src 'self' 'unsafe-inline'",
   fontSrc:
     "font-src 'self' data: https://vercel.live https://assets.vercel.com",
+  // Pre-computed media-src from canonical media domain registry
+  // @see constants/platforms/cdn-domains.ts
+  mediaSrc: ["media-src 'self'", ...getCspMediaSrcDomains()].join(' '),
+
   workerSrc: "worker-src 'self' blob:",
   manifestSrc: "manifest-src 'self'",
 
@@ -68,16 +83,20 @@ const STATIC_CSP_PARTS = {
   scriptSrcSuffix: [
     INLINE_SCRIPT_HASHES.clerk,
     INLINE_SCRIPT_HASHES.nextThemes,
+    INLINE_SCRIPT_HASHES.vercelAnalytics,
     'https://va.vercel-scripts.com',
     'https://vitals.vercel-insights.com',
     'https://vercel.live',
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://clerk.com',
     'https://cdn.clerk.com',
     'https://*.clerk.com',
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
+    'https://clerk.jov.ie',
     'https://challenges.cloudflare.com',
+    'https://r2.leadsy.ai',
+    'https://tag.trovo-tag.com',
   ].join(' '),
 
   // Pre-computed img-src from canonical CDN domain registry
@@ -87,21 +106,26 @@ const STATIC_CSP_PARTS = {
   // Pre-computed connect-src prefix (excludes dev-only localhost)
   connectSrcBase: [
     "connect-src 'self'",
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://clerk.com',
     'https://cdn.clerk.com',
     'https://*.clerk.com',
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
+    'https://clerk.jov.ie',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
+    'https://*.ingest.us.sentry.io',
+    'https://*.sentry.io',
     'wss://*.clerk.com',
-    'wss://clerk.jov.ie',
+    'wss://distinct-giraffe-5.clerk.accounts.dev',
     'https://jov.ie',
     'https://challenges.cloudflare.com',
     'https://clerk-telemetry.com',
     'https://vercel.live',
     'wss://ws-us3.pusher.com',
+    'https://r2.leadsy.ai',
+    'https://wvbknd.leadsy.ai',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
@@ -111,7 +135,7 @@ const STATIC_CSP_PARTS = {
     'https://checkout.stripe.com',
     'https://*.clerk.com',
     'https://*.clerk.accounts.dev',
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://challenges.cloudflare.com',
   ].join(' '),
 } as const;
@@ -160,6 +184,7 @@ const buildCspDirectives = ({
     connectSrc,
     STATIC_CSP_PARTS.fontSrc,
     frameSrc,
+    STATIC_CSP_PARTS.mediaSrc,
     STATIC_CSP_PARTS.workerSrc,
     STATIC_CSP_PARTS.manifestSrc,
   ];

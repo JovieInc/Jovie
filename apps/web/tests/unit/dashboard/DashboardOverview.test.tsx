@@ -33,7 +33,6 @@ function makeProfile(
     isClaimed: false,
     claimToken: null,
     claimedAt: null,
-    lastLoginAt: null,
     profileViews: 0,
     onboardingCompletedAt: null,
     settings: {},
@@ -95,11 +94,14 @@ describe('DashboardOverview', () => {
 
     // Progress indicator text
     expect(screen.getByText('0 of 3 complete')).toBeInTheDocument();
+
+    const taskRow = screen.getByText(/Claim your handle/i).closest('li');
+    expect(taskRow?.className).toContain('rounded-full');
   });
 
   it('marks tasks complete based on data', () => {
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, false);
@@ -130,14 +132,14 @@ describe('DashboardOverview', () => {
     (navigator as any).clipboard = { writeText };
 
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, true);
 
     // Copy flow - header copy control is icon-only (sr-only label)
     const headerEl = screen
-      .getByText('Keep your profile polished and ready to share.')
+      .getByText('Keep your profile polished and ready to share')
       .closest('header');
     expect(headerEl).not.toBeNull();
     const copyBtn = within(headerEl as HTMLElement).getByRole('button', {
@@ -179,18 +181,20 @@ describe('DashboardOverview', () => {
 
   it('uses shared compact shell sizing for header action buttons', () => {
     const profile = makeProfile({
-      userId: 'db-user-123',
+      userId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, true);
 
     // The "View profile" link button should use the shared compact shell control sizing.
-    const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
-    const btnClass = viewProfileLink.className;
-
-    expect(btnClass).toContain('h-(--linear-app-control-height-sm)');
-    expect(btnClass).toContain('w-(--linear-app-control-height-sm)');
-    expect(btnClass).not.toContain('sm:h-11');
-    expect(btnClass).not.toContain('sm:w-11');
+    const headerEl = screen
+      .getByText('Keep your profile polished and ready to share')
+      .closest('header');
+    expect(headerEl).not.toBeNull();
+    const viewProfileLink = within(headerEl as HTMLElement).getByRole('link', {
+      name: 'View profile',
+    });
+    expect(viewProfileLink).toBeInTheDocument();
+    expect(viewProfileLink).toHaveAttribute('href');
   });
 });

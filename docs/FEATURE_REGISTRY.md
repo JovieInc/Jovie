@@ -17,6 +17,8 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 - Statsig gates: `apps/web/lib/feature-flags/shared.ts`
 - Homepage section flags: `apps/web/lib/flags/homepage.ts`
 - Detailed Statsig gate documentation: `docs/STATSIG_FEATURE_GATES.md`
+- **Rich feature descriptions for AI agents and marketing:** `docs/PRODUCT_CAPABILITIES.md`
+- **User-facing documentation:** `apps/docs/` (live at docs.jov.ie)
 
 ## Product Feature List
 
@@ -29,6 +31,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Smart Links | Short link redirects | Shipped | Free+ | None | /r/slug redirect |
 | Smart Links | Vanity URLs / content slugs | Shipped | Free+ | None | Custom slug support |
 | Smart Links | Auto DSP detection & linking | Shipped | Free+ | None | MusicFetch integration |
+| Smart Links | "Use This Sound" pages | Shipped | Free+ | None | /{username}/{slug}/sounds — TikTok, Reels, Shorts |
 | Smart Links | Spotify pre-save campaigns | Shipped (flagged) | Free+ | `smartlink_pre_save_campaigns` | Controlled via Statsig |
 | Release Workflows | Auto-sync from Spotify | Shipped | Free+ | None | Base ingestion flow |
 | Release Workflows | Manual release creation | Shipped | Free+ | None | Entitlement-backed (`canCreateManualReleases`) |
@@ -92,4 +95,6 @@ When shipping or updating any feature:
 1. Update product behavior in code.
 2. Update flags (if applicable).
 3. Update this registry and `docs/STATSIG_FEATURE_GATES.md` in the same PR.
-4. Include tests for both gated and non-gated behavior where applicable.
+4. Update `docs/PRODUCT_CAPABILITIES.md` with rich feature description.
+5. Update the relevant `apps/docs/` page (user-facing docs at docs.jov.ie).
+6. Include tests for both gated and non-gated behavior where applicable.

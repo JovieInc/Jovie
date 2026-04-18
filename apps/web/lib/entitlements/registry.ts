@@ -3,43 +3,58 @@
  *
  * All consumers (server.ts, usePlanGate, pricing page, rate-limit config) derive from this.
  * NO `import 'server-only'` — this must be client-importable.
+ *
+ * Pricing amounts are derived from plan-prices.ts (the canonical source).
  */
+
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 // ---------------------------------------------------------------------------
 // Plan IDs
 // ---------------------------------------------------------------------------
 
-export type PlanId = 'free' | 'founding' | 'pro' | 'growth';
+export type PlanId = 'free' | 'trial' | 'pro' | 'max';
 
-const PLAN_IDS: readonly PlanId[] = [
-  'free',
-  'founding',
-  'pro',
-  'growth',
-] as const;
+const PLAN_IDS: readonly PlanId[] = ['free', 'trial', 'pro', 'max'] as const;
 
 // ---------------------------------------------------------------------------
 // Entitlement key unions
 // ---------------------------------------------------------------------------
 
 export type BooleanEntitlement =
-  | 'canRemoveBranding'
   | 'canExportContacts'
   | 'canAccessAdvancedAnalytics'
   | 'canFilterSelfFromAnalytics'
   | 'canAccessAdPixels'
   | 'canBeVerified'
   | 'aiCanUseTools'
+  | 'canGenerateAlbumArt'
   | 'canCreateManualReleases'
+  | 'canAccessTasksWorkspace'
+  | 'canGenerateReleasePlans'
+  | 'canAccessMetadataSubmissionAgent'
   | 'canAccessFutureReleases'
   | 'canSendNotifications'
-  | 'canEditSmartLinks';
+  | 'canEditSmartLinks'
+  | 'canAccessInbox'
+  | 'canAccessPreSave'
+  | 'canAccessTipping'
+  | 'canAccessUrlEncryption'
+  | 'canAccessStripeConnect'
+  | 'canAccessFanSubscriptions'
+  | 'canAccessEmailCampaigns'
+  | 'canAccessApiKeys'
+  | 'canAccessTeamManagement'
+  | 'canAccessWebhooks'
+  | 'canAccessWhiteLabel'
+  | 'canAccessAbTesting';
 
 export type NumericEntitlement =
   | 'analyticsRetentionDays'
   | 'contactsLimit'
   | 'smartLinksLimit'
-  | 'aiDailyMessageLimit';
+  | 'aiDailyMessageLimit'
+  | 'aiPitchGenPerRelease';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -48,10 +63,11 @@ export type NumericEntitlement =
 export interface PlanEntitlements {
   booleans: Record<BooleanEntitlement, boolean>;
   limits: {
-    analyticsRetentionDays: number;
+    analyticsRetentionDays: number | null;
     contactsLimit: number | null;
     smartLinksLimit: number | null;
     aiDailyMessageLimit: number;
+    aiPitchGenPerRelease: number | null;
   };
   marketing: {
     displayName: string;
@@ -66,42 +82,61 @@ export interface PlanEntitlements {
 // ---------------------------------------------------------------------------
 
 const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
-  canRemoveBranding: true,
   canExportContacts: true,
   canAccessAdvancedAnalytics: true,
   canFilterSelfFromAnalytics: true,
   canAccessAdPixels: true,
   canBeVerified: true,
   aiCanUseTools: true,
+  canGenerateAlbumArt: true,
   canCreateManualReleases: true,
+  canAccessTasksWorkspace: true,
+  canGenerateReleasePlans: false,
+  canAccessMetadataSubmissionAgent: false,
   canAccessFutureReleases: true,
   canSendNotifications: true,
   canEditSmartLinks: true,
+  canAccessInbox: true,
+  canAccessPreSave: true,
+  canAccessTipping: true,
+  canAccessUrlEncryption: true,
+  canAccessStripeConnect: false,
+  canAccessFanSubscriptions: false,
+  canAccessEmailCampaigns: false,
+  canAccessApiKeys: false,
+  canAccessTeamManagement: false,
+  canAccessWebhooks: false,
+  canAccessWhiteLabel: false,
+  canAccessAbTesting: false,
 };
 
 const PRO_LIMITS: PlanEntitlements['limits'] = {
-  analyticsRetentionDays: 90,
+  analyticsRetentionDays: 180,
   contactsLimit: null,
   smartLinksLimit: null,
   aiDailyMessageLimit: 100,
+  aiPitchGenPerRelease: 5,
 };
 
 const PRO_FEATURES: readonly string[] = [
   'All Free features +',
+  'Release notifications to fans',
+  'Pre-save campaigns',
   'Pre-release & countdown pages',
-  'Remove Jovie branding',
-  'Extended analytics (90 days)',
+  'Extended analytics (180 days)',
   'Advanced analytics & geographic insights',
-  'Filter your own visits',
+  'Traffic quality filtering',
   'AI-powered insights',
   'Unlimited contacts',
   'Contact export',
   'Fan CRM',
   'Tips & payments',
   'Earnings dashboard',
+  'URL encryption',
   'Ad pixel tracking',
   'Verified badge',
   'AI assistant (100 messages/day)',
+  'AI pitch generation (5 per release)',
   'Priority support',
 ];
 
@@ -112,27 +147,43 @@ const PRO_FEATURES: readonly string[] = [
 export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
   free: {
     booleans: {
-      canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canBeVerified: false,
       aiCanUseTools: true,
+      canGenerateAlbumArt: false,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: false,
+      canGenerateReleasePlans: false,
+      canAccessMetadataSubmissionAgent: false,
       canAccessFutureReleases: false,
-      canSendNotifications: true,
+      canSendNotifications: false,
       canEditSmartLinks: true,
+      canAccessInbox: false,
+      canAccessPreSave: false,
+      canAccessTipping: false,
+      canAccessUrlEncryption: false,
+      canAccessStripeConnect: false,
+      canAccessFanSubscriptions: false,
+      canAccessEmailCampaigns: false,
+      canAccessApiKeys: false,
+      canAccessTeamManagement: false,
+      canAccessWebhooks: false,
+      canAccessWhiteLabel: false,
+      canAccessAbTesting: false,
     },
     limits: {
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 25,
+      aiDailyMessageLimit: 10,
+      aiPitchGenPerRelease: 1,
     },
     marketing: {
       displayName: 'Free',
-      tagline: 'Free for everyone',
+      tagline: 'Your artist profile, free forever',
       features: [
         'Unlimited smart links',
         'Auto-sync from Spotify',
@@ -149,24 +200,14 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Contact page',
         'About page',
         'Tour dates (Bandsintown)',
-        'Release notifications',
         'Click & visit tracking',
         'Basic analytics (30 days)',
         'Audience intelligence',
         'Up to 100 contacts',
-        'AI assistant (25 msgs/day)',
+        'AI assistant (10 msgs/day)',
+        '1 AI pitch generation per release',
       ],
       price: null,
-    },
-  },
-  founding: {
-    booleans: { ...PRO_BOOLEANS },
-    limits: { ...PRO_LIMITS },
-    marketing: {
-      displayName: 'Founding Member',
-      tagline: 'Early supporter pricing, locked in for life',
-      features: PRO_FEATURES,
-      price: { monthly: 12, yearly: null },
     },
   },
   pro: {
@@ -174,46 +215,97 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
-      tagline: 'For growing artists',
+      tagline: 'Turn on fan notifications once. We handle the rest.',
       features: PRO_FEATURES,
-      price: { monthly: 39, yearly: 348 },
+      price: {
+        monthly: PLAN_PRICES.pro.monthly,
+        yearly: PLAN_PRICES.pro.yearly,
+      },
     },
   },
-  growth: {
+  max: {
     booleans: {
-      canRemoveBranding: true,
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
       canAccessAdPixels: true,
       canBeVerified: true,
       aiCanUseTools: true,
+      canGenerateAlbumArt: true,
       canCreateManualReleases: true,
+      canAccessTasksWorkspace: true,
+      canGenerateReleasePlans: true,
+      canAccessMetadataSubmissionAgent: true,
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,
+      canAccessInbox: true,
+      canAccessPreSave: true,
+      canAccessTipping: true,
+      canAccessUrlEncryption: true,
+      canAccessStripeConnect: true,
+      canAccessFanSubscriptions: true,
+      canAccessEmailCampaigns: true,
+      canAccessApiKeys: true,
+      canAccessTeamManagement: true,
+      canAccessWebhooks: true,
+      canAccessWhiteLabel: true,
+      canAccessAbTesting: true,
     },
     limits: {
-      analyticsRetentionDays: 365,
+      analyticsRetentionDays: null,
       contactsLimit: null,
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
+      aiPitchGenPerRelease: null,
     },
     marketing: {
-      displayName: 'Growth',
-      tagline: 'For serious artists',
+      displayName: 'Max',
+      tagline: 'Your release ops, automated.',
       features: [
         'All Pro features +',
-        'Full analytics (1 year)',
+        'Release plan generation',
+        'Metadata submission agent',
+        'Unlimited analytics',
         'AI assistant (500 messages/day)',
-        'A/B testing (Coming soon)',
-        'Automated follow-ups (Coming soon)',
-        'Catalog monitoring (Coming soon)',
+        'Unlimited AI pitch generation',
+        'Stripe Connect payouts',
+        'Fan subscriptions',
+        'Email campaigns',
+        'API access',
+        'Team management',
+        'Webhooks',
+        'White-label / custom domain',
+        'A/B testing',
       ],
-      price: { monthly: 99, yearly: 948 },
+      price: {
+        monthly: PLAN_PRICES.max.monthly,
+        yearly: PLAN_PRICES.max.yearly,
+      },
+    },
+  },
+  trial: {
+    booleans: {
+      ...PRO_BOOLEANS,
+    },
+    limits: {
+      analyticsRetentionDays: 180,
+      contactsLimit: 250,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
+      aiPitchGenPerRelease: 3,
+    },
+    marketing: {
+      displayName: 'Pro Trial',
+      tagline: '14 days of Pro, on us.',
+      features: PRO_FEATURES,
+      price: null,
     },
   },
 } as const;
+
+/** 50 notification recipients total during trial period. */
+export const TRIAL_NOTIFICATION_RECIPIENT_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // Pricing comparison chart data
@@ -223,7 +315,7 @@ export interface ComparisonFeature {
   readonly name: string;
   readonly free: boolean | string;
   readonly pro: boolean | string;
-  readonly growth: boolean | string;
+  readonly max: boolean | string;
   readonly comingSoon?: boolean;
 }
 
@@ -236,45 +328,57 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
   {
     category: 'Smart Links',
     features: [
-      { name: 'Unlimited smart links', free: true, pro: true, growth: true },
-      { name: 'Auto-sync from Spotify', free: true, pro: true, growth: true },
+      { name: 'Unlimited smart links', free: true, pro: true, max: true },
+      { name: 'Auto-sync from Spotify', free: true, pro: true, max: true },
       {
         name: 'Smart deep links (native apps)',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Edit & customize smart links',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Release pages with listen links per DSP',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
-      { name: 'Short link redirects', free: true, pro: true, growth: true },
-      { name: 'Vanity URLs', free: true, pro: true, growth: true },
+      { name: 'Short link redirects', free: true, pro: true, max: true },
+      { name: 'Vanity URLs', free: true, pro: true, max: true },
       {
         name: 'Auto DSP detection & linking',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Manual release creation',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
+      },
+      {
+        name: 'Pre-save campaigns',
+        free: false,
+        pro: true,
+        max: true,
       },
       {
         name: 'Pre-release & countdown pages',
         free: false,
         pro: true,
-        growth: true,
+        max: true,
+      },
+      {
+        name: 'URL encryption',
+        free: false,
+        pro: true,
+        max: true,
       },
     ],
   },
@@ -285,30 +389,35 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         name: 'Public artist profile page',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Artist bio & social links',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Subscribe / follow page',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
-      { name: 'Contact page', free: true, pro: true, growth: true },
-      { name: 'About page', free: true, pro: true, growth: true },
+      { name: 'Contact page', free: true, pro: true, max: true },
+      { name: 'About page', free: true, pro: true, max: true },
       {
         name: 'Tour dates (Bandsintown)',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
-      { name: 'Verified badge', free: false, pro: true, growth: true },
-      { name: 'Remove Jovie branding', free: false, pro: true, growth: true },
+      { name: 'Verified badge', free: false, pro: true, max: true },
+      {
+        name: 'White-label / custom domain',
+        free: false,
+        pro: false,
+        max: true,
+      },
     ],
   },
   {
@@ -318,40 +427,39 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         name: 'Click & visit tracking',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Data retention',
         free: '30 days',
-        pro: '90 days',
-        growth: '1 year',
+        pro: '180 days',
+        max: 'Unlimited',
       },
       {
         name: 'Audience intelligence (device, location, intent)',
         free: true,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
         name: 'Advanced analytics & geographic insights',
         free: false,
         pro: true,
-        growth: true,
+        max: true,
       },
       {
-        name: 'Filter your own visits',
+        name: 'Traffic quality filtering',
         free: false,
         pro: true,
-        growth: true,
+        max: true,
       },
-      { name: 'AI-powered insights', free: false, pro: true, growth: true },
-      { name: 'Ad pixel tracking', free: false, pro: true, growth: true },
+      { name: 'AI-powered insights', free: false, pro: true, max: true },
+      { name: 'Ad pixel tracking', free: false, pro: true, max: true },
       {
         name: 'A/B testing',
         free: false,
         pro: false,
-        growth: true,
-        comingSoon: true,
+        max: true,
       },
     ],
   },
@@ -362,28 +470,29 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         name: 'Contact / subscriber capture',
         free: 'Up to 100',
         pro: 'Unlimited',
-        growth: 'Unlimited',
+        max: 'Unlimited',
       },
       {
         name: 'Release notifications (email to fans)',
-        free: true,
+        free: false,
         pro: true,
-        growth: true,
+        max: true,
       },
-      { name: 'Contact export', free: false, pro: true, growth: true },
-      { name: 'Fan CRM', free: false, pro: true, growth: true },
+      { name: 'Contact export', free: false, pro: true, max: true },
+      { name: 'Fan CRM', free: false, pro: true, max: true },
+      { name: 'Email campaigns', free: false, pro: false, max: true },
       {
         name: 'Automated follow-ups',
         free: false,
         pro: false,
-        growth: true,
+        max: true,
         comingSoon: true,
       },
       {
         name: 'Catalog monitoring',
         free: false,
         pro: false,
-        growth: true,
+        max: true,
         comingSoon: true,
       },
     ],
@@ -391,8 +500,10 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
   {
     category: 'Monetization',
     features: [
-      { name: 'Tips & payments (Venmo)', free: false, pro: true, growth: true },
-      { name: 'Earnings dashboard', free: false, pro: true, growth: true },
+      { name: 'Tips & payments', free: false, pro: true, max: true },
+      { name: 'Earnings dashboard', free: false, pro: true, max: true },
+      { name: 'Stripe Connect payouts', free: false, pro: false, max: true },
+      { name: 'Fan subscriptions', free: false, pro: false, max: true },
     ],
   },
   {
@@ -400,18 +511,27 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     features: [
       {
         name: 'Daily messages',
-        free: '25 / day',
+        free: '10 / day',
         pro: '100 / day',
-        growth: '500 / day',
+        max: '500 / day',
       },
-      { name: 'AI tool use', free: true, pro: true, growth: true },
+      { name: 'AI tool use', free: true, pro: true, max: true },
+      {
+        name: 'AI pitch generation',
+        free: '1 / release',
+        pro: '5 / release',
+        max: 'Unlimited',
+      },
     ],
   },
   {
-    category: 'Support',
+    category: 'Platform',
     features: [
-      { name: 'Email support', free: true, pro: true, growth: true },
-      { name: 'Priority support', free: false, pro: true, growth: true },
+      { name: 'Email support', free: true, pro: true, max: true },
+      { name: 'Priority support', free: false, pro: true, max: true },
+      { name: 'API access', free: false, pro: false, max: true },
+      { name: 'Team management', free: false, pro: false, max: true },
+      { name: 'Webhooks', free: false, pro: false, max: true },
     ],
   },
 ] as const;
@@ -420,13 +540,16 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Resolve a raw plan string to a registry entry, defaulting to free. */
+/**
+ * Resolve a raw plan string to a registry entry, defaulting to free.
+ * Handles backward compat: DB may still store 'growth' for legacy subscribers.
+ */
 export function getEntitlements(
   plan: string | null | undefined
 ): PlanEntitlements {
-  if (plan === 'growth') return ENTITLEMENT_REGISTRY.growth;
-  if (plan === 'pro') return ENTITLEMENT_REGISTRY.pro;
-  if (plan === 'founding') return ENTITLEMENT_REGISTRY.founding;
+  if (plan === 'trial') return ENTITLEMENT_REGISTRY.trial;
+  if (plan === 'growth' || plan === 'max') return ENTITLEMENT_REGISTRY.max;
+  if (plan === 'pro' || plan === 'founding') return ENTITLEMENT_REGISTRY.pro;
   return ENTITLEMENT_REGISTRY.free;
 }
 
@@ -448,12 +571,18 @@ export function getLimit(
 
 /** Whether the plan is pro or higher. */
 export function isProPlan(plan: string | null | undefined): boolean {
-  return plan === 'founding' || plan === 'pro' || plan === 'growth';
+  return (
+    plan === 'founding' ||
+    plan === 'pro' ||
+    plan === 'trial' ||
+    plan === 'max' ||
+    plan === 'growth'
+  );
 }
 
-/** Whether the plan has growth-only advanced features. */
+/** Whether the plan has max-tier advanced features. */
 export function hasAdvancedFeatures(plan: string | null | undefined): boolean {
-  return plan === 'growth';
+  return plan === 'max' || plan === 'growth';
 }
 
 /** Display name for UI. */

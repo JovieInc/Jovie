@@ -12,8 +12,8 @@ type AnalyticsWindow = Window & {
 };
 
 function getAnalyticsWindow(): AnalyticsWindow | null {
-  if (typeof window === 'undefined') return null;
-  return window as AnalyticsWindow;
+  if (globalThis.window === undefined) return null;
+  return globalThis.window as AnalyticsWindow;
 }
 
 function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
@@ -60,11 +60,55 @@ export function identify(userId: string, traits?: Record<string, unknown>) {
 
 // Re-export client hooks from feature-flags module
 export {
-  useFeatureGate as useFeatureFlag,
-  useFeatureGateWithLoading as useFeatureFlagWithLoading,
+  useCodeFlag as useFeatureFlag,
+  useCodeFlagWithLoading as useFeatureFlagWithLoading,
 } from '@/lib/feature-flags/client';
-export type { FeatureFlagKey as FeatureFlagName } from '@/lib/feature-flags/shared';
-export { FEATURE_FLAG_KEYS as FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+export type { CodeFlagName as FeatureFlagName } from '@/lib/feature-flags/shared';
+export { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+
+/**
+ * Track the "magic moment" — when a profile has all 4 key elements:
+ * avatar + display name + at least 1 DSP link + at least 1 release.
+ * Uses localStorage to ensure it fires only once per profile.
+ */
+export function trackMagicMomentIfReady(params: {
+  profileId: string;
+  hasAvatar: boolean;
+  hasDisplayName: boolean;
+  dspLinkCount: number;
+  releaseCount: number;
+  signupTimestamp: number;
+  enrichmentStatus: string;
+}): boolean {
+  if (
+    !params.hasAvatar ||
+    !params.hasDisplayName ||
+    params.dspLinkCount < 1 ||
+    params.releaseCount < 1
+  ) {
+    return false;
+  }
+
+  const key = `magic_moment_achieved_${params.profileId}`;
+  if (globalThis.window !== undefined && globalThis.localStorage.getItem(key)) {
+    return false;
+  }
+
+  track('magic_moment_achieved', {
+    timeToMagicMoment: Date.now() - params.signupTimestamp,
+    hasAvatar: params.hasAvatar,
+    hasDisplayName: params.hasDisplayName,
+    dspLinkCount: params.dspLinkCount,
+    releaseCount: params.releaseCount,
+    enrichmentStatus: params.enrichmentStatus,
+  });
+
+  if (globalThis.window !== undefined) {
+    globalThis.localStorage.setItem(key, String(Date.now()));
+  }
+
+  return true;
+}
 
 // Lightweight helper for non-hook contexts
 export function isFeatureEnabled(_flag: string): boolean {

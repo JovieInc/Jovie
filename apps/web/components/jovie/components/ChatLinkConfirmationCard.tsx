@@ -4,6 +4,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -116,36 +117,38 @@ export function ChatLinkConfirmationCard({
 
   if (state === 'added') {
     return (
-      <div className='rounded-xl border border-success/30 bg-success-subtle p-4'>
+      <ContentSurfaceCard className='border-subtle bg-surface-1 p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>
             {platform.name} link added
           </span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   if (state === 'dismissed') {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 opacity-60'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4 opacity-60'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
           <span className='text-sm'>Link dismissed</span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='rounded-xl border border-accent/20 bg-accent/5 p-4'>
+    <ContentSurfaceCard className='border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_8%,var(--linear-app-content-surface))] p-4'>
       <div className='flex items-center gap-3'>
-        <SocialIcon
-          platform={normalizeSocialPlatform(platform.icon)}
-          className='h-5 w-5 shrink-0'
-          aria-hidden
-        />
+        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_10%,var(--linear-app-content-surface))]'>
+          <SocialIcon
+            platform={normalizeSocialPlatform(platform.icon)}
+            className='h-5 w-5 shrink-0'
+            aria-hidden
+          />
+        </span>
         <div className='min-w-0 flex-1'>
           <p className='text-sm font-medium text-primary-token'>
             {platform.name}
@@ -159,13 +162,13 @@ export function ChatLinkConfirmationCard({
             </output>
           )}
         </div>
-        <div className='flex items-center gap-1.5 shrink-0'>
+        <div className='shrink-0 flex items-center gap-1.5'>
           <button
             type='button'
             onClick={handleAdd}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium',
+              'inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-xs font-medium',
               'bg-accent text-accent-foreground hover:bg-accent/90',
               'disabled:opacity-50 transition-colors'
             )}
@@ -182,8 +185,8 @@ export function ChatLinkConfirmationCard({
             onClick={handleDismiss}
             disabled={state === 'adding'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md p-1.5 text-xs',
-              'text-secondary-token hover:bg-surface-2 hover:text-primary-token',
+              'inline-flex items-center gap-1 rounded-[8px] border border-transparent p-1.5 text-xs',
+              'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}
             aria-label={`Dismiss ${platform.name} link`}
@@ -192,6 +195,6 @@ export function ChatLinkConfirmationCard({
           </button>
         </div>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

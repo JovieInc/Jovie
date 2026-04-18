@@ -3,10 +3,11 @@
 import { useChat } from '@ai-sdk/react';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
+import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   FetchError,
@@ -17,6 +18,10 @@ import {
 } from '@/lib/queries';
 import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
 
+import {
+  extractPersistableToolCalls,
+  hydratePersistedMessageParts,
+} from '../message-parts';
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import {
@@ -37,25 +42,36 @@ interface UseJovieChatOptions {
   readonly username?: string;
 }
 
-/**
- * Extracts tool call data from message parts for persistence.
- * Only includes parts that have a toolInvocation property to ensure consistent shape.
- */
-function extractToolCalls(
-  parts: Array<{ type: string; [key: string]: unknown }>
-): Record<string, unknown>[] | undefined {
-  const toolCalls = parts
-    .filter(p => p.type === 'tool-invocation' && p.toolInvocation != null)
-    .map(p => ({ type: p.type, toolInvocation: p.toolInvocation }));
+/** Fast interval (ms) to poll for auto-generated title after first message. */
+const TITLE_POLL_FAST_INTERVAL_MS = 2_000;
 
-  return toolCalls.length > 0 ? toolCalls : undefined;
-}
-
-/** Interval (ms) to poll for auto-generated title after first message. */
-const TITLE_POLL_INTERVAL_MS = 2_000;
+/** Slower interval (ms) used once title polling appears stalled. */
+const TITLE_POLL_BACKOFF_INTERVAL_MS = 5_000;
 
 /** Max duration (ms) to keep polling before giving up. */
 const TITLE_POLL_MAX_DURATION_MS = 15_000;
+
+/** Number of fast poll intervals to allow before backing off. */
+const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+
+function getTitlePollIntervalMs(
+  titlePollingSince: number | null,
+  currentTime: number
+): number | false {
+  if (titlePollingSince === null) {
+    return false;
+  }
+
+  const elapsed = currentTime - titlePollingSince;
+
+  if (elapsed >= TITLE_POLL_MAX_DURATION_MS) {
+    return false;
+  }
+
+  return elapsed < TITLE_POLL_FAST_WINDOW_MS
+    ? TITLE_POLL_FAST_INTERVAL_MS
+    : TITLE_POLL_BACKOFF_INTERVAL_MS;
+}
 
 export function useJovieChat({
   profileId,
@@ -104,9 +120,10 @@ export function useJovieChat({
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
-  const shouldPollForTitle =
-    titlePollingSince !== null &&
-    Date.now() - titlePollingSince < TITLE_POLL_MAX_DURATION_MS;
+  const titlePollIntervalMs = getTitlePollIntervalMs(
+    titlePollingSince,
+    Date.now()
+  );
 
   // Load existing conversation if conversationId is provided.
   // When title is pending, enable refetchInterval to poll for the generated title.
@@ -114,7 +131,7 @@ export function useJovieChat({
     useChatConversationQuery({
       conversationId: activeConversationId,
       enabled: !!activeConversationId,
-      refetchInterval: shouldPollForTitle ? TITLE_POLL_INTERVAL_MS : false,
+      refetchInterval: titlePollIntervalMs,
     });
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
@@ -145,13 +162,23 @@ export function useJovieChat({
       }) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: msg.content }],
+        parts: hydratePersistedMessageParts(
+          msg.content,
+          msg.toolCalls
+        ) as UIMessage['parts'],
         createdAt: new Date(msg.createdAt),
       })
     );
   }, [existingConversation]);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const {
+    messages,
+    sendMessage,
+    status,
+    setMessages,
+    stop: rawStop,
+  } = useChat({
+    id: activeConversationId ?? 'new-chat',
     transport,
     onError: error => {
       captureException(error, {
@@ -213,6 +240,18 @@ export function useJovieChat({
     setMessages(initialMessages);
     hasHydratedRef.current = activeConversationId;
   }, [initialMessages, setMessages, status, activeConversationId]);
+
+  // Wrap stop to clear submission state so the composer re-enables immediately
+  // instead of waiting for the 30s safety timeout.
+  // NOTE: We intentionally do NOT clear pendingMessagesRef here. When the stream
+  // aborts, status will transition back to 'ready', and the persistence effect
+  // needs pendingMessagesRef to still be populated so it can save the user message
+  // (and any partial assistant response) to the database. Clearing it here would
+  // cause aborted turns to silently disappear on reload.
+  const stop = useCallback(() => {
+    rawStop();
+    setIsSubmitting(false);
+  }, [rawStop]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
@@ -330,7 +369,7 @@ export function useJovieChat({
     }
 
     // Extract tool calls for persistence
-    const toolCalls = extractToolCalls(
+    const toolCalls = extractPersistableToolCalls(
       lastAssistantMessage.parts as Array<{
         type: string;
         [key: string]: unknown;
@@ -471,11 +510,6 @@ export function useJovieChat({
 
         setInput('');
 
-        // Reset textarea height
-        if (inputRef.current) {
-          inputRef.current.style.height = 'auto';
-        }
-
         return true;
       } catch (err) {
         // Transient server errors (5xx, timeout, rate-limit) were already
@@ -530,13 +564,6 @@ export function useJovieChat({
     ]
   );
 
-  /** Reset textarea height to auto. */
-  const resetTextareaHeight = useCallback(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-    }
-  }, []);
-
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
     (trimmedText: string): boolean => {
@@ -558,11 +585,10 @@ export function useJovieChat({
       };
       setMessages(prev => [...prev, userMsg, assistantMsg]);
       setInput('');
-      resetTextareaHeight();
       command.execute(commandCtx);
       return true;
     },
-    [username, router, setMessages, setInput, resetTextareaHeight]
+    [username, router, setMessages, setInput]
   );
 
   // Core submit logic
@@ -613,7 +639,6 @@ export function useJovieChat({
 
       sendMessage(payload);
       setInput('');
-      resetTextareaHeight();
     },
     [
       isLoading,
@@ -622,7 +647,6 @@ export function useJovieChat({
       activeConversationId,
       handleCreateConversation,
       tryHandleCommand,
-      resetTextareaHeight,
     ]
   );
 
@@ -680,6 +704,30 @@ export function useJovieChat({
     [rateLimitedSubmitter]
   );
 
+  useEffect(() => {
+    const pendingPrompt = consumePendingChatPrompt();
+    if (!pendingPrompt) return;
+
+    rateLimitedSubmitter.maybeExecute({ text: pendingPrompt });
+  }, [rateLimitedSubmitter]);
+
+  useEffect(() => {
+    const handlePromptEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+      if (!detail?.prompt) return;
+
+      rateLimitedSubmitter.maybeExecute({ text: detail.prompt });
+    };
+
+    globalThis.addEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+    return () => {
+      globalThis.removeEventListener(
+        'jovie-chat-submit-prompt',
+        handlePromptEvent
+      );
+    };
+  }, [rateLimitedSubmitter]);
+
   return {
     // State
     input,
@@ -704,5 +752,7 @@ export function useJovieChat({
     submitMessage: doSubmit,
     setChatError,
     isRateLimited,
+    /** Stop the current AI generation */
+    stop,
   };
 }

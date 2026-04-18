@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
@@ -9,7 +9,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
-import { isWaitlistEnabled } from './waitlist-config';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 export interface ProxyUserState {
   needsWaitlist: boolean;
@@ -155,13 +155,14 @@ const APPROVED_STATUSES = [
   'active',
 ] as const;
 
+// Uses the canonical isProfileComplete() from profile-completeness.ts.
+// This eliminates the redirect loop bug class where proxy, gate, and
+// dashboard had independent completeness checks that could disagree.
+import { isProfileComplete } from './profile-completeness';
+
 /**
  * Whether the user has a complete profile.
- *
- * IMPORTANT: This MUST match the logic in `profileIsPublishable()` from
- * `lib/db/server.ts`. If the proxy considers a user "active" but the
- * dashboard considers them "needs onboarding", an infinite redirect loop
- * occurs: /app → redirect to /onboarding → proxy redirects back → repeat.
+ * Maps proxy query field names to the canonical check.
  */
 function hasCompleteProfile(result: {
   profileId: string | null;
@@ -172,14 +173,14 @@ function hasCompleteProfile(result: {
   profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
 }): boolean {
-  return (
-    !!result.profileId &&
-    !!result.profileComplete &&
-    !!result.profileUsername &&
-    !!result.profileUsernameNormalized &&
-    !!result.profileDisplayName?.trim() &&
-    result.profileIsPublic !== false
-  );
+  if (!result.profileId) return false;
+  return isProfileComplete({
+    username: result.profileUsername,
+    usernameNormalized: result.profileUsernameNormalized,
+    displayName: result.profileDisplayName,
+    isPublic: result.profileIsPublic,
+    onboardingCompletedAt: result.profileComplete,
+  });
 }
 
 /**
@@ -199,10 +200,9 @@ function determineUserState(
         profileAvatarUrl: string | null;
         profileIsPublic: boolean | null;
       }
-    | undefined
+    | undefined,
+  waitlistEnabled: boolean
 ): ProxyUserState {
-  const waitlistEnabled = isWaitlistEnabled();
-
   // No DB user → needs waitlist/signup (or onboarding if waitlist is disabled)
   if (!result?.dbUserId) {
     return waitlistEnabled
@@ -315,10 +315,7 @@ async function executeUserStateQuery(clerkUserId: string) {
         .from(users)
         .leftJoin(
           creatorProfiles,
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(creatorProfiles.isClaimed, true)
-          )
+          eq(creatorProfiles.id, users.activeProfileId)
         )
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
@@ -381,7 +378,7 @@ export async function getUserState(
     captureWarning(
       '[proxy-state] getUserState called with missing clerkUserId'
     );
-    return { ...DEFAULT_WAITLIST_STATE };
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
@@ -407,7 +404,8 @@ export async function getUserState(
 
     logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
-    const userState = determineUserState(result);
+    const gateEnabled = await isWaitlistGateEnabled();
+    const userState = determineUserState(result, gateEnabled);
 
     // Populate both cache layers
     setMemoryCachedState(cacheKey, userState);
@@ -425,7 +423,7 @@ export async function getUserState(
       errorType: isTransient ? 'transient' : 'persistent',
     });
 
-    return { ...DEFAULT_WAITLIST_STATE };
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 }
 

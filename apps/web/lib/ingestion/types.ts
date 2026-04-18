@@ -1,3 +1,4 @@
+import type { DiscoveredPixels } from '@/lib/db/schema/profiles';
 import { type SocialLinkState } from '@/types/db';
 
 export interface IngestionJobPayload {
@@ -35,7 +36,7 @@ export interface ExtractionResult {
   /**
    * Whether the Linktree profile has a verification badge.
    * Verification requires a paid plan + identity confirmation.
-   * Stronger paid-tier signal than branding removal alone.
+   * Stronger paid-tier signal than surface presentation alone.
    */
   isLinktreeVerified?: boolean | null;
   /**
@@ -48,6 +49,12 @@ export interface ExtractionResult {
    * Used for context and email extraction.
    */
   bio?: string | null;
+  /**
+   * Tracking pixels detected on the profile page (Facebook, TikTok, Google).
+   * Detected by matching pixel init calls in the HTML.
+   * null = no pixels detected or detection not performed.
+   */
+  discoveredPixels?: DiscoveredPixels | null;
 }
 
 export interface NormalizedLinkCandidate extends ExtractedLink {

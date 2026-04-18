@@ -25,3 +25,47 @@
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
+
+const RESERVED_TEST_EMAIL_DOMAINS = [
+  'example.com',
+  'example.net',
+  'example.org',
+  'invalid',
+  'localhost',
+  'test',
+] as const;
+
+export function getEmailDomain(email: string): string | null {
+  const normalizedEmail = normalizeEmail(email);
+  const atIndex = normalizedEmail.lastIndexOf('@');
+
+  if (atIndex === -1 || atIndex === normalizedEmail.length - 1) {
+    return null;
+  }
+
+  return normalizedEmail.slice(atIndex + 1);
+}
+
+export function isReservedTestEmailDomain(domain: string): boolean {
+  const normalizedDomain = domain.trim().toLowerCase();
+
+  return RESERVED_TEST_EMAIL_DOMAINS.some(
+    reservedDomain =>
+      normalizedDomain === reservedDomain ||
+      normalizedDomain.endsWith(`.${reservedDomain}`)
+  );
+}
+
+export function getEmailSendBlockReason(email: string): string | null {
+  const domain = getEmailDomain(email);
+
+  if (!domain) {
+    return null;
+  }
+
+  if (isReservedTestEmailDomain(domain)) {
+    return `Recipient domain ${domain} is reserved for testing`;
+  }
+
+  return null;
+}

@@ -1,8 +1,9 @@
 import { ImageResponse } from 'next/og';
-import { getReleaseStatsByUsername } from '@/lib/discography/queries';
+import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
 export const runtime = 'edge';
+export const revalidate = 900; // 15 min — matches previous Cache-Control max-age
 
 export const alt = 'Jovie artist profile';
 export const size = {
@@ -11,82 +12,227 @@ export const size = {
 };
 export const contentType = 'image/png';
 
-export function formatReleaseCount(count: number): string {
-  if (count <= 0) return 'No releases yet';
-  if (count === 1) return '1 release';
-  return `${count} releases`;
+function truncateName(name: string): string {
+  return name.length > 44 ? `${name.slice(0, 43)}…` : name;
 }
 
-export function truncate(input: string, maxLength: number): string {
-  if (input.length <= maxLength) return input;
-  return `${input.slice(0, maxLength - 1)}…`;
+async function toDataUrl(imageUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(imageUrl, {
+      headers: { Accept: 'image/*' },
+      cache: 'force-cache',
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) return null;
+
+    // Limit to 2MB to avoid memory pressure in edge runtime
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && Number.parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 2 * 1024 * 1024) return null;
+    const bytes = new Uint8Array(arrayBuffer);
+    // Convert to binary string in chunks to avoid call stack limits
+    // and O(n²) string concatenation in edge runtime
+    const CHUNK = 8192;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
+    }
+    return `data:${contentType};base64,${btoa(chunks.join(''))}`;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Returns a generic branded fallback OG image when data fetching fails
- * or the profile is not found.
- */
-function fallbackImage(username: string) {
+function gradientCard(headline: string, subtitle: string) {
   return new ImageResponse(
     <div
       style={{
         width: '100%',
         height: '100%',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        gap: 24,
+        position: 'relative',
         background:
-          'radial-gradient(circle at 15% 10%, #363062 0%, #17122d 40%, #0a0715 100%)',
+          'linear-gradient(138deg, #151033 0%, #22184a 45%, #2f1f68 100%)',
         color: '#ffffff',
-        fontFamily: 'Inter',
+        fontFamily: 'Inter, sans-serif',
       }}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
+      <img
+        src={`${BASE_URL}/Jovie-logo.png`}
+        alt='Jovie'
+        width={240}
+        height={64}
+        style={{
+          position: 'absolute',
+          top: 42,
+          left: 54,
+          objectFit: 'contain',
+        }}
+      />
       <div
         style={{
+          marginTop: 'auto',
+          marginBottom: 64,
+          marginLeft: 54,
+          marginRight: 54,
           display: 'flex',
-          fontSize: 48,
-          fontWeight: 700,
-          letterSpacing: -1,
-          color: '#b6a8ff',
+          flexDirection: 'column',
+          gap: 12,
+          maxWidth: 880,
         }}
       >
-        Jovie
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          fontSize: 32,
-          fontWeight: 500,
-          color: '#d4cffb',
-        }}
-      >
-        jov.ie/{username}
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          fontSize: 22,
-          color: '#9f95d9',
-        }}
-      >
-        Artist growth, simplified
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 74,
+            fontWeight: 700,
+            letterSpacing: -2,
+            lineHeight: 1,
+          }}
+        >
+          {headline}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 30,
+            color: 'rgba(255,255,255,0.82)',
+          }}
+        >
+          {subtitle}
+        </div>
       </div>
     </div>,
     { ...size }
   );
 }
 
-function getReleaseSubtitle(
-  profileIsPublic: boolean,
-  releaseCount: number,
-  topReleases: string[]
-): string {
-  if (!profileIsPublic) return 'Artist profile on Jovie';
-  if (releaseCount <= 0) return 'Build your release catalog on Jovie';
-  if (topReleases.length > 0) return topReleases.join(' • ');
-  return 'Latest releases on Spotify, Apple Music, and more';
+function heroImage(
+  name: string,
+  photoDataUrl: string,
+  genres: string[],
+  username: string
+) {
+  return new ImageResponse(
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#120d28',
+        color: '#ffffff',
+        fontFamily: 'Inter, sans-serif',
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
+      <img
+        src={photoDataUrl}
+        alt={`${name} profile`}
+        width={1200}
+        height={630}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
+
+      {/* Dark gradient overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          background:
+            'linear-gradient(100deg, rgba(10,8,20,0.86) 0%, rgba(10,8,20,0.58) 48%, rgba(10,8,20,0.24) 100%)',
+        }}
+      />
+
+      {/* Jovie logo */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
+      <img
+        src={`${BASE_URL}/Jovie-logo.png`}
+        alt='Jovie'
+        width={232}
+        height={62}
+        style={{
+          position: 'absolute',
+          top: 42,
+          left: 54,
+          objectFit: 'contain',
+        }}
+      />
+
+      {/* Artist name + genre tags */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 54,
+          bottom: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          maxWidth: 840,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 78,
+            fontWeight: 750,
+            lineHeight: 1,
+            letterSpacing: -2,
+            textShadow: '0 12px 34px rgba(0,0,0,0.35)',
+          }}
+        >
+          {truncateName(name)}
+        </div>
+        {genres.length > 0 ? (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {genres.map(genre => (
+              <div
+                key={genre}
+                style={{
+                  display: 'flex',
+                  padding: '6px 16px',
+                  borderRadius: 999,
+                  fontSize: 22,
+                  fontWeight: 500,
+                  color: 'rgba(255,255,255,0.9)',
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                }}
+              >
+                {genre}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              fontSize: 28,
+              color: 'rgba(255,255,255,0.84)',
+            }}
+          >
+            jov.ie/{username}
+          </div>
+        )}
+      </div>
+    </div>,
+    { ...size }
+  );
 }
 
 export default async function Image({
@@ -99,227 +245,42 @@ export default async function Image({
 
   let profileResult: Awaited<ReturnType<typeof getProfileWithLinks>> | null =
     null;
-  let releaseStats: Awaited<
-    ReturnType<typeof getReleaseStatsByUsername>
-  > | null = null;
 
   try {
-    [profileResult, releaseStats] = await Promise.all([
+    // 3-second timeout ensures the fallback image renders reliably
+    // even if the DB is slow (edge runtime has a 25s budget, but we want fast OG)
+    profileResult = await Promise.race([
       getProfileWithLinks(normalizedUsername),
-      getReleaseStatsByUsername(normalizedUsername),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('OG image data fetch timeout')), 3000)
+      ),
     ]);
   } catch {
-    return fallbackImage(normalizedUsername);
+    return gradientCard(
+      `jov.ie/${normalizedUsername}`,
+      'Artist growth, simplified'
+    );
   }
 
-  if (!profileResult) {
-    return fallbackImage(normalizedUsername);
+  if (!profileResult?.isPublic) {
+    return gradientCard(
+      `jov.ie/${normalizedUsername}`,
+      'Artist growth, simplified'
+    );
   }
 
-  const profileIsPublic = Boolean(profileResult?.isPublic);
-  const artistName = profileResult?.displayName || username;
-  const genreTags = profileIsPublic
-    ? (profileResult?.genres?.slice(0, 3) ?? [])
-    : [];
+  const artistName = profileResult.displayName || username;
+  const genres = profileResult.genres?.slice(0, 3) ?? [];
 
-  const topReleases =
-    profileIsPublic && releaseStats
-      ? releaseStats.topReleaseTitles
-          .slice(0, 3)
-          .map(title => truncate(title, 28))
-      : [];
+  if (!profileResult.avatarUrl) {
+    return gradientCard(truncateName(artistName), 'Artist profile on Jovie');
+  }
 
-  const releaseCount =
-    profileIsPublic && releaseStats ? releaseStats.releaseCount : 0;
+  const photoDataUrl = await toDataUrl(profileResult.avatarUrl);
 
-  const releaseSubtitle = getReleaseSubtitle(
-    profileIsPublic,
-    releaseCount,
-    topReleases
-  );
+  if (!photoDataUrl) {
+    return gradientCard(truncateName(artistName), 'Artist profile on Jovie');
+  }
 
-  return new ImageResponse(
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        position: 'relative',
-        background:
-          'radial-gradient(circle at 15% 10%, #363062 0%, #17122d 40%, #0a0715 100%)',
-        color: '#ffffff',
-        fontFamily: 'Inter',
-        padding: 48,
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          top: 30,
-          right: 40,
-          display: 'flex',
-          fontSize: 30,
-          fontWeight: 600,
-          letterSpacing: -0.5,
-          color: '#b6a8ff',
-        }}
-      >
-        Jovie
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          width: '100%',
-          borderRadius: 28,
-          border: '1px solid rgba(255,255,255,0.14)',
-          background: 'rgba(8, 8, 18, 0.44)',
-          padding: 36,
-        }}
-      >
-        <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
-          <div
-            style={{
-              width: 164,
-              height: 164,
-              borderRadius: 24,
-              border: '2px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.08)',
-              overflow: 'hidden',
-              display: 'flex',
-            }}
-          >
-            {profileIsPublic && profileResult?.avatarUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element -- next/og ImageResponse requires standard img elements */
-              <img
-                src={profileResult.avatarUrl}
-                alt={`${artistName} avatar`}
-                width={164}
-                height={164}
-                style={{ objectFit: 'cover' }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 58,
-                  fontWeight: 700,
-                  color: '#d9d4ff',
-                }}
-              >
-                {artistName.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div
-              style={{
-                display: 'flex',
-                fontSize: 60,
-                fontWeight: 700,
-                lineHeight: 1.05,
-                letterSpacing: -1.4,
-                maxWidth: 820,
-              }}
-            >
-              {truncate(artistName, 32)}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                fontSize: 28,
-                color: '#d4cffb',
-                maxWidth: 820,
-              }}
-            >
-              {profileIsPublic
-                ? `@${normalizedUsername}`
-                : 'Artist profile preview'}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {(genreTags.length > 0 ? genreTags : ['Artist profile']).map(
-              tag => (
-                <div
-                  key={tag}
-                  style={{
-                    display: 'flex',
-                    padding: '8px 14px',
-                    borderRadius: 999,
-                    fontSize: 20,
-                    fontWeight: 500,
-                    color: '#e7e1ff',
-                    background: 'rgba(182, 168, 255, 0.18)',
-                    border: '1px solid rgba(182, 168, 255, 0.35)',
-                  }}
-                >
-                  {truncate(tag, 18)}
-                </div>
-              )
-            )}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 20,
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 36,
-                  fontWeight: 650,
-                  letterSpacing: -0.8,
-                }}
-              >
-                {formatReleaseCount(releaseCount)}
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 22,
-                  color: '#b8b2dc',
-                  maxWidth: 720,
-                }}
-              >
-                {releaseSubtitle}
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                fontSize: 20,
-                color: '#c7bfff',
-              }}
-            >
-              <span>jov.ie/{normalizedUsername}</span>
-              <span style={{ color: '#9f95d9' }}>
-                Artist growth, simplified
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>,
-    {
-      ...size,
-    }
-  );
+  return heroImage(artistName, photoDataUrl, genres, normalizedUsername);
 }

@@ -18,6 +18,7 @@ import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
 import type { SpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
+import { evaluateProfileQuality } from './profile-quality-gate';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -224,6 +225,12 @@ export async function createNewSocialProfile(
       ? platformName
       : handle);
 
+  const qualityResult = evaluateProfileQuality({
+    displayName,
+    avatarUrl: spotifyData?.imageUrl ?? null,
+    linkCount: 1, // Social profiles always create exactly one link
+  });
+
   const [created] = await tx
     .insert(creatorProfiles)
     .values({
@@ -238,7 +245,7 @@ export async function createNewSocialProfile(
       genres: spotifyData?.genres ?? null,
       spotifyFollowers: spotifyData?.followerCount ?? null,
       spotifyPopularity: spotifyData?.popularity ?? null,
-      isPublic: true,
+      isPublic: qualityResult.isPublic,
       isVerified: false,
       isFeatured: false,
       marketingOptOut: false,
@@ -263,6 +270,15 @@ export async function createNewSocialProfile(
       { error: 'Failed to create creator profile' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
+  }
+
+  if (!qualityResult.isPublic) {
+    logger.info('New social profile quarantined by quality gate', {
+      profileId: created.id,
+      handle: finalHandle,
+      platform: platformId,
+      reasons: qualityResult.quarantineReasons,
+    });
   }
 
   await invalidateProfileCache(created.usernameNormalized);
@@ -291,6 +307,19 @@ export async function createNewSocialProfile(
       profileId: created.id,
       platform: platformId,
     });
+
+    // Quarantine the profile if link insert failed — a public profile
+    // with zero links violates the quality gate invariant
+    if (qualityResult.isPublic) {
+      await tx
+        .update(creatorProfiles)
+        .set({ isPublic: false, updatedAt: new Date() })
+        .where(eq(creatorProfiles.id, created.id));
+      logger.info('Profile quarantined after link insert failure', {
+        profileId: created.id,
+        handle: finalHandle,
+      });
+    }
   }
 
   // Calculate fit score
@@ -324,6 +353,11 @@ export async function createNewSocialProfile(
       },
       links: 1,
       platform: platformName,
+      quarantined: !qualityResult.isPublic,
+      quarantineReasons:
+        qualityResult.quarantineReasons.length > 0
+          ? qualityResult.quarantineReasons
+          : undefined,
     },
     { status: 200, headers: NO_STORE_HEADERS }
   );

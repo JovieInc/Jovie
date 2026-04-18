@@ -11,35 +11,22 @@ import 'server-only';
  * - lib/flags/server.ts
  */
 
+import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import type { CreatorProfile } from '@/lib/db/schema/profiles';
 
 /**
  * Determines if a creator profile meets the minimum requirements
  * to be considered publishable.
  *
- * A profile is publishable when it has:
- * - A claimed handle (username and usernameNormalized)
- * - A display name
- * - Is set to public
- * - Has completed onboarding at least once
- *
- * Moved from app/app/dashboard/actions/profile-selection.ts
+ * Delegates to the canonical isProfileComplete() check. This function
+ * adds the null-profile guard on top.
  *
  * @param profile - The creator profile to check, or null
  * @returns true if the profile is publishable, false otherwise
  */
 export function profileIsPublishable(profile: CreatorProfile | null): boolean {
   if (!profile) return false;
-
-  // A minimum viable profile must have a claimed handle, a display name,
-  // be public, and have completed onboarding at least once.
-  const hasHandle =
-    Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName?.trim());
-  const isPublic = profile.isPublic !== false;
-  const hasCompleted = Boolean(profile.onboardingCompletedAt);
-
-  return hasHandle && hasName && isPublic && hasCompleted;
+  return isProfileComplete(profile);
 }
 
 /**
@@ -59,6 +46,11 @@ export function profileIsPublishable(profile: CreatorProfile | null): boolean {
 export function selectDashboardProfile(
   profiles: CreatorProfile[]
 ): CreatorProfile {
+  // Prefer claimed + publishable profiles to avoid selecting unclaimed
+  // pre-populated profiles when a claimed profile exists
+  const claimed = profiles.find(p => p.isClaimed && profileIsPublishable(p));
+  if (claimed) return claimed;
+
   const publishable = profiles.find(profileIsPublishable);
   if (publishable) return publishable;
 
@@ -81,7 +73,7 @@ export function selectDashboardProfile(
  * Moved from app/app/dashboard/actions/tipping-stats.ts
  */
 export interface TippingStats {
-  /** Total number of tip-related clicks (QR + link combined) */
+  /** Total number of tip-link visits across all tracked sources */
   tipClicks: number;
   /** Number of tip clicks originating from QR codes */
   qrTipClicks: number;

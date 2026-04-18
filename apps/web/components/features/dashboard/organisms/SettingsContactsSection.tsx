@@ -4,11 +4,11 @@ import { Badge, Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { UsageLimitUpgradePrompt } from '@/components/molecules/UsageLimitUpgradePrompt';
 import {
   type EditableContact,
   useContactsManager,
@@ -19,7 +19,7 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { useContactsQuery } from '@/lib/queries';
+import { useContactsQuery, usePlanGate } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 interface SettingsContactsSectionProps {
@@ -42,36 +42,24 @@ export function SettingsContactsSection({
 
   if (isLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Team contacts'
+        description={`Manage bookings, management, and press contacts for ${artist.name}.`}
       >
-        <ContentSectionHeader
-          title='Contacts'
-          subtitle={`Manage bookings, management, and press contacts for ${artist.name}.`}
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
+        <div className='px-4 py-4 sm:px-5'>
           <ContactsSectionSkeleton />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   if (isError) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Team contacts'
+        description={`Manage bookings, management, and press contacts for ${artist.name}.`}
       >
-        <ContentSectionHeader
-          title='Contacts'
-          subtitle={`Manage bookings, management, and press contacts for ${artist.name}.`}
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
+        <div className='px-4 py-4 sm:px-5'>
           <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
             <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
             <p className='text-[13px] text-secondary-token'>
@@ -82,7 +70,7 @@ export function SettingsContactsSection({
             </Button>
           </ContentSurfaceCard>
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
@@ -180,6 +168,7 @@ function ContactsListInner({
       )
     : '';
 
+  const { contactsLimit } = usePlanGate();
   const isEmpty = contacts.length === 0;
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -208,29 +197,22 @@ function ContactsListInner({
 
   return (
     <>
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Team contacts'
+        description={`Manage bookings, management, and press contacts for ${artistName}.`}
+        actions={
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleAddContact}
+            className='gap-1.5 text-secondary-token hover:text-primary-token'
+          >
+            <Plus className='h-4 w-4' aria-hidden />
+            Add contact
+          </Button>
+        }
       >
-        <ContentSectionHeader
-          title='Contacts'
-          subtitle={`Manage bookings, management, and press contacts for ${artistName}.`}
-          className='min-h-0 px-4 py-3'
-          actions={
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={handleAddContact}
-              className='gap-1.5 text-secondary-token hover:text-primary-token'
-            >
-              <Plus className='h-4 w-4' aria-hidden />
-              Add contact
-            </Button>
-          }
-          actionsClassName='w-auto shrink-0'
-        />
-        <div className='px-4 py-3'>
+        <div className='px-4 py-4 sm:px-5'>
           {isEmpty ? (
             <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-10 text-center'>
               <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
@@ -250,8 +232,17 @@ function ContactsListInner({
               ))}
             </div>
           )}
+          {contactsLimit !== null && (
+            <UsageLimitUpgradePrompt
+              current={contacts.length}
+              limit={contactsLimit}
+              featureName='contacts'
+              upgradeCopy='unlimited contacts'
+              className='mt-3'
+            />
+          )}
         </div>
-      </DashboardCard>
+      </SettingsPanel>
 
       <ConfirmDialog
         open={Boolean(pendingDeleteContact)}
@@ -295,7 +286,7 @@ function ContactRow({
     >
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em]'>
+          <span className='text-[13px] font-[510] text-secondary-token tracking-normal'>
             {roleLabel}
           </span>
         </div>

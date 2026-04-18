@@ -31,11 +31,15 @@ import {
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ChatAlbumArtCard } from '@/components/jovie/components/ChatAlbumArtCard';
+import { ChatAnalyticsCard } from '@/components/jovie/components/ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
 import {
   type ArtistContext,
+  type ChatInsightsToolResult,
+  isChatAlbumArtToolResult,
   isToolInvocationPart,
   type SocialLinkToolResult,
   type ToolInvocationPart,
@@ -103,10 +107,10 @@ const InlineChatMessage = memo(function InlineChatMessage({
           )}
           <div
             className={cn(
-              'max-w-[85%] rounded-2xl px-3 py-2',
+              'max-w-[85%] rounded-[12px] px-3 py-2',
               message.role === 'user'
                 ? 'bg-accent text-accent-foreground'
-                : 'bg-surface-2 text-primary-token'
+                : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
             )}
           >
             <div className='whitespace-pre-wrap text-[13px] leading-relaxed'>
@@ -122,16 +126,19 @@ const InlineChatMessage = memo(function InlineChatMessage({
       )}
 
       {toolInvocations.map(toolInvocation => {
+        const result = toolInvocation.result as
+          | Record<string, unknown>
+          | undefined;
         if (
           toolInvocation.toolName === 'proposeProfileEdit' &&
           toolInvocation.state === 'result' &&
-          toolInvocation.result?.success &&
-          toolInvocation.result.preview
+          result?.success &&
+          result.preview
         ) {
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ProfileEditPreviewCard
-                preview={toolInvocation.result.preview as ProfileEditPreview}
+                preview={result.preview as ProfileEditPreview}
                 profileId={profileId}
               />
             </div>
@@ -146,6 +153,37 @@ const InlineChatMessage = memo(function InlineChatMessage({
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ChatAvatarUploadCard />
+            </div>
+          );
+        }
+
+        if (
+          toolInvocation.toolName === 'showTopInsights' &&
+          toolInvocation.state === 'result' &&
+          toolInvocation.result?.success
+        ) {
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatAnalyticsCard
+                result={
+                  toolInvocation.result as unknown as ChatInsightsToolResult
+                }
+              />
+            </div>
+          );
+        }
+
+        if (
+          toolInvocation.toolName === 'generateAlbumArt' &&
+          toolInvocation.state === 'result' &&
+          isChatAlbumArtToolResult(toolInvocation.result)
+        ) {
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatAlbumArtCard
+                result={toolInvocation.result}
+                profileId={profileId}
+              />
             </div>
           );
         }
@@ -194,6 +232,7 @@ export const InlineChatArea = forwardRef<
     profileId,
     artistContext,
   });
+  const shouldVirtualizeMessages = messages.length > 12;
 
   // Virtualizer for inline chat messages
   const virtualizer = useVirtualizer({
@@ -214,12 +253,26 @@ export const InlineChatArea = forwardRef<
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && expanded) {
-      virtualizer.scrollToIndex(messages.length - 1, {
-        align: 'end',
-        behavior: 'smooth',
-      });
+      if (shouldVirtualizeMessages) {
+        virtualizer.scrollToIndex(messages.length - 1, {
+          align: 'end',
+          behavior: 'smooth',
+        });
+      } else {
+        const scrollContainer = scrollContainerRef.current;
+        if (scrollContainer) {
+          if (typeof scrollContainer.scrollTo === 'function') {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          } else {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }
     }
-  }, [messages.length, expanded, virtualizer]);
+  }, [messages.length, expanded, shouldVirtualizeMessages, virtualizer]);
 
   // Expose submitMessage method via ref
   useImperativeHandle(
@@ -275,37 +328,50 @@ export const InlineChatArea = forwardRef<
             ref={scrollContainerRef}
             className='max-h-80 overflow-y-auto px-4 py-4'
           >
-            <div
-              style={{
-                position: 'relative',
-                height: virtualizer.getTotalSize(),
-              }}
-            >
-              {virtualizer.getVirtualItems().map(virtualItem => {
-                const message = messages[virtualItem.index];
-                return (
-                  <div
-                    key={message.id}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`,
-                    }}
-                  >
-                    <div className='pb-4'>
-                      <InlineChatMessage
-                        message={message}
-                        profileId={profileId}
-                      />
+            {shouldVirtualizeMessages ? (
+              <div
+                style={{
+                  position: 'relative',
+                  height: virtualizer.getTotalSize(),
+                }}
+              >
+                {virtualizer.getVirtualItems().map(virtualItem => {
+                  const message = messages[virtualItem.index];
+                  return (
+                    <div
+                      key={message.id}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div className='pb-4'>
+                        <InlineChatMessage
+                          message={message}
+                          profileId={profileId}
+                        />
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div>
+                {messages.map(message => (
+                  <div key={message.id} className='pb-4'>
+                    <InlineChatMessage
+                      message={message}
+                      profileId={profileId}
+                    />
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Loading indicator — rendered outside virtualizer */}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
@@ -313,7 +379,7 @@ export const InlineChatArea = forwardRef<
                 <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <BrandLogo size={14} tone='auto' />
                 </div>
-                <div className='rounded-2xl bg-surface-2 px-3 py-2'>
+                <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
                   <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
                 </div>
               </div>
@@ -321,7 +387,7 @@ export const InlineChatArea = forwardRef<
 
             {/* Error display */}
             {chatError && (
-              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3'>
+              <div className='flex items-start gap-3 rounded-[10px] border border-error/20 bg-error-subtle p-3'>
                 {chatError.type === 'network' ? (
                   <WifiOff className='mt-0.5 h-4 w-4 shrink-0 text-error' />
                 ) : (
@@ -338,7 +404,7 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 text-[11px]'
+                      className='mt-2 h-7 gap-1.5 rounded-[8px] text-[11px] font-[510] tracking-[-0.01em]'
                     >
                       <RefreshCw className='h-3 w-3' />
                       Try again

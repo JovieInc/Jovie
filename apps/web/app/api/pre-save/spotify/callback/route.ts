@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { preSaveTokens } from '@/lib/db/schema/pre-save';
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const redirectUri = `${origin}/api/pre-save/spotify/callback`;
     const tokenResponse = await exchangeSpotifyCode({ code, redirectUri });
     const me = await fetchSpotifyMe(tokenResponse.access_token);
-    const { userId: clerkId } = await auth();
+    const { userId: clerkId } = await getCachedAuth();
 
     let dbUserId: string | null = null;
     if (clerkId) {

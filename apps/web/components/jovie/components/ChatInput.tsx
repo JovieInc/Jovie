@@ -8,55 +8,141 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
-import { forwardRef, useCallback, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useTheme } from 'next-themes';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 
 import { cn } from '@/lib/utils';
 
 import type { PendingImage } from '../hooks/useChatImageAttachments';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import {
+  HIDDEN_DIV_STYLES,
+  useTextareaAutosize,
+} from '../hooks/useTextareaAutosize';
 import { MAX_MESSAGE_LENGTH } from '../types';
+import {
+  CHAT_PROMPT_RAIL_CLASS,
+  CHAT_PROMPT_RAIL_MASK_STYLE,
+  CHAT_PROMPT_RAIL_SCROLL_CLASS,
+  getChatPromptPillClass,
+} from './chat-prompt-styles';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
 
-interface SendButtonProps {
+/** DESIGN.md standard easing */
+const EASE_INTERACTIVE = [0.25, 0.46, 0.45, 0.94] as const;
+
+/** Spring config for layout (height) transitions — physical feel */
+const SPRING_LAYOUT = {
+  type: 'spring' as const,
+  stiffness: 500,
+  damping: 30,
+  mass: 0.8,
+};
+
+/** Fast cross-fade for icon morphs (100ms) */
+const TRANSITION_FAST = { duration: 0.1, ease: EASE_INTERACTIVE };
+
+// ─── Sub-components ──────────────────────────────────────────────
+
+interface ChatQuickAction {
+  readonly label: string;
+  readonly prompt: string;
+}
+
+interface SendStopButtonProps {
   readonly canSend: boolean;
+  readonly isStreaming: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly isCompact: boolean;
+  readonly reducedMotion: boolean | null;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly onStop?: () => void;
 }
 
-function SendButton({
+function getButtonIcon(
+  showStop: boolean,
+  isLoading: boolean,
+  isSubmitting: boolean,
+  isCompact: boolean
+): { key: string; icon: React.ReactNode } {
+  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  if (showStop) {
+    return {
+      key: 'stop',
+      icon: (
+        <span
+          className={cn(
+            'block rounded-[2px] bg-current',
+            isCompact ? 'h-2.5 w-2.5' : 'h-3 w-3'
+          )}
+        />
+      ),
+    };
+  }
+  if (isLoading || isSubmitting) {
+    return {
+      key: 'loading',
+      icon: <Loader2 className={cn('animate-spin', iconSize)} />,
+    };
+  }
+  return { key: 'send', icon: <ArrowUp className={iconSize} /> };
+}
+
+function SendStopButton({
   canSend,
+  isStreaming,
   isLoading,
   isSubmitting,
   isCompact,
+  reducedMotion,
   onMouseDown,
-}: SendButtonProps) {
+  onStop,
+}: SendStopButtonProps) {
+  const showStop = isStreaming && onStop;
+  const { key, icon } = getButtonIcon(
+    Boolean(showStop),
+    isLoading,
+    isSubmitting,
+    isCompact
+  );
+  const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
+
   return (
-    <SimpleTooltip content='Send message'>
+    <SimpleTooltip content={showStop ? 'Stop generating' : 'Send message'}>
       <button
-        type='submit'
+        type={showStop ? 'button' : 'submit'}
         onMouseDown={onMouseDown}
-        disabled={!canSend}
+        onClick={showStop ? onStop : undefined}
+        disabled={!showStop && !canSend}
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full transition-all duration-fast',
-          canSend
-            ? 'bg-accent text-accent-foreground hover:bg-accent/90'
-            : 'bg-surface-2 text-tertiary-token cursor-not-allowed',
+          'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow] duration-fast',
+          showStop || canSend
+            ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-[0_1px_1px_rgba(0,0,0,0.06),0_6px_16px_-10px_rgba(0,0,0,0.24)] hover:bg-(--linear-btn-primary-hover)'
+            : 'cursor-not-allowed border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token',
           isCompact ? 'h-8 w-8' : 'h-9 w-9'
         )}
-        aria-label='Send message'
+        aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
-        {isLoading || isSubmitting ? (
-          <Loader2
-            className={cn(
-              'animate-spin',
-              isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-            )}
-          />
-        ) : (
-          <ArrowUp className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
-        )}
+        <AnimatePresence mode='wait' initial={false}>
+          <motion.span
+            key={key}
+            initial={motionInit}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={motionInit}
+            transition={TRANSITION_FAST}
+            className='flex items-center justify-center'
+          >
+            {icon}
+          </motion.span>
+        </AnimatePresence>
       </button>
     </SimpleTooltip>
   );
@@ -92,8 +178,8 @@ function AttachDropdown({
           disabled={isImageProcessing || isLoading || isSubmitting}
           className={cn(
             'flex shrink-0 items-center justify-center rounded-full',
-            'bg-surface-2 text-secondary-token transition-colors',
-            'hover:bg-surface-3 hover:text-primary-token',
+            'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,border-color,color,box-shadow]',
+            'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             isCompact ? 'h-8 w-8' : 'h-9 w-9'
           )}
@@ -125,6 +211,8 @@ function AttachDropdown({
   );
 }
 
+// ─── Main ChatInput ──────────────────────────────────────────────
+
 interface ChatInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -132,18 +220,18 @@ interface ChatInputProps {
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly placeholder?: string;
-  /** Compact variant for chat view, default for empty state */
   readonly variant?: 'default' | 'compact';
-  /** Callback when the image attach button is clicked */
   readonly onImageAttach?: () => void;
-  /** Whether images are being processed (reading as data URLs) */
   readonly isImageProcessing?: boolean;
-  /** Pending image attachments to preview */
   readonly pendingImages?: PendingImage[];
-  /** Remove a pending image by ID */
   readonly onRemoveImage?: (id: string) => void;
-  /** Handle paste events for image content */
   readonly onPaste?: (e: React.ClipboardEvent) => void;
+  readonly quickActions?: readonly ChatQuickAction[];
+  readonly onQuickActionSelect?: (prompt: string) => void;
+  /** Whether the AI is currently streaming a response */
+  readonly isStreaming?: boolean;
+  /** Stop the current generation */
+  readonly onStop?: () => void;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -161,9 +249,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       pendingImages,
       onRemoveImage,
       onPaste,
+      quickActions,
+      onQuickActionSelect,
+      isStreaming = false,
+      onStop,
     },
     ref
   ) {
+    const reducedMotion = useReducedMotion();
     const characterCount = value.length;
     const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
@@ -177,12 +270,31 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       !isImageProcessing;
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const { resolvedTheme } = useTheme();
+    const isDark = resolvedTheme === 'dark';
 
-    // Snapshot of the input value at the moment dictation starts, so that the
-    // in-session transcript is appended rather than replacing existing text.
+    const isCompact = variant === 'compact';
+    const maxHeight = isCompact ? 128 : 192;
+    const minHeight = 28;
+
+    // Internal textarea ref for width measurement
+    const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+    // Forward the ref to the parent while keeping internal access
+    useImperativeHandle(ref, () => internalTextareaRef.current!, []);
+
+    // Smooth textarea height measurement (no height:'auto' trick)
+    const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
+      useTextareaAutosize({
+        value,
+        minHeight,
+        maxHeight,
+        textareaRef: internalTextareaRef,
+      });
+
+    // Dictation baseline snapshot
     const dictationBaselineRef = useRef('');
 
-    // Voice dictation via Web Speech API
     const {
       isSupported: hasDictation,
       isListening,
@@ -195,7 +307,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleMicToggle = useCallback(() => {
       if (!isListening) {
-        // Capture the current input value as the baseline before recording.
         dictationBaselineRef.current = value;
       }
       toggleDictation();
@@ -209,6 +320,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onSubmit]
     );
 
+    // IME-safe Enter handling
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
@@ -220,38 +332,69 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onSubmit, canSend]
     );
 
-    const handleInput = useCallback(
-      (e: React.FormEvent<HTMLTextAreaElement>) => {
-        const target = e.target as HTMLTextAreaElement;
-        target.style.height = 'auto';
-        const maxH = variant === 'compact' ? 128 : 192;
-        target.style.height = `${Math.min(target.scrollHeight, maxH)}px`;
-      },
-      [variant]
-    );
-
+    // Focus retention on toolbar button clicks
     const handleMouseDown = useCallback(
       (event: React.MouseEvent<HTMLButtonElement>) => {
-        // Keep focus in the textarea when clicking action buttons.
         event.preventDefault();
       },
       []
     );
 
-    const isCompact = variant === 'compact';
+    // isExpanded drives footer visibility (independent of measuredHeight)
+    const isExpanded =
+      isFocused ||
+      plusMenuOpen ||
+      isListening ||
+      Boolean(value.trim()) ||
+      hasPendingImages;
+
+    const hasQuickActions =
+      Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
+
+    // Both collapsed and expanded resolve to 32px radius for a pill shape.
+    const borderRadius = isCompact ? 26 : 30;
+
+    // Shadow states
+    let boxShadow = isDark
+      ? '0 2px 8px -4px rgba(0,0,0,0.28)'
+      : '0 2px 8px -4px rgba(15,23,42,0.07)';
+    if (isOverLimit) {
+      boxShadow = 'none';
+    } else if (isExpanded) {
+      boxShadow = isDark
+        ? '0 4px 16px -6px rgba(0,0,0,0.32)'
+        : '0 4px 16px -6px rgba(15,23,42,0.09)';
+    }
+
+    // Border style by state
+    let borderClass = 'border-black/6 dark:border-white/[0.07]';
+    if (isOverLimit) {
+      borderClass =
+        'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20';
+    } else if (isExpanded) {
+      borderClass = 'border-black/8 dark:border-white/[0.09]';
+    }
 
     return (
       <form onSubmit={handleFormSubmit}>
-        <div
+        <motion.div
+          animate={reducedMotion ? undefined : { borderRadius, boxShadow }}
+          transition={
+            reducedMotion
+              ? undefined
+              : { duration: 0.15, ease: EASE_INTERACTIVE }
+          }
           className={cn(
-            'rounded-full border bg-surface-1 transition-colors duration-fast',
-            isOverLimit
-              ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-subtle focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
+            'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
+            // Always one elevation above the content surface — shadow is animated via motion.div
+            'bg-surface-1',
+            borderClass
           )}
+          style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
         >
+          {/* Image previews */}
           {hasPendingImages && onRemoveImage && (
-            <div className='px-4 pt-2'>
+            <div className='px-4 pt-3'>
               <ImagePreviewStrip
                 images={pendingImages ?? []}
                 onRemove={onRemoveImage}
@@ -259,8 +402,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
-          <div className='flex items-end gap-2 px-2 py-1.5'>
-            {/* Left: Circular plus button with attachment dropdown */}
+          {/* Textarea row */}
+          <div
+            ref={containerRef}
+            className={cn(
+              'relative flex items-center gap-2 px-4 py-3',
+              isExpanded && 'pb-3'
+            )}
+          >
+            {/* Hidden measurement div */}
+            <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
             {hasAttachButton && onImageAttach && (
               <AttachDropdown
                 isCompact={isCompact}
@@ -274,28 +425,42 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               />
             )}
 
-            {/* Textarea */}
-            <textarea
-              ref={ref}
+            {/* Animated textarea */}
+            <motion.textarea
+              ref={internalTextareaRef}
               value={value}
               onChange={e => onChange(e.target.value)}
               placeholder={placeholder}
               rows={1}
+              animate={reducedMotion ? undefined : { height: measuredHeight }}
+              transition={reducedMotion ? undefined : SPRING_LAYOUT}
               className={cn(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                isCompact ? 'py-1.5 max-h-32 text-sm' : 'py-2 max-h-48 text-sm'
+                'py-1.5 text-[14px] leading-6',
+                isAtMaxHeight && 'overflow-y-auto',
+                isAtMaxHeight &&
+                  'shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.2)]'
               )}
+              style={
+                reducedMotion
+                  ? {
+                      height: measuredHeight,
+                      overflow: isAtMaxHeight ? 'auto' : 'hidden',
+                    }
+                  : { overflow: isAtMaxHeight ? 'auto' : 'hidden' }
+              }
               onKeyDown={handleKeyDown}
-              onInput={handleInput}
               onPaste={onPaste}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               maxLength={MAX_MESSAGE_LENGTH + 100}
               aria-label='Chat message input'
               aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             />
 
-            {/* Mic: Voice dictation toggle (hidden when unsupported) */}
+            {/* Mic toggle */}
             {hasDictation && (
               <SimpleTooltip
                 content={isListening ? 'Stop dictation' : 'Dictate message'}
@@ -306,10 +471,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onClick={handleMicToggle}
                   disabled={isLoading || isSubmitting}
                   className={cn(
-                    'flex shrink-0 items-center justify-center rounded-full transition-colors',
+                    'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow]',
                     isListening
-                      ? 'bg-error/10 text-error'
-                      : 'text-secondary-token hover:text-primary-token',
+                      ? 'border-error/20 bg-error/10 text-error'
+                      : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     isCompact ? 'h-8 w-8' : 'h-9 w-9'
                   )}
@@ -331,31 +496,101 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               </SimpleTooltip>
             )}
 
-            {/* Right: Circular send button */}
-            <SendButton
+            {/* Send / Stop button */}
+            <SendStopButton
               canSend={Boolean(canSend)}
+              isStreaming={isStreaming}
               isLoading={isLoading}
               isSubmitting={isSubmitting}
               isCompact={isCompact}
+              reducedMotion={reducedMotion}
               onMouseDown={handleMouseDown}
+              onStop={onStop}
             />
           </div>
 
-          {isNearLimit && (
-            <output
-              id='char-limit-status'
-              aria-live='polite'
-              className={cn(
-                'block px-4 pb-1.5 text-xs',
-                isOverLimit ? 'text-error' : 'text-tertiary-token'
-              )}
-            >
-              {isOverLimit
-                ? `Message is ${characterCount - MAX_MESSAGE_LENGTH} characters over the limit (${characterCount}/${MAX_MESSAGE_LENGTH})`
-                : `${characterCount}/${MAX_MESSAGE_LENGTH} characters`}
-            </output>
-          )}
-        </div>
+          {/* Expandable footer with smooth reveal */}
+          <AnimatePresence initial={false}>
+            {isExpanded && (
+              <motion.div
+                initial={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                transition={
+                  reducedMotion
+                    ? { duration: 0 }
+                    : { duration: 0.15, ease: EASE_INTERACTIVE }
+                }
+                style={{ overflow: 'hidden' }}
+              >
+                <div className='border-t border-black/6 px-3 pb-3 pt-2.5 dark:border-white/8'>
+                  {/* Quick actions first (actionable), then keyboard hint */}
+                  {hasQuickActions && quickActions ? (
+                    <div className='mb-2'>
+                      <div
+                        className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
+                        style={CHAT_PROMPT_RAIL_MASK_STYLE}
+                        data-testid='chat-input-quick-actions'
+                      >
+                        <div className={CHAT_PROMPT_RAIL_CLASS}>
+                          {quickActions.map(action => (
+                            <button
+                              key={action.label}
+                              type='button'
+                              onMouseDown={handleMouseDown}
+                              onClick={() =>
+                                onQuickActionSelect?.(action.prompt)
+                              }
+                              className={cn(
+                                getChatPromptPillClass('compact'),
+                                'min-w-[124px] max-w-[172px]'
+                              )}
+                            >
+                              <span className='truncate'>{action.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className='flex items-center justify-end'>
+                    <span className='text-[11px] text-tertiary-token'>
+                      ⏎ to send · Shift+Enter for newline
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Character limit with smooth reveal */}
+          <AnimatePresence initial={false}>
+            {isNearLimit && (
+              <motion.output
+                id='char-limit-status'
+                aria-live='polite'
+                initial={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                transition={
+                  reducedMotion
+                    ? { duration: 0 }
+                    : { duration: 0.15, ease: EASE_INTERACTIVE }
+                }
+                style={{ overflow: 'hidden' }}
+                className={cn(
+                  'block px-4 pb-1.5 text-xs',
+                  isOverLimit ? 'text-error' : 'text-tertiary-token'
+                )}
+              >
+                {isOverLimit
+                  ? `Message is ${characterCount - MAX_MESSAGE_LENGTH} characters over the limit (${characterCount}/${MAX_MESSAGE_LENGTH})`
+                  : `${characterCount}/${MAX_MESSAGE_LENGTH} characters`}
+              </motion.output>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </form>
     );
   }

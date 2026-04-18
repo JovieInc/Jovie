@@ -17,7 +17,12 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
   'youtubeUrl',
   'isPublic',
   'marketingOptOut',
+  'location',
+  'hometown',
   'settings',
   'theme',
   'venmo_handle',
+  'genres',
+  'careerHighlights',
+  'targetPlaylists',
 ]);

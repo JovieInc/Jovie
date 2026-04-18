@@ -1,20 +1,20 @@
-import type { Page } from '@playwright/test';
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import type { Browser, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import {
+  assertNoCriticalErrors,
+  SMOKE_TIMEOUTS,
+  setupPageMonitoring,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
-/**
- * Auth E2E Tests (consolidated from auth-flows + auth-ui)
- *
- * Verifies sign-in and sign-up pages render correctly, interactive flows
- * work (email step, validation, navigation between pages), and error
- * states don't cause layout shift.
- *
- * Runs unauthenticated -- no real Clerk credentials required.
- */
-
-test.use({ storageState: { cookies: [], origins: [] } });
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const AUTH_UI_TIMEOUT = 60_000;
+const EMPTY_STORAGE_STATE = {
+  cookies: [],
+  origins: [],
+};
 
 async function interceptAnalytics(page: Page): Promise<void> {
   await page.route('**/api/profile/view', r =>
@@ -26,232 +26,182 @@ async function interceptAnalytics(page: Page): Promise<void> {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
-// ---------------------------------------------------------------------------
-// Sign Up
-// ---------------------------------------------------------------------------
+async function waitForClerk(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+      undefined,
+      {
+        timeout: AUTH_UI_TIMEOUT,
+      }
+    )
+    .catch(() => {
+      // Local dev can lag on Clerk bootstrap; the visible UI assertion below is the real gate.
+    });
+}
 
-test.describe('Auth - Sign Up', () => {
+async function waitForClerkAuthUi(page: Page): Promise<void> {
+  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {
+    // Dev builds can keep background requests open; the DOM probe below is the real gate.
+  });
+
+  await page.waitForFunction(
+    () => {
+      const authForm = document.querySelector('#auth-form');
+      if (!authForm) return false;
+
+      if (authForm.querySelector('[data-clerk-component]')) {
+        return true;
+      }
+
+      const bodyText = document.body.innerText || '';
+      return (
+        bodyText.includes('Continue') ||
+        bodyText.includes('Google') ||
+        bodyText.includes('Sign in to Jovie') ||
+        bodyText.includes('Create your account')
+      );
+    },
+    undefined,
+    { timeout: AUTH_UI_TIMEOUT }
+  );
+}
+
+async function expectClerkAuthUi(page: Page): Promise<void> {
+  const authUi = page.locator(
+    [
+      'input[name="identifier"]',
+      'input[type="email"]',
+      'input[autocomplete="email"]',
+      'button:has-text("Continue")',
+      'button:has-text("Google")',
+      'a:has-text("Sign up")',
+      'a:has-text("Sign in")',
+    ].join(', ')
+  );
+
+  await waitForClerkAuthUi(page);
+
+  await expect(authUi.first()).toBeVisible({
+    timeout: AUTH_UI_TIMEOUT,
+  });
+
+  const bodyText = await page.locator('body').textContent();
+  expect(bodyText).not.toContain('Error boundary');
+  expect(bodyText).not.toContain('Something went wrong');
+  expect(bodyText).not.toContain('Unhandled Runtime Error');
+}
+
+async function openAuthPage(page: Page, route: string): Promise<void> {
+  await interceptAnalytics(page);
+  await page.goto(route, { waitUntil: 'load' });
+  await waitForHydration(page);
+  await waitForClerk(page);
+  await expectClerkAuthUi(page);
+}
+
+async function createFreshAuthPage(browser: Browser): Promise<Page> {
+  const context = await browser.newContext({
+    storageState: EMPTY_STORAGE_STATE,
+  });
+  const page = await context.newPage();
+
+  if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
+    await setupClerkTestingToken({ page }).catch((error: unknown) => {
+      // Signed-out auth-page assertions do not require the Clerk testing token.
+      console.warn(
+        '[auth.spec] setupClerkTestingToken skipped:',
+        error instanceof Error ? error.message : String(error)
+      );
+    });
+  }
+
+  return page;
+}
+
+test.describe('Auth', () => {
   test.skip(
     FAST_ITERATION,
     'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
   );
 
-  test.beforeEach(async ({ page }) => {
-    await interceptAnalytics(page);
-    await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-  });
+  test('signin renders Clerk auth UI without runtime errors', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-  test('renders Google OAuth and email buttons', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /continue with google/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-    await expect(
-      page.getByRole('button', { name: /continue with email/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  });
-
-  test('does not show Spotify, Apple, or GitHub OAuth providers', async ({
-    page,
-  }) => {
-    await expect(page.getByRole('button', { name: /spotify/i })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /apple/i })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /github/i })).toHaveCount(0);
-  });
-
-  test('clicking email button shows email input, invalid email shows error', async ({
-    page,
-  }) => {
-    const emailButton = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await emailButton.click();
-
-    const emailInput = page
-      .getByLabel(/email/i)
-      .or(page.locator('#email-input'));
-    await expect(emailInput.first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    // Submit invalid email
-    await emailInput.first().fill('not-an-email');
-    const submitButton = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await submitButton.click();
-
-    // Should show validation error
-    await expect(page.getByRole('alert').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-  });
-
-  test('has terms of service and privacy policy links', async ({ page }) => {
-    await expect(
-      page.getByRole('link', { name: /terms of service/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-    await expect(
-      page.getByRole('link', { name: /privacy policy/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  });
-
-  test('page has title, meta description, and no error boundaries', async ({
-    page,
-  }) => {
-    await expect(page).toHaveTitle(/Sign Up|Create|Jovie/i);
-
-    const metaDescription = page.locator('meta[name="description"]');
-    await expect(metaDescription).toHaveAttribute('content', /.+/);
-
-    const bodyText = await page.locator('body').textContent();
-    expect(bodyText).not.toContain('Error boundary');
-    expect(bodyText).not.toContain('Something went wrong');
-    expect(bodyText).not.toContain('Unhandled Runtime Error');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Sign In
-// ---------------------------------------------------------------------------
-
-test.describe('Auth - Sign In', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
-  );
-
-  test.beforeEach(async ({ page }) => {
-    await interceptAnalytics(page);
-    await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-  });
-
-  test('renders sign-in heading and auth buttons', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /log in to jovie/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-    await expect(
-      page.getByRole('button', { name: /continue with google/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-    await expect(
-      page.getByRole('button', { name: /continue with email/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  });
-
-  test('email step works with back navigation', async ({ page }) => {
-    const emailButton = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await emailButton.click();
-
-    // Email input visible
-    const emailInput = page
-      .getByLabel(/email/i)
-      .or(page.locator('#email-input'));
-    await expect(emailInput.first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    // Back button returns to method selection
-    const backButton = page.getByRole('button', { name: /back/i });
-    await expect(backButton).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await backButton.click();
-    await expect(
-      page.getByRole('button', { name: /continue with google/i })
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Navigation between sign-in and sign-up
-// ---------------------------------------------------------------------------
-
-test.describe('Auth - Navigation', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
-  );
-
-  test('can navigate from sign in to sign up and back', async ({ page }) => {
-    await interceptAnalytics(page);
-    await page.goto('/signin', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-
-    // Sign in -> sign up
-    const signUpLink = page
-      .getByRole('link', { name: /sign up|create account|get started/i })
-      .first();
-    if ((await signUpLink.count()) > 0) {
-      await signUpLink.click();
-      await expect(page).toHaveURL(/\/sign-up/, {
+    try {
+      await openAuthPage(page, APP_ROUTES.SIGNIN);
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
-    }
-
-    // Sign up -> sign in
-    const signInLink = page
-      .getByRole('link', { name: /sign in|log in|already have/i })
-      .first();
-    if ((await signInLink.count()) > 0) {
-      await signInLink.click();
-      await expect(page).toHaveURL(/\/signin/, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
     }
   });
-});
 
-// ---------------------------------------------------------------------------
-// Error Layout Stability
-// ---------------------------------------------------------------------------
+  test('signup renders Clerk auth UI and legal links without runtime errors', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-test.describe('Auth - Error Layout Stability', () => {
-  test.skip(
-    FAST_ITERATION,
-    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
-  );
+    try {
+      await openAuthPage(page, APP_ROUTES.SIGNUP);
+      await expect(
+        page.getByRole('link', { name: /terms of service/i })
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      await expect(
+        page.getByRole('link', { name: /privacy policy/i })
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
+  });
 
-  test('error messages do not cause layout shift on sign-up email step', async ({
-    page,
-  }) => {
-    await interceptAnalytics(page);
-    await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+  test('signin and signup navigation stays on the canonical routes and preserves redirect_url', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+    const redirectUrl = APP_ROUTES.ONBOARDING;
 
-    const emailButton = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await emailButton.click();
+    try {
+      await openAuthPage(
+        page,
+        `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
+      );
 
-    const submitButton = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await expect(submitButton).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    const initialBox = await submitButton.boundingBox();
-    expect(initialBox).not.toBeNull();
+      await page.getByRole('link', { name: /sign up|create account/i }).click();
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === APP_ROUTES.SIGNUP &&
+          url.searchParams.get('redirect_url') === redirectUrl,
+        {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        }
+      );
+      await expectClerkAuthUi(page);
 
-    // Trigger error
-    await submitButton.click();
-
-    await expect(page.getByRole('alert').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    // Button position should not shift more than 5px
-    const afterErrorBox = await submitButton.boundingBox();
-    expect(afterErrorBox).not.toBeNull();
-    const yShift = Math.abs(afterErrorBox!.y - initialBox!.y);
-    expect(
-      yShift,
-      `Submit button shifted ${yShift}px vertically when error appeared`
-    ).toBeLessThan(5);
+      await page.getByRole('link', { name: /sign in|log in/i }).click();
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === APP_ROUTES.SIGNIN &&
+          url.searchParams.get('redirect_url') === redirectUrl,
+        {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        }
+      );
+      await expectClerkAuthUi(page);
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
   });
 });

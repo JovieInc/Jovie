@@ -78,7 +78,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // The handle claim form is behind a feature flag (CLAIM_HANDLE).
     // If the form isn't rendered, skip all tests in this suite.
     const handleInput = page.getByLabel(
-      /choose your handle|enter your desired handle/i
+      /choose your handle|claim your handle/i
     );
     const isFormVisible = await handleInput
       .isVisible({ timeout: 5000 })

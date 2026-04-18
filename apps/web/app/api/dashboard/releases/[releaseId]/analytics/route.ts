@@ -1,11 +1,19 @@
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
+import {
+  isTestAuthBypassEnabled,
+  isTrustedTestBypassRequest,
+  resolveTestBypassUserId,
+} from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getReleaseById } from '@/lib/discography/queries';
+import { env } from '@/lib/env-server';
 
 export const runtime = 'nodejs';
 
@@ -34,12 +42,54 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
  *
  * Lightweight smartlink analytics for a release sidebar panel.
  */
+async function getProfileIdForClerkUserId(clerkUserId: string) {
+  const [profile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(users)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  return profile?.id ?? null;
+}
+
+async function resolveAnalyticsProfile(request: Request) {
+  const sessionProfile = await getCurrentUserProfile();
+  if (sessionProfile) {
+    return { id: sessionProfile.id };
+  }
+
+  const bypassUserId = resolveTestBypassUserId(request.headers);
+  if (bypassUserId) {
+    const bypassProfileId = await getProfileIdForClerkUserId(bypassUserId);
+    if (bypassProfileId) {
+      return { id: bypassProfileId };
+    }
+  }
+
+  if (
+    env.DEMO_RECORDING === '1' &&
+    isTestAuthBypassEnabled() &&
+    isTrustedTestBypassRequest(request.headers)
+  ) {
+    const demoClerkUserId = env.DEMO_CLERK_USER_ID?.trim();
+    if (demoClerkUserId) {
+      const demoProfileId = await getProfileIdForClerkUserId(demoClerkUserId);
+      if (demoProfileId) {
+        return { id: demoProfileId };
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ releaseId: string }> }
 ) {
   try {
-    const profile = await getCurrentUserProfile();
+    const profile = await resolveAnalyticsProfile(req);
     if (!profile) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -74,7 +124,7 @@ export async function GET(
             select created_at, metadata
             from ${clickEvents}
             where ${clickEvents.creatorProfileId} = ${profile.id}
-              and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+              and ${clickEvents.isBot} = false
               and ${clickEvents.metadata} ->> 'contentId' = ${releaseId}
               and ${clickEvents.metadata} ->> 'contentType' = 'release'
           ),

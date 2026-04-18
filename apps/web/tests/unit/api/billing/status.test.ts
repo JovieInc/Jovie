@@ -25,17 +25,18 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
+const routeModulePromise = import('@/app/api/billing/status/route');
+
 describe('GET /api/billing/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockGetRedis.mockReturnValue(null);
   });
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -55,7 +56,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -73,7 +74,7 @@ describe('GET /api/billing/status', () => {
       error: 'database connection failed',
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -105,7 +106,7 @@ describe('GET /api/billing/status', () => {
     };
     mockGetRedis.mockReturnValue(mockRedis);
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -125,7 +126,7 @@ describe('GET /api/billing/status', () => {
       data: null,
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -140,7 +141,7 @@ describe('GET /api/billing/status', () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockRejectedValue(new Error('Database error'));
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -148,30 +149,30 @@ describe('GET /api/billing/status', () => {
     expect(data.error).toBe('Failed to get billing status');
   });
 
-  it('returns growth user data correctly', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_growth' });
+  it('returns max user data correctly', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_max' });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {
         userId: 'db_id',
-        email: 'growth@example.com',
+        email: 'max@example.com',
         isAdmin: false,
         isPro: true,
-        plan: 'growth',
-        stripeCustomerId: 'cus_growth',
-        stripeSubscriptionId: 'sub_growth',
+        plan: 'max',
+        stripeCustomerId: 'cus_max',
+        stripeSubscriptionId: 'sub_max',
         billingVersion: 1,
         lastBillingEventAt: null,
       },
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.isPro).toBe(true);
-    expect(data.plan).toBe('growth');
+    expect(data.plan).toBe('max');
   });
 
   it('defaults plan to free when plan is null in billing data', async () => {
@@ -191,7 +192,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 
@@ -211,7 +212,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
 
     expect(response.headers.get('Cache-Control')).toBe(
@@ -237,7 +238,7 @@ describe('GET /api/billing/status', () => {
     };
     mockGetRedis.mockReturnValue(mockRedis);
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     await GET();
 
     expect(mockRedis.set).toHaveBeenCalledWith(
@@ -250,7 +251,7 @@ describe('GET /api/billing/status', () => {
   it('sets no-store cache header on 401', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
 
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -263,7 +264,7 @@ describe('GET /api/billing/status', () => {
       error: 'timeout',
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
 
     expect(response.status).toBe(503);
@@ -287,7 +288,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await import('@/app/api/billing/status/route');
+    const { GET } = await routeModulePromise;
     const response = await GET();
     const data = await response.json();
 

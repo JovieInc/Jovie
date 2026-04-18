@@ -16,6 +16,7 @@ export interface NotificationPreferences {
 
 export interface NotificationTarget {
   email?: string | null;
+  name?: string | null;
   userId?: string;
   clerkUserId?: string;
   creatorProfileId?: string;
@@ -39,7 +40,8 @@ export interface SenderContext {
     | 'release_notification'
     | 'claim_invite'
     | 'marketing'
-    | 'transactional';
+    | 'transactional'
+    | 'product_update';
   /** Optional reference ID for the specific entity (release ID, etc.) */
   referenceId?: string;
 }
@@ -87,6 +89,13 @@ export interface EmailMessage {
   replyTo?: string;
   headers?: Record<string, string>;
   from?: string;
+  attachments?: EmailAttachment[];
+}
+
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
 }
 
 export interface EmailProvider {

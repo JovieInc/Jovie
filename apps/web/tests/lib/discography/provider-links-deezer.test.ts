@@ -64,6 +64,7 @@ describe('lookupDeezerByIsrc', () => {
       trackId: '1234567',
       albumUrl: 'https://www.deezer.com/album/9876543',
       albumId: '9876543',
+      previewUrl: null,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -167,6 +168,7 @@ describe('lookupDeezerByIsrc', () => {
       trackId: '1234567',
       albumUrl: null,
       albumId: null,
+      previewUrl: null,
     });
   });
 
@@ -189,6 +191,7 @@ describe('lookupDeezerByIsrc', () => {
       trackId: '1234567',
       albumUrl: null,
       albumId: null,
+      previewUrl: null,
     });
   });
 });

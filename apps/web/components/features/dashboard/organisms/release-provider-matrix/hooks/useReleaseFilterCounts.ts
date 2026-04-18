@@ -50,6 +50,7 @@ export function useReleaseFilterCounts(
       compilation: 0,
       live: 0,
       mixtape: 0,
+      music_video: 0,
       other: 0,
     };
 

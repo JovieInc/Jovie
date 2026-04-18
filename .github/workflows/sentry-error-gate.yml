@@ -128,7 +128,7 @@ jobs:
           ERROR_COUNT=$(echo "$STATS_RESPONSE" | jq '[.data[]?[1][]?.count // 0] | add // 0' 2>/dev/null || echo "0")
 
           echo "Baseline error count: $ERROR_COUNT"
-          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+          echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Wait for post-deploy soak period
         run: |
@@ -161,7 +161,7 @@ jobs:
           ERROR_COUNT=$(echo "$STATS_RESPONSE" | jq '[.data[]?[1][]?.count // 0] | add // 0' 2>/dev/null || echo "0")
 
           echo "Post-deploy error count: $ERROR_COUNT"
-          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+          echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Evaluate error rate comparison
         id: evaluate
@@ -184,12 +184,12 @@ jobs:
             # Even with low baseline, flag if post-deploy errors are abnormally high
             if [[ "$POST_DEPLOY" -gt 50 ]]; then
               echo "High absolute error count post-deploy ($POST_DEPLOY > 50)"
-              echo "gate_status=failed" >> $GITHUB_OUTPUT
-              echo "reason=High absolute error count: $POST_DEPLOY errors in post-deploy window" >> $GITHUB_OUTPUT
+              echo "gate_status=failed" >> "$GITHUB_OUTPUT"
+              echo "reason=High absolute error count: $POST_DEPLOY errors in post-deploy window" >> "$GITHUB_OUTPUT"
             else
               echo "Post-deploy errors within acceptable range"
-              echo "gate_status=passed" >> $GITHUB_OUTPUT
-              echo "reason=Low baseline ($BASELINE), post-deploy errors ($POST_DEPLOY) within acceptable range" >> $GITHUB_OUTPUT
+              echo "gate_status=passed" >> "$GITHUB_OUTPUT"
+              echo "reason=Low baseline ($BASELINE), post-deploy errors ($POST_DEPLOY) within acceptable range" >> "$GITHUB_OUTPUT"
             fi
             exit 0
           fi
@@ -201,12 +201,12 @@ jobs:
             RATIO=$((POST_DEPLOY * 100 / BASELINE))
             echo "ERROR SPIKE DETECTED: ${RATIO}% of baseline (threshold: ${THRESHOLD}00%)"
             echo "Post-deploy ($POST_DEPLOY) > baseline ($BASELINE) * ${THRESHOLD}x ($LIMIT)"
-            echo "gate_status=failed" >> $GITHUB_OUTPUT
-            echo "reason=Error rate spike: ${RATIO}% of baseline (${POST_DEPLOY} vs ${BASELINE}, threshold ${THRESHOLD}x)" >> $GITHUB_OUTPUT
+            echo "gate_status=failed" >> "$GITHUB_OUTPUT"
+            echo "reason=Error rate spike: ${RATIO}% of baseline (${POST_DEPLOY} vs ${BASELINE}, threshold ${THRESHOLD}x)" >> "$GITHUB_OUTPUT"
           else
             echo "Error rate within acceptable range"
-            echo "gate_status=passed" >> $GITHUB_OUTPUT
-            echo "reason=Post-deploy errors ($POST_DEPLOY) within ${THRESHOLD}x of baseline ($BASELINE)" >> $GITHUB_OUTPUT
+            echo "gate_status=passed" >> "$GITHUB_OUTPUT"
+            echo "reason=Post-deploy errors ($POST_DEPLOY) within ${THRESHOLD}x of baseline ($BASELINE)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Auto-rollback on error spike
@@ -269,12 +269,12 @@ jobs:
           BASELINE="${{ steps.baseline.outputs.error_count }}"
           POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
 
-          echo "### Sentry Error Gate Result" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Status | $STATUS |" >> $GITHUB_STEP_SUMMARY
-          echo "| Baseline errors | $BASELINE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Post-deploy errors | $POST_DEPLOY |" >> $GITHUB_STEP_SUMMARY
-          echo "| Threshold | ${{ inputs.threshold_multiplier }}x |" >> $GITHUB_STEP_SUMMARY
-          echo "| Reason | $REASON |" >> $GITHUB_STEP_SUMMARY
+          echo "### Sentry Error Gate Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | $STATUS |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Baseline errors | $BASELINE |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Post-deploy errors | $POST_DEPLOY |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Threshold | ${{ inputs.threshold_multiplier }}x |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Reason | $REASON |" >> "$GITHUB_STEP_SUMMARY"

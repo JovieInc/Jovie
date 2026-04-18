@@ -35,12 +35,13 @@ const baseProfile: CreatorProfile = {
   is_claimed: true,
   claim_token: null,
   claimed_at: '2024-01-01T00:00:00Z',
+  location: 'Austin, TX',
   profile_views: 100,
   username_normalized: 'testartist',
   search_text: 'test artist',
   display_title: 'Test Artist',
   profile_completion_pct: 80,
-  settings: { hide_branding: true },
+  settings: { hometown: 'Tulsa, OK' },
   theme: { primaryColor: '#ff0000' },
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-15T00:00:00Z',
@@ -55,10 +56,12 @@ const baseArtist: Artist = {
   image_url: 'https://example.com/avatar.jpg',
   tagline: 'An amazing artist',
   theme: { primaryColor: '#ff0000' },
-  settings: { hide_branding: true },
+  settings: { hometown: 'Tulsa, OK' },
   spotify_url: 'https://open.spotify.com/artist/123',
   apple_music_url: 'https://music.apple.com/artist/123',
   youtube_url: 'https://youtube.com/channel/123',
+  location: 'Austin, TX',
+  hometown: 'Tulsa, OK',
   published: true,
   is_verified: true,
   is_featured: false,
@@ -82,6 +85,8 @@ describe('convertCreatorProfileToArtist', () => {
     expect(artist.spotify_url).toBe(baseProfile.spotify_url);
     expect(artist.apple_music_url).toBe(baseProfile.apple_music_url);
     expect(artist.youtube_url).toBe(baseProfile.youtube_url);
+    expect(artist.location).toBe(baseProfile.location);
+    expect(artist.hometown).toBe('Tulsa, OK');
     expect(artist.published).toBe(baseProfile.is_public);
     expect(artist.is_verified).toBe(baseProfile.is_verified);
     expect(artist.is_featured).toBe(baseProfile.is_featured);
@@ -135,7 +140,7 @@ describe('convertCreatorProfileToArtist', () => {
     const noSettings = { ...baseProfile, settings: null };
     const artist = convertCreatorProfileToArtist(noSettings);
 
-    expect(artist.settings).toEqual({ hide_branding: false });
+    expect(artist.settings).toEqual({});
   });
 
   it('converts null platform URLs to undefined', () => {
@@ -150,6 +155,28 @@ describe('convertCreatorProfileToArtist', () => {
     expect(artist.spotify_url).toBeUndefined();
     expect(artist.apple_music_url).toBeUndefined();
     expect(artist.youtube_url).toBeUndefined();
+  });
+
+  it('passes through genres when present', () => {
+    const withGenres = {
+      ...baseProfile,
+      genres: ['indie rock', 'alternative', 'dream pop'],
+    };
+    const artist = convertCreatorProfileToArtist(withGenres);
+
+    expect(artist.genres).toEqual(['indie rock', 'alternative', 'dream pop']);
+  });
+
+  it('defaults genres to null when absent', () => {
+    const artist = convertCreatorProfileToArtist(baseProfile);
+    expect(artist.genres).toBeNull();
+  });
+
+  it('passes through venmo_handle when present', () => {
+    const withVenmo = { ...baseProfile, venmo_handle: '@testartist' };
+    const artist = convertCreatorProfileToArtist(withVenmo);
+
+    expect(artist.venmo_handle).toBe('@testartist');
   });
 });
 
@@ -167,6 +194,9 @@ describe('convertArtistToCreatorProfile', () => {
     expect(profile.apple_music_url).toBe(baseArtist.apple_music_url);
     expect(profile.youtube_url).toBe(baseArtist.youtube_url);
     expect(profile.spotify_id).toBe(baseArtist.spotify_id);
+    expect(profile.settings).toEqual({
+      hometown: 'Tulsa, OK',
+    });
     expect(profile.is_public).toBe(baseArtist.published);
     expect(profile.is_verified).toBe(baseArtist.is_verified);
   });

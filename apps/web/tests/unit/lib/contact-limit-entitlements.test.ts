@@ -82,22 +82,21 @@ describe('Contact Limit Enforcement Contract', () => {
     expect(totalContacts >= e.contactsLimit!).toBe(false);
   });
 
-  it('pro plan returns null limit that bypasses enforcement', async () => {
+  it('pro plan returns null limit that bypasses enforcement (unlimited)', async () => {
     setupUser('pro', true);
     const e = await getCurrentUserEntitlements();
 
-    // null contactsLimit means the enforcement check is skipped entirely:
-    // if (contactsLimit !== null && contactsLimit !== undefined) → false, no limit check
+    // Pro now has unlimited contacts (null = no limit)
     expect(e.contactsLimit).toBeNull();
 
-    // Simulate the enforcement check
+    // Simulate the enforcement check — null means no enforcement
     const contactsLimit = e.contactsLimit;
     const shouldEnforce = contactsLimit !== null && contactsLimit !== undefined;
     expect(shouldEnforce).toBe(false);
   });
 
-  it('growth plan returns null limit that bypasses enforcement', async () => {
-    setupUser('growth', true);
+  it('max plan returns null limit that bypasses enforcement', async () => {
+    setupUser('max', true);
     const e = await getCurrentUserEntitlements();
 
     expect(e.contactsLimit).toBeNull();
@@ -163,7 +162,7 @@ describe('Contact Limit – Plan Transitions', () => {
     expect(e.isPro).toBe(false);
   });
 
-  it('upgrade from free to pro removes contact limit', async () => {
+  it('upgrade from free to pro removes contact limit (unlimited)', async () => {
     setupUser('pro', true);
     const e = await getCurrentUserEntitlements();
 
@@ -171,8 +170,8 @@ describe('Contact Limit – Plan Transitions', () => {
     expect(e.isPro).toBe(true);
   });
 
-  it('upgrade from pro to growth keeps unlimited contacts', async () => {
-    setupUser('growth', true);
+  it('upgrade from pro to max keeps unlimited contacts', async () => {
+    setupUser('max', true);
     const e = await getCurrentUserEntitlements();
 
     expect(e.contactsLimit).toBeNull();

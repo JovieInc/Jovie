@@ -1,5 +1,10 @@
-import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -72,8 +77,7 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 // schema evaluation chain.
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   connectSpotifyArtist: vi.fn(),
-  getSpotifyImportStatus: vi.fn(),
-  pollReleasesCount: vi.fn(),
+  getSpotifyImportPollSnapshot: vi.fn(),
   connectAppleMusicArtist: vi.fn(),
   rescanAppleMusicLinks: vi.fn(),
   rescanIsrcLinks: vi.fn(),
@@ -87,7 +91,10 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   saveProviderOverride: vi.fn(),
   resetProviderOverride: vi.fn(),
   saveCanvasStatus: vi.fn(),
+  savePrimaryIsrc: vi.fn(),
   saveReleaseLyrics: vi.fn(),
+  saveReleaseMetadata: vi.fn(),
+  saveReleaseTargetPlaylists: vi.fn(),
   formatReleaseLyrics: vi.fn(),
   updateAllowArtworkDownloads: vi.fn(),
   syncFromSpotify: vi.fn(),
@@ -144,38 +151,78 @@ const { DemoReleasesExperience } = await import(
 function renderDemo() {
   return render(
     <NuqsTestingAdapter>
-      <TooltipProvider>
-        <DemoReleasesExperience />
-      </TooltipProvider>
+      <DemoReleasesExperience />
     </NuqsTestingAdapter>
   );
 }
 
+function hasTextContent(text: string) {
+  return (_content: string, node: Element | null) =>
+    node?.textContent?.includes(text) ?? false;
+}
+
 describe('DemoReleasesExperience', () => {
-  it('renders fixture data and opens the selected release in the drawer', () => {
+  it('renders fixture data and opens the selected release in the drawer', async () => {
     renderDemo();
 
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
+    const releasesNavLabel = screen
+      .getAllByText('Releases')
+      .find(node => node.closest('button'));
+    expect(releasesNavLabel).toBeTruthy();
+    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
+
+    const releasesMatrix = await screen.findByTestId('releases-matrix');
+    fireEvent.click(
+      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
+    );
 
     // Release titles should appear in the list
-    expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
+    expect(
+      within(releasesMatrix).getAllByText(
+        hasTextContent('Blessings featuring Clementine Douglas')
+      ).length
+    ).toBeGreaterThan(0);
 
     // Click a release row to open the detail drawer
-    fireEvent.click(screen.getByText('Static Skies'));
+    const releaseTitle = within(releasesMatrix).getAllByText(
+      hasTextContent('Blessings featuring Clementine Douglas')
+    )[0];
+    fireEvent.click(
+      releaseTitle.closest('tr') ?? releaseTitle.closest('td') ?? releaseTitle
+    );
 
-    // Detail drawer should show the release info
-    expect(screen.getAllByText('Static Skies').length).toBeGreaterThan(0);
+    // Selecting a row should surface the release details alongside the table.
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(
+          hasTextContent('Blessings featuring Clementine Douglas')
+        ).length
+      ).toBeGreaterThan(1);
+    });
   });
 
-  it('renders release data in the table', () => {
+  it('renders release data in the table', async () => {
     renderDemo();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
+    const releasesNavLabel = screen
+      .getAllByText('Releases')
+      .find(node => node.closest('button'));
+    expect(releasesNavLabel).toBeTruthy();
+    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
+
+    const releasesMatrix = await screen.findByTestId('releases-matrix');
+    fireEvent.click(
+      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
+    );
 
     // The table should contain mock release titles
-    expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
+    expect(
+      within(releasesMatrix).getAllByText(
+        hasTextContent('Blessings featuring Clementine Douglas')
+      ).length
+    ).toBeGreaterThan(0);
   });
 });

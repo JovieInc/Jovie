@@ -18,11 +18,9 @@ export function DrawerEmptyState({
 }: DrawerEmptyStateProps) {
   return (
     <DrawerSurfaceCard
+      variant='flat'
       testId={testId}
-      className={cn(
-        'flex min-h-[140px] items-center rounded-[10px] bg-surface-1/25 px-4 py-4',
-        className
-      )}
+      className={cn('flex min-h-[88px] items-center px-3 py-3', className)}
     >
       <p
         className={cn(

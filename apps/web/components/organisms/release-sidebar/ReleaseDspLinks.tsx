@@ -3,38 +3,33 @@
 /**
  * ReleaseDspLinks Component
  *
- * DSP links section with add/remove functionality and ISRC rescan
+ * DSP links section with add/remove functionality
  */
 
 import {
-  Button,
   Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SimpleTooltip,
 } from '@jovie/ui';
-import { Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
-  DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerButton,
   DrawerFormGridRow,
   DrawerLinkSection,
   DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
-
-/** Cooldown duration in ms (matches server-side 5 min window) */
-const RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
 interface ReleaseDspLinksProps {
   readonly release: Release;
@@ -53,22 +48,8 @@ interface ReleaseDspLinksProps {
   readonly onSetSelectedProvider: (value: ProviderKey | null) => void;
   readonly onAddLink: () => Promise<void>;
   readonly onRemoveLink: (provider: ProviderKey) => Promise<void>;
-  readonly onNewLinkKeyDown: (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => void;
-  readonly onRescanIsrc?: () => void;
-  readonly isRescanningIsrc?: boolean;
-}
-
-/**
- * Format remaining cooldown time for display.
- */
-function formatCooldown(remainingMs: number): string {
-  if (remainingMs <= 0) return '';
-  const seconds = Math.ceil(remainingMs / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.ceil(seconds / 60);
-  return `${minutes}m`;
+  readonly onNewLinkKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  readonly showHeading?: boolean;
 }
 
 export function ReleaseDspLinks({
@@ -86,114 +67,24 @@ export function ReleaseDspLinks({
   onAddLink,
   onRemoveLink,
   onNewLinkKeyDown,
-  onRescanIsrc,
-  isRescanningIsrc = false,
+  showHeading = false,
 }: ReleaseDspLinksProps) {
-  // Track local cooldown state per release
-  const [cooldownEnd, setCooldownEnd] = useState<number>(0);
-  const [remainingMs, setRemainingMs] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval>>(null);
-
-  // Reset cooldown when release changes
-  useEffect(() => {
-    setCooldownEnd(0);
-    setRemainingMs(0);
-  }, [release.id]);
-
-  // Start cooldown timer after a successful (non-rate-limited) rescan
-  const wasRescanningRef = useRef(false);
-  useEffect(() => {
-    if (isRescanningIsrc) {
-      wasRescanningRef.current = true;
-    } else if (wasRescanningRef.current) {
-      wasRescanningRef.current = false;
-      // Rescan just finished - start cooldown
-      const end = Date.now() + RESCAN_COOLDOWN_MS;
-      setCooldownEnd(end);
-      setRemainingMs(RESCAN_COOLDOWN_MS);
-    }
-  }, [isRescanningIsrc]);
-
-  // Countdown timer
-  useEffect(() => {
-    if (cooldownEnd <= 0) return;
-
-    const tick = () => {
-      const remaining = cooldownEnd - Date.now();
-      if (remaining <= 0) {
-        setRemainingMs(0);
-        setCooldownEnd(0);
-        if (timerRef.current) clearInterval(timerRef.current);
-      } else {
-        setRemainingMs(remaining);
-      }
-    };
-
-    tick();
-    timerRef.current = setInterval(tick, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [cooldownEnd]);
-
-  const isCoolingDown = remainingMs > 0;
-  const isRescanDisabled = isRescanningIsrc || isCoolingDown;
-
-  const handleRescan = useCallback(() => {
-    if (isRescanDisabled || !onRescanIsrc) return;
-    onRescanIsrc();
-  }, [isRescanDisabled, onRescanIsrc]);
-
   // Get list of providers that don't have links yet (for the add dropdown)
   const providerKeys = Object.keys(providerConfig) as ProviderKey[];
   const availableProviders = providerKeys
     .filter(key => !release.providers.some(p => p.key === key))
     .map(key => [key, providerConfig[key]] as const);
 
-  let rescanTooltip = 'Scan ISRC for links';
-  if (isRescanningIsrc) {
-    rescanTooltip = 'Scanning...';
-  } else if (isCoolingDown) {
-    rescanTooltip = `Try again in ${formatCooldown(remainingMs)}`;
-  }
-
-  const rescanButton =
-    isEditable && onRescanIsrc ? (
-      <SimpleTooltip content={rescanTooltip} side='bottom'>
-        <Button
-          type='button'
-          size='icon'
-          variant='ghost'
-          aria-label={rescanTooltip}
-          onClick={handleRescan}
-          disabled={isRescanDisabled}
-          className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
-        >
-          {isRescanningIsrc ? (
-            <Loader2 className='h-4 w-4 animate-spin' />
-          ) : (
-            <RefreshCw className='h-4 w-4' />
-          )}
-        </Button>
-      </SimpleTooltip>
-    ) : null;
-
   return (
     <DrawerLinkSection
-      title='Links'
-      onAdd={
-        isEditable && availableProviders.length > 0
-          ? () => onSetIsAddingLink(true)
-          : undefined
-      }
-      addLabel='Add platform link'
-      headerActions={rescanButton}
+      title='DSPs'
+      showHeading={showHeading}
       isEmpty={release.providers.length === 0 && !isAddingLink}
-      emptyMessage='No platform links yet.'
+      emptyMessage='No DSP links yet.'
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='space-y-0.5'>
+        <div className='space-y-1.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const isManual = provider.source === 'manual';
@@ -215,6 +106,7 @@ export function ReleaseDspLinks({
                 isEditable={isEditable}
                 isRemoving={isRemovingDspLink === provider.key}
                 onRemove={() => void onRemoveLink(provider.key)}
+                surfaceVariant='track'
               />
             );
           })}
@@ -223,7 +115,9 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
+        <DrawerSurfaceCard
+          className={cn(LINEAR_SURFACE.drawerCardSm, 'mt-1.5 space-y-2.5 p-3')}
+        >
           <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
@@ -233,7 +127,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-[8px] border-subtle bg-surface-0 text-[12px]'>
+              <SelectTrigger className='h-[30px] w-full rounded-md border-subtle bg-surface-0 text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -254,7 +148,7 @@ export function ReleaseDspLinks({
             <Input
               type='url'
               value={newLinkUrl}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 onSetNewLinkUrl(event.target.value)
               }
               onKeyDown={onNewLinkKeyDown}
@@ -263,10 +157,10 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
-              className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              className='h-8 rounded-md border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormGridRow>
-          <div className='flex justify-end gap-2 pt-1'>
+          <div className='flex justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-2'>
             <DrawerButton
               type='button'
               onClick={() => {

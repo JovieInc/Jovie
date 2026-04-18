@@ -8,7 +8,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { FREQUENT_CACHE } from './cache-strategies';
+import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
@@ -40,8 +40,6 @@ export function useEarningsQuery(enabled = true) {
     queryKey: queryKeys.earnings.stats(),
     queryFn: fetchEarnings,
     enabled,
-    ...FREQUENT_CACHE,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    ...FREQUENT_BACKGROUND_CACHE,
   });
 }

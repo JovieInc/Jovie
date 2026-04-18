@@ -1,44 +1,61 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { CreditCard } from 'lucide-react';
+import { Badge, Button } from '@jovie/ui';
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CreditCard,
+  Sparkles,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
-interface BillingStateCardProps {
-  readonly icon: ReactNode;
-  readonly title: string;
-  readonly description: string;
-  readonly detail?: string | null;
+function resolvePlanLabel(plan: string | null | undefined): string {
+  if (plan === 'max' || plan === 'growth') return 'Max';
+  if (plan === 'pro') return 'Pro';
+  return 'Free';
 }
 
-function BillingStateCard({
-  icon,
-  title,
-  description,
-  detail,
-}: Readonly<BillingStateCardProps>) {
-  return (
-    <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
-      <div className='mt-0.5 shrink-0'>{icon}</div>
-      <div className='min-w-0 flex-1'>
-        <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
-        <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
-          {description}
-        </p>
-        {detail ? (
-          <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
-            {detail}
-          </p>
-        ) : null}
-      </div>
-    </ContentSurfaceCard>
-  );
+function resolveBadgeLabel(ctx: {
+  billingLoading: boolean;
+  isStale: boolean;
+  isPro: boolean;
+  canOpenPortal: boolean;
+}): string {
+  if (ctx.billingLoading) return 'Syncing';
+  if (ctx.isStale) return 'Cached';
+  if (ctx.isPro) return 'Active';
+  if (ctx.canOpenPortal) return 'Manageable';
+  return 'Free';
+}
+
+function resolveBadgeVariant(ctx: {
+  billingLoading: boolean;
+  isStale: boolean;
+  isPro: boolean;
+}): 'secondary' | 'warning' | 'success' {
+  if (ctx.billingLoading) return 'secondary';
+  if (ctx.isStale) return 'warning';
+  if (ctx.isPro) return 'success';
+  return 'secondary';
+}
+
+function resolveSummaryDescription(ctx: {
+  billingLoading: boolean;
+  isPro: boolean;
+  canOpenPortal: boolean;
+}): string {
+  if (ctx.billingLoading)
+    return 'Checking your subscription and billing access.';
+  if (ctx.isPro)
+    return 'Manage invoices, payment methods, and subscription details without leaving the app.';
+  if (ctx.canOpenPortal)
+    return 'Open Stripe to review invoices, payment details, or reactivate your plan.';
+  return 'Compare plans and upgrade when you are ready.';
 }
 
 export function SettingsBillingSection() {
@@ -48,61 +65,115 @@ export function SettingsBillingSection() {
   const portalMutation = usePortalMutation();
 
   const isPro = billingData?.isPro ?? false;
+  const hasStripeCustomer = billingData?.hasStripeCustomer ?? false;
+  const isStale = billingData?.stale ?? false;
+  const planLabel = resolvePlanLabel(billingData?.plan);
+  const canOpenPortal = hasStripeCustomer;
+  const badgeLabel = resolveBadgeLabel({
+    billingLoading,
+    isStale,
+    isPro,
+    canOpenPortal,
+  });
+  const badgeVariant = resolveBadgeVariant({
+    billingLoading,
+    isStale,
+    isPro,
+  });
+  const summaryTitle = billingLoading ? 'Loading billing' : `${planLabel} plan`;
+  const summaryDescription = resolveSummaryDescription({
+    billingLoading,
+    isPro,
+    canOpenPortal,
+  });
+  const primaryActionLabel = canOpenPortal
+    ? 'Manage in Stripe'
+    : 'Compare plans';
 
   const handleBilling = () => {
-    if (isPro) {
+    if (billingLoading) {
+      return;
+    }
+
+    if (canOpenPortal) {
       portalMutation.mutate(undefined, {
         onSuccess: data => {
           globalThis.location.href = data.url;
         },
       });
     } else {
-      router.push(APP_ROUTES.PRICING);
+      router.push(APP_ROUTES.BILLING);
     }
   };
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
-        title='Billing & subscription'
-        subtitle='Update payment details, manage your plan, and view invoices.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='space-y-3 px-4 py-3'>
-        <BillingStateCard
+    <SettingsPanel>
+      <div className='px-4 sm:px-5'>
+        <SettingsActionRow
           icon={
-            <CreditCard className='h-4 w-4 text-secondary-token' aria-hidden />
+            canOpenPortal ? (
+              <CreditCard className='h-4 w-4' aria-hidden />
+            ) : (
+              <Sparkles className='h-4 w-4' aria-hidden />
+            )
           }
-          title={isPro ? 'Pro plan active' : 'Upgrade available'}
-          description={
-            isPro
-              ? 'Open your Stripe billing portal to manage invoices and payment methods.'
-              : 'Upgrade to Pro to unlock premium profile controls, analytics, and growth tools.'
+          title={
+            <span className='flex flex-wrap items-center gap-1.5'>
+              <span>{summaryTitle}</span>
+              <Badge
+                variant={badgeVariant}
+                size='sm'
+                className={cn(
+                  'rounded-[6px] px-1.5 text-[10px]',
+                  badgeVariant === 'secondary' &&
+                    'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token',
+                  badgeVariant === 'warning' &&
+                    'border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                  badgeVariant === 'success' &&
+                    'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                )}
+              >
+                {badgeLabel}
+              </Badge>
+            </span>
+          }
+          description={summaryDescription}
+          action={
+            <Button
+              onClick={handleBilling}
+              loading={portalMutation.isPending || billingLoading || undefined}
+              variant='secondary'
+              size='sm'
+            >
+              {primaryActionLabel}
+              {billingLoading ? null : (
+                <ArrowUpRight className='h-3.5 w-3.5' aria-hidden />
+              )}
+            </Button>
           }
         />
-        <div className='flex flex-wrap gap-2'>
-          <Button
-            onClick={handleBilling}
-            loading={portalMutation.isPending || billingLoading || undefined}
-            className='w-full sm:w-auto'
-            variant='primary'
-            size='sm'
-          >
-            {isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
-          </Button>
+      </div>
+
+      {isStale && billingData?.staleReason ? (
+        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+          <div className='flex items-start gap-2 text-amber-700 dark:text-amber-300'>
+            <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
+            <p className='text-[13px] leading-[18px]'>
+              {billingData.staleReason}
+            </p>
+          </div>
         </div>
-        {portalMutation.error && (
-          <p className='text-[13px] text-destructive' role='alert'>
+      ) : null}
+
+      {portalMutation.error ? (
+        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+          <p className='text-[13px] leading-[18px] text-destructive'>
             {portalMutation.error instanceof Error
               ? portalMutation.error.message
               : 'Failed to open billing portal'}
           </p>
-        )}
-      </div>
-    </DashboardCard>
+        </div>
+      ) : null}
+    </SettingsPanel>
   );
 }

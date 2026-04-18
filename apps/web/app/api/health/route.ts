@@ -1,9 +1,8 @@
 export const runtime = 'nodejs';
 
-import { count, eq } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, RETRY_AFTER_HEALTH } from '@/lib/http/headers';
@@ -63,23 +62,21 @@ export async function GET(request: Request) {
       });
     }
 
-    // Count public creator profiles (seed invariant: should be >= 3)
-    const result = await db
-      .select({ count: count() })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.isPublic, true));
+    // Pure connectivity check — SELECT 1 proves DB is reachable, no table dependency
+    await db.execute(drizzleSql`SELECT 1`);
 
-    const profileCount = result[0]?.count ?? 0;
-
-    summary.status = 'ok';
-    summary.database = profileCount >= 3 ? 'ok' : 'degraded';
-    return NextResponse.json(summary, {
-      status: 200,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    // Success: return canonical {"status":"ok"} only (no timestamp/database).
+    // 503 responses include extra diagnostic fields — the asymmetry is intentional.
+    return NextResponse.json(
+      { status: 'ok' },
+      {
+        status: 200,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      }
+    );
   } catch (error) {
     void captureWarning('Health check degraded', error, {
       service: 'health',

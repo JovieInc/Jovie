@@ -1,6 +1,5 @@
 'use client';
 
-import { Input } from '@jovie/ui';
 import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -11,9 +10,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -205,7 +206,7 @@ export function WaitlistSpotifySearch({
     return (
       <div className='space-y-2'>
         {selectedArtistName ? (
-          <div className='w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3'>
+          <div className={AUTH_SURFACE.fieldShell}>
             <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15'>
               <SocialIcon
                 platform='spotify'
@@ -218,7 +219,7 @@ export function WaitlistSpotifySearch({
             <button
               type='button'
               onClick={handleBackToSearch}
-              className='text-xs text-secondary-token hover:text-primary-token transition-colors'
+              className={AUTH_SURFACE.inlineAction}
               disabled={isSubmitting}
             >
               Change
@@ -229,7 +230,7 @@ export function WaitlistSpotifySearch({
             <label htmlFor='spotifyUrl' className='sr-only'>
               Spotify link
             </label>
-            <Input
+            <AuthTextInput
               ref={el => {
                 inputRef.current = el;
                 setInputRef(el);
@@ -251,7 +252,7 @@ export function WaitlistSpotifySearch({
             <button
               type='button'
               onClick={handleBackToSearch}
-              className='text-xs text-secondary-token hover:text-primary-token transition-colors'
+              className={AUTH_SURFACE.inlineAction}
               disabled={isSubmitting}
             >
               Search for artist instead
@@ -279,12 +280,7 @@ export function WaitlistSpotifySearch({
       <label htmlFor='spotify-artist-search' className='sr-only'>
         Search Spotify artists
       </label>
-      <div
-        className={cn(
-          'w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3',
-          'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base'
-        )}
-      >
+      <div className={cn(AUTH_SURFACE.fieldShell, 'gap-3')}>
         <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15 shrink-0'>
           <SocialIcon
             platform='spotify'
@@ -308,7 +304,7 @@ export function WaitlistSpotifySearch({
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
-          className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
+          className={AUTH_SURFACE.fieldInput}
           role='combobox'
           aria-expanded={shouldShowDropdown}
           aria-controls='spotify-search-results'
@@ -323,8 +319,8 @@ export function WaitlistSpotifySearch({
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
-        <div
-          className='absolute z-50 w-full mt-1 rounded-lg border border-subtle bg-surface-0 shadow-lg overflow-hidden'
+        <ContentSurfaceCard
+          className='absolute z-50 mt-2 w-full overflow-hidden p-1'
           style={{ top: '100%' }}
         >
           <select
@@ -405,7 +401,7 @@ export function WaitlistSpotifySearch({
           {results.length > 0 && (
             <div
               ref={resultsListRef}
-              className='max-h-64 overflow-y-auto'
+              className='max-h-64 overflow-y-auto px-1'
               aria-hidden='true'
             >
               {results.map((artist, index) => (
@@ -414,7 +410,7 @@ export function WaitlistSpotifySearch({
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
+                    'flex w-full items-center gap-3 rounded-[8px] p-3 text-left transition-colors',
                     index === activeIndex
                       ? 'bg-surface-2'
                       : 'hover:bg-surface-2/50'
@@ -471,7 +467,7 @@ export function WaitlistSpotifySearch({
             type='button'
             tabIndex={0}
             className={cn(
-              'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-subtle border-l-0 border-r-0 border-b-0 bg-transparent w-full text-left',
+              'flex w-full items-center gap-3 rounded-[8px] p-3 text-left transition-colors',
               activeIndex === manualAddIndex
                 ? 'bg-surface-2'
                 : 'hover:bg-surface-2/50'
@@ -497,7 +493,7 @@ export function WaitlistSpotifySearch({
               </div>
             </div>
           </button>
-        </div>
+        </ContentSurfaceCard>
       )}
 
       <div className={FORM_LAYOUT.errorContainer}>

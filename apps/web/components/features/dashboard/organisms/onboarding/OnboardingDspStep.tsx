@@ -1,5 +1,6 @@
 'use client';
 
+import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
@@ -11,10 +12,11 @@ import {
   type ReleasesEmptyStateAction,
   type ReleasesEmptyStateState,
 } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/types';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { env } from '@/lib/env-client';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 function reducer(
   state: ReleasesEmptyStateState,
@@ -116,121 +118,125 @@ export function OnboardingDspStep({
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
-        <div className={FORM_LAYOUT.headerSection}>
+        <div className={cn(FORM_LAYOUT.headerSection, 'mb-6')}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
         </div>
 
-        <div className={FORM_LAYOUT.formInner}>
-          <div className='relative'>
-            <div
-              className={[
-                'flex w-full items-center gap-2 rounded-[8px] border bg-surface-1 px-4 py-2.5',
-                'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
-                state.error ? 'border-error' : 'border-subtle',
-              ].join(' ')}
-            >
-              <svg
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                className='h-4 w-4 shrink-0 text-tertiary-token'
-                aria-hidden='true'
+        <ContentSurfaceCard className='p-4 sm:p-5'>
+          <div className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}>
+            <div className='relative'>
+              <div
+                className={cn(
+                  AUTH_SURFACE.fieldShell,
+                  state.error && AUTH_SURFACE.fieldShellError
+                )}
               >
-                <circle cx='11' cy='11' r='8' />
-                <path d='m21 21-4.3-4.3' />
-              </svg>
-              <input
-                ref={inputRef}
-                type='text'
-                value={state.searchQuery}
-                onChange={e => handleInputChange(e.target.value)}
-                placeholder='Search for your artist or paste a Spotify link'
-                autoComplete='off'
-                autoCapitalize='none'
-                autoCorrect='off'
-                spellCheck={false}
-                className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
-              />
-              {searchState === 'loading' && (
-                <LoadingSpinner size='sm' className='text-tertiary-token' />
+                <Search
+                  className='h-4 w-4 shrink-0 text-tertiary-token'
+                  aria-hidden='true'
+                />
+                <input
+                  ref={inputRef}
+                  type='text'
+                  data-testid='spotify-link-input'
+                  value={state.searchQuery}
+                  onChange={e => handleInputChange(e.target.value)}
+                  placeholder='Search for your artist or paste a Spotify link'
+                  autoComplete='off'
+                  autoCapitalize='none'
+                  autoCorrect='off'
+                  spellCheck={false}
+                  aria-label='Search for your artist or paste a Spotify link'
+                  aria-invalid={Boolean(state.error)}
+                  aria-describedby={
+                    state.error ? 'onboarding-dsp-search-error' : undefined
+                  }
+                  className={AUTH_SURFACE.fieldInput}
+                />
+                {searchState === 'loading' && (
+                  <LoadingSpinner size='sm' className='text-tertiary-token' />
+                )}
+              </div>
+
+              {state.showResults && results.length > 0 && (
+                <ContentSurfaceCard
+                  as='ul'
+                  className='absolute top-full right-0 left-0 z-10 mt-2 max-h-[240px] overflow-y-auto p-1'
+                >
+                  {results.map((artist, index) => (
+                    <li key={artist.id}>
+                      <button
+                        type='button'
+                        onClick={() => handleSelect(artist)}
+                        onMouseEnter={() =>
+                          dispatch({
+                            type: 'SET_ACTIVE_RESULT_INDEX',
+                            payload: index,
+                          })
+                        }
+                        className={cn(
+                          'w-full flex items-center gap-3 rounded-[8px] px-2.5 py-2 text-left transition-colors',
+                          state.activeResultIndex === index
+                            ? 'bg-surface-0'
+                            : 'hover:bg-surface-0'
+                        )}
+                      >
+                        {artist.imageUrl ? (
+                          <Image
+                            src={artist.imageUrl}
+                            alt=''
+                            width={32}
+                            height={32}
+                            className='h-8 w-8 shrink-0 rounded-full object-cover'
+                            unoptimized
+                          />
+                        ) : (
+                          <div className='h-8 w-8 shrink-0 rounded-full bg-surface-0' />
+                        )}
+                        <div className='min-w-0 flex-1'>
+                          <p className='truncate text-[13px] font-[510] text-primary-token'>
+                            {artist.name}
+                          </p>
+                          {artist.followers != null && (
+                            <p className='text-[11px] text-tertiary-token'>
+                              {artist.followers.toLocaleString()} followers
+                            </p>
+                          )}
+                        </div>
+                        {artist.isClaimed && (
+                          <span className={AUTH_SURFACE.subtlePill}>
+                            On Jovie
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ContentSurfaceCard>
               )}
             </div>
 
-            {state.showResults && results.length > 0 && (
-              <ContentSurfaceCard
-                as='ul'
-                className='absolute top-full right-0 left-0 z-10 mt-1 max-h-[240px] overflow-y-auto py-1'
+            {state.error && (
+              <p
+                id='onboarding-dsp-search-error'
+                role='alert'
+                className='text-error text-[13px] text-center'
               >
-                {results.map((artist, index) => (
-                  <li key={artist.id}>
-                    <button
-                      type='button'
-                      onClick={() => handleSelect(artist)}
-                      onMouseEnter={() =>
-                        dispatch({
-                          type: 'SET_ACTIVE_RESULT_INDEX',
-                          payload: index,
-                        })
-                      }
-                      className={[
-                        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
-                        state.activeResultIndex === index
-                          ? 'bg-surface-0'
-                          : 'hover:bg-surface-0',
-                      ].join(' ')}
-                    >
-                      {artist.imageUrl ? (
-                        <Image
-                          src={artist.imageUrl}
-                          alt=''
-                          width={32}
-                          height={32}
-                          className='h-8 w-8 shrink-0 rounded-full object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <div className='h-8 w-8 shrink-0 rounded-full border border-subtle bg-surface-0' />
-                      )}
-                      <div className='min-w-0 flex-1'>
-                        <p className='truncate text-[13px] font-[510] text-primary-token'>
-                          {artist.name}
-                        </p>
-                        {artist.followers != null && (
-                          <p className='text-[11px] text-tertiary-token'>
-                            {artist.followers.toLocaleString()} followers
-                          </p>
-                        )}
-                      </div>
-                      {artist.isClaimed && (
-                        <span className='shrink-0 rounded-full bg-(--linear-accent)/10 px-2 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
-                          On Jovie
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ContentSurfaceCard>
+                {state.error}
+              </p>
             )}
+
+            <AuthButton
+              onClick={onSkip}
+              variant='secondary'
+              disabled={isTransitioning}
+            >
+              Skip for now
+            </AuthButton>
           </div>
+        </ContentSurfaceCard>
 
-          {state.error && (
-            <p className='text-error text-[13px] text-center'>{state.error}</p>
-          )}
-
-          <AuthButton
-            onClick={onSkip}
-            variant='secondary'
-            disabled={isTransitioning}
-          >
-            Skip for now
-          </AuthButton>
-        </div>
-
-        <div className={FORM_LAYOUT.footerHint}>
+        <div className={cn(FORM_LAYOUT.footerHint, 'mt-4')}>
           You can always connect your music later from the dashboard.
         </div>
       </div>

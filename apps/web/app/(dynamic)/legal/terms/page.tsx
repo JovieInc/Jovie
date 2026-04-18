@@ -1,17 +1,18 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
 // Full SSG - markdown content is read at build time, no runtime regeneration needed
 export const dynamic = 'force-static';
+export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Terms of Service | ${APP_NAME}`,
+  title: 'Terms of Service',
   description:
     'Jovie is a creative workspace governed by clear, fair policies so you can focus on sharing your music.',
   alternates: {
-    canonical: `${APP_URL}/legal/terms`,
+    canonical: `${BASE_URL}/legal/terms`,
   },
   robots: {
     index: true,

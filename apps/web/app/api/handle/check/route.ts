@@ -100,9 +100,9 @@ export async function GET(request: Request) {
     );
   }
 
-  if (handle.length > 30) {
+  if (handle.length > 24) {
     return respondWithConstantTime(
-      { available: false, error: 'Handle must be less than 30 characters' },
+      { available: false, error: 'Handle must be no more than 24 characters' },
       { status: 400 }
     );
   }

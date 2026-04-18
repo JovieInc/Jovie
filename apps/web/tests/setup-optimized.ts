@@ -6,9 +6,20 @@
  * Reduces setup time significantly by deferring all heavy initialization.
  */
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
 import { afterEach, expect, vi } from 'vitest';
+
+const appRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..'
+);
+
+if (process.cwd() !== appRoot) {
+  process.chdir(appRoot);
+}
 
 // Extend expect with jest-dom matchers (lightweight, always needed)
 expect.extend(matchers);
@@ -188,7 +199,21 @@ vi.mock('@headlessui/react', async () => {
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
-  SignedIn: ({ children }: { children: unknown }) => children,
+  useClerk: () => ({
+    setActive: async () => {},
+  }),
+  useSignIn: () => ({
+    isLoaded: true,
+    fetchStatus: 'idle',
+    errors: [],
+    signIn: null,
+  }),
+  useSignUp: () => ({
+    fetchStatus: 'idle',
+    errors: [],
+    signUp: null,
+  }),
+  SignedIn: ({ children }: { children: unknown }) => null,
   SignedOut: ({ children }: { children: unknown }) => children,
   ClerkProvider: ({ children }: { children: unknown }) => children,
 }));

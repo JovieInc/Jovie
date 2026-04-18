@@ -15,7 +15,10 @@ import {
   type SortableColumnKey,
 } from '@/features/admin/creator-sort-config';
 import { AdminCreatorsTableHeader } from '@/features/admin/table/AdminCreatorsTableHeader';
-import { AdminCreatorsToolbar } from '@/features/admin/table/AdminCreatorsToolbar';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
@@ -333,6 +336,16 @@ export function AdminCreatorProfilesWithSidebar({
     return result;
   }, [deleteCreatorOrUser, profileToDelete]);
 
+  const handleSidebarDelete = useCallback(
+    (contact: Contact) => {
+      const profile = profilesWithActions.find(p => p.id === contact.id);
+      if (profile) {
+        handleDelete(profile);
+      }
+    },
+    [profilesWithActions, handleDelete]
+  );
+
   const handleInviteSuccess = useCallback(() => {
     setProfileToInvite(null);
     notifications.success('Invite created successfully');
@@ -388,12 +401,18 @@ export function AdminCreatorProfilesWithSidebar({
               onKeyDown: handleKeyDown,
             }}
             toolbar={
-              <AdminCreatorsToolbar
-                from={from}
-                to={to}
-                total={total}
-                profiles={profilesWithActions}
-              />
+              <>
+                <AdminTableHeader
+                  title='Creators'
+                  subtitle='Manage creator profiles, verification, and feature status.'
+                />
+                <AdminTableSubheader>
+                  <div className='max-md:hidden text-[11px] text-secondary-token tabular-nums'>
+                    Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()} profiles
+                  </div>
+                </AdminTableSubheader>
+              </>
             }
           >
             {({ headerElevated, stickyTopPx }) => (
@@ -481,6 +500,7 @@ export function AdminCreatorProfilesWithSidebar({
           onRefresh={handleSidebarRefresh}
           onContactChange={handleContactChange}
           onAvatarUpload={handleAvatarUpload}
+          onDelete={handleSidebarDelete}
         />
       ) : null}
       <DeleteCreatorDialog

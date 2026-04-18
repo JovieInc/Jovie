@@ -1,7 +1,12 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
@@ -9,7 +14,8 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `Pricing — ${APP_NAME}`;
+  const title = 'Pricing';
+  const ogTitle = `Pricing — ${APP_NAME}`;
   const description =
     'Simple pricing. No surprises. Free and Pro plans for every stage of your music career.';
 
@@ -17,23 +23,22 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     openGraph: {
-      title,
+      title: ogTitle,
       description,
-      url: `${APP_URL}/launch/pricing`,
+      url: `${BASE_URL}/launch/pricing`,
       siteName: APP_NAME,
       type: 'website',
     },
-    twitter: { card: 'summary_large_image', title, description },
-    alternates: { canonical: `${APP_URL}/launch/pricing` },
+    twitter: { card: 'summary_large_image', title: ogTitle, description },
+    alternates: { canonical: `${BASE_URL}/launch/pricing` },
   };
 }
 
-const WRAP = 'mx-auto max-w-[1100px] px-6';
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 
 const free = ENTITLEMENT_REGISTRY.free;
 const pro = ENTITLEMENT_REGISTRY.pro;
-const growth = ENTITLEMENT_REGISTRY.growth;
+const max = ENTITLEMENT_REGISTRY.max;
 
 interface FeatureListProps {
   readonly features: readonly string[];
@@ -57,19 +62,17 @@ function FeatureList({ features }: FeatureListProps) {
 
 export default function PricingPage() {
   return (
-    <div className='section-spacing-linear'>
-      <section aria-labelledby='pricing-heading' className={WRAP}>
-        <div className='pb-8'>
-          <h2
-            id='pricing-heading'
-            className='marketing-h2-linear max-w-[680px]'
-          >
-            Simple pricing.{' '}
-            <span className='text-secondary-token'>No surprises.</span>
-          </h2>
-        </div>
+    <MarketingPageShell>
+      <MarketingHero variant='centered'>
+        <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+          Simple pricing.{' '}
+          <span className='text-secondary-token'>No surprises.</span>
+        </h1>
+      </MarketingHero>
+
+      <MarketingContainer width='page'>
         <div
-          className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
+          className={`grid grid-cols-1 ${maxPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
         >
           {/* Free */}
           <div className='py-12 md:pr-8 md:border-r md:border-subtle'>
@@ -118,34 +121,34 @@ export default function PricingPage() {
             </div>
             <Link
               href={`${APP_ROUTES.SIGNUP}?plan=pro`}
-              className='marketing-cta focus-ring mt-7'
+              className='public-action-primary focus-ring mt-7'
             >
               Get started
             </Link>
           </div>
 
-          {growthPlanEnabled && (
+          {maxPlanEnabled && (
             <div className='py-12 md:pl-8'>
               <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-                {growth.marketing.displayName}
+                {max.marketing.displayName}
               </div>
               <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
-                ${growth.marketing.price!.monthly}{' '}
+                ${max.marketing.price!.monthly}{' '}
                 <span className='text-base font-normal text-tertiary-token'>
                   /mo
                 </span>
               </div>
               <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-                {growth.marketing.tagline}
+                {max.marketing.tagline}
               </div>
               <div className='mt-6 pt-5 border-t border-subtle'>
                 <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                   Everything in Pro, plus
                 </div>
-                <FeatureList features={growth.marketing.features} />
+                <FeatureList features={max.marketing.features} />
               </div>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=growth`}
+                href={`${APP_ROUTES.SIGNUP}?plan=max`}
                 className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
               >
                 Get started
@@ -153,7 +156,7 @@ export default function PricingPage() {
             </div>
           )}
         </div>
-      </section>
-    </div>
+      </MarketingContainer>
+    </MarketingPageShell>
   );
 }

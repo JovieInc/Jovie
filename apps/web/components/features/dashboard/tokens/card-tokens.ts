@@ -1,4 +1,8 @@
-import { CONTENT_SURFACE_CARD_CLASSNAME } from '@/components/molecules/ContentSurfaceCard';
+import { contentSurfaceCardVariants } from '@/components/molecules/ContentSurfaceCard';
+import {
+  LINEAR_SURFACE,
+  LINEAR_SURFACE_TIER,
+} from '@/components/tokens/linear-surface';
 
 /**
  * Dashboard Card System Tokens
@@ -8,10 +12,10 @@ import { CONTENT_SURFACE_CARD_CLASSNAME } from '@/components/molecules/ContentSu
  * radii, shadows, and padding across all dashboard components.
  *
  * Design principles (from Linear):
- * 1. Surface hierarchy for depth (0-3 levels)
- * 2. Subtle shadows that respect light/dark modes
- * 3. Smooth micro-interactions with spring easing
- * 4. Perceptually uniform colors via OKLCH
+ * 1. Cards sit on one consistent subtle elevation tier across light and dark.
+ * 2. Separation comes from a thin seam border plus a single low-depth shadow.
+ * 3. Hover uses bg/border changes only — cards do not jump tiers on hover.
+ * 4. Stronger shadows are still reserved for popovers/dropdowns only.
  */
 
 // Animation tokens - Linear-style timing
@@ -31,7 +35,7 @@ function tw(strings: TemplateStringsArray, ...values: unknown[]): string {
 
 export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
-  base: `${CONTENT_SURFACE_CARD_CLASSNAME} transition-[background-color,border-color,box-shadow,transform] ${timing.slow} ${timing.easing}`,
+  base: `${contentSurfaceCardVariants()} transition-[background-color,border-color] ${timing.slow} ${timing.easing}`,
 
   // Padding variations (8px grid system) - mobile-first responsive
   padding: {
@@ -46,7 +50,7 @@ export const cardTokens = {
   // Border radius variations - Linear-style precision
   radius: {
     none: 'rounded-none',
-    minimal: 'rounded-[6px]', // 6px
+    minimal: 'rounded-md', // 6px
     small: 'rounded-lg', // 8px
     default: 'rounded-xl', // 12px
     large: 'rounded-2xl', // 16px
@@ -57,10 +61,10 @@ export const cardTokens = {
   // Using semantic shadow variables defined in design-system.css
   shadow: {
     none: 'shadow-none',
-    subtle: 'shadow-[var(--shadow-sm)]',
-    default: 'shadow-[var(--shadow-md)]',
-    medium: 'shadow-[var(--shadow-lg)]',
-    large: 'shadow-[var(--shadow-xl)]',
+    subtle: 'shadow-sm',
+    default: 'shadow-md',
+    medium: 'shadow-lg',
+    large: 'shadow-xl',
   },
 
   // Sophisticated border system using design tokens
@@ -77,16 +81,11 @@ export const cardTokens = {
     hover: tw`
       hover:bg-[var(--color-bg-surface-2)]
       hover:border-[var(--color-border-default)]
-      hover:shadow-[var(--shadow-lg)]
-      hover:-translate-y-0.5
       transition-all ${timing.normal} ${timing.easing}
     `,
 
     active: tw`
       active:bg-[var(--color-bg-surface-3)]
-      active:shadow-[var(--shadow-sm)]
-      active:translate-y-0
-      active:scale-[0.99]
     `,
 
     focus: tw`
@@ -98,11 +97,11 @@ export const cardTokens = {
     `,
   },
 
-  // Glass effects for modern UI depth
+  // Glass effects — reserved for sticky headers/toolbars only (not content cards)
   glass: {
-    subtle: 'backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80',
-    medium: 'backdrop-blur-md bg-[var(--color-bg-surface-1)]/70',
-    strong: 'backdrop-blur-lg bg-[var(--color-bg-surface-1)]/60',
+    subtle: 'backdrop-blur-sm bg-(--linear-app-content-surface)/80',
+    medium: 'backdrop-blur-md bg-(--linear-app-content-surface)/70',
+    strong: 'backdrop-blur-lg bg-(--linear-app-content-surface)/60',
   },
 
   // Status variants for feedback
@@ -118,21 +117,15 @@ export const cardTokens = {
     // Default static card - responsive padding
     default: tw`
       bg-surface-1
-      shadow-[0_1px_0_rgba(0,0,0,0.03)]
-      dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
-    // Interactive clickable card - full hover effects, responsive padding
+    // Interactive clickable card - flat Linear-style (bg change only, no shadow/transform animation)
     interactive: tw`
       bg-surface-1
       cursor-pointer
-      transition-[background-color,border-color,box-shadow,transform] ${timing.normal} ${timing.easing}
+      transition-[background-color,border-color] ${timing.normal} ${timing.easing}
       hover:bg-surface-0
       hover:border-default
-      hover:shadow-(--linear-shadow-card-elevated)
-      hover:-translate-y-0.5
-      active:translate-y-0
-      active:shadow-[0_1px_0_rgba(0,0,0,0.03)]
       focus-visible:outline-none
       focus-visible:ring-2
       focus-visible:ring-(--linear-border-focus)
@@ -142,8 +135,6 @@ export const cardTokens = {
     // Settings card - elevated surface, no hover effects (Linear-style)
     settings: tw`
       bg-surface-1
-      shadow-[0_1px_0_rgba(0,0,0,0.03)]
-      dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
     // Analytics/metric card - minimal, data-focused
@@ -160,65 +151,56 @@ export const cardTokens = {
       text-center
     `,
 
-    // Elevated card - stands out with stronger border, responsive padding
+    // Elevated card — shared card surface inside the shell
     elevated: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-default)]
+      bg-surface-1
+      border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
-      shadow-[var(--shadow-sm)]
-      transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-md)]
+      transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Floating card - modal-like presence, responsive padding
+    // Floating card — shared card surface with seam border
     floating: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-default)]
+      bg-surface-1
+      border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
-      shadow-[var(--shadow-xl)]
-      backdrop-blur-lg
-      transition-all ${timing.slow} ${timing.easing}
+      transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Onboarding card - gradient border effect, responsive padding
+    // Onboarding card — shared card surface with seam border
     onboarding: tw`
       relative
-      bg-[var(--color-bg-surface-1)]
+      bg-surface-1
+      border border-(--linear-app-frame-seam)
       rounded-2xl
-      shadow-[var(--shadow-lg)]
-      ring-1
-      ring-[var(--color-border-subtle)]
-      transition-all ${timing.slow} ${timing.easing}
+      transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Feature card - for showcasing features, responsive padding
+    // Feature card — shared card surface with seam border
     feature: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
+      bg-surface-1
+      border border-(--linear-app-frame-seam)
       rounded-2xl
       p-6 sm:p-8
-      shadow-[var(--shadow-sm)]
-      transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-md)]
-      hover:border-[var(--color-accent-subtle)]
+      transition-[background-color,border-color] ${timing.slow} ${timing.easing}
+      hover:border-[var(--color-border-default)]
     `,
 
     // Compact card - for dense layouts
     compact: tw`
       bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
       rounded-lg
       p-4
-      transition-all ${timing.fast} ${timing.easing}
+      transition-[background-color,border-color]
     `,
 
     // Ghost card - minimal, no background
     ghost: tw`
       rounded-xl
       p-6
-      transition-all ${timing.normal} ${timing.easing}
+      transition-[background-color,border-color] ${timing.normal} ${timing.easing}
       hover:bg-[var(--color-interactive-hover)]
     `,
   },
@@ -231,3 +213,6 @@ export type CardShadow = keyof typeof cardTokens.shadow;
 export type CardBorder = keyof typeof cardTokens.border;
 export type CardVariant = keyof typeof cardTokens.variants;
 export type CardStatus = keyof typeof cardTokens.status;
+export type LinearSurface = keyof typeof LINEAR_SURFACE;
+export type LinearSurfaceTier =
+  (typeof LINEAR_SURFACE_TIER)[keyof typeof LINEAR_SURFACE_TIER];

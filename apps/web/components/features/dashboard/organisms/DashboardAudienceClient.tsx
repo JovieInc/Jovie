@@ -1,6 +1,4 @@
 'use client';
-
-import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
   parseAsString,
@@ -10,29 +8,20 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary, useAudienceInfiniteQuery } from '@/lib/queries';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AudiencePanelProvider } from './AudiencePanelContext';
-import { AudienceTableLoadingShell } from './dashboard-audience-table/AudienceTableLoadingShell';
+import {
+  AudiencePanelProvider,
+  useAudiencePanel,
+} from './AudiencePanelContext';
+import { DashboardAudienceWorkspace } from './DashboardAudienceWorkspace';
 import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
-
-const DashboardAudienceTable = dynamic(
-  () =>
-    import('@/features/dashboard/organisms/dashboard-audience-table').then(
-      mod => ({
-        default: mod.DashboardAudienceTable,
-      })
-    ),
-  {
-    loading: () => <AudienceTableLoadingShell />,
-    ssr: false,
-  }
-);
 
 export type AudienceMode = 'members' | 'subscribers';
 
@@ -80,7 +69,7 @@ export function DashboardAudienceClient({
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider initialMode='analytics'>
+    <AudiencePanelProvider initialMode={null}>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -113,6 +102,30 @@ function DashboardAudienceClientInner({
   filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
+  const { mode: panelMode, open, close } = useAudiencePanel();
+  const isBelowLg = useBreakpointDown('lg');
+  const previousIsBelowLgRef = React.useRef<boolean | null>(null);
+
+  React.useEffect(() => {
+    if ((globalThis.window?.innerWidth ?? 0) >= 1024) {
+      open('analytics');
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (previousIsBelowLgRef.current === null) {
+      previousIsBelowLgRef.current = isBelowLg;
+      return;
+    }
+
+    const crossedToMobile = previousIsBelowLgRef.current === false && isBelowLg;
+    previousIsBelowLgRef.current = isBelowLg;
+
+    if (crossedToMobile && panelMode === 'analytics') {
+      close();
+    }
+  }, [close, isBelowLg, panelMode]);
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
@@ -197,7 +210,7 @@ function DashboardAudienceClientInner({
         className='flex h-full min-h-0 flex-col'
       >
         <div className='flex-1 min-h-0 flex flex-col'>
-          <DashboardAudienceTable
+          <DashboardAudienceWorkspace
             mode={mode}
             view={view}
             rows={rows}

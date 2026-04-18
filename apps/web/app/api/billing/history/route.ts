@@ -3,9 +3,9 @@
  * Returns the current user's billing audit log entries
  */
 
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import {
   getBillingAuditLog,
   getUserBillingInfo,
@@ -109,7 +109,7 @@ const resolveIdentifier = (
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await auth();
+    const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

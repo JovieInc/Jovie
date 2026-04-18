@@ -3,7 +3,6 @@
  * Categorizes domains and provides crawler-safe aliases
  */
 
-import * as Sentry from '@sentry/nextjs';
 import { extractDomain } from './url-parsing';
 
 export interface DomainCategory {
@@ -238,69 +237,4 @@ export function getCategoryDescription(category: string): string {
   };
 
   return descriptions[category] || 'This link requires confirmation';
-}
-
-/**
- * Gets all sensitive domains for administrative purposes
- */
-export function getAllSensitiveDomains(): SensitiveDomainRecord[] {
-  return Object.values(SENSITIVE_DOMAINS);
-}
-
-/**
- * Adds a new sensitive domain (for admin use)
- */
-export async function addSensitiveDomain(
-  domain: string,
-  category: string,
-  alias: string
-): Promise<boolean> {
-  // Adding sensitive domains to database is disabled
-  // Consider implementing with alternative storage if needed
-  Sentry.addBreadcrumb({
-    category: 'domain-categorizer',
-    message: 'Would add sensitive domain (feature disabled)',
-    level: 'info',
-    data: { domain, category, alias },
-  });
-  return false;
-}
-
-/**
- * Checks if URL contains sensitive keywords that should be avoided
- */
-export function containsSensitiveKeywords(text: string): boolean {
-  const sensitiveKeywords = [
-    'porn',
-    'adult',
-    'xxx',
-    'nsfw',
-    'sex',
-    'casino',
-    'gambling',
-    'bet',
-    'crypto',
-    'bitcoin',
-    'ethereum',
-    'trading',
-    'forex',
-    'loan',
-    'cash advance',
-  ];
-
-  const lowerText = text.toLowerCase();
-  return sensitiveKeywords.some(keyword => lowerText.includes(keyword));
-}
-
-/**
- * Sanitizes text to be crawler-safe
- */
-export function sanitizeForCrawlers(text: string): string {
-  // Replace sensitive keywords with generic terms
-  return text
-    .replaceAll(/\b(porn|adult|xxx|nsfw|sex)\b/gi, 'content')
-    .replaceAll(/\b(casino|gambling|bet)\b/gi, 'gaming')
-    .replaceAll(/\b(crypto|bitcoin|ethereum)\b/gi, 'digital')
-    .replaceAll(/\b(trading|forex)\b/gi, 'investment')
-    .replaceAll(/\b(loan|cash advance)\b/gi, 'financial');
 }

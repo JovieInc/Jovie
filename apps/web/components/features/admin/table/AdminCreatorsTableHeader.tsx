@@ -15,7 +15,7 @@ import {
   SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/features/admin/creator-sort-config';
-import type { AdminCreatorProfilesSort } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfilesSort } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 
 export interface AdminCreatorsTableHeaderProps {
@@ -55,13 +55,12 @@ export function AdminCreatorsTableHeader({
 
   return (
     <thead className='text-left text-secondary-token'>
-      <tr className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <tr className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
           <Checkbox
             aria-label='Select all creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
-            className='border-subtle bg-surface-0 text-(--linear-accent) data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white'
           />
         </th>
         <th className={headerCellClass} style={stickyStyle}>
@@ -86,24 +85,24 @@ export function AdminCreatorsTableHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
                 Creator
               </span>
             )}
           </div>
         </th>
         <th
-          className={cn(headerCellClass, 'hidden lg:table-cell')}
+          className={cn(headerCellClass, 'max-lg:hidden lg:table-cell')}
           style={stickyStyle}
         >
-          <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Social
           </span>
         </th>
         <th
           className={cn(
             headerCellClass,
-            'cursor-pointer select-none hidden md:table-cell'
+            'cursor-pointer select-none max-md:hidden md:table-cell'
           )}
           style={stickyStyle}
         >
@@ -117,7 +116,7 @@ export function AdminCreatorsTableHeader({
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (
-            <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
               Actions
             </span>
           )}

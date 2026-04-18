@@ -19,7 +19,7 @@ import {
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
-import { useUpdateContentPreferencesMutation } from '@/lib/queries';
+import { useUpdateContentPreferencesMutation } from '@/lib/queries/useNotificationStatusQuery';
 import {
   NOTIFICATION_CONTENT_TYPES,
   type NotificationChannel,
@@ -54,6 +54,7 @@ export function ProfileNotificationsMenu({
   subscribedChannels,
   subscriptionDetails,
   triggerRef,
+  smsEnabled = false,
 }: ProfileNotificationsMenuProps) {
   const {
     confirmChannel,
@@ -247,7 +248,7 @@ export function ProfileNotificationsMenu({
             How you get notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {renderChannelMenuItem('sms', 'SMS')}
+          {smsEnabled && renderChannelMenuItem('sms', 'Text')}
           {renderChannelMenuItem('email', 'Email')}
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -270,7 +271,7 @@ export function ProfileNotificationsMenu({
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
             Listening preference
           </DropdownMenuLabel>
-          <div className='px-2 pb-2'>
+          <div className='px-2 pb-1.5'>
             <label htmlFor='preferred-dsp-select' className='sr-only'>
               Preferred streaming platform
             </label>
@@ -278,7 +279,7 @@ export function ProfileNotificationsMenu({
               id='preferred-dsp-select'
               value={selectedDspPreference}
               onChange={event => handleDspPreferenceChange(event.target.value)}
-              className='h-9 w-full rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1 px-2.5 text-sm text-primary-token shadow-none focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+              className='h-8 w-full rounded-md bg-surface-1 px-2 text-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
             >
               <option value=''>Choose your platform</option>
               {availableDspPreferences.map(preference => (
@@ -334,7 +335,7 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md rounded-[12px] border border-(--linear-app-shell-border) bg-surface-0 shadow-(--linear-app-drawer-shadow)'>
+        <AlertDialogContent className='max-w-md rounded-lg bg-surface-0'>
           <AlertDialogHeader className='gap-2'>
             <AlertDialogTitle className='text-base font-semibold text-primary-token'>
               {confirmChannel
@@ -350,14 +351,14 @@ export function ProfileNotificationsMenu({
           <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel
               disabled={isConfirming}
-              className='flex-1 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
+              className='flex-1 rounded-full bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
             >
               Keep
             </AlertDialogCancel>
             <AlertDialogAction
               variant='destructive'
               disabled={isConfirming || confirmChannel === null}
-              className='flex-1 rounded-[8px] sm:flex-none'
+              className='flex-1 rounded-full sm:flex-none'
               onClick={() => handleConfirm(onUnsubscribe)}
             >
               {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}

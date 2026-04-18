@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Jovie",
+  "description": "Jovie side panel for DistroKid release metadata context and preview.",
+  "version": "0.1.0",
+  "permissions": ["permissions", "sidePanel", "storage", "tabs"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://app.jov.ie/*",
+    "https://jov.ie/*"
+  ],
+  "optional_host_permissions": [
+    "https://distrokid.com/*",
+    "https://*.distrokid.com/*",
+    "https://workstation.awal.com/*",
+    "https://*.awal.com/*",
+    "https://app.kosignmusic.com/*",
+    "https://*.kosignmusic.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://distrokid.com/*",
+        "https://*.distrokid.com/*",
+        "https://workstation.awal.com/*",
+        "https://*.awal.com/*",
+        "https://app.kosignmusic.com/*",
+        "https://*.kosignmusic.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Jovie"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

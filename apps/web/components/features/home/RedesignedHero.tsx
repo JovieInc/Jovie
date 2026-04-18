@@ -11,11 +11,11 @@ export async function RedesignedHero() {
 
       <div className='hero-stagger relative z-10 mx-auto flex w-full max-w-[var(--linear-content-max)] flex-col items-center text-center'>
         <h1 className='marketing-h1-linear text-balance text-primary-token'>
-          One link to grow your music career.
+          One link to launch your music career.
         </h1>
 
         <p className='marketing-lead-linear mt-8 max-w-[40rem] text-balance text-tertiary-token'>
-          Import your catalog, capture every fan, and own the relationship.
+          Import your catalog. Fans get notified when you release.
         </p>
 
         <div className='mt-10 w-full max-w-[32rem]'>
@@ -25,8 +25,8 @@ export async function RedesignedHero() {
         <p className='mt-5 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] tracking-[0.01em] text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-          />
+            className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
+          />{' '}
           Free forever · Live in 60 seconds
         </p>
       </div>

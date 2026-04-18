@@ -210,6 +210,11 @@ const FRAMEWORK_INTERNAL_ERRORS = [
   'headcachenode',
   'should not already be working',
 ] as const;
+const PLAYWRIGHT_TIMEOUT_PATTERNS = [
+  'page.waitforfunction',
+  'locator.waitfor',
+  'tohaveurl',
+] as const;
 
 /**
  * Checks if an error is an AbortError from request cancellation.
@@ -230,6 +235,15 @@ function isAbortError(event: SentryEvent): boolean {
  * (mounted guards, theme handling) and remaining occurrences are transient.
  * Downgrade to warning instead of dropping entirely for monitoring.
  */
+function isCspViolation(event: SentryEvent): boolean {
+  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
+    (v): v is string => typeof v === 'string'
+  );
+  return cspValues.some(
+    v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
+  );
+}
+
 function isHydrationMismatch(event: SentryEvent): boolean {
   const message = [
     event.message,
@@ -302,6 +316,31 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
   return FRAMEWORK_INTERNAL_ERRORS.some(pattern => message.includes(pattern));
 }
 
+export function isNonProductionServerNoise(event: SentryEvent): boolean {
+  const requestUrl = event.request?.url?.toLowerCase() ?? '';
+  if (
+    requestUrl.includes('://localhost') ||
+    requestUrl.includes('://127.0.0.1')
+  ) {
+    return true;
+  }
+
+  if (event.tags?.source === 'playwright-ci') {
+    return true;
+  }
+
+  const message = [
+    event.message,
+    event.logentry?.message,
+    event.exception?.values?.[0]?.value,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+
+  return PLAYWRIGHT_TIMEOUT_PATTERNS.some(pattern => message.includes(pattern));
+}
+
 /**
  * PII Collection Notice (for documentation purposes):
  *
@@ -313,6 +352,26 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
  * This data is used for error debugging and is retained per Sentry's data retention policy.
  * Users can request data deletion via privacy@jov.ie.
  */
+
+/** Replace known-sensitive headers with a placeholder. */
+function scrubSensitiveHeaders(headers: Record<string, string>): void {
+  for (const header of SENSITIVE_HEADERS) {
+    if (headers[header]) {
+      headers[header] = '[Filtered]';
+    }
+  }
+}
+
+/** Scrub user-level PII (IP addresses and emails). */
+function scrubUserPii(user: SentryEvent['user']): void {
+  if (!user) return;
+  if (user.ip_address) {
+    user.ip_address = '{{auto}}';
+  }
+  if (user.email) {
+    delete user.email;
+  }
+}
 
 /**
  * Scrubs PII from Sentry events and filters deployment noise.
@@ -329,6 +388,10 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
  * @returns The scrubbed event, or null to drop the event
  */
 export function scrubPii(event: SentryEvent): SentryEvent | null {
+  if (isNonProductionServerNoise(event)) {
+    return null;
+  }
+
   // Filter deployment transition errors (handled by useChunkErrorHandler)
   if (isDeploymentTransitionError(event)) {
     return null;
@@ -349,23 +412,18 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Anonymize IP addresses if present
-  if (event.user?.ip_address) {
-    event.user.ip_address = '{{auto}}';
+  // Drop Content Security Policy violations — typically caused by browser
+  // extensions injecting inline scripts that violate our strict CSP. Not actionable.
+  if (isCspViolation(event)) {
+    return null;
   }
 
-  // Remove email addresses if present (we use Clerk user IDs instead)
-  if (event.user?.email) {
-    delete event.user.email;
-  }
+  // Anonymize IP addresses and remove emails
+  scrubUserPii(event.user);
 
   // Scrub sensitive headers from request data
   if (event.request?.headers) {
-    for (const header of SENSITIVE_HEADERS) {
-      if (event.request.headers[header]) {
-        event.request.headers[header] = '[Filtered]';
-      }
-    }
+    scrubSensitiveHeaders(event.request.headers);
   }
 
   // Scrub sensitive query parameters from request URLs
@@ -443,6 +501,7 @@ export interface BaseSentryClientConfig {
     event: SentryEvent,
     hint?: SentryEventHint
   ) => SentryEvent | null;
+  ignoreErrors?: Array<string | RegExp>;
 }
 
 /**
@@ -489,6 +548,11 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
     enableLogs: true,
     sendDefaultPii: false, // Disabled on client - user context set server-side only
     beforeSend: scrubPii,
+    ignoreErrors: [
+      // React hooks mismatch: known bug in onboarding/settings — tracked separately.
+      // This is a client-side React error, so it must be filtered here (not server config).
+      /Rendered more hooks than during the previous render/,
+    ],
   };
 }
 

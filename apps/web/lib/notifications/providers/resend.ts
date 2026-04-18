@@ -3,6 +3,7 @@ import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { EMAIL_REPLY_TO, RESEND_ENABLED } from '@/lib/notifications/config';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
+import { getEmailSendBlockReason } from '@/lib/utils/email';
 import type {
   EmailMessage,
   EmailProvider,
@@ -33,6 +34,16 @@ export class ResendEmailProvider implements EmailProvider {
       };
     }
 
+    const blockReason = getEmailSendBlockReason(message.to);
+    if (blockReason) {
+      return {
+        channel: 'email' as NotificationDeliveryChannel,
+        status: 'skipped',
+        provider: this.provider,
+        detail: blockReason,
+      };
+    }
+
     try {
       const resend = getClient();
       const response = await resend.emails.send({
@@ -43,6 +54,11 @@ export class ResendEmailProvider implements EmailProvider {
         html: message.html,
         replyTo: message.replyTo ?? EMAIL_REPLY_TO,
         headers: message.headers,
+        attachments: message.attachments?.map(attachment => ({
+          filename: attachment.filename,
+          content: attachment.content,
+          contentType: attachment.contentType,
+        })),
       });
 
       if (response.error) {

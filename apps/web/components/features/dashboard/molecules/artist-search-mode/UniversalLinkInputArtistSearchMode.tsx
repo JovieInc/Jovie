@@ -123,7 +123,7 @@ export function UniversalLinkInputArtistSearchMode({
       </div>
 
       {showResults && (
-        <div className='absolute z-50 w-full overflow-hidden rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-[0_18px_48px_rgba(0,0,0,0.22)]'>
+        <div className='absolute z-50 w-full overflow-hidden rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-popover'>
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {ARTIST_SEARCH_LOADING_KEYS.map(key => (

@@ -4,6 +4,13 @@
  * Central export for all email templates.
  */
 
+export type { ChangelogVerifyTemplateData } from './changelog-verify';
+export {
+  getChangelogVerifyEmail,
+  getChangelogVerifyHtml,
+  getChangelogVerifySubject,
+  getChangelogVerifyText,
+} from './changelog-verify';
 export type { ClaimInviteTemplateData } from './claim-invite';
 export {
   buildClaimUrl,
@@ -27,6 +34,14 @@ export {
   getFounderWelcomeSubject,
   getFounderWelcomeText,
 } from './founder-welcome';
+export type { ProductUpdateTemplateData } from './product-update';
+export {
+  getProductUpdateEmail,
+  getProductUpdateHtml,
+  getProductUpdateSubject,
+  getProductUpdateText,
+  getProductUpdateUnsubscribeHeaders,
+} from './product-update';
 export type { TipThankYouTemplateData } from './tip-thank-you';
 export {
   getTipThankYouEmail,

@@ -14,12 +14,12 @@ describe('Contact Limit Configuration', () => {
     expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
   });
 
-  it('pro plan has unlimited contacts', () => {
+  it('pro plan has 5000 contact limit', () => {
     expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
   });
 
-  it('growth plan has unlimited contacts', () => {
-    expect(ENTITLEMENT_REGISTRY.growth.limits.contactsLimit).toBeNull();
+  it('max plan has unlimited contacts', () => {
+    expect(ENTITLEMENT_REGISTRY.max.limits.contactsLimit).toBeNull();
   });
 });
 

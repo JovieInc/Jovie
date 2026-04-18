@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  actions: write
   contents: read
   pull-requests: read
 
@@ -19,16 +19,17 @@ jobs:
       summary: ${{ steps.evaluate.outputs.summary }}
       details: ${{ steps.evaluate.outputs.details }}
       run_url: ${{ steps.evaluate.outputs.run_url }}
+      failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
     steps:
       - name: Evaluate main CI health
         id: evaluate
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          STUCK_THRESHOLD_MINUTES: '15'
+          STUCK_THRESHOLD_MINUTES: '45'
           NO_SUCCESS_THRESHOLD_HOURS: '3'
         with:
           script: |
-            const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '15');
+            const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '30');
             const noSuccessHours = Number(process.env.NO_SUCCESS_THRESHOLD_HOURS ?? '3');
             const now = Date.now();
 
@@ -63,11 +64,12 @@ jobs:
               const ageMinutes = (now - Date.parse(startedAt)) / (1000 * 60);
               return ageMinutes > thresholdMinutes;
             });
+            const activeRun = runs.find((run) => run.status === 'queued' || run.status === 'in_progress');
 
             const latestSuccess = runs.find((run) => run.status === 'completed' && run.conclusion === 'success');
             const latestFailure = runs.find((run) =>
               run.status === 'completed' &&
-              ['failure', 'timed_out', 'cancelled', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
+              ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
             );
 
             const failedForTooLong = (() => {
@@ -128,6 +130,10 @@ jobs:
             }
 
             const noSuccessForTooLong = (() => {
+              if (activeRun && !staleRun) {
+                return false;
+              }
+
               if (!successCutoff) {
                 return mergedCount > 0;
               }
@@ -156,36 +162,84 @@ jobs:
             core.setOutput('summary', shouldAlert ? 'Main CI health issue detected.' : 'Main CI is healthy.');
             core.setOutput('details', shouldAlert ? reasons.join('\n') : 'No stale, failed, or blocked main CI conditions were detected.');
             core.setOutput('run_url', runUrl);
+            // Only emit failed_run_id when:
+            // 1. The alert reason is an unresolved failure (failedForTooLong)
+            // 2. No stale run exists (a stale run means a newer commit is already
+            //    queued/in-progress — rerunning the older failure would race the
+            //    production-deploy concurrency group and potentially deploy stale code)
+            const safeToRerun = failedForTooLong && !staleRun && latestFailure;
+            core.setOutput('failed_run_id', safeToRerun ? String(latestFailure.id) : '');
 
       - name: Slack alert (main CI unhealthy)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-production'
-          author_name: 'CI Monitor'
-          custom_payload: |
-            {
-              "text": "🚨 Main CI health monitor detected an issue",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Repository", "value": "${{ github.repository }}", "short": true },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Summary", "value": "${{ steps.evaluate.outputs.summary }}", "short": false },
-                    { "title": "Details", "value": "${{ steps.evaluate.outputs.details }}", "short": false },
-                    { "title": "Run", "value": "<${{ steps.evaluate.outputs.run_url }}|View failing or stale run>", "short": false }
-                  ]
-                }
-              ]
-            }
+        run: |
+          DETAILS_JSON=$(jq -Rn --arg text "$DETAILS" '$text')
+          SUMMARY_JSON=$(jq -Rn --arg text "$SUMMARY" '$text')
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "🚨 Main CI health monitor detected an issue",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Repository", "value": "$GH_REPOSITORY", "short": true },
+                  { "title": "Branch", "value": "main", "short": true },
+                  { "title": "Summary", "value": ${SUMMARY_JSON}, "short": false },
+                  { "title": "Details", "value": ${DETAILS_JSON}, "short": false },
+                  { "title": "Run", "value": "<$RUN_URL|View failing or stale run>", "short": false }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
         env:
+          DETAILS: ${{ steps.evaluate.outputs.details }}
+          SUMMARY: ${{ steps.evaluate.outputs.summary }}
+          RUN_URL: ${{ steps.evaluate.outputs.run_url }}
+          GH_REPOSITORY: ${{ github.repository }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Auto-rerun failed deploy (self-healing)
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' && steps.evaluate.outputs.failed_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAILED_RUN_ID: ${{ steps.evaluate.outputs.failed_run_id }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "Evaluating failed CI run $FAILED_RUN_ID for auto-rerun..."
+
+          # Guard 1: Only re-run once per failed run to avoid infinite retry loops.
+          ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt' 2>/dev/null || echo "1")
+          if [ "$ATTEMPT" -gt 1 ]; then
+            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping."
+            exit 0
+          fi
+
+          # Guard 2: Do not rerun if canary or sentry gate failed.
+          # Those gates trigger auto-rollback on failure. Rerunning with --failed
+          # would also rerun the deploy job (as a dependency), redeploying the same
+          # bad SHA and undoing the rollback that just protected production.
+          FAILED_JOBS=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(",")' 2>/dev/null || echo "")
+          if echo "$FAILED_JOBS" | grep -qiE 'canary|sentry'; then
+            echo "Canary/Sentry gate failed (rollback already triggered) — skipping auto-rerun to avoid redeploying bad SHA."
+            exit 0
+          fi
+
+          echo "Re-running failed CI run $FAILED_RUN_ID (failed jobs only)..."
+          gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
 
       - name: Fail job when unhealthy
         if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
+        env:
+          SUMMARY: ${{ steps.evaluate.outputs.summary }}
+          DETAILS: ${{ steps.evaluate.outputs.details }}
         run: |
-          echo "${{ steps.evaluate.outputs.summary }}"
-          echo "${{ steps.evaluate.outputs.details }}"
+          echo "$SUMMARY"
+          echo "$DETAILS"
           exit 1

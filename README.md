@@ -83,8 +83,9 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 ### Prerequisites
 
-- **Node.js 24+** (LTS)
-- **pnpm 8.0.0+** (package manager)
+- **Node.js 22.13.0+** (22.x only)
+- **pnpm 9.15.4** (exact, via Corepack)
+- **ripgrep (`rg`)** for local agent and search tooling
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
 - **Accounts Required:**
   - [Neon](https://neon.tech/) - PostgreSQL database
@@ -103,11 +104,36 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    cd Jovie
    ```
 
-2. **Install dependencies**
+2. **Bootstrap the workspace**
 
    ```bash
-   pnpm install
+   ./scripts/setup.sh
    ```
+
+   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies, and checks Doppler access.
+   On supported macOS and Debian/Ubuntu systems it will attempt to install `ripgrep` automatically. If auto-install is unavailable, use:
+
+   ```bash
+   brew install ripgrep  # macOS
+   sudo apt-get install -y ripgrep  # Ubuntu/Debian
+   ```
+
+### Internal Quickstart
+
+From the repo root, use the root wrappers for the canonical internal workflow:
+
+```bash
+pnpm run db:web:migrate
+pnpm run dev:web:local
+pnpm run test:web
+pnpm run dev:web:browse
+```
+
+For authenticated local browser QA, open:
+
+```text
+/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+```
 
 3. **Set up Doppler (Recommended)**
 
@@ -124,9 +150,9 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    doppler setup --project jovie-web --config dev
    ```
 
-4. **Alternative: Manual Environment Setup**
+4. **Manual Environment Setup (Non-Canonical Fallback)**
 
-   If not using Doppler, copy `.env.example` to `.env.local`:
+   Internal team and agent workflows should use Doppler plus the root wrapper commands above. Only use a manual `.env.local` flow if you explicitly need to run outside the standard internal setup:
 
    ```bash
    cp .env.example .env.local
@@ -136,21 +162,13 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 5. **Run database migrations**
 
    ```bash
-   # With Doppler
-   doppler run -- pnpm drizzle:migrate:main
-
-   # Or without Doppler
-   pnpm drizzle:migrate:main
+   pnpm run db:web:migrate
    ```
 
 6. **Start the development server**
 
    ```bash
-   # With Doppler (recommended)
-   doppler run -- pnpm dev
-
-   # Or without Doppler
-   pnpm dev
+   pnpm run dev:web:local
    ```
 
    Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -176,16 +194,16 @@ Jovie/
 
 ```bash
 # Check schema matches database
-pnpm drizzle:check:main
+pnpm --filter=@jovie/web run drizzle:check
 
 # Generate migrations from schema changes
-pnpm drizzle:generate
+pnpm --filter=@jovie/web run drizzle:generate
 
 # Run migrations on main branch
-pnpm drizzle:migrate:main
+pnpm run db:web:migrate
 
 # Open Drizzle Studio (database GUI)
-pnpm drizzle:studio
+pnpm run db:web:studio
 
 # Note: Migrations are APPEND-ONLY - never modify existing migrations
 ```
@@ -193,23 +211,17 @@ pnpm drizzle:studio
 ### Testing
 
 ```bash
-# Unit tests (fast)
+# Web app test suite with pinned Doppler scope
+pnpm run test:web
+
+# Web smoke suite
+pnpm run test:web:smoke
+
+# Web E2E suite
+pnpm run test:web:e2e
+
+# Workspace-wide fast unit tests
 pnpm test:fast
-
-# All tests
-pnpm test
-
-# E2E smoke tests
-pnpm e2e:smoke
-
-# E2E full suite
-pnpm test:e2e
-
-# E2E with UI
-pnpm test:e2e:ui
-
-# Profile tests
-pnpm test:profile
 ```
 
 ### Code Quality
@@ -254,7 +266,7 @@ Git worktrees enable parallel agent work with shared Turbo cache (2.8+):
 ```bash
 # Create a worktree for parallel work
 git worktree add ../Jovie-agent-1 -b agent/task-name
-cd ../Jovie-agent-1 && pnpm install
+cd ../Jovie-agent-1 && ./scripts/setup.sh
 
 # Work normally -- turbo cache is shared automatically
 pnpm turbo build
@@ -347,7 +359,7 @@ See `.env.example` for complete list.
 **Manual (Production):**
 ```bash
 export ALLOW_PROD_MIGRATIONS=true
-doppler run --config prd -- pnpm drizzle:migrate:main
+doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run drizzle:migrate
 ```
 
 ## Monitoring & Observability
@@ -412,7 +424,7 @@ This project has evolved through several migrations:
    - `fix:` - Bug fixes
    - `chore:` - Maintenance tasks
    - `docs:` - Documentation updates
-4. **Test** - Ensure all tests pass: `pnpm test:fast && pnpm typecheck`
+4. **Test** - Ensure all tests pass: `pnpm run test:web && pnpm typecheck`
 5. **Submit PR** - PRs auto-run fast CI checks
 
 ### Code Review Process
@@ -447,14 +459,6 @@ Jovie uses Calendar Versioning (`YY.M.PATCH`) tracked in `version.json` and mirr
 ```bash
 # Validate versioning integrity (calendar, workspace sync, changelog consistency)
 pnpm version:check
-
-# Bump to next calendar-aware version and rotate changelog
-pnpm version:bump
 ```
 
-`pnpm version:bump` now:
-- Uses UTC calendar month/year to prevent timezone drift
-- Increments patch only within the same month
-- Resets patch to `0` when the month changes
-- Refuses empty releases unless `--allow-empty` is provided
-- Rotates `[Unreleased]` into a dated release and scaffolds a fresh unreleased template
+Version bumps and changelog entries are handled automatically by the `/ship` workflow. `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.

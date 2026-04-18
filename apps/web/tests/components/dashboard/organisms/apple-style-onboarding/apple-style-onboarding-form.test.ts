@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getOnboardingDashboardInitialQuery,
   type SpotifyImportStatus,
-} from '@/features/dashboard/organisms/apple-style-onboarding/onboardingDashboardQuery';
+} from '@/features/dashboard/organisms/onboarding-v2/shared/onboardingDashboardQuery';
 
 describe('getOnboardingDashboardInitialQuery', () => {
   it('returns a latest releases prompt when spotify import succeeded', () => {

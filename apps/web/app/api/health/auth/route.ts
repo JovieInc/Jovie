@@ -1,7 +1,9 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
+import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDbUser } from '@/lib/auth/session';
+import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureWarning } from '@/lib/error-tracking';
@@ -12,17 +14,31 @@ export const dynamic = 'force-dynamic';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Internal health check that validates auth.jwt()->>'sub' path
-// Only accessible in development for security
+// Only accessible in development unless a trusted test-bypass request is probing
+// preview auth during CI.
 export async function GET() {
-  if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json(
-      { ok: false, error: 'Only available in development' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
   try {
-    const { userId } = await auth();
+    if (process.env.VERCEL_ENV === 'production') {
+      return NextResponse.json(
+        { ok: false, error: 'Only available in development' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const headerStore = await headers();
+    const cookieStore = await cookies();
+    const allowTestBypassProbe = Boolean(
+      resolveTestBypassUserId(headerStore, cookieStore)
+    );
+
+    if (process.env.NODE_ENV !== 'development' && !allowTestBypassProbe) {
+      return NextResponse.json(
+        { ok: false, error: 'Only available in development' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { userId } = await getCachedAuth();
 
     if (!userId) {
       return NextResponse.json(

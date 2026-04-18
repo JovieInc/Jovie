@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { SegmentedDigitBox } from '@/components/atoms/SegmentedDigitBox';
 import { cn } from '@/lib/utils';
 import type { OtpInputProps } from './types';
 import { OTP_LENGTH } from './types';
@@ -67,8 +68,8 @@ export function OtpInput({
             className={cn(
               'h-1 w-1 rounded-full transition-all duration-200',
               i < currentValue.length
-                ? 'bg-primary-token scale-125'
-                : 'bg-subtle'
+                ? 'scale-125 bg-[var(--profile-pearl-primary-bg)]'
+                : 'bg-[color:var(--profile-pearl-border)]'
             )}
           />
         ))}
@@ -110,79 +111,31 @@ export function OtpInput({
         onPaste={handlePaste}
       >
         <legend className='sr-only'>{ariaLabel}</legend>
-        {digitKeys.map((key, index) => {
-          const digit = getDigit(index);
-          const isFocused = focusedIndex === index;
-          const isCursor = isFocused && !digit;
-          const isFirstInput = index === 0;
-
-          return (
-            <div
-              key={key}
-              className={cn(
-                'relative flex items-center justify-center rounded-(--linear-radius-sm) border text-xl sm:text-2xl font-(--linear-caption-weight) transition-all duration-150',
-                'h-(--linear-button-height-md) w-11 sm:h-(--linear-button-height-md) sm:w-10 min-h-[40px]',
-                'bg-surface-0 text-primary-token',
-                isFocused
-                  ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/30 scale-[1.02]'
-                  : 'border-subtle',
-                error && 'border-(--linear-error)',
-                disabled && 'opacity-50 cursor-not-allowed',
-                'active:scale-95 active:bg-surface-1'
-              )}
-            >
-              <input
-                ref={el => {
-                  inputRefs.current[index] = el;
-                }}
-                type='text'
-                inputMode='numeric'
-                pattern='[0-9]*'
-                value={digit}
-                onChange={e => handleInputChange(index, e.target.value)}
-                onKeyDown={e => handleKeyDown(index, e)}
-                onInput={e => handleInput(index, e)}
-                onPaste={handlePaste}
-                onFocus={() => handleFocus(index)}
-                onBlur={handleBlur}
-                disabled={disabled}
-                autoComplete={isFirstInput ? 'one-time-code' : 'off'}
-                className={cn(
-                  'absolute inset-0 w-full h-full bg-transparent text-center text-xl sm:text-2xl font-sans',
-                  'outline-none border-none',
-                  'touch-manipulation [-webkit-tap-highlight-color:transparent]',
-                  disabled && 'cursor-not-allowed'
-                )}
-                aria-label={`Digit ${index + 1} of ${OTP_LENGTH}`}
-                aria-describedby={errorId}
-              />
-
-              {/* Cursor indicator */}
-              {isCursor && (
-                <span
-                  className='animate-pulse motion-reduce:animate-none text-secondary-token pointer-events-none'
-                  aria-hidden='true'
-                >
-                  |
-                </span>
-              )}
-
-              {/* Digit display (for animation) */}
-              {digit && (
-                <span
-                  className={cn(
-                    'pointer-events-none absolute inset-0 flex items-center justify-center',
-                    'transition-transform duration-100',
-                    'animate-in zoom-in-90 duration-100'
-                  )}
-                  aria-hidden='true'
-                >
-                  {digit}
-                </span>
-              )}
-            </div>
-          );
-        })}
+        {digitKeys.map((key, index) => (
+          <SegmentedDigitBox
+            key={key}
+            digit={getDigit(index)}
+            isFocused={focusedIndex === index}
+            error={error}
+            disabled={disabled}
+            index={index}
+            inputRef={el => {
+              inputRefs.current[index] = el;
+            }}
+            onInputChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onInput={handleInput}
+            onPaste={handlePaste}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            autoComplete={index === 0 ? 'one-time-code' : 'off'}
+            ariaLabel={`Digit ${index + 1} of ${OTP_LENGTH}`}
+            ariaDescribedBy={errorId}
+            ariaInvalid={error || undefined}
+            boxSizeClassName='h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]'
+            textSizeClassName='text-[1.22rem] sm:text-[1.3rem]'
+          />
+        ))}
       </fieldset>
     </div>
   );

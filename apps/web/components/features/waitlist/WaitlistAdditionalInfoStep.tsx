@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
 import type { FormErrors } from './types';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 
@@ -42,7 +42,7 @@ export function WaitlistAdditionalInfoStep({
       <label htmlFor='heardAbout' className='sr-only'>
         How did you hear about us?
       </label>
-      <Input
+      <AuthTextInput
         type='text'
         id='heardAbout'
         value={heardAbout}

@@ -37,6 +37,9 @@ on:
 
 permissions: {}
 
+env:
+  GH_REPO: ${{ github.repository }}
+
 concurrency:
   group: agent-pipeline-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: true
@@ -89,13 +92,13 @@ jobs:
           if [[ "$EVENT" == "workflow_run" ]]; then
             if [[ "$CONCLUSION" == "failure" ]]; then
               echo "CI failed — routing to fix path"
-              echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
+              echo "trigger_type=ci_failure" >> "$GITHUB_OUTPUT"
             elif [[ "$CONCLUSION" == "success" ]]; then
               echo "$WORKFLOW_NAME succeeded — routing to approve path"
-              echo "trigger_type=approval_candidate" >> $GITHUB_OUTPUT
+              echo "trigger_type=approval_candidate" >> "$GITHUB_OUTPUT"
             else
               echo "Workflow conclusion: $CONCLUSION. Skipping."
-              echo "should_continue=false" >> $GITHUB_OUTPUT
+              echo "should_continue=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
@@ -106,7 +109,7 @@ jobs:
 
             if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
               echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
-              echo "should_continue=false" >> $GITHUB_OUTPUT
+              echo "should_continue=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
@@ -116,12 +119,12 @@ jobs:
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
             HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
 
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
-            echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
-            echo "is_draft=$IS_DRAFT" >> $GITHUB_OUTPUT
-            echo "has_needs_human=$HAS_NEEDS_HUMAN" >> $GITHUB_OUTPUT
-            echo "should_continue=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
+            echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
+            echo "is_draft=$IS_DRAFT" >> "$GITHUB_OUTPUT"
+            echo "has_needs_human=$HAS_NEEDS_HUMAN" >> "$GITHUB_OUTPUT"
+            echo "should_continue=true" >> "$GITHUB_OUTPUT"
 
           elif [[ "$EVENT" == "pull_request_review" ]]; then
             REVIEWER="$PR_REVIEW_USER"
@@ -129,23 +132,23 @@ jobs:
 
             if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
               echo "Reviewer is not CodeRabbit (got: $REVIEWER). Skipping."
-              echo "should_continue=false" >> $GITHUB_OUTPUT
+              echo "should_continue=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
             if [[ "$STATE" != "changes_requested" ]]; then
               echo "Review state is not blocking (got: $STATE). Skipping."
-              echo "should_continue=false" >> $GITHUB_OUTPUT
+              echo "should_continue=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
-            echo "trigger_type=coderabbit_review" >> $GITHUB_OUTPUT
-            echo "pr_number=$PR_NUMBER_EVENT" >> $GITHUB_OUTPUT
-            echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> $GITHUB_OUTPUT
-            echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> $GITHUB_OUTPUT
-            echo "is_draft=$PR_IS_DRAFT_EVENT" >> $GITHUB_OUTPUT
-            echo "has_needs_human=false" >> $GITHUB_OUTPUT
-            echo "should_continue=true" >> $GITHUB_OUTPUT
+            echo "trigger_type=coderabbit_review" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$PR_NUMBER_EVENT" >> "$GITHUB_OUTPUT"
+            echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> "$GITHUB_OUTPUT"
+            echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> "$GITHUB_OUTPUT"
+            echo "is_draft=$PR_IS_DRAFT_EVENT" >> "$GITHUB_OUTPUT"
+            echo "has_needs_human=false" >> "$GITHUB_OUTPUT"
+            echo "should_continue=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check agent branch pattern
@@ -158,10 +161,10 @@ jobs:
 
           if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) ]]; then
             echo "Agent branch detected"
-            echo "is_agent_branch=true" >> $GITHUB_OUTPUT
+            echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
             echo "Not an agent branch. Skipping."
-            echo "is_agent_branch=false" >> $GITHUB_OUTPUT
+            echo "is_agent_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check not draft
@@ -171,9 +174,9 @@ jobs:
           IS_DRAFT="${{ steps.trigger.outputs.is_draft }}"
           if [[ "$IS_DRAFT" == "true" ]]; then
             echo "PR is a draft. Skipping."
-            echo "is_ready=false" >> $GITHUB_OUTPUT
+            echo "is_ready=false" >> "$GITHUB_OUTPUT"
           else
-            echo "is_ready=true" >> $GITHUB_OUTPUT
+            echo "is_ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Detect systemic failures (fix path only)
@@ -190,7 +193,7 @@ jobs:
 
           # Only check for systemic failures on CI failures (not CodeRabbit reviews)
           if [[ "$TRIGGER_TYPE" != "ci_failure" ]]; then
-            echo "is_systemic=false" >> $GITHUB_OUTPUT
+            echo "is_systemic=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -200,7 +203,7 @@ jobs:
 
           if [[ -z "$THIS_PR_FAILS" ]]; then
             echo "No failing checks found for PR #$PR_NUMBER"
-            echo "is_systemic=false" >> $GITHUB_OUTPUT
+            echo "is_systemic=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -227,11 +230,11 @@ jobs:
           if [[ -n "$SYSTEMIC_CHECKS" ]]; then
             echo "Systemic failures detected:"
             echo -e "$SYSTEMIC_CHECKS"
-            echo "is_systemic=true" >> $GITHUB_OUTPUT
-            echo "systemic_checks=$(echo -e "$SYSTEMIC_CHECKS" | head -5 | tr '\n' '; ')" >> $GITHUB_OUTPUT
+            echo "is_systemic=true" >> "$GITHUB_OUTPUT"
+            echo "systemic_checks=$(echo -e "$SYSTEMIC_CHECKS" | head -5 | tr '\n' '; ')" >> "$GITHUB_OUTPUT"
           else
             echo "No systemic failures detected"
-            echo "is_systemic=false" >> $GITHUB_OUTPUT
+            echo "is_systemic=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Retry guard (fix path only, max 5 attempts per SHA)
@@ -260,28 +263,28 @@ jobs:
 
           if [[ "$HAS_5" -gt 0 ]]; then
             echo "SHA $SHORT_SHA has exhausted retries (5/5) for $TRIGGER_TYPE"
-            echo "retries_available=false" >> $GITHUB_OUTPUT
-            echo "attempt_number=0" >> $GITHUB_OUTPUT
+            echo "retries_available=false" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=0" >> "$GITHUB_OUTPUT"
           elif [[ "$HAS_4" -gt 0 ]]; then
             echo "SHA $SHORT_SHA on attempt 5/5 (final) for $TRIGGER_TYPE"
-            echo "retries_available=true" >> $GITHUB_OUTPUT
-            echo "attempt_number=5" >> $GITHUB_OUTPUT
+            echo "retries_available=true" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=5" >> "$GITHUB_OUTPUT"
           elif [[ "$HAS_3" -gt 0 ]]; then
             echo "SHA $SHORT_SHA on attempt 4/5 for $TRIGGER_TYPE"
-            echo "retries_available=true" >> $GITHUB_OUTPUT
-            echo "attempt_number=4" >> $GITHUB_OUTPUT
+            echo "retries_available=true" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=4" >> "$GITHUB_OUTPUT"
           elif [[ "$HAS_2" -gt 0 ]]; then
             echo "SHA $SHORT_SHA on attempt 3/5 for $TRIGGER_TYPE"
-            echo "retries_available=true" >> $GITHUB_OUTPUT
-            echo "attempt_number=3" >> $GITHUB_OUTPUT
+            echo "retries_available=true" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=3" >> "$GITHUB_OUTPUT"
           elif [[ "$HAS_1" -gt 0 ]]; then
             echo "SHA $SHORT_SHA on attempt 2/5 for $TRIGGER_TYPE"
-            echo "retries_available=true" >> $GITHUB_OUTPUT
-            echo "attempt_number=2" >> $GITHUB_OUTPUT
+            echo "retries_available=true" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=2" >> "$GITHUB_OUTPUT"
           else
             echo "SHA $SHORT_SHA on attempt 1/5 for $TRIGGER_TYPE"
-            echo "retries_available=true" >> $GITHUB_OUTPUT
-            echo "attempt_number=1" >> $GITHUB_OUTPUT
+            echo "retries_available=true" >> "$GITHUB_OUTPUT"
+            echo "attempt_number=1" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract error context (fix path only)
@@ -347,7 +350,7 @@ jobs:
           fi
 
           # Base64 encode to handle multiline safely
-          echo "error_context=$(echo "$ERROR_CONTEXT" | base64 -w0)" >> $GITHUB_OUTPUT
+          echo "error_context=$(echo "$ERROR_CONTEXT" | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       - name: Evaluate all guards
         id: evaluate
@@ -392,12 +395,12 @@ jobs:
             echo "Routing to approve path"
           fi
 
-          echo "should_fix=$SHOULD_FIX" >> $GITHUB_OUTPUT
-          echo "should_approve=$SHOULD_APPROVE" >> $GITHUB_OUTPUT
-          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
-          echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
+          echo "should_fix=$SHOULD_FIX" >> "$GITHUB_OUTPUT"
+          echo "should_approve=$SHOULD_APPROVE" >> "$GITHUB_OUTPUT"
+          echo "trigger_type=$TRIGGER_TYPE" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
 
   # ==========================================================================
   # SYSTEMIC REPORT: Label and comment on PRs blocked by systemic failures
@@ -560,8 +563,8 @@ jobs:
 
           if [[ "$SCOPE_STATUS" != "success" ]]; then
             echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
-            echo "all_passed=false" >> $GITHUB_OUTPUT
-            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> $GITHUB_OUTPUT
+            echo "all_passed=false" >> "$GITHUB_OUTPUT"
+            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -571,8 +574,8 @@ jobs:
 
           if [[ "$CI_PR_READY" != "success" ]]; then
             echo "CI PR Ready has not passed (conclusion: $CI_PR_READY). Cannot auto-approve."
-            echo "all_passed=false" >> $GITHUB_OUTPUT
-            echo "blocking_reason=PR Ready: $CI_PR_READY" >> $GITHUB_OUTPUT
+            echo "all_passed=false" >> "$GITHUB_OUTPUT"
+            echo "blocking_reason=PR Ready: $CI_PR_READY" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -582,13 +585,13 @@ jobs:
 
           if [[ "$REVIEWS" == "CHANGES_REQUESTED" ]]; then
             echo "CodeRabbit has requested changes. Cannot auto-approve."
-            echo "all_passed=false" >> $GITHUB_OUTPUT
-            echo "blocking_reason=CodeRabbit: changes_requested" >> $GITHUB_OUTPUT
+            echo "all_passed=false" >> "$GITHUB_OUTPUT"
+            echo "blocking_reason=CodeRabbit: changes_requested" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "All status checks passed"
-          echo "all_passed=true" >> $GITHUB_OUTPUT
+          echo "all_passed=true" >> "$GITHUB_OUTPUT"
 
       - name: Check for sensitive file changes
         id: sensitive-check
@@ -629,11 +632,11 @@ jobs:
           if [[ -n "$SENSITIVE_FOUND" ]]; then
             echo "Sensitive files changed — requires human review:"
             echo -e "$SENSITIVE_FOUND"
-            echo "is_safe=false" >> $GITHUB_OUTPUT
-            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> $GITHUB_OUTPUT
+            echo "is_safe=false" >> "$GITHUB_OUTPUT"
+            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> "$GITHUB_OUTPUT"
           else
             echo "No sensitive files changed"
-            echo "is_safe=true" >> $GITHUB_OUTPUT
+            echo "is_safe=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check merge queue pressure
@@ -663,18 +666,19 @@ jobs:
           ')
 
           echo "Open merge-ready/automerge PRs ahead of this PR: $READY_COUNT"
-          echo "ready_count=$READY_COUNT" >> $GITHUB_OUTPUT
-          echo "ready_threshold=$READY_THRESHOLD" >> $GITHUB_OUTPUT
+          echo "ready_count=$READY_COUNT" >> "$GITHUB_OUTPUT"
+          echo "ready_threshold=$READY_THRESHOLD" >> "$GITHUB_OUTPUT"
 
           if [ "$READY_COUNT" -ge "$READY_THRESHOLD" ]; then
-            echo "defer_auto_merge=true" >> $GITHUB_OUTPUT
+            echo "defer_auto_merge=true" >> "$GITHUB_OUTPUT"
             echo "Queue pressure is high. Agent PR will be approved but not auto-queued."
           else
-            echo "defer_auto_merge=false" >> $GITHUB_OUTPUT
+            echo "defer_auto_merge=false" >> "$GITHUB_OUTPUT"
             echo "Queue pressure is acceptable. Agent PR may auto-enter the queue."
           fi
 
       - name: Auto-approve PR
+        id: auto-approve
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true'
@@ -682,11 +686,20 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
+          APPROVER=$(gh api user --jq '.login')
+          echo "permission_denied=false" >> "$GITHUB_OUTPUT"
 
-          echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+          if [[ "$PR_AUTHOR" == "$APPROVER" ]]; then
+            echo "Skipping auto-approval for PR #$PR_NUMBER because approver '$APPROVER' matches PR author."
+            exit 0
+          fi
+
+          echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
 
           # Submit approval review
-          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+          APPROVAL_ERROR_LOG=$(mktemp)
+          if ! gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
             --method POST \
             -f event="APPROVE" \
             -f body="## Auto-Approved by Agent Pipeline
@@ -700,7 +713,17 @@ jobs:
           This PR was auto-approved because it meets all criteria for low-risk agent changes.
           It will now enter the merge queue for final validation.
 
-          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
+            >"$APPROVAL_ERROR_LOG" 2>&1; then
+            if rg -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
+              echo "permission_denied=true" >> "$GITHUB_OUTPUT"
+              echo "Skipping auto-approval for PR #$PR_NUMBER because the GitHub App token lacks review permission."
+              exit 0
+            fi
+
+            cat "$APPROVAL_ERROR_LOG"
+            exit 1
+          fi
 
           echo "PR #$PR_NUMBER approved"
 
@@ -708,6 +731,7 @@ jobs:
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.auto-approve.outputs.permission_denied != 'true' &&
           steps.queue-pressure.outputs.defer_auto_merge != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -728,6 +752,7 @@ jobs:
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.auto-approve.outputs.permission_denied != 'true' &&
           steps.queue-pressure.outputs.defer_auto_merge == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

@@ -4,7 +4,7 @@ import { Badge, Button } from '@jovie/ui';
 import { Mail } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DateCell } from '@/components/organisms/table';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 import {
   PLATFORM_LABELS,
@@ -44,20 +44,19 @@ export function WaitlistKanbanCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'bg-surface-0 p-3',
-        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-default hover:bg-surface-1',
+        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-2.5',
+        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-default hover:bg-surface-0',
         'cursor-grab active:cursor-grabbing'
       )}
     >
-      {/* Header: Name + Status */}
-      <div className='flex items-start justify-between gap-2 mb-2'>
-        <div className='flex-1 min-w-0'>
-          <h4 className='truncate text-sm font-semibold text-primary-token'>
+      <div className='mb-2 flex items-start justify-between gap-2'>
+        <div className='min-w-0 flex-1'>
+          <h4 className='truncate text-[13px] font-semibold text-primary-token'>
             {entry.fullName}
           </h4>
           <a
             href={`mailto:${entry.email}`}
-            className='mt-0.5 flex items-center gap-1 text-xs text-secondary-token hover:text-primary-token'
+            className='mt-0.5 flex items-center gap-1 text-[11px] text-secondary-token hover:text-primary-token'
           >
             <Mail className='h-3 w-3' />
             <span className='truncate'>{entry.email}</span>
@@ -68,9 +67,7 @@ export function WaitlistKanbanCard({
         </Badge>
       </div>
 
-      {/* Details */}
-      <div className='space-y-2 text-xs'>
-        {/* Primary Goal */}
+      <div className='space-y-1.5 text-[11px]'>
         {primaryGoalLabel && (
           <div>
             <span className='text-tertiary-token'>Goal: </span>
@@ -80,7 +77,6 @@ export function WaitlistKanbanCard({
           </div>
         )}
 
-        {/* Primary Social */}
         <div>
           <span className='text-tertiary-token'>Platform: </span>
           <Badge size='sm' variant='secondary'>
@@ -88,7 +84,6 @@ export function WaitlistKanbanCard({
           </Badge>
         </div>
 
-        {/* Social Link */}
         {entry.primarySocialUrlNormalized && (
           <a
             href={entry.primarySocialUrlNormalized}
@@ -100,7 +95,6 @@ export function WaitlistKanbanCard({
           </a>
         )}
 
-        {/* Spotify */}
         {entry.spotifyUrlNormalized && (
           <div>
             <span className='text-tertiary-token'>Spotify: </span>
@@ -115,7 +109,6 @@ export function WaitlistKanbanCard({
           </div>
         )}
 
-        {/* Created Date */}
         <div className='text-tertiary-token'>
           <DateCell
             date={entry.createdAt}
@@ -128,13 +121,12 @@ export function WaitlistKanbanCard({
         </div>
       </div>
 
-      {/* Actions */}
       {onApprove && (
-        <div className='mt-3 border-t border-subtle pt-3'>
+        <div className='mt-2.5 border-t border-subtle pt-2.5'>
           <Button
             size='sm'
             variant='primary'
-            className='w-full'
+            className='h-8 w-full text-[12px]'
             disabled={
               approveStatus === 'approving' || approveStatus === 'disapproving'
             }

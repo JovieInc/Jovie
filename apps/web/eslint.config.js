@@ -65,6 +65,11 @@ const baseConfig = {
             message: "Use Button from '@jovie/ui' instead of local atoms.",
           },
           {
+            name: '@/components/atoms/LinearButton',
+            message:
+              "LinearButton was a link component. Use <Link> from 'next/link' or <Button asChild> with a Link child instead.",
+          },
+          {
             name: '@/components/atoms/Sheet',
             message:
               "Use Sheet components from '@jovie/ui' instead of local atoms.",
@@ -129,6 +134,15 @@ const baseConfig = {
               'components/atoms/Button',
             ],
             message: "Use Button from '@jovie/ui' instead of local atoms.",
+          },
+          {
+            group: [
+              '../components/atoms/LinearButton',
+              './components/atoms/LinearButton',
+              'components/atoms/LinearButton',
+            ],
+            message:
+              "LinearButton was a link component. Use <Link> from 'next/link' or <Button asChild> with a Link child instead.",
           },
         ],
       },
@@ -222,19 +236,26 @@ module.exports = [
   },
   // NOTE: Test file overrides for @typescript-eslint/no-explicit-any removed
   // - Biome already disables suspicious/noExplicitAny for test files
+  // Enforce type-only exports in admin types barrel file
+  {
+    files: ['lib/admin/types.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportNamedDeclaration:not([exportKind="type"])',
+          message:
+            'Only type exports allowed in types.ts. Use "export type { ... }" to prevent bundling server code into client.',
+        },
+      ],
+    },
+  },
+
   // Disable server/client boundary rules for server-only contexts
   {
     files: ['**/app/api/**', '**/actions.ts', '**/actions/*.ts'],
     rules: {
       '@jovie/use-client-directive': 'off',
-      '@jovie/server-only-imports': 'off',
-    },
-  },
-  // TODO: Admin components have legacy server import patterns that need refactoring
-  // These should be migrated to use server actions instead of direct imports
-  {
-    files: ['**/components/admin/**', '**/components/features/admin/**'],
-    rules: {
       '@jovie/server-only-imports': 'off',
     },
   },
@@ -293,7 +314,7 @@ module.exports = [
   // Component dependency direction enforcement
   // atoms → molecules → organisms → features (no reverse imports)
   {
-    files: ['apps/web/components/**/*.{ts,tsx}'],
+    files: ['components/**/*.{ts,tsx}'],
     plugins: {
       boundaries: boundariesPlugin,
     },
@@ -301,23 +322,23 @@ module.exports = [
       'boundaries/elements': [
         {
           type: 'ui-atoms',
-          pattern: ['packages/ui/atoms/**'],
+          pattern: ['../../packages/ui/atoms/**'],
         },
         {
           type: 'atoms',
-          pattern: ['apps/web/components/atoms/**'],
+          pattern: ['components/atoms/**'],
         },
         {
           type: 'molecules',
-          pattern: ['apps/web/components/molecules/**'],
+          pattern: ['components/molecules/**'],
         },
         {
           type: 'organisms',
-          pattern: ['apps/web/components/organisms/**'],
+          pattern: ['components/organisms/**'],
         },
         {
           type: 'features',
-          pattern: ['apps/web/components/features/*/**'],
+          pattern: ['components/features/*/**'],
           capture: ['feature'],
         },
       ],

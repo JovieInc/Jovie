@@ -11,10 +11,20 @@ export const creatorTypeEnum = pgEnum('creator_type', [
 export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
 
 export const photoStatusEnum = pgEnum('photo_status', [
+  'draft',
   'uploading',
   'processing',
   'ready',
   'failed',
+]);
+
+export const playlistStatusEnum = pgEnum('playlist_status', [
+  'draft',
+  'pending',
+  'approved',
+  'published',
+  'archived',
+  'rejected',
 ]);
 
 // Link & Social Enums
@@ -37,6 +47,16 @@ export const socialAccountStatusEnum = pgEnum('social_account_status', [
   'rejected',
 ]);
 
+export const creatorDistributionPlatformEnum = pgEnum(
+  'creator_distribution_platform',
+  ['instagram']
+);
+
+export const creatorDistributionEventTypeEnum = pgEnum(
+  'creator_distribution_event_type',
+  ['step_viewed', 'link_copied', 'platform_opened', 'skipped', 'activated']
+);
+
 // Provider & Content Enums
 export const providerKindEnum = pgEnum('provider_kind', [
   'music_streaming',
@@ -53,12 +73,14 @@ export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
   'compilation',
   'live',
   'mixtape',
+  'music_video',
   'other',
 ]);
 
 export const providerLinkOwnerEnum = pgEnum('provider_link_owner_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Billing & Subscription Enums
@@ -126,8 +148,42 @@ export const contactRoleEnum = pgEnum('contact_role', [
   'management',
   'press_pr',
   'brand_partnerships',
+  'music_collaboration',
   'fan_general',
   'other',
+]);
+
+// Inbox Enums
+export const inboxEmailCategoryEnum = pgEnum('inbox_email_category', [
+  'booking',
+  'music_collaboration',
+  'brand_partnership',
+  'management',
+  'fan_mail',
+  'personal',
+  'press',
+  'business',
+  'spam',
+  'other',
+]);
+
+export const inboxThreadPriorityEnum = pgEnum('inbox_thread_priority', [
+  'high',
+  'medium',
+  'low',
+]);
+
+export const inboxThreadStatusEnum = pgEnum('inbox_thread_status', [
+  'pending_review',
+  'routed',
+  'routing_failed',
+  'in_progress',
+  'resolved',
+  'archived',
+]);
+
+export const inboxOutboundSentByEnum = pgEnum('inbox_outbound_sent_by', [
+  'jovie_routing',
 ]);
 
 export const contactChannelEnum = pgEnum('contact_channel', ['email', 'phone']);
@@ -192,6 +248,25 @@ export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
   'rejected',
   'email_sent',
   'expired',
+]);
+
+// DSP Catalog Scan Enums
+export const catalogScanStatusEnum = pgEnum('catalog_scan_status', [
+  'pending',
+  'running',
+  'completed',
+  'failed',
+]);
+
+export const catalogMismatchTypeEnum = pgEnum('catalog_mismatch_type', [
+  'not_in_catalog',
+  'missing_from_dsp',
+]);
+
+export const catalogMismatchStatusEnum = pgEnum('catalog_mismatch_status', [
+  'flagged',
+  'confirmed_mismatch',
+  'dismissed',
 ]);
 
 export const outreachStatusEnum = pgEnum('outreach_status', [
@@ -275,6 +350,8 @@ export const artistRoleEnum = pgEnum('artist_role', [
   'lyricist',
   'arranger',
   'conductor',
+  'mix_engineer',
+  'mastering_engineer',
   'vs',
   'with',
   'other',
@@ -284,6 +361,7 @@ export const artistRoleEnum = pgEnum('artist_role', [
 export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Sender Reputation Enums
@@ -325,6 +403,27 @@ export const dspBioSyncStatusEnum = pgEnum('dsp_bio_sync_status', [
   'failed',
   'unsupported',
 ]);
+
+export const metadataSubmissionStatusEnum = pgEnum(
+  'metadata_submission_status',
+  [
+    'draft',
+    'awaiting_approval',
+    'queued',
+    'sent',
+    'acknowledged',
+    'live',
+    'drifted',
+    'failed',
+    'manual_followup_needed',
+    'cancelled',
+  ]
+);
+
+export const metadataSubmissionIssueStatusEnum = pgEnum(
+  'metadata_submission_issue_status',
+  ['open', 'resolved', 'ignored']
+);
 
 // Chat Enums
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
@@ -414,12 +513,80 @@ export const leadOutreachStatusEnum = pgEnum('lead_outreach_status', [
   'dismissed',
 ]);
 
+export const leadSourcePlatformEnum = pgEnum('lead_source_platform', [
+  'linktree',
+  'beacons',
+  'laylo',
+]);
+
+export const leadAttributionStatusEnum = pgEnum('lead_attribution_status', [
+  'unattributed',
+  'attributed',
+  'expired',
+]);
+
+export const leadRampModeEnum = pgEnum('lead_ramp_mode', [
+  'manual',
+  'recommend_only',
+]);
+
 // Tip Status Enum
 export const tipStatusEnum = pgEnum('tip_status', [
   'pending',
   'completed',
   'failed',
   'refunded',
+]);
+
+// Profile Claim Enums
+export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
+  'owner',
+  'manager',
+  'viewer',
+]);
+
+export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
+  'claimed',
+  'linked',
+  'unlinked',
+  'transferred',
+  'role_changed',
+]);
+
+// Release Task Enums
+export const releaseTaskStatusEnum = pgEnum('release_task_status', [
+  'backlog',
+  'todo',
+  'in_progress',
+  'done',
+  'cancelled',
+]);
+
+export const releaseTaskPriorityEnum = pgEnum('release_task_priority', [
+  'urgent',
+  'high',
+  'medium',
+  'low',
+  'none',
+]);
+
+export const releaseTaskAssigneeTypeEnum = pgEnum(
+  'release_task_assignee_type',
+  ['human', 'ai_workflow']
+);
+
+export const taskAssigneeKindEnum = pgEnum('task_assignee_kind', [
+  'human',
+  'jovie',
+]);
+
+export const taskAgentStatusEnum = pgEnum('task_agent_status', [
+  'idle',
+  'queued',
+  'drafting',
+  'awaiting_review',
+  'approved',
+  'failed',
 ]);
 
 // Referral Program Enums

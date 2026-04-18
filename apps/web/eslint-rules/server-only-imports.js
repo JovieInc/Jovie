@@ -22,7 +22,7 @@ const SERVER_ONLY_PATH_PATTERNS = [
   /^@\/lib\/auth\/gate$/,
   /^@\/lib\/env-server/,
   /^@\/lib\/stripe\/client$/,
-  /^@\/lib\/admin\//, // @/lib/admin/*
+  /^@\/lib\/admin\/(?!types$|csv-configs\/)/, // @/lib/admin/* (except types.ts and csv-configs/)
   /\.server$/, // *.server.ts files
 ];
 

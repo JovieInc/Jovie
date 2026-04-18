@@ -1,5 +1,6 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -53,6 +54,9 @@ export const audienceMembers = pgTable(
     latestActions: jsonb('latest_actions')
       .$type<Record<string, unknown>[]>()
       .default([]),
+    // Summary columns for fast list views (avoids JSONB expansion)
+    latestReferrerUrl: text('latest_referrer_url'),
+    latestActionLabel: text('latest_action_label'),
     email: text('email'),
     phone: text('phone'),
     spotifyConnected: boolean('spotify_connected').default(false).notNull(),
@@ -68,6 +72,7 @@ export const audienceMembers = pgTable(
       }>()
       .default({}),
     fingerprint: text('fingerprint'),
+    attributionSource: text('attribution_source'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -99,6 +104,165 @@ export const audienceMembers = pgTable(
   })
 );
 
+// Normalized audience referrer history (replaces JSONB referrer_history)
+export const audienceReferrers = pgTable(
+  'audience_referrers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    source: text('source'),
+    timestamp: timestamp('timestamp', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    memberTimestampIdx: index('audience_referrers_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
+  })
+);
+
+// Normalized audience action history (replaces JSONB latest_actions)
+export const audienceActions = pgTable(
+  'audience_actions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'cascade' }
+    ),
+    audienceMemberId: uuid('audience_member_id')
+      .notNull()
+      .references(() => audienceMembers.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    emoji: text('emoji'),
+    platform: text('platform'),
+    eventType: text('event_type').default('legacy').notNull(),
+    verb: text('verb'),
+    confidence: text('confidence').default('observed').notNull(),
+    sourceKind: text('source_kind'),
+    sourceLabel: text('source_label'),
+    sourceLinkId: uuid('source_link_id').references(
+      (): AnyPgColumn => audienceSourceLinks.id,
+      { onDelete: 'set null' }
+    ),
+    objectType: text('object_type'),
+    objectId: text('object_id'),
+    objectLabel: text('object_label'),
+    clickEventId: uuid('click_event_id').references(
+      (): AnyPgColumn => clickEvents.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    properties: jsonb('properties')
+      .$type<Record<string, unknown>>()
+      .default({}),
+    context: jsonb('context').$type<Record<string, unknown>>().default({}),
+    // Intentionally nullable with no default — action timestamps come from
+    // external event sources and may be backdated by the caller.
+    timestamp: timestamp('timestamp', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    creatorProfileTimestampIdx: index(
+      'audience_actions_creator_profile_id_timestamp_idx'
+    ).on(table.creatorProfileId, table.timestamp),
+    memberTimestampIdx: index('audience_actions_member_ts_idx').on(
+      table.audienceMemberId,
+      table.timestamp
+    ),
+    sourceLinkTimestampIdx: index(
+      'audience_actions_source_link_id_timestamp_idx'
+    ).on(table.sourceLinkId, table.timestamp),
+    eventTypeTimestampIdx: index(
+      'audience_actions_event_type_timestamp_idx'
+    ).on(table.eventType, table.timestamp),
+  })
+);
+
+// Creator-facing source/campaign buckets for trackable links and QR codes.
+export const audienceSourceGroups = pgTable(
+  'audience_source_groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    sourceType: text('source_type').default('qr').notNull(),
+    destinationKind: text('destination_kind').default('profile').notNull(),
+    destinationId: text('destination_id'),
+    destinationUrl: text('destination_url'),
+    utmParams: jsonb('utm_params')
+      .$type<Record<string, string | undefined>>()
+      .default({}),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    archivedAt: timestamp('archived_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileCreatedAtIdx: index(
+      'audience_source_groups_creator_profile_id_created_at_idx'
+    ).on(table.creatorProfileId, table.createdAt),
+    creatorProfileSourceTypeIdx: index(
+      'audience_source_groups_creator_profile_id_source_type_idx'
+    ).on(table.creatorProfileId, table.sourceType),
+  })
+);
+
+// Individual trackable short links/QR code destinations.
+export const audienceSourceLinks = pgTable(
+  'audience_source_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    sourceGroupId: uuid('source_group_id').references(
+      () => audienceSourceGroups.id,
+      { onDelete: 'cascade' }
+    ),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    sourceType: text('source_type').default('qr').notNull(),
+    destinationKind: text('destination_kind').default('profile').notNull(),
+    destinationId: text('destination_id'),
+    destinationUrl: text('destination_url').notNull(),
+    utmParams: jsonb('utm_params')
+      .$type<Record<string, string | undefined>>()
+      .default({}),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    scanCount: integer('scan_count').default(0).notNull(),
+    lastScannedAt: timestamp('last_scanned_at'),
+    archivedAt: timestamp('archived_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    codeUnique: uniqueIndex('audience_source_links_code_unique').on(table.code),
+    creatorProfileGroupIdx: index(
+      'audience_source_links_creator_profile_id_source_group_id_idx'
+    ).on(table.creatorProfileId, table.sourceGroupId),
+    creatorProfileSourceTypeIdx: index(
+      'audience_source_links_creator_profile_id_source_type_idx'
+    ).on(table.creatorProfileId, table.sourceType),
+    creatorProfileLastScannedIdx: index(
+      'audience_source_links_creator_profile_id_last_scanned_at_idx'
+    ).on(table.creatorProfileId, table.lastScannedAt),
+  })
+);
+
 // Click events table
 export const clickEvents = pgTable(
   'click_events',
@@ -119,7 +283,7 @@ export const clickEvents = pgTable(
     deviceType: text('device_type'),
     os: text('os'),
     browser: text('browser'),
-    isBot: boolean('is_bot').default(false),
+    isBot: boolean('is_bot').notNull().default(false),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     audienceMemberId: uuid('audience_member_id').references(
       () => audienceMembers.id,
@@ -149,10 +313,13 @@ export const clickEvents = pgTable(
       table.createdAt
     ),
     // Performance index: non-bot clicks for dashboard analytics (JOV-520)
-    // Partial index avoids full table scans when filtering is_bot = false OR is_bot IS NULL
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
-      .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
+      .where(drizzleSql`is_bot = false`),
+    // Partial index for release analytics queries filtering on metadata contentId
+    metadataContentIdx: index('idx_click_events_metadata_content')
+      .on(table.creatorProfileId, table.createdAt)
+      .where(drizzleSql`metadata->>'contentId' IS NOT NULL`),
   })
 );
 
@@ -186,7 +353,8 @@ export type FanNotificationContentType =
   | 'newMusic'
   | 'tourDates'
   | 'merch'
-  | 'general';
+  | 'general'
+  | 'promo';
 
 /** All available content types, ordered for UI display. */
 export const FAN_NOTIFICATION_CONTENT_TYPES: readonly {
@@ -210,6 +378,11 @@ export const FAN_NOTIFICATION_CONTENT_TYPES: readonly {
     label: 'General Updates',
     description: 'Announcements & other news',
   },
+  {
+    key: 'promo',
+    label: 'Promos',
+    description: 'Downloads, stems & DJ promos',
+  },
 ] as const;
 
 /**
@@ -229,6 +402,8 @@ export interface FanNotificationPreferences {
   merch?: boolean;
   /** Opt-in to general announcements */
   general?: boolean;
+  /** Opt-in to promo downloads, stems & DJ promos */
+  promo?: boolean;
 }
 
 // Notification subscriptions table
@@ -246,6 +421,8 @@ export const notificationSubscriptions = pgTable(
     city: text('city'),
     ipAddress: text('ip_address'),
     source: text('source'),
+    name: text('name'),
+    birthday: text('birthday'), // "YYYY-MM-DD" (ISO date); legacy: "MM-DD"
     // Fan notification preferences for granular control
     preferences: jsonb('preferences')
       .$type<FanNotificationPreferences>()
@@ -352,6 +529,15 @@ export const selectTipSchema = createSelectSchema(tips);
 export type AudienceMember = typeof audienceMembers.$inferSelect;
 export type NewAudienceMember = typeof audienceMembers.$inferInsert;
 
+export type AudienceAction = typeof audienceActions.$inferSelect;
+export type NewAudienceAction = typeof audienceActions.$inferInsert;
+
+export type AudienceSourceGroup = typeof audienceSourceGroups.$inferSelect;
+export type NewAudienceSourceGroup = typeof audienceSourceGroups.$inferInsert;
+
+export type AudienceSourceLink = typeof audienceSourceLinks.$inferSelect;
+export type NewAudienceSourceLink = typeof audienceSourceLinks.$inferInsert;
+
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
 
@@ -365,3 +551,41 @@ export type NewNotificationSubscription =
 
 export type Tip = typeof tips.$inferSelect;
 export type NewTip = typeof tips.$inferInsert;
+
+// Audience blocks table — creators can block individual audience members
+// from viewing their public profile. Blocked visitors are silently redirected.
+export const audienceBlocks = pgTable(
+  'audience_blocks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    audienceMemberId: uuid('audience_member_id').references(
+      () => audienceMembers.id,
+      { onDelete: 'set null' }
+    ),
+    fingerprint: text('fingerprint').notNull(),
+    email: text('email'), // stored lowercase for case-insensitive matching
+    displayName: text('display_name'), // snapshotted at block time
+    geoCity: text('geo_city'), // snapshotted at block time
+    geoCountry: text('geo_country'), // snapshotted at block time
+    reason: text('reason'),
+    blockedAt: timestamp('blocked_at').defaultNow().notNull(),
+    unblockedAt: timestamp('unblocked_at'),
+  },
+  table => [
+    uniqueIndex('audience_blocks_profile_fingerprint_active')
+      .on(table.creatorProfileId, table.fingerprint)
+      .where(drizzleSql`unblocked_at IS NULL`),
+    index('idx_audience_blocks_profile_email_active')
+      .on(table.creatorProfileId, table.email)
+      .where(drizzleSql`email IS NOT NULL AND unblocked_at IS NULL`),
+  ]
+);
+
+export const insertAudienceBlockSchema = createInsertSchema(audienceBlocks);
+export const selectAudienceBlockSchema = createSelectSchema(audienceBlocks);
+
+export type AudienceBlock = typeof audienceBlocks.$inferSelect;
+export type NewAudienceBlock = typeof audienceBlocks.$inferInsert;

@@ -214,3 +214,45 @@ export const updateContentPreferences = async (
     undefined,
     'PATCH'
   );
+
+export type UpdateSubscriberNamePayload = {
+  artistId: string;
+  email: string;
+  name: string;
+};
+
+export const updateSubscriberName = async (
+  payload: UpdateSubscriberNamePayload
+): Promise<{ success: true }> =>
+  requestNotifications<{ success: true }>(
+    '/api/notifications/update-name',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      name: payload.name,
+    },
+    NOTIFICATION_COPY.errors.generic,
+    undefined,
+    'PATCH'
+  );
+
+export type UpdateSubscriberBirthdayPayload = {
+  artistId: string;
+  email: string;
+  birthday: string; // "YYYY-MM-DD" (ISO date); legacy: "MM-DD"
+};
+
+export const updateSubscriberBirthday = async (
+  payload: UpdateSubscriberBirthdayPayload
+): Promise<{ success: true }> =>
+  requestNotifications<{ success: true }>(
+    '/api/notifications/update-birthday',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      birthday: payload.birthday,
+    },
+    NOTIFICATION_COPY.errors.generic,
+    undefined,
+    'PATCH'
+  );

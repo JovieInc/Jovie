@@ -1,7 +1,7 @@
 'use client';
 
 import { Switch } from '@jovie/ui';
-import * as React from 'react';
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerSettingsToggleProps {
@@ -36,16 +36,19 @@ export function DrawerSettingsToggle({
   density = 'default',
   className,
 }: DrawerSettingsToggleProps) {
-  const id = React.useId();
+  const id = useId();
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[7px] py-0.5 transition-[background-color,box-shadow] duration-150',
+        'flex items-center justify-between gap-3 rounded-[10px] border py-px transition-[background-color,border-color] duration-150',
+        density === 'compact'
+          ? 'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
+          : 'border-(--linear-app-frame-seam) bg-surface-0',
         !disabled &&
-          'hover:bg-surface-1 focus-within:bg-surface-1 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+          'hover:border-default hover:bg-surface-1 focus-within:border-default focus-within:bg-surface-1',
         density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
-        density === 'compact' ? 'px-1.5' : 'px-2',
+        density === 'compact' ? 'px-2' : 'px-2.5',
         disabled && 'opacity-60',
         className
       )}
@@ -55,7 +58,7 @@ export function DrawerSettingsToggle({
         className={cn(
           'select-none text-secondary-token',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-          density === 'compact' ? 'text-[11px]' : 'text-[12px]'
+          density === 'compact' ? 'text-[11.5px] font-[500]' : 'text-[12px]'
         )}
       >
         {label}

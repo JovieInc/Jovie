@@ -47,6 +47,7 @@
 
 import type { FullSentryConfig } from './client-full';
 import type { LiteSentryConfig } from './client-lite';
+import { initLiteSentry as initLiteSentrySync } from './client-lite';
 import { getCurrentPathname, getSdkMode } from './route-detector';
 import {
   getSentryMode,
@@ -277,9 +278,10 @@ export function initSentrySync(
     };
   }
 
-  // For sync initialization, we always use lite SDK
-  const { initLiteSentry } = require('./client-lite');
-  const success = initLiteSentry(liteOptions);
+  // For sync initialization, we always use lite SDK.
+  // This must stay ESM-safe because Vitest/Vite cannot transform require()
+  // inside this module on CI test shards.
+  const success = initLiteSentrySync(liteOptions);
 
   if (success) {
     setCurrentMode('lite');

@@ -5,9 +5,9 @@ import { publicEnv } from '@/lib/env-public';
  * Matches the three-tier pricing grid layout
  */
 
-const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
-const TIER_SKELETON_KEYS = growthPlanEnabled
-  ? (['free-tier', 'pro-tier', 'growth-tier'] as const)
+const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
+const TIER_SKELETON_KEYS = maxPlanEnabled
+  ? (['free-tier', 'pro-tier', 'max-tier'] as const)
   : (['free-tier', 'pro-tier'] as const);
 const FEATURE_SKELETON_KEYS = Array.from(
   { length: 5 },

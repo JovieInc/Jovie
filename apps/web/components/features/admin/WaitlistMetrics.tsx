@@ -1,6 +1,6 @@
 import { CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
+import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 
 interface MetricCardProps {
@@ -29,7 +29,7 @@ function MetricCard({
         <Icon className={cn('h-4 w-4', colorClass)} aria-hidden />
       </div>
       <div className='min-w-0'>
-        <p className='text-[10px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+        <p className='text-[13px] font-[560] tracking-normal text-secondary-token'>
           {label}
         </p>
         <p className='text-[15px] font-[590] leading-tight tabular-nums text-primary-token'>

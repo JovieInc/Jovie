@@ -18,21 +18,27 @@
     {
       "path": "/api/cron/process-ingestion-jobs",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/purge-pixel-ips",
+      "schedule": "0 3 * * *"
     }
   ],
   "functions": {
-    "app/api/**/*.ts": {
+    "app/api/**/route.ts": {
       "maxDuration": 30
     },
-    "app/api/cron/**/*.ts": {
+    "app/api/**/route.tsx": {
+      "maxDuration": 30
+    },
+    "app/api/cron/**/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/**/route.tsx": {
       "maxDuration": 300
     }
   },
   "rewrites": [
-    {
-      "source": "/clerk/(.*)",
-      "destination": "https://clerk.jov.ie/$1"
-    },
     {
       "source": "/ingest/static/(.*)",
       "destination": "https://us-assets.i.posthog.com/static/$1"

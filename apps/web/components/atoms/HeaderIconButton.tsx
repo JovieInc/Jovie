@@ -22,9 +22,9 @@ export const HeaderIconButton = React.forwardRef<
   ref
 ) {
   const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {
-    xs: 'h-6 w-6 rounded-[7px] [&_svg]:h-3 [&_svg]:w-3',
-    sm: 'h-7 w-7 rounded-[8px] [&_svg]:h-3.5 [&_svg]:w-3.5',
-    md: 'h-8 w-8 rounded-[9px] [&_svg]:h-4 [&_svg]:w-4',
+    xs: 'h-6 w-6 rounded-full [&_svg]:h-3 [&_svg]:w-3',
+    sm: 'h-7 w-7 rounded-full [&_svg]:h-3.5 [&_svg]:w-3.5',
+    md: 'h-8 w-8 rounded-full [&_svg]:h-4 [&_svg]:w-4',
   };
 
   return (

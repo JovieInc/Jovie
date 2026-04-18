@@ -83,31 +83,25 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400] text-tertiary-token'
+          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-[11px] font-[510] text-tertiary-token'
         >
-          <Icon
-            name='Plus'
-            className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100 group-focus-visible/add:opacity-100'
-            aria-hidden='true'
-          />
-          <span className='line-clamp-1 text-tertiary-token group-hover/add:hidden group-focus-visible/add:hidden'>
-            —
-          </span>
-          <span className='line-clamp-1 hidden group-hover/add:inline group-focus-visible/add:inline'>
-            Add link
-          </span>
+          <Icon name='Plus' className='h-3.5 w-3.5' aria-hidden='true' />
+          <span className='line-clamp-1'>Add</span>
         </DrawerButton>
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[288px] border-0 bg-transparent p-0 shadow-none'
+        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
         }}
       >
-        <DrawerSurfaceCard className='p-3'>
-          <form onSubmit={handleSubmit} className='space-y-3'>
+        <DrawerSurfaceCard
+          variant='card'
+          className='rounded-[12px] border-0 bg-transparent p-2.5'
+        >
+          <form onSubmit={handleSubmit} className='space-y-2.5'>
             <div className='flex items-center gap-2'>
               <span
                 className='h-2 w-2 shrink-0 rounded-full'
@@ -139,13 +133,14 @@ export function AddProviderUrlPopover({
                 }}
                 disabled={isSaving}
                 autoComplete='off'
-                className='h-8 rounded-[8px] border-subtle bg-surface-1 text-[12px]'
+                className='h-8 rounded-full border-subtle bg-surface-1 text-[12px]'
               />
             </DrawerFormField>
             <div className='flex justify-end gap-2'>
               <DrawerButton
                 type='button'
                 tone='ghost'
+                className='h-7 rounded-full px-2.5 text-[11px]'
                 onClick={() => {
                   setUrl('');
                   setOpen(false);
@@ -157,7 +152,7 @@ export function AddProviderUrlPopover({
                 type='submit'
                 tone='primary'
                 disabled={!url.trim() || isSaving}
-                className='min-w-[68px]'
+                className='h-7 min-w-[60px] rounded-full px-2.5 text-[11px]'
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </DrawerButton>

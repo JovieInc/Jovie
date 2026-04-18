@@ -20,8 +20,9 @@ const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockRedisGet = vi.hoisted(() => vi.fn());
 const mockRedisSet = vi.hoisted(() => vi.fn().mockResolvedValue('OK'));
 const mockRedisDel = vi.hoisted(() => vi.fn());
+const mockGetRedis = vi.hoisted(() => vi.fn());
 const mockGetLatestRelease = vi.hoisted(() => vi.fn());
-const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
 
 // Mock database
 vi.mock('@/lib/db', () => ({
@@ -32,11 +33,11 @@ vi.mock('@/lib/db', () => ({
 
 // Mock Redis
 vi.mock('@/lib/redis', () => ({
-  getRedis: () => ({
+  getRedis: mockGetRedis.mockImplementation(() => ({
     get: mockRedisGet,
     set: mockRedisSet,
     del: mockRedisDel,
-  }),
+  })),
 }));
 
 // Mock discography queries
@@ -44,10 +45,11 @@ vi.mock('@/lib/discography/queries', () => ({
   getLatestReleaseByUsername: mockGetLatestRelease,
 }));
 
-// Mock error tracking
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
-  captureWarning: mockCaptureWarning,
+// Mock logger
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: mockLoggerWarn,
+  },
 }));
 
 // Helper to create a chainable select mock
@@ -132,6 +134,11 @@ const mockContact = {
 describe('Profile Service Queries', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRedis.mockImplementation(() => ({
+      get: mockRedisGet,
+      set: mockRedisSet,
+      del: mockRedisDel,
+    }));
   });
 
   afterEach(() => {
@@ -245,10 +252,10 @@ describe('Profile Service Queries', () => {
       );
       await getProfileSocialLinks('profile-123');
 
-      expect(mockCaptureWarning).toHaveBeenCalledWith(
-        '[profile-service] MAX_SOCIAL_LINKS limit hit',
-        undefined,
-        expect.objectContaining({ profileId: 'profile-123', count: 100 })
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'MAX_SOCIAL_LINKS limit hit',
+        expect.objectContaining({ profileId: 'profile-123', count: 100 }),
+        'profile-service'
       );
     });
   });
@@ -284,7 +291,11 @@ describe('Profile Service Queries', () => {
       const result = await getProfileContacts('profile-123');
 
       expect(result).toEqual([]);
-      expect(mockCaptureWarning).toHaveBeenCalled();
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'creator_contacts table does not exist, returning empty',
+        undefined,
+        'profile-service'
+      );
     });
 
     it('rethrows non-table-missing errors', async () => {
@@ -307,6 +318,17 @@ describe('Profile Service Queries', () => {
   });
 
   describe('getProfileWithLinks', () => {
+    it('fast-fails known probe usernames without touching Redis or the database', async () => {
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      const result = await getProfileWithLinks('wp');
+
+      expect(result).toBeNull();
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
     it('returns cached data from Redis when available', async () => {
       const cachedProfile = {
         ...mockProfileWithUser,
@@ -414,6 +436,7 @@ describe('Profile Service Queries', () => {
       await getProfileWithLinks('testartist', { skipCache: true });
 
       expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
     });
 
     it('handles Redis read failure gracefully', async () => {
@@ -445,9 +468,81 @@ describe('Profile Service Queries', () => {
 
       // Should fall back to database and still return data
       expect(result).toBeTruthy();
-      expect(mockCaptureWarning).toHaveBeenCalledWith(
-        '[profile-service] Redis cache read failed',
-        expect.any(Error)
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Redis cache read failed',
+        expect.any(Error),
+        'profile-service'
+      );
+    });
+
+    it('falls back to the legacy profile query shape when the rich select fails', async () => {
+      mockRedisGet.mockResolvedValue(null);
+      mockGetLatestRelease.mockResolvedValue(null);
+
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: vi.fn().mockReturnThis(),
+            leftJoin: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi
+              .fn()
+              .mockRejectedValue(new Error('column "theme" does not exist')),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'profile-123',
+                userId: 'user-456',
+                username: 'testartist',
+                usernameNormalized: 'testartist',
+                displayName: 'Test Artist',
+                bio: 'A test artist bio',
+                avatarUrl: 'https://example.com/avatar.jpg',
+                venmoHandle: 'testartist',
+                spotifyUrl: 'https://open.spotify.com/artist/123',
+                appleMusicUrl: 'https://music.apple.com/artist/123',
+                youtubeUrl: 'https://youtube.com/channel/123',
+                isPublic: true,
+                isVerified: false,
+                isClaimed: true,
+                claimToken: 'hashed-token',
+                createdAt: NOW,
+                updatedAt: NOW,
+              },
+            ]),
+          };
+        }
+        return {
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue([]),
+        };
+      });
+
+      const { getProfileWithLinks } = await import(
+        '@/lib/services/profile/queries'
+      );
+      const result = await getProfileWithLinks('testartist');
+
+      expect(result).toBeTruthy();
+      expect(result?.creatorType).toBe('artist');
+      expect(result?.theme).toEqual({});
+      expect(result?.userIsPro).toBe(false);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Falling back to legacy profile query',
+        expect.objectContaining({
+          error: expect.any(Error),
+          username: 'testartist',
+        }),
+        'profile-service'
       );
     });
   });
@@ -496,6 +591,9 @@ describe('Profile Service Queries', () => {
       );
       await invalidateProfileEdgeCache('testartist');
 
+      expect(mockGetRedis).toHaveBeenCalledWith({
+        signal: expect.any(AbortSignal),
+      });
       expect(mockRedisDel).toHaveBeenCalledWith('profile:data:testartist');
     });
 
@@ -510,7 +608,11 @@ describe('Profile Service Queries', () => {
       await expect(
         invalidateProfileEdgeCache('testartist')
       ).resolves.toBeUndefined();
-      expect(mockCaptureWarning).toHaveBeenCalled();
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        'Failed to invalidate edge cache',
+        expect.any(Error),
+        'profile-service'
+      );
     });
   });
 

@@ -141,7 +141,7 @@ function ThemeToggleButton({
             disabled={isUpdating}
             onClick={onToggle}
             className={cn(
-              'h-8 w-8 rounded-[8px] bg-surface-1 text-quaternary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-4 [&_svg]:w-4',
+              'h-8 w-8 rounded-full bg-surface-1 text-quaternary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-4 [&_svg]:w-4',
               isUpdating && 'opacity-70'
             )}
           >

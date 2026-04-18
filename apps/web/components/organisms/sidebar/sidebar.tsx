@@ -57,7 +57,7 @@ export const Sidebar = React.forwardRef<
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
             style={
               {
-                '--sidebar-width': '18rem',
+                '--sidebar-width': '244px',
               } as React.CSSProperties
             }
             side={side}
@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:block data-[variant=sidebar]:lg:m-2 data-[variant=sidebar]:lg:mr-0'
+            className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}
@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-[calc(100svh-1rem)] w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
+                'duration-normal relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
                 'group-data-[collapsible=offcanvas]:w-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&
@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-[transform,border-color,box-shadow] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-l-[18px] group-data-[variant=sidebar]:rounded-r-[14px] group-data-[variant=sidebar]:rounded-tr-[18px] group-data-[variant=sidebar]:rounded-br-[12px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-sidebar-border/90 group-data-[variant=sidebar]:border-r-0 group-data-[variant=sidebar]:shadow-[1px_0_0_0_var(--linear-app-frame-seam)_inset] group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-[var(--linear-app-shell-radius)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

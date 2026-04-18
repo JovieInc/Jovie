@@ -5,463 +5,253 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1768619021825,
-      "tag": "0000_sleepy_ted_forrester",
+      "when": 1774034157660,
+      "tag": "0000_v1_initial_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1768673713215,
-      "tag": "0001_tidy_valkyrie",
+      "when": 1774034157661,
+      "tag": "0001_custom_functions_and_rls",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1737252000000,
-      "tag": "0002_create_profile_with_user_function",
+      "when": 1774310400000,
+      "tag": "0002_fix_tim_white_avatar",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1737256800000,
-      "tag": "0003_seed_music_streaming_providers",
+      "when": 1774310400001,
+      "tag": "0003_goofy_lord_tyger",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1768844997295,
-      "tag": "0004_productive_nocturne",
+      "when": 1774310400002,
+      "tag": "0004_add_active_profile_id",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1768854229748,
-      "tag": "0005_silky_cloak",
+      "when": 1774310400003,
+      "tag": "0005_blushing_colonel_america",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1769040000000,
-      "tag": "0006_add_spotify_popularity",
+      "when": 1774338000000,
+      "tag": "0006_repair_missing_columns",
       "breakpoints": true
     },
     {
       "idx": 7,
       "version": "7",
-      "when": 1769050000000,
-      "tag": "0007_add_spotify_popularity_range_check",
+      "when": 1774339000000,
+      "tag": "0007_repair_missing_claim_tables",
       "breakpoints": true
     },
     {
       "idx": 8,
       "version": "7",
-      "when": 1769060000000,
-      "tag": "0008_fix_email_conflict_in_create_profile",
+      "when": 1774340000000,
+      "tag": "0008_repair_missing_claim_tables_retry",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1769124583369,
-      "tag": "0009_add_performance_indexes",
+      "when": 1774480204178,
+      "tag": "0009_certain_agent_brand",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
-      "when": 1769136948971,
-      "tag": "0010_graceful_roxanne_simpson",
+      "when": 1774497265733,
+      "tag": "0010_eminent_nitro",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1769200000000,
-      "tag": "0011_add_tour_dates",
+      "when": 1774510318265,
+      "tag": "0011_even_lady_ursula",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1769462356718,
-      "tag": "0012_sender-quotas-reputation",
+      "when": 1774552006324,
+      "tag": "0012_third_skin",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1769500000000,
-      "tag": "0013_add_pixel_tracking",
+      "when": 1774570658668,
+      "tag": "0013_mushy_jigsaw",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1769481856592,
-      "tag": "0014_absent_harpoon",
+      "when": 1774577343168,
+      "tag": "0014_certain_natasha_romanoff",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1769553363347,
-      "tag": "0015_omniscient_blonde_phantom",
+      "when": 1774843200000,
+      "tag": "0015_rename_pitch_context_to_career_highlights",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "7",
-      "when": 1769600000000,
-      "tag": "0016_analytics_performance_indexes",
+      "when": 1774843200001,
+      "tag": "0016_open_strong_guy",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1769700000000,
-      "tag": "0017_add_email_engagement_and_campaigns",
+      "when": 1774843200002,
+      "tag": "0017_repair_missing_career_highlights",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1769800000000,
-      "tag": "0018_featured_creator_query_index",
+      "when": 1774843200003,
+      "tag": "0018_overjoyed_umar",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1769900000000,
-      "tag": "0019_creator_provenance_tables",
+      "when": 1774843200004,
+      "tag": "0019_clear_fake_musicfetch_confidence",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1770000000000,
-      "tag": "0020_dashboard_performance_indexes",
+      "when": 1774991946325,
+      "tag": "0020_romantic_captain_britain",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1738282000000,
-      "tag": "0021_optimize_provider_links_query",
+      "when": 1774991946326,
+      "tag": "0021_easy_weapon_omega",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1770091962199,
-      "tag": "0022_big_vengeance",
+      "when": 1774998129788,
+      "tag": "0022_ordinary_romulus",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1770339600000,
-      "tag": "0023_optimize_social_links_platform_type_query",
+      "when": 1775340180216,
+      "tag": "0023_good_zaladane",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1770338344147,
-      "tag": "0024_bizarre_slapstick",
+      "when": 1775402990657,
+      "tag": "0024_useful_namor",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1770497158714,
-      "tag": "0025_adorable_karnak",
+      "when": 1775404678166,
+      "tag": "0025_typical_gunslinger",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1770681600000,
-      "tag": "0026_add_subscription_email_verification",
+      "when": 1775537740815,
+      "tag": "0026_first_magdalene",
       "breakpoints": true
     },
     {
       "idx": 27,
       "version": "7",
-      "when": 1770671504667,
-      "tag": "0027_small_tombstone",
+      "when": 1775587016744,
+      "tag": "0027_cool_malcolm_colcord",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1770768000000,
-      "tag": "0028_add_tour_date_timezone",
+      "when": 1775682246003,
+      "tag": "0028_curious_squirrel_girl",
       "breakpoints": true
     },
     {
       "idx": 29,
       "version": "7",
-      "when": 1771027200000,
-      "tag": "0029_add_audience_utm_params",
+      "when": 1775682246100,
+      "tag": "0029_normalize_is_bot",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1771097050969,
-      "tag": "0030_regular_the_hunter",
+      "when": 1775682246200,
+      "tag": "0030_normalize_audience_jsonb",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1771200000000,
-      "tag": "0031_add_referral_program",
+      "when": 1775885889990,
+      "tag": "0031_needy_blindfold",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1771200000001,
-      "tag": "0032_seed_video_providers",
+      "when": 1775975959585,
+      "tag": "0032_tricky_thing",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1771182092653,
-      "tag": "0033_strange_menace",
+      "when": 1776055016627,
+      "tag": "0033_wet_zzzax",
       "breakpoints": true
     },
     {
       "idx": 34,
       "version": "7",
-      "when": 1771195048104,
-      "tag": "0034_aspiring_proemial_gods",
+      "when": 1776300136185,
+      "tag": "0034_youthful_white_queen",
       "breakpoints": true
     },
     {
       "idx": 35,
       "version": "7",
-      "when": 1771359913412,
-      "tag": "0035_old_mindworm",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1771459200000,
-      "tag": "0036_add_ingest_audit_logs",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1771480180366,
-      "tag": "0037_add_email_otp_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1771561165876,
-      "tag": "0038_enable_rls_for_pii_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1772000000000,
-      "tag": "0039_hash_claim_tokens",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1771642685744,
-      "tag": "0040_add_social_link_verification",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1771642408553,
-      "tag": "0040_waitlist_gate_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1771740470141,
-      "tag": "0041_add_pre_save_tokens",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1771781686070,
-      "tag": "0041_add_outreach_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1771778962066,
-      "tag": "0041_add_track_audio_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1771802378066,
-      "tag": "0041_creator_profiles_spotify_id_unique",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1771900000000,
-      "tag": "0042_create_feedback_items",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1772006400000,
-      "tag": "0043_creator_profiles_user_created_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1772092800000,
-      "tag": "0044_optimize_audience_type_filtering",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1772179200000,
-      "tag": "0045_add_users_stripe_price_id",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1772524800000,
-      "tag": "0046_add_tip_checkout_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1772524800001,
-      "tag": "0046_add_tip_audience",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1772265600000,
-      "tag": "0047_add_stripe_connect_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1772492931795,
-      "tag": "0048_add_tip_pixel_events",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1772607628950,
-      "tag": "0054_powerful_vampiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1741046400000,
-      "tag": "0055_add_campaign_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1772689770136,
-      "tag": "0056_first_squadron_sinister",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1772870400000,
-      "tag": "0057_add_leads_linktree_verified",
-      "breakpoints": true
-    },
-    {
-      "idx": 58,
-      "version": "7",
-      "when": 1772870500000,
-      "tag": "0058_chubby_jocasta",
-      "breakpoints": true
-    },
-    {
-      "idx": 59,
-      "version": "7",
-      "when": 1772956800000,
-      "tag": "0059_add_user_lifecycle_email_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 60,
-      "version": "7",
-      "when": 1772938561227,
-      "tag": "0060_daily_profile_views_rollup",
-      "breakpoints": true
-    },
-    {
-      "idx": 61,
-      "version": "7",
-      "when": 1773197224777,
-      "tag": "0061_social_links_profile_platform_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 62,
-      "version": "7",
-      "when": 1741968000000,
-      "tag": "0063_tips_status_amount_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 63,
-      "version": "7",
-      "when": 1773648000000,
-      "tag": "0064_fix_audience_fingerprint_and_isrc_constraints",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1773820800000,
-      "tag": "0065_add_keyword_search_offset",
-      "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1773907200000,
-      "tag": "0066_add_discog_tracks_lyrics",
+      "when": 1776300243139,
+      "tag": "0035_tranquil_stephen_strange",
       "breakpoints": true
     }
   ]

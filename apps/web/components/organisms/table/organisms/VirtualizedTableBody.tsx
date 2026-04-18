@@ -87,12 +87,19 @@ export interface VirtualizedTableBodyProps<TData> {
   /**
    * Get context menu items for a row
    */
-  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (
+    row: TData
+  ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
 
   /**
    * Get custom class names for a row
    */
   readonly getRowClassName?: (row: TData, index: number) => string;
+
+  /**
+   * Get a stable test ID for a row when callers need selector-level targeting.
+   */
+  readonly getRowTestId?: (row: TData, index: number) => string | undefined;
 
   /**
    * Called when the row is shift-clicked (for range selection).
@@ -174,6 +181,7 @@ export function VirtualizedTableBody<TData>({
   onRowShiftClick,
   getContextMenuItems,
   getRowClassName,
+  getRowTestId,
   renderRow,
   getRowId,
   expandedRowIds,
@@ -245,6 +253,7 @@ export function VirtualizedTableBody<TData>({
             onKeyDown={onKeyDown}
             onFocusChange={onFocusChange}
             getRowClassName={getRowClassName}
+            getRowTestId={getRowTestId}
             measureElement={rowVirtualizer?.measureElement}
             onRowShiftClick={onRowShiftClick}
           />
@@ -252,7 +261,10 @@ export function VirtualizedTableBody<TData>({
 
         // Apply context menu wrapper if needed
         const wrappedRow = getContextMenuItems ? (
-          <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+          <TableContextMenu
+            key={row.id}
+            getItems={() => getContextMenuItems(rowData)}
+          >
             {rowElement}
           </TableContextMenu>
         ) : (

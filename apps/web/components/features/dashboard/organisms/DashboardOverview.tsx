@@ -21,7 +21,10 @@ import {
   getIncompleteTaskIndicatorContent,
   getIncompleteTaskLabelClass,
 } from '@/features/dashboard/organisms/dashboard-overview-helpers';
+import { GetStartedChecklistCard } from '@/features/dashboard/organisms/GetStartedChecklistCard';
+import { LinkClicksCard } from '@/features/dashboard/organisms/LinkClicksCard';
 import { StarterEmptyState } from '@/features/feedback/StarterEmptyState';
+import type { BioLinkActivation } from '@/lib/distribution/instagram-activation';
 import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
   trimLeadingSlashes,
@@ -46,8 +49,11 @@ function getGreetingName(artistName: string | null | undefined): string {
 
 interface DashboardOverviewProps {
   readonly artist: Artist | null;
+  readonly bioLinkActivation?: BioLinkActivation | null;
   readonly hasSocialLinks: boolean;
   readonly hasMusicLinks?: boolean;
+  readonly linkClickStats?: { platform: string; clicks: number }[];
+  readonly linkClickTotal?: number;
 }
 
 interface SetupTaskItemProps {
@@ -87,7 +93,7 @@ function SetupTaskItem({
       {!isComplete && (
         <Link
           href={actionHref}
-          className='text-[12.5px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+          className='rounded-full border border-transparent px-2.5 py-1 text-[12px] font-[510] text-secondary-token transition-[background-color,border-color,color] hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
           {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
@@ -98,8 +104,11 @@ function SetupTaskItem({
 
 export function DashboardOverview({
   artist,
+  bioLinkActivation = null,
   hasSocialLinks,
   hasMusicLinks = false,
+  linkClickStats = [],
+  linkClickTotal = 0,
 }: DashboardOverviewProps) {
   if (!artist) {
     return (
@@ -147,9 +156,9 @@ export function DashboardOverview({
             Welcome back, {greetingName}
           </span>
         }
-        subtitle='Keep your profile polished and ready to share.'
+        subtitle='Keep your profile polished and ready to share'
         actions={
-          <div className='flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-nowrap sm:justify-end'>
+          <div className='flex w-full flex-wrap items-center justify-between gap-1 sm:w-auto sm:flex-nowrap sm:justify-end'>
             <div className='flex items-center gap-1'>
               <Button
                 asChild
@@ -190,17 +199,17 @@ export function DashboardOverview({
     return (
       <DashboardOverviewControlsProvider>
         <div
-          className='flex min-h-[60vh] items-center justify-center px-4 py-6 sm:px-0'
+          className='flex items-center justify-center px-4 py-1 sm:px-0'
           data-testid='dashboard-overview'
         >
-          <ContentSurfaceCard className='w-full max-w-md overflow-hidden'>
+          <ContentSurfaceCard className='w-full max-w-sm overflow-hidden'>
             <ContentSectionHeader
               title='Complete your setup'
               subtitle={`${completedCount} of ${totalSteps} complete`}
               bodyClassName='space-y-0'
             />
 
-            <ul className='space-y-1 p-2 sm:p-3'>
+            <ul className='space-y-0 p-1 sm:p-1.5'>
               <SetupTaskItem
                 isComplete={isHandleClaimed}
                 stepNumber={1}
@@ -231,11 +240,22 @@ export function DashboardOverview({
 
   return (
     <DashboardOverviewControlsProvider>
-      <div className='space-y-6' data-testid='dashboard-overview'>
+      <div className='space-y-1' data-testid='dashboard-overview'>
         {header}
 
+        {artist.owner_user_id && (
+          <GetStartedChecklistCard
+            userId={artist.owner_user_id}
+            profileUrl={profileUrl}
+          />
+        )}
+
         {profileUrl && (
-          <SocialBioNudge profileId={artist.id} profileUrl={profileUrl} />
+          <SocialBioNudge
+            bioLinkActivation={bioLinkActivation}
+            profileId={artist.id}
+            profileUrl={profileUrl}
+          />
         )}
 
         <DashboardOverviewMetricsClient
@@ -243,6 +263,8 @@ export function DashboardOverview({
           profileUrl={profileUrl}
           showActivity
         />
+
+        <LinkClicksCard stats={linkClickStats} total={linkClickTotal} />
       </div>
     </DashboardOverviewControlsProvider>
   );

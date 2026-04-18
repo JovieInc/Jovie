@@ -5,6 +5,7 @@ import { Button, CommonDropdown, Input } from '@jovie/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
@@ -27,7 +28,7 @@ const CHIP_BG_ALPHA = 0x15 / 255;
 function getChipSafeIconColor(brandHex: string, isDark: boolean): string {
   if (isDark && isBrandDark(brandHex)) return '#ffffff';
 
-  const surfaceHex = isDark ? '#101012' : '#fcfcfc';
+  const surfaceHex = isDark ? '#17171a' : '#fcfcfc';
   const brand = hexToRgb(brandHex);
   const surface = hexToRgb(surfaceHex);
   const r = Math.round(
@@ -319,7 +320,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-0/50'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-1'
               >
                 <CommonDropdown
                   variant='dropdown'
@@ -403,10 +404,19 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             </Button>
             <Button
               type='submit'
+              disabled={loading}
               variant='primary'
               className='w-full sm:w-auto'
+              aria-busy={loading}
             >
-              Save Social Links
+              {loading ? (
+                <div className='flex items-center justify-center space-x-2'>
+                  <LoadingSpinner size='sm' tone='inverse' label='Saving' />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                'Save Social Links'
+              )}
             </Button>
           </div>
         </form>

@@ -1,25 +1,31 @@
 'use client';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@jovie/ui';
-import { AlertCircle, Mail, Phone } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
-import { CTAButton } from '@/components/molecules/CTAButton';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
+  profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
-  SubscriptionPendingConfirmation,
+  SubscriptionOtpResendAction,
+  SubscriptionPearlComposer,
   SubscriptionSuccess,
+  subscriptionComposerFocusClassName,
+  subscriptionHeadingClassName,
+  subscriptionInputClassName,
+  subscriptionPrimaryActionClassName,
+  subscriptionPrimaryLinkClassName,
+  subscriptionSuccessTextClassName,
+  useSubscriptionErrorFeedback,
 } from './shared';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
@@ -39,22 +45,21 @@ function ListenNowCTA({
 
   if (variant === 'button') {
     return (
-      <CTAButton
+      <Link
         href={listenHref}
-        variant='primary'
-        size='lg'
-        className='w-full'
+        prefetch={false}
+        className={subscriptionPrimaryLinkClassName}
       >
         Listen Now
-      </CTAButton>
+      </Link>
     );
   }
 
   return (
     <Link
       href={listenHref}
-      prefetch
-      className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+      prefetch={false}
+      className={subscriptionPrimaryLinkClassName}
     >
       Listen Now
     </Link>
@@ -78,7 +83,7 @@ function ChannelToggle({
   return (
     <button
       type='button'
-      className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+      className={`flex h-10 w-10 items-center justify-center rounded-full ${profileQuietIconButtonClassName} transition-colors focus-visible:outline-none`}
       aria-label={
         channel === 'sms' ? 'Switch to email updates' : 'Switch to text updates'
       }
@@ -231,10 +236,62 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+/**
+ * Get the heading text for the subscribe form.
+ */
+function getFormHeading(otpStep: string): string {
+  return otpStep === 'verify'
+    ? 'Check your inbox. Enter your code.'
+    : 'Never miss a release.';
+}
+
+/** Whether the fallback CTA should be shown instead of the subscribe form. */
+function shouldShowFallbackCTA(
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean,
+  forceExpanded: boolean,
+  hideListenFallback: boolean
+): boolean {
+  if (hideListenFallback || forceExpanded) {
+    return false;
+  }
+
+  return !notificationsEnabled || (notificationsState === 'idle' && !autoOpen);
+}
+
+/** Whether the subscribe form should trigger impression tracking. */
+function isSubscribeFormVisible(
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean,
+  forceExpanded: boolean,
+  hideListenFallback: boolean
+): boolean {
+  if (
+    shouldShowFallbackCTA(
+      notificationsEnabled,
+      notificationsState,
+      autoOpen,
+      forceExpanded,
+      hideListenFallback
+    )
+  ) {
+    return false;
+  }
+  return (
+    notificationsState !== 'success' &&
+    notificationsState !== 'pending_confirmation'
+  );
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
   autoOpen = false,
+  forceExpanded = false,
+  hideListenFallback = false,
+  source,
 }: ArtistNotificationsCTAProps) {
   const {
     country,
@@ -242,11 +299,14 @@ export function ArtistNotificationsCTA({
     phoneInput,
     emailInput,
     error,
+    errorOrigin,
     otpCode,
     otpStep,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
+    resendCooldownEnd,
+    isResending,
     handleChannelChange,
     handlePhoneChange,
     handleEmailChange,
@@ -254,6 +314,7 @@ export function ArtistNotificationsCTA({
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
+    handleResendOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
@@ -262,12 +323,20 @@ export function ArtistNotificationsCTA({
     openSubscription,
     registerInputFocus,
     hydrationStatus,
-  } = useSubscriptionForm({ artist });
+    smsEnabled,
+  } = useSubscriptionForm({ artist, source });
 
   const inputId = useId();
   const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showInlineErrorCopy, shouldShowDesktopTooltip } =
+    useSubscriptionErrorFeedback({
+      error,
+      errorOrigin,
+    });
 
   useInputFocusRegistration(inputRef, registerInputFocus);
   usePhoneInputConstraint(country.dialCode, phoneInput, handlePhoneChange);
@@ -278,12 +347,17 @@ export function ArtistNotificationsCTA({
     notificationsState,
     openSubscription
   );
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
 
-  const showsSubscribeForm =
-    notificationsEnabled &&
-    !(notificationsState === 'idle' && !autoOpen) &&
-    notificationsState !== 'success' &&
-    notificationsState !== 'pending_confirmation';
+  const showsSubscribeForm = isSubscribeFormVisible(
+    notificationsEnabled,
+    notificationsState,
+    autoOpen,
+    forceExpanded,
+    hideListenFallback
+  );
   useImpressionTracking(showsSubscribeForm, artist.handle, variant);
 
   const hasSubscriptions = Boolean(
@@ -298,24 +372,40 @@ export function ArtistNotificationsCTA({
 
   // Show loading skeleton while checking subscription status
   if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
+    return (
+      <div className='min-h-[180px]'>
+        <SubscriptionFormSkeleton />
+      </div>
+    );
   }
 
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
-    return <ListenNowCTA variant={variant} handle={artist.handle} />;
-  }
-
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
+  if (
+    shouldShowFallbackCTA(
+      notificationsEnabled,
+      notificationsState,
+      autoOpen,
+      forceExpanded,
+      hideListenFallback
+    )
+  ) {
+    return (
+      <div className='min-h-[180px]'>
+        <ListenNowCTA variant={variant} handle={artist.handle} />
+      </div>
+    );
   }
 
   if (isSubscribed) {
     return (
-      <SubscriptionSuccess
-        artistName={artist.name}
-        handle={artist.handle}
-        subscribedChannels={subscribedChannels}
-      />
+      <div className='min-h-[180px]'>
+        <SubscriptionSuccess
+          artistName={artist.name}
+          handle={artist.handle}
+          subscribedChannels={subscribedChannels}
+          artistId={artist.id}
+          subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
+        />
+      </div>
     );
   }
 
@@ -327,139 +417,163 @@ export function ArtistNotificationsCTA({
     country.dialCode
   );
 
-  const handleInputChange = (value: string) => {
-    if (channel === 'sms') {
-      handlePhoneChange(value);
-    } else {
-      handleEmailChange(value);
-    }
-  };
+  const handleInputChange =
+    channel === 'sms' ? handlePhoneChange : handleEmailChange;
 
   const handleInputBlur = () => {
     setIsInputFocused(false);
     handleFieldBlur();
   };
 
+  const handleFormSubmit =
+    otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
+
+  let leftSlot: React.ReactNode;
+  if (otpStep === 'verify') {
+    leftSlot = undefined;
+  } else if (shouldShowCountrySelector) {
+    leftSlot = (
+      <CountrySelector
+        country={country}
+        isOpen={isCountryOpen}
+        onOpenChange={setIsCountryOpen}
+        onSelect={setCountry}
+      />
+    );
+  } else if (smsEnabled) {
+    leftSlot = (
+      <ChannelToggle
+        channel={channel}
+        isSubmitting={isSubmitting}
+        onChannelChange={handleChannelChange}
+      />
+    );
+  }
+
+  const actionClassName =
+    otpStep === 'verify'
+      ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
+      : subscriptionPrimaryActionClassName;
+
+  let composerClassName: string | undefined;
+  if (otpStep === 'verify') {
+    composerClassName = 'px-3 py-3';
+  } else if (isInputFocused) {
+    composerClassName = subscriptionComposerFocusClassName;
+  }
+
   return (
-    <div className='space-y-3'>
-      <p
-        className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
-        style={noFontSynthesisStyle}
-      >
-        {otpStep === 'verify'
-          ? 'Check your inbox. Enter your code.'
-          : 'Never miss a release.'}
+    <div className='min-h-[180px] space-y-3'>
+      <p className={subscriptionHeadingClassName} style={noFontSynthesisStyle}>
+        {getFormHeading(otpStep)}
       </p>
 
-      <div className='overflow-hidden rounded-xl bg-transparent ring-1 ring-(--color-border-subtle) transition-[ring,background-color] focus-within:bg-surface-1/30 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
-        <div className='flex items-center'>
-          {shouldShowCountrySelector ? (
-            <CountrySelector
-              country={country}
-              isOpen={isCountryOpen}
-              onOpenChange={setIsCountryOpen}
-              onSelect={setCountry}
-            />
-          ) : (
-            <ChannelToggle
-              channel={channel}
-              isSubmitting={isSubmitting}
-              onChannelChange={handleChannelChange}
-            />
-          )}
-
-          <div className='flex-1 min-w-0'>
-            {otpStep === 'verify' ? (
-              <div className='px-3 py-2'>
-                <OtpInput
-                  value={otpCode}
-                  onChange={handleOtpChange}
-                  onComplete={() => {
-                    void handleVerifyOtp();
-                  }}
-                  autoFocus
-                  aria-label='Enter 6-digit verification code'
-                  disabled={isSubmitting}
-                  error={Boolean(error)}
-                />
-              </div>
-            ) : (
-              <>
-                <label htmlFor={inputId} className='sr-only'>
-                  {inputConfig.label}
-                </label>
-                <input
-                  ref={inputRef}
-                  id={inputId}
-                  aria-describedby={disclaimerId}
-                  type={inputConfig.type}
-                  inputMode={inputConfig.inputMode}
-                  className='h-12 w-full border-none bg-transparent px-4 text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
-                  placeholder={inputConfig.placeholder}
-                  value={inputValue}
-                  onChange={event => handleInputChange(event.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={handleInputBlur}
-                  onKeyDown={handleKeyDown}
-                  disabled={isSubmitting}
-                  autoComplete={inputConfig.autoComplete}
-                  maxLength={inputConfig.maxLength}
-                  style={noFontSynthesisStyle}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <button
-        type='button'
-        onClick={() =>
-          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe())
+      <SubscriptionPearlComposer
+        dataTestId='subscription-pearl-composer'
+        layout={otpStep === 'verify' ? 'stacked' : 'inline'}
+        leftSlot={leftSlot}
+        action={
+          <button
+            type='button'
+            onClick={() => {
+              handleFormSubmit();
+            }}
+            disabled={isSubmitting || (otpStep === 'verify' && Boolean(error))}
+            className={actionClassName}
+            style={noFontSynthesisStyle}
+          >
+            {getSubmitButtonLabel(isSubmitting, otpStep)}
+          </button>
         }
-        disabled={isSubmitting}
-        className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
-        style={noFontSynthesisStyle}
+        className={composerClassName}
       >
-        {getSubmitButtonLabel(isSubmitting, otpStep)}
-      </button>
-
-      <div className='flex items-center justify-center gap-2'>
-        <p
-          id={disclaimerId}
-          className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
-            isInputFocused && !error ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={noFontSynthesisStyle}
-          aria-hidden={!isInputFocused || Boolean(error)}
-        >
-          No spam. Opt-out anytime.
-        </p>
-
-        {/* Error tooltip - no layout shift, shows inline icon with tooltip */}
-        {error && (
-          <TooltipProvider delayDuration={0}>
-            <Tooltip defaultOpen>
-              <TooltipTrigger>
-                <span
-                  className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
-                  role='alert'
-                  aria-live='assertive'
-                >
-                  <AlertCircle className='h-4 w-4' aria-hidden='true' />
-                  <span className='sr-only'>{error}</span>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent
-                side='bottom'
-                className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
-              >
-                {error}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        {otpStep === 'verify' ? (
+          <div className='px-2 py-2'>
+            <OtpInput
+              value={otpCode}
+              onChange={handleOtpChange}
+              onComplete={() => {
+                if (!error) handleVerifyOtp();
+              }}
+              autoFocus
+              aria-label='Enter 6-digit verification code'
+              disabled={isSubmitting}
+              error={Boolean(error)}
+            />
+          </div>
+        ) : (
+          <>
+            <label htmlFor={inputId} className='sr-only'>
+              {inputConfig.label}
+            </label>
+            <input
+              ref={inputRef}
+              id={inputId}
+              data-testid='subscription-input'
+              aria-describedby={disclaimerId}
+              type={inputConfig.type}
+              inputMode={inputConfig.inputMode}
+              className={subscriptionInputClassName}
+              placeholder={inputConfig.placeholder}
+              value={inputValue}
+              onChange={event => handleInputChange(event.target.value)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={handleInputBlur}
+              onKeyDown={handleKeyDown}
+              disabled={isSubmitting}
+              aria-invalid={error ? true : undefined}
+              autoComplete={inputConfig.autoComplete}
+              maxLength={inputConfig.maxLength}
+              style={noFontSynthesisStyle}
+            />
+          </>
         )}
-      </div>
+      </SubscriptionPearlComposer>
+
+      <SubscriptionFeedbackRail
+        message={
+          error && showInlineErrorCopy ? (
+            <span id={disclaimerId} role='alert'>
+              {error}
+            </span>
+          ) : confirmMessage ? (
+            <span
+              id={disclaimerId}
+              className={subscriptionSuccessTextClassName}
+            >
+              {confirmMessage}
+            </span>
+          ) : otpStep === 'verify' ? (
+            <span id={disclaimerId}>
+              Enter the 6-digit code we sent to your email.
+            </span>
+          ) : isInputFocused ? (
+            <span id={disclaimerId}>No spam. Opt-out anytime.</span>
+          ) : null
+        }
+        sideAction={
+          otpStep === 'verify' ? (
+            <>
+              {error && shouldShowDesktopTooltip ? (
+                <SubscriptionDesktopErrorIndicator error={error} />
+              ) : null}
+              <SubscriptionOtpResendAction
+                resendCooldownEnd={resendCooldownEnd}
+                isResending={isResending}
+                onResend={() => {
+                  requestOtpResendConfirmation({
+                    handleResendOtp,
+                    confirmTimeoutRef,
+                    setConfirmMessage,
+                  });
+                }}
+              />
+            </>
+          ) : error && shouldShowDesktopTooltip ? (
+            <SubscriptionDesktopErrorIndicator error={error} />
+          ) : null
+        }
+      />
     </div>
   );
 }

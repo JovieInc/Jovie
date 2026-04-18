@@ -16,6 +16,7 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
 import { activateReferral, getInternalUserId } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
@@ -27,6 +28,22 @@ import type {
   WebhookContext,
 } from '../types';
 import { getUserIdFromStripeCustomer, invalidateBillingCache } from '../utils';
+
+/**
+ * Best-effort referral activation — logs but does not throw on failure.
+ */
+async function tryActivateReferral(clerkUserId: string): Promise<void> {
+  try {
+    const internalId = await getInternalUserId(clerkUserId);
+    if (internalId) {
+      await activateReferral(internalId);
+    }
+  } catch (error) {
+    logger.warn('Failed to activate referral on checkout', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
 
 /**
  * Handler for checkout.session.completed events.
@@ -118,22 +135,24 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
-    // Activate referral if this user was referred.
-    // Awaited so failures are surfaced instead of silently dropped.
-    try {
-      const internalId = await getInternalUserId(userId);
-      if (internalId) {
-        await activateReferral(internalId);
-      }
-    } catch (error) {
-      // Log but don't fail the webhook — referral activation is secondary
-      logger.warn('Failed to activate referral on checkout', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    // Activate referral if this user was referred (best-effort).
+    // Awaited to preserve ordering before cache invalidation; failures are logged, not thrown.
+    await tryActivateReferral(userId);
 
     // Invalidate client cache
     await invalidateBillingCache(userId);
+
+    if (result.success && result.isActive) {
+      try {
+        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+      } catch (error) {
+        logger.warn('Failed to attribute lead paid conversion on checkout', {
+          userId,
+          subscriptionId: subscription.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
 
     return result;
   }

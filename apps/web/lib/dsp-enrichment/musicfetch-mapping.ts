@@ -7,6 +7,11 @@ import {
   getMusicFetchServiceUrl,
   type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
+import {
+  MUSICFETCH_LINK_MAPPINGS,
+  MUSICFETCH_SERVICE_TO_DSP,
+} from '@/lib/dsp-registry';
+import type { RawIdentityLink } from '@/lib/identity/store';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
 /** Profile fields that can be enriched from MusicFetch. */
@@ -114,23 +119,6 @@ export function mapMusicFetchProfileFields(
   return updates;
 }
 
-const MUSICFETCH_LINK_MAPPINGS: Array<{
-  serviceKey: string;
-  platformId: string;
-}> = [
-  { serviceKey: 'spotify', platformId: 'spotify' },
-  { serviceKey: 'appleMusic', platformId: 'apple_music' },
-  { serviceKey: 'youtube', platformId: 'youtube' },
-  { serviceKey: 'youtubeMusic', platformId: 'youtube_music' },
-  { serviceKey: 'soundcloud', platformId: 'soundcloud' },
-  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
-  { serviceKey: 'amazonMusic', platformId: 'amazon_music' },
-  { serviceKey: 'tidal', platformId: 'tidal' },
-  { serviceKey: 'deezer', platformId: 'deezer' },
-  { serviceKey: 'instagram', platformId: 'instagram' },
-  { serviceKey: 'tiktok', platformId: 'tiktok' },
-] as const;
-
 export function extractMusicFetchLinks(
   artistData: MusicFetchArtistResult,
   spotifyUrl: string,
@@ -157,4 +145,50 @@ export function extractMusicFetchLinks(
   }
 
   return Array.from(deduped.values());
+}
+
+/**
+ * Extract ALL services from a MusicFetch response for the identity layer.
+ * Unlike extractMusicFetchLinks (streaming-only), this returns every platform
+ * with a valid URL — streaming, video, metadata, social — preserving the raw
+ * service object as payload.
+ */
+export function extractAllMusicFetchServices(
+  artistData: MusicFetchArtistResult,
+  spotifyUrl?: string
+): RawIdentityLink[] {
+  const links: RawIdentityLink[] = [];
+  const seen = new Set<string>();
+
+  for (const [serviceKey, service] of Object.entries(artistData.services)) {
+    const url = getMusicFetchServiceUrl(service);
+    if (!url) continue;
+
+    // Map MusicFetch service key to DSP registry key
+    const dspEntry = MUSICFETCH_SERVICE_TO_DSP.get(serviceKey);
+    const platform = dspEntry?.key ?? serviceKey;
+
+    // Deduplicate by platform
+    if (seen.has(platform)) continue;
+    seen.add(platform);
+
+    links.push({
+      platform,
+      url,
+      externalId: service.id ?? null,
+      rawPayload: { ...service },
+    });
+  }
+
+  // Add Spotify from the known URL if not already in services
+  if (spotifyUrl && !seen.has('spotify')) {
+    links.push({
+      platform: 'spotify',
+      url: spotifyUrl,
+      externalId: null,
+      rawPayload: {},
+    });
+  }
+
+  return links;
 }

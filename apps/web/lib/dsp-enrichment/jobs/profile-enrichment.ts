@@ -21,8 +21,10 @@ import {
   creatorAvatarCandidates,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { DSP_PROVIDER_AVATAR_CONFIDENCE } from '@/lib/dsp-provider-metadata';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { setEnrichmentJobStatus } from '../enrichment-status';
 
 import {
   extractAppleMusicImageUrls,
@@ -93,6 +95,9 @@ const DSP_AVATAR_CONFIDENCE: Record<DspProviderId, number> = {
   soundcloud: 0.7, // More indie/DIY
   amazon_music: 0.7, // Less artist-focused
   musicbrainz: 0.6, // Community-sourced, variable quality
+  genius: DSP_PROVIDER_AVATAR_CONFIDENCE.genius ?? 0.3, // Metadata-only, no artist images
+  discogs: DSP_PROVIDER_AVATAR_CONFIDENCE.discogs ?? 0.4, // Community-sourced, variable quality
+  allmusic: DSP_PROVIDER_AVATAR_CONFIDENCE.allmusic ?? 0.35, // Editorial, limited images
 };
 
 // ============================================================================
@@ -267,7 +272,7 @@ async function updateAvatarIfNeeded(
   existingProfile: { avatarUrl: string | null; avatarLockedByUser: boolean },
   updates: Record<string, unknown>
 ): Promise<boolean> {
-  if (existingProfile.avatarLockedByUser || existingProfile.avatarUrl) {
+  if (existingProfile.avatarLockedByUser) {
     return false;
   }
 
@@ -338,7 +343,7 @@ function updateGenresIfNeeded(
     return false;
   }
 
-  updates.genres = Array.from(allGenres).slice(0, 10);
+  updates.genres = Array.from(allGenres).slice(0, 3);
   return true;
 }
 
@@ -540,6 +545,7 @@ export async function processProfileEnrichmentJob(
 
   if (!profile) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'failed');
     return result;
   }
 
@@ -547,6 +553,8 @@ export async function processProfileEnrichmentJob(
     result.errors.push(
       'Profile already enriched (use forceRefresh to override)'
     );
+    // Already enriched is a success state
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'complete');
     return result;
   }
 
@@ -555,6 +563,7 @@ export async function processProfileEnrichmentJob(
 
   if (dspData.length === 0) {
     result.errors.push('No DSP data could be fetched');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'failed');
     return result;
   }
 
@@ -573,6 +582,9 @@ export async function processProfileEnrichmentJob(
     profile
   );
   result.profileUpdated = profileUpdated;
+
+  // Mark enrichment as complete
+  await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'complete');
 
   return result;
 }

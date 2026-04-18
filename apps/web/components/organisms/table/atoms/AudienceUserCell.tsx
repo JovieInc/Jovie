@@ -4,15 +4,21 @@ import { Ghost, User } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getFallbackName } from '@/lib/utils/audience';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import {
+  capitalizeFirst,
+  safeDecodeURIComponent,
+} from '@/lib/utils/string-utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
   readonly displayName: string | null;
   readonly type: AudienceMemberType;
+  readonly tags?: string[];
   readonly deviceType?: string | null;
   readonly geoCity?: string | null;
   readonly geoCountry?: string | null;
+  /** Show a colored type dot inline after the name */
+  readonly showTypeDot?: boolean;
   readonly className?: string;
 }
 
@@ -20,6 +26,14 @@ const DEVICE_LABELS: Record<string, string> = {
   mobile: 'Mobile',
   tablet: 'Tablet',
   desktop: 'Desktop',
+};
+
+const TYPE_DOT_COLORS: Record<AudienceMemberType, string> = {
+  anonymous: 'bg-zinc-400',
+  email: 'bg-blue-500',
+  sms: 'bg-violet-500',
+  spotify: 'bg-emerald-500',
+  customer: 'bg-amber-500',
 };
 
 function formatAnonymousVisitorLabel(
@@ -43,16 +57,20 @@ function formatAnonymousVisitorLabel(
  *
  * Anonymous visitors get a Ghost icon; identified contacts get a User icon.
  * Primary label is either the display name or a descriptive "Mobile visitor from ..." label.
+ * When showTypeDot is true, a colored dot indicating member type appears after the name.
  */
 export const AudienceUserCell = React.memo(function AudienceUserCell({
   displayName,
   type,
+  tags = [],
   deviceType,
   geoCity,
   geoCountry,
+  showTypeDot,
   className,
 }: AudienceUserCellProps) {
   const isAnonymous = type === 'anonymous';
+  const isBot = tags.includes('bot');
 
   const primaryLabel = isAnonymous
     ? formatAnonymousVisitorLabel(deviceType, geoCity, geoCountry)
@@ -63,15 +81,40 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div
       className={cn(
-        'min-w-0 text-[13px] text-primary-token flex items-center gap-2',
+        'flex min-w-0 items-center gap-2 text-[13px] text-primary-token',
         className
       )}
     >
       <IconComponent
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        className={cn(
+          'h-3.5 w-3.5 shrink-0',
+          isAnonymous ? 'text-quaternary-token' : 'text-tertiary-token'
+        )}
         aria-hidden='true'
       />
-      <span className='truncate font-[510]'>{primaryLabel}</span>
+      <span
+        className={cn(
+          'truncate',
+          isAnonymous ? 'font-[400] text-secondary-token' : 'font-[510]'
+        )}
+      >
+        {primaryLabel}
+      </span>
+      {isBot ? (
+        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-[510] text-amber-700 dark:text-amber-300'>
+          Bot
+        </span>
+      ) : null}
+      {showTypeDot && !isAnonymous && (
+        <span
+          className={cn(
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            TYPE_DOT_COLORS[type]
+          )}
+          aria-hidden='true'
+          title={type === 'sms' ? 'SMS' : capitalizeFirst(type)}
+        />
+      )}
     </div>
   );
 });

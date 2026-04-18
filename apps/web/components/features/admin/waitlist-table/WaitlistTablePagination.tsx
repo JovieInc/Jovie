@@ -24,43 +24,59 @@ export function WaitlistTablePagination({
   return (
     <div className='flex items-center justify-between gap-2 border-t border-subtle px-4 py-3 text-xs text-secondary-token'>
       <div className='flex items-center gap-1'>
-        <span className='hidden sm:inline'>Page </span>
+        <span className='max-sm:hidden sm:inline'>Page </span>
         <span className='font-medium text-primary-token'>{page}</span>
         <span> / {totalPages}</span>
       </div>
       <div className='flex items-center gap-1 sm:gap-2'>
-        <Button
-          asChild
-          size='sm'
-          variant='ghost'
-          disabled={!canPrev}
-          className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
-        >
-          <Link
-            href={prevHref ?? '#'}
-            aria-disabled={!canPrev}
+        {prevHref ? (
+          <Button
+            asChild
+            size='sm'
+            variant='ghost'
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
+          >
+            <Link href={prevHref} aria-label='Previous page'>
+              <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
+              <span className='max-sm:hidden sm:inline'>Previous</span>
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            size='sm'
+            variant='ghost'
+            disabled
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
             aria-label='Previous page'
           >
             <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
-            <span className='hidden sm:inline'>Previous</span>
-          </Link>
-        </Button>
-        <Button
-          asChild
-          size='sm'
-          variant='ghost'
-          disabled={!canNext}
-          className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
-        >
-          <Link
-            href={nextHref ?? '#'}
-            aria-disabled={!canNext}
+            <span className='max-sm:hidden sm:inline'>Previous</span>
+          </Button>
+        )}
+        {nextHref ? (
+          <Button
+            asChild
+            size='sm'
+            variant='ghost'
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
+          >
+            <Link href={nextHref} aria-label='Next page'>
+              <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
+              <span className='max-sm:hidden sm:inline'>Next</span>
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            size='sm'
+            variant='ghost'
+            disabled
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
             aria-label='Next page'
           >
             <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
-            <span className='hidden sm:inline'>Next</span>
-          </Link>
-        </Button>
+            <span className='max-sm:hidden sm:inline'>Next</span>
+          </Button>
+        )}
       </div>
     </div>
   );

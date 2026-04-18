@@ -2,17 +2,19 @@
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
-  DrawerButton,
+  DrawerCardActionBar,
   DrawerPropertyRow,
   DrawerSection,
   DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { type DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -107,13 +109,77 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded-[8px] border border-default bg-surface-1 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
     </span>
   );
+}
+
+function FeedbackActionsCell({
+  row,
+  getContextMenuItems,
+}: {
+  readonly row: FeedbackRow;
+  readonly getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+}) {
+  const items = convertContextMenuItems(getContextMenuItems(row));
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+}
+
+/** Build column definitions for feedback table (file-level to satisfy S6478). */
+function buildFeedbackColumns(deps: {
+  getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+}): ColumnDef<FeedbackRow, any>[] {
+  return [
+    columnHelper.accessor('createdAtIso', {
+      id: 'submitted',
+      header: 'Submitted',
+      cell: renderSubmittedCell,
+      size: 180,
+    }),
+    columnHelper.accessor('user', {
+      id: 'user',
+      header: 'User',
+      cell: renderUserCell,
+      size: 200,
+    }),
+    columnHelper.accessor('message', {
+      id: 'message',
+      header: 'Feedback',
+      cell: renderMessageCell,
+      size: 400,
+    }),
+    columnHelper.accessor('status', {
+      id: 'status',
+      header: 'Status',
+      cell: renderStatusCell,
+      size: 120,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <FeedbackActionsCell
+          row={row.original}
+          getContextMenuItems={deps.getContextMenuItems}
+        />
+      ),
+      size: 48,
+    }),
+  ];
+}
+
+function formatDismissedLabel(dismissedAtIso: string | null): string {
+  if (!dismissedAtIso) return 'Dismissed';
+  return `Dismissed ${new Date(dismissedAtIso).toLocaleString()}`;
 }
 
 export function AdminFeedbackTable({
@@ -122,18 +188,29 @@ export function AdminFeedbackTable({
   const [selectedId, setSelectedId] = useState<string | null>(
     items[0]?.id ?? null
   );
-  const { mutateAsync: dismissFeedback, isPending: isDismissing } =
-    useDismissFeedbackMutation();
+  const { mutateAsync: dismissFeedback } = useDismissFeedbackMutation();
   const [rows, setRows] = useState(items);
+  const [dismissingIds, setDismissingIds] = useState<Record<string, true>>({});
+  const dismissingIdsRef = useRef<Set<string>>(new Set());
 
   const selected = useMemo(
     () => rows.find(item => item.id === selectedId) ?? null,
     [rows, selectedId]
   );
 
+  const isDismissPending = useCallback(
+    (id: string) => Boolean(dismissingIds[id]),
+    [dismissingIds]
+  );
+
   const dismissRow = useCallback(
     async (item: FeedbackRow) => {
       if (item.status === 'dismissed') return;
+      if (dismissingIdsRef.current.has(item.id)) return;
+
+      dismissingIdsRef.current.add(item.id);
+      setDismissingIds(current => ({ ...current, [item.id]: true }));
+
       try {
         await dismissFeedback(item.id);
         setRows(current =>
@@ -149,6 +226,13 @@ export function AdminFeedbackTable({
         );
       } catch {
         // Error toast handled by mutation's onError callback
+      } finally {
+        dismissingIdsRef.current.delete(item.id);
+        setDismissingIds(current => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
       }
     },
     [dismissFeedback]
@@ -173,10 +257,10 @@ export function AdminFeedbackTable({
         label: 'Dismiss',
         icon: <XCircle className='h-4 w-4' />,
         onClick: () => dismissRow(item),
-        disabled: item.status === 'dismissed',
+        disabled: item.status === 'dismissed' || isDismissPending(item.id),
       },
     ],
-    [copyRowAsMarkdown, dismissRow]
+    [copyRowAsMarkdown, dismissRow, isDismissPending]
   );
 
   const copyAllAsMarkdown = useCallback(async () => {
@@ -189,56 +273,25 @@ export function AdminFeedbackTable({
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
-    () => [
-      columnHelper.accessor('createdAtIso', {
-        id: 'submitted',
-        header: 'Submitted',
-        cell: renderSubmittedCell,
-        size: 180,
-      }),
-      columnHelper.accessor('user', {
-        id: 'user',
-        header: 'User',
-        cell: renderUserCell,
-        size: 200,
-      }),
-      columnHelper.accessor('message', {
-        id: 'message',
-        header: 'Feedback',
-        cell: renderMessageCell,
-        size: 400,
-      }),
-      columnHelper.accessor('status', {
-        id: 'status',
-        header: 'Status',
-        cell: renderStatusCell,
-        size: 120,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          // NOSONAR - TanStack Table render prop
-          const items = convertContextMenuItems(
-            getContextMenuItems(row.original)
-          );
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={items} align='end' />
-            </div>
-          );
-        },
-        size: 48,
-      }),
-    ],
+    () => buildFeedbackColumns({ getContextMenuItems }),
     [getContextMenuItems]
+  );
+
+  // Arrow keys update the detail pane (always visible in split view)
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (rows[index]) {
+        setSelectedId(rows[index].id);
+      }
+    },
+    [rows]
   );
 
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'cursor-pointer bg-surface-1 shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-surface-1'
-        : 'group cursor-pointer bg-transparent hover:bg-surface-1',
+        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
+        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
     [selectedId]
   );
 
@@ -275,10 +328,11 @@ export function AdminFeedbackTable({
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={row => setSelectedId(row.id)}
+              onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px]'
+              className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               emptyState={
                 <TableEmptyState
                   icon={
@@ -298,68 +352,74 @@ export function AdminFeedbackTable({
         isOpen={Boolean(selected)}
         width={560}
         ariaLabel='Feedback details'
-        title='Feedback details'
+        scrollStrategy='shell'
         onClose={() => setSelectedId(null)}
+        headerMode='minimal'
+        hideMinimalHeaderBar
         isEmpty={!selected}
         emptyMessage='Select a feedback row to view details.'
         entityHeader={
           selected ? (
-            <div className='space-y-2'>
-              <p className='text-[12px] leading-[16px] text-secondary-token'>
-                Source: {selected.source} ·{' '}
-                {new Date(selected.createdAtIso).toLocaleString()}
-              </p>
-              <div className='space-y-0.5'>
-                <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
-                  {getFeedbackUserLabel(selected.user)}
-                </p>
-                <p className='truncate text-[12px] leading-[16px] text-secondary-token'>
-                  {selected.user.email ?? 'No email available'}
-                </p>
-              </div>
-            </div>
-          ) : undefined
-        }
-        footer={
-          selected ? (
-            <div className='space-y-3'>
-              <div className='flex items-center gap-2'>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  onClick={() => dismissRow(selected)}
-                  disabled={selected.status === 'dismissed'}
-                  loading={isDismissing}
-                >
-                  Dismiss
-                </DrawerButton>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  onClick={() => copyRowAsMarkdown(selected)}
-                >
-                  <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
-                  Copy as Markdown
-                </DrawerButton>
-              </div>
-              <span className='text-[12px] leading-[16px] text-tertiary-token'>
-                {(() => {
-                  if (selected.status !== 'dismissed') {
-                    return 'Marked as pending';
-                  }
-                  const date = selected.dismissedAtIso
-                    ? new Date(selected.dismissedAtIso).toLocaleString()
-                    : '';
-                  return `Dismissed ${date}`;
-                })()}
-              </span>
-            </div>
+            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+              <EntityHeaderCard
+                eyebrow='Feedback'
+                title={getFeedbackUserLabel(selected.user)}
+                subtitle={selected.user.email ?? 'No email available'}
+                meta={
+                  <div className='space-y-1 text-[12px] leading-[16px] text-secondary-token'>
+                    <p>
+                      Source: {selected.source} ·{' '}
+                      {new Date(selected.createdAtIso).toLocaleString()}
+                    </p>
+                    <p className='text-tertiary-token'>
+                      {selected.status === 'dismissed'
+                        ? formatDismissedLabel(selected.dismissedAtIso)
+                        : 'Marked as pending'}
+                    </p>
+                  </div>
+                }
+                actions={
+                  <DrawerCardActionBar
+                    primaryActions={
+                      [
+                        ...(selected.status === 'dismissed'
+                          ? []
+                          : [
+                              {
+                                id: 'dismiss-feedback',
+                                label: 'Dismiss',
+                                icon: XCircle,
+                                disabled: isDismissPending(selected.id),
+                                onClick: () => {
+                                  dismissRow(selected);
+                                },
+                              } satisfies DrawerHeaderAction,
+                            ]),
+                        {
+                          id: 'copy-feedback-markdown',
+                          label: 'Copy as Markdown',
+                          icon: ClipboardCopy,
+                          onClick: () => {
+                            copyRowAsMarkdown(selected);
+                          },
+                        } satisfies DrawerHeaderAction,
+                      ] satisfies readonly DrawerHeaderAction[]
+                    }
+                    onClose={() => setSelectedId(null)}
+                    overflowTriggerPlacement='card-top-right'
+                    overflowTriggerIcon='vertical'
+                    className='border-0 bg-transparent px-0 py-0'
+                  />
+                }
+                bodyClassName='pr-9'
+              />
+            </DrawerSurfaceCard>
           ) : undefined
         }
       >
         {selected ? (
           <>
-            <DrawerSection title='User'>
+            <DrawerSection title='User' className='space-y-1.5' surface='card'>
               <div className='space-y-1'>
                 <DrawerPropertyRow
                   label='User'
@@ -379,18 +439,28 @@ export function AdminFeedbackTable({
               </div>
             </DrawerSection>
 
-            <DrawerSection title='Feedback'>
-              <DrawerSurfaceCard className='rounded-[12px] bg-surface-0 px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+            <DrawerSection
+              title='Feedback'
+              collapsible={false}
+              className='space-y-1.5'
+              surface='card'
+            >
+              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
-              </DrawerSurfaceCard>
+              </div>
             </DrawerSection>
 
-            <DrawerSection title='Context'>
-              <DrawerSurfaceCard className='overflow-auto rounded-[12px] bg-surface-0 p-0'>
-                <pre className='p-3 text-[11px] leading-[16px] text-secondary-token'>
+            <DrawerSection
+              title='Context'
+              collapsible={false}
+              className='space-y-1.5'
+              surface='card'
+            >
+              <div className='overflow-auto rounded-md bg-surface-0 p-0'>
+                <pre className='p-2.5 text-[10.5px] leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
-              </DrawerSurfaceCard>
+              </div>
             </DrawerSection>
           </>
         ) : null}

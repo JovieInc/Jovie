@@ -9,8 +9,14 @@ import { useEffect } from 'react';
  */
 export function ScrollRevealInit() {
   useEffect(() => {
+    document.documentElement.classList.add('reveal-js');
+
     const elements = document.querySelectorAll('.reveal-on-scroll');
-    if (!elements.length) return;
+    if (!elements.length) {
+      return () => {
+        document.documentElement.classList.remove('reveal-js');
+      };
+    }
 
     const observer = new IntersectionObserver(
       entries => {
@@ -28,7 +34,10 @@ export function ScrollRevealInit() {
       observer.observe(el);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      document.documentElement.classList.remove('reveal-js');
+      observer.disconnect();
+    };
   }, []);
 
   return null;

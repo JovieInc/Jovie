@@ -13,6 +13,8 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
 import {
+  isMusicfetchInvalidServicesError,
+  MusicfetchBudgetExceededError,
   MusicfetchRequestError,
   musicfetchRequest,
 } from '@/lib/musicfetch/resilient-client';
@@ -27,20 +29,40 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Services to request from MusicFetch when looking up an artist.
- * Covers major DSPs + social platforms.
+ *
+ * This is intentionally narrower than the full DSP registry. The MusicFetch
+ * artist lookup endpoint rejects some registry values (`allMusic`,
+ * `youtubeShorts`, `napster`, `telmoreMusik`) and our current account also
+ * does not have every optional social provider enabled. Invalid values cause a
+ * hard 400 and abort enrichment entirely, so keep this list limited to the
+ * stable supported subset for artist lookups.
  */
-const ARTIST_LOOKUP_SERVICES = [
+export const MUSICFETCH_ARTIST_LOOKUP_SERVICES = [
+  'spotify',
   'appleMusic',
-  'youtube',
   'youtubeMusic',
   'soundcloud',
   'deezer',
   'tidal',
   'amazonMusic',
   'bandcamp',
-  'instagram',
-  'tiktok',
-].join(',');
+  'pandora',
+  'audiomack',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iHeartRadio',
+  'beatport',
+  'youtube',
+  'genius',
+  'discogs',
+  'musicBrainz',
+  'shazam',
+  'sevenDigital',
+  'youseeMusik',
+] as const;
+
+const ARTIST_LOOKUP_SERVICES = MUSICFETCH_ARTIST_LOOKUP_SERVICES.join(',');
 
 // ============================================================================
 // Types
@@ -93,8 +115,42 @@ export function isMusicFetchAvailable(): boolean {
 /**
  * Look up an artist by their Spotify URL via MusicFetch.io.
  *
- * Returns cross-platform DSP links and social profiles, or null on failure.
+ * Returns cross-platform DSP links and social profiles, or null for
+ * non-retryable lookup failures.
+ *
+ * @throws {MusicfetchRequestError} When MusicFetch rejects the configured
+ * service list with an invalid-services 400 detected by
+ * isMusicfetchInvalidServicesError().
  */
+function handleMusicfetchLookupError(error: unknown, spotifyUrl: string): null {
+  if (error instanceof MusicfetchRequestError) {
+    logger.warn('MusicFetch request failed', {
+      spotifyUrl,
+      statusCode: error.statusCode,
+      retryAfterSeconds: error.retryAfterSeconds,
+      details: error.details,
+      budgetScope:
+        error instanceof MusicfetchBudgetExceededError
+          ? error.budgetScope
+          : undefined,
+      message: error.message,
+    });
+
+    if (error.statusCode === 400 && !isMusicfetchInvalidServicesError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  logger.warn('MusicFetch request failed', {
+    spotifyUrl,
+    error: error instanceof Error ? error.message : 'Unknown error',
+  });
+
+  throw error instanceof Error ? error : new Error('MusicFetch request failed');
+}
+
 export async function fetchArtistBySpotifyUrl(
   spotifyUrl: string
 ): Promise<MusicFetchArtistResult | null> {
@@ -144,36 +200,7 @@ export async function fetchArtistBySpotifyUrl(
         return data.result;
       } catch (error) {
         span.setStatus({ code: 2, message: 'error' });
-
-        const statusCode =
-          error instanceof MusicfetchRequestError
-            ? error.statusCode
-            : undefined;
-
-        Sentry.captureException(error, {
-          tags: { 'music.fetch.source': 'musicfetch' },
-          extra: {
-            spotifyUrl,
-            statusCode,
-            errorMessage:
-              error instanceof Error ? error.message : 'Unknown error',
-          },
-        });
-
-        if (error instanceof MusicfetchRequestError) {
-          logger.warn('MusicFetch request failed', {
-            spotifyUrl,
-            statusCode: error.statusCode,
-            retryAfterSeconds: error.retryAfterSeconds,
-            message: error.message,
-          });
-        } else {
-          logger.warn('MusicFetch request failed', {
-            spotifyUrl,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-        return null;
+        return handleMusicfetchLookupError(error, spotifyUrl);
       }
     }
   );

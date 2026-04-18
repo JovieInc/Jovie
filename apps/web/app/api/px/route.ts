@@ -15,7 +15,10 @@ import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin': '*',
+} as const;
 
 function getClaimRetargetingLink(pageUrl: string | undefined): string | null {
   if (!pageUrl) return null;
@@ -231,6 +234,11 @@ export async function POST(request: NextRequest) {
 
 /**
  * OPTIONS - CORS preflight
+ *
+ * Intentionally allows all origins (`*`) because this is a public tracking
+ * pixel endpoint designed for cross-origin embedding on creator websites.
+ * No credentials or sensitive data are involved. Rate limiting and input
+ * validation are enforced on the POST handler.
  */
 export async function OPTIONS() {
   return new NextResponse(null, {

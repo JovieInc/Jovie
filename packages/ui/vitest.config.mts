@@ -9,7 +9,13 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
     exclude: ['node_modules/**', 'dist/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      exclude: ['node_modules/**', 'dist/**', '**/*.d.ts'],
+    },
     globals: false,
+    passWithNoTests: true,
   },
   resolve: {
     alias: {

@@ -4,6 +4,11 @@ import { FunnelMetricsStrip } from '@/features/admin/FunnelMetricsStrip';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 const defaultMetrics: AdminFunnelMetrics = {
+  instagramShareStepViews7d: 20,
+  instagramBioCopies7d: 12,
+  instagramBioOpenRate7d: 0.4,
+  instagramBioActivations7d: 6,
+  instagramBioActivationRate7d: 0.3,
   outreachSent7d: 150,
   claimClicks7d: 30,
   claimRate: 0.2,
@@ -31,6 +36,9 @@ const defaultMetrics: AdminFunnelMetrics = {
   outreachToSignupRate: 0.067,
   signupToPaidRate: 0.2,
   dollarPerOutreach: 0.003,
+  magicMomentRate: 0.75,
+  magicMomentCount: 15,
+  enrichmentFailureRate: 0.1,
 };
 
 describe('FunnelMetricsStrip', () => {
@@ -41,13 +49,14 @@ describe('FunnelMetricsStrip', () => {
     expect(screen.getByText('ARR')).toBeInTheDocument();
     expect(screen.getByText('Runway')).toBeInTheDocument();
     expect(screen.getByText('Paying customers')).toBeInTheDocument();
+    expect(screen.getByText('Instagram Activation')).toBeInTheDocument();
     expect(screen.getByText('YC metrics')).toBeInTheDocument();
   });
 
   it('displays paying customer count', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 
-    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getAllByText('12').length).toBeGreaterThan(0);
   });
 
   it('displays growth rates summary', () => {

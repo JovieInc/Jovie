@@ -24,7 +24,7 @@ interface ModeData {
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Capture the fan before they disappear.',
+    headline: 'Keep the fan before they disappear.',
     description:
       'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
     slug: '',
@@ -39,12 +39,12 @@ const MODES: ModeData[] = [
     outcome: 'Sell tickets',
   },
   {
-    id: 'tip',
+    id: 'pay',
     headline: 'Turn in-person moments into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
-    slug: 'tip',
-    outcome: 'Earn tips',
+      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.',
+    slug: 'pay',
+    outcome: 'Earn',
   },
   {
     id: 'listen',
@@ -126,7 +126,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-secondary-token'>
           Powered by Jovie
         </p>
       </div>
@@ -136,24 +136,25 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
 
 function CrossfadeBlock({
   activeIndex,
-  children,
+  items,
 }: {
   readonly activeIndex: number;
-  readonly children: React.ReactNode[];
+  readonly items: readonly { id: string; content: React.ReactNode }[];
 }) {
   return (
     <div className='grid'>
-      {children.map((child, i) => (
+      {items.map((item, i) => (
         <div
-          key={`${i}-${activeIndex}`}
+          key={item.id}
           aria-hidden={i !== activeIndex}
           className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
           style={{
             opacity: i === activeIndex ? 1 : 0,
+            pointerEvents: i === activeIndex ? 'auto' : 'none',
             gridArea: '1 / 1',
           }}
         >
-          {child}
+          {item.content}
         </div>
       ))}
     </div>
@@ -221,27 +222,27 @@ export function DeeplinksGrid() {
 
   const headlines = useMemo(
     () =>
-      MODES.map(mode => (
-        <h3
-          key={mode.id}
-          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
-        >
-          {mode.headline}
-        </h3>
-      )),
+      MODES.map(mode => ({
+        id: mode.id,
+        content: (
+          <h3 className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'>
+            {mode.headline}
+          </h3>
+        ),
+      })),
     []
   );
 
   const descriptions = useMemo(
     () =>
-      MODES.map(mode => (
-        <p
-          key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-secondary-token'
-        >
-          {mode.description}
-        </p>
-      )),
+      MODES.map(mode => ({
+        id: mode.id,
+        content: (
+          <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
+            {mode.description}
+          </p>
+        ),
+      })),
     []
   );
 
@@ -285,19 +286,18 @@ export function DeeplinksGrid() {
                     The right action for every fan.
                   </h2>
 
-                  <CrossfadeBlock activeIndex={activeIndex}>
-                    {headlines}
-                  </CrossfadeBlock>
+                  <CrossfadeBlock activeIndex={activeIndex} items={headlines} />
 
-                  <CrossfadeBlock activeIndex={activeIndex}>
-                    {descriptions}
-                  </CrossfadeBlock>
+                  <CrossfadeBlock
+                    activeIndex={activeIndex}
+                    items={descriptions}
+                  />
 
                   <div className='flex flex-wrap gap-2'>
                     {MODES.map((mode, i) => (
                       <span
                         key={mode.id}
-                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-300'
+                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-slower'
                         style={{
                           borderColor:
                             i === activeIndex
@@ -372,7 +372,6 @@ export function DeeplinksGrid() {
                       key={mode.id}
                       className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
                       style={{
-                        opacity: i === activeIndex ? 1 : 0.2,
                         transform:
                           i === activeIndex
                             ? 'translateX(0)'
@@ -383,16 +382,24 @@ export function DeeplinksGrid() {
                         className='font-mono tracking-[-0.02em]'
                         style={{
                           fontSize: i === activeIndex ? '20px' : '15px',
-                          fontWeight: i === activeIndex ? 600 : 400,
+                          fontWeight: i === activeIndex ? 590 : 400,
                           color:
                             i === activeIndex
                               ? 'var(--linear-text-primary)'
-                              : 'var(--linear-text-tertiary)',
+                              : 'var(--linear-text-secondary)',
                           transition:
                             'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                         }}
                       >
-                        <span className='mr-2 text-xs uppercase tracking-[0.12em] text-quaternary-token'>
+                        <span
+                          className='mr-2 text-xs uppercase tracking-[0.12em]'
+                          style={{
+                            color:
+                              i === activeIndex
+                                ? 'var(--linear-text-secondary)'
+                                : 'var(--linear-text-tertiary)',
+                          }}
+                        >
                           {mode.outcome}
                         </span>
                         jov.ie/tim
@@ -401,8 +408,8 @@ export function DeeplinksGrid() {
                             style={{
                               color:
                                 i === activeIndex
-                                  ? 'var(--linear-text-primary)'
-                                  : 'var(--linear-text-quaternary)',
+                                  ? 'var(--linear-text-secondary)'
+                                  : 'var(--linear-text-tertiary)',
                             }}
                           >
                             /{mode.slug}
@@ -439,7 +446,7 @@ export function DeeplinksGrid() {
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
-                moment: listen, tip, tour, or subscribe.
+                moment: listen, pay, tour, or subscribe.
               </p>
             </div>
 

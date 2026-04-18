@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetRedis = vi.hoisted(() => vi.fn());
 const mockExists = vi.hoisted(() => vi.fn());
@@ -20,6 +20,10 @@ describe('recent-dispatch', () => {
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('acquireRecentDispatch deduplicates repeated keys via Redis NX', async () => {
     mockSet.mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
 
@@ -27,12 +31,18 @@ describe('recent-dispatch', () => {
       '@/lib/webhooks/recent-dispatch'
     );
 
-    await expect(acquireRecentDispatch('linear', 'issue_1', 60)).resolves.toBe(
-      true
-    );
-    await expect(acquireRecentDispatch('linear', 'issue_1', 60)).resolves.toBe(
-      false
-    );
+    await expect(
+      acquireRecentDispatch('linear', 'issue_1', 60)
+    ).resolves.toEqual({
+      acquired: true,
+      reason: 'acquired',
+    });
+    await expect(
+      acquireRecentDispatch('linear', 'issue_1', 60)
+    ).resolves.toEqual({
+      acquired: false,
+      reason: 'duplicate',
+    });
 
     expect(mockSet).toHaveBeenNthCalledWith(
       1,
@@ -60,5 +70,21 @@ describe('recent-dispatch', () => {
     );
 
     await expect(hasRecentDispatch('linear', 'issue_1')).resolves.toBe(false);
+  });
+
+  it('fails closed in production when Redis is unavailable', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockGetRedis.mockReturnValue(null);
+
+    const { acquireRecentDispatch } = await import(
+      '@/lib/webhooks/recent-dispatch'
+    );
+
+    await expect(
+      acquireRecentDispatch('linear', 'issue_1', 60)
+    ).resolves.toEqual({
+      acquired: false,
+      reason: 'backend_unavailable',
+    });
   });
 });

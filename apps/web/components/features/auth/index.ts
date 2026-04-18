@@ -6,6 +6,8 @@ export { AuthFormContainer } from './AuthFormContainer';
 // Organisms
 export { AuthLayout } from './AuthLayout';
 export { AuthPageSkeleton } from './AuthPageSkeleton';
+export { AuthRoutePrefetch } from './AuthRoutePrefetch';
+export { AuthUnavailableCard } from './AuthUnavailableCard';
 export {
   AuthBackButton,
   AuthButton,
@@ -17,9 +19,6 @@ export {
   AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
-
-// Forms (Clerk Core API implementation)
-export { SignInForm, SignUpForm } from './forms';
 
 // SSO Callback Handler
 export { SsoCallbackHandler } from './SsoCallbackHandler';

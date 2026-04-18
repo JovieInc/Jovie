@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import {
   type BandsintownConnectionStatus,
   loadTourDates,
-  type TourDateViewModel,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -15,6 +14,7 @@ import {
   useDisconnectBandsintownMutation,
   useSyncFromBandsintownMutation,
 } from '@/lib/queries';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { TourDateSidebar } from './TourDateSidebar';
 import { TourDatesEmptyState } from './TourDatesEmptyState';
@@ -197,7 +197,7 @@ export function TourDatesManager({
             <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
               <p className='mt-4 text-[13px] text-secondary-token'>
-                No tour dates found
+                No upcoming tour dates
               </p>
               {isConnected && (
                 <Button

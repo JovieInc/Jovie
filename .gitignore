@@ -8,6 +8,8 @@ apps/web/node_modules
 
 # testing
 /coverage
+apps/web/coverage/
+packages/ui/coverage/
 
 # playwright
 /playwright-report/
@@ -90,3 +92,4 @@ logs/security/
 output/
 .audit/
 .gstack/
+.claude/skills/gstack/

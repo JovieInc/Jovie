@@ -31,6 +31,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ArtistNotificationsCTA: () => null,
+  ProfileInlineNotificationsCTA: () => null,
 }));
 
 // Mock heavy sub-trees to prevent module resolution hangs
@@ -55,6 +56,11 @@ vi.mock('@/components/atoms/DspLogo', async importOriginal => {
     DspLogo: () => <span data-testid='dsp-logo' />,
   };
 });
+
+// Mock SmartLinkAudioPreview to avoid duplicate text in DOM
+vi.mock('@/features/release/SmartLinkAudioPreview', () => ({
+  SmartLinkAudioPreview: () => <div data-testid='audio-preview' />,
+}));
 
 // Mock AlbumArtworkContextMenu to avoid QueryClient dependency
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
@@ -229,5 +235,56 @@ describe('release artist links', () => {
     );
 
     expect(screen.queryByText('Is this your music?')).not.toBeInTheDocument();
+  });
+
+  it('opens credits dialog and renders grouped collaborators', () => {
+    renderWithQueryClient(
+      <ReleaseLandingPage
+        release={{
+          title: 'Test Release',
+          artworkUrl: null,
+          releaseDate: '2026-01-10',
+        }}
+        artist={{
+          name: 'Test Artist',
+          handle: 'test-artist',
+          avatarUrl: null,
+        }}
+        providers={[]}
+        credits={[
+          {
+            role: 'producer',
+            label: 'Producer',
+            entries: [
+              {
+                artistId: 'producer-1',
+                name: 'Producer One',
+                handle: 'producer-one',
+                role: 'producer',
+                position: 1,
+              },
+              {
+                artistId: 'producer-2',
+                name: 'Producer Two',
+                handle: null,
+                role: 'producer',
+                position: 2,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    // Open the menu drawer, then click Credits
+    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    fireEvent.click(screen.getByRole('button', { name: /credits/i }));
+
+    expect(screen.getByText('Credits')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Producer One' })).toHaveAttribute(
+      'href',
+      '/producer-one'
+    );
+    expect(screen.getByText('Producer Two')).toBeInTheDocument();
   });
 });

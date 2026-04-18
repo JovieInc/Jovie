@@ -1,8 +1,7 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { useInsightsSummaryQuery } from '@/lib/queries';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
@@ -12,16 +11,16 @@ export function InsightsSummaryWidget() {
 
   if (isLoading) {
     return (
-      <ContentSurfaceCard className='p-4'>
-        <div className='flex items-center gap-2'>
+      <div>
+        <div className='flex items-center gap-1.5'>
           <div className='h-4 w-4 rounded skeleton' />
           <div className='h-3 w-24 rounded skeleton' />
         </div>
-        <div className='mt-3 space-y-2'>
+        <div className='mt-1 space-y-1'>
           <div className='h-3 w-full rounded skeleton' />
           <div className='h-3 w-3/4 rounded skeleton' />
         </div>
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
@@ -33,48 +32,46 @@ export function InsightsSummaryWidget() {
   }
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      className='p-4'
-      aria-label='AI Insights summary'
-    >
+    <section aria-label='AI Insights summary' className='space-y-2'>
       {/* Header */}
       <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-subtle bg-surface-0'>
-            <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
-          </div>
+        <div className='flex items-center gap-1.5'>
+          <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
           <span className='text-[13px] font-[510] text-primary-token'>
             AI Insights
           </span>
-          <span className='rounded-full border border-subtle bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
+          <span className='inline-flex min-w-[18px] items-center justify-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] leading-none text-secondary-token tabular-nums'>
             {totalActive}
           </span>
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='text-[11px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+          className='inline-flex items-center gap-1 rounded-[8px] border border-transparent px-1.5 py-1 text-[11px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
-          View all &rarr;
+          <span>View all</span>
+          <ChevronRight className='h-3 w-3' aria-hidden='true' />
         </Link>
       </div>
 
       {/* Top insights */}
-      <ul className='mt-3 space-y-2'>
+      <ul className='space-y-1'>
         {insights.map(insight => (
-          <li key={insight.id} className='flex items-start gap-2'>
+          <li
+            key={insight.id}
+            className='flex items-start gap-2 rounded-[8px] border border-transparent px-2 py-1.5 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
+          >
             <InsightCategoryIcon category={insight.category} size='sm' />
-            <p className='text-[13px] text-secondary-token leading-snug line-clamp-2'>
+            <p className='line-clamp-2 text-[12px] leading-snug text-secondary-token'>
               <span className='font-[510] text-primary-token'>
                 {insight.title}
               </span>
               {insight.actionSuggestion
-                ? ` — ${insight.actionSuggestion}`
+                ? ` · ${insight.actionSuggestion}`
                 : null}
             </p>
           </li>
         ))}
       </ul>
-    </ContentSurfaceCard>
+    </section>
   );
 }

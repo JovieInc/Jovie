@@ -9,11 +9,13 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
     isTableRoute: false,
     showMobileTabs: false,
     isArtistProfileSettings: false,
+    isDemoRoute: false,
+    showChatUsageIndicator: false,
   }),
 }));
 
-vi.mock('@/hooks/useSequentialShortcuts', () => ({
-  useSequentialShortcuts: vi.fn(),
+vi.mock('@/hooks/useDashboardShortcuts', () => ({
+  useDashboardShortcuts: vi.fn(),
 }));
 
 vi.mock('@/components/organisms/AuthShell', () => ({

@@ -8,9 +8,20 @@
 import { db } from '@/lib/db';
 import type { ParsedArtistCredit } from '../artist-parser';
 import { findOrCreateArtist } from './artist-crud';
+import {
+  deleteRecordingArtists,
+  upsertRecordingArtist,
+} from './recording-artists';
 import { deleteReleaseArtists, upsertReleaseArtist } from './release-artists';
 import { deleteTrackArtists, upsertTrackArtist } from './track-artists';
 import type { ArtistWithRole } from './types';
+
+type ArtistImportSourceType = 'manual' | 'admin' | 'ingested';
+
+type ArtistImportOptions = {
+  deleteExisting?: boolean;
+  sourceType?: ArtistImportSourceType;
+};
 
 /**
  * Process parsed artist credits for a track
@@ -21,10 +32,7 @@ import type { ArtistWithRole } from './types';
 export async function processTrackArtistCredits(
   trackId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -82,10 +90,7 @@ export async function processTrackArtistCredits(
 export async function processReleaseArtistCredits(
   releaseId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -109,6 +114,62 @@ export async function processReleaseArtistCredits(
     await upsertReleaseArtist(
       {
         releaseId,
+        artistId: artist.id,
+        role: credit.role,
+        joinPhrase: credit.joinPhrase,
+        position: credit.position,
+        isPrimary: credit.isPrimary,
+        sourceType,
+      },
+      db
+    );
+
+    results.push({
+      ...artist,
+      role: credit.role,
+      creditName: null,
+      joinPhrase: credit.joinPhrase,
+      position: credit.position,
+      isPrimary: credit.isPrimary,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Process parsed artist credits for a recording
+ *
+ * Creates/updates artist records and recording-artist relationships.
+ * The neon-http driver does not support transactions.
+ */
+export async function processRecordingArtistCredits(
+  recordingId: string,
+  credits: ParsedArtistCredit[],
+  options?: ArtistImportOptions
+): Promise<ArtistWithRole[]> {
+  const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
+
+  if (deleteExisting) {
+    await deleteRecordingArtists(recordingId, db);
+  }
+
+  const results: ArtistWithRole[] = [];
+
+  for (const credit of credits) {
+    const artist = await findOrCreateArtist(
+      {
+        name: credit.name,
+        spotifyId: credit.spotifyId,
+        imageUrl: credit.imageUrl,
+        isAutoCreated: !credit.spotifyId,
+      },
+      db
+    );
+
+    await upsertRecordingArtist(
+      {
+        recordingId,
         artistId: artist.id,
         role: credit.role,
         joinPhrase: credit.joinPhrase,

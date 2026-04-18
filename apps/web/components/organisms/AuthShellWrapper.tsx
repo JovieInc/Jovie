@@ -1,11 +1,14 @@
 'use client';
 
+import { TooltipProvider } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from 'react';
@@ -23,7 +26,7 @@ import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
-import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
+import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
@@ -41,12 +44,34 @@ type TableMetaContextValue = {
 
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
 
+type PendingShellRoute = 'releases' | null;
+
+interface PendingShellContextValue {
+  readonly clearPendingShell: (route?: PendingShellRoute) => void;
+  readonly pendingShellRoute: PendingShellRoute;
+  readonly showPendingShell: (route: Exclude<PendingShellRoute, null>) => void;
+}
+
+const noopPendingShellContext: PendingShellContextValue = {
+  clearPendingShell: () => {},
+  pendingShellRoute: null,
+  showPendingShell: () => {},
+};
+
+const PendingShellContext = createContext<PendingShellContextValue>(
+  noopPendingShellContext
+);
+
 export function useTableMeta(): TableMetaContextValue {
   const ctx = useContext(TableMetaContext);
   if (!ctx) {
     throw new TypeError('useTableMeta must be used within AuthShellWrapper');
   }
   return ctx;
+}
+
+export function usePendingShell() {
+  return useContext(PendingShellContext);
 }
 
 /**
@@ -84,7 +109,7 @@ export interface AuthShellWrapperProps {
  */
 function KeyboardShortcutsHandler() {
   const { open } = useKeyboardShortcuts();
-  useSequentialShortcuts({ onOpenShortcutsModal: open });
+  useDashboardShortcuts({ onOpenShortcutsModal: open });
   return <KeyboardShortcutsSheet />;
 }
 
@@ -105,6 +130,12 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig();
   const headerActionsContext = useOptionalHeaderActions();
   const [, startTransition] = useTransition();
+  const [pendingShellRoute, setPendingShellRoute] =
+    useState<PendingShellRoute>(null);
+  const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const releasesShellOverlayRef = useRef<HTMLDivElement | null>(null);
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -123,11 +154,13 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        <HeaderChatUsageIndicator />
+        {config.showChatUsageIndicator && !config.isDemoRoute ? (
+          <HeaderChatUsageIndicator />
+        ) : null}
         <HeaderProfileProgress />
       </>
     ),
-    []
+    [config.isDemoRoute, config.showChatUsageIndicator]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -157,6 +190,60 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
+  const setReleasesShellVisible = useCallback((visible: boolean) => {
+    const node = releasesShellOverlayRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.style.display = visible ? 'flex' : 'none';
+    node.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }, []);
+
+  const clearPendingShell = useCallback(
+    (route?: PendingShellRoute) => {
+      setPendingShellRoute(current =>
+        route && current !== route ? current : null
+      );
+      setReleasesShellVisible(false);
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+        pendingShellTimerRef.current = null;
+      }
+    },
+    [setReleasesShellVisible]
+  );
+
+  const showPendingShell = useCallback(
+    (route: Exclude<PendingShellRoute, null>) => {
+      setPendingShellRoute(route);
+      if (route === 'releases') {
+        setReleasesShellVisible(true);
+      }
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+      }
+
+      pendingShellTimerRef.current = setTimeout(() => {
+        setReleasesShellVisible(false);
+        setPendingShellRoute(activeRoute =>
+          activeRoute === route ? null : activeRoute
+        );
+        pendingShellTimerRef.current = null;
+      }, 10_000);
+    },
+    [setReleasesShellVisible]
+  );
+
+  useEffect(
+    () => () => {
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+      }
+    },
+    []
+  );
+
   // Memoize context value to prevent unnecessary re-renders
   // setTableMeta is a stable useState setter, so we exclude it from deps
   const tableMetaContextValue = useMemo(
@@ -164,31 +251,71 @@ function AuthShellWrapperInner({
 
     [tableMeta]
   );
+  const pendingShellContextValue = useMemo(
+    () => ({
+      clearPendingShell,
+      pendingShellRoute,
+      showPendingShell,
+    }),
+    [clearPendingShell, pendingShellRoute, showPendingShell]
+  );
+  const shellChildren = (
+    <div className='relative min-h-full'>
+      {children}
+      <div
+        ref={releasesShellOverlayRef}
+        aria-hidden='true'
+        className='absolute inset-0 z-10 hidden items-start justify-center bg-page/96 px-4 py-6 sm:px-6'
+        data-testid='releases-shell-ready'
+      >
+        <div className='w-full max-w-3xl rounded-2xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
+          <div className='flex items-center justify-between gap-4'>
+            <div>
+              <p className='text-sm font-[560] tracking-[-0.02em] text-primary-token'>
+                Opening Releases
+              </p>
+              <p className='mt-1 text-sm text-secondary-token'>
+                Preparing your release workspace.
+              </p>
+            </div>
+            <div
+              aria-hidden='true'
+              className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)]'
+            >
+              <div className='h-full w-1/2 animate-pulse rounded-full bg-primary-token/65' />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <RightPanelProvider>
-        <PreviewPanelProvider
-          key={config.section}
-          defaultOpen={shouldDefaultOpenPreviewPanel}
-          enabled={previewEnabled}
-        >
-          <AuthShell
-            section={config.section}
-            breadcrumbs={config.breadcrumbs}
-            headerBadge={headerBadge}
-            headerAction={headerAction}
-            showMobileTabs={config.showMobileTabs}
-            isTableRoute={config.isTableRoute}
-            onSidebarOpenChange={
-              persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-            }
-            sidebarDefaultOpen={sidebarDefaultOpen}
+      <PendingShellContext.Provider value={pendingShellContextValue}>
+        <RightPanelProvider>
+          <PreviewPanelProvider
+            key={config.section}
+            defaultOpen={shouldDefaultOpenPreviewPanel}
+            enabled={previewEnabled}
           >
-            {children}
-          </AuthShell>
-        </PreviewPanelProvider>
-      </RightPanelProvider>
+            <AuthShell
+              section={config.section}
+              breadcrumbs={config.breadcrumbs}
+              headerBadge={headerBadge}
+              headerAction={headerAction}
+              showMobileTabs={config.showMobileTabs}
+              isTableRoute={config.isTableRoute}
+              onSidebarOpenChange={
+                persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+              }
+              sidebarDefaultOpen={sidebarDefaultOpen}
+            >
+              {shellChildren}
+            </AuthShell>
+          </PreviewPanelProvider>
+        </RightPanelProvider>
+      </PendingShellContext.Provider>
     </TableMetaContext.Provider>
   );
 }
@@ -212,17 +339,19 @@ export function AuthShellWrapper({
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
-    <KeyboardShortcutsProvider>
-      <HeaderActionsProvider>
-        <AuthShellWrapperInner
-          persistSidebarCollapsed={persistSidebarCollapsed}
-          sidebarDefaultOpen={sidebarDefaultOpen}
-          previewPanelDefaultOpen={previewPanelDefaultOpen}
-        >
-          {children}
-        </AuthShellWrapperInner>
-        <KeyboardShortcutsHandler />
-      </HeaderActionsProvider>
-    </KeyboardShortcutsProvider>
+    <TooltipProvider delayDuration={1200}>
+      <KeyboardShortcutsProvider>
+        <HeaderActionsProvider>
+          <AuthShellWrapperInner
+            persistSidebarCollapsed={persistSidebarCollapsed}
+            sidebarDefaultOpen={sidebarDefaultOpen}
+            previewPanelDefaultOpen={previewPanelDefaultOpen}
+          >
+            {children}
+          </AuthShellWrapperInner>
+          <KeyboardShortcutsHandler />
+        </HeaderActionsProvider>
+      </KeyboardShortcutsProvider>
+    </TooltipProvider>
   );
 }
