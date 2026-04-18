@@ -371,7 +371,14 @@ export function ProfileInlineNotificationsCTA({
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const focusDelay = prefersReducedMotion ? 0 : 180;
+    const focusDelay =
+      step === 'email'
+        ? prefersReducedMotion
+          ? 0
+          : 240
+        : prefersReducedMotion
+          ? 0
+          : 180;
 
     if (step === 'email') {
       timeoutId = globalThis.setTimeout(() => {
