@@ -1803,7 +1803,7 @@ jobs:
             COVERAGE_FLAG="--coverage"
           fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
-          export NODE_OPTIONS="--max-old-space-size=4096"
+          export NODE_OPTIONS="--max-old-space-size=2048"
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
