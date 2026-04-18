@@ -14,7 +14,7 @@ const baseConfig = getBaseServerConfig();
 // Health endpoint is polled every minute by Sentry uptime monitoring.
 // Exclude it from performance traces to avoid polluting transaction data.
 // Sentry uptime monitor config: Alerts → Uptime → Add Monitor
-//   URL: https://app.jovie.com/api/health  |  Interval: 1 min
+//   URL: https://jov.ie/api/health  |  Interval: 1 min
 const HEALTH_ENDPOINT_PATTERN = /^\/api\/health/;
 
 Sentry.init({

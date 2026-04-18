@@ -3133,14 +3133,42 @@ jobs:
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
-          bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
-            --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+          deploy_args=(
+            --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}"
             --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
+            --env NEXT_PUBLIC_APP_URL="https://staging.jov.ie"
+            --env NEXT_PUBLIC_PROFILE_URL="https://staging.jov.ie"
+            --env NEXT_PUBLIC_PROFILE_HOSTNAME="staging.jov.ie"
+            --env NEXT_PUBLIC_APP_HOSTNAME="staging.jov.ie"
+          )
+
+          if [ -n "${STRIPE_SECRET_KEY_STAGING}" ]; then
+            deploy_args+=(--env STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY_STAGING}")
+          fi
+          if [ -n "${STRIPE_WEBHOOK_SECRET_STAGING}" ]; then
+            deploy_args+=(--env STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET_STAGING}")
+          fi
+          if [ -n "${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_STAGING}" ]; then
+            deploy_args+=(--env NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_STAGING}")
+          fi
+          if [ -n "${STRIPE_PRICE_PRO_MONTHLY_STAGING}" ]; then
+            deploy_args+=(--env STRIPE_PRICE_PRO_MONTHLY="${STRIPE_PRICE_PRO_MONTHLY_STAGING}")
+          fi
+          if [ -n "${STRIPE_PRICE_PRO_YEARLY_STAGING}" ]; then
+            deploy_args+=(--env STRIPE_PRICE_PRO_YEARLY="${STRIPE_PRICE_PRO_YEARLY_STAGING}")
+          fi
+
+          bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url "${deploy_args[@]}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          STRIPE_SECRET_KEY_STAGING: ${{ secrets.STRIPE_SECRET_KEY_STAGING }}
+          STRIPE_WEBHOOK_SECRET_STAGING: ${{ secrets.STRIPE_WEBHOOK_SECRET_STAGING }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_STAGING: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_STAGING }}
+          STRIPE_PRICE_PRO_MONTHLY_STAGING: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY_STAGING }}
+          STRIPE_PRICE_PRO_YEARLY_STAGING: ${{ secrets.STRIPE_PRICE_PRO_YEARLY_STAGING }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Alias preview to staging.jov.ie
@@ -3168,10 +3196,154 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-  promote-production:
-    name: Promote to Production
+  staging-auth-journey-gate:
+    name: Staging Auth Journey Gate
     needs: [deploy-staging, canary-health-gate]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Validate required staging auth secrets
+        env:
+          E2E_STAGING_USER_EMAIL: ${{ secrets.E2E_STAGING_USER_EMAIL }}
+          E2E_STAGING_USER_PASSWORD: ${{ secrets.E2E_STAGING_USER_PASSWORD }}
+        run: |
+          missing=()
+          for key in E2E_STAGING_USER_EMAIL E2E_STAGING_USER_PASSWORD; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required staging auth secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Wait for staging alias propagation
+        run: sleep 30
+
+      - name: Run staging auth journey gate
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          CI=true BASE_URL=https://staging.jov.ie pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --no-deps --reporter=line
+        env:
+          E2E_DEPLOY_USER_EMAIL: ${{ secrets.E2E_STAGING_USER_EMAIL }}
+          E2E_DEPLOY_USER_PASSWORD: ${{ secrets.E2E_STAGING_USER_PASSWORD }}
+          E2E_DEPLOY_USER_CODE: ${{ secrets.E2E_STAGING_USER_CODE }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-auth-journey-gate-${{ github.run_id }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+  staging-billing-gate:
+    name: Staging Billing Gate
+    needs: [deploy-staging, canary-health-gate]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Validate required staging billing secrets
+        env:
+          E2E_STAGING_USER_EMAIL: ${{ secrets.E2E_STAGING_USER_EMAIL }}
+          E2E_STAGING_USER_PASSWORD: ${{ secrets.E2E_STAGING_USER_PASSWORD }}
+          E2E_STAGING_BILLING_PRICE_ID: ${{ secrets.E2E_STAGING_BILLING_PRICE_ID }}
+          STRIPE_SECRET_KEY_STAGING: ${{ secrets.STRIPE_SECRET_KEY_STAGING }}
+          STRIPE_WEBHOOK_SECRET_STAGING: ${{ secrets.STRIPE_WEBHOOK_SECRET_STAGING }}
+        run: |
+          missing=()
+          for key in \
+            E2E_STAGING_USER_EMAIL \
+            E2E_STAGING_USER_PASSWORD \
+            E2E_STAGING_BILLING_PRICE_ID \
+            STRIPE_SECRET_KEY_STAGING \
+            STRIPE_WEBHOOK_SECRET_STAGING; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required staging billing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Wait for staging alias propagation
+        run: sleep 30
+
+      - name: Run staging billing gate
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          CI=true BASE_URL=https://staging.jov.ie pnpm exec playwright test tests/e2e/staging-billing-smoke.spec.ts --project=chromium --no-deps --reporter=line
+        env:
+          E2E_DEPLOY_USER_EMAIL: ${{ secrets.E2E_STAGING_USER_EMAIL }}
+          E2E_DEPLOY_USER_PASSWORD: ${{ secrets.E2E_STAGING_USER_PASSWORD }}
+          E2E_DEPLOY_USER_CODE: ${{ secrets.E2E_STAGING_USER_CODE }}
+          E2E_STAGING_BILLING_PRICE_ID: ${{ secrets.E2E_STAGING_BILLING_PRICE_ID }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_STAGING }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET_STAGING }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-billing-gate-${{ github.run_id }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+  promote-production:
+    name: Promote to Production
+    needs:
+      [deploy-staging, canary-health-gate, staging-auth-journey-gate, staging-billing-gate]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-auth-journey-gate.result == 'success' && needs.staging-billing-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:

@@ -1,51 +1,52 @@
 # Launch Gates
 
-## Required CI Jobs For Launch-Candidate PRs
+This document defines the blocking evidence required to treat Jovie as launch-ready.
 
-Launch-candidate PRs are not launch-ready unless all of these jobs are green when the launch gate is triggered:
+Related docs:
+
+- [Synthetic Monitoring](../SYNTHETIC_MONITORING.md)
+- [Production Readiness Review](./PRODUCTION_READINESS_REVIEW.md)
+- [Readiness Scorecard](./READINESS_SCORECARD.md)
+- [On-Call Process](../ON_CALL_PROCESS.md)
+
+## Blocking Signals
+
+Launch-candidate work is not ready unless all of the following are green:
 
 - `PR Ready`
 - `Golden Path (PR)`
 - `Lighthouse (dashboard PR)`
 - `Lighthouse (onboarding PR)`
+- `Canary Health Gate (staging)` on main deploy
+- `Staging Auth Journey Gate` on main deploy
+- `Staging Billing Gate` on main deploy
 
-The launch gate is path-based. It turns on for changes touching:
+Supporting but non-blocking signals:
 
-- onboarding routes, components, or libs
-- auth signup/signin entrypoints used by the golden path
-- dashboard shell or releases flows
-- billing and checkout routes used by the golden path
-- golden-path Playwright specs and helpers
-- launch-gate CI, Lighthouse, or perf-budget configuration
+- post-deploy production auth smoke
+- production synthetic monitoring history
+- Sentry error soak gate
 
-Docs-only changes do not trigger launch-gate jobs.
+## What The Staging Gates Prove
 
-## What Each Gate Means
+- `Canary Health Gate (staging)`: the deployment is reachable and healthy enough for HTTP-level verification
+- `Staging Auth Journey Gate`: a real seeded user can authenticate and perform a safe core action on staging
+- `Staging Billing Gate`: checkout plus webhook side effects work on staging before promotion
 
-- `Golden Path (PR)`: `tests/e2e/golden-path.spec.ts` passes in CI against an ephemeral Neon database.
-- `Lighthouse (dashboard PR)`: authenticated dashboard Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.dashboard.pr.json](../../apps/web/.lighthouserc.dashboard.pr.json).
-- `Lighthouse (onboarding PR)`: onboarding Lighthouse stays within the blocking thresholds in [apps/web/.lighthouserc.onboarding.pr.json](../../apps/web/.lighthouserc.onboarding.pr.json).
+## Migration Contract
 
-## Required Local Launch Perf Check
+Current deploy behavior is not a true isolated staging environment.
 
-The Gmail-equivalent latency contract is enforced locally before push, not as a dedicated CI job.
+- Database migrations run against production before staging app verification.
+- App rollout is staged.
+- Schema rollout is already live.
 
-Run this from the repo root with pinned Doppler scope:
+Because of that, schema-affecting launches must follow this contract:
 
-```bash
-doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:budgets:launch
-```
-
-What it does:
-
-- builds the production app locally
-- starts the standalone server on loopback
-- enables the local auth bypass for authenticated measurement
-- runs strict budgets for:
-  - `--group onboarding`
-  - `--route-id creator-releases`
-
-This is the required 100ms perceived-latency check. Lighthouse does not measure that warm-navigation budget directly, so this must pass locally before you push.
+1. Use additive expand/contract changes only.
+2. Keep old app code compatible with the new schema during the staging verification window.
+3. Treat rollback as forward-fix unless a truly isolated staging database exists.
+4. Do not describe the current flow as full staging verification.
 
 ## Local Equivalents
 
@@ -69,32 +70,17 @@ Onboarding Lighthouse:
 doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:lighthouse:onboarding:pr
 ```
 
-Standard release QA:
+Launch perf budget:
 
 ```bash
-/qa
+doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:budgets:launch
 ```
 
-For local browse QA, start the app with:
+## Launch-Day Checklist
 
-```bash
-pnpm run dev:web:browse
-```
-
-## Launch-Candidate Process
-
-1. Confirm the local launch perf check passes.
-2. Confirm the PR is green on all required launch-gate CI jobs.
-3. Run standard `/qa` against preview or the local browse-compatible build.
-4. Save QA artifacts under `.context/launch-readiness/<date>/`.
-5. Confirm the last 3 synthetic golden-path runs are green.
-6. Confirm there are no open Sev-1 or Sev-2 regressions from QA or synthetic monitoring.
-
-## Launch-Day Manual Checklist
-
-- Latest local launch perf check passed.
-- Latest launch-candidate PR is green on all required launch-gate CI jobs.
-- `/qa` report is green.
-- QA evidence is stored in `.context/launch-readiness/<date>/`.
-- Last 3 synthetic golden-path runs are green.
-- No open Sev-1 or Sev-2 launch regressions remain.
+- Latest launch-candidate PR is green on all blocking launch-gate jobs.
+- Staging auth and billing gates passed on the exact production-bound build.
+- Last 3 production synthetic runs are green.
+- No unresolved Sev-1 or Sev-2 launch regressions remain.
+- [Production Readiness Review](./PRODUCTION_READINESS_REVIEW.md) is complete.
+- [Readiness Scorecard](./READINESS_SCORECARD.md) is green enough to support a go/no-go call.

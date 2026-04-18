@@ -6,10 +6,12 @@ const createGenerationRunMock = vi.fn();
 const aggregateMetricsMock = vi.fn();
 const getExistingInsightTypesMock = vi.fn();
 const generateInsightsMock = vi.fn();
+const getOperationalControlsMock = vi.fn();
 const persistInsightsMock = vi.fn();
 const completeGenerationRunMock = vi.fn();
 
 vi.mock('@sentry/nextjs', () => ({
+  captureCheckIn: vi.fn(() => 'check-in-id'),
   getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
 }));
@@ -18,6 +20,10 @@ vi.mock('@/lib/db', () => ({
   db: {
     execute: executeMock,
   },
+}));
+
+vi.mock('@/lib/admin/operational-controls', () => ({
+  getOperationalControls: getOperationalControlsMock,
 }));
 
 vi.mock('@/lib/env-server', () => ({
@@ -68,6 +74,14 @@ describe('GET /api/cron/generate-insights', () => {
         { profile_id: 'profile-5' },
         { profile_id: 'profile-6' },
       ],
+    });
+    getOperationalControlsMock.mockResolvedValue({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
     });
 
     expireStaleInsightsMock.mockResolvedValue(0);

@@ -8,17 +8,18 @@
 
 Source of truth: `apps/web/vercel.json`
 
-| Cron Path | Schedule | Frequency |
-|-----------|----------|-----------|
-| `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
-| `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
-| `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute |
-| `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
+| Cron Path | Schedule | Frequency | Sentry Monitor Slug |
+|-----------|----------|-----------|---------------------|
+| `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes | `cron-frequent` |
+| `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC | `cron-daily-maintenance` |
+| `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC | `cron-generate-insights` |
+| `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute | `cron-process-ingestion-jobs` |
+| `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC | `cron-purge-pixel-ips` |
 
 Only these 5 paths are scheduled in production. Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
+**Operational control:** high-risk cron fanout can be paused with the runtime `cronFanoutEnabled` control. Housekeeping routes remain monitored even when fanout is paused.
 
 ---
 
@@ -31,10 +32,11 @@ Only these 5 paths are scheduled in production. Other cron route files exist as 
 | 1 | dbWarmPing | Every invocation | `SELECT 1` to keep Neon compute from auto-suspending |
 | 2 | campaigns | Every invocation | `processCampaigns()` (drip sends) + `cleanupExpiredSuppressions()` |
 | 3 | pixelRetry | `minute >= 30` | Retries pending pixel event forwarding to ad platforms (FB, Google, TikTok) |
-| 4 | sendNotifications | `minute < 15` | Sends pending release-day fan notifications via email |
-| 5 | leadDiscovery | Every invocation | SerpAPI lead discovery, qualification, auto-approve (gated on `leadPipelineSettings.enabled`) |
-| 6 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
-| 7 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
+| 4 | scheduleNotifications | Every invocation | Schedules release-day notifications |
+| 5 | sendNotifications | Every invocation | Sends pending release-day fan notifications via email |
+| 6 | leadDiscovery | Every invocation | SerpAPI lead discovery, qualification, auto-approve (gated on `leadPipelineSettings.enabled`) |
+| 7 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
+| 8 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
@@ -44,11 +46,10 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 
 | # | Sub-job | When It Runs | What It Does |
 |---|---------|-------------|--------------|
-| 1 | scheduleNotifications | Every day | Finds releases dropping in next 24h, creates `fanReleaseNotifications` rows |
-| 2 | cleanupPhotos | Every day | Deletes orphaned `profilePhotos` (failed uploads >1-24h) + Vercel Blobs |
-| 3 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
-| 4 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
-| 5 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+| 1 | cleanupPhotos | Every day | Deletes orphaned `profilePhotos` (failed uploads >1-24h) + Vercel Blobs |
+| 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
+| 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
+| 4 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
 
 Source: `apps/web/app/api/cron/daily-maintenance/route.ts`
 

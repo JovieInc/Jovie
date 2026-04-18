@@ -14,7 +14,7 @@ on:
 
 jobs:
   synthetic-test:
-    name: Golden Path Synthetic Test
+    name: Production Synthetic Journey
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
@@ -43,25 +43,41 @@ jobs:
       - name: Install Playwright Browsers (chromium only)
         run: pnpm --filter=@jovie/web exec playwright install --with-deps chromium
 
-      - name: Run Golden Path Test
+      - name: Validate required synthetic secrets
+        env:
+          E2E_SYNTHETIC_USER_EMAIL: ${{ secrets.E2E_SYNTHETIC_USER_EMAIL }}
+          E2E_SYNTHETIC_USER_PASSWORD: ${{ secrets.E2E_SYNTHETIC_USER_PASSWORD }}
+        run: |
+          missing=()
+          for key in E2E_SYNTHETIC_USER_EMAIL E2E_SYNTHETIC_USER_PASSWORD; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required synthetic secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Run synthetic journey suite
         env:
           BASE_URL: https://jov.ie
           PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          # Use production Clerk for synthetic tests
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_PROD }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PROD }}
-          # Enable synthetic monitoring mode
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
+          E2E_SYNTHETIC_USER_EMAIL: ${{ secrets.E2E_SYNTHETIC_USER_EMAIL }}
+          E2E_SYNTHETIC_USER_PASSWORD: ${{ secrets.E2E_SYNTHETIC_USER_PASSWORD }}
+          E2E_SYNTHETIC_USER_CODE: ${{ secrets.E2E_SYNTHETIC_USER_CODE }}
         run: |
-          # Run only the golden path test
-          pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --reporter=json --output=test-results
+          cd apps/web
+          pnpm run test:e2e:synthetic
         continue-on-error: true
 
       - name: Parse test results
         id: test-results
         run: |
-          RESULTS_DIR="test-results"
+          RESULTS_DIR="apps/web/test-results"
           if [ -f "$RESULTS_DIR/results.json" ]; then
             FAILED_TESTS=$(jq -r '[.suites[].specs[] | select(.outcome == "unexpected") | .title] | join("\n")' "$RESULTS_DIR/results.json")
             TOTAL_TESTS=$(jq -r '[.suites[].specs[]] | length' "$RESULTS_DIR/results.json")
@@ -89,8 +105,8 @@ jobs:
         with:
           name: synthetic-test-results
           path: |
-            test-results/
-            playwright-report/
+            apps/web/test-results/
+            apps/web/playwright-report/
           retention-days: 30
 
       - name: Fail job if tests failed
@@ -108,7 +124,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "🚨 Golden Path Test Failed - jov.ie",
+              "text": "🚨 Synthetic Journey Failed - jov.ie",
               "attachments": [
                 {
                   "color": "danger",
@@ -144,7 +160,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "✅ Golden Path Health Check - jov.ie",
+              "text": "✅ Synthetic Journey Healthy - jov.ie",
               "attachments": [
                 {
                   "color": "good",

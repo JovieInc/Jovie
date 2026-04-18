@@ -18,6 +18,7 @@ export async function getPost() {
 
 export const {
   mockConstructEvent,
+  mockGetOperationalControls,
   mockRetrieve,
   mockUpdateBilling,
   mockGetPlanFromPriceId,
@@ -76,6 +77,14 @@ export const {
 
   return {
     mockConstructEvent: vi.fn(),
+    mockGetOperationalControls: vi.fn(async () => ({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
+    })),
     mockRetrieve: vi.fn(),
     mockUpdateBilling: vi.fn(),
     mockGetPlanFromPriceId: mockGetPlan,
@@ -126,6 +135,10 @@ vi.mock('@/lib/db/schema', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mockUpdateBilling,
+}));
+
+vi.mock('@/lib/admin/operational-controls', () => ({
+  getOperationalControls: mockGetOperationalControls,
 }));
 
 vi.mock('@/lib/stripe/config', () => ({

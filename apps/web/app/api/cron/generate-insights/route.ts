@@ -1,7 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getOperationalControls } from '@/lib/admin/operational-controls';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { runMonitoredCron } from '@/lib/cron/monitoring';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -28,6 +30,12 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for batch processing
+const GENERATE_INSIGHTS_MONITOR = {
+  slug: 'cron-generate-insights',
+  schedule: '0 5 * * *',
+  maxRuntime: 5,
+  checkinMargin: 10,
+} as const;
 
 interface ProfileProcessResult {
   insightsGenerated: number;
@@ -113,34 +121,52 @@ function processChunkResults(
  * Runs daily. Processes up to MAX_CRON_BATCH_SIZE profiles per run.
  */
 export async function GET(request: Request) {
-  const startTime = Date.now();
-
   const authError = verifyCronRequest(request, {
     route: '/api/cron/generate-insights',
   });
   if (authError) return authError;
 
-  try {
-    // 1. Expire stale insights first
-    const expired = await expireStaleInsights();
-    logger.info(`[insights-cron] Expired ${expired} stale insights`);
+  const controls = await getOperationalControls();
+  if (!controls.cronFanoutEnabled) {
+    return NextResponse.json(
+      {
+        success: true,
+        skipped: true,
+        reason: 'cron_fanout_disabled',
+      },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  }
 
-    // 2. Find eligible profiles:
-    //    - Claimed profiles with sufficient click data
-    //    - No generation run in the last 20 hours
-    const twentyHoursAgo = new Date();
-    twentyHoursAgo.setHours(twentyHoursAgo.getHours() - 20);
+  return runMonitoredCron(
+    {
+      monitor: GENERATE_INSIGHTS_MONITOR,
+      shouldFailResult: response => response.status !== 200,
+    },
+    async () => {
+      const startTime = Date.now();
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      try {
+        // 1. Expire stale insights first
+        const expired = await expireStaleInsights();
+        logger.info(`[insights-cron] Expired ${expired} stale insights`);
 
-    // Find profiles with enough data that haven't been processed recently.
-    // Starts from claimed pro/founding/growth profiles (small set), then
-    // checks click counts per-profile using the partial non-bot index,
-    // avoiding a full scan of the click_events table.
-    const eligibleProfiles = await db
-      .execute<{ profile_id: string }>(
-        drizzleSql`
+        // 2. Find eligible profiles:
+        //    - Claimed profiles with sufficient click data
+        //    - No generation run in the last 20 hours
+        const twentyHoursAgo = new Date();
+        twentyHoursAgo.setHours(twentyHoursAgo.getHours() - 20);
+
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // Find profiles with enough data that haven't been processed recently.
+        // Starts from claimed pro/founding/growth profiles (small set), then
+        // checks click counts per-profile using the partial non-bot index,
+        // avoiding a full scan of the click_events table.
+        const eligibleProfiles = await db
+          .execute<{ profile_id: string }>(
+            drizzleSql`
           SELECT cp.id as profile_id
           FROM ${creatorProfiles} cp
           INNER JOIN ${users} u ON u.id = cp.user_id
@@ -168,85 +194,87 @@ export async function GET(request: Request) {
           ORDER BY cp.profile_views DESC
           LIMIT ${MAX_CRON_BATCH_SIZE}
         `
-      )
-      .then(res => res.rows);
+          )
+          .then(res => res.rows);
 
-    logger.info(
-      `[insights-cron] Found ${eligibleProfiles.length} eligible profiles`
-    );
-
-    let processed = 0;
-    let insightsTotal = 0;
-    const errors: string[] = [];
-
-    // 3. Process profiles in bounded concurrent chunks with per-profile timeout guard
-    //    while preserving a 4 minute safety margin on the 5 minute max duration.
-    const MAX_RUNTIME_MS = 240_000;
-    for (
-      let index = 0;
-      index < eligibleProfiles.length;
-      index += INSIGHTS_CRON_CONCURRENCY
-    ) {
-      if (Date.now() - startTime > MAX_RUNTIME_MS) {
-        logger.warn(
-          `[insights-cron] Approaching timeout after ${processed} profiles, stopping early`
+        logger.info(
+          `[insights-cron] Found ${eligibleProfiles.length} eligible profiles`
         );
-        break;
+
+        let processed = 0;
+        let insightsTotal = 0;
+        const errors: string[] = [];
+
+        // 3. Process profiles in bounded concurrent chunks with per-profile timeout guard
+        //    while preserving a 4 minute safety margin on the 5 minute max duration.
+        const MAX_RUNTIME_MS = 240_000;
+        for (
+          let index = 0;
+          index < eligibleProfiles.length;
+          index += INSIGHTS_CRON_CONCURRENCY
+        ) {
+          if (Date.now() - startTime > MAX_RUNTIME_MS) {
+            logger.warn(
+              `[insights-cron] Approaching timeout after ${processed} profiles, stopping early`
+            );
+            break;
+          }
+
+          const chunk = eligibleProfiles.slice(
+            index,
+            index + INSIGHTS_CRON_CONCURRENCY
+          );
+          const results = await Promise.allSettled(
+            chunk.map(({ profile_id: profileId }) =>
+              withTimeout(processProfile(profileId), {
+                timeoutMs: INSIGHTS_CRON_PROFILE_TIMEOUT_MS,
+                context: `insight generation for profile ${profileId}`,
+              }).then(profileResult => ({ profileId, profileResult }))
+            )
+          );
+
+          const chunkStats = processChunkResults(results, chunk);
+          insightsTotal += chunkStats.insightsTotal;
+          processed += chunkStats.processed;
+          errors.push(...chunkStats.errors);
+        }
+
+        const duration = Date.now() - startTime;
+        logger.info(
+          `[insights-cron] Completed: ${processed}/${eligibleProfiles.length} profiles, ${insightsTotal} insights, ${duration}ms`
+        );
+
+        return NextResponse.json(
+          {
+            success: true,
+            stats: {
+              eligibleProfiles: eligibleProfiles.length,
+              processed,
+              insightsGenerated: insightsTotal,
+              expired,
+              errors: errors.length,
+            },
+            errors: errors.length > 0 ? errors : undefined,
+            duration,
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      } catch (error) {
+        logger.error('[insights-cron] Fatal error:', error);
+
+        Sentry.captureException(error, {
+          tags: { route: '/api/cron/generate-insights', method: 'GET' },
+        });
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            duration: Date.now() - startTime,
+          },
+          { status: 500, headers: NO_STORE_HEADERS }
+        );
       }
-
-      const chunk = eligibleProfiles.slice(
-        index,
-        index + INSIGHTS_CRON_CONCURRENCY
-      );
-      const results = await Promise.allSettled(
-        chunk.map(({ profile_id: profileId }) =>
-          withTimeout(processProfile(profileId), {
-            timeoutMs: INSIGHTS_CRON_PROFILE_TIMEOUT_MS,
-            context: `insight generation for profile ${profileId}`,
-          }).then(profileResult => ({ profileId, profileResult }))
-        )
-      );
-
-      const chunkStats = processChunkResults(results, chunk);
-      insightsTotal += chunkStats.insightsTotal;
-      processed += chunkStats.processed;
-      errors.push(...chunkStats.errors);
     }
-
-    const duration = Date.now() - startTime;
-    logger.info(
-      `[insights-cron] Completed: ${processed}/${eligibleProfiles.length} profiles, ${insightsTotal} insights, ${duration}ms`
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        stats: {
-          eligibleProfiles: eligibleProfiles.length,
-          processed,
-          insightsGenerated: insightsTotal,
-          expired,
-          errors: errors.length,
-        },
-        errors: errors.length > 0 ? errors : undefined,
-        duration,
-      },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
-  } catch (error) {
-    logger.error('[insights-cron] Fatal error:', error);
-
-    Sentry.captureException(error, {
-      tags: { route: '/api/cron/generate-insights', method: 'GET' },
-    });
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration: Date.now() - startTime,
-      },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
+  );
 }

@@ -5,9 +5,11 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getOperationalControls } from '@/lib/admin/operational-controls';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
@@ -34,8 +36,6 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -91,7 +91,10 @@ function jsonServiceUnavailable() {
       error:
         'Payment service is temporarily unavailable. Please try again in a moment.',
     },
-    { status: 503, headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' } }
+    {
+      status: 503,
+      headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+    }
   );
 }
 
@@ -133,6 +136,23 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
+
+    const controls = await getOperationalControls();
+    if (!controls.checkoutEnabled) {
+      return NextResponse.json(
+        {
+          error:
+            'Checkout is temporarily unavailable while we stabilize billing. Please try again shortly.',
+        },
+        {
+          status: 503,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': RETRY_AFTER_SERVICE,
+          },
+        }
+      );
+    }
 
     const body = await request.json();
     const {

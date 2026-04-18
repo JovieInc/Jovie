@@ -9,11 +9,15 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import Stripe from 'stripe';
 
-const stripePriceId =
-  process.env.STRIPE_PRICE_PRO_MONTHLY ||
-  process.env.STRIPE_PRICE_PRO_YEARLY ||
-  process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
-  process.env.STRIPE_PRICE_STANDARD_YEARLY;
+function getDefaultStripePriceId(): string | null {
+  return (
+    process.env.STRIPE_PRICE_PRO_MONTHLY ||
+    process.env.STRIPE_PRICE_PRO_YEARLY ||
+    process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
+    process.env.STRIPE_PRICE_STANDARD_YEARLY ||
+    null
+  );
+}
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -53,8 +57,10 @@ export const TEST_CARD_DECLINE: CardDetails = {
  * Validate Stripe env vars are present and price ID is reachable.
  * Calls test.skip() if prerequisites are missing.
  */
-export async function getStripeContextOrSkip() {
-  if (!stripePriceId) {
+export async function getStripeContextOrSkip(priceIdOverride?: string) {
+  const priceId = priceIdOverride || getDefaultStripePriceId();
+
+  if (!priceId) {
     test.skip(true, 'Stripe price IDs are not configured');
   }
   if (!stripeSecretKey || !stripeWebhookSecret) {
@@ -64,7 +70,7 @@ export async function getStripeContextOrSkip() {
   const stripeClient = new Stripe(stripeSecretKey!);
 
   try {
-    await stripeClient.prices.retrieve(stripePriceId!);
+    await stripeClient.prices.retrieve(priceId!);
   } catch (error) {
     test.skip(
       true,
@@ -72,7 +78,7 @@ export async function getStripeContextOrSkip() {
     );
   }
 
-  return { stripeClient, priceId: stripePriceId! };
+  return { stripeClient, priceId: priceId! };
 }
 
 /** Fetch current billing status via the app's API. */

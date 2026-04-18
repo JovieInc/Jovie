@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockCaptureError,
   mockClaimPendingJobs,
+  mockGetOperationalControls,
   mockHandleIngestionJobFailure,
   mockLoggerError,
   mockProcessJob,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockClaimPendingJobs: vi.fn(),
+  mockGetOperationalControls: vi.fn(),
   mockHandleIngestionJobFailure: vi.fn(),
   mockLoggerError: vi.fn(),
   mockProcessJob: vi.fn(),
@@ -21,12 +23,17 @@ const {
   mockWithSystemIngestionSession: vi.fn(),
 }));
 
+vi.mock('@sentry/nextjs', () => ({
+  captureCheckIn: vi.fn(() => 'check-in-id'),
+}));
+
 vi.mock('@/lib/cron/auth', () => ({
   verifyCronRequest: mockVerifyCronRequest,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
+  captureWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
@@ -40,6 +47,10 @@ vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: mockWithSystemIngestionSession,
 }));
 
+vi.mock('@/lib/admin/operational-controls', () => ({
+  getOperationalControls: mockGetOperationalControls,
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     error: mockLoggerError,
@@ -51,6 +62,14 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockVerifyCronRequest.mockReturnValue(null);
+    mockGetOperationalControls.mockResolvedValue({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
     mockWithSystemIngestionSession.mockImplementation(async callback =>
       callback({})
     );
