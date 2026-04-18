@@ -48,8 +48,7 @@ import {
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ProviderKey } from '@/lib/discography/types';
-import { usePlanGate } from '@/lib/queries';
-import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { fetchWithTimeout, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseCreditsSection } from './ReleaseCreditsSection';
@@ -338,6 +337,7 @@ export function ReleaseSidebar({
   providerConfig,
   artistName,
   canGenerateAlbumArt,
+  canGenerateCanvas: canGenerateCanvasProp,
   onGenerateAlbumArt,
   onClose,
   onRefresh,
@@ -363,6 +363,8 @@ export function ReleaseSidebar({
   showCredits = true,
   onCanvasStatusUpdate,
 }: ReleaseSidebarProps) {
+  const canGenerateCanvas =
+    canGenerateCanvasProp ?? canGenerateAlbumArt ?? false;
   const {
     isAddingLink,
     setIsAddingLink,
@@ -460,15 +462,27 @@ export function ReleaseSidebar({
     };
   }, [platformRescanCooldownEnd]);
 
-  const handleCanvasStatusChange = useCallback(
-    (status: CanvasStatus) => {
-      if (!release || !onCanvasStatusUpdate) return;
-      void onCanvasStatusUpdate(release.id, status);
+  const handleGenerateAllCanvases = useCallback(
+    (targetRelease: Release) => {
+      void fetchWithTimeout('/api/canvas/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ releaseId: targetRelease.id }),
+      })
+        .then(() => {
+          toast.success('Canvas generation started for this release');
+          onRefresh?.();
+        })
+        .catch(error => {
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'Failed to generate Canvases';
+          toast.error(message);
+        });
     },
-    [release, onCanvasStatusUpdate]
+    [onRefresh]
   );
-
-  const canEditCanvasStatus = Boolean(release && onCanvasStatusUpdate);
 
   // Audio preview player
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -515,7 +529,9 @@ export function ReleaseSidebar({
         onCopy: (path, label) => handleCopyReleasePath(path, label),
         artistName,
         canGenerateAlbumArt,
+        canGenerateCanvas,
         onGenerateAlbumArt,
+        onGenerateAllCanvases: handleGenerateAllCanvases,
       })
     );
 
@@ -546,7 +562,9 @@ export function ReleaseSidebar({
     handleCopyReleasePath,
     artistName,
     canGenerateAlbumArt,
+    canGenerateCanvas,
     onGenerateAlbumArt,
+    handleGenerateAllCanvases,
     isRefreshing,
     onRefresh,
     setIsAddingLink,
@@ -744,9 +762,6 @@ export function ReleaseSidebar({
                 variant='flat'
                 onSaveMetadata={readOnly ? undefined : onSaveMetadata}
                 onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
-                onCanvasStatusChange={
-                  canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                }
               />
             ) : null}
 
@@ -774,6 +789,7 @@ export function ReleaseSidebar({
               <ReleaseTrackList
                 release={release}
                 tracksOverride={tracksOverride}
+                canGenerateCanvas={canGenerateCanvas}
               />
             ) : null}
           </DrawerTabbedCard>

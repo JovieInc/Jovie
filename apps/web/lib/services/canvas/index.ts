@@ -6,10 +6,14 @@ export {
   TIKTOK_PREVIEW_SPEC,
 } from './specs';
 export type {
+  CanvasArtifactKind,
+  CanvasArtifactRecord,
   CanvasGenerationInput,
   CanvasGenerationJob,
+  CanvasGenerationRecord,
   CanvasGenerationResult,
-  CanvasGenerationStatus,
+  CanvasGenerationStage,
+  CanvasMotionPreset,
   CanvasStatus,
   CanvasStyle,
   CanvasVideoSpec,
@@ -18,4 +22,7 @@ export type {
   SocialAdGenerationResult,
   SocialAdPlatform,
   TikTokPreviewClip,
+  TrackCanvasHistory,
+  TrackCanvasStatus,
+  TrackCanvasSummary,
 } from './types';

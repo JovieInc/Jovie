@@ -16,6 +16,7 @@ import {
 } from '@/lib/discography/queries';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
 import { buildTrackDeepLinkPath } from '@/lib/discography/utils';
+import { listTrackCanvasSummariesForRelease } from '@/lib/services/canvas/service';
 import { toISOStringOrFallback } from '@/lib/utils/date';
 
 function buildProviderLabels(): Record<ProviderKey, string> {
@@ -175,6 +176,9 @@ export async function loadReleaseTracksForProfile(params: {
 
   const providerLabels = buildProviderLabels();
   const releaseSlug = release.slug;
+  const canvasSummaries = await listTrackCanvasSummariesForRelease(
+    params.releaseId
+  );
 
   // Try new model first, fall back to legacy
   const newResult = await getReleaseTracksForReleaseWithProviders(
@@ -182,25 +186,33 @@ export async function loadReleaseTracksForProfile(params: {
   );
 
   if (newResult.total > 0) {
-    return newResult.tracks.map(track =>
-      mapReleaseTrackToViewModel(
-        track,
-        providerLabels,
-        params.profileHandle,
-        releaseSlug
-      )
+    return newResult.tracks.map(
+      track =>
+        ({
+          ...mapReleaseTrackToViewModel(
+            track,
+            providerLabels,
+            params.profileHandle,
+            releaseSlug
+          ),
+          canvas: canvasSummaries.get(track.id),
+        }) satisfies TrackViewModel
     );
   }
 
   // Fallback to legacy discog_tracks
   const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
 
-  return tracks.map(track =>
-    mapLegacyTrackToViewModel(
-      track,
-      providerLabels,
-      params.profileHandle,
-      releaseSlug
-    )
+  return tracks.map(
+    track =>
+      ({
+        ...mapLegacyTrackToViewModel(
+          track,
+          providerLabels,
+          params.profileHandle,
+          releaseSlug
+        ),
+        canvas: canvasSummaries.get(track.id),
+      }) satisfies TrackViewModel
   );
 }

@@ -9,6 +9,8 @@ import { queryKeys } from './keys';
 export type ReleaseTrack = Pick<
   TrackViewModel,
   | 'id'
+  | 'releaseTrackId'
+  | 'recordingId'
   | 'releaseId'
   | 'releaseSlug'
   | 'title'
@@ -26,6 +28,7 @@ export type ReleaseTrack = Pick<
   | 'previewVerification'
   | 'providerConfidenceSummary'
   | 'providers'
+  | 'canvas'
 >;
 
 async function fetchReleaseTracks(

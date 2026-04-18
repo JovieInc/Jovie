@@ -98,6 +98,21 @@ export {
   selectStripeWebhookEventSchema,
   stripeWebhookEvents,
 } from './billing';
+// Canvas (Track-level Spotify Canvas generation)
+export {
+  type CanvasArtifact,
+  type CanvasGeneration,
+  type CanvasImageMaster,
+  canvasArtifacts,
+  canvasGenerations,
+  canvasImageMasters,
+  type NewCanvasArtifact,
+  type NewCanvasGeneration,
+  type NewCanvasImageMaster,
+  type NewTrackCanvasState,
+  type TrackCanvasState,
+  trackCanvasState,
+} from './canvas';
 // Chat (Conversations, Messages, Audit)
 export {
   type ChatAuditLog,

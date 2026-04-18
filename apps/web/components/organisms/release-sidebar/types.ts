@@ -16,6 +16,8 @@ export type Release = ReleaseViewModel;
 export type ReleaseSidebarTrack = Pick<
   TrackViewModel,
   | 'id'
+  | 'releaseTrackId'
+  | 'recordingId'
   | 'releaseId'
   | 'releaseSlug'
   | 'title'
@@ -33,6 +35,7 @@ export type ReleaseSidebarTrack = Pick<
   | 'previewVerification'
   | 'providerConfidenceSummary'
   | 'providers'
+  | 'canvas'
 >;
 
 export interface ReleaseSidebarAnalytics {
@@ -62,6 +65,7 @@ export interface ReleaseSidebarProps {
   /** Artist name to display in the sidebar header */
   readonly artistName?: string | null;
   readonly canGenerateAlbumArt?: boolean;
+  readonly canGenerateCanvas?: boolean;
   readonly onGenerateAlbumArt?: (release: Release) => void;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;

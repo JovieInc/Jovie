@@ -47,6 +47,8 @@ export interface BuildReleaseActionsOptions {
   readonly qrCodeIcon?: ReactNode;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
+  readonly canGenerateCanvas?: boolean;
+  readonly onGenerateAllCanvases?: (release: ReleaseViewModel) => void;
 }
 
 function buildShareItems(
@@ -219,6 +221,8 @@ export function buildReleaseActions({
   qrCodeIcon,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
+  canGenerateCanvas,
+  onGenerateAllCanvases,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
@@ -259,6 +263,16 @@ export function buildReleaseActions({
             label: 'Generate Album Art',
             icon: menuIcon('Sparkles'),
             onClick: () => onGenerateAlbumArt(release),
+          } satisfies ContextMenuItemType,
+        ]
+      : []),
+    ...(canGenerateCanvas && onGenerateAllCanvases
+      ? [
+          {
+            id: 'generate-all-canvases',
+            label: 'Generate All Canvases',
+            icon: menuIcon('Sparkles'),
+            onClick: () => onGenerateAllCanvases(release),
           } satisfies ContextMenuItemType,
         ]
       : []),

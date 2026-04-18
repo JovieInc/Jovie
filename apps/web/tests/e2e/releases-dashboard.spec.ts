@@ -261,13 +261,14 @@ test.describe('Releases dashboard', () => {
     await installClipboardSpy(page);
 
     const sidebar = await openFirstReleaseSidebar(page);
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    const detailsTab = sidebar.getByRole('tab', { name: 'Details' });
+    const dspsTab = sidebar.getByRole('tab', { name: 'DSPs' });
+    const tracksTab = sidebar.getByRole('tab', { name: 'Tracks' });
+    await expect(detailsTab).toBeVisible();
+    await expect(dspsTab).toBeVisible();
+    await expect(tracksTab).toBeVisible();
+    await dspsTab.click();
+    await expect(dspsTab).toHaveAttribute('aria-selected', 'true');
 
     const copiedUrl = await getSidebarSmartLinkUrl(sidebar);
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
@@ -281,12 +282,8 @@ test.describe('Releases dashboard', () => {
       })
       .toBe(copiedUrl);
 
-    await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await tracksTab.click();
+    await expect(tracksTab).toHaveAttribute('aria-selected', 'true');
 
     const smartLinkPage = await page.context().newPage();
     try {
@@ -365,14 +362,13 @@ test.describe('Releases dashboard', () => {
 
     const sidebar = await openFirstReleaseSidebar(page);
     await expect(sidebar.getByTestId('release-tabbed-card')).toBeVisible();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
+    const detailsTab = sidebar.getByRole('tab', { name: 'Details' });
+    const tracksTab = sidebar.getByRole('tab', { name: 'Tracks' });
+    await expect(detailsTab).toBeVisible();
+    await detailsTab.click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    await tracksTab.click();
+    await expect(tracksTab).toHaveAttribute('aria-selected', 'true');
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
@@ -398,7 +394,6 @@ test.describe('Releases dashboard', () => {
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
     expect(smartLinkHandle).toBeTruthy();
 
-    await sidebar.getByTestId('drawer-tab-links').click();
     const smartLinkTokens = sidebar.locator(
       '[title^="http://"], [title^="https://"]'
     );

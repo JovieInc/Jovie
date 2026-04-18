@@ -121,9 +121,15 @@ export interface MusicVideoMetadata {
   duration?: number;
 }
 
-import type { CanvasStatus } from '@/lib/services/canvas/types';
+import type {
+  CanvasStatus,
+  TrackCanvasSummary,
+} from '@/lib/services/canvas/types';
 
-export type { CanvasStatus } from '@/lib/services/canvas/types';
+export type {
+  CanvasStatus,
+  TrackCanvasSummary,
+} from '@/lib/services/canvas/types';
 
 export interface ReleaseViewModel {
   profileId: string;
@@ -214,6 +220,7 @@ export interface TrackViewModel {
       isPrimary: boolean;
     }
   >;
+  canvas?: TrackCanvasSummary;
 }
 
 export type AppRelease = ReleaseViewModel;

@@ -27,6 +27,10 @@ const CANVAS_STATUS_CONFIG: Record<
   CanvasStatus,
   { label: string; className: string; displayLabel?: string }
 > = {
+  processing: {
+    label: 'Processing',
+    className: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  },
   uploaded: {
     label: 'Has video',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
@@ -152,7 +156,9 @@ export function ReleaseMetadata({
 }: ReleaseMetadataProps) {
   const canvasStatus: CanvasStatus = release.canvasStatus ?? 'not_set';
   const selectionStatus: CanvasStatus =
-    canvasStatus === 'generated' ? 'not_set' : canvasStatus;
+    canvasStatus === 'generated' || canvasStatus === 'processing'
+      ? 'not_set'
+      : canvasStatus;
   const canvasStatusConfig =
     CANVAS_STATUS_CONFIG[canvasStatus] ?? CANVAS_STATUS_CONFIG.not_set;
   const canvasStatusDisplayLabel =
