@@ -93,9 +93,29 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
-  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
-    <section>{children}</section>
-  ),
+  DrawerSection: ({
+    children,
+    title,
+    testId,
+    defaultOpen = true,
+    collapsible,
+  }: {
+    children?: React.ReactNode;
+    title?: string;
+    testId?: string;
+    defaultOpen?: boolean;
+    collapsible?: boolean;
+  }) => {
+    const isCollapsible = collapsible ?? Boolean(title);
+    const isClosed = isCollapsible && !defaultOpen;
+
+    return (
+      <section data-testid={testId}>
+        {title ? <h3>{title}</h3> : null}
+        {!isClosed ? children : null}
+      </section>
+    );
+  },
   DrawerLinkSection: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -298,6 +318,14 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ),
 }));
 
+vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
+  ReleaseCreditsSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='credits' data-variant={variant ?? 'card'}>
+      Credits
+    </div>
+  ),
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));
@@ -443,14 +471,18 @@ describe('ReleaseSidebar inspector cards', () => {
     );
   });
 
-  it('renders the release drawer with a tabbed primary card and secondary collapsible cards', () => {
+  it('renders the release drawer with a tabbed primary card and a details properties panel', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
-    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('metadata')).toHaveAttribute(
+      'data-variant',
+      'flat'
+    );
+    expect(screen.getByTestId('release-credits')).toHaveAttribute(
       'data-variant',
       'flat'
     );
@@ -462,7 +494,6 @@ describe('ReleaseSidebar inspector cards', () => {
       screen.getByTestId('release-settings-card-stack')
     ).toBeInTheDocument();
     expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
-    expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.getByTestId('lyrics')).toHaveAttribute(
       'data-variant',
       'flat'
@@ -515,6 +546,7 @@ describe('ReleaseSidebar inspector cards', () => {
       'data-surface-variant',
       'card'
     );
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
   });
@@ -527,12 +559,14 @@ describe('ReleaseSidebar inspector cards', () => {
 
     await user.click(screen.getByTestId('drawer-tab-dsps'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-properties-card')
+    ).not.toBeInTheDocument();
 
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
   });
 
@@ -574,6 +608,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
+    expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
@@ -612,22 +647,9 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.queryByTestId('drawer-tab-tracks')).not.toBeInTheDocument();
   });
 
-  it('renders the Credits card only when credits exist and keeps the inner content flat', async () => {
-    mockFetchReleaseCreditsAction.mockResolvedValue([
-      {
-        role: 'producer',
-        label: 'Producer',
-        entries: [
-          { role: 'producer', artistId: 'artist_1', name: 'A', handle: null },
-        ],
-      },
-    ]);
-
+  it('renders the properties panel with flat metadata and credits content', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(
-      await screen.findByTestId('release-credits-card-stack')
-    ).toBeInTheDocument();
     expect(screen.getByTestId('release-credits')).toHaveAttribute(
       'data-variant',
       'flat'
