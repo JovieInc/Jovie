@@ -15,14 +15,14 @@ describe('DotBadge', () => {
     });
 
     it('renders with custom className', () => {
-      const { container } = render(
+      render(
         <DotBadge
           label='Test'
           variant={defaultVariant}
           className='custom-class'
         />
       );
-      const badge = container.querySelector('span');
+      const badge = screen.getByText('Test').closest('span');
 
       expect(badge).toHaveClass('custom-class');
     });
@@ -41,10 +41,8 @@ describe('DotBadge', () => {
 
   describe('sizes', () => {
     it('renders medium size by default', () => {
-      const { container } = render(
-        <DotBadge label='Medium' variant={defaultVariant} />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Medium' variant={defaultVariant} />);
+      const badge = screen.getByText('Medium').closest('span');
 
       expect(badge).toHaveClass('px-2');
       expect(badge).toHaveClass('py-0.5');
@@ -52,20 +50,16 @@ describe('DotBadge', () => {
     });
 
     it('renders small size', () => {
-      const { container } = render(
-        <DotBadge label='Small' variant={defaultVariant} size='sm' />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Small' variant={defaultVariant} size='sm' />);
+      const badge = screen.getByText('Small').closest('span');
 
       expect(badge).toHaveClass('px-1.5');
       expect(badge).toHaveClass('text-[10px]');
     });
 
     it('renders medium size explicitly', () => {
-      const { container } = render(
-        <DotBadge label='Medium' variant={defaultVariant} size='md' />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Medium' variant={defaultVariant} size='md' />);
+      const badge = screen.getByText('Medium').closest('span');
 
       expect(badge).toHaveClass('px-2');
       expect(badge).toHaveClass('text-[11px]');
@@ -97,10 +91,8 @@ describe('DotBadge', () => {
         dotClassName: 'bg-green-500',
       };
 
-      const { container } = render(
-        <DotBadge label='Success' variant={successVariant} />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Success' variant={successVariant} />);
+      const badge = screen.getByText('Success').closest('span');
 
       expect(badge).toHaveClass('border-green-500');
       expect(badge).toHaveClass('bg-green-100');
@@ -149,23 +141,21 @@ describe('DotBadge', () => {
     });
 
     it('supports title attribute for tooltip', () => {
-      const { container } = render(
+      render(
         <DotBadge
           label='Active'
           variant={defaultVariant}
           title='Currently active status'
         />
       );
-      const badge = container.querySelector('span');
+      const badge = screen.getByText('Active').closest('span');
 
       expect(badge).toHaveAttribute('title', 'Currently active status');
     });
 
     it('renders without title by default', () => {
-      const { container } = render(
-        <DotBadge label='Status' variant={defaultVariant} />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Status' variant={defaultVariant} />);
+      const badge = screen.getByText('Status').closest('span');
 
       expect(badge).not.toHaveAttribute('title');
     });
@@ -173,10 +163,8 @@ describe('DotBadge', () => {
 
   describe('styling', () => {
     it('applies base badge classes', () => {
-      const { container } = render(
-        <DotBadge label='Badge' variant={defaultVariant} />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Badge' variant={defaultVariant} />);
+      const badge = screen.getByText('Badge').closest('span');
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
@@ -199,10 +187,8 @@ describe('DotBadge', () => {
     });
 
     it('applies w-fit class', () => {
-      const { container } = render(
-        <DotBadge label='Badge' variant={defaultVariant} />
-      );
-      const badge = container.querySelector('span');
+      render(<DotBadge label='Badge' variant={defaultVariant} />);
+      const badge = screen.getByText('Badge').closest('span');
 
       expect(badge).toHaveClass('w-fit');
     });
@@ -241,7 +227,7 @@ describe('DotBadge', () => {
       const { container } = render(
         <DotBadge label='' variant={defaultVariant} />
       );
-      const badge = container.querySelector('span');
+      const badge = container.querySelector('[title], span');
 
       // Badge should still render with empty label
       expect(badge).toBeInTheDocument();
@@ -256,7 +242,7 @@ describe('DotBadge', () => {
     });
 
     it('combines all props', () => {
-      const { container } = render(
+      render(
         <DotBadge
           label='Full'
           variant={defaultVariant}
@@ -265,7 +251,7 @@ describe('DotBadge', () => {
           className='extra-class'
         />
       );
-      const badge = container.querySelector('span');
+      const badge = screen.getByText('Full').closest('span');
 
       expect(badge).toHaveClass('px-1.5');
       expect(badge).toHaveClass('extra-class');
