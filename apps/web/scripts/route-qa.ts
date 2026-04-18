@@ -72,6 +72,10 @@ const BASE_URL =
   process.env.ROUTE_QA_BASE_URL?.trim() || 'http://localhost:3000';
 const ROUTE_FILTER = process.env.ROUTE_QA_FILTER?.trim().toLowerCase() || null;
 const ROUTE_LIMIT = Number.parseInt(process.env.ROUTE_QA_LIMIT || '', 10);
+const ROUTE_CASE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_CASE_TIMEOUT_MS || '',
+  10
+);
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -750,6 +754,35 @@ async function collectPageErrors(page: Page): Promise<string[]> {
   ];
 }
 
+export function resolveRouteCaseTimeoutMs() {
+  return Number.isFinite(ROUTE_CASE_TIMEOUT_MS)
+    ? ROUTE_CASE_TIMEOUT_MS
+    : 120_000;
+}
+
+export async function settleWithTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number
+): Promise<
+  | { readonly timedOut: false; readonly result: T }
+  | { readonly timedOut: true; readonly result?: undefined }
+> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation.then(result => ({ timedOut: false as const, result })),
+      new Promise<{ readonly timedOut: true }>(resolve => {
+        timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function runRouteCase(
   context: BrowserContext,
   routeCase: RouteCase
@@ -774,6 +807,8 @@ async function runRouteCase(
   }
 
   const page = await context.newPage();
+  page.setDefaultNavigationTimeout(45_000);
+  page.setDefaultTimeout(15_000);
   const consoleErrors: string[] = [];
 
   page.on('console', message => {
@@ -791,100 +826,134 @@ async function runRouteCase(
   let title = '';
   let screenshotPath: string | undefined;
   let pageErrors: string[] = [];
+  const caseTimeoutMs = resolveRouteCaseTimeoutMs();
 
   try {
-    const response = await page.goto(targetUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 45_000,
-    });
-    await waitForStablePage(page);
-    finalUrl = page.url();
-    title = await page.title().catch(() => '');
-    const bodyText = (
-      await page
-        .locator('body')
-        .innerText()
-        .catch(() => '')
-    ).toLowerCase();
-    const hasNotFoundTestId = await page
-      .locator('[data-testid="not-found"]')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    pageErrors = await collectPageErrors(page);
+    const routeRun = settleWithTimeout(
+      (async () => {
+        const response = await page.goto(targetUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: 45_000,
+        });
+        await waitForStablePage(page);
+        finalUrl = page.url();
+        title = await page.title().catch(() => '');
+        const bodyText = (
+          await page
+            .locator('body')
+            .innerText()
+            .catch(() => '')
+        ).toLowerCase();
+        const hasNotFoundTestId = await page
+          .locator('[data-testid="not-found"]')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        pageErrors = await collectPageErrors(page);
 
-    const hasMainContent = await page
-      .locator('main, body')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const responseStatus = response?.status() ?? 0;
-    const notFoundLike = isNotFoundLike({
-      responseStatus,
-      finalUrl,
-      bodyText,
-      title,
-      hasNotFoundTestId,
-    });
+        const hasMainContent = await page
+          .locator('main, body')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const responseStatus = response?.status() ?? 0;
+        const notFoundLike = isNotFoundLike({
+          responseStatus,
+          finalUrl,
+          bodyText,
+          title,
+          hasNotFoundTestId,
+        });
 
-    const unauthorizedLike = await page
-      .locator('text=/unauthorized|sign in as an admin|valid kiosk token/i')
-      .first()
-      .isVisible()
-      .catch(() => false);
+        const unauthorizedLike = await page
+          .locator('text=/unauthorized|sign in as an admin|valid kiosk token/i')
+          .first()
+          .isVisible()
+          .catch(() => false);
 
-    let status: ResultStatus = 'pass';
-    const findings: string[] = [...pageErrors];
+        let status: ResultStatus = 'pass';
+        const findings: string[] = [...pageErrors];
 
-    if (!hasMainContent) {
-      status = 'fail';
-      findings.push('No visible main content');
-    }
+        if (!hasMainContent) {
+          status = 'fail';
+          findings.push('No visible main content');
+        }
 
-    if (routeCase.expectedState === 'not-found') {
-      if (!notFoundLike) {
-        status = 'fail';
-        findings.push(
-          'Expected a not-found style state but did not observe one.'
-        );
-      }
-    } else if (routeCase.expectedState === 'unauthorized') {
-      if (!unauthorizedLike && responseStatus >= 400) {
-        status = 'fail';
-        findings.push(
-          `Expected an unauthorized fallback but received HTTP ${responseStatus}.`
-        );
-      }
-    } else if (responseStatus >= 400) {
-      status = 'fail';
-      findings.push(`HTTP ${responseStatus}`);
-    }
+        if (routeCase.expectedState === 'not-found') {
+          if (!notFoundLike) {
+            status = 'fail';
+            findings.push(
+              'Expected a not-found style state but did not observe one.'
+            );
+          }
+        } else if (routeCase.expectedState === 'unauthorized') {
+          if (!unauthorizedLike && responseStatus >= 400) {
+            status = 'fail';
+            findings.push(
+              `Expected an unauthorized fallback but received HTTP ${responseStatus}.`
+            );
+          }
+        } else if (responseStatus >= 400) {
+          status = 'fail';
+          findings.push(`HTTP ${responseStatus}`);
+        }
 
-    if (pageErrors.length > 0 && routeCase.expectedState === 'ok') {
-      status = 'fail';
-    }
+        if (pageErrors.length > 0 && routeCase.expectedState === 'ok') {
+          status = 'fail';
+        }
 
-    if (status !== 'pass') {
+        if (status !== 'pass') {
+          screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
+          await page
+            .screenshot({ path: screenshotPath, fullPage: true })
+            .catch(() => undefined);
+        }
+
+        return {
+          id: routeCase.id,
+          lane: routeCase.lane,
+          path: routeCase.path,
+          source: routeCase.source,
+          authPersona: routeCase.authPersona,
+          status,
+          finalUrl,
+          title,
+          consoleErrors,
+          pageErrors: findings,
+          screenshotPath,
+          notes: routeCase.notes,
+        } satisfies RouteResult;
+      })(),
+      caseTimeoutMs
+    );
+    const settledResult = await routeRun;
+
+    if (settledResult.timedOut) {
+      finalUrl = page.url() || finalUrl;
       screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
       await page
         .screenshot({ path: screenshotPath, fullPage: true })
         .catch(() => undefined);
+
+      return {
+        id: routeCase.id,
+        lane: routeCase.lane,
+        path: routeCase.path,
+        source: routeCase.source,
+        authPersona: routeCase.authPersona,
+        status: 'fail',
+        finalUrl,
+        title,
+        consoleErrors,
+        pageErrors: [
+          `Route timed out after ${caseTimeoutMs}ms while waiting for the page to stabilize.`,
+        ],
+        screenshotPath,
+        notes: routeCase.notes,
+      };
     }
 
-    return {
-      id: routeCase.id,
-      lane: routeCase.lane,
-      path: routeCase.path,
-      source: routeCase.source,
-      authPersona: routeCase.authPersona,
-      status,
-      finalUrl,
-      title,
-      consoleErrors,
-      pageErrors: findings,
-      screenshotPath,
-      notes: routeCase.notes,
-    };
+    return settledResult.result;
   } catch (error) {
     screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
     await page
