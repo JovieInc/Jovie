@@ -50,3 +50,15 @@ cleanup_old_branches*.sh
 # Build-critical web postbuild script
 !apps/web/scripts/
 !apps/web/scripts/sync-standalone-assets.mjs
+
+# Source-deploy fallback still needs these runtime directories from apps/web.
+!apps/web/content/
+!apps/web/content/**
+!apps/web/lib/docs/
+!apps/web/lib/docs/**
+!apps/web/lib/chat/knowledge/topics/
+!apps/web/lib/chat/knowledge/topics/**
+!apps/web/lib/e2e/
+!apps/web/lib/e2e/**
+!apps/web/lib/submission-agent/artifacts/
+!apps/web/lib/submission-agent/artifacts/**

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.157] - 2026-04-17
+
+> Preview deploys now survive the Vercel oversized-prebuilt edge case, so PR review links keep generating even when the archive upload path fails first.
+
+### Fixed
+
+- [internal] Updated the shared Vercel deploy wrapper to count `.vercel/output` files, skip the plain `--prebuilt` fallback once output exceeds Vercel's `15000`-file cap, and fall back to a source deploy instead of retrying an impossible path.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.157`.
+
 ## [26.4.156] - 2026-04-16
 
 > Homepage and Artist Profile surfaces now inherit the refreshed design-system timing, weights, and profile shell tokens, and the PR preview deploy path now survives Vercel archive upload failures without stalling review.

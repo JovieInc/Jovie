@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { resolveAppPath } from '@/lib/filesystem-paths';
 
 /**
  * Knowledge topic registry.
@@ -19,7 +19,7 @@ interface KnowledgeTopic {
   readonly content: string;
 }
 
-const TOPICS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'topics');
+const TOPICS_DIR = resolveAppPath('lib', 'chat', 'knowledge', 'topics');
 
 function loadTopic(filename: string): string {
   try {
