@@ -33,6 +33,7 @@ import {
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { runBackgroundSyncOperations } from './sync';
 
@@ -440,6 +441,13 @@ export async function connectOnboardingSpotifyArtist(
         }
       );
     }
+
+    void refreshFeaturedPlaylistFallbackCandidate({
+      profileId: profile.id,
+      usernameNormalized: profile.handle,
+      artistName: params.artistName,
+      artistSpotifyId: params.spotifyArtistId,
+    });
   };
 
   const runSpotifyImport = async (): Promise<SpotifyImportResult> => {

@@ -43,6 +43,10 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  getConfirmedFeaturedPlaylistFallback,
+  getFeaturedPlaylistFallbackCandidate,
+} from '@/lib/profile/featured-playlist-fallback';
 
 // ============================================================================
 // Types
@@ -50,7 +54,12 @@ import { captureError } from '@/lib/error-tracking';
 
 export interface ProfileSuggestion {
   id: string;
-  type: 'dsp_match' | 'social_link' | 'avatar' | 'profile_ready';
+  type:
+    | 'dsp_match'
+    | 'social_link'
+    | 'avatar'
+    | 'playlist_fallback'
+    | 'profile_ready';
   platform: string;
   platformLabel: string;
   title: string;
@@ -100,6 +109,7 @@ export async function GET(request: Request) {
         avatarUrl: creatorProfiles.avatarUrl,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -226,6 +236,18 @@ export async function GET(request: Request) {
     const filteredAvatars = avatarCandidates.filter(
       c => c.avatarUrl !== profile.avatarUrl
     );
+    const pendingPlaylistFallback = getFeaturedPlaylistFallbackCandidate(
+      profile.settings as Record<string, unknown> | null | undefined
+    );
+    const confirmedPlaylistFallback = getConfirmedFeaturedPlaylistFallback(
+      profile.settings as Record<string, unknown> | null | undefined
+    );
+    const dismissedPlaylistId =
+      typeof (profile.settings as Record<string, unknown> | null | undefined)
+        ?.featuredPlaylistFallbackDismissedId === 'string'
+        ? ((profile.settings as Record<string, unknown>)
+            .featuredPlaylistFallbackDismissedId as string)
+        : null;
 
     // Normalize into unified format
     const suggestions: ProfileSuggestion[] = [
@@ -256,6 +278,25 @@ export async function GET(request: Request) {
         externalUrl: suggestion.url,
         confidence: Number.parseFloat(suggestion.confidenceScore),
       })),
+
+      ...(pendingPlaylistFallback &&
+      confirmedPlaylistFallback?.playlistId !==
+        pendingPlaylistFallback.playlistId &&
+      dismissedPlaylistId !== pendingPlaylistFallback.playlistId
+        ? [
+            {
+              id: pendingPlaylistFallback.playlistId,
+              type: 'playlist_fallback' as const,
+              platform: 'spotify',
+              platformLabel: 'Spotify',
+              title: pendingPlaylistFallback.title,
+              subtitle: 'Official playlist fallback suggestion',
+              imageUrl: pendingPlaylistFallback.imageUrl,
+              externalUrl: pendingPlaylistFallback.url,
+              confidence: null,
+            },
+          ]
+        : []),
 
       // Avatar candidates last
       ...filteredAvatars.map(candidate => ({

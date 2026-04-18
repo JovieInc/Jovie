@@ -33,7 +33,7 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
             <Link
               key={artist.id}
               href={`/${artist.handle}`}
-              className={`group shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-300 hover:scale-110'}`}
+              className={`group shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-slower hover:scale-110'}`}
             >
               <div className='relative'>
                 {/* Artist image */}
@@ -54,7 +54,7 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
                   className={`absolute inset-0 flex items-center justify-center bg-black/50 rounded-full ${
                     prefersReducedMotion
                       ? 'opacity-0 focus-visible-within:opacity-100 group-focus-visible:opacity-100'
-                      : 'opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                      : 'opacity-0 group-hover:opacity-100 transition-opacity duration-slower'
                   }`}
                 >
                   <span className='text-white text-xs sm:text-sm font-medium text-center px-2'>

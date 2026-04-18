@@ -108,6 +108,16 @@ describe('Public Profile Page Logic', () => {
         'getPublicTourDates(profile.id)'
       );
     });
+
+    it('reads a confirmed playlist fallback from profile settings without live search', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'getConfirmedFeaturedPlaylistFallback(profileSettings)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchGoogleCSE');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        'discoverThisIsPlaylistCandidate'
+      );
+    });
   });
 
   describe('public claim banner handling', () => {

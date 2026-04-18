@@ -3,6 +3,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -36,6 +37,7 @@ export interface StaticArtistPageProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly viewerCountryCode?: string | null;
   readonly presentation?: StaticArtistPagePresentation;
   readonly releases?: readonly PublicRelease[];
@@ -65,6 +67,7 @@ export function StaticArtistPage({
   showSubscriptionConfirmedBanner = false,
   showShopButton = false,
   profileSettings,
+  featuredPlaylistFallback,
   viewerCountryCode,
   presentation = 'full-public',
   releases,
@@ -93,6 +96,7 @@ export function StaticArtistPage({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
+    featuredPlaylistFallback,
   });
 
   // Live public profiles and compact preview callers intentionally share the
@@ -119,6 +123,7 @@ export function StaticArtistPage({
         viewModel.showSubscriptionConfirmedBanner
       }
       profileSettings={viewModel.profileSettings}
+      featuredPlaylistFallback={viewModel.featuredPlaylistFallback}
       viewerCountryCode={viewerCountryCode}
       releases={releases}
       hideJovieBranding={hideJovieBranding}

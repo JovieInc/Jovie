@@ -123,7 +123,7 @@ export function ProductDemoCarousel() {
             <div key={s.id} className='relative flex-1 overflow-hidden'>
               {i === current && (
                 <motion.div
-                  className='absolute inset-y-0 left-0 bg-[#7170ff]'
+                  className='absolute inset-y-0 left-0 bg-accent'
                   initial={{ width: '0%' }}
                   animate={{ width: '100%' }}
                   transition={{
@@ -132,7 +132,7 @@ export function ProductDemoCarousel() {
                   }}
                 />
               )}
-              {i < current && <div className='absolute inset-0 bg-[#7170ff]' />}
+              {i < current && <div className='absolute inset-0 bg-accent' />}
             </div>
           ))}
         </div>

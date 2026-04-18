@@ -297,7 +297,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <span
                         key={mode.id}
-                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-300'
+                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-slower'
                         style={{
                           borderColor:
                             i === activeIndex
@@ -382,7 +382,7 @@ export function DeeplinksGrid() {
                         className='font-mono tracking-[-0.02em]'
                         style={{
                           fontSize: i === activeIndex ? '20px' : '15px',
-                          fontWeight: i === activeIndex ? 600 : 400,
+                          fontWeight: i === activeIndex ? 590 : 400,
                           color:
                             i === activeIndex
                               ? 'var(--linear-text-primary)'

@@ -38,6 +38,13 @@ import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from './AboutSection';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import {
+  PROFILE_DRAWER_DANGER_ITEM_CLASS,
+  PROFILE_DRAWER_MENU_ITEM_CLASS,
+  PROFILE_DRAWER_META_CLASS,
+  PROFILE_DRAWER_TITLE_CLASS,
+  PROFILE_DRAWER_TOGGLE_ROW_CLASS,
+} from './profile-drawer-classes';
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
 
@@ -130,8 +137,6 @@ interface ProfileUnifiedDrawerProps {
   readonly onRevealNotifications?: () => void;
 }
 
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -160,21 +165,18 @@ function ContactList({
         const primaryHref = getActionHref(primary);
 
         return (
-          <div
-            key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[14px] px-4 py-3'
-          >
+          <div key={contact.id} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
             {primaryHref ? (
               <a
                 href={primaryHref}
                 className='flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left'
                 onClick={() => trackAction(primary, contact)}
               >
-                <span className='text-[14px] font-[470] text-white/88'>
+                <span className={PROFILE_DRAWER_TITLE_CLASS}>
                   {contact.roleLabel}
                 </span>
                 {contact.secondaryLabel ? (
-                  <span className='text-[11px] font-[400] text-white/40'>
+                  <span className={PROFILE_DRAWER_META_CLASS}>
                     {contact.secondaryLabel}
                   </span>
                 ) : null}
@@ -192,7 +194,7 @@ function ContactList({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/80'
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-normal hover:bg-white/[0.08] hover:text-white/80'
                     aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
                     onClick={() => trackAction(channel, contact)}
                   >
@@ -304,7 +306,7 @@ function ReleasesDrawerContent({
             ) : null}
             <a
               href={`/${artistHandle}/${release.slug}`}
-              className='flex items-center gap-3 rounded-[14px] px-4 py-3 transition-colors duration-150 active:bg-white/[0.06]'
+              className='flex items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 transition-colors duration-normal active:bg-white/[0.06]'
               aria-label={ariaLabel}
             >
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -317,10 +319,10 @@ function ReleasesDrawerContent({
                 />
               </div>
               <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
-                <span className='truncate text-[14px] font-[470] text-white/88'>
+                <span className={`truncate ${PROFILE_DRAWER_TITLE_CLASS}`}>
                   {release.title}
                 </span>
-                <span className='text-[11px] font-[400] text-white/40'>
+                <span className={PROFILE_DRAWER_META_CLASS}>
                   {collabs ? `${collabs} \u00b7 ` : ''}
                   {metaParts.join(' \u00b7 ')}
                   {release.releaseType === 'music_video' ? (
@@ -507,7 +509,7 @@ export function ProfileUnifiedDrawer({
               <button
                 type='button'
                 role='menuitem'
-                className={menuItemClass}
+                className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                 onClick={() => navigateTo('share')}
               >
                 <Share2 className={iconClass} />
@@ -518,7 +520,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('about')}
                 >
                   <Info className={iconClass} />
@@ -530,7 +532,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('releases')}
                 >
                   <Disc3 className={iconClass} />
@@ -542,7 +544,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('tour')}
                 >
                   <CalendarDays className={iconClass} />
@@ -554,7 +556,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('pay')}
                 >
                   <Ticket className={iconClass} />
@@ -566,7 +568,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('contact')}
                 >
                   <Mail className={iconClass} />
@@ -578,7 +580,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={`${menuItemClass} justify-between`}
+                  className={`${PROFILE_DRAWER_MENU_ITEM_CLASS} justify-between`}
                   onClick={() => navigateTo('notifications')}
                 >
                   <span className='flex items-center gap-3'>
@@ -591,7 +593,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => {
                     if (onRevealNotifications) {
                       handleOpenChange(false);
@@ -619,15 +621,12 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'notifications' && (
             <div className='flex flex-col gap-1'>
               {NOTIFICATION_CONTENT_TYPES.map(pref => (
-                <div
-                  key={pref.key}
-                  className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
-                >
+                <div key={pref.key} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
                   <div className='flex flex-col gap-0.5'>
-                    <span className='text-[14px] font-[470] text-white/88'>
+                    <span className={PROFILE_DRAWER_TITLE_CLASS}>
                       {pref.label}
                     </span>
-                    <span className='text-[11px] font-[400] text-white/40'>
+                    <span className={PROFILE_DRAWER_META_CLASS}>
                       {pref.description}
                     </span>
                   </div>
@@ -645,7 +644,7 @@ export function ProfileUnifiedDrawer({
               <button
                 type='button'
                 role='menuitem'
-                className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
+                className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
@@ -729,7 +728,7 @@ export function ProfileUnifiedDrawer({
                   paymentLabel='Venmo'
                 />
               ) : (
-                <div className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
+                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
                   <p className='text-sm font-[590] text-white/88'>
                     Payments not available yet
                   </p>

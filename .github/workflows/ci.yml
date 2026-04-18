@@ -2469,74 +2469,9 @@ jobs:
             echo "Using stub database URL for UI-only deployment"
           fi
 
-          deploy_preview() {
-            local mode="$1"
-            local deploy_output=""
-            local deploy_exit=0
-
-            if [ "$mode" = "archive" ]; then
-              echo "Deploy mode: archive"
-              if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
-                --env DATABASE_URL="$POOLED_URL" \
-                --env GIT_BRANCH="${GIT_BRANCH}" \
-                --token "$VERCEL_TOKEN" 2>&1)"; then
-                deploy_exit=0
-              else
-                deploy_exit=$?
-              fi
-            else
-              echo "Deploy mode: standard"
-              if deploy_output="$(vercel deploy --prebuilt \
-                --env DATABASE_URL="$POOLED_URL" \
-                --env GIT_BRANCH="${GIT_BRANCH}" \
-                --token "$VERCEL_TOKEN" 2>&1)"; then
-                deploy_exit=0
-              else
-                deploy_exit=$?
-              fi
-            fi
-
-            echo "$deploy_output"
-            if [ "$deploy_exit" -eq 0 ]; then
-              deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
-              if [ -z "$deployment_url" ]; then
-                echo "Deploy succeeded but no preview URL was found in Vercel output"
-                exit 1
-              fi
-              echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
-              return 0
-            fi
-
-            if [ "$mode" = "archive" ] && printf '%s\n' "$deploy_output" | grep -q 'Building: Extracting deployment files...'; then
-              echo "Archive deploy failed during extraction; falling back to standard upload"
-              return 2
-            fi
-
-            return 1
-          }
-
-          if deploy_preview archive; then
-            exit 0
-          else
-            archive_exit=$?
-          fi
-          if [ "$archive_exit" -eq 2 ]; then
-            for attempt in 1 2 3; do
-              echo "Standard deploy attempt $attempt/3"
-              if deploy_preview standard; then
-                exit 0
-              fi
-              if [ "$attempt" -lt 3 ]; then
-                echo "Standard deploy failed, retrying in 10s..."
-                sleep 10
-              fi
-            done
-            echo "Standard deploy failed after 3 attempts"
-            exit 1
-          fi
-
-          echo "Archive deploy failed"
-          exit 1
+          bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
+            --env DATABASE_URL="$POOLED_URL" \
+            --env GIT_BRANCH="${GIT_BRANCH}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -3052,80 +2987,15 @@ jobs:
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
-          deploy_staging_preview() {
-            local mode="$1"
-            local deploy_output=""
-            local deploy_exit=0
-
-            if [ "$mode" = "archive" ]; then
-              echo "Deploy mode: archive"
-              if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
-                --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
-                --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" \
-                --token "${{ secrets.VERCEL_TOKEN }}" 2>&1)"; then
-                deploy_exit=0
-              else
-                deploy_exit=$?
-              fi
-            else
-              echo "Deploy mode: standard"
-              if deploy_output="$(vercel deploy --prebuilt \
-                --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
-                --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" \
-                --token "${{ secrets.VERCEL_TOKEN }}" 2>&1)"; then
-                deploy_exit=0
-              else
-                deploy_exit=$?
-              fi
-            fi
-
-            echo "$deploy_output"
-            if [ "$deploy_exit" -eq 0 ]; then
-              deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
-              if [ -z "$deploy_url" ]; then
-                echo "Deploy succeeded but no preview URL was found in Vercel output"
-                exit 1
-              fi
-              echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
-              return 0
-            fi
-
-            if [ "$mode" = "archive" ] && printf '%s\n' "$deploy_output" | grep -q 'Building: Extracting deployment files...'; then
-              echo "Archive deploy failed during extraction; falling back to standard upload"
-              return 2
-            fi
-
-            return 1
-          }
-
-          if deploy_staging_preview archive; then
-            exit 0
-          else
-            archive_exit=$?
-          fi
-          if [ "$archive_exit" -eq 2 ]; then
-            for attempt in 1 2 3; do
-              echo "Standard deploy attempt $attempt/3"
-              if deploy_staging_preview standard; then
-                echo "Deploy succeeded on attempt $attempt"
-                exit 0
-              fi
-              if [ "$attempt" -lt 3 ]; then
-                echo "Standard deploy failed, retrying in 10s..."
-                sleep 10
-              fi
-            done
-            echo "Standard deploy failed after 3 attempts"
-            exit 1
-          fi
-
-          echo "Archive deploy failed"
-          exit 1
+          bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+            --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+            --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Alias preview to staging.jov.ie
         run: |
