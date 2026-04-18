@@ -140,7 +140,7 @@ export const updateSubscriberBirthdaySchema = z.object({
   birthday: z
     .string()
     .regex(
-      /^(?:\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/,
+      /^(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2})$/,
       'Birthday must be in YYYY-MM-DD or MM-DD format'
     )
     .refine(

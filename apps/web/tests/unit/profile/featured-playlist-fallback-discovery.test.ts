@@ -92,4 +92,74 @@ describe('featured playlist fallback discovery', () => {
       })
     ).resolves.toBeNull();
   });
+
+  it('escapes quotes in artist names before querying Google CSE', async () => {
+    hoisted.searchGoogleCSEMock.mockResolvedValue([]);
+
+    const { discoverThisIsPlaylistCandidate } = await import(
+      '@/lib/profile/featured-playlist-fallback-discovery'
+    );
+
+    await expect(
+      discoverThisIsPlaylistCandidate({
+        artistName: 'Tim "TJ" White',
+        artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+      })
+    ).resolves.toBeNull();
+
+    expect(hoisted.searchGoogleCSEMock).toHaveBeenCalledWith(
+      'site:open.spotify.com/playlist "This Is Tim TJ White"',
+      1
+    );
+  });
+
+  it('returns null and captures a warning when Google CSE throws', async () => {
+    hoisted.searchGoogleCSEMock.mockRejectedValue(new Error('search failed'));
+
+    const { discoverThisIsPlaylistCandidate } = await import(
+      '@/lib/profile/featured-playlist-fallback-discovery'
+    );
+
+    await expect(
+      discoverThisIsPlaylistCandidate({
+        artistName: 'Tim White',
+        artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+      })
+    ).resolves.toBeNull();
+
+    expect(hoisted.captureWarningMock).toHaveBeenCalledWith(
+      'Google CSE discovery failed',
+      expect.any(Error),
+      expect.objectContaining({
+        query: 'site:open.spotify.com/playlist "This Is Tim White"',
+        route: 'featured-playlist-fallback-discovery',
+      })
+    );
+  });
+
+  it('does not capture a warning for expected 404 playlist responses', async () => {
+    hoisted.searchGoogleCSEMock.mockResolvedValue([
+      {
+        link: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu',
+        title: 'This Is Tim White',
+        snippet: '',
+      },
+    ]);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('', { status: 404 })
+    );
+
+    const { discoverThisIsPlaylistCandidate } = await import(
+      '@/lib/profile/featured-playlist-fallback-discovery'
+    );
+
+    await expect(
+      discoverThisIsPlaylistCandidate({
+        artistName: 'Tim White',
+        artistSpotifyId: '4Uwpa6zW3zzCSQvooQNksm',
+      })
+    ).resolves.toBeNull();
+
+    expect(hoisted.captureWarningMock).not.toHaveBeenCalled();
+  });
 });
