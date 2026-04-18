@@ -4,6 +4,9 @@ on:
     - cron: '0 6 * * 1'  # Monday 6 AM UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: evals-periodic
   cancel-in-progress: true
@@ -22,12 +25,12 @@ jobs:
     outputs:
       image-tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.2.2
 
       - id: meta
         run: echo "tag=${{ env.IMAGE }}:${{ hashFiles('.github/docker/Dockerfile.ci', 'package.json') }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -46,7 +49,7 @@ jobs:
         run: cp package.json .github/docker/
 
       - if: steps.check.outputs.exists == 'false'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.0.0
         with:
           context: .github/docker
           file: .github/docker/Dockerfile.ci
@@ -87,7 +90,7 @@ jobs:
           - name: e2e-gemini
             file: test/gemini-e2e.test.ts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -121,7 +124,7 @@ jobs:
 
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: eval-periodic-${{ matrix.suite.name }}
           path: ~/.gstack-dev/evals/*.json
