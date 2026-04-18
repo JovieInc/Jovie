@@ -47,7 +47,7 @@ async function getOwnedProfile(params: {
     .where(eq(creatorProfiles.id, params.profileId))
     .limit(1);
 
-  if (!profile || profile.clerkId !== params.clerkUserId) {
+  if (profile?.clerkId !== params.clerkUserId) {
     throw new Error('Profile not found');
   }
 

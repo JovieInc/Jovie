@@ -82,7 +82,7 @@ export function ArtistProfileModeSwitcher({
 
     const listenIndex = adaptive.modes.findIndex(mode => mode.id === 'listen');
     const tourIndex = adaptive.modes.findIndex(mode => mode.id === 'tour');
-    const firstIndex = listenIndex >= 0 ? listenIndex : 0;
+    const firstIndex = Math.max(listenIndex, 0);
 
     sequenceStartedRef.current = true;
     setTabsVisible(true);
