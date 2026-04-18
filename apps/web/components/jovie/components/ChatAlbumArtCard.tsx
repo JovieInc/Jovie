@@ -108,12 +108,12 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
   if (!result.success) {
     return (
       <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-[13px] text-primary-token'>
-        <div className='font-medium'>Album Art Failed</div>
-        <div className='mt-1 text-secondary-token'>{result.error}</div>
+        <span className='block font-medium'>Album Art Failed</span>
+        <span className='mt-1 block text-secondary-token'>{result.error}</span>
         {result.retryable ? (
-          <div className='mt-2 text-[12px] text-tertiary-token'>
+          <span className='mt-2 block text-[12px] text-tertiary-token'>
             Retry from chat when the provider is available.
-          </div>
+          </span>
         ) : null}
       </output>
     );
