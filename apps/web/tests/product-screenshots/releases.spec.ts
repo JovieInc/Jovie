@@ -87,6 +87,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-detail.png');
 
+    await sidebar.getByTestId('drawer-tab-links').click();
     const platformsCard = sidebar.getByTestId('release-platforms-card');
     await expect(platformsCard).toBeVisible({
       timeout: TIMEOUTS.CONTENT_VISIBLE,
@@ -97,9 +98,9 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-platforms.png');
 
+    await sidebar.getByTestId('drawer-tab-tasks').click();
     const tasksCard = sidebar.getByTestId('release-tasks-card');
     await expect(tasksCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
-    await tasksCard.getByRole('button', { name: 'Tasks' }).click();
     await expect(
       tasksCard.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
