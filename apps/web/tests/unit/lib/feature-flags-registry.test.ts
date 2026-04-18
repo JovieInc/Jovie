@@ -105,6 +105,22 @@ describe('feature flag registry integrity', () => {
         'HomeAdaptiveProfileStory.tsx'
       ),
       path.join('components', 'features', 'home', 'HomePageNarrative.tsx'),
+      path.join(
+        'components',
+        'marketing',
+        'homepage-v2',
+        'HomepageV2Route.tsx'
+      ),
+      path.join(
+        'components',
+        'features',
+        'dashboard',
+        'organisms',
+        'release-provider-matrix',
+        'ReleaseProviderMatrix.tsx'
+      ),
+      path.join('app', 'api', 'chat', 'route.ts'),
+      path.join('app', 'api', 'chat', 'album-art', 'shared.ts'),
       path.join('lib', 'feature-flags', 'client.tsx'),
       path.join('lib', 'feature-flags', 'server.ts'),
       path.join('lib', 'feature-flags', 'shared.ts'),

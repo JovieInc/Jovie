@@ -14,7 +14,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "ignoreDeprecations": "6.0",
     "tsBuildInfoFile": ".cache/tsbuildinfo",
     "types": ["./tests/types/vitest", "./tests/types/jest-dom"],
     "plugins": [

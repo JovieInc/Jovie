@@ -83,8 +83,6 @@ export function ProfilePaySurface({
   className,
 }: Readonly<ProfilePaySurfaceProps>) {
   const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
-}: Readonly<ProfilePaySurfaceProps>) {
-  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   const isDrawer = variant === 'drawer';
   const isShareable =
     summary.tipUrl !== null &&
