@@ -53,7 +53,7 @@ export const chatMessages = pgTable(
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
     role: chatMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
-    toolCalls: jsonb('tool_calls').$type<Record<string, unknown>[]>(),
+    toolCalls: jsonb('tool_calls'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({

@@ -57,7 +57,7 @@ function ClaimMoment({ accent }: Readonly<{ accent: string }>) {
         <span className='font-medium text-primary-token'>Tim White</span>
       </div>
       <div className='mt-3 overflow-hidden rounded-[1.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.02)),#090c10] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.22)]'>
-        <p className='px-2.5 pb-2 text-[10px] font-medium tracking-[0.08em] text-white/36'>
+        <p className='px-2.5 pb-2 text-[10px] font-medium tracking-[0.08em] text-white/64'>
           Top results
         </p>
         <div className='rounded-[1rem] border border-white/8 bg-white/[0.05] px-3 py-3'>
@@ -174,11 +174,11 @@ function BuildMoment({ accent }: Readonly<{ accent: string }>) {
                 className='rounded-full px-3 py-1.5 text-[10px] font-semibold'
                 style={{
                   background: isIngesting
-                    ? `color-mix(in srgb, ${providerAccent} 15%, transparent)`
+                    ? 'rgba(0,0,0,0.34)'
                     : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${isIngesting ? `color-mix(in srgb, ${providerAccent} 24%, transparent)` : 'rgba(255,255,255,0.08)'}`,
+                  border: `1px solid ${isIngesting ? `color-mix(in srgb, ${providerAccent} 38%, transparent)` : 'rgba(255,255,255,0.08)'}`,
                   color: isIngesting
-                    ? providerAccent
+                    ? `color-mix(in srgb, ${providerAccent} 72%, white)`
                     : 'rgba(255,255,255,0.74)',
                 }}
               >
@@ -311,7 +311,7 @@ export function ArtistProfileHowItWorks({
                 className='relative flex flex-col items-center'
               >
                 <div className='mx-auto flex w-full max-w-[23rem] items-start gap-3 text-left'>
-                  <span className='pt-0.5 text-[13px] font-semibold tracking-[-0.03em] text-white/42'>
+                  <span className='pt-0.5 text-[13px] font-semibold tracking-[-0.03em] text-white/60'>
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <div className='min-w-0'>
