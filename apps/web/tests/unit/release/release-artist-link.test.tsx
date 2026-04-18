@@ -280,7 +280,7 @@ describe('release artist links', () => {
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
     fireEvent.click(screen.getByRole('button', { name: /credits/i }));
 
-    expect(screen.getByText('Credits')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Credits' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Producer One' })).toHaveAttribute(
       'href',
       '/producer-one'

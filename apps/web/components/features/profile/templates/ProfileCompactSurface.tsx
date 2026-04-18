@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
@@ -61,19 +61,113 @@ const ProfileInlineNotificationsCTA = dynamic(
   { ssr: false }
 );
 
-const glass = {
-  bg: 'bg-white/[0.05]',
-  bgHover: 'hover:bg-white/[0.08]',
-  border: 'border-white/[0.08]',
-  blur: 'backdrop-blur-2xl',
-} as const;
-
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
   newMusic: true,
   tourDates: true,
   merch: true,
   general: true,
 };
+
+const heroActionCardClassName =
+  'flex min-h-[74px] w-full items-center gap-3.5 rounded-[var(--profile-action-radius)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_91%,rgba(6,7,10,0.32))] px-3.5 py-3 text-left shadow-[0_14px_34px_rgba(0,0,0,0.22)] backdrop-blur-[18px] transition-[background-color,box-shadow] duration-150';
+const heroActionPillClassName = `${profilePrimaryPillClassName} h-9 px-3.5 text-[12px] font-[620] tracking-[-0.012em] shadow-[0_8px_18px_rgba(0,0,0,0.14)]`;
+const heroKickerClassName =
+  'truncate text-[9px] font-[650] uppercase tracking-[0.12em] text-white/50';
+
+interface HeroActionCardProps {
+  readonly kicker?: string;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly artworkUrl?: string | null;
+  readonly artworkAlt: string;
+  readonly trailingContent?: ReactNode;
+  readonly leadingContent?: ReactNode;
+}
+
+function HeroActionCard({
+  kicker,
+  title,
+  subtitle,
+  artworkUrl,
+  artworkAlt,
+  trailingContent,
+  leadingContent,
+}: Readonly<HeroActionCardProps>) {
+  return (
+    <div className={heroActionCardClassName}>
+      {artworkUrl ? (
+        <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-[15px]'>
+          <ImageWithFallback
+            src={artworkUrl}
+            alt={artworkAlt}
+            fill
+            sizes='48px'
+            className='object-cover'
+            fallbackVariant='release'
+          />
+        </div>
+      ) : leadingContent ? (
+        <div className='shrink-0'>{leadingContent}</div>
+      ) : null}
+      <div className='min-w-0 flex-1'>
+        {kicker ? <p className={heroKickerClassName}>{kicker}</p> : null}
+        <p className='truncate text-[14px] font-[620] leading-[1.12] text-white/94'>
+          {title}
+        </p>
+        {subtitle ? (
+          <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+      {trailingContent ? (
+        <div className='shrink-0'>{trailingContent}</div>
+      ) : null}
+    </div>
+  );
+}
+
+interface HeroActionButtonProps {
+  readonly label: string;
+  readonly ariaLabel: string;
+  readonly href?: string;
+  readonly onClick?: () => void;
+  readonly external?: boolean;
+}
+
+function HeroActionButton({
+  label,
+  ariaLabel,
+  href,
+  onClick,
+  external = false,
+}: Readonly<HeroActionButtonProps>) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
+        aria-label={ariaLabel}
+        className={heroActionPillClassName}
+        onClick={external ? undefined : onClick}
+      >
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={heroActionPillClassName}
+    >
+      {label}
+    </button>
+  );
+}
 
 interface ProfileCompactRelease {
   readonly title: string;
@@ -300,6 +394,9 @@ export function ProfileCompactSurface({
         null
     );
   }, [artist.image_url, photoDownloadSizes]);
+  const latestReleaseArtworkUrl = useMemo(() => {
+    return unwrapNextImageUrl(latestRelease?.artworkUrl) ?? heroImageUrl;
+  }, [heroImageUrl, latestRelease?.artworkUrl]);
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -350,7 +447,6 @@ export function ProfileCompactSurface({
 
     return getReleaseSupportingLine(latestRelease, artist.name);
   }, [artist.name, latestRelease]);
-  const actionCardClassName = `group flex min-h-[60px] w-full items-center gap-3 rounded-[var(--profile-action-radius)] border ${glass.border} ${glass.bg} px-3 py-2.5 text-left ${glass.blur} transition-colors duration-150 ${glass.bgHover} active:scale-[0.985]`;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
 
   return (
@@ -384,7 +480,7 @@ export function ProfileCompactSurface({
           <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg)_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
 
           <div
-            className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),20px)]'
+            className='relative z-10 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),16px)]'
             data-testid='profile-header'
           >
             {!hideJovieBranding && (
@@ -417,20 +513,20 @@ export function ProfileCompactSurface({
             )}
           </div>
 
-          <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+          <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between gap-4 px-5'>
             <IdentityHeading className='min-w-0'>
               <Link
                 data-testid='profile-identity-link'
                 href={profileHref}
                 aria-label={`Go to ${artist.name}'s profile`}
-                className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='inline-flex min-w-0 -translate-y-px items-center gap-1.5 rounded-md text-[34px] font-[590] leading-[1.04] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               >
                 <span className='truncate'>{artist.name}</span>
                 {artist.is_verified ? (
                   <BadgeCheck
-                    className='h-5 w-5 shrink-0 drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
-                    fill='#3b82f6'
-                    stroke='white'
+                    className='h-5 w-5 shrink-0 -translate-y-[2px] drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
+                    fill='white'
+                    stroke='rgba(7,8,10,0.68)'
                     strokeWidth={2}
                     aria-label='Verified'
                   />
@@ -441,179 +537,19 @@ export function ProfileCompactSurface({
               <button
                 type='button'
                 onClick={onPlayClick}
-                className='mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-transform duration-150 hover:scale-[1.06] active:scale-95'
+                className='mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_8px_24px_rgba(0,0,0,0.28)] transition-[opacity,box-shadow] duration-150 hover:opacity-[0.96]'
                 aria-label={`Play ${artist.name}`}
               >
-                <Play className='ml-0.5 h-3.5 w-3.5 fill-current text-black/85' />
+                <Play className='ml-0.5 h-4 w-4 fill-current text-black/85' />
               </button>
             ) : null}
           </div>
         </header>
 
-        <div className='relative z-10 flex shrink-0 flex-col gap-3 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3'>
+        <div className='relative z-10 flex shrink-0 flex-col gap-2.5 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-2.5'>
           {showSubscriptionConfirmedBanner ? (
             <SubscriptionConfirmedBanner />
           ) : null}
-
-          <div className='min-h-[52px]'>
-            {releaseVisibility?.show &&
-            releaseVisibility.isCountdown &&
-            latestRelease ? (
-              <Link
-                href={`/${artist.handle}/${latestRelease.slug}`}
-                prefetch={false}
-                className={actionCardClassName}
-                aria-label={`${latestRelease.title} — drops soon`}
-              >
-                {latestRelease.artworkUrl ? (
-                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
-                    <ImageWithFallback
-                      src={latestRelease.artworkUrl}
-                      alt={latestRelease.title}
-                      fill
-                      sizes='44px'
-                      className='object-cover'
-                      fallbackVariant='release'
-                    />
-                  </div>
-                ) : null}
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-[13px] font-[560] leading-[1.15] text-white/88'>
-                    {latestRelease.title}
-                  </p>
-                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
-                    {releaseSupportingLine}
-                  </p>
-                </div>
-                <ReleaseCountdown
-                  releaseDate={new Date(latestRelease.releaseDate!)}
-                  compact
-                />
-              </Link>
-            ) : releaseVisibility?.show &&
-              !releaseVisibility.isCountdown &&
-              latestRelease &&
-              mergedDSPs.length > 0 ? (
-              <button
-                type='button'
-                onClick={onPlayClick}
-                className={actionCardClassName}
-                aria-label={`Listen to ${latestRelease.title}`}
-              >
-                {latestRelease.artworkUrl ? (
-                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
-                    <ImageWithFallback
-                      src={latestRelease.artworkUrl}
-                      alt={latestRelease.title}
-                      fill
-                      sizes='44px'
-                      className='object-cover'
-                      fallbackVariant='release'
-                    />
-                  </div>
-                ) : null}
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-[13px] font-[560] leading-[1.15] text-white/88'>
-                    {latestRelease.title}
-                  </p>
-                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
-                    {releaseSupportingLine}
-                  </p>
-                </div>
-                <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  {renderMode === 'preview'
-                    ? previewReleaseActionLabel
-                    : 'Listen'}
-                </span>
-              </button>
-            ) : nextTourDate ? (
-              <a
-                href={nextTourDate.ticketUrl ?? '#'}
-                target={nextTourDate.ticketUrl ? '_blank' : undefined}
-                rel={nextTourDate.ticketUrl ? 'noopener noreferrer' : undefined}
-                className={actionCardClassName}
-              >
-                <div className='flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[12px] bg-white/[0.04] leading-none'>
-                  <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
-                    {new Intl.DateTimeFormat('en-US', {
-                      month: 'short',
-                    }).format(new Date(nextTourDate.startDate))}
-                  </span>
-                  <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
-                    {new Intl.DateTimeFormat('en-US', {
-                      day: 'numeric',
-                    }).format(new Date(nextTourDate.startDate))}
-                  </span>
-                </div>
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-[13px] font-[560] text-white/88'>
-                    {nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
-                  </p>
-                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
-                    {[nextTourDate.city, nextTourDate.region]
-                      .filter(Boolean)
-                      .join(', ') || 'Upcoming show'}
-                  </p>
-                </div>
-                <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  {nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
-                </span>
-              </a>
-            ) : featuredPlaylistFallback ? (
-              <a
-                href={featuredPlaylistFallback.url}
-                target='_blank'
-                rel='noopener noreferrer'
-                className={actionCardClassName}
-                aria-label={`Open This Is playlist for ${artist.name}`}
-              >
-                {featuredPlaylistFallback.imageUrl ? (
-                  <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-[12px]'>
-                    <ImageWithFallback
-                      src={featuredPlaylistFallback.imageUrl}
-                      alt={featuredPlaylistFallback.title}
-                      fill
-                      sizes='44px'
-                      className='object-cover'
-                      fallbackVariant='release'
-                    />
-                  </div>
-                ) : (
-                  <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
-                )}
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-[13px] font-[560] text-white/88'>
-                    {featuredPlaylistFallback.title}
-                  </p>
-                </div>
-                <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  Open Playlist
-                </span>
-              </a>
-            ) : mergedDSPs.length > 0 ? (
-              <button
-                type='button'
-                onClick={onPlayClick}
-                className={actionCardClassName}
-                aria-label={`Listen to ${artist.name}`}
-              >
-                <Play className='h-4 w-4 shrink-0 fill-current text-white/60' />
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-[13px] font-[560] text-white/88'>
-                    Listen to {artist.name}
-                  </p>
-                  <p className='mt-0.5 truncate text-[11px] font-[510] text-white/50'>
-                    Start with the featured release
-                  </p>
-                </div>
-                <span className='shrink-0 rounded-full bg-white/[0.1] px-3 py-1 text-[11px] font-[510] text-white/80 transition-colors duration-150 group-hover:bg-white/[0.15]'>
-                  {renderMode === 'preview'
-                    ? previewReleaseActionLabel
-                    : 'Listen'}
-                </span>
-              </button>
-            ) : null}
-          </div>
 
           {renderMode === 'interactive' ? (
             <ProfileInlineNotificationsCTA
@@ -627,9 +563,125 @@ export function ProfileCompactSurface({
             />
           )}
 
+          <div className='min-h-[52px]'>
+            {releaseVisibility?.show &&
+            releaseVisibility.isCountdown &&
+            latestRelease ? (
+              <HeroActionCard
+                kicker='Latest Release'
+                title={latestRelease.title}
+                subtitle={releaseSupportingLine}
+                artworkUrl={latestReleaseArtworkUrl}
+                artworkAlt={latestRelease.title}
+                trailingContent={
+                  <ReleaseCountdown
+                    releaseDate={new Date(latestRelease.releaseDate!)}
+                    compact
+                  />
+                }
+              />
+            ) : releaseVisibility?.show &&
+              !releaseVisibility.isCountdown &&
+              latestRelease &&
+              mergedDSPs.length > 0 ? (
+              <HeroActionCard
+                kicker='Latest Release'
+                title={latestRelease.title}
+                subtitle={releaseSupportingLine}
+                artworkUrl={latestReleaseArtworkUrl}
+                artworkAlt={latestRelease.title}
+                trailingContent={
+                  <HeroActionButton
+                    label={
+                      renderMode === 'preview'
+                        ? previewReleaseActionLabel
+                        : 'Listen'
+                    }
+                    ariaLabel={`Listen to ${latestRelease.title}`}
+                    onClick={onPlayClick}
+                  />
+                }
+              />
+            ) : nextTourDate ? (
+              <HeroActionCard
+                kicker='Next Show'
+                title={nextTourDate.venueName ?? nextTourDate.city ?? 'Live'}
+                subtitle={
+                  [nextTourDate.city, nextTourDate.region]
+                    .filter(Boolean)
+                    .join(', ') || 'Upcoming show'
+                }
+                artworkAlt='Next tour date'
+                leadingContent={
+                  <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-[14px] bg-white/[0.04] leading-none'>
+                    <span className='text-[10px] font-[590] uppercase tracking-[0.1em] text-white/45'>
+                      {new Intl.DateTimeFormat('en-US', {
+                        month: 'short',
+                      }).format(new Date(nextTourDate.startDate))}
+                    </span>
+                    <span className='text-[18px] font-[680] tracking-[-0.04em] text-white/90'>
+                      {new Intl.DateTimeFormat('en-US', {
+                        day: 'numeric',
+                      }).format(new Date(nextTourDate.startDate))}
+                    </span>
+                  </div>
+                }
+                trailingContent={
+                  <HeroActionButton
+                    label={nextTourDate.ticketUrl ? 'Tickets' : 'Details'}
+                    ariaLabel={
+                      nextTourDate.ticketUrl
+                        ? 'Open ticket link'
+                        : 'Open show details'
+                    }
+                    href={nextTourDate.ticketUrl ?? undefined}
+                    onClick={
+                      nextTourDate.ticketUrl
+                        ? undefined
+                        : () => onDrawerViewChange('tour')
+                    }
+                    external={Boolean(nextTourDate.ticketUrl)}
+                  />
+                }
+              />
+            ) : featuredPlaylistFallback ? (
+              <HeroActionCard
+                kicker='Featured Playlist'
+                title={featuredPlaylistFallback.title}
+                artworkUrl={featuredPlaylistFallback.imageUrl}
+                artworkAlt={featuredPlaylistFallback.title}
+                trailingContent={
+                  <HeroActionButton
+                    label='Open Playlist'
+                    ariaLabel={`Open This Is playlist for ${artist.name}`}
+                    href={featuredPlaylistFallback.url}
+                    external
+                  />
+                }
+              />
+            ) : mergedDSPs.length > 0 ? (
+              <HeroActionCard
+                kicker='Latest Release'
+                title={`Listen to ${artist.name}`}
+                artworkAlt={artist.name}
+                trailingContent={
+                  <HeroActionButton
+                    label={
+                      renderMode === 'preview'
+                        ? previewReleaseActionLabel
+                        : 'Listen'
+                    }
+                    ariaLabel={`Listen to ${artist.name}`}
+                    onClick={onPlayClick}
+                  />
+                }
+              />
+            ) : null}
+          </div>
+
           {visibleSocialLinks.length > 0 ? (
             <nav
-              className='flex items-center justify-center gap-4'
+              className='flex items-center justify-center gap-4 pt-0.5'
               aria-label='Social links'
             >
               {visibleSocialLinks.map(link =>
@@ -651,18 +703,6 @@ export function ProfileCompactSurface({
               )}
             </nav>
           ) : null}
-
-          <a
-            href={BASE_URL}
-            className='flex flex-col items-center gap-0.5 pt-1 text-white/20 transition-colors duration-150 hover:text-white/40'
-          >
-            <span className='text-[8px] font-[510] uppercase tracking-[0.14em]'>
-              Powered by
-            </span>
-            <span className='text-[13px] font-[590] tracking-[-0.01em]'>
-              Jovie
-            </span>
-          </a>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { cloneElement, isValidElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 
@@ -27,18 +28,32 @@ vi.mock('vaul', () => ({
     ),
     Title: ({
       children,
+      asChild,
       ...props
     }: {
       readonly children: ReactNode;
+      readonly asChild?: boolean;
       [key: string]: unknown;
-    }) => <h2 {...props}>{children}</h2>,
+    }) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <h2 {...props}>{children}</h2>
+      ),
     Description: ({
       children,
+      asChild,
       ...props
     }: {
       readonly children: ReactNode;
+      readonly asChild?: boolean;
       [key: string]: unknown;
-    }) => <p {...props}>{children}</p>,
+    }) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <p {...props}>{children}</p>
+      ),
   },
 }));
 
@@ -60,8 +75,8 @@ describe('ProfileDrawerShell', () => {
     expect(dialog).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tour Dates' })).toBeVisible();
     expect(
-      screen.getByText('Upcoming shows and ticket links.')
-    ).toBeInTheDocument();
+      screen.getByText('Upcoming shows and ticket links.', { selector: 'p' })
+    ).toBeVisible();
     expect(screen.getByText('Drawer body')).toBeInTheDocument();
   });
 

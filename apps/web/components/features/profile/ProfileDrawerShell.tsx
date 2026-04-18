@@ -38,6 +38,8 @@ export function ProfileDrawerShell({
 }: ProfileDrawerShellProps) {
   const titleId = useId();
   const subtitleId = useId();
+  const accessibleDescriptionId = useId();
+  const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const showBackButton = navigationLevel === 'secondary' && Boolean(onBack);
   const contentClasses = `flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] ${contentClassName ?? ''}`;
   const bodyClasses = `relative z-10 min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
@@ -74,38 +76,20 @@ export function ProfileDrawerShell({
             className='min-h-[2.625rem] min-w-0 py-px'
             data-testid='profile-drawer-title-slot'
           >
-            {presentation === 'embedded' ? (
-              <h2
-                id={titleId}
-                className='truncate text-[15px] font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'
-              >
-                {title}
-              </h2>
-            ) : (
-              <Drawer.Title
-                id={titleId}
-                className='truncate text-[15px] font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'
-              >
-                {title}
-              </Drawer.Title>
-            )}
+            <h2
+              id={titleId}
+              className='truncate text-[15px] font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'
+            >
+              {title}
+            </h2>
             <div className='mt-0.5 min-h-[0.9rem]'>
               {subtitle ? (
-                presentation === 'embedded' ? (
-                  <p
-                    id={subtitleId}
-                    className='truncate text-[10px] font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
-                  >
-                    {subtitle}
-                  </p>
-                ) : (
-                  <Drawer.Description
-                    id={subtitleId}
-                    className='truncate text-[10px] font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
-                  >
-                    {subtitle}
-                  </Drawer.Description>
-                )
+                <p
+                  id={subtitleId}
+                  className='truncate text-[10px] font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                >
+                  {subtitle}
+                </p>
               ) : (
                 <span
                   aria-hidden='true'
@@ -147,12 +131,15 @@ export function ProfileDrawerShell({
           className='absolute inset-x-0 bottom-0 z-20'
           data-testid={dataTestId}
           role='dialog'
-          aria-describedby={subtitle ? subtitleId : undefined}
+          aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
         >
           <div
             className={`relative flex max-h-[78%] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl ${contentClassName ?? ''}`}
           >
+            <span id={accessibleDescriptionId} className='sr-only'>
+              {accessibleDescription}
+            </span>
             {header}
             {body}
           </div>
@@ -170,8 +157,16 @@ export function ProfileDrawerShell({
             className={contentClasses}
             data-testid={dataTestId}
             aria-labelledby={titleId}
-            aria-describedby={subtitle ? subtitleId : undefined}
+            aria-describedby={accessibleDescriptionId}
           >
+            <Drawer.Title asChild>
+              <span className='sr-only'>{title}</span>
+            </Drawer.Title>
+            <Drawer.Description asChild>
+              <span id={accessibleDescriptionId} className='sr-only'>
+                {accessibleDescription}
+              </span>
+            </Drawer.Description>
             {header}
             {body}
           </Drawer.Content>
