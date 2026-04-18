@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -52,9 +53,10 @@ export function DotBadge({
   className,
 }: DotBadgeProps) {
   return (
-    <span
+    <Badge
+      variant='outline'
       className={cn(
-        'inline-flex w-fit items-center whitespace-nowrap rounded-full border font-[510] tracking-[-0.01em] shadow-none',
+        'w-fit whitespace-nowrap shadow-none tracking-[-0.01em]',
         SIZE_CLASSES[size],
         variant.className,
         className
@@ -70,6 +72,6 @@ export function DotBadge({
         )}
       />
       {label}
-    </span>
+    </Badge>
   );
 }

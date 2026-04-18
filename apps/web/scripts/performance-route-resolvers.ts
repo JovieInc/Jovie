@@ -11,6 +11,10 @@ const DEFAULT_PUBLIC_TRACK_SLUG = 'neon-skyline';
 const PERF_CHAT_THREAD_TITLE = 'Performance Budget Thread';
 const PERF_RELEASE_SLUG = 'performance-budget-release';
 const PERF_RELEASE_TITLE = 'Performance Budget Release';
+const PERF_ROUTE_DB_TIMEOUT_MS = Number.parseInt(
+  process.env.PERF_ROUTE_DB_TIMEOUT_MS || '',
+  10
+);
 const RELEASE_TASKS_RESOLUTION_ERROR =
   'Release tasks require either DATABASE_URL with a resolvable active profile or authenticated authCookies for the app fallback.';
 
@@ -51,6 +55,40 @@ function replaceRouteToken(
   return template.replaceAll(`[${token}]`, value);
 }
 
+async function withResolverTimeout<T>(
+  label: string,
+  operation: Promise<T>,
+  fallback: T | null = null
+) {
+  const timeoutMs = Number.isFinite(PERF_ROUTE_DB_TIMEOUT_MS)
+    ? PERF_ROUTE_DB_TIMEOUT_MS
+    : 5_000;
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const guardedOperation = operation.catch(error => {
+    console.warn(
+      `[perf-route-resolvers] ${label} failed: ${(error as Error).message}`
+    );
+    return fallback;
+  });
+  const timeoutPromise = new Promise<T | null>(resolve => {
+    timeoutId = setTimeout(() => {
+      console.warn(
+        `[perf-route-resolvers] ${label} timed out after ${timeoutMs}ms`
+      );
+      resolve(fallback);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([guardedOperation, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 function resolveReleaseTasksPathname(pathname: string, search = '') {
   const releaseTasksPrefix = `${APP_ROUTES.DASHBOARD_RELEASES}/`;
   if (
@@ -73,12 +111,16 @@ async function queryProfileHandle(handle: string) {
     return null;
   }
 
-  const rows = await sql<Array<{ username_normalized: string }>>`
-    select username_normalized
-    from creator_profiles
-    where username_normalized = ${handle.toLowerCase()}
-    limit 1
-  `;
+  const rows = await withResolverTimeout(
+    `queryProfileHandle(${handle})`,
+    sql<Array<{ username_normalized: string }>>`
+      select username_normalized
+      from creator_profiles
+      where username_normalized = ${handle.toLowerCase()}
+      limit 1
+    `,
+    [] as Array<{ username_normalized: string }>
+  );
 
   return rows[0]?.username_normalized ?? null;
 }
@@ -92,13 +134,17 @@ async function queryActiveProfile(clerkUserId?: string | null) {
     return null;
   }
 
-  const rows = await sql<Array<{ id: string; username_normalized: string }>>`
-    select cp.id, cp.username_normalized
-    from users u
-    join creator_profiles cp on cp.id = u.active_profile_id
-    where u.clerk_id = ${resolvedClerkUserId}
-    limit 1
-  `;
+  const rows = await withResolverTimeout(
+    `queryActiveProfile(${resolvedClerkUserId})`,
+    sql<Array<{ id: string; username_normalized: string }>>`
+      select cp.id, cp.username_normalized
+      from users u
+      join creator_profiles cp on cp.id = u.active_profile_id
+      where u.clerk_id = ${resolvedClerkUserId}
+      limit 1
+    `,
+    [] as Array<{ id: string; username_normalized: string }>
+  );
 
   return rows[0] ?? null;
 }
@@ -109,13 +155,17 @@ async function queryExistingConversationId(profileId: string) {
     return null;
   }
 
-  const rows = await sql<Array<{ id: string }>>`
-    select id
-    from chat_conversations
-    where creator_profile_id = ${profileId}
-    order by updated_at desc
-    limit 1
-  `;
+  const rows = await withResolverTimeout(
+    `queryExistingConversationId(${profileId})`,
+    sql<Array<{ id: string }>>`
+      select id
+      from chat_conversations
+      where creator_profile_id = ${profileId}
+      order by updated_at desc
+      limit 1
+    `,
+    [] as Array<{ id: string }>
+  );
 
   return rows[0]?.id ?? null;
 }
@@ -126,41 +176,49 @@ async function ensurePerfRelease(profileId: string) {
     return null;
   }
 
-  const existing = await sql<Array<{ id: string }>>`
-    select id
-    from discog_releases
-    where creator_profile_id = ${profileId}
-      and slug = ${PERF_RELEASE_SLUG}
-    limit 1
-  `;
+  const existing = await withResolverTimeout(
+    `ensurePerfRelease.select(${profileId})`,
+    sql<Array<{ id: string }>>`
+      select id
+      from discog_releases
+      where creator_profile_id = ${profileId}
+        and slug = ${PERF_RELEASE_SLUG}
+      limit 1
+    `,
+    [] as Array<{ id: string }>
+  );
 
   if (existing[0]?.id) {
     return existing[0].id;
   }
 
-  const inserted = await sql<Array<{ id: string }>>`
-    insert into discog_releases (
-      creator_profile_id,
-      title,
-      slug,
-      release_type,
-      release_date,
-      status,
-      total_tracks,
-      source_type
-    )
-    values (
-      ${profileId},
-      ${PERF_RELEASE_TITLE},
-      ${PERF_RELEASE_SLUG},
-      'single',
-      now(),
-      'released',
-      1,
-      'manual'
-    )
-    returning id
-  `;
+  const inserted = await withResolverTimeout(
+    `ensurePerfRelease.insert(${profileId})`,
+    sql<Array<{ id: string }>>`
+      insert into discog_releases (
+        creator_profile_id,
+        title,
+        slug,
+        release_type,
+        release_date,
+        status,
+        total_tracks,
+        source_type
+      )
+      values (
+        ${profileId},
+        ${PERF_RELEASE_TITLE},
+        ${PERF_RELEASE_SLUG},
+        'single',
+        now(),
+        'released',
+        1,
+        'manual'
+      )
+      returning id
+    `,
+    [] as Array<{ id: string }>
+  );
 
   return inserted[0]?.id ?? null;
 }
@@ -469,13 +527,17 @@ export async function resolveReleaseTasksPerfPath(
     throw new Error(RELEASE_TASKS_RESOLUTION_ERROR);
   }
 
-  const releases = await sql<Array<{ id: string }>>`
-    select id
-    from discog_releases
-    where creator_profile_id = ${activeProfile.id}
-    order by release_date desc nulls last, created_at desc
-    limit 1
-  `;
+  const releases = await withResolverTimeout(
+    `resolveReleaseTasksPerfPath.select(${activeProfile.id})`,
+    sql<Array<{ id: string }>>`
+      select id
+      from discog_releases
+      where creator_profile_id = ${activeProfile.id}
+      order by release_date desc nulls last, created_at desc
+      limit 1
+    `,
+    [] as Array<{ id: string }>
+  );
 
   const releaseId = releases[0]?.id;
   const resolvedReleaseId =

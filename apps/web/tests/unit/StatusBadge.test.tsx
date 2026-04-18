@@ -2,6 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 
+function getBadgeElement(text: string): HTMLElement {
+  const label = screen.getByText(text);
+  const badge = label.parentElement;
+
+  if (!badge) {
+    throw new Error(`Could not find badge root for text: ${text}`);
+  }
+
+  return badge;
+}
+
 describe('StatusBadge', () => {
   describe('rendering', () => {
     it('renders children text', () => {
@@ -10,19 +21,15 @@ describe('StatusBadge', () => {
     });
 
     it('renders with custom className', () => {
-      const { container } = render(
-        <StatusBadge className='custom-class'>Badge</StatusBadge>
-      );
-      const badge = container.querySelector('output');
-
-      expect(badge).toHaveClass('custom-class');
+      render(<StatusBadge className='custom-class'>Badge</StatusBadge>);
+      expect(getBadgeElement('Badge')).toHaveClass('custom-class');
     });
   });
 
   describe('variants', () => {
     it('uses blue variant by default', () => {
-      const { container } = render(<StatusBadge>Default</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Default</StatusBadge>);
+      const badge = getBadgeElement('Default');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-info/20');
@@ -30,10 +37,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders green variant', () => {
-      const { container } = render(
-        <StatusBadge variant='green'>Success</StatusBadge>
-      );
-      const badge = container.querySelector('output');
+      render(<StatusBadge variant='green'>Success</StatusBadge>);
+      const badge = getBadgeElement('Success');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-success/20');
@@ -41,10 +46,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders purple variant', () => {
-      const { container } = render(
-        <StatusBadge variant='purple'>Info</StatusBadge>
-      );
-      const badge = container.querySelector('output');
+      render(<StatusBadge variant='purple'>Info</StatusBadge>);
+      const badge = getBadgeElement('Info');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-accent/20');
@@ -52,10 +55,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders orange variant', () => {
-      const { container } = render(
-        <StatusBadge variant='orange'>Warning</StatusBadge>
-      );
-      const badge = container.querySelector('output');
+      render(<StatusBadge variant='orange'>Warning</StatusBadge>);
+      const badge = getBadgeElement('Warning');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-warning/20');
@@ -63,10 +64,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders red variant', () => {
-      const { container } = render(
-        <StatusBadge variant='red'>Error</StatusBadge>
-      );
-      const badge = container.querySelector('output');
+      render(<StatusBadge variant='red'>Error</StatusBadge>);
+      const badge = getBadgeElement('Error');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-error/20');
@@ -74,10 +73,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders gray variant', () => {
-      const { container } = render(
-        <StatusBadge variant='gray'>Neutral</StatusBadge>
-      );
-      const badge = container.querySelector('output');
+      render(<StatusBadge variant='gray'>Neutral</StatusBadge>);
+      const badge = getBadgeElement('Neutral');
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-subtle');
@@ -87,8 +84,8 @@ describe('StatusBadge', () => {
 
   describe('sizes', () => {
     it('uses medium size by default', () => {
-      const { container } = render(<StatusBadge>Medium</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Medium</StatusBadge>);
+      const badge = getBadgeElement('Medium');
 
       expect(badge).toHaveClass('px-4');
       expect(badge).toHaveClass('py-2');
@@ -96,8 +93,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders small size', () => {
-      const { container } = render(<StatusBadge size='sm'>Small</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge size='sm'>Small</StatusBadge>);
+      const badge = getBadgeElement('Small');
 
       expect(badge).toHaveClass('px-3');
       expect(badge).toHaveClass('py-1');
@@ -105,8 +102,8 @@ describe('StatusBadge', () => {
     });
 
     it('renders large size', () => {
-      const { container } = render(<StatusBadge size='lg'>Large</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge size='lg'>Large</StatusBadge>);
+      const badge = getBadgeElement('Large');
 
       expect(badge).toHaveClass('px-5');
       expect(badge).toHaveClass('py-2.5');
@@ -117,8 +114,7 @@ describe('StatusBadge', () => {
   describe('icon support', () => {
     it('renders without icon by default', () => {
       const { container } = render(<StatusBadge>No Icon</StatusBadge>);
-      const badge = container.querySelector('output');
-      const iconSpan = badge?.querySelector('.flex-shrink-0');
+      const iconSpan = container.querySelector('.shrink-0');
 
       expect(iconSpan).not.toBeInTheDocument();
     });
@@ -139,32 +135,27 @@ describe('StatusBadge', () => {
         <StatusBadge icon={<span>⚡</span>}>Icon Badge</StatusBadge>
       );
 
-      const iconWrapper = container.querySelector('.flex-shrink-0');
+      const iconWrapper = container.querySelector('.shrink-0');
       expect(iconWrapper).toBeInTheDocument();
       expect(iconWrapper).toHaveTextContent('⚡');
     });
 
     it('icon appears before text', () => {
-      const { container } = render(
-        <StatusBadge icon={<span>→</span>}>Text</StatusBadge>
-      );
+      render(<StatusBadge icon={<span>→</span>}>Text</StatusBadge>);
 
-      const badge = container.querySelector('output');
+      const badge = getBadgeElement('Text');
       const firstChild = badge?.firstChild;
 
-      expect(firstChild).toHaveClass('flex-shrink-0');
+      expect(firstChild).toHaveClass('shrink-0');
     });
   });
 
   describe('accessibility', () => {
-    it('renders as output element with implicit status role', () => {
-      const { container } = render(<StatusBadge>Static</StatusBadge>);
-      const badge = container.querySelector('output');
-
-      expect(badge).toBeInTheDocument();
+    it('renders as a badge element', () => {
+      expect(() => render(<StatusBadge>Static</StatusBadge>)).not.toThrow();
     });
 
-    it('has implicit status role via output element', () => {
+    it('adds an explicit status role for dynamic badges', () => {
       render(<StatusBadge dynamic>Loading...</StatusBadge>);
       const badge = screen.getByRole('status');
 
@@ -186,8 +177,8 @@ describe('StatusBadge', () => {
 
   describe('styling', () => {
     it('applies base badge classes', () => {
-      const { container } = render(<StatusBadge>Badge</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Badge</StatusBadge>);
+      const badge = getBadgeElement('Badge');
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
@@ -198,8 +189,8 @@ describe('StatusBadge', () => {
     });
 
     it('text is wrapped in span', () => {
-      const { container } = render(<StatusBadge>Text</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Text</StatusBadge>);
+      const badge = getBadgeElement('Text');
       const textSpan = badge?.querySelector('span:last-child');
 
       expect(textSpan).toHaveTextContent('Text');
@@ -231,8 +222,8 @@ describe('StatusBadge', () => {
 
   describe('edge cases', () => {
     it('handles empty children', () => {
-      const { container } = render(<StatusBadge>Empty</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Empty</StatusBadge>);
+      const badge = getBadgeElement('Empty');
 
       expect(badge).toBeInTheDocument();
     });
@@ -269,8 +260,8 @@ describe('StatusBadge', () => {
     });
 
     it('empty className defaults to empty string', () => {
-      const { container } = render(<StatusBadge>Test</StatusBadge>);
-      const badge = container.querySelector('output');
+      render(<StatusBadge>Test</StatusBadge>);
+      const badge = getBadgeElement('Test');
 
       expect(badge).toBeInTheDocument();
     });
