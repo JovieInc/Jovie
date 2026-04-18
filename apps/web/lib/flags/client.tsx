@@ -32,13 +32,7 @@ const OverridesContext = createContext<AppFlagOverridesContextValue | null>(
   null
 );
 
-export function AppFlagProvider({
-  children,
-  initialFlags,
-}: {
-  readonly children: React.ReactNode;
-  readonly initialFlags?: AppFlagSnapshot;
-}) {
+export function useStoredAppFlagOverrides(): AppFlagOverridesContextValue {
   const [overrides, setOverrides] = useState<AppFlagOverrideRecord>(
     readStoredAppFlagOverrides
   );
@@ -65,10 +59,20 @@ export function AppFlagProvider({
     clearStoredAppFlagOverrides();
   }, []);
 
-  const overridesValue = useMemo(
+  return useMemo(
     () => ({ overrides, setOverride, removeOverride, clearOverrides }),
     [clearOverrides, overrides, removeOverride, setOverride]
   );
+}
+
+export function AppFlagProvider({
+  children,
+  initialFlags,
+}: {
+  readonly children: React.ReactNode;
+  readonly initialFlags?: AppFlagSnapshot;
+}) {
+  const overridesValue = useStoredAppFlagOverrides();
 
   return (
     <AppFlagsContext.Provider value={initialFlags ?? APP_FLAG_DEFAULTS}>

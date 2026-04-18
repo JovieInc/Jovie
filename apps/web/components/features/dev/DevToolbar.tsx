@@ -31,15 +31,11 @@ import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import { useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
 } from '@/lib/flags/contracts';
-import {
-  clearStoredAppFlagOverrides,
-  readStoredAppFlagOverrides,
-  writeStoredAppFlagOverrides,
-} from '@/lib/flags/overrides';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
 
@@ -58,36 +54,6 @@ import {
   unregisterServiceWorker,
 } from '@/lib/service-worker/control';
 import { useFlagBadges } from './FlagBadgeContext';
-
-function useLocalOverrides() {
-  const [overrides, setOverrides] = useState<Record<string, boolean>>(
-    readStoredAppFlagOverrides
-  );
-
-  const setOverride = useCallback((key: string, value: boolean) => {
-    setOverrides(prev => {
-      const next = { ...prev, [key]: value };
-      writeStoredAppFlagOverrides(next);
-      return next;
-    });
-  }, []);
-
-  const removeOverride = useCallback((key: string) => {
-    setOverrides(prev => {
-      const next = { ...prev };
-      delete next[key];
-      writeStoredAppFlagOverrides(next);
-      return next;
-    });
-  }, []);
-
-  const clearOverrides = useCallback(() => {
-    setOverrides({});
-    clearStoredAppFlagOverrides();
-  }, []);
-
-  return { overrides, setOverride, removeOverride, clearOverrides };
-}
 
 type FlagEntry = {
   name: string;
@@ -265,7 +231,7 @@ export function DevToolbar({
     prod: string;
   } | null>(null);
   const { theme, setTheme } = useTheme();
-  const overridesCtx = useLocalOverrides();
+  const overridesCtx = useStoredAppFlagOverrides();
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
