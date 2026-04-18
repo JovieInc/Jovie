@@ -1161,7 +1161,10 @@ jobs:
 
   ci-lighthouse-admin-pr:
     name: Lighthouse (admin PR)
-    needs: [ci-fast, ci-path-changes, neon-db]
+    # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
+    # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
+    # its own ephemeral branch below and does not reuse the shared neon-db branch.
+    needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1191,7 +1194,7 @@ jobs:
           branch_name: admin-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,development,preview,br-main,br-production
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         id: resolve-admin-neon-db-url
