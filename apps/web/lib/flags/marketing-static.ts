@@ -13,6 +13,7 @@ export const FEATURE_FLAGS = {
   SHOW_FEATURE_SHOWCASE: false,
   SHOW_FINAL_CTA: true,
   SHOW_HOMEPAGE_SECTIONS: false,
+  SHOW_HOMEPAGE_V2_SOCIAL_PROOF: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;

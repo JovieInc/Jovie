@@ -16,6 +16,10 @@ vi.mock('@/lib/env-client', () => ({
   },
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => true,
+}));
+
 vi.mock('@/lib/billing/verified-upgrade', () => ({
   getPreferredVerifiedPrice: () => ({
     priceId: 'price_123',
