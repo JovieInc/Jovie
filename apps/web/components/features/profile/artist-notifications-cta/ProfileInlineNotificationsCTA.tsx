@@ -28,6 +28,7 @@ import {
   SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
+  subscriptionComposerSurfaceClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
   subscriptionSuccessTextClassName,
@@ -39,6 +40,7 @@ type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
 type RevealVisualState = 'collapsed' | 'expanded' | 'submitting' | 'error';
 
 const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
+const revealButtonClassName = `${subscriptionComposerSurfaceClassName} flex h-12 w-full items-center gap-3 px-1 pl-4 text-left`;
 
 function getRevealVisualState(
   step: Step,
@@ -316,7 +318,6 @@ export function ProfileInlineNotificationsCTA({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const otpStepRef = useRef<HTMLDivElement>(null);
   const birthdayStepRef = useRef<HTMLDivElement>(null);
-  const revealShellRef = useRef<HTMLDivElement>(null);
   const inputId = useId();
   const { user } = useUserSafe();
   const prefersReducedMotion = useReducedMotion();
@@ -525,21 +526,6 @@ export function ProfileInlineNotificationsCTA({
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
 
-  const handleRevealShellBlurCapture = useCallback(() => {
-    globalThis.setTimeout(() => {
-      if (step !== 'email') return;
-
-      const activeElement = document.activeElement;
-      if (revealShellRef.current?.contains(activeElement)) {
-        return;
-      }
-
-      if (!emailInput.trim() && !isSubmitting) {
-        setStep('cta');
-      }
-    }, 0);
-  }, [step, emailInput, isSubmitting]);
-
   const handleManageButtonFocus = useCallback(() => {
     if (!lastInteractionWasKeyboardRef.current) return;
     if (suppressNextFocusOpenRef.current) return;
@@ -585,10 +571,8 @@ export function ProfileInlineNotificationsCTA({
       <div className='step-stack-track'>
         <StepPanel active={revealActive} panelId='reveal'>
           <div
-            ref={revealShellRef}
             data-ui='cta-reveal'
             data-visual-state={revealVisualState}
-            onBlurCapture={handleRevealShellBlurCapture}
             style={
               {
                 '--cta-reveal-min-height': '48px',
@@ -606,11 +590,15 @@ export function ProfileInlineNotificationsCTA({
                 <button
                   type='button'
                   onClick={handleReveal}
-                  className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+                  className={revealButtonClassName}
                   style={noFontSynthesisStyle}
                 >
-                  <Bell className='h-4 w-4' />
-                  Turn on notifications
+                  <span className='min-w-0 flex-1 truncate text-[15px] font-[590] tracking-[-0.02em] text-primary-token'>
+                    Turn on notifications
+                  </span>
+                  <span className={circularButtonClassName}>
+                    <Bell className='h-4 w-4' />
+                  </span>
                 </button>
               </div>
 
