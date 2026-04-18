@@ -60,6 +60,8 @@ cleanup_old_branches*.sh
 !apps/web/scripts/sync-standalone-assets.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
+!apps/web/scripts/
+!apps/web/scripts/sync-standalone-assets.mjs
 !apps/web/content/
 !apps/web/content/**
 !apps/web/lib/docs/
