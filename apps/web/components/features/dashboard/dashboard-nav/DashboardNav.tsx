@@ -180,19 +180,28 @@ export function DashboardNav(_: DashboardNavProps) {
     }
 
     releasesPrefetchedProfileIdRef.current = profileId;
-    router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
-    void import('@/features/dashboard/organisms/release-provider-matrix').catch(
-      () => {
-        releasesPrefetchedProfileIdRef.current = null;
-      }
-    );
-    void import('@/lib/queries/prefetch-dashboard')
-      .then(({ prefetchForRoute }) =>
-        prefetchForRoute('releases', queryClient, profileId)
-      )
-      .catch(() => {
+
+    // Defer the eager releases prefetch past initial dashboard paint so the
+    // shell can hydrate without competing with a background chunk fetch +
+    // TanStack Query warmup. Matches the hover-prefetch debounce pattern
+    // used by handlePrefetch below.
+    const handle = setTimeout(() => {
+      router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
+      void import(
+        '@/features/dashboard/organisms/release-provider-matrix'
+      ).catch(() => {
         releasesPrefetchedProfileIdRef.current = null;
       });
+      void import('@/lib/queries/prefetch-dashboard')
+        .then(({ prefetchForRoute }) =>
+          prefetchForRoute('releases', queryClient, profileId)
+        )
+        .catch(() => {
+          releasesPrefetchedProfileIdRef.current = null;
+        });
+    }, 300);
+
+    return () => clearTimeout(handle);
   }, [isDemo, pathname, profileId, queryClient, router]);
 
   const handlePrefetch = useCallback(
