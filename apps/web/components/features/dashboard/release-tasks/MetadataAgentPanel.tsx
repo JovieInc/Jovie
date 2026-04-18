@@ -294,6 +294,39 @@ export function MetadataAgentPanel({
     });
   };
 
+  let currentStatusLabel = 'Current Status: Unavailable';
+  if (storageAvailable) {
+    currentStatusLabel = latestRequest
+      ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
+      : 'Current Status: Not Started';
+  }
+
+  let reviewLabel = 'Unavailable In This Environment';
+  if (storageAvailable && hasBlockingFields) {
+    reviewLabel = `${latestRequest?.missingFields.length ?? 0} blockers`;
+  } else if (storageAvailable && latestRequest) {
+    reviewLabel = 'Package prepared';
+  } else if (storageAvailable) {
+    reviewLabel = 'Package not prepared';
+  }
+
+  let reviewDescription =
+    'Apply the metadata submission tables before running the agent in this environment.';
+  if (storageAvailable && hasBlockingFields) {
+    reviewDescription =
+      'Fill the missing fields before Jovie can queue the submission.';
+  } else if (storageAvailable) {
+    reviewDescription =
+      'Prepare the release sheet, images, and bio bundle before send approval.';
+  }
+
+  let trackingLabel = 'Tracking unavailable';
+  if (storageAvailable) {
+    trackingLabel = latestRequest?.targets.length
+      ? `${latestRequest.targets.length} live targets`
+      : 'No live targets yet';
+  }
+
   return (
     <section className='mb-6 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex flex-col gap-2 md:flex-row md:items-start md:justify-between'>
@@ -311,11 +344,7 @@ export function MetadataAgentPanel({
         </div>
 
         <div className='rounded-full border border-(--linear-app-frame-seam) px-3 py-1 text-xs font-medium text-secondary-token'>
-          {storageAvailable
-            ? latestRequest
-              ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
-              : 'Current Status: Not Started'
-            : 'Current Status: Unavailable'}
+          {currentStatusLabel}
         </div>
       </div>
 
@@ -351,21 +380,9 @@ export function MetadataAgentPanel({
           <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
             Review
           </p>
-          <p className='mt-2 text-sm text-primary-token'>
-            {!storageAvailable
-              ? 'Unavailable In This Environment'
-              : hasBlockingFields
-                ? `${latestRequest?.missingFields.length ?? 0} blockers`
-                : latestRequest
-                  ? 'Package prepared'
-                  : 'Package not prepared'}
-          </p>
+          <p className='mt-2 text-sm text-primary-token'>{reviewLabel}</p>
           <p className='mt-1 text-xs text-secondary-token'>
-            {!storageAvailable
-              ? 'Apply the metadata submission tables before running the agent in this environment.'
-              : hasBlockingFields
-                ? 'Fill the missing fields before Jovie can queue the submission.'
-                : 'Prepare the release sheet, images, and bio bundle before send approval.'}
+            {reviewDescription}
           </p>
         </div>
 
@@ -373,13 +390,7 @@ export function MetadataAgentPanel({
           <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
             Tracking
           </p>
-          <p className='mt-2 text-sm text-primary-token'>
-            {storageAvailable
-              ? latestRequest?.targets.length
-                ? `${latestRequest.targets.length} live targets`
-                : 'No live targets yet'
-              : 'Tracking unavailable'}
-          </p>
+          <p className='mt-2 text-sm text-primary-token'>{trackingLabel}</p>
           <p className='mt-1 text-xs text-secondary-token'>
             {storageAvailable
               ? 'Monitor live pages, target discovery, and correction-worthy drift.'
@@ -459,7 +470,7 @@ export function MetadataAgentPanel({
         </div>
       ) : null}
 
-      {latestRequest ? (
+      {latestRequest && (
         <div className='mt-4 grid gap-4 lg:grid-cols-2'>
           <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
             <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
@@ -511,7 +522,7 @@ export function MetadataAgentPanel({
               </p>
             )}
 
-            {openIssues.length > 0 ? (
+            {openIssues.length > 0 && (
               <ul className='mt-3 space-y-2 text-sm text-primary-token'>
                 {openIssues.map(issue => (
                   <li key={issue.id}>
@@ -524,18 +535,20 @@ export function MetadataAgentPanel({
                   </li>
                 ))}
               </ul>
-            ) : latestRequest.status === 'live' ? (
+            )}
+            {openIssues.length === 0 && latestRequest.status === 'live' && (
               <p className='mt-3 text-sm text-emerald-700'>
                 No open drift issues on the latest snapshot.
               </p>
-            ) : null}
+            )}
           </div>
         </div>
-      ) : actionState === 'loading' ? (
+      )}
+      {!latestRequest && actionState === 'loading' && (
         <p className='mt-4 text-sm text-secondary-token'>
           Loading metadata agent state...
         </p>
-      ) : null}
+      )}
     </section>
   );
 }
