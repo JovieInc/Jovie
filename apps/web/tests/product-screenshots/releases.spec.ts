@@ -104,6 +104,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     await sidebar.getByTestId('drawer-tab-tasks').click();
     const tasksCard = sidebar.getByTestId('release-tasks-card');
     await expect(tasksCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
+    await tasksCard.getByTestId('release-tasks-toggle').click();
     await expect(
       tasksCard.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'

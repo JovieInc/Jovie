@@ -728,6 +728,7 @@ export function ReleaseSidebar({
               defaultOpen={false}
               lazyMount
               data-testid='release-tasks-card'
+              headingTestId='release-tasks-toggle'
             >
               {isTasksWorkspaceGateLoading ? (
                 <div

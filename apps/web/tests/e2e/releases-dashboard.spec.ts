@@ -282,10 +282,13 @@ test.describe('Releases dashboard', () => {
       .toBe(copiedUrl);
 
     await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
-      'Tasks'
-    );
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
+    await sidebar.getByTestId('release-tasks-toggle').click();
+    await expect(
+      sidebar.locator(
+        '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
+      )
+    ).toBeVisible();
     await sidebar.getByTestId('drawer-tab-dsps').click();
 
     const smartLinkPage = await page.context().newPage();
@@ -370,10 +373,13 @@ test.describe('Releases dashboard', () => {
     await sidebar.getByTestId('drawer-tab-dsps').click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('release-tasks-card')).toContainText(
-      'Tasks'
-    );
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
+    await sidebar.getByTestId('release-tasks-toggle').click();
+    await expect(
+      sidebar.locator(
+        '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
+      )
+    ).toBeVisible();
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
