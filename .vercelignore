@@ -42,6 +42,14 @@ chromatic.config.json
 *.pem
 .DS_Store
 .eslintcache
+.cache/
+**/.cache/
+.next/
+**/.next/
+.turbo/
+**/.turbo/
+node_modules/
+**/node_modules/
 scripts/
 *.mjs
 *.cjs
