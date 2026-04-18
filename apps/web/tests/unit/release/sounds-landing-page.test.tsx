@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { cloneElement, isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VideoProviderKey } from '@/lib/discography/types';
 
@@ -45,9 +46,32 @@ vi.mock('vaul', () => ({
     }: { children: React.ReactNode } & Record<string, unknown>) => (
       <div {...props}>{children}</div>
     ),
-    Title: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Title: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    } & Record<string, unknown>) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <div {...props}>{children}</div>
+      ),
+    Description: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    } & Record<string, unknown>) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <div {...props}>{children}</div>
+      ),
   },
 }));
 

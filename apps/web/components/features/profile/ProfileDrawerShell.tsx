@@ -131,12 +131,15 @@ export function ProfileDrawerShell({
           className='absolute inset-x-0 bottom-0 z-20'
           data-testid={dataTestId}
           role='dialog'
-          aria-describedby={subtitle ? subtitleId : undefined}
+          aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
         >
           <div
             className={`relative flex max-h-[78%] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl ${contentClassName ?? ''}`}
           >
+            <span id={accessibleDescriptionId} className='sr-only'>
+              {accessibleDescription}
+            </span>
             {header}
             {body}
           </div>

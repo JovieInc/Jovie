@@ -635,6 +635,11 @@ export function ProfileCompactSurface({
                         : 'Open show details'
                     }
                     href={nextTourDate.ticketUrl ?? undefined}
+                    onClick={
+                      nextTourDate.ticketUrl
+                        ? undefined
+                        : () => onDrawerViewChange('tour')
+                    }
                     external={Boolean(nextTourDate.ticketUrl)}
                   />
                 }
@@ -657,7 +662,7 @@ export function ProfileCompactSurface({
             ) : mergedDSPs.length > 0 ? (
               <HeroActionCard
                 kicker='Latest Release'
-                title='Wired to my latest release'
+                title={`Listen to ${artist.name}`}
                 artworkAlt={artist.name}
                 trailingContent={
                   <HeroActionButton
