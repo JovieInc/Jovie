@@ -38,8 +38,13 @@ run_deploy() {
   local mode="$1"
   shift
 
-  if [ "$mode" = "archive" ]; then
+  if [ "$mode" = "tgz" ]; then
     vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
+    return
+  fi
+
+  if [ "$mode" = "split-tgz" ]; then
+    vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN"
     return
   fi
 
@@ -96,7 +101,7 @@ echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 deploy_modes=()
 
 if [ "$has_prebuilt_output" = true ]; then
-  deploy_modes+=(archive)
+  deploy_modes+=(tgz split-tgz)
 fi
 
 if [ "$can_use_plain_prebuilt" = true ]; then
@@ -111,11 +116,15 @@ for mode in "${deploy_modes[@]}"; do
   attempt=$((attempt + 1))
 
   case "$mode" in
-    archive)
-      echo "Deploy attempt $attempt/$total_attempts (archive prebuilt)"
+    tgz)
+      echo "Deploy attempt $attempt/$total_attempts (tgz archive prebuilt)"
+      ;;
+    split-tgz)
+      echo "tgz archive deploy failed; trying split-tgz."
+      echo "Deploy attempt $attempt/$total_attempts (split-tgz archive prebuilt)"
       ;;
     plain)
-      echo "Archive deploy failed; falling back to standard prebuilt upload."
+      echo "Archive deploys failed; falling back to standard prebuilt upload."
       echo "Deploy attempt $attempt/$total_attempts (plain prebuilt)"
       ;;
     source)

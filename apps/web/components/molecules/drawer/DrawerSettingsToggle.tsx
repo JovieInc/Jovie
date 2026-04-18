@@ -18,6 +18,7 @@ export interface DrawerSettingsToggleProps {
   /** Visual density for compact footer usage */
   readonly density?: 'default' | 'compact';
   readonly className?: string;
+  readonly testId?: string;
 }
 
 /**
@@ -35,11 +36,13 @@ export function DrawerSettingsToggle({
   ariaLabel,
   density = 'default',
   className,
+  testId,
 }: DrawerSettingsToggleProps) {
   const id = useId();
 
   return (
     <div
+      data-testid={testId}
       className={cn(
         'flex items-center justify-between gap-3 rounded-[10px] border py-px transition-[background-color,border-color] duration-150',
         density === 'compact'
