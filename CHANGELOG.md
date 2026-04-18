@@ -22,6 +22,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Hardened the preview deploy flow so Vercel falls back from impossible oversized prebuilt uploads to a source deploy, and made the postbuild asset sync script survive `.vercelignore` filtering.
 - [internal] Fixed the mobile public profile listen drawer accessibility contract by injecting stable hidden drawer labels at the content root, which removes the Next dev overlay issue on `?mode=listen`.
+- [internal] Fixed the inline mobile notifications flow so the revealed email field reliably receives focus after the hero CTA animates open, which keeps the primary public-profile conversion step feeling responsive.
 - [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.158`.
 
 ## [26.4.157] - 2026-04-17
