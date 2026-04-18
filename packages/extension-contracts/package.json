@@ -1,6 +1,6 @@
 {
   "name": "@jovie/extension-contracts",
-  "version": "26.4.156",
+  "version": "26.4.158",
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",

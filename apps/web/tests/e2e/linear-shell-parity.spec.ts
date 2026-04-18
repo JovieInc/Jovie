@@ -179,9 +179,17 @@ for (const theme of ['light', 'dark'] as const) {
       drawer.getByText(primaryReleaseTitle, { exact: true }).first()
     ).toBeVisible();
     await expect(drawer.getByTestId('release-header-card')).toBeVisible();
-    const metadataCard = drawer.getByTestId('release-metadata-card');
-    await expect(metadataCard).toBeVisible();
-    await expectCardChrome(metadataCard);
+    await expect(drawer.getByTestId('release-tab-panel-card')).toHaveCount(0);
+
+    const tracksTab = drawer.getByTestId('drawer-tab-tracks');
+    const platformsTab = drawer.getByTestId('drawer-tab-links');
+    const propertiesCard = drawer.getByTestId('release-properties-card');
+    await expect(tracksTab).toBeVisible();
+    await expect(platformsTab).toBeVisible();
+    await expectFlatPillChrome(tracksTab);
+    await expectFlatPillChrome(platformsTab);
+    await expect(propertiesCard).toBeVisible();
+    await expectCardChrome(propertiesCard);
 
     const copySmartLinkButton = drawer.getByRole('button', {
       name: 'Copy smart link',

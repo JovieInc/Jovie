@@ -11,10 +11,15 @@ import {
 
 const SPOTIFY_WEB_TIMEOUT_MS = 8_000;
 const MAX_PAGE_FETCH_ATTEMPTS = 2;
+const RETRY_BACKOFF_BASE_MS = 500;
 const PLAYLIST_QUERY_TEMPLATES = [
   'site:open.spotify.com/playlist "This Is {artistName}"',
   'site:open.spotify.com/playlist "This Is {artistName}" "Spotify Playlist"',
 ] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function fetchSpotifyPublicPage(url: string): Promise<string | null> {
   for (let attempt = 1; attempt <= MAX_PAGE_FETCH_ATTEMPTS; attempt += 1) {
@@ -32,8 +37,20 @@ async function fetchSpotifyPublicPage(url: string): Promise<string | null> {
         return await response.text();
       }
 
-      if (response.status >= 500 && attempt < MAX_PAGE_FETCH_ATTEMPTS) {
-        continue;
+      if (response.status >= 500) {
+        if (attempt < MAX_PAGE_FETCH_ATTEMPTS) {
+          await sleep(RETRY_BACKOFF_BASE_MS * attempt);
+          continue;
+        }
+        return null;
+      }
+
+      if (
+        response.status === 404 ||
+        response.status === 410 ||
+        response.status === 429
+      ) {
+        return null;
       }
 
       await captureWarning(
@@ -48,6 +65,7 @@ async function fetchSpotifyPublicPage(url: string): Promise<string | null> {
       return null;
     } catch (error) {
       if (attempt < MAX_PAGE_FETCH_ATTEMPTS) {
+        await sleep(RETRY_BACKOFF_BASE_MS * attempt);
         continue;
       }
 
@@ -67,17 +85,28 @@ export async function discoverThisIsPlaylistCandidate(input: {
   readonly artistSpotifyId: string;
 }): Promise<FeaturedPlaylistFallbackCandidate | null> {
   const artistName = input.artistName.trim();
+  const safeArtistName = artistName.replaceAll('"', '');
   const artistSpotifyId = input.artistSpotifyId.trim();
 
-  if (!artistName || !artistSpotifyId) {
+  if (!artistName || !safeArtistName || !artistSpotifyId) {
     return null;
   }
 
   const seenPlaylistIds = new Set<string>();
 
   for (const queryTemplate of PLAYLIST_QUERY_TEMPLATES) {
-    const query = queryTemplate.replace('{artistName}', artistName);
-    const searchResults = await searchGoogleCSE(query, 1);
+    const query = queryTemplate.replace('{artistName}', safeArtistName);
+    const searchResults = await searchGoogleCSE(query, 1).catch(async error => {
+      await captureWarning('Google CSE discovery failed', error, {
+        query,
+        route: 'featured-playlist-fallback-discovery',
+      });
+      return null;
+    });
+
+    if (!searchResults) {
+      continue;
+    }
 
     for (const result of searchResults) {
       const normalizedUrl = normalizeSpotifyPlaylistUrl(result.link);

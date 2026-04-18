@@ -18,6 +18,7 @@ interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
   readonly phoneCaption: string;
   readonly phoneSubcaption: string;
+  readonly showIntroHeading?: boolean;
 }
 
 interface RailFrame {
@@ -29,6 +30,7 @@ export function ArtistProfileModeSwitcher({
   adaptive,
   phoneCaption,
   phoneSubcaption,
+  showIntroHeading = true,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const tabRailRef = useRef<HTMLDivElement>(null);
@@ -82,10 +84,7 @@ export function ArtistProfileModeSwitcher({
 
     const listenIndex = adaptive.modes.findIndex(mode => mode.id === 'listen');
     const tourIndex = adaptive.modes.findIndex(mode => mode.id === 'tour');
-    const contactIndex = adaptive.modes.findIndex(
-      mode => mode.id === 'contact'
-    );
-    const firstIndex = listenIndex >= 0 ? listenIndex : 0;
+    const firstIndex = Math.max(listenIndex, 0);
 
     sequenceStartedRef.current = true;
     setTabsVisible(true);
@@ -110,12 +109,6 @@ export function ArtistProfileModeSwitcher({
     queueSelection(firstIndex, 220);
     if (tourIndex >= 0 && tourIndex !== firstIndex) {
       queueSelection(tourIndex, 1320);
-    }
-    if (contactIndex >= 0) {
-      queueSelection(
-        contactIndex,
-        tourIndex >= 0 && tourIndex !== firstIndex ? 2260 : 1320
-      );
     }
   }, [adaptive.modes, reducedMotion]);
 
@@ -186,30 +179,32 @@ export function ArtistProfileModeSwitcher({
       ref={rootRef}
       className='artist-profile-mode-switcher mx-auto flex w-full max-w-[26rem] flex-col items-center text-center'
     >
-      <motion.div
-        className='artist-profile-mode-switcher-heading mx-auto max-w-[24rem]'
-        initial={false}
-        animate={
-          introVisible
-            ? { opacity: 1, y: 0, filter: 'blur(0px)' }
-            : { opacity: 0, y: 18, filter: 'blur(8px)' }
-        }
-        transition={{
-          duration: reducedMotion ? 0.16 : 0.34,
-          ease: [0.22, 1, 0.36, 1],
-        }}
-      >
-        <div className='min-h-[4.5rem] sm:min-h-[5.1rem]'>
-          <h2 className='mx-auto max-w-[9ch] text-[clamp(2.05rem,4vw,3.75rem)] font-semibold leading-[0.9] tracking-[-0.07em] text-primary-token'>
-            {phoneCaption}
-          </h2>
-        </div>
-        <div className='min-h-[2.3rem]'>
-          <p className='mt-1.5 text-[clamp(0.9rem,1.2vw,1rem)] font-medium leading-[1.28] tracking-[-0.03em] text-secondary-token'>
-            {phoneSubcaption}
-          </p>
-        </div>
-      </motion.div>
+      {showIntroHeading ? (
+        <motion.div
+          className='artist-profile-mode-switcher-heading mx-auto max-w-[24rem]'
+          initial={false}
+          animate={
+            introVisible
+              ? { opacity: 1, y: 0, filter: 'blur(0px)' }
+              : { opacity: 0, y: 18, filter: 'blur(8px)' }
+          }
+          transition={{
+            duration: reducedMotion ? 0.16 : 0.34,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          <div className='min-h-[4.5rem] sm:min-h-[5.1rem]'>
+            <h2 className='mx-auto max-w-[9ch] text-[clamp(2.05rem,4vw,3.75rem)] font-semibold leading-[0.9] tracking-[-0.07em] text-primary-token'>
+              {phoneCaption}
+            </h2>
+          </div>
+          <div className='min-h-[2.3rem]'>
+            <p className='mt-1.5 text-[clamp(0.9rem,1.2vw,1rem)] font-medium leading-[1.28] tracking-[-0.03em] text-secondary-token'>
+              {phoneSubcaption}
+            </p>
+          </div>
+        </motion.div>
+      ) : null}
 
       <div className='artist-profile-mode-switcher-phone relative mt-3.5 w-full max-w-[15.75rem] sm:mt-4 sm:max-w-[16.75rem]'>
         <div

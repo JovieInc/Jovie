@@ -361,11 +361,15 @@ test.describe('Releases dashboard', () => {
     });
 
     const sidebar = await openFirstReleaseSidebar(page);
+    await expect(sidebar.getByTestId('release-properties-card')).toBeVisible();
     await expect(sidebar.getByTestId('release-tabbed-card')).toBeVisible();
     const detailsTab = sidebar.getByRole('tab', { name: 'Details' });
+    const dspsTab = sidebar.getByRole('tab', { name: 'DSPs' });
     const tracksTab = sidebar.getByRole('tab', { name: 'Tracks' });
     await expect(detailsTab).toBeVisible();
+    await expect(dspsTab).toBeVisible();
     await detailsTab.click();
+    await dspsTab.click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
     await tracksTab.click();
     await expect(tracksTab).toHaveAttribute('aria-selected', 'true');

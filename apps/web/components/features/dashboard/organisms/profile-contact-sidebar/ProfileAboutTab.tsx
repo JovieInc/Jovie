@@ -757,6 +757,7 @@ export function ProfileAboutTab({
           ariaLabel='Keep showing releases older than 90 days on your public profile'
           checked={showOldReleases}
           onToggle={updateShowOldReleases}
+          testId='profile-contact-lower-settings-control'
           successMessage={on =>
             on
               ? 'Old releases will stay visible on your profile'

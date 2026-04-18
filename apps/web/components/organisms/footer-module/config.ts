@@ -7,7 +7,7 @@ export const CONTAINER_SIZES: Record<ContainerSize, string> = {
   lg: 'max-w-6xl',
   xl: 'max-w-7xl',
   full: 'max-w-none',
-  homepage: 'max-w-none',
+  homepage: 'max-w-[var(--linear-content-max)]',
 };
 
 export function getVariantConfigs(
@@ -18,7 +18,7 @@ export function getVariantConfigs(
   FooterVariantConfig
 > {
   const isHomepage = containerSize === 'homepage';
-  const pxClass = isHomepage ? 'px-5 sm:px-6 lg:px-[77px]' : 'px-6 lg:px-8';
+  const pxClass = isHomepage ? 'px-5 sm:px-6 lg:px-0' : 'px-6 lg:px-8';
   const mxClass = isHomepage ? '' : 'mx-auto';
   return {
     marketing: {
@@ -86,7 +86,7 @@ export const FOOTER_LINK_HOVER_CLASS =
 
 // Linear: 13px, weight 510, normal case, line-height 19.5px, tracking -0.01em, mb 24px
 export const SECTION_HEADING_CLASS_NAME =
-  'text-[13px] leading-[19.5px] font-[510] tracking-[-0.01em] mb-6';
+  'mb-5 text-[13px] font-semibold leading-[19.5px] tracking-[-0.01em]';
 
 // Linear-aligned: headings are PRIMARY (white), links are muted
 export const SECTION_HEADING_STYLE = {

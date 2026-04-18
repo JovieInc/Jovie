@@ -61,7 +61,7 @@ interface TrackControlSource {
   readonly artworkUrl?: string | null;
 }
 
-function getTrackLabel(track: ReleaseSidebarTrack): string {
+function getCanonicalTrackLabel(track: ReleaseSidebarTrack): string {
   return track.discNumber > 1
     ? `${track.discNumber}-${track.trackNumber}`
     : String(track.trackNumber);
@@ -111,6 +111,19 @@ function sanitizeFilename(value: string): string {
       .replaceAll(/\s+/g, '-')
       .toLowerCase() || 'spotify-canvas'
   );
+}
+
+function getDisplayTrackLabel(params: {
+  track: ReleaseSidebarTrack;
+  index: number;
+  isSingleDiscPartialSubset: boolean;
+}): string {
+  const { track, index, isSingleDiscPartialSubset } = params;
+  if (isSingleDiscPartialSubset) {
+    return String(index + 1);
+  }
+
+  return getCanonicalTrackLabel(track);
 }
 
 export function ReleaseTrackList({
@@ -222,6 +235,14 @@ export function ReleaseTrackList({
     );
   }
 
+  const inferredDiscCount = Math.max(
+    1,
+    ...tracks.map(track => track.discNumber)
+  );
+  const isSingleDiscPartialSubset =
+    tracks.length < release.totalTracks &&
+    (release.totalDiscs ?? inferredDiscCount) === 1;
+
   return (
     <>
       <div className='space-y-1' data-testid='tracklist'>
@@ -249,6 +270,11 @@ export function ReleaseTrackList({
           <TrackListRow
             key={track.releaseTrackId ?? track.id}
             track={track}
+            trackLabel={getDisplayTrackLabel({
+              track,
+              index,
+              isSingleDiscPartialSubset,
+            })}
             release={release}
             playbackState={playbackState}
             onToggleTrack={toggleTrack}
@@ -276,6 +302,7 @@ export function ReleaseTrackList({
 
 function TrackListRow({
   track,
+  trackLabel,
   release,
   playbackState,
   onToggleTrack,
@@ -285,6 +312,7 @@ function TrackListRow({
   onInvalidateCanvasData,
 }: {
   readonly track: ReleaseSidebarTrack;
+  readonly trackLabel: string;
   readonly release: Release;
   readonly playbackState: {
     activeTrackId: string | null;
@@ -297,7 +325,6 @@ function TrackListRow({
   readonly onOpenHistory: () => void;
   readonly onInvalidateCanvasData: () => void;
 }) {
-  const trackLabel = getTrackLabel(track);
   const playableUrl = track.audioUrl ?? track.previewUrl ?? undefined;
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;

@@ -18,7 +18,7 @@ const FALLBACK_CREATOR_DATA = [
     handle: 'kaskade',
     name: 'Kaskade',
     tagline: 'Live profile',
-    src: '/images/avatars/pop-star.jpg',
+    src: '/images/avatars/music-maker.jpg',
   },
 ] as const;
 

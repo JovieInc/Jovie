@@ -33,7 +33,7 @@ export function PublicSurfaceShell({
               src={ambientMediaUrl}
               alt=''
               fill
-              sizes='100vw'
+              sizes='(max-width: 767px) 100vw, 680px'
               className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
             />
           </div>

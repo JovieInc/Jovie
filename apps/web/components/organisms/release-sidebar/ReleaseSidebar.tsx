@@ -18,7 +18,6 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import type { SmartLinkCreditGroup as CreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
@@ -27,8 +26,8 @@ import {
   DrawerCardActionBar,
   DrawerFormGridRow,
   DrawerInspectorCard,
-  DrawerInspectorStack,
   DrawerMediaThumb,
+  DrawerSection,
   DrawerSplitButton,
   DrawerSurfaceCard,
   DrawerTabbedCard,
@@ -51,17 +50,15 @@ import type { ProviderKey } from '@/lib/discography/types';
 import { fetchWithTimeout, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { ReleaseCreditsSection } from './ReleaseCreditsSection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
-import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleasePitchSection } from './ReleasePitchSection';
+import { ReleasePropertiesPanel } from './ReleasePropertiesPanel';
 import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
-import { fetchReleaseCreditsAction } from './release-credits-action';
 import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
@@ -266,66 +263,6 @@ function ReleaseArtworkDownloadsSetting({
         density='compact'
       />
     </DrawerFormGridRow>
-  );
-}
-
-function ReleaseCreditsInspectorCard({
-  releaseId,
-}: {
-  readonly releaseId: string;
-}) {
-  const [creditsGroups, setCreditsGroups] = useState<CreditGroup[] | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setCreditsGroups(null);
-    setIsLoading(true);
-
-    fetchReleaseCreditsAction(releaseId)
-      .then(groups => {
-        if (cancelled) return;
-        setCreditsGroups(groups);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCreditsGroups(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [releaseId]);
-
-  const hasVisibleCredits =
-    creditsGroups?.some(
-      group => group.role !== 'main_artist' && group.entries.length > 0
-    ) ?? false;
-
-  if (isLoading || !hasVisibleCredits) {
-    return null;
-  }
-
-  return (
-    <DrawerInspectorCard
-      title='Credits'
-      defaultOpen={false}
-      data-testid='release-credits-card-stack'
-    >
-      <ReleaseCreditsSection
-        releaseId={releaseId}
-        variant='flat'
-        creditsGroups={creditsGroups}
-      />
-    </DrawerInspectorCard>
   );
 }
 
@@ -737,7 +674,7 @@ export function ReleaseSidebar({
       emptyMessage='Select a release in the table to view its details.'
     >
       {release && (
-        <DrawerInspectorStack data-testid='release-inspector-stack'>
+        <div className='space-y-2.5'>
           <DrawerTabbedCard
             testId='release-tabbed-card'
             tabs={
@@ -756,10 +693,10 @@ export function ReleaseSidebar({
             contentClassName='pt-2'
           >
             {activeTab === 'details' ? (
-              <ReleaseMetadata
+              <ReleasePropertiesPanel
                 release={release}
+                showCredits={showCredits}
                 isEditable={isEditable}
-                variant='flat'
                 onSaveMetadata={readOnly ? undefined : onSaveMetadata}
                 onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
               />
@@ -793,10 +730,6 @@ export function ReleaseSidebar({
               />
             ) : null}
           </DrawerTabbedCard>
-
-          {showCredits ? (
-            <ReleaseCreditsInspectorCard releaseId={release.id} />
-          ) : null}
 
           {shouldRenderTasks ? (
             <DrawerInspectorCard
@@ -837,11 +770,13 @@ export function ReleaseSidebar({
             </DrawerInspectorCard>
           ) : null}
 
-          <DrawerInspectorCard
+          <DrawerSection
             title='Lyrics'
+            surface='card'
             defaultOpen={false}
-            data-testid='release-lyrics-card'
-            gridClassName='space-y-2.5'
+            lazyMount
+            testId='release-lyrics-card'
+            contentClassName='p-0'
           >
             <ReleaseLyricsSection
               releaseId={release.id}
@@ -852,13 +787,15 @@ export function ReleaseSidebar({
               onSaveLyrics={onSaveLyrics}
               onFormatLyrics={onFormatLyrics}
             />
-          </DrawerInspectorCard>
+          </DrawerSection>
 
-          <DrawerInspectorCard
-            title='Settings'
+          <DrawerSection
+            title='Extras'
+            surface='card'
             defaultOpen={false}
-            data-testid='release-settings-card-stack'
-            gridClassName='space-y-2.5'
+            lazyMount
+            testId='release-extras-card'
+            contentClassName='space-y-3 p-3'
           >
             {isEditable ? (
               <ReleaseArtworkDownloadsSetting
@@ -872,15 +809,17 @@ export function ReleaseSidebar({
               targetPlaylists={release.targetPlaylists}
               onSave={readOnly ? undefined : onSaveTargetPlaylists}
               readOnly={readOnly}
+              variant='flat'
             />
             {!readOnly ? (
               <ReleasePitchSection
                 releaseId={release.id}
                 existingPitches={release.generatedPitches}
+                variant='flat'
               />
             ) : null}
-          </DrawerInspectorCard>
-        </DrawerInspectorStack>
+          </DrawerSection>
+        </div>
       )}
     </EntitySidebarShell>
   );

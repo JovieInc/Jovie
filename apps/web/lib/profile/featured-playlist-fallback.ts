@@ -102,20 +102,7 @@ export async function refreshFeaturedPlaylistFallbackCandidate(input: {
     }
   } else if (dismissedPlaylistId === discoveredCandidate.playlistId) {
     return;
-  } else if (
-    currentConfirmed &&
-    currentConfirmed.playlistId !== discoveredCandidate.playlistId
-  ) {
-    if (currentCandidate) {
-      nextSettings = {
-        ...currentSettings,
-        featuredPlaylistFallbackCandidate: null,
-      };
-    }
-  } else if (
-    currentConfirmed &&
-    currentConfirmed.playlistId === discoveredCandidate.playlistId
-  ) {
+  } else if (currentConfirmed) {
     if (currentCandidate) {
       nextSettings = {
         ...currentSettings,

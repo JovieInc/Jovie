@@ -65,12 +65,12 @@ function getMetaContent(
     `<meta[^>]+${attribute}=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`,
     'i'
   );
-  const match = html.match(pattern);
+  const match = pattern.exec(html);
   return match ? decodeHtmlEntities(match[1]) : null;
 }
 
 function getHtmlTitle(html: string): string | null {
-  const match = html.match(/<title>([^<]+)<\/title>/i);
+  const match = /<title>([^<]+)<\/title>/i.exec(html);
   return match ? decodeHtmlEntities(match[1]) : null;
 }
 
@@ -146,10 +146,7 @@ export function validateThisIsPlaylistPage(params: {
   const normalizedCanonical = canonicalUrl
     ? normalizeSpotifyPlaylistUrl(canonicalUrl)
     : null;
-  if (
-    !normalizedCanonical ||
-    normalizedCanonical.playlistId !== params.playlistId
-  ) {
+  if (normalizedCanonical?.playlistId !== params.playlistId) {
     return null;
   }
 

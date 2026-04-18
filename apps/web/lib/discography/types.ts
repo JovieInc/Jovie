@@ -157,6 +157,7 @@ export interface ReleaseViewModel {
   upc?: string | null;
   label?: string | null;
   totalTracks: number;
+  totalDiscs?: number;
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];

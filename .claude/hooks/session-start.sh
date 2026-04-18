@@ -51,17 +51,12 @@ if [ -x "$PROJECT_DIR/scripts/setup.sh" ]; then
   "$PROJECT_DIR/scripts/setup.sh"
 fi
 
-# 0.5. Install GitHub CLI if not available
+# 0.5. Verify GitHub CLI availability
 if ! command -v gh &> /dev/null; then
-  echo "Installing GitHub CLI..."
-  GH_VERSION="2.67.0"
-  wget -q "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -O /tmp/gh.tar.gz \
-    && tar -xzf /tmp/gh.tar.gz -C /tmp \
-    && cp /tmp/gh_${GH_VERSION}_linux_amd64/bin/gh /usr/local/bin/gh \
-    && chmod +x /usr/local/bin/gh \
-    && rm -rf /tmp/gh.tar.gz /tmp/gh_${GH_VERSION}_linux_amd64 \
-    && echo "GitHub CLI installed." \
-    || echo "WARNING: Failed to install GitHub CLI"
+  echo "WARNING: GitHub CLI is not installed."
+  echo "Install it manually before using GitHub automation:"
+  echo "  macOS: brew install gh"
+  echo "  Linux: https://github.com/cli/cli#installation"
 else
   echo "GitHub CLI already installed."
 fi
@@ -89,11 +84,8 @@ chmod +x "$PROJECT_DIR"/.claude/hooks/*.sh 2>/dev/null || true
 
 # 2.5. Install Bun if not available (required by gstack)
 if ! command -v bun &> /dev/null; then
-  echo "Installing Bun runtime (required by gstack)..."
-  curl -fsSL https://bun.sh/install | bash 2>/dev/null \
-    && export PATH="$HOME/.bun/bin:$PATH" \
-    && echo "Bun installed: $(bun --version)" \
-    || echo "WARNING: Failed to install Bun. gstack browser skills will not work."
+  echo "WARNING: Bun runtime is not installed. gstack browser skills will not work."
+  echo "Install Bun manually before using those skills: https://bun.sh/docs/installation"
 fi
 
 # 2.6. Initialize gstack skills if submodule is present

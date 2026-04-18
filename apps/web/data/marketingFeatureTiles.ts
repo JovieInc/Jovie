@@ -36,7 +36,13 @@ export interface MarketingIconBadgeFeatureTile
   readonly badgeLabel: string;
 }
 
+export interface MarketingAnalyticsFunnelHeroTile
+  extends MarketingFeatureTileBase {
+  readonly visual: 'analytics-funnel-hero';
+}
+
 export type MarketingFeatureTile =
   | MarketingButtonChipFeatureTile
+  | MarketingAnalyticsFunnelHeroTile
   | MarketingIconBadgeFeatureTile
   | MarketingScreenshotFeatureTile;

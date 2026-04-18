@@ -1,6 +1,6 @@
 'use client';
 
-import { Slot } from '@radix-ui/react-slot';
+import { Button } from '@jovie/ui';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -41,7 +41,10 @@ export type CircleIconButtonVariant =
   | 'pearlQuiet';
 
 export interface CircleIconButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  extends Omit<
+    React.ComponentProps<typeof Button>,
+    'size' | 'variant' | 'asChild'
+  > {
   /** Button content (typically an icon) */
   readonly children: React.ReactNode;
   /** Accessible label for screen readers */
@@ -70,49 +73,76 @@ const iconSizeStyles: Record<CircleIconButtonSize, string> = {
   lg: '[&>svg]:h-5 [&>svg]:w-5',
 };
 
-const variantStyles: Record<CircleIconButtonVariant, string> = {
+const variantStyles: Record<
+  CircleIconButtonVariant,
+  {
+    buttonVariant: React.ComponentProps<typeof Button>['variant'];
+    className: string;
+  }
+> = {
   // Surface - elevated card style with subtle border
-  surface: cn(
-    'border border-subtle bg-surface-1 text-primary-token',
-    'shadow-sm',
-    'hover:bg-surface-2 hover:text-primary-token hover:shadow-md'
-  ),
+  surface: {
+    buttonVariant: 'secondary',
+    className: cn(
+      'border border-subtle bg-surface-1 text-primary-token',
+      'shadow-sm',
+      'hover:bg-surface-2 hover:text-primary-token hover:shadow-md'
+    ),
+  },
   // Frosted - glassmorphic with backdrop blur
-  frosted: cn(
-    'border border-subtle bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)] text-primary-token backdrop-blur-sm',
-    'shadow-sm',
-    'hover:bg-[color-mix(in_srgb,var(--linear-bg-surface-2)_88%,transparent)]'
-  ),
+  frosted: {
+    buttonVariant: 'frosted-ghost',
+    className: cn(
+      'border border-subtle bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)] text-primary-token backdrop-blur-sm',
+      'shadow-sm',
+      'hover:bg-[color-mix(in_srgb,var(--linear-bg-surface-2)_88%,transparent)]'
+    ),
+  },
   // Ghost - transparent with hover background
-  ghost: cn(
-    'bg-transparent text-secondary-token',
-    'hover:bg-surface-1 hover:text-primary-token'
-  ),
+  ghost: {
+    buttonVariant: 'ghost',
+    className: cn(
+      'bg-transparent text-secondary-token',
+      'hover:bg-surface-1 hover:text-primary-token'
+    ),
+  },
   // Secondary - subtle background without border
-  secondary: cn(
-    'bg-surface-2 text-secondary-token',
-    'shadow-sm',
-    'hover:bg-surface-3 hover:text-primary-token'
-  ),
+  secondary: {
+    buttonVariant: 'secondary',
+    className: cn(
+      'bg-surface-2 text-secondary-token',
+      'shadow-sm',
+      'hover:bg-surface-3 hover:text-primary-token'
+    ),
+  },
   // Outline - transparent with visible border
-  outline: cn(
-    'border border-subtle bg-transparent text-tertiary-token',
-    'hover:bg-surface-1 hover:text-primary-token'
-  ),
+  outline: {
+    buttonVariant: 'outline',
+    className: cn(
+      'border border-subtle bg-transparent text-tertiary-token',
+      'hover:bg-surface-1 hover:text-primary-token'
+    ),
+  },
   // Pearl - public profile chrome
-  pearl: cn(
-    'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token backdrop-blur-xl',
-    'shadow-[var(--profile-pearl-shadow)]',
-    'hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token',
-    'active:bg-[var(--profile-pearl-bg-active)]'
-  ),
-  pearlQuiet: cn(
-    'border border-transparent bg-transparent text-primary-token/78 backdrop-blur-xl',
-    'shadow-none',
-    'hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
-    'focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
-    'active:bg-[var(--profile-pearl-bg-active)] active:text-primary-token'
-  ),
+  pearl: {
+    buttonVariant: 'ghost',
+    className: cn(
+      'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token backdrop-blur-xl',
+      'shadow-[var(--profile-pearl-shadow)]',
+      'hover:bg-[var(--profile-pearl-bg-hover)] hover:text-primary-token',
+      'active:bg-[var(--profile-pearl-bg-active)]'
+    ),
+  },
+  pearlQuiet: {
+    buttonVariant: 'ghost',
+    className: cn(
+      'border border-transparent bg-transparent text-primary-token/78 backdrop-blur-xl',
+      'shadow-none',
+      'hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
+      'focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
+      'active:bg-[var(--profile-pearl-bg-active)] active:text-primary-token'
+    ),
+  },
 };
 
 const baseStyles = cn(
@@ -122,9 +152,6 @@ const baseStyles = cn(
   'transition-all duration-150 ease-out',
   // Active state
   'active:scale-95',
-  // Focus ring using design system utility
-  'focus-ring-themed',
-  'focus-visible:ring-offset-[var(--color-bg-base)]',
   // Required for soft material treatments on profile chrome
   'relative isolate overflow-hidden',
   // Touch optimizations
@@ -150,24 +177,27 @@ export const CircleIconButton = React.forwardRef<
   },
   ref
 ) {
-  const Comp = asChild ? Slot : 'button';
+  const variantConfig = variantStyles[variant];
 
   return (
-    <Comp
+    <Button
       ref={ref}
+      asChild={asChild}
       type={asChild ? undefined : type}
+      variant={variantConfig.buttonVariant}
+      size='icon'
       className={cn(
         baseStyles,
         sizeStyles[size],
         iconSizeStyles[size],
-        variantStyles[variant],
+        variantConfig.className,
         className
       )}
       aria-label={ariaLabel}
       {...props}
     >
       {children}
-    </Comp>
+    </Button>
   );
 });
 

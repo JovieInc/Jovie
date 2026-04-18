@@ -1,6 +1,6 @@
 {
   "name": "@jovie/extension",
-  "version": "26.4.156",
+  "version": "26.4.158",
   "private": true,
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-static.mjs",

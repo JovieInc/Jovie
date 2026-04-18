@@ -81,7 +81,7 @@ export function PhoneProfileDemo() {
         >
           <PhoneFrame className='lg:h-[634px] lg:w-[302px] xl:h-[664px] xl:w-[316px]'>
             <Image
-              src='/product-screenshots/profile-phone.png'
+              src='/product-screenshots/tim-white-profile-listen-phone.png'
               alt='Artist profile page showing streaming links, tips, and tour dates'
               width={780}
               height={1688}

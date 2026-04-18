@@ -1,6 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
+import type React from 'react';
 import {
   cloneElement,
   isValidElement,
@@ -86,6 +87,36 @@ function isSubmenu(item: ContextMenuItemType): item is ContextMenuSubmenu {
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   return typeof (value as PromiseLike<T>).then === 'function';
+}
+
+function resolveAsyncContextMenuItems(
+  promise: PromiseLike<ContextMenuItemType[]>,
+  targetGeneration: number,
+  setResolveGeneration: React.Dispatch<React.SetStateAction<number>>,
+  setResolvedItems: React.Dispatch<React.SetStateAction<ContextMenuItemType[]>>
+) {
+  void Promise.resolve(promise)
+    .then(loadedItems => {
+      setResolveGeneration(activeGeneration => {
+        if (activeGeneration === targetGeneration) {
+          setResolvedItems(loadedItems);
+        }
+        return activeGeneration;
+      });
+    })
+    .catch(error => {
+      setResolveGeneration(activeGeneration => {
+        if (activeGeneration === targetGeneration) {
+          logger.warn(
+            'Failed to resolve async context menu items',
+            error,
+            'TableContextMenu'
+          );
+          setResolvedItems([]);
+        }
+        return activeGeneration;
+      });
+    });
 }
 
 function normalizeContextMenuItems(
@@ -274,30 +305,12 @@ export function TableContextMenu({
 
       setResolveGeneration(currentGeneration => {
         const nextGeneration = currentGeneration + 1;
-
-        void Promise.resolve(nextItems)
-          .then(loadedItems => {
-            setResolveGeneration(activeGeneration => {
-              if (activeGeneration === nextGeneration) {
-                setResolvedItems(loadedItems);
-              }
-              return activeGeneration;
-            });
-          })
-          .catch(error => {
-            setResolveGeneration(activeGeneration => {
-              if (activeGeneration === nextGeneration) {
-                logger.warn(
-                  'Failed to resolve async context menu items',
-                  error,
-                  'TableContextMenu'
-                );
-                setResolvedItems([]);
-              }
-              return activeGeneration;
-            });
-          });
-
+        resolveAsyncContextMenuItems(
+          nextItems,
+          nextGeneration,
+          setResolveGeneration,
+          setResolvedItems
+        );
         return nextGeneration;
       });
 

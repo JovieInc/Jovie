@@ -38,16 +38,28 @@ test.describe('Pricing Page', () => {
 
     // Check main heading
     await expect(page.locator('h1')).toHaveText('Pricing');
+    await expect(
+      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Capture every fan. Send them every release automatically.',
+      })
+    ).toBeVisible();
 
     // Check that pricing tiers are visible
-    await expect(page.getByText('Free').first()).toBeVisible();
-    await expect(page.getByText('$0').first()).toBeVisible();
+    await expect(page.locator('table').first()).toContainText('Free');
+    await expect(page.locator('table').first()).toContainText('$0');
+    await expect(page.locator('table').first()).toContainText('Pro');
   });
 
   test('has working call-to-action buttons', async ({ page }) => {
-    const freeTierCta = page.getByRole('link', { name: 'Get started' }).first();
+    const freeTierCta = page.getByRole('link', { name: 'Start Free' }).first();
     await expect(freeTierCta).toBeVisible();
     await expect(freeTierCta).toHaveAttribute('href', /\/signup/);
+    await expect(
+      page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
+    ).toBeVisible();
 
     await expect(page.getByText('Compare all features').first()).toBeVisible();
   });

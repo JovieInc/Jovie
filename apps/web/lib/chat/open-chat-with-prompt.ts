@@ -9,7 +9,7 @@ interface AppRouter {
 }
 
 export function openChatWithPrompt(prompt: string, router: AppRouter): void {
-  if (typeof globalThis.window !== 'undefined') {
+  if (globalThis.window !== undefined) {
     try {
       globalThis.window.sessionStorage.setItem(PENDING_CHAT_PROMPT_KEY, prompt);
     } catch {
@@ -21,7 +21,7 @@ export function openChatWithPrompt(prompt: string, router: AppRouter): void {
 }
 
 export function consumePendingChatPrompt(): string | null {
-  if (typeof globalThis.window === 'undefined') return null;
+  if (globalThis.window === undefined) return null;
 
   try {
     const prompt = globalThis.window.sessionStorage.getItem(

@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.158] - 2026-04-17
+
+> Staged homepage and pricing refresh work is ready to review again, the mobile public profile hero is cleaner and more stable, and preview deploys keep working even when Vercel rejects oversized prebuilt uploads.
+
+### Added
+
+- Added the staged `/new` homepage route, shared marketing story primitives, and the data-driven homepage v2 copy/config stack so the refreshed landing experience can be reviewed behind a noindex route.
+
+### Changed
+
+- Refreshed `/pricing` with the new comparison-table and mobile-plan layout, updated staged marketing navigation/footer wiring, and swapped the demo founder persona assets to the canonical Calvin Harris image set used in the new marketing surfaces.
+- Reworked the mobile public profile hero stack to prioritize notification capture, simplify the top-fold shell, and align the latest release treatment with the quieter pearl-style profile system.
+
+### Fixed
+
+- [internal] Hardened the preview deploy flow so Vercel falls back from impossible oversized prebuilt uploads to a source deploy, and made the postbuild asset sync script survive `.vercelignore` filtering.
+- [internal] Fixed the mobile public profile listen drawer accessibility contract by injecting stable hidden drawer labels at the content root, which removes the Next dev overlay issue on `?mode=listen`.
+- [internal] Fixed the inline mobile notifications flow so the revealed email field reliably receives focus after the hero CTA animates open, which keeps the primary public-profile conversion step feeling responsive.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.158`.
+
+## [26.4.157] - 2026-04-17
+
+> Preview deploys now survive the Vercel oversized-prebuilt edge case, so PR review links keep generating even when the archive upload path fails first.
+
+### Fixed
+
+- [internal] Updated the shared Vercel deploy wrapper to count `.vercel/output` files, skip the plain `--prebuilt` fallback once output exceeds Vercel's `15000`-file cap, and fall back to a source deploy instead of retrying an impossible path.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.157`.
+
 ## [26.4.156] - 2026-04-16
 
 > Homepage and Artist Profile surfaces now inherit the refreshed design-system timing, weights, and profile shell tokens, and the PR preview deploy path now survives Vercel archive upload failures without stalling review.
