@@ -1,14 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSetTheme = vi.fn();
 
@@ -57,25 +48,10 @@ function renderToolbar(
 }
 
 describe('DevToolbar', () => {
-  const originalLocation = globalThis.location;
-  const mockReload = vi.fn();
-
-  beforeAll(() => {
-    Object.defineProperty(globalThis, 'location', {
-      value: {
-        ...originalLocation,
-        reload: mockReload,
-      },
-      writable: true,
-      configurable: true,
-    });
-  });
-
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     mockSetTheme.mockClear();
-    mockReload.mockReset();
 
     // Mock clipboard API
     Object.assign(navigator, {
@@ -88,14 +64,6 @@ describe('DevToolbar', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
-  });
-
-  afterAll(() => {
-    Object.defineProperty(globalThis, 'location', {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
-    });
   });
 
   // ─── Show/Hide ───────────────────────────────────────────────
@@ -629,15 +597,20 @@ describe('DevToolbar', () => {
 
   describe('clear session', () => {
     let fetchSpy: ReturnType<typeof vi.fn>;
+    let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       fetchSpy = vi.fn().mockResolvedValue({
         json: () => Promise.resolve({ success: true, deleted: ['__session'] }),
       });
       vi.stubGlobal('fetch', fetchSpy);
+      setTimeoutSpy = vi
+        .spyOn(globalThis, 'setTimeout')
+        .mockImplementation((() => 0) as typeof globalThis.setTimeout);
     });
 
     afterEach(() => {
+      setTimeoutSpy.mockRestore();
       vi.unstubAllGlobals();
     });
 
