@@ -24,6 +24,12 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   return <>{children}</>;
 }
 
+// Global keyboard shortcut listeners are deferred past first paint. Users
+// do not press `t` or `/` within the first 300ms of page load, and leaving
+// listener attachment on the critical path added two `addEventListener`
+// calls plus per-keypress handler dispatch overhead during boot.
+const KEYBOARD_SHORTCUT_ATTACH_DELAY_MS = 300;
+
 function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -40,8 +46,12 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
       setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
     }
 
-    globalThis.addEventListener('keydown', handleKeyDown);
+    const attachHandle = setTimeout(() => {
+      globalThis.addEventListener('keydown', handleKeyDown);
+    }, KEYBOARD_SHORTCUT_ATTACH_DELAY_MS);
+
     return () => {
+      clearTimeout(attachHandle);
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
   }, [resolvedTheme, setTheme, isEnabled]);
@@ -95,8 +105,12 @@ function SearchKeyboardShortcut() {
       });
     }
 
-    globalThis.addEventListener('keydown', handleKeyDown);
+    const attachHandle = setTimeout(() => {
+      globalThis.addEventListener('keydown', handleKeyDown);
+    }, KEYBOARD_SHORTCUT_ATTACH_DELAY_MS);
+
     return () => {
+      clearTimeout(attachHandle);
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
