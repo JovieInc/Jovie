@@ -87,13 +87,16 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     console.log('📸 Saved: release-sidebar-detail.png');
 
-    await sidebar.getByTestId('drawer-tab-links').click();
-    const platformsCard = sidebar.getByTestId('release-platforms-card');
-    await expect(platformsCard).toBeVisible({
+    const platformsTab = sidebar.getByTestId('drawer-tab-dsps');
+    await expect(platformsTab).toBeVisible({
       timeout: TIMEOUTS.CONTENT_VISIBLE,
     });
+    await platformsTab.click();
+    await expect(platformsTab).toHaveAttribute('aria-selected', 'true');
+    const tabbedCard = sidebar.getByTestId('release-tabbed-card');
+    await expect(tabbedCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
     await waitForSettle(page);
-    await platformsCard.screenshot({
+    await tabbedCard.screenshot({
       path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,
     });
     console.log('📸 Saved: release-sidebar-platforms.png');
@@ -101,6 +104,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     await sidebar.getByTestId('drawer-tab-tasks').click();
     const tasksCard = sidebar.getByTestId('release-tasks-card');
     await expect(tasksCard).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
+    await tasksCard.getByTestId('release-tasks-toggle').click();
     await expect(
       tasksCard.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'

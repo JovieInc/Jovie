@@ -11,6 +11,7 @@ export interface CollapsibleSectionHeadingProps {
   readonly children: ReactNode;
   readonly className?: string;
   readonly 'aria-controls'?: string;
+  readonly 'data-testid'?: string;
 }
 
 export function CollapsibleSectionHeading({
@@ -19,6 +20,7 @@ export function CollapsibleSectionHeading({
   children,
   className,
   'aria-controls': ariaControls,
+  'data-testid': testId,
 }: CollapsibleSectionHeadingProps) {
   return (
     <button
@@ -26,6 +28,7 @@ export function CollapsibleSectionHeading({
       onClick={onToggle}
       aria-expanded={isOpen}
       aria-controls={ariaControls}
+      data-testid={testId}
       className={cn(
         DRAWER_SECTION_HEADING_CLASSNAME,
         'flex w-full items-center justify-between rounded-[10px] border border-transparent px-2.5 py-2 transition-[background-color,color,border-color] duration-150',
