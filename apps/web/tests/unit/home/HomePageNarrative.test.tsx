@@ -2,6 +2,20 @@ import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
 
+vi.mock('@/features/home/HomeProfileShowcase', () => ({
+  HomeProfileShowcase: ({
+    stateId,
+    className,
+  }: {
+    readonly stateId: string;
+    readonly className?: string;
+  }) => (
+    <div data-testid={`homepage-phone-state-${stateId}`} className={className}>
+      {stateId}
+    </div>
+  ),
+}));
+
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();

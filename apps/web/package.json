@@ -45,6 +45,7 @@
     "test:lighthouse:public:launch": "tsx scripts/run-public-lighthouse.ts",
     "test:lighthouse:dashboard:pr": "node scripts/lighthouse-dashboard-auth.cjs",
     "test:lighthouse:onboarding:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.onboarding.pr.json LIGHTHOUSE_DASHBOARD_URLS=/onboarding node scripts/lighthouse-dashboard-auth.cjs",
+    "test:lighthouse:admin:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.admin.pr.json LIGHTHOUSE_DASHBOARD_URLS=/app/admin/growth,/app/admin/creators,/app/admin/users,/app/admin/releases LIGHTHOUSE_TEST_PERSONA=admin node scripts/lighthouse-dashboard-auth.cjs",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",

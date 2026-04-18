@@ -8,6 +8,24 @@ import {
 } from '@/features/home/home-surface-seed';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
+vi.mock('@/features/home/HomeProfileShowcase', () => ({
+  HomeProfileShowcase: ({
+    stateId,
+    className,
+  }: {
+    readonly stateId: string;
+    readonly className?: string;
+  }) =>
+    createElement(
+      'div',
+      {
+        'data-testid': `homepage-phone-state-${stateId}`,
+        className,
+      },
+      stateId
+    ),
+}));
+
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();
