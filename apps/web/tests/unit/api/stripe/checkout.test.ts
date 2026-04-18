@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
 const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
@@ -10,9 +10,10 @@ const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
 const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
+const mockWithStripeRetry = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -46,10 +47,19 @@ vi.mock('@/lib/stripe/config', () => ({
   },
 }));
 
+vi.mock('@/lib/stripe/retry', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/stripe/retry')>();
+  return {
+    ...actual,
+    withStripeRetry: mockWithStripeRetry,
+  };
+});
+
+import { POST } from '@/app/api/stripe/checkout/route';
+
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -66,12 +76,68 @@ describe('POST /api/stripe/checkout', () => {
       customerId: 'cus_123',
     });
     mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
+    mockWithStripeRetry.mockImplementation(async (_operation, fn) => {
+      let attempts = 0;
+
+      while (true) {
+        try {
+          return await fn();
+        } catch (error) {
+          attempts += 1;
+          const statusCode =
+            typeof error === 'object' &&
+            error !== null &&
+            'statusCode' in error &&
+            typeof error.statusCode === 'number'
+              ? error.statusCode
+              : undefined;
+          const errorType =
+            typeof error === 'object' &&
+            error !== null &&
+            'type' in error &&
+            typeof error.type === 'string'
+              ? error.type
+              : undefined;
+          const errorName = error instanceof Error ? error.name : undefined;
+          const transient =
+            errorType === 'StripeConnectionError' ||
+            errorType === 'StripeAPIError' ||
+            errorType === 'StripeRateLimitError' ||
+            errorType === 'StripeIdempotencyError' ||
+            errorName === 'StripeConnectionError' ||
+            errorName === 'StripeAPIError' ||
+            errorName === 'StripeRateLimitError' ||
+            errorName === 'StripeIdempotencyError' ||
+            statusCode === 408 ||
+            statusCode === 409 ||
+            statusCode === 429 ||
+            statusCode === 500 ||
+            statusCode === 502 ||
+            statusCode === 503 ||
+            statusCode === 504;
+
+          if (!transient) {
+            throw error;
+          }
+
+          if (attempts >= 3) {
+            const { StripeRetryExhaustedError } = await import(
+              '@/lib/stripe/retry'
+            );
+            throw new StripeRetryExhaustedError(
+              'createCheckoutSession',
+              attempts,
+              error
+            );
+          }
+        }
+      }
+    });
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -86,12 +152,11 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('returns 403 when max plan is disabled', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetActivePriceIds.mockReturnValue(['price_max']);
     mockIsMaxPlanEnabled.mockReturnValue(false);
     mockIsMaxPriceId.mockReturnValue(true);
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -106,13 +171,12 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('creates checkout session for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({
       id: 'cs_123',
       url: 'https://checkout.stripe.com/pay/cs_123',
     });
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -128,7 +192,7 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('retries transient Stripe errors and preserves idempotency key', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
     const transientError = Object.assign(
       new Error('Temporary connection issue'),
@@ -146,7 +210,6 @@ describe('POST /api/stripe/checkout', () => {
         url: 'https://checkout.stripe.com/pay/cs_retry_success',
       });
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -171,7 +234,7 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('returns 503 with Retry-After when transient Stripe errors exhaust retries', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
     const transientError = Object.assign(new Error('Stripe API unavailable'), {
       name: 'StripeAPIError',
@@ -181,7 +244,6 @@ describe('POST /api/stripe/checkout', () => {
 
     mockCreateCheckoutSession.mockRejectedValue(transientError);
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -198,7 +260,7 @@ describe('POST /api/stripe/checkout', () => {
   });
 
   it('does not retry permanent Stripe errors', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
     const permanentError = Object.assign(new Error('Invalid price ID'), {
       name: 'StripeInvalidRequestError',
@@ -208,7 +270,6 @@ describe('POST /api/stripe/checkout', () => {
 
     mockCreateCheckoutSession.mockRejectedValue(permanentError);
 
-    const { POST } = await import('@/app/api/stripe/checkout/route');
     const request = new NextRequest('http://localhost/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

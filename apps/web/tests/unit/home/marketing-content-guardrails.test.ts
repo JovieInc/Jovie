@@ -8,6 +8,24 @@ import {
 } from '@/features/home/home-surface-seed';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
+
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();

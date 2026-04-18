@@ -23,12 +23,19 @@ vi.mock('sonner', () => ({
 }));
 
 // Mock Sentry (used by handleMutationError)
-vi.mock('@sentry/nextjs', () => ({
-  getClient: vi.fn(() => undefined),
-  captureException: vi.fn(),
-  addBreadcrumb: vi.fn(),
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+  return {
+    ...actual,
+    getClient: vi.fn(() => undefined),
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(() => ({})),
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  };
+});
 
 // Import the mocked modules for assertions
 import { toast } from 'sonner';

@@ -17,12 +17,8 @@ export default defineConfig({
     ],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        isolate: true,
-        singleFork: false,
-      },
-    },
+    isolate: true,
+    singleFork: false,
     maxWorkers: process.env.CI ? 2 : undefined,
     minWorkers: 1,
     testTimeout: 10000,

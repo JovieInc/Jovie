@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockGetCachedAuth,
   mockGetDashboardData,
+  mockGetDashboardShellData,
   mockRedirect,
   mockRevalidateTag,
   mockRevalidatePath,
@@ -27,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetDashboardData: vi.fn(),
+  mockGetDashboardShellData: vi.fn(),
   mockRedirect: vi.fn(),
   mockRevalidateTag: vi.fn(),
   mockRevalidatePath: vi.fn(),
@@ -57,6 +59,7 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardData: mockGetDashboardData,
+  getDashboardShellData: mockGetDashboardShellData,
 }));
 
 vi.mock('next/cache', () => ({
@@ -81,6 +84,15 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema/content', () => ({
   discogReleases: { id: 'id' },
+  discogRecordings: {
+    id: 'recordingId',
+    creatorProfileId: 'creatorProfileId',
+    isrc: 'isrc',
+  },
+  discogReleaseTracks: {
+    releaseId: 'releaseId',
+    recordingId: 'recordingId',
+  },
 }));
 
 vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
@@ -195,6 +207,8 @@ vi.mock('@/lib/env-public', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
+  inArray: vi.fn((column: unknown, values: unknown[]) => [column, values]),
+  isNotNull: vi.fn((value: unknown) => value),
   ne: vi.fn((a: unknown, b: unknown) => [a, b]),
 }));
 
@@ -248,19 +262,36 @@ function makeRelease(overrides: Record<string, unknown> = {}) {
 
 /** Set up a chain mock for db.select().from().where().limit() */
 function setupDbSelectChain(result: unknown[]) {
+  const resolved = Promise.resolve(result);
   mockDbSelect.mockReturnValueOnce({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue(result),
+        then: resolved.then.bind(resolved),
+        catch: resolved.catch.bind(resolved),
+        finally: resolved.finally.bind(resolved),
       }),
     }),
   });
 }
 
-/** Set up a chain mock for db.delete().where() */
-function setupDbDeleteChain() {
-  mockDbDelete.mockReturnValue({
-    where: vi.fn().mockResolvedValue(undefined),
+function setupDbSelectJoinChain(result: unknown[]) {
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(result),
+        }),
+      }),
+    }),
+  });
+}
+
+function setupDbUpdateChain() {
+  mockDbUpdate.mockReturnValue({
+    set: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
   });
 }
 
@@ -287,6 +318,7 @@ describe('@critical releases/actions.ts — publish/status operations', () => {
     mockDbDelete.mockReset();
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
+    mockGetDashboardShellData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
       throw new Error(`NEXT_REDIRECT:${url}`);
     });
@@ -304,6 +336,7 @@ describe('@critical releases/actions.ts — publish/status operations', () => {
       setupDbSelectChain([
         {
           id: 'match_001',
+          providerId: 'apple_music',
           externalArtistId: 'am_artist_1',
           status: 'confirmed',
         },
@@ -322,6 +355,7 @@ describe('@critical releases/actions.ts — publish/status operations', () => {
       expect(mockProcessReleaseEnrichmentJobStandalone).toHaveBeenCalledWith(
         expect.objectContaining({
           creatorProfileId: MOCK_PROFILE.id,
+          matchId: 'match_001',
           providerId: 'apple_music',
         })
       );
@@ -521,7 +555,8 @@ describe('@critical releases/actions.ts — publish/status operations', () => {
 
     it('deleteRelease invalidates tag and path', async () => {
       mockGetReleaseById.mockResolvedValue(makeRelease());
-      setupDbDeleteChain();
+      setupDbSelectJoinChain([]);
+      setupDbUpdateChain();
 
       const { deleteRelease } = await import(
         '@/app/app/(shell)/dashboard/releases/actions'
@@ -533,6 +568,7 @@ describe('@critical releases/actions.ts — publish/status operations', () => {
         'max'
       );
       expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockDbUpdate).toHaveBeenCalled();
     });
   });
 });

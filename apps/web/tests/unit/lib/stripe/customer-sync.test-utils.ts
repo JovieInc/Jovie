@@ -7,14 +7,7 @@
 import { vi } from 'vitest';
 
 // Hoisted mocks — available inside vi.mock() factory functions in test files
-export const {
-  mockDbSelect,
-  mockCaptureCriticalError,
-  mockCaptureWarning,
-  mockUsersTable,
-  mockBillingAuditLog,
-  mockDb,
-} = vi.hoisted(() => {
+const hoisted = vi.hoisted(() => {
   const _mockDbSelect = vi.fn();
   return {
     mockDbSelect: _mockDbSelect,
@@ -38,6 +31,13 @@ export const {
     mockDb: { select: _mockDbSelect },
   };
 });
+
+export const mockDbSelect = hoisted.mockDbSelect;
+export const mockCaptureCriticalError = hoisted.mockCaptureCriticalError;
+export const mockCaptureWarning = hoisted.mockCaptureWarning;
+export const mockUsersTable = hoisted.mockUsersTable;
+export const mockBillingAuditLog = hoisted.mockBillingAuditLog;
+export const mockDb = hoisted.mockDb;
 
 // Helper to create mock DB query chain
 export function createMockDbQuery(resolvedValue: unknown[]) {

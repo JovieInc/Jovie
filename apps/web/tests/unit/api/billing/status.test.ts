@@ -4,8 +4,8 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
 const mockGetRedis = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockAuth,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
@@ -16,19 +16,30 @@ vi.mock('@/lib/redis', () => ({
   getRedis: mockGetRedis,
 }));
 
-vi.mock('@sentry/nextjs', () => ({
-  captureException: vi.fn(),
-  getClient: vi.fn().mockReturnValue(null),
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+  return {
+    ...actual,
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    getClient: vi.fn().mockReturnValue(null),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
-const routeModulePromise = import('@/app/api/billing/status/route');
+async function loadRouteModule() {
+  return import('@/app/api/billing/status/route');
+}
 
 describe('GET /api/billing/status', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     mockGetRedis.mockReturnValue(null);
   });
@@ -36,7 +47,7 @@ describe('GET /api/billing/status', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -56,7 +67,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -74,7 +85,7 @@ describe('GET /api/billing/status', () => {
       error: 'database connection failed',
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -106,7 +117,7 @@ describe('GET /api/billing/status', () => {
     };
     mockGetRedis.mockReturnValue(mockRedis);
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -126,7 +137,7 @@ describe('GET /api/billing/status', () => {
       data: null,
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -141,7 +152,7 @@ describe('GET /api/billing/status', () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockRejectedValue(new Error('Database error'));
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -166,7 +177,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -192,7 +203,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 
@@ -212,7 +223,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
 
     expect(response.headers.get('Cache-Control')).toBe(
@@ -238,7 +249,7 @@ describe('GET /api/billing/status', () => {
     };
     mockGetRedis.mockReturnValue(mockRedis);
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     await GET();
 
     expect(mockRedis.set).toHaveBeenCalledWith(
@@ -251,7 +262,7 @@ describe('GET /api/billing/status', () => {
   it('sets no-store cache header on 401', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
 
     expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -264,7 +275,7 @@ describe('GET /api/billing/status', () => {
       error: 'timeout',
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
 
     expect(response.status).toBe(503);
@@ -288,7 +299,7 @@ describe('GET /api/billing/status', () => {
       },
     });
 
-    const { GET } = await routeModulePromise;
+    const { GET } = await loadRouteModule();
     const response = await GET();
     const data = await response.json();
 

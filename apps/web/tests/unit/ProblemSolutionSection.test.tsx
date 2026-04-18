@@ -49,6 +49,7 @@ describe('ProblemSolutionSection', () => {
     const ctaButton = screen.getByRole('link', {
       name: /Request Early Access/i,
     });
+    ctaButton.addEventListener('click', event => event.preventDefault());
     fireEvent.click(ctaButton);
 
     expect(track).toHaveBeenCalledWith('claim_handle_click', {

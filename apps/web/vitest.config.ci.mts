@@ -49,14 +49,15 @@ export default defineConfig({
         '.next/**',
         'dist/**',
       ],
-      // Coverage ratchet: prevents coverage from DECREASING on main branch.
-      // Calibrate by running: doppler run -- pnpm vitest run --config=vitest.config.ci.mts --coverage
-      // Then set thresholds 1% below current values.
-      // These are placeholder zeros — calibrate before enforcing.
+      // Coverage ratchet: prevents coverage from decreasing on main.
+      // Baseline from latest generated coverage report:
+      // branches 51.16%, functions 56.17%, lines 59.77%.
+      // Keep thresholds 1 point below the measured baseline so follow-up work
+      // can ratchet upward without blocking on tiny fluctuations.
       thresholds: {
-        lines: 0,
-        functions: 0,
-        branches: 0,
+        lines: 58,
+        functions: 55,
+        branches: 50,
       },
     },
     // Test timeout - 5s safety net (tests target <200ms)

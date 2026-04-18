@@ -1,5 +1,14 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 const mockSetTheme = vi.fn();
 
@@ -48,10 +57,25 @@ function renderToolbar(
 }
 
 describe('DevToolbar', () => {
+  const originalLocation = globalThis.location;
+  const mockReload = vi.fn();
+
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'location', {
+      value: {
+        ...originalLocation,
+        reload: mockReload,
+      },
+      writable: true,
+      configurable: true,
+    });
+  });
+
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     mockSetTheme.mockClear();
+    mockReload.mockReset();
 
     // Mock clipboard API
     Object.assign(navigator, {
@@ -64,6 +88,14 @@ describe('DevToolbar', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+  });
+
+  afterAll(() => {
+    Object.defineProperty(globalThis, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
   });
 
   // ─── Show/Hide ───────────────────────────────────────────────

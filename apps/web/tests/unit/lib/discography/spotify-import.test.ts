@@ -11,12 +11,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock external dependencies before imports
-vi.mock('@sentry/nextjs', () => ({
-  captureException: vi.fn(),
-  captureMessage: vi.fn(),
-  getClient: vi.fn(() => undefined),
-  startSpan: vi.fn((_, callback) => callback({ setAttribute: vi.fn() })),
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+
+  return {
+    ...actual,
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(),
+    getClient: vi.fn(() => undefined),
+    startSpan: vi.fn((_, callback) => callback({ setAttribute: vi.fn() })),
+  };
+});
 
 vi.mock('@/lib/db', () => ({
   db: {

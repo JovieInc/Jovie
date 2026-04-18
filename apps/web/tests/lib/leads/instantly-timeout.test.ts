@@ -29,10 +29,6 @@ describe('Instantly push timeout', () => {
 
     // Dynamic import to get fresh module after global mock
     vi.resetModules();
-    vi.mock('server-only', () => ({}));
-    vi.mock('@/lib/leads/pipeline-logger', () => ({
-      pipelineLog: mockPipelineLog,
-    }));
 
     const { pushLeadToInstantly } = await import('@/lib/leads/instantly');
 

@@ -16,20 +16,7 @@ export async function getPost() {
   return mod.POST;
 }
 
-export const {
-  mockConstructEvent,
-  mockRetrieve,
-  mockUpdateBilling,
-  mockGetPlanFromPriceId,
-  mockDbInsert,
-  mockDbSelect,
-  mockDbUpdate,
-  mockGetHandler,
-  mockGetStripeObjectId,
-  mockStripeTimestampToDate,
-  mockHandlerHandle,
-  mockCaptureCriticalError,
-} = vi.hoisted(() => {
+const hoisted = vi.hoisted(() => {
   const mockGetPlan = vi.fn<(priceId: string) => string | null>(
     () => 'standard'
   );
@@ -91,6 +78,19 @@ export const {
     mockCaptureCriticalError: vi.fn(),
   };
 });
+
+export const mockConstructEvent = hoisted.mockConstructEvent;
+export const mockRetrieve = hoisted.mockRetrieve;
+export const mockUpdateBilling = hoisted.mockUpdateBilling;
+export const mockGetPlanFromPriceId = hoisted.mockGetPlanFromPriceId;
+export const mockDbInsert = hoisted.mockDbInsert;
+export const mockDbSelect = hoisted.mockDbSelect;
+export const mockDbUpdate = hoisted.mockDbUpdate;
+export const mockGetHandler = hoisted.mockGetHandler;
+export const mockGetStripeObjectId = hoisted.mockGetStripeObjectId;
+export const mockStripeTimestampToDate = hoisted.mockStripeTimestampToDate;
+export const mockHandlerHandle = hoisted.mockHandlerHandle;
+export const mockCaptureCriticalError = hoisted.mockCaptureCriticalError;
 
 // Set up all mocks
 vi.mock('@/lib/stripe/client', () => ({

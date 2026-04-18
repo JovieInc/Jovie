@@ -107,7 +107,7 @@
     "tsx": "^4.21.0",
     "turbo": "^2.8.20",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.1"
+    "vitest": "4.1.4"
   },
   "lint-staged": {
     "apps/web/drizzle/migrations/**/*.{sql,ts}": [

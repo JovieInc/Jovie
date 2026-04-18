@@ -73,7 +73,8 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  redis: null, // Disable Redis for testing
+  redis: null,
+  getRedis: vi.fn(() => null), // Disable Redis for testing
 }));
 
 describe('Analytics Tracking Integration', () => {
@@ -214,10 +215,10 @@ describe('Analytics Tracking Integration', () => {
   });
 
   describe('Query Timeouts', () => {
-    it('should apply dashboard timeout (20s)', async () => {
+    it('should apply dashboard timeout (8s)', async () => {
       const { QUERY_TIMEOUTS } = await import('@/lib/db/query-timeout');
 
-      expect(QUERY_TIMEOUTS.dashboard).toBe(20000);
+      expect(QUERY_TIMEOUTS.dashboard).toBe(8000);
     });
 
     it('should apply API timeout (5s)', async () => {

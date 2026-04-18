@@ -2,15 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { STATSIG_GATE_KEYS } from '@/lib/feature-flags/shared';
 
 // Mock statsig-node before importing the module under test
-vi.mock('statsig-node', () => ({
-  default: {
-    initialize: vi.fn(),
-    getFeatureGateSync: vi.fn(() => ({
-      value: false,
-      evaluationDetails: { reason: 'Unrecognized' },
-    })),
-  },
-}));
+vi.mock(
+  'statsig-node',
+  () => ({
+    default: {
+      initialize: vi.fn(),
+      getFeatureGateSync: vi.fn(() => ({
+        value: false,
+        evaluationDetails: { reason: 'Unrecognized' },
+      })),
+    },
+  }),
+  { virtual: true }
+);
 
 // Mock env to control STATSIG_SERVER_SECRET
 vi.mock('@/lib/env-server', () => ({
@@ -18,6 +22,12 @@ vi.mock('@/lib/env-server', () => ({
     STATSIG_SERVER_SECRET: undefined,
     VERCEL_ENV: undefined,
     NODE_ENV: 'test',
+  },
+}));
+
+vi.mock('@/lib/env-public', () => ({
+  publicEnv: {
+    NEXT_PUBLIC_E2E_MODE: undefined,
   },
 }));
 

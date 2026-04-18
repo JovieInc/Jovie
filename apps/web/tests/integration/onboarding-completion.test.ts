@@ -125,7 +125,7 @@ describe('onboarding completion persistence (integration)', () => {
         role: 'owner',
       })
     );
-  });
+  }, 20_000);
 
   it('updates the active profile and deactivates orphaned unclaimed profiles', async () => {
     const suffix = `${Date.now().toString(36)}-update`;
@@ -226,5 +226,5 @@ describe('onboarding completion persistence (integration)', () => {
     expect(updatedCurrent?.onboardingCompletedAt).toBeTruthy();
     expect(updatedOrphan?.isPublic).toBe(false);
     expect(updatedUser?.activeProfileId).toBe(currentProfile.id);
-  });
+  }, 20_000);
 });

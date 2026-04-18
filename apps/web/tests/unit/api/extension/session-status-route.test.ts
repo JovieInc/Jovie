@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetOptionalAuth = vi.hoisted(() => vi.fn());
 const mockGetSessionContext = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getOptionalAuth: mockGetOptionalAuth,
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -12,15 +12,19 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 
 describe('GET /api/extension/session/status', () => {
+  let GET: typeof import('@/app/api/extension/session/status/route').GET;
+
+  beforeAll(async () => {
+    ({ GET } = await import('@/app/api/extension/session/status/route'));
+  });
+
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
   });
 
   it('returns signed out when no Clerk session exists', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+    mockGetOptionalAuth.mockResolvedValue({ userId: null });
 
-    const { GET } = await import('@/app/api/extension/session/status/route');
     const response = await GET(
       new Request('http://localhost/api/extension/session/status')
     );
@@ -34,7 +38,7 @@ describe('GET /api/extension/session/status', () => {
   });
 
   it('returns the profile summary for a signed-in session', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_clerk_1' });
+    mockGetOptionalAuth.mockResolvedValue({ userId: 'user_clerk_1' });
     mockGetSessionContext.mockResolvedValue({
       profile: {
         id: 'profile_1',
@@ -45,7 +49,6 @@ describe('GET /api/extension/session/status', () => {
       },
     });
 
-    const { GET } = await import('@/app/api/extension/session/status/route');
     const response = await GET(
       new Request('http://localhost/api/extension/session/status')
     );

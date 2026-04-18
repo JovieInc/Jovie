@@ -88,6 +88,10 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'creatorProfileId',
     isrc: 'isrc',
   },
+  discogReleaseTracks: {
+    releaseId: 'releaseId',
+    recordingId: 'recordingId',
+  },
   discogTracks: { id: 'trackId', isrc: 'isrc' },
 }));
 
@@ -197,6 +201,8 @@ vi.mock('@/lib/env-public', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
+  inArray: vi.fn((column: unknown, values: unknown[]) => [column, values]),
+  isNotNull: vi.fn((value: unknown) => value),
   ne: vi.fn((a: unknown, b: unknown) => [a, b]),
 }));
 
@@ -303,10 +309,15 @@ function setupDbUpdateChain() {
   });
 }
 
-/** Set up a chain mock for db.delete().where() */
-function setupDbDeleteChain() {
-  mockDbDelete.mockReturnValue({
-    where: vi.fn().mockResolvedValue(undefined),
+function setupDbSelectJoinChain(result: unknown[]) {
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(result),
+        }),
+      }),
+    }),
   });
 }
 
@@ -576,7 +587,8 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
   describe('deleteRelease', () => {
     it('deletes a release owned by the user', async () => {
       mockGetReleaseById.mockResolvedValue(makeRelease());
-      setupDbDeleteChain();
+      setupDbSelectJoinChain([]);
+      setupDbUpdateChain();
 
       const { deleteRelease } = await import(
         '@/app/app/(shell)/dashboard/releases/actions'
@@ -584,7 +596,7 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
       const result = await deleteRelease({ releaseId: 'rel_001' });
 
       expect(result.success).toBe(true);
-      expect(mockDbDelete).toHaveBeenCalled();
+      expect(mockDbUpdate).toHaveBeenCalled();
       expect(mockRevalidateTag).toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
     });

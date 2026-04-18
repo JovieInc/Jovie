@@ -57,6 +57,7 @@ describe('SupportPage', () => {
     const contactButton = screen.getByRole('link', {
       name: /send email to support team/i,
     });
+    contactButton.addEventListener('click', event => event.preventDefault());
     fireEvent.click(contactButton);
 
     expect(track).toHaveBeenCalledWith('Support Email Clicked', {

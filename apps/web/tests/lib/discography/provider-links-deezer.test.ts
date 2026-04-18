@@ -9,10 +9,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Sentry before imports
-vi.mock('@sentry/nextjs', () => ({
-  getClient: vi.fn(() => undefined),
-  addBreadcrumb: vi.fn(),
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+  return {
+    ...actual,
+    getClient: vi.fn(() => undefined),
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(() => ({})),
+  };
+});
 
 // Mock musicfetch to control availability in resolveProviderLinks
 const mockIsMusicfetchAvailable = vi.fn(() => false);

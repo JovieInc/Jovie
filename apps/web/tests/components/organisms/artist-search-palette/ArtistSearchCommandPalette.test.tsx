@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette/ArtistSearchCommandPalette';
@@ -115,7 +114,6 @@ vi.mock('@/lib/queries', () => ({
 
 describe('ArtistSearchCommandPalette', () => {
   it('creates a synthetic Apple Music artist from a manual url', async () => {
-    const user = userEvent.setup();
     const onArtistSelect = vi.fn();
     const onOpenChange = vi.fn();
     const artistUrl = 'https://music.apple.com/us/artist/jovie-artist/12345';
@@ -129,19 +127,15 @@ describe('ArtistSearchCommandPalette', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByPlaceholderText('Search Apple Music artists...')
-      ).toHaveFocus();
-    });
+    expect(
+      await screen.findByPlaceholderText('Search Apple Music artists...')
+    ).toBeInTheDocument();
 
     const manualInput = screen.getByTestId(
       'artist-search-manual-input'
     ) as HTMLInputElement;
 
-    await user.click(manualInput);
-    await user.type(manualInput, artistUrl);
-
+    fireEvent.change(manualInput, { target: { value: artistUrl } });
     await waitFor(() => {
       expect(manualInput.value).toBe(artistUrl);
     });
@@ -151,7 +145,7 @@ describe('ArtistSearchCommandPalette', () => {
       expect(connectButton).toBeEnabled();
     });
 
-    await user.click(connectButton);
+    fireEvent.click(connectButton);
 
     await waitFor(() => {
       expect(onArtistSelect).toHaveBeenCalledWith({

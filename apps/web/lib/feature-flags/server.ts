@@ -31,7 +31,10 @@ async function getStatsigClient(): Promise<StatsigClient | null> {
   }
 
   try {
-    const statsigModule = await import('statsig-node');
+    // Statsig is optional in some local/test environments; keep the specifier
+    // non-literal so Vite/Vitest do not pre-resolve it before runtime fallback.
+    const optionalModuleName = 'statsig-node';
+    const statsigModule = await import(optionalModuleName);
     statsigClient = statsigModule.default;
     return statsigClient;
   } catch (error) {

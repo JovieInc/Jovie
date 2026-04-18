@@ -2,6 +2,24 @@ import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomeAdaptiveProfileStory } from '@/features/home/HomeAdaptiveProfileStory';
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
+
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();

@@ -6,14 +6,7 @@ import { vi } from 'vitest';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 
 // Hoisted mocks - must be defined before vi.mock calls
-export const {
-  mockGetUserIdFromStripeCustomer,
-  mockInvalidateBillingCache,
-  mockUpdateUserBillingStatus,
-  mockGetPlanFromPriceId,
-  mockCaptureCriticalError,
-  mockLogFallback,
-} = vi.hoisted(() => ({
+const hoisted = vi.hoisted(() => ({
   mockGetUserIdFromStripeCustomer: vi.fn(),
   mockInvalidateBillingCache: vi.fn(),
   mockUpdateUserBillingStatus: vi.fn(),
@@ -21,6 +14,14 @@ export const {
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
 }));
+
+export const mockGetUserIdFromStripeCustomer =
+  hoisted.mockGetUserIdFromStripeCustomer;
+export const mockInvalidateBillingCache = hoisted.mockInvalidateBillingCache;
+export const mockUpdateUserBillingStatus = hoisted.mockUpdateUserBillingStatus;
+export const mockGetPlanFromPriceId = hoisted.mockGetPlanFromPriceId;
+export const mockCaptureCriticalError = hoisted.mockCaptureCriticalError;
+export const mockLogFallback = hoisted.mockLogFallback;
 
 // Setup mocks
 vi.mock('@/lib/stripe/webhooks/utils', () => ({

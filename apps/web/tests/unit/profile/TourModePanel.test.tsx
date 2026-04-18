@@ -129,6 +129,7 @@ describe('TourModePanel', () => {
     const ticketLink = screen.getByRole('link', { name: 'Tickets' });
     expect(ticketLink).toHaveAttribute('href', londonDate.ticketUrl);
 
+    ticketLink.addEventListener('click', event => event.preventDefault());
     fireEvent.click(ticketLink);
     expect(ticketClickMock).toHaveBeenCalledTimes(1);
   });

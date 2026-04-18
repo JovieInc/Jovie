@@ -54,9 +54,9 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/coverage-v8": "4.1.4",
     "jsdom": "29.0.2",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.1"
+    "vitest": "4.1.4"
   }
 }

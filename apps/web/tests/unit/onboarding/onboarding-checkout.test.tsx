@@ -1,63 +1,15 @@
-/**
- * OnboardingCheckoutClient Tests
- * @critical — Plan selection and Stripe checkout during onboarding
- *
- * Tests pure logic functions + basic render behavior.
- * The component has many heavy dependencies, so we test the algorithm
- * (formatPrice, getAnnualSavingsPercent) directly and verify key UI states.
- */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Pure logic tests (functions are not exported, so we duplicate the algorithm)
-// ---------------------------------------------------------------------------
-
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
-}
-
-function getAnnualSavingsPercent(
-  monthlyAmount: number,
-  annualAmount: number
-): number {
-  const yearlyAtMonthly = monthlyAmount * 12;
-  return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
-}
-
-describe('@critical OnboardingCheckout — pricing logic', () => {
-  it('formatPrice converts cents to dollar string', () => {
-    expect(formatPrice(3900)).toBe('$39');
-    expect(formatPrice(19900)).toBe('$199');
-  });
-
-  it('formatPrice handles zero', () => {
-    expect(formatPrice(0)).toBe('$0');
-  });
-
-  it('formatPrice handles small amounts', () => {
-    expect(formatPrice(99)).toBe('$1');
-  });
-
-  it('getAnnualSavingsPercent calculates correctly', () => {
-    // $39/mo × 12 = $468/yr. Annual price $390. Savings = (468-390)/468 ≈ 17%
-    expect(getAnnualSavingsPercent(3900, 39000)).toBe(17);
-  });
-
-  it('getAnnualSavingsPercent returns 0 for equal amounts', () => {
-    // $39/mo × 12 = $468/yr. Annual also $468. Savings = 0%
-    expect(getAnnualSavingsPercent(3900, 46800)).toBe(0);
-  });
-
-  it('getAnnualSavingsPercent handles 50% discount', () => {
-    // $100/mo × 12 = $1200/yr. Annual $600. Savings = 50%
-    expect(getAnnualSavingsPercent(10000, 60000)).toBe(50);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Component render tests (mock all heavy dependencies)
-// ---------------------------------------------------------------------------
+const { clearPlanIntentMock, fetchMock, hrefState, trackMock } = vi.hoisted(
+  () => ({
+    clearPlanIntentMock: vi.fn(),
+    fetchMock: vi.fn(),
+    hrefState: { current: 'http://localhost/onboarding/checkout' },
+    trackMock: vi.fn(),
+  })
+);
 
 vi.mock('@jovie/ui', () => ({
   Button: ({
@@ -67,66 +19,43 @@ vi.mock('@jovie/ui', () => ({
     readonly children: React.ReactNode;
     readonly [key: string]: unknown;
   }) => (
-    <button type='button' data-testid='button' {...props}>
+    <button type='button' {...props}>
       {children}
     </button>
   ),
 }));
 
-vi.mock('lucide-react', () => ({
-  BadgeCheck: () => <span data-testid='icon-badge' />,
-  BarChart3: () => <span data-testid='icon-chart' />,
-  Bell: () => <span data-testid='icon-bell' />,
-  Sparkles: () => <span data-testid='icon-sparkles' />,
-}));
-
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () =>
+    new URLSearchParams('returnTo=%2Fapp%2Fdashboard%2Fearnings'),
 }));
 
 vi.mock('@/components/molecules/Avatar/Avatar', () => ({
-  Avatar: () => <div data-testid='avatar' />,
+  Avatar: ({ alt }: { readonly alt: string }) => (
+    <div role='img' aria-label={alt} />
+  ),
 }));
 
 vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
   ContentSurfaceCard: ({
     children,
+    ...props
   }: {
     readonly children: React.ReactNode;
-  }) => <div data-testid='surface-card'>{children}</div>,
+    readonly [key: string]: unknown;
+  }) => <div {...props}>{children}</div>,
 }));
 
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-
-vi.mock('@/lib/auth/constants', () => ({
-  AUTH_SURFACE: {
-    pillOption: 'pill',
-    pillOptionActive: 'pill-active',
-  },
-  FORM_LAYOUT: {
-    formContainer: 'form',
-    headerSection: 'header',
-    title: 'title',
-    hint: 'hint',
-  },
-}));
+vi.mock('@/lib/analytics', () => ({ track: trackMock }));
 
 vi.mock('@/lib/auth/plan-intent', () => ({
-  clearPlanIntent: vi.fn(),
+  clearPlanIntent: clearPlanIntentMock,
 }));
 
 vi.mock('@/lib/entitlements/registry', () => ({
   getEntitlements: () => ({
     marketing: { displayName: 'Pro', tagline: 'For serious artists' },
   }),
-}));
-
-vi.mock('@/lib/onboarding/return-to', () => ({
-  normalizeOnboardingReturnTo: (v: string) => v,
-}));
-
-vi.mock('@/lib/utils', () => ({
-  cn: (...args: string[]) => args.filter(Boolean).join(' '),
 }));
 
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
@@ -144,39 +73,138 @@ const defaultProps = {
   isDefaultUpsell: false,
 };
 
-describe('@critical OnboardingCheckoutClient — render', () => {
-  it('renders display name', () => {
-    render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(screen.getByText('Tim White')).toBeDefined();
+describe('OnboardingCheckoutClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock.mockReset();
+    hrefState.current = 'http://localhost/onboarding/checkout';
+    vi.stubGlobal('fetch', fetchMock);
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: {
+        get href() {
+          return hrefState.current;
+        },
+        set href(value: string) {
+          hrefState.current = value;
+        },
+      },
+    });
   });
 
-  it('renders username with @ prefix', () => {
+  it('renders the live profile preview with the monthly price by default', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(screen.getByText('@timwhite')).toBeDefined();
-  });
 
-  it('renders spotify followers when present', () => {
-    render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(screen.getByText('5,000 Spotify followers')).toBeDefined();
-  });
-
-  it('hides followers section when null', () => {
-    render(
-      <OnboardingCheckoutClient {...defaultProps} spotifyFollowers={null} />
+    expect(
+      screen.getByRole('heading', { name: 'Upgrade to Pro' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(screen.getByText('@timwhite')).toBeInTheDocument();
+    expect(screen.getByText('5,000 Spotify followers')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Pro' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('$39')).toBeInTheDocument();
+    expect(screen.getByText('/mo')).toBeInTheDocument();
+    expect(trackMock).toHaveBeenCalledWith(
+      'onboarding_checkout_shown',
+      expect.objectContaining({
+        plan: 'pro',
+        has_spotify: true,
+        has_annual: true,
+        intent_source: 'paid_intent',
+      })
     );
-    expect(screen.queryByText('Spotify followers')).toBeNull();
   });
 
-  it('renders plan highlight features', () => {
+  it('updates the displayed price when annual billing is selected', async () => {
+    const user = userEvent.setup();
     render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(screen.getByText('Release notifications')).toBeDefined();
-    expect(screen.getByText('90-day analytics')).toBeDefined();
-    expect(screen.getByText('Verified badge')).toBeDefined();
+
+    await user.click(screen.getByRole('radio', { name: /annual/i }));
+
+    expect(screen.getByText('$390')).toBeInTheDocument();
+    expect(screen.getByText('/yr')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /annual/i })).toBeChecked();
   });
 
-  it('renders billing interval selector when annual price exists', () => {
+  it('starts checkout with the selected annual price id and onboarding return target', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ url: 'https://checkout.stripe.com/session_123' }),
+    });
+
     render(<OnboardingCheckoutClient {...defaultProps} />);
-    expect(screen.getByText('Monthly')).toBeDefined();
-    expect(screen.getByText(/Annual/)).toBeDefined();
+
+    await user.click(screen.getByRole('radio', { name: /annual/i }));
+    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/stripe/checkout',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId: 'price_annual',
+            returnTo: '/app/chat?from=onboarding&panel=profile',
+            source: 'onboarding',
+          }),
+        })
+      );
+    });
+
+    expect(trackMock).toHaveBeenCalledWith(
+      'onboarding_checkout_initiated',
+      expect.objectContaining({
+        plan: 'pro',
+        price_id: 'price_annual',
+        interval: 'year',
+        intent_source: 'paid_intent',
+      })
+    );
+    expect(hrefState.current).toBe('https://checkout.stripe.com/session_123');
+  });
+
+  it('shows an alert when checkout fails and restores the CTA state', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Checkout is temporarily unavailable.' }),
+    });
+
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+
+    expect(
+      await screen.findByRole('alert', {
+        name: '',
+      })
+    ).toHaveTextContent('Checkout is temporarily unavailable.');
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Pro' })
+    ).toBeEnabled();
+    expect(hrefState.current).toBe('http://localhost/onboarding/checkout');
+  });
+
+  it('clears paid intent and redirects back to the normalized free path when skipped', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Continue with Free' })
+    );
+
+    expect(clearPlanIntentMock).toHaveBeenCalled();
+    expect(trackMock).toHaveBeenCalledWith(
+      'onboarding_checkout_skipped',
+      expect.objectContaining({
+        plan: 'pro',
+        intent_source: 'paid_intent',
+      })
+    );
+    expect(hrefState.current).toBe('/app/chat?from=onboarding&panel=profile');
   });
 });

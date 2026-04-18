@@ -11,6 +11,23 @@ import { ARTIST_PROFILE_SECTION_ORDER } from '@/data/artistProfilePageOrder';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+  return {
+    ...actual,
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+    }),
+    usePathname: () => '/artist-profiles',
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
+
 function getEnabledSectionTestIds(flags: ArtistProfileSectionFlags) {
   if (!flags.FULL_PAGE) {
     return ARTIST_PROFILE_SECTION_ORDER.filter(section =>
