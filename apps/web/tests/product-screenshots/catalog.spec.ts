@@ -212,8 +212,9 @@ async function prepareScenario(
   const isOpenFirstRelease =
     scenario.interaction === 'open-first-release' ||
     scenario.interaction === 'open-first-release-dsps';
-  const initialWaitSelector =
-    isOpenFirstRelease ? '[data-testid="releases-matrix"]' : scenario.waitFor;
+  const initialWaitSelector = isOpenFirstRelease
+    ? '[data-testid="releases-matrix"]'
+    : scenario.waitFor;
   const initialWait = page.locator(initialWaitSelector).first();
   await expect(initialWait).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
 
