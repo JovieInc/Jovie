@@ -15,6 +15,7 @@ export interface DrawerInspectorCardProps {
   readonly surfaceClassName?: string;
   readonly lazyMount?: boolean;
   readonly 'data-testid'?: string;
+  readonly headingTestId?: string;
 }
 
 export function DrawerInspectorCard({
@@ -30,6 +31,7 @@ export function DrawerInspectorCard({
   surfaceClassName,
   lazyMount,
   'data-testid': testId,
+  headingTestId,
 }: DrawerInspectorCardProps) {
   return (
     <DrawerSection
@@ -42,6 +44,7 @@ export function DrawerInspectorCard({
       surfaceClassName={surfaceClassName}
       lazyMount={lazyMount}
       testId={testId}
+      headingTestId={headingTestId}
     >
       <DrawerInspectorGrid
         labelWidth={labelWidth}

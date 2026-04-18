@@ -398,6 +398,7 @@ test.describe('Releases dashboard', () => {
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
     expect(smartLinkHandle).toBeTruthy();
 
+    await sidebar.getByRole('tab', { name: 'DSPs' }).click();
     const smartLinkTokens = sidebar.locator(
       '[title^="http://"], [title^="https://"]'
     );

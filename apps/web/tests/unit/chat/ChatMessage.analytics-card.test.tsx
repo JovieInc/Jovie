@@ -25,6 +25,12 @@ vi.mock('@jovie/ui', () => ({
   SimpleTooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('next/dynamic', () => ({
+  default:
+    () =>
+    ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
 vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
   ChatMarkdown: ({ content }: { content: string }) => <div>{content}</div>,
 }));
@@ -47,11 +53,12 @@ describe('ChatMessage analytics cards', () => {
     const parts = [
       { type: 'text', text: 'Here are the strongest signals I see.' },
       {
-        type: 'tool-invocation',
-        toolInvocationId: 'tool-1',
+        type: 'dynamic-tool',
         toolName: 'showTopInsights',
-        state: 'result',
-        result: {
+        toolCallId: 'tool-1',
+        state: 'output-available',
+        input: { artistId: 'artist-1' },
+        output: {
           success: true,
           title: 'Top signals',
           totalActive: 2,
@@ -74,10 +81,6 @@ describe('ChatMessage analytics cards', () => {
             },
           ],
         },
-        toolInvocation: {
-          toolName: 'showTopInsights',
-          state: 'result',
-        },
       },
     ] as ComponentProps<typeof ChatMessage>['parts'];
     const messageProps = {
@@ -93,5 +96,30 @@ describe('ChatMessage analytics cards', () => {
     expect(
       screen.getByText('Subscribers are picking up in Chicago')
     ).toBeTruthy();
+  });
+
+  it('renders a compact error row for unknown failed tools', () => {
+    const messageProps = {
+      id: 'assistant-3',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'unknownTool',
+          toolCallId: 'tool-unknown',
+          state: 'output-error' as const,
+          input: { value: 1 },
+          errorText: 'Something broke',
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    const statusRow = screen.getByTestId('tool-status-row');
+    expect(statusRow.getAttribute('role')).toBe('alert');
+    expect(statusRow.getAttribute('data-tool-name')).toBe('unknownTool');
+    expect(screen.getByText('Unknown Tool Failed')).toBeTruthy();
+    expect(screen.getByText('Something broke')).toBeTruthy();
   });
 });

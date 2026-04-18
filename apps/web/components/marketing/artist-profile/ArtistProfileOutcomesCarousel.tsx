@@ -343,7 +343,7 @@ function DriveStreamsProof({
   return (
     <div className='max-w-[20rem] rounded-[1.25rem] border border-white/7 bg-black/26 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:p-4'>
       <div className='border-b border-white/6 pb-3.5'>
-        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/68'>
           {proof.floatingCardLabel}
         </p>
         <p className='mt-2.5 text-[1.15rem] font-semibold leading-[1.06] tracking-[-0.04em] text-white'>
@@ -383,21 +383,21 @@ function SellOutProof({
         <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
           {proof.drawerTitle}
         </p>
-        <p className='mt-1 text-[11px] text-white/44'>{proof.drawerSubtitle}</p>
+        <p className='mt-1 text-[11px] text-white/68'>{proof.drawerSubtitle}</p>
         <div className='mt-3 divide-y divide-white/6'>
           {proof.drawerRows.map(row => (
             <div
               key={row.id}
               className='grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2.5 py-2.5'
             >
-              <span className='text-[11px] font-medium tracking-[-0.01em] text-white/52'>
+              <span className='text-[11px] font-medium tracking-[-0.01em] text-white/70'>
                 {row.month} {row.day}
               </span>
               <span className='min-w-0'>
                 <span className='block truncate text-[12.5px] font-semibold text-white'>
                   {row.venue}
                 </span>
-                <span className='block truncate text-[11px] text-white/44'>
+                <span className='block truncate text-[11px] text-white/66'>
                   {row.location}
                 </span>
               </span>
@@ -410,7 +410,7 @@ function SellOutProof({
       </div>
 
       <div className='absolute right-3.5 top-3.5 z-10 w-[11.75rem] rounded-[1.15rem] bg-[#f4f1e8] p-3.5 text-black shadow-[0_20px_42px_rgba(0,0,0,0.3)] sm:right-4 sm:top-4'>
-        <p className='text-[10px] font-semibold tracking-[0.08em] text-black/54'>
+        <p className='text-[10px] font-semibold tracking-[0.08em] text-black/72'>
           {proof.nearbyCardLabel}
         </p>
         <p className='mt-2.5 text-[1.5rem] font-semibold leading-none tracking-[-0.07em]'>
@@ -419,7 +419,7 @@ function SellOutProof({
         <p className='mt-2.5 text-[0.9rem] font-semibold leading-[1.08] tracking-[-0.03em]'>
           {proof.nearbyVenue}
         </p>
-        <p className='mt-1 text-[12px] leading-[1.35] text-black/58'>
+        <p className='mt-1 text-[12px] leading-[1.35] text-black/74'>
           {proof.nearbyLocation}
         </p>
         <span className='mt-3 inline-flex rounded-full bg-black px-2.75 py-1.25 text-[10.5px] font-semibold text-white'>
@@ -448,7 +448,7 @@ function GetPaidProof({
         />
       </div>
       <div className='absolute left-0 bottom-4 rounded-[1.05rem] border border-white/10 bg-black/34 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'>
-        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
+        <p className='text-[11px] font-medium tracking-[-0.01em] text-white/66'>
           {proof.drawerTitle}
         </p>
         <p className='mt-1 text-[12.5px] font-semibold tracking-[-0.03em] text-white'>
@@ -488,7 +488,7 @@ function ShareProof({
       <p className='mt-3.5 font-mono text-[11.5px] font-semibold tracking-[-0.02em] text-black'>
         {proof.url}
       </p>
-      <p className='mt-2 text-[11px] font-medium text-black/56'>
+      <p className='mt-2 text-[11px] font-medium text-black/68'>
         {proof.subtitle}
       </p>
     </div>
