@@ -1005,29 +1005,6 @@ function summarizeResults(results: readonly RouteResult[]) {
   );
 }
 
-export async function settleWithTimeout<T>(
-  operation: Promise<T>,
-  timeoutMs: number
-): Promise<
-  | { readonly timedOut: false; readonly result: T }
-  | { readonly timedOut: true; readonly result?: undefined }
-> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  try {
-    return await Promise.race([
-      operation.then(result => ({ timedOut: false as const, result })),
-      new Promise<{ readonly timedOut: true }>(resolve => {
-        timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
-}
-
 async function writeArtifacts(
   routeCases: readonly RouteCase[],
   results: readonly RouteResult[]
@@ -1124,8 +1101,6 @@ async function main() {
       console.log(`${marker} ${routeCase.path}`);
     }
 
-    await writeArtifacts(routeCases, results);
-
     const summary = summarizeResults(results);
     console.log(
       `Route QA complete. Pass=${summary.pass} Fail=${summary.fail} Blocked=${summary.blocked}`
@@ -1162,6 +1137,8 @@ async function main() {
         );
       }
     }
+
+    await writeArtifacts(routeCases, results);
   }
 
   await flushStandardStreams();

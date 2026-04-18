@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
+  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
