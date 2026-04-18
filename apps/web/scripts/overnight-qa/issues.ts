@@ -51,6 +51,27 @@ interface PlaywrightJsonResult {
   }>;
 }
 
+function isPlaywrightJsonReport(value: unknown): value is PlaywrightJsonReport {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const report = value as Record<string, unknown> & {
+    readonly suites?: unknown;
+  };
+
+  if (Array.isArray(report.suites)) {
+    return true;
+  }
+
+  return Object.keys(report).length === 0;
+}
+
+function parsePlaywrightJsonCandidate(candidate: string) {
+  const parsed = JSON.parse(candidate) as unknown;
+  return isPlaywrightJsonReport(parsed) ? parsed : null;
+}
+
 function sanitizeComponent(value: string) {
   return value
     .trim()
@@ -247,7 +268,10 @@ function parsePlaywrightJsonReport(raw: string): PlaywrightJsonReport {
 
   if (trimmed.startsWith('{')) {
     try {
-      return JSON.parse(trimmed) as PlaywrightJsonReport;
+      const parsed = parsePlaywrightJsonCandidate(trimmed);
+      if (parsed) {
+        return parsed;
+      }
     } catch {
       // Fall through to scanning so we can tolerate trailing noise.
     }
@@ -276,7 +300,10 @@ function parsePlaywrightJsonReport(raw: string): PlaywrightJsonReport {
     }
 
     try {
-      return JSON.parse(candidate) as PlaywrightJsonReport;
+      const parsed = parsePlaywrightJsonCandidate(candidate);
+      if (parsed) {
+        return parsed;
+      }
     } catch {
       // Keep scanning in case the first brace belonged to a log line.
     }

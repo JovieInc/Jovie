@@ -60,4 +60,42 @@ describe('overnight-qa issues', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.summary).toContain('indented json still parsed');
   });
+
+  it('skips unrelated json logs before the Playwright report', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'overnight-qa-issues-'));
+    const reportPath = join(root, 'smoke-public-leading-log.json');
+
+    await writeFile(
+      reportPath,
+      [
+        '{"level":"info","message":"setup started"}',
+        '{"suites":[{"title":"auth.setup.ts","file":"auth.setup.ts","specs":[{"title":"authenticate","file":"auth.setup.ts","tests":[{"results":[{"status":"failed","error":{"message":"real report still parsed"}}]}]}]}]}',
+      ].join('\n'),
+      'utf8'
+    );
+
+    const issues = await parsePlaywrightIssues(PLAYWRIGHT_SUITE, reportPath);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.summary).toContain('real report still parsed');
+  });
+
+  it('parses Playwright reports with unicode escape sequences in messages', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'overnight-qa-issues-'));
+    const reportPath = join(root, 'smoke-public-unicode.json');
+
+    await writeFile(
+      reportPath,
+      [
+        '[dotenv@17.3.1] injecting env (0) from .env.local',
+        '{"suites":[{"title":"auth.setup.ts","file":"auth.setup.ts","specs":[{"title":"authenticate","file":"auth.setup.ts","tests":[{"results":[{"status":"failed","error":{"message":"unicode \\u0022quote\\u0022 still parsed"}}]}]}]}]}',
+      ].join('\n'),
+      'utf8'
+    );
+
+    const issues = await parsePlaywrightIssues(PLAYWRIGHT_SUITE, reportPath);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.summary).toContain('unicode "quote" still parsed');
+  });
 });
