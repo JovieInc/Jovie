@@ -115,6 +115,18 @@ describe('ArtistProfilesPage', () => {
       ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
         ?.screenshotAlt
     ).toContain('contact');
+
+    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
+
+    expect(
+      adaptiveSequence.getByText('Make support one tap away.')
+    ).toBeInTheDocument();
+    expect(
+      adaptiveSequence.getByRole('img', {
+        name: ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'pay')
+          ?.screenshotAlt,
+      })
+    ).toBeInTheDocument();
     expect(screen.queryByText('/listen')).not.toBeInTheDocument();
     expect(screen.queryByText('/tour')).not.toBeInTheDocument();
     expect(screen.queryByText('/pay')).not.toBeInTheDocument();
