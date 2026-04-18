@@ -80,15 +80,15 @@ export function ArtistProfileSocialProof({
       ) : null}
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
-        <article className='mx-auto mt-8 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.012)),#050505] px-6 py-7 shadow-[0_22px_60px_rgba(0,0,0,0.24)] sm:px-8 sm:py-9 lg:px-10 lg:py-10'>
-          <blockquote className='max-w-[50rem] text-pretty text-[clamp(1.45rem,2.7vw,2.35rem)] font-semibold leading-[1.12] tracking-[-0.045em] text-primary-token'>
+        <article className='mx-auto mt-8 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-7 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-9 lg:px-10 lg:py-10'>
+          <blockquote className='max-w-[50rem] text-pretty text-[clamp(1.45rem,2.7vw,2.35rem)] font-semibold leading-[1.12] tracking-[-0.045em] text-black'>
             “{proofData.founderQuote.quote}”
           </blockquote>
           <div className='mt-6 flex flex-col gap-1 text-left'>
-            <p className='text-[14px] font-medium tracking-[-0.02em] text-primary-token'>
+            <p className='text-[14px] font-medium tracking-[-0.02em] text-black'>
               {proofData.founderQuote.name}
             </p>
-            <p className='text-[12px] tracking-[-0.01em] text-tertiary-token'>
+            <p className='text-[12px] tracking-[-0.01em] text-black/56'>
               {proofData.founderQuote.role}
             </p>
           </div>

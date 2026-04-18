@@ -118,6 +118,10 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
       'Jovie analytics showing top-line profile and listen metrics.',
     screenshotWidth: 344,
     screenshotHeight: 540,
+    frameClassName:
+      'aspect-[1.58/1] min-h-[11.5rem] md:aspect-[1.64/1] xl:min-h-[12.5rem]',
+    imageClassName: 'object-top',
+    objectPosition: 'center top',
   },
   {
     id: 'geo-insights',
@@ -128,10 +132,14 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     layoutClassName:
       'xl:col-start-6 xl:row-start-1 xl:col-span-4 xl:row-span-2',
     visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-panel.png',
+    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
     screenshotAlt: 'Jovie geo insights showing the top cities list.',
     screenshotWidth: 344,
     screenshotHeight: 540,
+    frameClassName:
+      'aspect-[1.14/1] min-h-[11.5rem] md:aspect-[1.18/1] xl:min-h-[12.5rem]',
+    imageClassName: 'object-top',
+    objectPosition: 'center top',
   },
   {
     id: 'always-in-sync',

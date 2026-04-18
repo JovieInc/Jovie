@@ -60,10 +60,8 @@ export function ArtistProfileCaptureSection({
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
-  const [activated, setActivated] = useState(reducedMotion);
-  const [phase, setPhase] = useState<CapturePhase>(
-    reducedMotion ? 'done' : 'idle'
-  );
+  const [activated, setActivated] = useState(false);
+  const [phase, setPhase] = useState<CapturePhase>('idle');
 
   useEffect(() => {
     if (reducedMotion) {
@@ -72,10 +70,12 @@ export function ArtistProfileCaptureSection({
       return;
     }
 
+    setActivated(false);
+    setPhase(currentPhase => (currentPhase === 'done' ? 'idle' : currentPhase));
+
     const root = rootRef.current;
     if (!root || globalThis.IntersectionObserver === undefined) {
       setActivated(true);
-      setPhase('typing');
       return;
     }
 
@@ -87,9 +87,6 @@ export function ArtistProfileCaptureSection({
         }
 
         setActivated(true);
-        setPhase(currentPhase =>
-          currentPhase === 'idle' ? 'typing' : currentPhase
-        );
         observer.disconnect();
       },
       {
@@ -105,13 +102,27 @@ export function ArtistProfileCaptureSection({
   }, [reducedMotion]);
 
   useEffect(() => {
+    if (!activated || reducedMotion || phase !== 'idle') {
+      return;
+    }
+
+    const startTypingTimer = globalThis.setTimeout(() => {
+      setPhase('typing');
+    }, 240);
+
+    return () => {
+      globalThis.clearTimeout(startTypingTimer);
+    };
+  }, [activated, phase, reducedMotion]);
+
+  useEffect(() => {
     if (!activated || reducedMotion || phase !== 'typing') {
       return;
     }
 
     const submitTimer = globalThis.setTimeout(() => {
       setPhase('submitting');
-    }, 1200);
+    }, 1680);
 
     return () => {
       globalThis.clearTimeout(submitTimer);
@@ -125,7 +136,7 @@ export function ArtistProfileCaptureSection({
 
     const finishTimer = globalThis.setTimeout(() => {
       setPhase('done');
-    }, 420);
+    }, 520);
 
     return () => {
       globalThis.clearTimeout(finishTimer);
@@ -274,13 +285,15 @@ function CaptureActionPill({
 
   return (
     <div
-      className='w-full max-w-[25rem] rounded-full border border-white/10 bg-white/[0.035] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+      className='w-full max-w-[27rem] rounded-full border border-white/10 bg-white/[0.035] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl'
       aria-live='polite'
     >
       <div
         className={cn(
-          'flex min-h-[3.7rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-300',
-          isDone ? 'justify-center bg-white text-black' : 'gap-2 bg-black/28'
+          'flex min-h-[4rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-300',
+          isDone
+            ? 'justify-center bg-white text-black'
+            : 'gap-2 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]'
         )}
       >
         {isDone ? (
@@ -298,7 +311,7 @@ function CaptureActionPill({
               <Mail className='h-4 w-4' strokeWidth={1.9} />
             </span>
 
-            <span className='flex min-w-0 flex-1 items-center rounded-full bg-black/28 px-3 py-3'>
+            <span className='flex min-w-0 flex-1 items-center rounded-full border border-white/8 bg-black/34 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
               {isTyping || isSubmitting ? (
                 <>
                   <span className='artist-profile-capture-typed inline-block overflow-hidden whitespace-nowrap font-mono text-[12px] font-medium tracking-[-0.02em] text-primary-token'>

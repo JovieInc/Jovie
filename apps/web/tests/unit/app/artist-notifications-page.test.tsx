@@ -64,8 +64,20 @@ describe('ArtistNotificationsPage', () => {
         name: 'Notify them automatically.',
       })
     ).toBeInTheDocument();
-    expect(reactivationSection.getByText('New music')).toBeInTheDocument();
-    expect(reactivationSection.getByText('Show near due')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('New music gets another listening moment.')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText(
+        'Subscribers go straight to the latest release.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('New music')
+    ).not.toBeInTheDocument();
+    expect(
+      reactivationSection.queryByText('Show near due')
+    ).not.toBeInTheDocument();
     expect(
       reactivationSection.queryByText('Video Live')
     ).not.toBeInTheDocument();

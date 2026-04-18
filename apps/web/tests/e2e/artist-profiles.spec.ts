@@ -177,11 +177,11 @@ test.describe('Artist Profiles Landing', () => {
     const viewportHeight = await getViewportHeight(page);
     expect(trustRect.top).toBeGreaterThanOrEqual(viewportHeight);
 
-    const stayBookedTab = page.getByRole('tab', { name: 'Stay Booked' });
-    await expect(stayBookedTab).toBeVisible();
-    await stayBookedTab.click();
+    const contactTab = page.getByRole('tab', { name: 'Contact' });
+    await expect(contactTab).toBeVisible();
+    await contactTab.click();
     await expect(
-      page.getByText('Make booking, management, and press easy to reach.')
+      page.getByText('Keep booking, management, and press one tap away.')
     ).toBeVisible();
     await expect(
       page.getByAltText(
@@ -249,7 +249,7 @@ test.describe('Artist Profiles Landing', () => {
     await expectNotPartiallyVisible(page, phone);
   });
 
-  test('outcomes section comes right after the trust strip and uses a desktop grid with mobile carousel fallback', async ({
+  test('outcomes section comes right after the trust strip and keeps a stable grid across breakpoints', async ({
     page,
   }) => {
     await expectNoHorizontalOverflow(page);
@@ -297,8 +297,8 @@ test.describe('Artist Profiles Landing', () => {
     await mobileOutcomesSection.scrollIntoViewIfNeeded();
     const mobileGrid = page.getByTestId('artist-profile-outcomes-grid');
     const mobileScroller = page.getByTestId('artist-profile-outcomes-scroller');
-    await expect(mobileGrid).toBeHidden();
-    await expect(mobileScroller).toBeVisible();
+    await expect(mobileGrid).toBeVisible();
+    await expect(mobileScroller).toBeHidden();
     await expect(
       page.getByRole('heading', { name: /drive streams/i })
     ).toBeVisible();

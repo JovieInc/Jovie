@@ -56,10 +56,11 @@ export function ArtistProfileHowItWorks({
         <div className='mt-12 grid gap-6 lg:grid-cols-3 lg:gap-5'>
           <article className='flex flex-col gap-4'>
             <StepNumber value={1} />
-            <DrawerSurfaceCard
-              variant='card'
-              className='space-y-3 rounded-[1.15rem] p-3.5'
-            >
+            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
+              />
               <div className='flex h-11 items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-4'>
                 <Search
                   className='h-4 w-4 text-tertiary-token'
@@ -99,7 +100,7 @@ export function ArtistProfileHowItWorks({
                   strokeWidth={2}
                 />
               </div>
-            </DrawerSurfaceCard>
+            </div>
             <div>
               <p className='text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
                 {howItWorks.steps[0]?.title}
@@ -183,18 +184,19 @@ export function ArtistProfileHowItWorks({
 
           <article className='flex flex-col gap-4'>
             <StepNumber value={3} />
-            <DrawerSurfaceCard
-              variant='card'
-              className='space-y-3 rounded-[1.15rem] p-3.5'
-            >
+            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
+              />
               <CopyableUrlRow
                 url={howItWorks.share.url}
                 displayValue={howItWorks.share.displayValue}
-                className='rounded-[10px]'
+                className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'
                 valueClassName='text-secondary-token'
                 surface='boxed'
               />
-              <div className='flex flex-wrap gap-2'>
+              <div className='mt-3 flex flex-wrap gap-2'>
                 <HoverPopover
                   label={howItWorks.share.qrLabel}
                   content={
@@ -231,7 +233,7 @@ export function ArtistProfileHowItWorks({
                   }
                 />
               </div>
-            </DrawerSurfaceCard>
+            </div>
             <div>
               <p className='text-[15px] font-semibold tracking-[-0.03em] text-primary-token'>
                 {howItWorks.steps[2]?.title}

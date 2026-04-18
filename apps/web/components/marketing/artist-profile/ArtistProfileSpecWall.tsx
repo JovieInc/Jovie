@@ -31,31 +31,52 @@ interface ArtistProfileSpecWallProps {
 function ScreenshotCrop({
   alt,
   className,
+  frameClassName,
   imageClassName,
   objectPosition,
+  screenshotHeight,
+  screenshotWidth,
   src,
 }: Readonly<{
   alt: string;
   className?: string;
+  frameClassName?: string;
   imageClassName?: string;
   objectPosition?: string;
+  screenshotHeight?: number;
+  screenshotWidth?: number;
   src: string;
 }>) {
+  const frameStyle =
+    screenshotWidth && screenshotHeight
+      ? {
+          aspectRatio: `${screenshotWidth} / ${screenshotHeight}`,
+        }
+      : undefined;
+
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[1rem] bg-[#0d1015]',
+        'flex h-full items-start overflow-hidden rounded-[1rem] bg-[#0d1015] p-2.5',
         className
       )}
     >
-      <Image
-        fill
-        alt={alt}
-        className={cn('object-cover', imageClassName)}
-        sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
-        src={src}
-        style={{ objectPosition }}
-      />
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-[0.95rem] bg-[#090d12]',
+          frameClassName
+        )}
+        style={frameClassName ? undefined : frameStyle}
+      >
+        <Image
+          fill
+          alt={alt}
+          className={cn('object-cover object-top', imageClassName)}
+          sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
+          src={src}
+          style={{ objectPosition }}
+        />
+      </div>
     </div>
   );
 }
@@ -150,6 +171,10 @@ function ArtistProfilePowerFeatureTile({
   const style: AccentStyle = {
     '--tile-accent': SPEC_TILE_ACCENTS[tile.accent],
   };
+  const chromeStyle: CSSProperties = {
+    boxShadow:
+      '0 0 0 1px color-mix(in srgb, var(--tile-accent) 26%, rgba(255,255,255,0.08)), 0 22px 64px rgba(0,0,0,0.28), 0 0 42px color-mix(in srgb, var(--tile-accent) 14%, transparent)',
+  };
 
   return (
     <article
@@ -160,13 +185,32 @@ function ArtistProfilePowerFeatureTile({
       )}
       style={style}
     >
-      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.012)),#07090d] p-4 shadow-[0_22px_64px_rgba(0,0,0,0.28)]'>
+      <div
+        className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-white/8 bg-[#07090d] p-4'
+        style={chromeStyle}
+      >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-24 opacity-75'
+          className='pointer-events-none absolute inset-0 rounded-[1.35rem] border'
+          style={{
+            borderColor:
+              'color-mix(in srgb, var(--tile-accent) 38%, rgba(255,255,255,0.12))',
+          }}
+        />
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-6 top-0 h-px'
           style={{
             background:
-              'radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--tile-accent) 16%, transparent), transparent 55%)',
+              'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tile-accent) 72%, white), transparent)',
+          }}
+        />
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-8 top-5 h-10 rounded-full blur-2xl'
+          style={{
+            background:
+              'color-mix(in srgb, var(--tile-accent) 18%, transparent)',
           }}
         />
         <div className='relative z-10 flex-1'>
@@ -192,8 +236,11 @@ function ArtistProfilePowerFeatureTile({
             <ScreenshotCrop
               alt={tile.screenshotAlt}
               className='h-full min-h-[12rem]'
+              frameClassName={tile.frameClassName}
               imageClassName='object-top'
               objectPosition={tile.objectPosition}
+              screenshotHeight={tile.screenshotHeight}
+              screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
             />
           ) : null}
@@ -202,8 +249,11 @@ function ArtistProfilePowerFeatureTile({
             <ScreenshotCrop
               alt={tile.screenshotAlt}
               className='h-full min-h-[12rem]'
+              frameClassName={tile.frameClassName}
               imageClassName={tile.imageClassName}
               objectPosition={tile.objectPosition}
+              screenshotHeight={tile.screenshotHeight}
+              screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
             />
           ) : null}

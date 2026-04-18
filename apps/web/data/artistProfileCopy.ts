@@ -472,9 +472,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'contact',
-        label: 'Stay Booked',
-        headline: 'Make booking, management, and press easy to reach.',
-        description: 'Make booking, management, and press easy to reach.',
+        label: 'Contact',
+        headline: 'Keep booking, management, and press one tap away.',
+        description: 'Keep booking, management, and press one tap away.',
         pathLabel: 'jov.ie/you/contact',
         drawer: {
           title: 'Contact',
@@ -517,7 +517,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   outcomes: {
-    headline: 'Obsessively specific.',
+    headline: 'Built for Artists.',
     body: 'Every detail is tuned to move the next tap forward.',
     cards: [
       {
@@ -552,9 +552,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           liveScreenshotAlt:
             'Jovie artist profile showing Tim White with the latest release live.',
           presaveScreenshotSrc:
-            '/product-screenshots/tim-white-profile-presave-phone.png',
+            '/product-screenshots/release-deep-end-phone.png',
           presaveScreenshotAlt:
-            'Jovie artist profile showing Tim White with a presave countdown for The Deep End.',
+            'Jovie release page showing The Deep End countdown card.',
           title: 'The Deep End',
           artistName: 'Cosmic Gate & Tim White',
           liveLabel: 'Out now',

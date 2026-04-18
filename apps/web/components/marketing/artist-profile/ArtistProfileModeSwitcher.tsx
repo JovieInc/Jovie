@@ -132,7 +132,7 @@ export function ArtistProfileModeSwitcher({
   return (
     <div
       ref={rootRef}
-      className='artist-profile-mode-switcher mx-auto flex w-full max-w-[26rem] flex-col items-center text-center'
+      className='artist-profile-mode-switcher mx-auto flex w-full max-w-[32rem] flex-col items-center text-center'
     >
       <motion.div
         className='artist-profile-mode-switcher-heading mx-auto max-w-[24rem]'
@@ -202,7 +202,7 @@ export function ArtistProfileModeSwitcher({
 
       <div
         className={cn(
-          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-full overflow-x-auto px-2 transition-opacity duration-300 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-[29rem] px-0 transition-opacity duration-300',
           tabsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
@@ -210,7 +210,7 @@ export function ArtistProfileModeSwitcher({
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-10 top-1/2 h-8 -translate-y-1/2 rounded-full bg-white/[0.08] blur-2xl'
         />
-        <div className='flex min-w-max justify-center pb-1'>
+        <div className='w-full pb-1'>
           <SegmentControl
             value={selectedModeId}
             onValueChange={nextModeId => {
@@ -228,21 +228,21 @@ export function ArtistProfileModeSwitcher({
             }}
             options={modeOptions}
             variant='linear-pill'
-            layout='hug'
+            layout='fill'
             size='sm'
             aria-label='Profile modes'
-            className='mx-auto supports-[backdrop-filter]:backdrop-blur-xl'
-            triggerClassName='px-3 sm:px-4'
+            className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
+            triggerClassName='min-w-0 px-2.5 data-[state=active]:text-black sm:px-3.5'
           />
         </div>
       </div>
 
-      <div className='artist-profile-mode-switcher-active relative mx-auto mt-2.5 min-h-[2.2rem] w-full max-w-[20rem] px-2 sm:mt-3'>
+      <div className='artist-profile-mode-switcher-active relative mx-auto mt-2.5 min-h-[2.4rem] w-full max-w-[19rem] px-2 sm:mt-3'>
         <AnimatePresence initial={false}>
           {activeMode ? (
             <motion.p
               key={activeMode.id}
-              className='absolute inset-x-0 text-[14px] font-medium leading-[1.3] tracking-[-0.03em] text-primary-token/92 sm:text-[15px]'
+              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-[-0.03em] text-primary-token/92 sm:text-[15px]'
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -285,13 +285,13 @@ export function ArtistProfileModeSwitcher({
 
         @media (max-width: 640px) {
           .artist-profile-mode-switcher-tabs button {
-            font-size: 12px;
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
+            font-size: 11px;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
           }
 
           .artist-profile-mode-switcher-active {
-            min-height: 2.8rem;
+            min-height: 2.5rem;
           }
 
           .artist-profile-mode-switcher-active p {

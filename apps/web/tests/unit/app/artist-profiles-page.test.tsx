@@ -109,7 +109,7 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
 
     expect(
-      adaptiveSequence.getByRole('tab', { name: 'Stay Booked' })
+      adaptiveSequence.getByRole('tab', { name: 'Contact' })
     ).toBeInTheDocument();
     expect(
       ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
@@ -149,19 +149,13 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('Notifications Enabled')
+      reactivationSection.getByText('Subscribers hear it first.')
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('New release alert')
+      reactivationSection.getByText('New release live now')
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('Nearby show alert')
-    ).toBeInTheDocument();
-    expect(
-      reactivationSection.getByText('Latest release page')
-    ).toBeInTheDocument();
-    expect(
-      reactivationSection.queryByText('Subscribers hear it first.')
+      reactivationSection.queryByText('Nearby show alert')
     ).not.toBeInTheDocument();
 
     const monetizationSection = within(
@@ -224,11 +218,11 @@ describe('ArtistProfilesPage', () => {
       screen.getByTestId('artist-profile-section-outcomes')
     );
     expect(
-      outcomesSection.getByRole('heading', { name: 'Obsessively specific.' })
+      outcomesSection.getByRole('heading', { name: 'Built for Artists.' })
     ).toBeInTheDocument();
     expect(
       within(
-        outcomesSection.getByTestId('artist-profile-outcomes-scroller')
+        outcomesSection.getByTestId('artist-profile-outcomes-grid')
       ).getAllByTestId('artist-profile-outcome-card')
     ).toHaveLength(4);
     expect(
@@ -368,7 +362,7 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Stay Booked' })
+      screen.queryByRole('button', { name: 'Contact' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Get paid. Again and again.' })
