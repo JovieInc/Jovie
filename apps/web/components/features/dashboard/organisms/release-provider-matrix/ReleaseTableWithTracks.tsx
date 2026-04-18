@@ -9,6 +9,7 @@ import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
@@ -21,12 +22,6 @@ const TrackRowsContainer = lazy(() =>
     '@/features/dashboard/organisms/release-provider-matrix/components'
   ).then(m => ({
     default: m.TrackRowsContainer,
-  }))
-);
-
-const MobileReleaseList = lazy(() =>
-  import('./MobileReleaseList').then(m => ({
-    default: m.MobileReleaseList,
   }))
 );
 
@@ -273,19 +268,17 @@ export function ReleaseTableWithTracks({
     }
 
     return (
-      <Suspense fallback={<div className='min-h-[320px]' aria-hidden />}>
-        <MobileReleaseList
-          releases={releases}
-          artistName={artistName}
-          onEdit={onEdit}
-          onCopy={onCopy}
-          canGenerateAlbumArt={canGenerateAlbumArt}
-          onGenerateAlbumArt={onGenerateAlbumArt}
-          isSmartLinkLocked={isSmartLinkLocked}
-          getSmartLinkLockReason={getSmartLinkLockReason}
-          groupByYear={groupByYear}
-        />
-      </Suspense>
+      <MobileReleaseListLazy
+        releases={releases}
+        artistName={artistName}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
+        isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
+        groupByYear={groupByYear}
+      />
     );
   }
 
