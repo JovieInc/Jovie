@@ -16,18 +16,31 @@ coverage:
     project:
       default:
         target: auto
-        threshold: 1%
-        # Don't fail CI, just report
+        threshold: 0.5%
+        # Soak window: report until branch protection is tightened after rollout.
         informational: true
-        # Only measure files changed in the PR
+        # Ratchet PRs against the existing main baseline.
         only_pulls: true
     # Patch coverage: coverage of new/modified lines
     patch:
       default:
-        target: 60%
-        threshold: 5%
-        # Block PRs with insufficient coverage on new/modified lines
-        informational: false
+        target: 80%
+        threshold: 0%
+        if_not_found: success
+        informational: true
+      critical:
+        target: 95%
+        threshold: 0%
+        if_not_found: success
+        informational: true
+        paths:
+          - apps/web/lib/stripe/**
+          - apps/web/lib/billing/**
+          - apps/web/lib/auth/**
+          - apps/web/lib/entitlements/**
+          - apps/web/app/api/webhooks/**
+          - apps/web/app/api/clerk/**
+          - apps/web/app/api/billing/**
 
 # PR comment configuration
 comment:

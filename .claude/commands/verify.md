@@ -100,6 +100,17 @@ ls -la apps/web/components/FEATURE_AREA/
 - [ ] Searched for similar patterns in related files
 - [ ] Fixed all identified instances (or documented why not)
 
+## 3a. Regression Test Discipline
+
+If this change fixes a bug, warning-only check the regression-test policy:
+
+```bash
+node scripts/check-regression-test.mjs --mode warn --base-ref origin/main
+```
+
+- [ ] Bug-fix changes add or update at least one `*.test.*` or `*.spec.*` file, or the PR includes a concrete Regression Test Exception
+- [ ] Any warning from `check-regression-test.mjs` is addressed before completion
+
 ## 4. Database Driver Consistency
 
 **Use ONLY `@/lib/db` (index.ts) - Never mix drivers.**
