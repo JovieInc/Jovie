@@ -17,7 +17,15 @@ Brief description of the changes in this PR.
 - [ ] Unit tests pass
 - [ ] E2E tests pass
 - [ ] Manual testing completed
-- [ ] New tests added (if applicable)
+- [ ] New tests added or updated (if applicable)
+- [ ] Regression test added or updated for this bug fix
+- [ ] No regression test added because the exception section below explains why
+
+## Regression Test Exception
+
+Required for bug-fix PRs that do not change any `*.test.*` or `*.spec.*` files.
+
+<!-- Explain why a regression test is impossible, deferred, or not useful for this fix. -->
 
 ## Icon Usage Standards ✅
 
@@ -134,4 +142,3 @@ If this PR introduces custom SVGs:
 4. **Configuration**: Added to ESLint approved list
 
 Use the [Design Review Checklist](docs/DESIGN_REVIEW_CHECKLIST.md) for detailed guidance.
-

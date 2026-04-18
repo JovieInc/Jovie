@@ -69,6 +69,13 @@ Local `/browse` auth is bypass-first, not Clerk-form-first.
 - `scripts/browse-auth.ts` remains available as a fallback helper for non-loopback hosts
 - Full docs: `apps/web/tests/TESTING.md`
 
+## Test Coverage Policy
+
+- Treat Codecov patch coverage as the PR readiness signal and project coverage as the regression ratchet.
+- During the rollout soak window, coverage statuses stay informational before becoming required checks in GitHub branch protection.
+- Bug-fix PRs must add or update a regression test, or explain the exception in the PR body.
+- Add the `testing` label to billing, auth, entitlements, webhook, migration, and environment/config PRs so `E2E Smoke (PR Fast Feedback)` runs before merge.
+
 ## Design System
 
 Always read `DESIGN.md` before making any visual or UI decisions. All font choices, colors, spacing, and aesthetic direction are defined there. Do not deviate without explicit user approval. In QA mode, flag any code that doesn't match `DESIGN.md`.

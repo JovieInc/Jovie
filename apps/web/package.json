@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.158",
+  "version": "26.4.159",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -36,7 +36,7 @@
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
-    "test:fast": "vitest run --config=vitest.config.mts",
+    "test:fast": "vitest run --config=vitest.config.fast.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",

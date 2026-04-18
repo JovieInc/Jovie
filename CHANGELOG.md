@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.159] - 2026-04-18
+
+> Coverage enforcement now starts on pull requests instead of only on `main`, and bug-fix PRs get a durable regression-test policy warning before they ship.
+
+### Added
+
+- [internal] Added `scripts/check-regression-test.mjs` plus CI and `/verify` wiring so bug-fix PRs warn when they ship without a matching regression test or a documented exception.
+- [internal] Added repo-owned coverage and smoke-policy guidance to the PR template, `AGENTS.md`, and `CLAUDE.md` so the rollout survives upstream gstack changes.
+
+### Changed
+
+- [internal] CI now runs the web unit suite with coverage on pull requests and `main`, uploads shard coverage to Codecov, and emits empty-upload statuses for skipped PR lanes so future required Codecov checks do not deadlock on docs-only changes.
+- [internal] Tightened the Codecov rollout config to use an informational soak window, an 80% default patch target, and a 95% critical-path target for billing, auth, entitlements, and webhook paths.
+- [internal] `apps/web` fast tests now use the dedicated `vitest.config.fast.mts` config instead of relying on the default alias.
+
+### Fixed
+
+- [internal] Fixed the future required-check path for Codecov by explicitly emitting passing statuses on pull requests where the unit-test lane is intentionally skipped.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.159`.
+
 ## [26.4.158] - 2026-04-17
 
 > Staged homepage and pricing refresh work is ready to review again, the mobile public profile hero is cleaner and more stable, and preview deploys keep working even when Vercel rejects oversized prebuilt uploads.
