@@ -24,11 +24,11 @@ export interface HeaderNavProps {
 
 function PublicAuthActions() {
   return (
-    <div className='flex items-center gap-1'>
-      <Link href='/signin' className='btn-linear-login focus-ring-themed'>
+    <div className='flex items-center gap-4'>
+      <Link href='/signin' className='nav-link-linear focus-ring-themed'>
         Log in
       </Link>
-      <Link href='/signup' className='btn-linear-signup focus-ring-themed'>
+      <Link href='/signup' className='nav-link-linear focus-ring-themed'>
         Sign up
       </Link>
     </div>
@@ -98,7 +98,7 @@ export function HeaderNav({
 
           {/* Nav links - desktop only, right-aligned */}
           {hasNavLinks && (
-            <div className='max-md:hidden items-center gap-1 md:flex lg:gap-1.5'>
+            <div className='hidden items-center gap-1 md:flex lg:gap-1.5'>
               {navLinks?.map(link =>
                 link.href.startsWith('/') && !link.href.startsWith('#') ? (
                   <Link
@@ -120,13 +120,17 @@ export function HeaderNav({
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks ? (
             <div
-              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
+              className='mx-1.5 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
               aria-hidden='true'
             />
           ) : null}
 
-          {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
-          <div className='flex items-center gap-1'>
+          <div
+            className={cn(
+              'items-center gap-4',
+              hasNavLinks ? 'hidden md:flex' : 'flex'
+            )}
+          >
             {authMode === 'public-static' ? (
               <PublicAuthActions />
             ) : (
@@ -136,7 +140,7 @@ export function HeaderNav({
 
           {/* Mobile hamburger menu - shown on small screens only */}
           {hasNavLinks && (
-            <div className='flex md:hidden items-center'>
+            <div className='md:hidden'>
               <MobileNav navLinks={navLinks} />
             </div>
           )}

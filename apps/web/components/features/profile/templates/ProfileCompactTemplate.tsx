@@ -552,7 +552,7 @@ export function ProfileCompactTemplate({
               src={heroImageUrl}
               alt={`${artist.name} background`}
               fill
-              sizes='100vw'
+              sizes='(max-width: 767px) 100vw, 680px'
               className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
               fallbackVariant='avatar'
               fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'

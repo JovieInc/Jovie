@@ -1,22 +1,19 @@
 import type { Metadata } from 'next';
-import { MarketingPageShell } from '@/components/marketing';
+import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
-import { NewLandingFinalCta } from './_components/NewLandingFinalCta';
-import { NewLandingHero } from './_components/NewLandingHero';
-import { NewLandingSections } from './_components/NewLandingSections';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: { absolute: `${APP_NAME} | Drop More Music. Crush Every Release.` },
-  description:
-    'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
+  title: { absolute: HOMEPAGE_V2_COPY.seo.title },
+  description: HOMEPAGE_V2_COPY.seo.description,
   metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: APP_ROUTES.LANDING_NEW,
@@ -24,9 +21,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     url: `${BASE_URL}${APP_ROUTES.LANDING_NEW}`,
-    title: `${APP_NAME} | Drop More Music. Crush Every Release.`,
-    description:
-      'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
+    title: HOMEPAGE_V2_COPY.seo.title,
+    description: HOMEPAGE_V2_COPY.seo.description,
     siteName: APP_NAME,
     images: [
       {
@@ -39,9 +35,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${APP_NAME} | Drop More Music. Crush Every Release.`,
-    description:
-      'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
+    title: HOMEPAGE_V2_COPY.seo.title,
+    description: HOMEPAGE_V2_COPY.seo.description,
     images: [`${BASE_URL}/og/default.png`],
   },
   robots: {
@@ -60,35 +55,27 @@ export const metadata: Metadata = {
 
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie release platform'],
-  description:
-    'Drop more music. Crush every release. Jovie gives independent artists smart links, release automation, artist profiles, and audience proof in one clean system.',
+  description: HOMEPAGE_V2_COPY.seo.description,
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Smart links, release automation, artist profiles, and audience proof for independent artists.'
+  'Artist profiles, smart links, fan capture, and reactivation built as one release system for artists.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie is the release platform for independent artists, combining smart links, release automation, artist profiles, and fan intelligence.',
+    'Jovie builds artist profiles, release surfaces, smart links, and fan intelligence for independent artists.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
 export default function NewLandingPage() {
   return (
-    <MarketingPageShell>
+    <>
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-
-      <NewLandingHero />
-
-      <div aria-hidden='true' className='section-gradient-divider' />
-
-      <NewLandingSections />
-
-      <NewLandingFinalCta />
-    </MarketingPageShell>
+      <HomepageV2Route />
+    </>
   );
 }

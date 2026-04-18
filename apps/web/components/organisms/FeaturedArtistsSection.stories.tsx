@@ -30,7 +30,7 @@ const mockCreators = [
     id: '3',
     handle: 'popstar',
     name: 'Pop Star',
-    src: '/images/avatars/pop-star.jpg',
+    src: '/images/avatars/music-maker.jpg',
   },
   {
     id: '4',

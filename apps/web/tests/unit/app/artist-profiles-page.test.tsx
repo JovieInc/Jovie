@@ -73,6 +73,10 @@ describe('ArtistProfilesPage', () => {
       SOCIAL_PROOF: true,
       FAQ: true,
     });
+    expect(document.getElementById('capture-every-fan')).toBeInTheDocument();
+    expect(
+      document.getElementById('bring-them-back-automatically')
+    ).toBeInTheDocument();
 
     expect(screen.getByTestId('homepage-hero')).toHaveClass(
       'homepage-hero--artist-profile'
