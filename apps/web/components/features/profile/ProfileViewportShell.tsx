@@ -22,7 +22,7 @@ export function ProfileViewportShell({
             src={ambientImageUrl}
             alt={`${artistName} background`}
             fill
-            sizes='100vw'
+            sizes='(max-width: 767px) 100vw, 680px'
             className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
             fallbackVariant='avatar'
             fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%)]'
@@ -33,7 +33,7 @@ export function ProfileViewportShell({
       <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:px-6 md:py-8'>
         <main className='relative flex w-full items-stretch'>
           <div
-            className='relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[30px] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+            className='relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:min-h-[min(920px,calc(100dvh-64px))] md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
             data-testid='profile-viewport-shell'
           >
             <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />

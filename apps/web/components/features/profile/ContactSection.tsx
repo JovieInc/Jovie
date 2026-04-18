@@ -27,7 +27,7 @@ export function ContactSection({
   if (available.length === 0) {
     return (
       <div className='text-center'>
-        <div className='rounded-[28px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-6 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'>
+        <div className='rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-6 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'>
           <p className='text-sm text-secondary-token' role='alert'>
             No contact information is available for this artist yet.
           </p>
@@ -41,7 +41,7 @@ export function ContactSection({
       <h1 id='contact-title' className='sr-only'>
         Contact {artistName}
       </h1>
-      <div className='rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-2 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
+      <div className='rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-2 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
         <ProfileContactDrawerContent
           artistHandle={artistHandle}
           contacts={available}

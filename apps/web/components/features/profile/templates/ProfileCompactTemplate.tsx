@@ -20,6 +20,7 @@ import {
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
@@ -50,6 +51,7 @@ interface ProfileCompactTemplateProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
@@ -148,6 +150,7 @@ export function ProfileCompactTemplate({
   showPayButton = false,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
@@ -549,7 +552,7 @@ export function ProfileCompactTemplate({
               src={heroImageUrl}
               alt={`${artist.name} background`}
               fill
-              sizes='100vw'
+              sizes='(max-width: 767px) 100vw, 680px'
               className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
               fallbackVariant='avatar'
               fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
@@ -573,6 +576,7 @@ export function ProfileCompactTemplate({
                 showPayButton={showPayButton}
                 latestRelease={latestRelease}
                 profileSettings={profileSettings}
+                featuredPlaylistFallback={featuredPlaylistFallback}
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
                 genres={genres}

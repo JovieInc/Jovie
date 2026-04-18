@@ -131,7 +131,7 @@ export function AddPlatformDialog({
                 }}
                 className={cn(
                   'flex flex-col items-center gap-1 rounded-lg border border-subtle p-2 text-[11px] text-secondary-token hover:bg-surface-1 transition-colors',
-                  selectedProvider === id && 'border-[#7170ff] bg-surface-1'
+                  selectedProvider === id && 'border-accent bg-surface-1'
                 )}
               >
                 <DspProviderIcon provider={id} size='md' />
@@ -156,7 +156,7 @@ export function AddPlatformDialog({
                 value={artistName}
                 onChange={e => setArtistName(e.target.value)}
                 placeholder='Artist name on this platform'
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
               />
             </div>
             <div>
@@ -169,7 +169,7 @@ export function AddPlatformDialog({
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-[#7170ff]/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
               />
             </div>
             {error && (

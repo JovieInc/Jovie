@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { Badge } from './badge';
 
@@ -78,6 +78,28 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-error-subtle)');
       expect(badge.className).toContain('text-error');
+    });
+
+    it('applies neutral tone overrides', () => {
+      render(
+        <Badge tone='neutral' data-testid='badge'>
+          Neutral
+        </Badge>
+      );
+      const badge = screen.getByTestId('badge');
+      expect(badge.className).toContain('border-subtle');
+      expect(badge.className).toContain('text-tertiary-token');
+    });
+
+    it('applies accent tone overrides', () => {
+      render(
+        <Badge tone='accent' data-testid='badge'>
+          Accent
+        </Badge>
+      );
+      const badge = screen.getByTestId('badge');
+      expect(badge.className).toContain('border-accent/20');
+      expect(badge.className).toContain('text-accent');
     });
   });
 
@@ -191,6 +213,3 @@ describe('Badge', () => {
     });
   });
 });
-
-// Need to import vi for the onClick test
-import { vi } from 'vitest';

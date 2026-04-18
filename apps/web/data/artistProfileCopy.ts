@@ -1,5 +1,5 @@
 export interface ArtistProfileMode {
-  readonly id: 'listen' | 'pay' | 'tour' | 'contact';
+  readonly id: 'listen' | 'pay' | 'tour';
   readonly label: string;
   readonly headline: string;
   readonly description: string;
@@ -320,7 +320,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
     restingScreenshotAlt:
       'Jovie artist profile showing the default profile view before a mode is opened.',
-    restingScreenshotSrc: '/product-screenshots/profile-phone.png',
+    restingScreenshotSrc:
+      '/product-screenshots/tim-white-profile-listen-phone.png',
     modes: [
       {
         id: 'listen',
@@ -441,50 +442,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
         screenshotSrc: '/product-screenshots/tim-white-profile-pay-phone.png',
         screenshotAlt: 'Jovie artist profile showing direct support options.',
-        screenshotWidth: 660,
-        screenshotHeight: 1368,
-      },
-      {
-        id: 'contact',
-        label: 'Stay Booked',
-        headline: 'Make booking, management, and press easy to reach.',
-        description: 'Make booking, management, and press easy to reach.',
-        pathLabel: 'jov.ie/you/contact',
-        drawer: {
-          title: 'Contact',
-          subtitle: 'Booking, management, and press in one place.',
-          ctaLabel: 'Email team',
-          items: [
-            {
-              id: 'booking',
-              label: 'Booking',
-              detail: 'North America + Europe',
-              action: 'Email',
-            },
-            {
-              id: 'management',
-              label: 'Management',
-              detail: 'Worldwide',
-              action: 'Email',
-            },
-            {
-              id: 'press',
-              label: 'Press',
-              detail: 'US + UK',
-              action: 'Email',
-            },
-            {
-              id: 'brands',
-              label: 'Brands',
-              detail: 'Partnerships',
-              action: 'Email',
-            },
-          ],
-        },
-        screenshotSrc:
-          '/product-screenshots/tim-white-profile-contact-phone.png',
-        screenshotAlt:
-          'Jovie artist profile showing contact access for booking and press.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },

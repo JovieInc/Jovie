@@ -719,9 +719,12 @@ export function useJovieChat({
       rateLimitedSubmitter.maybeExecute({ text: detail.prompt });
     };
 
-    window.addEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+    globalThis.addEventListener('jovie-chat-submit-prompt', handlePromptEvent);
     return () => {
-      window.removeEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+      globalThis.removeEventListener(
+        'jovie-chat-submit-prompt',
+        handlePromptEvent
+      );
     };
   }, [rateLimitedSubmitter]);
 

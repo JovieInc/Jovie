@@ -51,6 +51,27 @@ interface PlaywrightJsonResult {
   }>;
 }
 
+function isPlaywrightJsonReport(value: unknown): value is PlaywrightJsonReport {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const report = value as Record<string, unknown> & {
+    readonly suites?: unknown;
+  };
+
+  if (Array.isArray(report.suites)) {
+    return true;
+  }
+
+  return Object.keys(report).length === 0;
+}
+
+function parsePlaywrightJsonCandidate(candidate: string) {
+  const parsed = JSON.parse(candidate) as unknown;
+  return isPlaywrightJsonReport(parsed) ? parsed : null;
+}
+
 function sanitizeComponent(value: string) {
   return value
     .trim()
@@ -187,6 +208,110 @@ function collectPlaywrightFailures(
   }
 }
 
+function extractJsonObject(raw: string, start: number) {
+  if (raw[start] !== '{') {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+
+  for (let index = start; index < raw.length; index += 1) {
+    const char = raw[index];
+
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaping = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+
+    if (char !== '}') {
+      continue;
+    }
+
+    depth -= 1;
+    if (depth === 0) {
+      return raw.slice(start, index + 1);
+    }
+  }
+
+  return null;
+}
+
+function parsePlaywrightJsonReport(raw: string): PlaywrightJsonReport {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = parsePlaywrightJsonCandidate(trimmed);
+      if (parsed) {
+        return parsed;
+      }
+    } catch {
+      // Fall through to scanning so we can tolerate trailing noise.
+    }
+  }
+
+  for (let index = 0; index < raw.length; index += 1) {
+    if (raw[index] !== '{') {
+      continue;
+    }
+
+    let cursor = index - 1;
+    while (cursor >= 0 && (raw[cursor] === ' ' || raw[cursor] === '\t')) {
+      cursor -= 1;
+    }
+
+    const isJsonStart =
+      cursor < 0 || raw[cursor] === '\n' || raw[cursor] === '\r';
+
+    if (!isJsonStart) {
+      continue;
+    }
+
+    const candidate = extractJsonObject(raw, index);
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      const parsed = parsePlaywrightJsonCandidate(candidate);
+      if (parsed) {
+        return parsed;
+      }
+    } catch {
+      // Keep scanning in case the first brace belonged to a log line.
+    }
+  }
+
+  throw new Error('Unable to parse Playwright JSON report.');
+}
+
 export async function parsePlaywrightIssues(
   suite: OvernightSuiteDefinition,
   reportPath: string
@@ -200,7 +325,45 @@ export async function parsePlaywrightIssues(
     return [];
   }
 
-  const report = JSON.parse(raw) as PlaywrightJsonReport;
+  let report: PlaywrightJsonReport;
+  try {
+    report = parsePlaywrightJsonReport(raw);
+  } catch (error) {
+    const surface = suite.failureSurface ?? 'unknown';
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unknown report parsing failure.';
+    const verificationSteps: readonly VerificationStep[] = [
+      {
+        id: `${suite.id}-playwright-rerun`,
+        label: `Rerun ${suite.label}`,
+        kind: 'playwright',
+        command: suite.command,
+        env: suite.env,
+      },
+    ];
+
+    return [
+      {
+        key: buildIssueKey([suite.id, 'report-parse-failed']),
+        suiteId: suite.id,
+        source: 'playwright',
+        surface,
+        path: null,
+        summary: `${suite.label}: unable to parse Playwright JSON report`,
+        signature: 'Unable to parse Playwright JSON report',
+        evidencePaths: [reportPath],
+        discoveredAt: new Date().toISOString(),
+        priority: suite.priority * 1000 + surfacePriority(surface),
+        verificationSteps,
+        failureContext: `${message}\nReport: ${reportPath}`,
+        routeFilter: null,
+        testFile: null,
+      } satisfies OvernightIssue,
+    ];
+  }
+
   const failures: Array<{
     file: string | null;
     title: string;

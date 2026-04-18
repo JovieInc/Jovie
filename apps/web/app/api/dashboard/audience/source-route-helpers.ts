@@ -157,9 +157,9 @@ function buildAudienceSourceSlugFallback(
 ): string {
   const normalized = value
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replaceAll(/[\u0300-\u036f]/g, '')
     .toLowerCase();
-  const sanitized = normalized.replace(/[^a-z0-9]+/g, '-');
+  const sanitized = normalized.replaceAll(/[^a-z0-9]+/g, '-');
   const trimmed = trimEdgeDashes(sanitized);
 
   if (trimmed) {
@@ -168,7 +168,7 @@ function buildAudienceSourceSlugFallback(
 
   let hash = 0;
   for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
   }
 
   return `${prefix}-${hash.toString(36)}`;

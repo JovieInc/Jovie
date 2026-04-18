@@ -1,3 +1,4 @@
+import { logger } from '@/lib/utils/logger';
 import {
   buildFixBranchName,
   determineStopReason,
@@ -41,6 +42,14 @@ import {
   runVerificationSteps,
   startManagedDevServer,
 } from './verify';
+
+function describeControllerError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return 'Overnight QA controller failed.';
+}
 
 export async function runLiveController(params: {
   readonly options: ControllerOptions;
@@ -304,6 +313,35 @@ export async function runLiveController(params: {
     }
 
     await writeState({ ...state, status: 'complete' }, paths);
+  } catch (error) {
+    const stopReason = describeControllerError(error);
+
+    try {
+      await writeState(
+        {
+          ...state,
+          status: 'blocked',
+          stopReason,
+        },
+        paths
+      );
+      await appendRunEvent(runDir, 'controller-error', {
+        stopReason,
+      });
+    } catch (persistenceError) {
+      // Best-effort persistence should not mask the original controller error.
+      logger.warn(
+        'Persistence failed while handling controller error',
+        {
+          error: persistenceError,
+          runId: state.runId,
+          runDir,
+        },
+        'overnight-qa-controller'
+      );
+    }
+
+    throw error;
   } finally {
     await server.stop();
   }
