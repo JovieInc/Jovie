@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import Link from 'next/link';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -78,8 +79,7 @@ describe('CircleIconButton', () => {
   it('renders as child element when asChild is true', () => {
     render(
       <CircleIconButton ariaLabel='Link button' asChild>
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- test only */}
-        <a href='/profile'>Back</a>
+        <Link href='/profile'>Back</Link>
       </CircleIconButton>
     );
     const link = screen.getByRole('link', { name: 'Link button' });
