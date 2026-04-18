@@ -597,15 +597,20 @@ describe('DevToolbar', () => {
 
   describe('clear session', () => {
     let fetchSpy: ReturnType<typeof vi.fn>;
+    let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       fetchSpy = vi.fn().mockResolvedValue({
         json: () => Promise.resolve({ success: true, deleted: ['__session'] }),
       });
       vi.stubGlobal('fetch', fetchSpy);
+      setTimeoutSpy = vi
+        .spyOn(globalThis, 'setTimeout')
+        .mockImplementation((() => 0) as typeof globalThis.setTimeout);
     });
 
     afterEach(() => {
+      setTimeoutSpy.mockRestore();
       vi.unstubAllGlobals();
     });
 

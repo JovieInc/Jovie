@@ -2,20 +2,46 @@ import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomeAdaptiveProfileStory } from '@/features/home/HomeAdaptiveProfileStory';
 
-vi.mock('@/features/home/HomeProfileShowcase', () => ({
-  HomeProfileShowcase: ({
-    stateId,
-    className,
-  }: {
-    readonly stateId: string;
-    readonly className?: string;
-  }) => (
-    <div data-testid={`homepage-phone-state-${stateId}`} className={className}>
-      {stateId}
+vi.mock('@/features/home/HomeHeroCTA', () => ({
+  HomeHeroCTA: () => (
+    <div data-testid='homepage-claim-form'>
+      <span>jov.ie/</span>
+      <button type='button'>Claim your profile</button>
     </div>
   ),
 }));
 
+vi.mock('@/features/home/HomeHeroPhoneComposition', () => ({
+  HomeHeroPhoneComposition: () => (
+    <div data-testid='homepage-hero-composition'>
+      <div data-testid='homepage-phone-state-catalog'>phone states</div>
+    </div>
+  ),
+}));
+
+vi.mock('@/features/home/HomeTrustSection', () => ({
+  HomeTrustSection: () => (
+    <section data-testid='homepage-trust'>Trusted by artists on</section>
+  ),
+}));
+
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();
