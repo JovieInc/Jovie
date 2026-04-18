@@ -43,7 +43,7 @@ function normalizeEventType(
 
 function cleanLabel(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function titleCase(value: string): string {

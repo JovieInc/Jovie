@@ -109,7 +109,7 @@ export async function getPlaylistFallbackRequestContext(
   const { profileId, settings, usernameNormalized } = profile;
   const candidate = getFeaturedPlaylistFallbackCandidate(settings);
 
-  if (!candidate || candidate.playlistId !== playlistId) {
+  if (candidate?.playlistId !== playlistId) {
     return NextResponse.json(
       { success: false, error: 'Playlist suggestion not found' },
       { status: 404 }
