@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { Badge } from '@jovie/ui/atoms/badge';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 
 // ---------------------------------------------------------------------------
 // Lightweight changelog parser (build-time only)
@@ -65,17 +65,11 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 
 export function RecentlyShippedSection() {
-  const candidates = [
-    path.join(process.cwd(), 'CHANGELOG.md'),
-    path.join(process.cwd(), '..', '..', 'CHANGELOG.md'),
-  ];
+  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
 
   let markdown = '';
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      markdown = fs.readFileSync(p, 'utf8');
-      break;
-    }
+  if (fs.existsSync(changelogPath)) {
+    markdown = fs.readFileSync(changelogPath, 'utf8');
   }
 
   const releases = parseRecentReleases(markdown, 3);

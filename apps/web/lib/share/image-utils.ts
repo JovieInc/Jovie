@@ -5,6 +5,7 @@
 
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { resolveAppPath } from '@/lib/filesystem-paths';
 import { fetchWithTimeoutResponse } from '@/lib/queries/fetch';
 
 export const STORY_SIZE = { width: 1080, height: 1920 } as const;
@@ -20,7 +21,7 @@ export const THEME = {
   buttonText: '#000000',
 } as const;
 
-const FONT_DIR = join(process.cwd(), 'public', 'fonts');
+const FONT_DIR = resolveAppPath('public', 'fonts');
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return Uint8Array.from(buffer).buffer;
