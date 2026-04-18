@@ -24,11 +24,12 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   return <>{children}</>;
 }
 
-// Global keyboard shortcut listeners are deferred past first paint. Users
-// do not press `t` or `/` within the first 300ms of page load, and leaving
-// listener attachment on the critical path added two `addEventListener`
-// calls plus per-keypress handler dispatch overhead during boot.
-const KEYBOARD_SHORTCUT_ATTACH_DELAY_MS = 300;
+// Deferral delay shared by the keyboard-shortcut listeners and the monitoring
+// chunk imports. 300ms gives the first-paint burst of work room to finish
+// before we schedule optional side effects. Users do not press `t` or `/`,
+// nor do monitoring chunks need to arrive, within this window of boot.
+const BOOT_DEFERRED_WORK_DELAY_MS = 300;
+const KEYBOARD_SHORTCUT_ATTACH_DELAY_MS = BOOT_DEFERRED_WORK_DELAY_MS;
 
 function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -184,8 +185,8 @@ function CoreProvidersInner({
     let cleanupWebVitals: (() => void) | undefined;
     let isUnmounted = false;
 
+    // useEffect only runs on the client, so we can dispatch unconditionally.
     function dispatchWebVital(metric: unknown) {
-      if (typeof globalThis.window === 'undefined') return;
       const event = new CustomEvent('web-vitals', { detail: metric });
       globalThis.dispatchEvent(event);
     }
@@ -226,7 +227,7 @@ function CoreProvidersInner({
             logger.error('Failed to initialize monitoring:', error);
           });
       }
-    }, 300);
+    }, BOOT_DEFERRED_WORK_DELAY_MS);
 
     return () => {
       isUnmounted = true;
