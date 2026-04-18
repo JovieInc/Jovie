@@ -1226,7 +1226,7 @@ jobs:
           cd apps/web
 
           if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_ADMIN_CLERK_USER_ID not set — skipping admin Lighthouse."
+            echo "E2E_CLERK_USER_ID empty (no E2E_ADMIN_CLERK_USER_ID secret) — skipping admin Lighthouse."
             exit 0
           fi
 

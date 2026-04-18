@@ -179,13 +179,14 @@ export function DashboardNav(_: DashboardNavProps) {
       return;
     }
 
-    releasesPrefetchedProfileIdRef.current = profileId;
-
     // Defer the eager releases prefetch past initial dashboard paint so the
     // shell can hydrate without competing with a background chunk fetch +
     // TanStack Query warmup. Matches the hover-prefetch debounce pattern
-    // used by handlePrefetch below.
+    // used by handlePrefetch below. The prefetched marker is written inside
+    // the timer so a cleanup that fires before the timer runs (fast route
+    // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
+      releasesPrefetchedProfileIdRef.current = profileId;
       router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
       void import(
         '@/features/dashboard/organisms/release-provider-matrix'

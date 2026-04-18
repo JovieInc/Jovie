@@ -172,38 +172,44 @@ function CoreProvidersInner({
     let cleanupWebVitals: (() => void) | undefined;
     let isUnmounted = false;
 
+    function dispatchWebVital(metric: unknown) {
+      if (typeof globalThis.window === 'undefined') return;
+      const event = new CustomEvent('web-vitals', { detail: metric });
+      globalThis.dispatchEvent(event);
+    }
+
+    function handleWebVitalsReady(
+      mod: typeof import('@/lib/monitoring/web-vitals')
+    ) {
+      const cleanup = mod.initWebVitals(dispatchWebVital);
+      if (isUnmounted) {
+        cleanup();
+        return;
+      }
+      cleanupWebVitals = cleanup;
+    }
+
+    function handleMonitoringReady(
+      mod: typeof import('@/lib/monitoring/client')
+    ) {
+      if (isUnmounted) return;
+      mod.initAllMonitoring();
+    }
+
     // Defer monitoring chunks past initial provider hydration so they do
     // not contend with main-thread work during first paint. Web Vitals
     // still captures FCP/LCP/CLS because the underlying PerformanceObserver
     // subscriptions use `{ buffered: true }` to replay early entries.
     const handle = setTimeout(() => {
       import('@/lib/monitoring/web-vitals')
-        .then(({ initWebVitals }) => {
-          const cleanup = initWebVitals(metric => {
-            // Create a custom event for the performance dashboard
-            if (typeof window !== 'undefined') {
-              const event = new CustomEvent('web-vitals', { detail: metric });
-              window.dispatchEvent(event);
-            }
-          });
-
-          if (isUnmounted) {
-            cleanup();
-            return;
-          }
-
-          cleanupWebVitals = cleanup;
-        })
+        .then(handleWebVitalsReady)
         .catch(error => {
           logger.error('Failed to initialize Web Vitals:', error);
         });
 
-      // Initialize other performance monitoring in production
       if (process.env.NODE_ENV === 'production') {
         import('@/lib/monitoring/client')
-          .then(({ initAllMonitoring }) => {
-            initAllMonitoring();
-          })
+          .then(handleMonitoringReady)
           .catch(error => {
             logger.error('Failed to initialize monitoring:', error);
           });
