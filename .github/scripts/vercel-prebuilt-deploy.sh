@@ -15,6 +15,32 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
   exit 1
 fi
 
+VERCEL_CMD=()
+
+resolve_vercel_cmd() {
+  if command -v vercel >/dev/null 2>&1; then
+    VERCEL_CMD=("$(command -v vercel)")
+    return 0
+  fi
+
+  if command -v pnpm >/dev/null 2>&1 && pnpm exec -- vercel --version >/dev/null 2>&1; then
+    VERCEL_CMD=(pnpm exec -- vercel)
+    return 0
+  fi
+
+  if [ -x "./node_modules/.bin/vercel" ]; then
+    VERCEL_CMD=("./node_modules/.bin/vercel")
+    return 0
+  fi
+
+  echo "Vercel CLI not found in PATH or project dependencies" >&2
+  return 127
+}
+
+run_vercel() {
+  "${VERCEL_CMD[@]}" "$@"
+}
+
 parse_deployment_url() {
   printf '%s\n' "$1" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1 || true
 }
@@ -39,21 +65,21 @@ run_deploy() {
   shift
 
   if [ "$mode" = "tgz" ]; then
-    vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
     return
   fi
 
-  vercel deploy "$@" --token "$VERCEL_TOKEN"
+  run_vercel deploy "$@" --token "$VERCEL_TOKEN"
 }
 
 try_mode() {
@@ -96,6 +122,8 @@ if [ "$has_prebuilt_output" = true ]; then
 else
   echo "Prebuilt output file count: unavailable (.vercel/output missing or empty)"
 fi
+resolve_vercel_cmd
+echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
 deploy_modes=()
