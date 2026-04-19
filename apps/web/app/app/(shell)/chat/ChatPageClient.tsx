@@ -187,7 +187,7 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
-  const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
+  const [, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
     useRef<WelcomeChatBootstrapState>('idle');
