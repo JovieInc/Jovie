@@ -63,6 +63,7 @@ vi.mock('@jovie/ui', async () => {
 vi.mock('@/components/molecules/drawer', () => ({
   EntitySidebarShell: ({
     children,
+    contextMenuItems,
     isEmpty,
     emptyMessage,
     entityHeader,
@@ -75,6 +76,12 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader?: React.ReactNode;
     tabs?: React.ReactNode;
     footer?: React.ReactNode;
+    contextMenuItems?: Array<{
+      id?: string;
+      type?: string;
+      label?: string;
+      onClick?: () => void;
+    }>;
     [key: string]: unknown;
   }) =>
     isEmpty ? (
@@ -83,6 +90,18 @@ vi.mock('@/components/molecules/drawer', () => ({
       <div data-testid='right-drawer'>
         {entityHeader}
         {tabs}
+        {contextMenuItems?.map(item =>
+          item.type === 'action' && item.label ? (
+            <button
+              key={item.id ?? item.label}
+              type='button'
+              data-testid={`context-menu-${item.id ?? item.label}`}
+              onClick={item.onClick}
+            >
+              {item.label}
+            </button>
+          ) : null
+        )}
         {children}
         {footer}
       </div>
@@ -343,7 +362,14 @@ vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
-  ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
+  ReleaseDspLinks: ({ isAddingLink }: { isAddingLink?: boolean }) => (
+    <div
+      data-testid='dsp-links'
+      data-adding-link={isAddingLink ? 'true' : 'false'}
+    >
+      DSP Links Content
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseCreditsSection', () => ({
@@ -363,10 +389,30 @@ vi.mock(
 );
 
 vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
-  ReleasePitchSection: () => (
-    <div data-testid='pitch-section'>Pitch Section</div>
+  ReleasePitchSection: ({ variant }: { variant?: 'card' | 'flat' }) => (
+    <div data-testid='pitch-section' data-variant={variant ?? 'card'}>
+      Pitch Section
+    </div>
   ),
 }));
+
+vi.mock(
+  '@/components/organisms/release-sidebar/ReleaseTargetPlaylistsSection',
+  () => ({
+    ReleaseTargetPlaylistsSection: ({
+      variant,
+    }: {
+      variant?: 'card' | 'flat';
+    }) => (
+      <div
+        data-testid='target-playlists-section'
+        data-variant={variant ?? 'card'}
+      >
+        Target Playlists
+      </div>
+    ),
+  })
+);
 
 vi.mock('@/components/features/dashboard/release-tasks', () => ({
   ReleaseTaskChecklist: () => <div data-testid='task-checklist'>Tasks</div>,
@@ -471,10 +517,9 @@ describe('ReleaseSidebar inspector cards', () => {
     );
   });
 
-  it('renders the release drawer with a tabbed primary card and a details properties panel', () => {
+  it('renders the release drawer with collapsed secondary sections', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
@@ -490,14 +535,15 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
     expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-extras-card')).toBeInTheDocument();
+    expect(screen.getByText('Lyrics')).toBeInTheDocument();
+    expect(screen.getByText('Extras')).toBeInTheDocument();
+    expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('async-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pitch-section')).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('release-settings-card-stack')
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
-    expect(screen.getByTestId('lyrics')).toHaveAttribute(
-      'data-variant',
-      'flat'
-    );
+      screen.queryByTestId('target-playlists-section')
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
@@ -547,8 +593,10 @@ describe('ReleaseSidebar inspector cards', () => {
       'card'
     );
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
-    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-inspector-stack')
+    ).not.toBeInTheDocument();
   });
 
   it('resets the active tab to Details when the release changes', async () => {
@@ -595,6 +643,31 @@ describe('ReleaseSidebar inspector cards', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the DSP tab and add-link form from the edit release links action', async () => {
+    const user = userEvent.setup();
+    render(
+      <ReleaseSidebar
+        release={mockRelease}
+        {...defaultProps}
+        providerConfig={{
+          spotify: { label: 'Spotify', accent: '#1DB954' },
+        }}
+      />
+    );
+
+    await user.click(screen.getByTestId('context-menu-edit'));
+
+    expect(screen.getByTestId('drawer-tab-dsps')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('dsp-links')).toHaveAttribute(
+      'data-adding-link',
+      'true'
+    );
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+  });
+
   it('smart link analytics card renders when a release is selected', async () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
@@ -602,16 +675,17 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
-  it('renders the release drawer as stacked header, analytics, tabbed primary content, and secondary cards', () => {
+  it('renders the release drawer as header, analytics, primary tabs, and collapsed secondary sections', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
-    expect(screen.getByTestId('release-inspector-stack')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
+    expect(screen.getByTestId('release-extras-card')).toBeInTheDocument();
     expect(
       screen.queryByTestId('release-credits-card-stack')
     ).not.toBeInTheDocument();

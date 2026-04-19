@@ -322,10 +322,10 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'dashboard-release-sidebar-platforms-desktop',
       title: 'Release Sidebar Platforms',
       route: '/demo',
-      waitFor: '[data-testid="release-platforms-card"]',
+      waitFor: '[data-testid="release-tabbed-card"]',
       captureTarget: 'locator',
-      captureSelector: '[data-testid="release-platforms-card"]',
-      interaction: 'open-first-release',
+      captureSelector: '[data-testid="release-tabbed-card"]',
+      interaction: 'open-first-release-dsps',
       publicExportPath: 'release-sidebar-platforms.png',
     },
     {

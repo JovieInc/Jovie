@@ -1,10 +1,29 @@
+import { Badge } from '@jovie/ui';
 import { cn } from '@/lib/utils';
-import {
-  type StatusBadgeSize,
-  type StatusBadgeVariant,
-  sizeClasses,
-  variantClasses,
-} from './StatusBadgeStyles';
+
+const STATUS_BADGE_TONES = {
+  blue: 'info',
+  green: 'success',
+  purple: 'accent',
+  orange: 'warning',
+  red: 'error',
+  gray: 'neutral',
+} as const;
+
+const STATUS_BADGE_SIZES = {
+  sm: 'sm',
+  md: 'md',
+  lg: 'lg',
+} as const;
+
+const STATUS_BADGE_SIZE_CLASSES = {
+  sm: 'px-3 py-1 text-xs',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-5 py-2.5 text-base',
+} as const;
+
+export type StatusBadgeVariant = keyof typeof STATUS_BADGE_TONES;
+export type StatusBadgeSize = keyof typeof STATUS_BADGE_SIZES;
 
 export interface StatusBadgeProps {
   /** Badge text content */
@@ -26,20 +45,23 @@ export function StatusBadge({
   variant = 'blue',
   icon,
   size = 'md',
-  className = '',
+  className,
   dynamic = false,
 }: StatusBadgeProps) {
   return (
-    <output
+    <Badge
+      role={dynamic ? 'status' : undefined}
+      aria-live={dynamic ? 'polite' : undefined}
+      tone={STATUS_BADGE_TONES[variant]}
+      size={STATUS_BADGE_SIZES[size]}
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border font-medium',
-        variantClasses[variant],
-        sizeClasses[size],
+        'gap-2 font-medium',
+        STATUS_BADGE_SIZE_CLASSES[size],
         className
       )}
     >
-      {icon && <span className='flex-shrink-0'>{icon}</span>}
+      {icon && <span className='shrink-0'>{icon}</span>}
       <span>{children}</span>
-    </output>
+    </Badge>
   );
 }

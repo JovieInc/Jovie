@@ -1,6 +1,10 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type {
+  ChatPersistenceMessage,
+  PersistedToolEvent,
+} from '@/lib/chat/tool-events';
 import { createMutationFn, FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { ChatConversation } from './useChatConversationsQuery';
@@ -28,7 +32,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  toolCalls?: Record<string, unknown>[];
+  toolCalls?: PersistedToolEvent[];
   createdAt: string;
 }
 
@@ -43,11 +47,7 @@ interface CreateConversationResponse {
 
 interface AddMessagesInput {
   conversationId: string;
-  messages: Array<{
-    role: 'user' | 'assistant';
-    content: string;
-    toolCalls?: Record<string, unknown>[];
-  }>;
+  messages: ChatPersistenceMessage[];
 }
 
 interface AddMessagesResponse {

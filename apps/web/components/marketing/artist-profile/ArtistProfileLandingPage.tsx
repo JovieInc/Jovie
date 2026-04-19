@@ -59,10 +59,14 @@ export function ArtistProfileLandingPage({
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
-        <ArtistProfileCaptureSection capture={copy.capture} />
+        <ArtistProfileCaptureSection
+          capture={copy.capture}
+          id='capture-every-fan'
+        />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.reactivation}>
         <ArtistProfileReactivationSection
+          id='bring-them-back-automatically'
           notification={copy.capture.notification}
           reactivation={copy.reactivation}
         />

@@ -27,6 +27,14 @@ const badgeVariants = cva(
         lg: 'px-2.5 py-0.5 text-xs',
         xl: 'px-3 py-1 text-xs',
       },
+      tone: {
+        neutral: 'border border-subtle bg-surface-1 text-tertiary-token',
+        info: 'border border-info/20 bg-surface-1 text-info',
+        success: 'border border-success/20 bg-surface-1 text-success',
+        accent: 'border border-accent/20 bg-surface-1 text-accent',
+        warning: 'border border-warning/20 bg-surface-1 text-warning',
+        error: 'border border-error/20 bg-surface-1 text-error',
+      },
     },
     defaultVariants: {
       variant: 'default',
@@ -40,11 +48,11 @@ export interface BadgeProps
     VariantProps<typeof badgeVariants> {}
 
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant, size, ...props }, ref) => {
+  ({ className, variant, size, tone, ...props }, ref) => {
     return (
       <span
         ref={ref}
-        className={cn(badgeVariants({ variant, size }), className)}
+        className={cn(badgeVariants({ variant, size, tone }), className)}
         {...props}
       />
     );

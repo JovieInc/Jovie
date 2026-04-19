@@ -146,7 +146,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
   profile: {
     handle: 'calvin-demo',
     displayName: 'Calvin Harris',
-    avatarSrc: '/images/avatars/pop-star.jpg',
+    avatarSrc: '/images/avatars/calvin-harris.jpg',
     bio: 'Festival-headlining DJ and producer with a catalog built for clubs, stadiums, and late-night drive time.',
     creatorType: 'artist',
     location: 'London, UK',

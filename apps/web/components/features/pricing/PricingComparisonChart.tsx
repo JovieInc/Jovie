@@ -96,14 +96,15 @@ function MobileFeatureRow({
       className='border-b'
       style={{ borderColor: 'var(--linear-border-subtle)' }}
     >
-      <td
-        className='py-3 pr-4 text-[13px]'
+      <th
+        scope='row'
+        className='px-5 py-3.5 pr-4 text-[13px]'
         style={{ color: 'var(--linear-text-secondary)' }}
       >
         {feature.name}
-      </td>
+      </th>
       <td
-        className='py-3 text-center px-2'
+        className='px-5 py-3.5 text-center'
         style={
           selectedPlan === 'pro'
             ? { backgroundColor: 'var(--linear-bg-surface-1)' }
@@ -129,20 +130,21 @@ function DesktopFeatureRow({
       className='border-b'
       style={{ borderColor: 'var(--linear-border-subtle)' }}
     >
-      <td
-        className='py-3 pr-4 text-[13px]'
+      <th
+        scope='row'
+        className='px-5 py-3.5 pr-4 text-[13px]'
         style={{ color: 'var(--linear-text-secondary)' }}
       >
         {feature.name}
-      </td>
-      <td className='py-3 text-center px-2'>
+      </th>
+      <td className='px-5 py-3.5 text-center'>
         <CellValue
           value={feature.free}
           comingSoon={feature.comingSoon && feature.free !== false}
         />
       </td>
       <td
-        className='py-3 text-center px-2'
+        className='px-5 py-3.5 text-center'
         style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
       >
         <CellValue
@@ -151,7 +153,7 @@ function DesktopFeatureRow({
         />
       </td>
       {maxPlanEnabled && (
-        <td className='py-3 text-center px-2'>
+        <td className='px-5 py-3.5 text-center'>
           <CellValue value={feature.max} comingSoon={feature.comingSoon} />
         </td>
       )}
@@ -277,21 +279,21 @@ export function PricingComparisonChart() {
 
       {/* Desktop comparison table */}
       <div
-        className='max-md:hidden overflow-x-auto rounded-lg'
+        className='hidden overflow-x-auto rounded-[1.5rem] border p-3 md:block'
         style={{
-          border: '1px solid var(--linear-border-default)',
           backgroundColor: 'var(--linear-bg-surface-0)',
+          borderColor: 'var(--linear-border-default)',
         }}
       >
-        <table className='w-full border-collapse'>
+        <table className='w-full border-separate border-spacing-0'>
           <thead>
             <tr
               className='border-b'
               style={{ borderColor: 'var(--linear-border-default)' }}
             >
-              <th className='w-[40%] p-4 text-left' />
+              <th className='w-[40%] px-5 py-5 text-left' />
               {/* Free */}
-              <th className='p-4 text-center min-w-[120px]'>
+              <th className='min-w-[120px] px-5 py-5 text-center'>
                 <div
                   className='text-[13px] font-medium'
                   style={{ color: 'var(--linear-text-tertiary)' }}
@@ -307,7 +309,7 @@ export function PricingComparisonChart() {
               </th>
               {/* Pro */}
               <th
-                className='p-4 text-center min-w-[160px]'
+                className='min-w-[160px] px-5 py-5 text-center'
                 style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
               >
                 <div
@@ -339,7 +341,7 @@ export function PricingComparisonChart() {
               </th>
               {/* Max */}
               {maxPlanEnabled && (
-                <th className='p-4 text-center min-w-[140px]'>
+                <th className='min-w-[140px] px-5 py-5 text-center'>
                   <div className='flex items-center justify-center gap-1.5'>
                     <span
                       className='text-[13px] font-medium'
@@ -388,7 +390,7 @@ export function PricingComparisonChart() {
                 <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
                   <td
                     colSpan={maxPlanEnabled ? 4 : 3}
-                    className='px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider'
+                    className='px-5 py-3 text-[12px] font-semibold tracking-[0.04em]'
                     style={{ color: 'var(--linear-text-tertiary)' }}
                   >
                     {category.category}
@@ -408,21 +410,21 @@ export function PricingComparisonChart() {
 
       {/* Mobile comparison table */}
       <div
-        className='md:hidden overflow-x-auto rounded-lg'
+        className='overflow-x-auto rounded-[1.5rem] border p-3 md:hidden'
         style={{
-          border: '1px solid var(--linear-border-default)',
           backgroundColor: 'var(--linear-bg-surface-0)',
+          borderColor: 'var(--linear-border-default)',
         }}
       >
-        <table className='w-full border-collapse'>
+        <table className='w-full border-separate border-spacing-0'>
           <thead>
             <tr
               className='border-b'
               style={{ borderColor: 'var(--linear-border-default)' }}
             >
-              <th className='w-[60%] p-4 text-left' />
+              <th className='w-[60%] px-5 py-5 text-left' />
               <th
-                className='p-4 text-center'
+                className='px-5 py-5 text-center'
                 style={
                   selectedPlan === 'pro'
                     ? { backgroundColor: 'var(--linear-bg-surface-1)' }
@@ -451,7 +453,7 @@ export function PricingComparisonChart() {
                 <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
                   <td
                     colSpan={2}
-                    className='px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider'
+                    className='px-5 py-3 text-[12px] font-semibold tracking-[0.04em]'
                     style={{ color: 'var(--linear-text-tertiary)' }}
                   >
                     {category.category}

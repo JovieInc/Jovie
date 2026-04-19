@@ -22,6 +22,7 @@ import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileCaptureSectionProps {
+  readonly id?: string;
   readonly capture: ArtistProfileLandingCopy['capture'];
 }
 
@@ -56,6 +57,7 @@ type PillAccentStyle = CSSProperties & {
 };
 
 export function ArtistProfileCaptureSection({
+  id,
   capture,
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -144,7 +146,7 @@ export function ArtistProfileCaptureSection({
   }, [activated, phase, reducedMotion]);
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.008]'>
+    <ArtistProfileSectionShell className='bg-white/[0.008]' id={id}>
       <style>{`
         .artist-profile-audience-mask {
           mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);

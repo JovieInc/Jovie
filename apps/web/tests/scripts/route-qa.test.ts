@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isNotFoundLike } from '../../scripts/route-qa';
+import {
+  isNotFoundLike,
+  resolveRouteCaseTimeoutMs,
+  settleWithTimeout,
+} from '../../scripts/route-qa';
 
 describe('route-qa not-found detection', () => {
   it('accepts explicit not-found copy variants', () => {
@@ -37,5 +41,15 @@ describe('route-qa not-found detection', () => {
         hasNotFoundTestId: false,
       })
     ).toBe(false);
+  });
+
+  it('times out unresolved route work so route qa can fail the case explicitly', async () => {
+    await expect(
+      settleWithTimeout(new Promise<void>(() => undefined), 10)
+    ).resolves.toEqual({ timedOut: true });
+  });
+
+  it('uses a two minute per-route timeout by default', () => {
+    expect(resolveRouteCaseTimeoutMs()).toBe(120_000);
   });
 });

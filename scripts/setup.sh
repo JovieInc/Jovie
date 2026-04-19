@@ -256,7 +256,7 @@ echo "── Doppler CLI ──────────────────�
 if command -v doppler &>/dev/null; then
   success "Doppler CLI $(doppler --version 2>/dev/null | head -1)"
 else
-  warn "Doppler CLI not found — installing..."
+  warn "Doppler CLI not found"
   OS="$(uname -s 2>/dev/null || echo Windows)"
   case "$OS" in
     Darwin)
@@ -267,19 +267,17 @@ else
           MISSING+=("Doppler CLI")
         fi
       else
-        info "Installing via curl (macOS)..."
-        if ! curl -Lsf https://cli.doppler.com/install.sh | sh; then
-          warn "Curl install failed for Doppler CLI"
-          MISSING+=("Doppler CLI")
-        fi
+        warn "Homebrew not found. Install Doppler CLI manually:"
+        info "  brew install dopplerhq/cli/doppler"
+        info "  or install Homebrew first: https://brew.sh"
+        MISSING+=("Doppler CLI")
       fi
       ;;
     Linux)
-      info "Installing via curl (Linux)..."
-      if ! curl -Lsf https://cli.doppler.com/install.sh | sh; then
-        warn "Curl install failed for Doppler CLI"
-        MISSING+=("Doppler CLI")
-      fi
+      warn "Linux detected. Install Doppler CLI manually before continuing:"
+      info "  apt: sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg"
+      info "  docs: https://docs.doppler.com/docs/install-cli"
+      MISSING+=("Doppler CLI")
       ;;
     Windows* | MINGW* | MSYS* | CYGWIN*)
       warn "Windows detected — install Doppler manually:"
@@ -287,11 +285,9 @@ else
       MISSING+=("Doppler CLI")
       ;;
     *)
-      info "Unknown OS ($OS) — trying curl installer..."
-      curl -Lsf https://cli.doppler.com/install.sh | sh || {
-        warn "Auto-install failed. Visit: https://docs.doppler.com/docs/install-cli"
-        MISSING+=("Doppler CLI")
-      }
+      warn "Unknown OS ($OS). Install Doppler CLI manually:"
+      info "  https://docs.doppler.com/docs/install-cli"
+      MISSING+=("Doppler CLI")
       ;;
   esac
   if command -v doppler &>/dev/null; then
@@ -409,5 +405,6 @@ if [[ ${#MISSING[@]} -eq 0 ]]; then
 else
   warn "Missing: $(IFS=', '; echo "${MISSING[*]}")"
   echo "  See instructions above to resolve each item, then re-run: ./scripts/setup.sh"
+  exit 1
 fi
 echo ""

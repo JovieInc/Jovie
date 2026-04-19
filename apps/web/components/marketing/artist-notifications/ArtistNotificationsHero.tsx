@@ -1,28 +1,16 @@
-import { AtSign, Headphones, Mail, MailCheck, Ticket } from 'lucide-react';
 import Link from 'next/link';
-import type { ComponentType } from 'react';
 import { MarketingContainer } from '@/components/marketing';
+import { ArtistNotificationFloatingCardView } from '@/components/marketing/MarketingStoryPrimitives';
 import type { ArtistNotificationsLandingCopy } from '@/data/artistNotificationsCopy';
-
-type FloatingCard =
-  ArtistNotificationsLandingCopy['hero']['floatingCards'][number];
 
 interface ArtistNotificationsHeroProps {
   readonly hero: ArtistNotificationsLandingCopy['hero'];
 }
 
-const CARD_ICONS: Record<
-  FloatingCard['kind'],
-  ComponentType<{ className?: string; strokeWidth?: number }>
+const CARD_POSITIONS: Record<
+  ArtistNotificationsLandingCopy['hero']['floatingCards'][number]['kind'],
+  string
 > = {
-  capture: AtSign,
-  subscribe: Mail,
-  email: MailCheck,
-  click: Headphones,
-  outcome: Ticket,
-};
-
-const CARD_POSITIONS: Record<FloatingCard['kind'], string> = {
   capture:
     'lg:absolute lg:left-[2%] lg:top-[2%] lg:w-[17rem] lg:-rotate-[2deg]',
   subscribe:
@@ -79,55 +67,12 @@ export function ArtistNotificationsHero({
                 key={card.id}
                 className={`${CARD_POSITIONS[card.kind]} w-full`}
               >
-                <FloatingCardView card={card} />
+                <ArtistNotificationFloatingCardView card={card} />
               </div>
             ))}
           </div>
         </div>
       </MarketingContainer>
     </section>
-  );
-}
-
-function FloatingCardView({ card }: Readonly<{ card: FloatingCard }>) {
-  const Icon = CARD_ICONS[card.kind];
-
-  if (card.kind === 'subscribe') {
-    return (
-      <div className='rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]'>
-        <div className='flex items-center gap-2 rounded-full bg-black/34 py-1 pl-3 pr-1'>
-          <Mail
-            className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-            strokeWidth={1.9}
-          />
-          <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
-            {card.detail}
-          </span>
-          <span className='inline-flex h-7 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-medium text-black'>
-            {card.title}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <article className='rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]'>
-      <div className='flex items-start gap-3'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-primary-token'>
-          <Icon className='h-4 w-4' strokeWidth={1.9} />
-        </span>
-        <div className='min-w-0 flex-1'>
-          <p className='text-[14px] font-semibold leading-[1.35] tracking-[-0.02em] text-primary-token'>
-            {card.title}
-          </p>
-          {card.detail ? (
-            <p className='mt-1.5 text-[13px] leading-[1.5] text-secondary-token'>
-              {card.detail}
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </article>
   );
 }

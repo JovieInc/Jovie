@@ -21,6 +21,7 @@ export interface DrawerSectionProps {
   readonly defaultOpen?: boolean;
   /** Delay mounting collapsed content until the first time it opens. */
   readonly lazyMount?: boolean;
+  readonly headingTestId?: string;
 }
 
 interface DrawerSectionHeadingSlotProps {
@@ -29,6 +30,7 @@ interface DrawerSectionHeadingSlotProps {
   readonly isOpen: boolean;
   readonly onToggle: () => void;
   readonly contentId: string;
+  readonly testId?: string;
 }
 
 function DrawerSectionHeadingSlot({
@@ -37,6 +39,7 @@ function DrawerSectionHeadingSlot({
   isOpen,
   onToggle,
   contentId,
+  testId,
 }: DrawerSectionHeadingSlotProps) {
   if (!title) {
     return null;
@@ -48,6 +51,7 @@ function DrawerSectionHeadingSlot({
         isOpen={isOpen}
         onToggle={onToggle}
         aria-controls={contentId}
+        data-testid={testId}
         className='min-w-0 flex-1'
       >
         {title}
@@ -129,6 +133,7 @@ export function DrawerSection({
   collapsible,
   defaultOpen = true,
   lazyMount = false,
+  headingTestId,
 }: DrawerSectionProps) {
   const isCollapsible = collapsible ?? !!title;
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -152,6 +157,7 @@ export function DrawerSection({
       isOpen={isOpen}
       onToggle={handleToggle}
       contentId={contentId}
+      testId={headingTestId}
     />
   );
   const isContentHidden = isCollapsible && !isOpen;

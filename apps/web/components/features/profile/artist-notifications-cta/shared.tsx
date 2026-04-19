@@ -40,7 +40,7 @@ export const subscriptionDisclaimerClassName =
   'text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
 
 export const profilePrimaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_12px_32px_rgba(0,0,0,0.18)] transition-[background-color,color,opacity,box-shadow,transform] duration-200 ease-out hover:opacity-95 hover:shadow-[0_16px_36px_rgba(0,0,0,0.2)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
 export const profileSecondaryPillClassName =
   'inline-flex h-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-[15px] font-[580] tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--profile-pearl-bg-hover)] hover:border-[color:var(--profile-pearl-border)] hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
@@ -49,7 +49,7 @@ export const profileQuietIconButtonClassName =
   'border-transparent bg-transparent text-white/72 shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_86%,transparent)] hover:text-white focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,transparent)] focus-visible:text-white active:bg-[var(--profile-pearl-bg-active)] active:text-white';
 
 export const subscriptionComposerSurfaceClassName =
-  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_8px_20px_rgba(15,17,24,0.06)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-slow ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
+  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_10px_22px_rgba(15,17,24,0.08)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-slow ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
 
 export const subscriptionComposerFocusClassName =
   'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_14px_30px_rgba(15,17,24,0.12)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';

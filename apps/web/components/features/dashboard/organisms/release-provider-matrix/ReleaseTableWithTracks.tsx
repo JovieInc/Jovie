@@ -9,7 +9,7 @@ import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
-import { MobileReleaseList } from './MobileReleaseList';
+import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
@@ -276,7 +276,7 @@ export function ReleaseTableWithTracks({
     }
 
     return (
-      <MobileReleaseList
+      <MobileReleaseListLazy
         releases={releases}
         artistName={artistName}
         onEdit={onEdit}
