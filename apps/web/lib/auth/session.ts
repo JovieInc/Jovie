@@ -85,9 +85,17 @@ export function getSessionSetupSql(userId: string) {
   return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`;
 }
 
-function getSessionSetupFallbackSql(userId: string) {
-  validateClerkUserId(userId);
-  return drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`;
+export async function setTransactionSessionUserId(
+  tx: DbOrTransaction,
+  userId: string,
+  context: string
+): Promise<void> {
+  try {
+    await tx.execute(getSessionSetupSql(userId));
+  } catch (error) {
+    logDbError(context, error, { userId });
+    throw error;
+  }
 }
 
 async function applySessionUserId(userId: string): Promise<void> {
@@ -179,13 +187,14 @@ export async function withDbSessionTx<T>(
   // Keep usage centralized through runLegacyDbTransaction for auditability.
   return runLegacyDbTransaction(
     async tx => {
-      // Set the session variable within the transaction
-      try {
-        await tx.execute(getSessionSetupSql(userId));
-      } catch (error) {
-        logDbError('withDbSessionTx_set_config_failed', error, { userId });
-        await tx.execute(getSessionSetupFallbackSql(userId));
-      }
+      // Set the session variable within the transaction.
+      // Neon HTTP does not support SET LOCAL fallback outside a real transaction,
+      // so fail closed if transaction-scoped session state cannot be set.
+      await setTransactionSessionUserId(
+        tx,
+        userId,
+        'withDbSessionTx_set_config_failed'
+      );
       return operation(tx, userId);
     },
     options?.isolationLevel

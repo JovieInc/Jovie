@@ -17,7 +17,7 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import {
   getProfileMonetizationHeading,
   getProfileMonetizationPrimaryActionLabel,
@@ -82,7 +82,7 @@ export function ProfilePaySurface({
   onViewAnalytics,
   className,
 }: Readonly<ProfilePaySurfaceProps>) {
-  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
+  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   const isDrawer = variant === 'drawer';
   const isShareable =
     summary.tipUrl !== null &&

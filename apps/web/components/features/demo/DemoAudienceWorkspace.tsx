@@ -141,14 +141,12 @@ export function DemoAudienceWorkspace() {
     captureMode === 'retargeting'
       ? null
       : 'analytics';
-  const tableTestId =
-    captureMode === 'quality'
-      ? 'demo-audience-capture-quality'
-      : captureMode === 'crm'
-        ? 'demo-audience-capture-crm'
-        : captureMode === 'retargeting'
-          ? 'demo-audience-capture-retargeting'
-          : 'demo-audience-shell';
+  const captureTestIds: Record<string, string> = {
+    quality: 'demo-audience-capture-quality',
+    crm: 'demo-audience-capture-crm',
+    retargeting: 'demo-audience-capture-retargeting',
+  };
+  const tableTestId = captureTestIds[captureMode] ?? 'demo-audience-shell';
   const analyticsSidebarTestId =
     captureMode === 'geo'
       ? 'demo-audience-capture-geo'

@@ -212,6 +212,19 @@ function normalizeApproval(value: unknown): PersistedToolApproval | undefined {
   };
 }
 
+function getSummaryForState(
+  state: PersistedToolState,
+  output: Record<string, unknown> | undefined,
+  outputError: string | undefined,
+  approvalReason: string | undefined
+): string | undefined {
+  if (state === 'succeeded') return extractSummary(output);
+  if (state === 'failed' || state === 'denied') {
+    return extractSummary(output) ?? outputError ?? approvalReason;
+  }
+  return undefined;
+}
+
 function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
   if (!isToolUIPart(part)) {
     return null;
@@ -241,12 +254,12 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
       ? approval.reason
       : undefined;
   const outputError = extractErrorMessage(output);
-  const errorMessage =
-    typeof part.errorText === 'string'
-      ? part.errorText
-      : state === 'failed' || state === 'denied'
-        ? (outputError ?? approvalReason)
-        : undefined;
+  let errorMessage: string | undefined;
+  if (typeof part.errorText === 'string') {
+    errorMessage = part.errorText;
+  } else if (state === 'failed' || state === 'denied') {
+    errorMessage = outputError ?? approvalReason;
+  }
 
   return {
     schemaVersion: 2,
@@ -256,12 +269,7 @@ function normalizeToolPart(part: ToolPart): PersistedToolEvent | null {
     input,
     output,
     errorMessage,
-    summary:
-      state === 'succeeded'
-        ? extractSummary(output)
-        : state === 'failed' || state === 'denied'
-          ? (extractSummary(output) ?? outputError ?? approvalReason)
-          : undefined,
+    summary: getSummaryForState(state, output, outputError, approvalReason),
     uiHint: config.uiHint,
     approval,
   };

@@ -31,11 +31,11 @@ import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import { useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
-  CODE_FLAG_KEYS,
-  FEATURE_FLAGS,
-  FF_OVERRIDES_KEY,
-} from '@/lib/feature-flags/shared';
+  APP_FLAG_DEFAULTS,
+  APP_FLAG_OVERRIDE_KEYS,
+} from '@/lib/flags/contracts';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
 
@@ -55,41 +55,6 @@ import {
 } from '@/lib/service-worker/control';
 import { useFlagBadges } from './FlagBadgeContext';
 
-function useLocalOverrides() {
-  const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
-    if (globalThis.window === undefined) return {};
-    try {
-      return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
-    } catch {
-      return {};
-    }
-  });
-
-  const setOverride = useCallback((key: string, value: boolean) => {
-    setOverrides(prev => {
-      const next = { ...prev, [key]: value };
-      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const removeOverride = useCallback((key: string) => {
-    setOverrides(prev => {
-      const next = { ...prev };
-      delete next[key];
-      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const clearOverrides = useCallback(() => {
-    setOverrides({});
-    localStorage.removeItem(FF_OVERRIDES_KEY);
-  }, []);
-
-  return { overrides, setOverride, removeOverride, clearOverrides };
-}
-
 type FlagEntry = {
   name: string;
   key: string;
@@ -98,12 +63,12 @@ type FlagEntry = {
 };
 
 const ALL_FLAGS: FlagEntry[] = (
-  Object.entries(CODE_FLAG_KEYS) as [string, string][]
+  Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
 ).map(([name, key]) => ({
   name,
   key,
   source: 'code' as const,
-  serverDefault: FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS],
+  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
 }));
 
 const BREAKPOINTS = [
@@ -266,7 +231,7 @@ export function DevToolbar({
     prod: string;
   } | null>(null);
   const { theme, setTheme } = useTheme();
-  const overridesCtx = useLocalOverrides();
+  const overridesCtx = useStoredAppFlagOverrides();
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);

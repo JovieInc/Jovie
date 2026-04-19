@@ -43,6 +43,7 @@ jobs:
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
+      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
@@ -60,7 +61,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -73,7 +74,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -84,7 +85,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -133,6 +134,13 @@ jobs:
             echo "run_onboarding_lighthouse=false" >> $GITHUB_OUTPUT
           fi
 
+          ADMIN_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.admin\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/admin/|apps/web/components/features/admin/)'
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ADMIN_LIGHTHOUSE_PATTERN"; then
+            echo "run_admin_lighthouse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
+          fi
+
           # E2E paths
           E2E_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$E2E_PATTERN"; then
@@ -156,6 +164,7 @@ jobs:
             echo "run_build=false" >> "$GITHUB_OUTPUT"
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
+            echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -576,7 +585,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr]
+    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -588,12 +597,14 @@ jobs:
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
           ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
+          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
           PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
+          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
@@ -622,6 +633,12 @@ jobs:
           # Onboarding Lighthouse — path-gated, so skipped when no onboarding files changed
           if [[ "$ONBOARDING_LIGHTHOUSE_RESULT" != "success" && "$ONBOARDING_LIGHTHOUSE_RESULT" != "skipped" ]]; then
             echo "❌ ci-lighthouse-onboarding-pr did not pass (result: $ONBOARDING_LIGHTHOUSE_RESULT)"
+            exit 1
+          fi
+
+          # Admin Lighthouse — path-gated, so skipped when no admin files changed
+          if [[ "$ADMIN_LIGHTHOUSE_RESULT" != "success" && "$ADMIN_LIGHTHOUSE_RESULT" != "skipped" ]]; then
+            echo "❌ ci-lighthouse-admin-pr did not pass (result: $ADMIN_LIGHTHOUSE_RESULT)"
             exit 1
           fi
 
@@ -1152,6 +1169,140 @@ jobs:
         with:
           name: lighthouse-onboarding-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/onboarding-pr/
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  ci-lighthouse-admin-pr:
+    name: Lighthouse (admin PR)
+    # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
+    # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
+    # its own ephemeral branch below and does not reuse the shared neon-db branch.
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: admin-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        id: resolve-admin-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-admin-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Build app for admin Lighthouse
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run authenticated admin Lighthouse
+        run: |
+          cd apps/web
+
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "E2E_CLERK_USER_ID empty (no E2E_ADMIN_CLERK_USER_ID secret) — skipping admin Lighthouse."
+            exit 0
+          fi
+
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found — admin Lighthouse cannot start."
+            exit 1
+          fi
+
+          node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          echo "Waiting for standalone server..."
+          SERVER_READY=false
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Server failed to start within 30s."
+            exit 1
+          fi
+
+          pnpm run test:lighthouse:admin:pr
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-admin-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-admin-ci
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_ADMIN_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_ADMIN_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_ADMIN_CLERK_USER_PASSWORD }}
+
+      - name: Upload admin Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse-admin-pr-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/.lighthouseci/admin-pr/
           if-no-files-found: ignore
           retention-days: 3
 
@@ -2507,7 +2658,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ALLOW_SOURCE_FALLBACK: '1'
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: '1'
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -3024,6 +3175,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
       - name: Alias preview to staging.jov.ie
         run: |

@@ -2,6 +2,64 @@ import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HomePageNarrative } from '@/features/home/HomePageNarrative';
 
+vi.mock('@/features/home/HomeAdaptiveProfileStory', () => ({
+  HomeAdaptiveProfileStory: () => (
+    <>
+      <section data-testid='homepage-hero'>hero</section>
+      <section data-testid='homepage-trust'>trust</section>
+    </>
+  ),
+}));
+
+vi.mock('@/features/home/HomeEngageBentoSection', () => ({
+  HomeEngageBentoSection: () => (
+    <section data-testid='homepage-engage-bento'>
+      <h2>Engage.</h2>
+      <p>Smart links that stay current.</p>
+    </section>
+  ),
+}));
+
+vi.mock('@/features/home/HomeAutoNotifySection', () => ({
+  HomeAutoNotifySection: () => (
+    <section data-testid='homepage-auto-notify'>
+      <h2>Notify every fan. Automatically.</h2>
+    </section>
+  ),
+}));
+
+vi.mock('@/features/home/HomeFanRelationshipSection', () => ({
+  HomeFanRelationshipSection: () => (
+    <section data-testid='homepage-fan-relationship'>
+      <h2>Turn action into a relationship.</h2>
+      <p>Recognize the people who care.</p>
+    </section>
+  ),
+}));
+
+vi.mock('@/features/home/HomeLiveProofSection', () => ({
+  HomeLiveProofSection: () => (
+    <section data-testid='homepage-live-proof'>live proof</section>
+  ),
+}));
+
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();

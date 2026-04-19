@@ -32,8 +32,8 @@ vi.mock(
   })
 );
 
-vi.mock('@/lib/feature-flags/client', () => ({
-  useCodeFlag: () => true,
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => true,
 }));
 
 vi.mock('@/components/atoms/Icon', () => ({
