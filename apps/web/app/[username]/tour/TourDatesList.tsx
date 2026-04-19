@@ -48,7 +48,7 @@ export function TourDatesList({
           handle={handle}
           isNearYou={item.isNearby}
           distanceKm={
-            item.distanceMiles != null ? item.distanceMiles / 0.621371 : null
+            item.distanceMiles == null ? null : item.distanceMiles / 0.621371
           }
         />
       ))}

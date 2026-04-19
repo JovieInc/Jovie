@@ -89,7 +89,6 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
                   showBackButton={false}
                   contacts={[]}
                   showFooter={false}
-                  autoOpenCapture={false}
                 />
               </div>
             </div>
