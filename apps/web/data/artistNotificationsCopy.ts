@@ -173,14 +173,14 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       rows: [
         {
           id: 'release',
-          trigger: 'New music',
+          trigger: 'New release',
           audience: 'Fans who asked for music',
           message: 'New release alert',
           destination: 'Latest release page',
         },
         {
           id: 'tour',
-          trigger: 'Show near due',
+          trigger: 'Nearby show',
           audience: 'Fans near the venue',
           message: 'Nearby show alert',
           destination: 'Ticket page',

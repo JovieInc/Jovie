@@ -334,12 +334,21 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
   },
 } as const;
 
+const HOMEPAGE_PROFILE_PREVIEW_ARTIST_SPOTIFY_ID =
+  HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id;
+
+if (!HOMEPAGE_PROFILE_PREVIEW_ARTIST_SPOTIFY_ID) {
+  throw new Error(
+    'HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id is required for Tim White playlist fixtures'
+  );
+}
+
 export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
   playlistId: 'playlist-this-is-tim-white',
   title: 'This Is Tim White',
   url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO0RjExample',
   imageUrl: '/img/releases/the-deep-end.jpg',
-  artistSpotifyId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id,
+  artistSpotifyId: HOMEPAGE_PROFILE_PREVIEW_ARTIST_SPOTIFY_ID,
   source: 'serp_html',
   discoveredAt: '2026-01-10T00:00:00.000Z',
   searchQuery: 'site:open.spotify.com "This Is Tim White"',

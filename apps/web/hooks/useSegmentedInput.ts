@@ -139,6 +139,32 @@ export function useSegmentedInput({
     [updateValue, haptic, length]
   );
 
+  const handleMultiDigitInsertion = useCallback(
+    (index: number, digits: string) => {
+      const chars = Array.from(
+        { length },
+        (_, charIndex) => currentValue[charIndex] ?? ''
+      );
+
+      for (const [offset, digit] of digits
+        .slice(0, length - index)
+        .split('')
+        .entries()) {
+        chars[index + offset] = digit;
+      }
+
+      const nextValue = chars.join('');
+      const complete = nextValue.length >= length;
+      updateValue(nextValue, complete);
+
+      if (!complete) {
+        inputRefs.current[Math.min(index + digits.length, length - 1)]?.focus();
+        haptic.medium();
+      }
+    },
+    [currentValue, updateValue, haptic, length]
+  );
+
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
       const digits = inputValue.replaceAll(/\D/g, '');
@@ -153,10 +179,13 @@ export function useSegmentedInput({
           : Math.min(index, currentValue.length);
 
       if (digits.length > 1) {
-        const isPasteLike =
-          digits.length >= length || currentValue.length === 0;
-        if (isPasteLike) {
+        if (digits.length >= length || currentValue.length === 0) {
           handleMultiDigitInput(digits);
+          return;
+        }
+
+        if (currentValue.length < length) {
+          handleMultiDigitInsertion(effectiveIndex, digits);
           return;
         }
       }
@@ -171,7 +200,13 @@ export function useSegmentedInput({
         inputRefs.current[nextIndex]?.focus();
       }
     },
-    [currentValue, updateValue, handleMultiDigitInput, length]
+    [
+      currentValue,
+      updateValue,
+      handleMultiDigitInput,
+      handleMultiDigitInsertion,
+      length,
+    ]
   );
 
   const handleKeyDown = useCallback(

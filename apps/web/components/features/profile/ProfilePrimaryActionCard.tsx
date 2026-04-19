@@ -95,6 +95,34 @@ const CTA_PILL_CLASS_NAME = cn(
   'h-7 rounded-full border-white/14 bg-white text-[11px] font-[620] text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
 );
 
+function toDateValue(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = dateOnlyMatch
+    ? new Date(
+        Number(dateOnlyMatch[1]),
+        Number(dateOnlyMatch[2]) - 1,
+        Number(dateOnlyMatch[3])
+      )
+    : new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfLocalDay(date: Date) {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
 function getReleaseArtistNames(
   release: ProfilePrimaryActionCardRelease | null | undefined
 ) {
@@ -128,26 +156,38 @@ function getUpcomingTourDates(
   tourDates: readonly TourDateViewModel[],
   now?: Date
 ) {
-  const nowMs = (now ?? new Date()).getTime();
+  const today = startOfLocalDay(now ?? new Date());
 
   return [...tourDates]
-    .filter(tourDate => new Date(tourDate.startDate).getTime() >= nowMs)
+    .filter(tourDate => {
+      const start = toDateValue(tourDate.startDate);
+      return (
+        start !== null && startOfLocalDay(start).getTime() >= today.getTime()
+      );
+    })
     .sort(
       (left, right) =>
-        new Date(left.startDate).getTime() - new Date(right.startDate).getTime()
+        (toDateValue(left.startDate)?.getTime() ?? 0) -
+        (toDateValue(right.startDate)?.getTime() ?? 0)
     );
 }
 
 function getMonthLabel(date: string) {
-  return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
-    new Date(date)
-  );
+  const dateValue = toDateValue(date);
+  if (!dateValue) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(dateValue);
 }
 
 function getDayLabel(date: string) {
-  return new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(
-    new Date(date)
-  );
+  const dateValue = toDateValue(date);
+  if (!dateValue) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(dateValue);
 }
 
 function getTourLocationLabel(tourDate: TourDateViewModel) {
@@ -164,7 +204,7 @@ function ActionCardShell({
 }: Readonly<{
   kind: ProfilePrimaryActionCardState['kind'];
   href?: string | null;
-  onClick?: (() => void) | undefined;
+  onClick?: () => void;
   className: string;
   dataTestId?: string;
   children: ReactNode;
@@ -372,10 +412,12 @@ export function ProfilePrimaryActionCard({
 
   if (state.kind === 'release_countdown' || state.kind === 'release_live') {
     const href = `/${artist.handle}/${state.release.slug}`;
-    const wrapperHref = state.kind === 'release_countdown' ? href : undefined;
+    const wrapperHref =
+      state.kind === 'release_countdown' || !onPlayClick ? href : undefined;
     const actionClick = state.kind === 'release_live' ? onPlayClick : undefined;
     const actionLabel =
       renderMode === 'preview' ? previewActionLabel : 'Listen';
+    const releaseDate = toDateValue(state.release.releaseDate);
 
     return (
       <ActionCardShell
@@ -424,12 +466,13 @@ export function ProfilePrimaryActionCard({
         </div>
 
         {state.kind === 'release_countdown' ? (
-          <div className='shrink-0 rounded-[18px] border border-white/10 bg-black/16 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-            <ReleaseCountdown
-              releaseDate={new Date(state.release.releaseDate!)}
-              compact
-            />
-          </div>
+          releaseDate ? (
+            <div className='shrink-0 rounded-[18px] border border-white/10 bg-black/16 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <ReleaseCountdown releaseDate={releaseDate} compact />
+            </div>
+          ) : (
+            <ActionPill label={actionLabel} />
+          )
         ) : (
           <ActionPill label={actionLabel} />
         )}
@@ -445,7 +488,7 @@ export function ProfilePrimaryActionCard({
     return (
       <ActionCardShell
         kind={state.kind}
-        href={state.tourDate.ticketUrl ?? undefined}
+        href={state.tourDate.ticketUrl ?? `/${artist.handle}/tour`}
         className={shellClassName}
         dataTestId={dataTestId}
       >
@@ -529,6 +572,7 @@ export function ProfilePrimaryActionCard({
   return (
     <ActionCardShell
       kind={state.kind}
+      href={onPlayClick ? undefined : `/${artist.handle}/listen`}
       onClick={onPlayClick}
       className={shellClassName}
       dataTestId={dataTestId}

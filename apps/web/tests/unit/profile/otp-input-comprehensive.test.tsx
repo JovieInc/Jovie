@@ -222,11 +222,34 @@ describe('OtpInput', () => {
     expect(onComplete).toHaveBeenLastCalledWith('123457');
 
     fireEvent.change(inputs[5], { target: { value: '77' } });
-    expect(onComplete).not.toHaveBeenCalledTimes(2);
+    expect(onComplete).toHaveBeenCalledTimes(1);
 
     fireEvent.keyDown(inputs[5], { key: 'Backspace' });
     fireEvent.change(getDigitInputs()[5], { target: { value: '77' } });
     expect(onComplete).toHaveBeenCalledTimes(2);
     expect(onComplete).toHaveBeenLastCalledWith('123457');
+  });
+
+  it('distributes partial multi-digit input across the remaining slots', () => {
+    function ControlledOtpInput() {
+      const [value, setValue] = useState('12');
+      return <OtpInput value={value} onChange={setValue} autoFocus={false} />;
+    }
+
+    render(<ControlledOtpInput />);
+
+    const inputs = getDigitInputs();
+    inputs[2].focus();
+
+    fireEvent.change(inputs[2], { target: { value: '34' } });
+
+    expect(inputs.map(input => input.value)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '',
+      '',
+    ]);
   });
 });

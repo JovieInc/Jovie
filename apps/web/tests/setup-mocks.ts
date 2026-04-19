@@ -333,14 +333,18 @@ export function setupComponentMocks() {
   }));
 
   // Mock Next.js app router helpers to avoid needing actual routing context
-  vi.mock('next/navigation', () => ({
-    useRouter: () => ({
+  vi.mock('next/navigation', () => {
+    const router = {
       push: vi.fn(),
       replace: vi.fn(),
       refresh: vi.fn(),
       prefetch: vi.fn().mockResolvedValue(undefined),
-    }),
-  }));
+    };
+
+    return {
+      useRouter: () => router,
+    };
+  });
 
   // Mock FeaturedArtists component to handle async component
   vi.mock('@/features/home/FeaturedArtists', () => ({

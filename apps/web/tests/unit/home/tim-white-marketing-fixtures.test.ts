@@ -12,8 +12,10 @@ const FIXTURE_PATHS = [
   'components/features/home/homepage-profile-preview-fixture.ts',
 ] as const;
 
+const APP_ROOT = resolve(import.meta.dirname, '../../..');
+
 function readFixture(relativePath: string) {
-  return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+  return readFileSync(resolve(APP_ROOT, relativePath), 'utf8');
 }
 
 describe('Tim White marketing fixtures', () => {

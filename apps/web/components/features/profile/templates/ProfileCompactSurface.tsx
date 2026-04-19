@@ -164,12 +164,13 @@ function PreviewInlineNotifications({
           }
         >
           <div className='min-w-0 px-1 py-1'>
-            <div className='pointer-events-none'>
+            <div className='pointer-events-none' aria-hidden='true'>
               <OtpInput
                 value={notifications.value ?? '123456'}
                 onChange={() => {}}
                 autoFocus={false}
                 aria-label={notifications.label}
+                disabled
                 error={notifications.tone === 'error'}
                 size='compact'
                 showProgressDots={false}
@@ -533,10 +534,7 @@ export function ProfileCompactSurface({
             href={BASE_URL}
             className='flex flex-col items-center gap-0.5 pt-1 text-white/20 transition-colors duration-150 hover:text-white/40'
           >
-            <span className='text-[8px] font-[510] uppercase tracking-[0.14em]'>
-              Powered by
-            </span>
-            <span className='text-[13px] font-[590] tracking-[-0.01em]'>
+            <span className='text-[12px] font-[580] tracking-[-0.02em]'>
               Jovie
             </span>
           </a>

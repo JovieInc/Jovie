@@ -155,35 +155,50 @@ export const TrackRow = memo(function TrackRow({
         : 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))]'
     );
 
+    const titleRow = (
+      <div className='flex items-center gap-2'>
+        <span className='text-[11px] tabular-nums text-tertiary-token'>
+          {trackLabel}.
+        </span>
+        <TruncatedText
+          lines={1}
+          className='text-[12.5px] font-[510] text-primary-token'
+          tooltipSide='top'
+          tooltipAlign='start'
+        >
+          {track.title}
+        </TruncatedText>
+        {track.isExplicit ? (
+          <Badge
+            variant='secondary'
+            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+            title='Explicit content'
+            aria-label='Explicit content'
+          >
+            E
+          </Badge>
+        ) : null}
+      </div>
+    );
+
     const stackContent = (
       <div className='flex items-start gap-3'>
         <div className='pt-0.5'>{playbackButton}</div>
         <div className='min-w-0 flex-1'>
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
-              <div className='flex items-center gap-2'>
-                <span className='text-[11px] tabular-nums text-tertiary-token'>
-                  {trackLabel}.
-                </span>
-                <TruncatedText
-                  lines={1}
-                  className='text-[12.5px] font-[510] text-primary-token'
-                  tooltipSide='top'
-                  tooltipAlign='start'
+              {onClick ? (
+                <button
+                  type='button'
+                  onClick={onClick}
+                  className='min-w-0 rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                  aria-label={`Open details for ${track.title}`}
                 >
-                  {track.title}
-                </TruncatedText>
-                {track.isExplicit ? (
-                  <Badge
-                    variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
-                    title='Explicit content'
-                    aria-label='Explicit content'
-                  >
-                    E
-                  </Badge>
-                ) : null}
-              </div>
+                  {titleRow}
+                </button>
+              ) : (
+                titleRow
+              )}
               <div className='mt-2 flex flex-wrap items-center gap-2'>
                 {linkedProviders.length > 0 ? (
                   <CompactLinkRail
@@ -229,20 +244,6 @@ export const TrackRow = memo(function TrackRow({
         </div>
       </div>
     );
-
-    if (onClick) {
-      return (
-        <button
-          type='button'
-          className={stackClassName}
-          onClick={onClick}
-          data-testid={`track-row-${track.id}`}
-          data-state={isSelected ? 'selected' : 'idle'}
-        >
-          {stackContent}
-        </button>
-      );
-    }
 
     return (
       <div

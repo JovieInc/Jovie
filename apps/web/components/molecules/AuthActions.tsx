@@ -20,12 +20,15 @@ export function AuthActions() {
       ) : (
         <>
           {/* Login - Linear exact specs via CSS class */}
-          <Link href='/signin' className='btn-linear-login focus-ring-themed'>
+          <Link
+            href={APP_ROUTES.SIGNIN}
+            className='btn-linear-login focus-ring-themed'
+          >
             Log in
           </Link>
           {/* Signup - Linear exact specs via CSS class */}
           <Link
-            href='/signup'
+            href={APP_ROUTES.SIGNUP}
             className={getLinearPillClassName({
               className: 'focus-ring-themed',
             })}

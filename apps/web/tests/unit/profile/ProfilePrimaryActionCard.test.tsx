@@ -234,4 +234,65 @@ describe('ProfilePrimaryActionCard', () => {
       screen.getByRole('img', { name: 'The Deep End artwork' })
     ).toBeInTheDocument();
   });
+
+  it('keeps same-day date-only tours eligible for the next-tour fallback', () => {
+    render(
+      <ProfilePrimaryActionCard
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        tourDates={[
+          makeTourDate({
+            startDate: '2026-04-20',
+            ticketUrl: null,
+          }),
+        ]}
+        hasPlayableDestinations={false}
+        resolveNearbyTour={false}
+        now={new Date('2026-04-20T12:00:00.000Z')}
+      />
+    );
+
+    expect(screen.getByTestId('profile-primary-action-card')).toHaveAttribute(
+      'data-state',
+      'tour_next'
+    );
+  });
+
+  it('falls back to the release route when no play handler is provided', () => {
+    render(
+      <ProfilePrimaryActionCard
+        artist={makeArtist()}
+        latestRelease={makeRelease({
+          releaseDate: '2026-03-10T07:00:00.000Z',
+          revealDate: null,
+        })}
+        profileSettings={{ showOldReleases: true }}
+        tourDates={[]}
+        hasPlayableDestinations={true}
+        renderMode='preview'
+        now={new Date('2026-04-20T12:00:00.000Z')}
+      />
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/tim/the-deep-end'
+    );
+  });
+
+  it('falls back to the listen route when no play handler is provided', () => {
+    render(
+      <ProfilePrimaryActionCard
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        tourDates={[]}
+        hasPlayableDestinations={true}
+        now={new Date('2026-04-20T12:00:00.000Z')}
+      />
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tim/listen');
+  });
 });

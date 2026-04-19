@@ -114,8 +114,7 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
       'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
     visual: 'cropped-screenshot',
     screenshotSrc: '/product-screenshots/artist-spec-rich-analytics-panel.png',
-    screenshotAlt:
-      'Jovie analytics showing top-line profile and listen metrics.',
+    screenshotAlt: 'Rich analytics funnel preview',
     screenshotWidth: 344,
     screenshotHeight: 540,
     frameClassName:

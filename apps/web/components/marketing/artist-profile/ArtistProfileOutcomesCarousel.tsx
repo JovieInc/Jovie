@@ -174,6 +174,8 @@ function ProofActionCardFrame({
   );
 }
 
+const SHOWCASE_NOW = new Date('2026-04-20T12:00:00.000Z');
+
 function DriveStreamsProof() {
   return (
     <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-2'>
@@ -187,6 +189,7 @@ function DriveStreamsProof() {
           renderMode='preview'
           previewActionLabel='Listen'
           size='showcase'
+          now={SHOWCASE_NOW}
           className='w-full'
           dataTestId='artist-profile-drive-streams-live-card'
         />
@@ -202,6 +205,7 @@ function DriveStreamsProof() {
           renderMode='preview'
           previewActionLabel='Listen'
           size='showcase'
+          now={SHOWCASE_NOW}
           className='w-full'
           dataTestId='artist-profile-drive-streams-presave-card'
         />
@@ -230,6 +234,7 @@ function SellOutProof({
           renderMode='preview'
           size='showcase'
           viewerLocation={SHOWCASE_VIEWER_LOCATION}
+          now={SHOWCASE_NOW}
           className='w-full'
           dataTestId='artist-profile-sell-out-tour-card'
         />

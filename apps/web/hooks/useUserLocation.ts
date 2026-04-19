@@ -42,6 +42,9 @@ export function useUserLocation({
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     // Check for cached location first
     const cachedLocation = getCachedLocation();
     if (cachedLocation) {

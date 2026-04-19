@@ -243,9 +243,16 @@ describe('SegmentControl', () => {
         />
       );
 
-      expect(
-        container.querySelector('[aria-hidden="true"]')
-      ).toBeInTheDocument();
+      const activeTab = screen.getByRole('tab', {
+        name: 'Links',
+        selected: true,
+      });
+      const indicator = screen
+        .getByRole('tablist')
+        .querySelector(':scope > [aria-hidden="true"]');
+
+      expect(activeTab).toHaveAttribute('data-state', 'active');
+      expect(indicator).toBeInTheDocument();
       expect((container.firstChild as HTMLElement).className).toContain(
         'bg-(--linear-bg-button)'
       );

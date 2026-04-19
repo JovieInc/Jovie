@@ -319,6 +319,8 @@ test.describe('Releases dashboard', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
 
     const { surface } = await ensureReleasesVisible(page);
 

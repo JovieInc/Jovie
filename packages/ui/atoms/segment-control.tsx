@@ -175,6 +175,7 @@ export function SegmentControl<T extends string = string>({
     const listNode = listRef.current;
     const activeTrigger = triggerRefs.current[value];
     if (!listNode || !activeTrigger) {
+      setIndicatorLayout(null);
       return;
     }
 

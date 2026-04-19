@@ -52,7 +52,9 @@ function ScreenshotCrop({
       ? {
           aspectRatio: `${screenshotWidth} / ${screenshotHeight}`,
         }
-      : undefined;
+      : {
+          aspectRatio: '4 / 5',
+        };
 
   return (
     <div
@@ -64,6 +66,7 @@ function ScreenshotCrop({
       <div
         className={cn(
           'relative w-full overflow-hidden rounded-[0.95rem] bg-[#090d12]',
+          !frameClassName && 'aspect-[4/5]',
           frameClassName
         )}
         style={frameClassName ? undefined : frameStyle}

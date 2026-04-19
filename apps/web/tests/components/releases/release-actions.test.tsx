@@ -49,6 +49,24 @@ function createRelease(
   };
 }
 
+function everyNestedItemHasIcon(items: readonly unknown[]): boolean {
+  return items.every(item => {
+    if (!item || typeof item !== 'object') {
+      return true;
+    }
+
+    if ('icon' in item && !item.icon) {
+      return false;
+    }
+
+    if ('items' in item && Array.isArray(item.items)) {
+      return everyNestedItemHasIcon(item.items);
+    }
+
+    return true;
+  });
+}
+
 describe('buildReleaseActions', () => {
   it('keeps edit separate from copy/share actions without extra separators', () => {
     const items = buildReleaseActions({
@@ -181,8 +199,6 @@ describe('buildReleaseActions', () => {
     }
 
     expect(trackedLinksItem.icon).toBeTruthy();
-    expect(
-      trackedLinksItem.items.every(item => 'icon' in item && Boolean(item.icon))
-    ).toBe(true);
+    expect(everyNestedItemHasIcon(trackedLinksItem.items)).toBe(true);
   });
 });

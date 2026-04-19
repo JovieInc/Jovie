@@ -87,6 +87,7 @@ const SHOWCASE_VIEWER_LOCATION = {
   latitude: 34.0522,
   longitude: -118.2437,
 } as const;
+const SHOWCASE_NOW = new Date('2026-04-20T12:00:00.000Z');
 const DEMO_TIM_WHITE_SHOWCASE_MODES = ['cards', 'subscribe'] as const;
 const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
   'streams-latest',
@@ -303,6 +304,7 @@ function renderActionCardPreview({
       viewerLocation={viewerLocation}
       resolveNearbyTour={resolveNearbyTour}
       size='showcase'
+      now={SHOWCASE_NOW}
       className={SHOWCASE_ACTION_CARD_CLASS_NAME}
       dataTestId={dataTestId}
     />

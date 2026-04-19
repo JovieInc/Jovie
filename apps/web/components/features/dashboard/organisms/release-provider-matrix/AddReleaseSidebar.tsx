@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui/atoms/popover';
-import { format, parse } from 'date-fns';
+import { format, isValid, parse, startOfToday, subDays } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -49,12 +49,13 @@ type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 
 function parseDateValue(value: string): Date | undefined {
   if (!value) return undefined;
-  return parse(value, 'yyyy-MM-dd', new Date());
+  const parsed = parse(value, 'yyyy-MM-dd', new Date(0));
+  return isValid(parsed) ? parsed : undefined;
 }
 
 function formatDateValue(value: string): string {
-  if (!value) return 'Pick a date';
-  return format(parse(value, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy');
+  const parsed = parseDateValue(value);
+  return parsed ? format(parsed, 'MMM d, yyyy') : 'Pick a date';
 }
 
 export interface AddReleaseSidebarProps {
@@ -90,18 +91,20 @@ export function AddReleaseSidebar({
 
   // Show reveal date field when release date is in the future
   const isFutureRelease = useMemo(() => {
-    if (!releaseDate) return false;
-    return new Date(releaseDate) > new Date();
+    const parsedReleaseDate = parseDateValue(releaseDate);
+    return parsedReleaseDate ? parsedReleaseDate > startOfToday() : false;
   }, [releaseDate]);
 
   // Auto-calculate reveal date default (30 days before release)
   const autoRevealDate = useMemo(() => {
-    if (!releaseDate || !isFutureRelease) return '';
-    const rd = new Date(releaseDate);
-    rd.setDate(rd.getDate() - 30);
-    const now = new Date();
-    const effective = rd > now ? rd : now;
-    return effective.toISOString().split('T')[0];
+    const parsedReleaseDate = parseDateValue(releaseDate);
+    if (!parsedReleaseDate || !isFutureRelease) return '';
+
+    const today = startOfToday();
+    const suggestedRevealDate = subDays(parsedReleaseDate, 30);
+    const effective = suggestedRevealDate > today ? suggestedRevealDate : today;
+
+    return format(effective, 'yyyy-MM-dd');
   }, [releaseDate, isFutureRelease]);
 
   // Auto-set reveal date when release date changes (only if user hasn't manually set one)
