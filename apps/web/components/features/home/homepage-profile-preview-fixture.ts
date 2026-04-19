@@ -98,6 +98,55 @@ const createShowcaseState = ({
     previewOverlay,
   }) as ProfileShowcaseState;
 
+type HomepageShowcaseCoreInput = Omit<
+  HomepageShowcaseStateInput,
+  'kind' | 'tone' | 'showSubscriptionConfirmedBanner'
+>;
+
+type HomepageShowcaseComposeInput = Omit<
+  HomepageShowcaseStateInput,
+  'tone' | 'showSubscriptionConfirmedBanner'
+>;
+
+const createQuietButtonShowcaseState = (
+  input: HomepageShowcaseCoreInput
+): ProfileShowcaseState =>
+  createShowcaseState({
+    ...input,
+    kind: 'button',
+    tone: 'quiet',
+    showSubscriptionConfirmedBanner: false,
+  });
+
+const createSuccessButtonShowcaseState = (
+  input: HomepageShowcaseCoreInput
+): ProfileShowcaseState =>
+  createShowcaseState({
+    ...input,
+    kind: 'button',
+    tone: 'success',
+    showSubscriptionConfirmedBanner: false,
+  });
+
+const createComposeShowcaseState = (
+  input: HomepageShowcaseComposeInput
+): ProfileShowcaseState =>
+  createShowcaseState({
+    ...input,
+    tone: 'compose',
+    showSubscriptionConfirmedBanner: false,
+  });
+
+const createSuccessStatusShowcaseState = (
+  input: HomepageShowcaseCoreInput
+): ProfileShowcaseState =>
+  createShowcaseState({
+    ...input,
+    kind: 'status',
+    tone: 'success',
+    showSubscriptionConfirmedBanner: true,
+  });
+
 export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   id: 'homepage-preview-artist',
   owner_user_id: 'homepage-preview-owner',
@@ -301,30 +350,22 @@ export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
 export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   Record<ProfileShowcaseStateId, ProfileShowcaseState>
 > = {
-  'streams-latest': createShowcaseState({
+  'streams-latest': createQuietButtonShowcaseState({
     id: 'streams-latest',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Latest release live',
     helper: 'The newest song stays one tap away.',
     releaseActionLabel: 'Listen',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'streams-presave': createShowcaseState({
+  'streams-presave': createQuietButtonShowcaseState({
     id: 'streams-presave',
     latestReleaseKey: 'presave',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Presave is live',
     helper: 'The same link now leads to the countdown.',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'streams-release-day': createShowcaseState({
+  'streams-release-day': createSuccessButtonShowcaseState({
     id: 'streams-release-day',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'success',
     label: 'Release day live',
     helper: 'The newest release is now the thing fans see first.',
     releaseActionLabel: 'Listen',
@@ -334,13 +375,10 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'Take Me Over is live now. Listen in one tap.',
       accentLabel: 'Release alert',
     },
-    showSubscriptionConfirmedBanner: false,
   }),
-  'streams-video': createShowcaseState({
+  'streams-video': createQuietButtonShowcaseState({
     id: 'streams-video',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Video live',
     helper: 'The same profile now leads with the video.',
     releaseActionLabel: 'Watch',
@@ -350,60 +388,43 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'This Is Love is live now. Watch from the same link.',
       accentLabel: 'Video alert',
     },
-    showSubscriptionConfirmedBanner: false,
   }),
-  'tour-nearby': createShowcaseState({
+  'tour-nearby': createQuietButtonShowcaseState({
     id: 'tour-nearby',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Nearby show',
     helper: 'Lead with the local date when there is no newer release.',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'playlist-fallback': createShowcaseState({
+  'playlist-fallback': createQuietButtonShowcaseState({
     id: 'playlist-fallback',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Playlist fallback',
     helper: 'Fall back to a real playlist when there is no release or tour.',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'listen-fallback': createShowcaseState({
+  'listen-fallback': createQuietButtonShowcaseState({
     id: 'listen-fallback',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Listen fallback',
     helper: 'Keep a clean listen action live when nothing else should lead.',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'fans-opt-in': createShowcaseState({
+  'fans-opt-in': createComposeShowcaseState({
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
     kind: 'input',
-    tone: 'compose',
     label: 'Turn on notifications',
     helper: 'Fans turn on notifications once. After that, Jovie keeps working.',
     value: 'fan@example.com',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'fans-confirmed': createShowcaseState({
+  'fans-confirmed': createSuccessStatusShowcaseState({
     id: 'fans-confirmed',
     latestReleaseKey: 'live',
-    kind: 'status',
-    tone: 'success',
     label: 'Notifications on',
     helper: 'Every new song, video, or show reaches them automatically.',
     value: 'fan@example.com',
-    showSubscriptionConfirmedBanner: true,
   }),
-  'fans-song-alert': createShowcaseState({
+  'fans-song-alert': createSuccessStatusShowcaseState({
     id: 'fans-song-alert',
     latestReleaseKey: 'live',
-    kind: 'status',
-    tone: 'success',
     label: 'Notifications on',
     helper: 'New music reaches the same fans automatically.',
     releaseActionLabel: 'Listen',
@@ -413,13 +434,10 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'Take Me Over is live now. Listen from the same link.',
       accentLabel: 'Inbox',
     },
-    showSubscriptionConfirmedBanner: true,
   }),
-  'fans-show-alert': createShowcaseState({
+  'fans-show-alert': createSuccessStatusShowcaseState({
     id: 'fans-show-alert',
     latestReleaseKey: 'none',
-    kind: 'status',
-    tone: 'success',
     label: 'Notifications on',
     helper: 'Shows reach the same fans without another signup.',
     previewOverlay: {
@@ -428,66 +446,52 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'The next local show reaches the fans already following along.',
       accentLabel: 'Show alert',
     },
-    showSubscriptionConfirmedBanner: true,
   }),
-  'subscribe-email': createShowcaseState({
+  'subscribe-email': createComposeShowcaseState({
     id: 'subscribe-email',
     latestReleaseKey: 'live',
     kind: 'input',
-    tone: 'compose',
     label: 'Email address',
     helper: 'One clean line from CTA to email capture.',
     value: 'fan@example.com',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'subscribe-otp': createShowcaseState({
+  'subscribe-otp': createComposeShowcaseState({
     id: 'subscribe-otp',
     latestReleaseKey: 'live',
     kind: 'otp',
-    tone: 'compose',
     label: 'Enter the 6-digit code from your email',
     helper: 'OTP stays in the same inline shell.',
     value: '142683',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'subscribe-otp-error': createShowcaseState({
+  'subscribe-otp-error': createComposeShowcaseState({
     id: 'subscribe-otp-error',
     latestReleaseKey: 'live',
     kind: 'otp',
-    tone: 'error',
     label: 'Enter the 6-digit code from your email',
     helper: 'That code was invalid. Try again.',
     value: '142680',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'subscribe-name': createShowcaseState({
+  'subscribe-name': createComposeShowcaseState({
     id: 'subscribe-name',
     latestReleaseKey: 'live',
     kind: 'name',
-    tone: 'compose',
     label: 'Name',
     helper: 'Name capture keeps the same footprint.',
     value: 'Ava Lopez',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'subscribe-birthday': createShowcaseState({
+  'subscribe-birthday': createComposeShowcaseState({
     id: 'subscribe-birthday',
     latestReleaseKey: 'live',
     kind: 'birthday',
-    tone: 'compose',
     label: 'Birthday',
     helper: 'Birthday capture stays inline too.',
     value: '05/17/1994',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'subscribe-done': createShowcaseState({
+  'subscribe-done': createSuccessStatusShowcaseState({
     id: 'subscribe-done',
     latestReleaseKey: 'live',
-    kind: 'status',
-    tone: 'success',
     label: 'Notifications on',
     helper: 'The done state keeps the exact same footprint.',
-    showSubscriptionConfirmedBanner: true,
   }),
   tour: createShowcaseState({
     id: 'tour',
@@ -499,21 +503,16 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     drawerView: 'tour',
     showSubscriptionConfirmedBanner: false,
   }),
-  'tips-open': createShowcaseState({
+  'tips-open': createQuietButtonShowcaseState({
     id: 'tips-open',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Get paid',
     helper: 'Take payment in one tap.',
     drawerView: 'pay',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'tips-apple-pay': createShowcaseState({
+  'tips-apple-pay': createQuietButtonShowcaseState({
     id: 'tips-apple-pay',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Apple Pay ready',
     helper: 'Apple Pay keeps the moment moving.',
     drawerView: 'pay',
@@ -523,13 +522,10 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'Tip Tim White $10',
       accentLabel: 'Double-click to pay',
     },
-    showSubscriptionConfirmedBanner: false,
   }),
-  'tips-thank-you': createShowcaseState({
+  'tips-thank-you': createSuccessButtonShowcaseState({
     id: 'tips-thank-you',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'success',
     label: 'Say thanks',
     helper: 'Turn support into a listener.',
     releaseActionLabel: 'Listen',
@@ -539,13 +535,10 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: "Here's my latest song.",
       accentLabel: 'Say thanks',
     },
-    showSubscriptionConfirmedBanner: false,
   }),
-  'tips-followup': createShowcaseState({
+  'tips-followup': createSuccessButtonShowcaseState({
     id: 'tips-followup',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'success',
     label: 'Turn support into a listener',
     helper: 'The same moment can turn into the next listen.',
     releaseActionLabel: 'Listen',
@@ -555,7 +548,6 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: "Here's my latest song.",
       accentLabel: 'Follow-up',
     },
-    showSubscriptionConfirmedBanner: false,
   }),
   contact: createShowcaseState({
     id: 'contact',
