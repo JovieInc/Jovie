@@ -115,10 +115,6 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
-  useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
   useSubscribeNotificationsMutation: () => ({ mutateAsync: vi.fn() }),
   useVerifyEmailOtpMutation: () => ({ mutateAsync: vi.fn() }),
 }));

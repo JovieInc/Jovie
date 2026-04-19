@@ -485,8 +485,12 @@ export function ProfileInlineNotificationsCTA({
     onRegisterReveal?.(handleReveal);
   }, [onRegisterReveal, handleReveal]);
 
-  const handleEmailSubmit = useCallback(() => {
-    void handleSubscribe();
+  const handleEmailSubmit = useCallback(async () => {
+    try {
+      await handleSubscribe();
+    } catch (error) {
+      console.error('Failed to submit email step', error);
+    }
   }, [handleSubscribe]);
 
   const handleNameSubmit = useCallback(async () => {
@@ -602,13 +606,17 @@ export function ProfileInlineNotificationsCTA({
   );
 
   const handleOtpComplete = useCallback(
-    (value: string) => {
+    async (value: string) => {
       if (lastAutoVerifiedCodeRef.current === value) {
         return;
       }
 
       lastAutoVerifiedCodeRef.current = value;
-      void handleVerifyOtp(value);
+      try {
+        await handleVerifyOtp(value);
+      } catch (error) {
+        console.error('Failed to verify OTP on completion', error);
+      }
     },
     [handleVerifyOtp]
   );
@@ -719,8 +727,12 @@ export function ProfileInlineNotificationsCTA({
                 dataTestId='inline-otp-composer'
                 action={
                   <CircularSubmitButton
-                    onClick={() => {
-                      void handleVerifyOtp();
+                    onClick={async () => {
+                      try {
+                        await handleVerifyOtp();
+                      } catch (error) {
+                        console.error('Failed to verify OTP', error);
+                      }
                     }}
                     disabled={otpCode.length !== 6 || isSubmitting}
                     submitting={isSubmitting}
@@ -793,8 +805,12 @@ export function ProfileInlineNotificationsCTA({
               placeholder="What's your name?"
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
-              onSubmit={() => {
-                void handleNameSubmit();
+              onSubmit={async () => {
+                try {
+                  await handleNameSubmit();
+                } catch (error) {
+                  console.error('Failed to submit name step', error);
+                }
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setIsInputFocused(true)}
@@ -817,8 +833,12 @@ export function ProfileInlineNotificationsCTA({
                 dataTestId='inline-birthday-composer'
                 action={
                   <CircularSubmitButton
-                    onClick={() => {
-                      void handleBirthdaySubmit();
+                    onClick={async () => {
+                      try {
+                        await handleBirthdaySubmit();
+                      } catch (error) {
+                        console.error('Failed to submit birthday step', error);
+                      }
                     }}
                     disabled={birthdayMutation.isPending}
                     submitting={birthdayMutation.isPending}
@@ -832,11 +852,22 @@ export function ProfileInlineNotificationsCTA({
                       setBirthdayInput(value);
                       if (birthdayHintShown) setBirthdayHintShown(false);
                     }}
-                    onComplete={value => {
-                      void handleBirthdaySubmit(value);
+                    onComplete={async value => {
+                      try {
+                        await handleBirthdaySubmit(value);
+                      } catch (error) {
+                        console.error(
+                          'Failed to submit birthday completion',
+                          error
+                        );
+                      }
                     }}
-                    onSubmit={() => {
-                      void handleBirthdaySubmit();
+                    onSubmit={async () => {
+                      try {
+                        await handleBirthdaySubmit();
+                      } catch (error) {
+                        console.error('Failed to submit birthday step', error);
+                      }
                     }}
                     autoFocus={step === 'birthday'}
                     disabled={birthdayMutation.isPending}

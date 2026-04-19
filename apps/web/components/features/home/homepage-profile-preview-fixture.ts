@@ -353,20 +353,20 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'streams-latest': createQuietButtonShowcaseState({
     id: 'streams-latest',
     latestReleaseKey: 'live',
-    label: 'Latest release live',
+    label: 'Latest Release Live',
     helper: 'The newest song stays one tap away.',
     releaseActionLabel: 'Listen',
   }),
   'streams-presave': createQuietButtonShowcaseState({
     id: 'streams-presave',
     latestReleaseKey: 'presave',
-    label: 'Presave is live',
+    label: 'Presave Is Live',
     helper: 'The same link now leads to the countdown.',
   }),
   'streams-release-day': createSuccessButtonShowcaseState({
     id: 'streams-release-day',
     latestReleaseKey: 'live',
-    label: 'Release day live',
+    label: 'Release Day Live',
     helper: 'The newest release is now the thing fans see first.',
     releaseActionLabel: 'Listen',
     previewOverlay: {
@@ -379,7 +379,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'streams-video': createQuietButtonShowcaseState({
     id: 'streams-video',
     latestReleaseKey: 'live',
-    label: 'Video live',
+    label: 'Video Live',
     helper: 'The same profile now leads with the video.',
     releaseActionLabel: 'Watch',
     previewOverlay: {
@@ -392,40 +392,40 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'tour-nearby': createQuietButtonShowcaseState({
     id: 'tour-nearby',
     latestReleaseKey: 'none',
-    label: 'Nearby show',
+    label: 'Nearby Show',
     helper: 'Lead with the local date when there is no newer release.',
   }),
   'playlist-fallback': createQuietButtonShowcaseState({
     id: 'playlist-fallback',
     latestReleaseKey: 'none',
-    label: 'Playlist fallback',
+    label: 'Playlist Fallback',
     helper: 'Fall back to a real playlist when there is no release or tour.',
   }),
   'listen-fallback': createQuietButtonShowcaseState({
     id: 'listen-fallback',
     latestReleaseKey: 'none',
-    label: 'Listen fallback',
+    label: 'Listen Fallback',
     helper: 'Keep a clean listen action live when nothing else should lead.',
   }),
   'fans-opt-in': createComposeShowcaseState({
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
     kind: 'input',
-    label: 'Turn on notifications',
+    label: 'Turn On Notifications',
     helper: 'Fans turn on notifications once. After that, Jovie keeps working.',
     value: 'fan@example.com',
   }),
   'fans-confirmed': createSuccessStatusShowcaseState({
     id: 'fans-confirmed',
     latestReleaseKey: 'live',
-    label: 'Notifications on',
+    label: 'Notifications On',
     helper: 'Every new song, video, or show reaches them automatically.',
     value: 'fan@example.com',
   }),
   'fans-song-alert': createSuccessStatusShowcaseState({
     id: 'fans-song-alert',
     latestReleaseKey: 'live',
-    label: 'Notifications on',
+    label: 'Notifications On',
     helper: 'New music reaches the same fans automatically.',
     releaseActionLabel: 'Listen',
     previewOverlay: {
@@ -438,7 +438,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'fans-show-alert': createSuccessStatusShowcaseState({
     id: 'fans-show-alert',
     latestReleaseKey: 'none',
-    label: 'Notifications on',
+    label: 'Notifications On',
     helper: 'Shows reach the same fans without another signup.',
     previewOverlay: {
       kind: 'email-preview',
@@ -451,7 +451,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'subscribe-email',
     latestReleaseKey: 'live',
     kind: 'input',
-    label: 'Email address',
+    label: 'Email Address',
     helper: 'One clean line from CTA to email capture.',
     value: 'fan@example.com',
   }),
@@ -459,7 +459,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'subscribe-otp',
     latestReleaseKey: 'live',
     kind: 'otp',
-    label: 'Enter the 6-digit code from your email',
+    label: 'Enter the 6-Digit Code From Your Email',
     helper: 'OTP stays in the same inline shell.',
     value: '142683',
   }),
@@ -467,7 +467,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'subscribe-otp-error',
     latestReleaseKey: 'live',
     kind: 'otp',
-    label: 'Enter the 6-digit code from your email',
+    label: 'Enter the 6-Digit Code From Your Email',
     helper: 'That code was invalid. Try again.',
     value: '142680',
   }),
@@ -490,7 +490,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'subscribe-done': createSuccessStatusShowcaseState({
     id: 'subscribe-done',
     latestReleaseKey: 'live',
-    label: 'Notifications on',
+    label: 'Notifications On',
     helper: 'The done state keeps the exact same footprint.',
   }),
   tour: createShowcaseState({
@@ -498,7 +498,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     latestReleaseKey: 'none',
     kind: 'button',
     tone: 'quiet',
-    label: 'Next date live',
+    label: 'Next Date Live',
     helper: 'Lead with the next date and open the full run from there.',
     drawerView: 'tour',
     showSubscriptionConfirmedBanner: false,
@@ -506,14 +506,14 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'tips-open': createQuietButtonShowcaseState({
     id: 'tips-open',
     latestReleaseKey: 'none',
-    label: 'Get paid',
+    label: 'Get Paid',
     helper: 'Take payment in one tap.',
     drawerView: 'pay',
   }),
   'tips-apple-pay': createQuietButtonShowcaseState({
     id: 'tips-apple-pay',
     latestReleaseKey: 'none',
-    label: 'Apple Pay ready',
+    label: 'Apple Pay Ready',
     helper: 'Apple Pay keeps the moment moving.',
     drawerView: 'pay',
     previewOverlay: {
@@ -526,7 +526,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'tips-thank-you': createSuccessButtonShowcaseState({
     id: 'tips-thank-you',
     latestReleaseKey: 'live',
-    label: 'Say thanks',
+    label: 'Say Thanks',
     helper: 'Turn support into a listener.',
     releaseActionLabel: 'Listen',
     previewOverlay: {
@@ -539,7 +539,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   'tips-followup': createSuccessButtonShowcaseState({
     id: 'tips-followup',
     latestReleaseKey: 'live',
-    label: 'Turn support into a listener',
+    label: 'Turn Support Into a Listener',
     helper: 'The same moment can turn into the next listen.',
     releaseActionLabel: 'Listen',
     previewOverlay: {
@@ -554,7 +554,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     latestReleaseKey: 'none',
     kind: 'button',
     tone: 'quiet',
-    label: 'Never miss a booking',
+    label: 'Never Miss a Booking',
     helper: 'If a talent buyer wants to book you, the contact is right there.',
     drawerView: 'contact',
     showSubscriptionConfirmedBanner: false,
@@ -564,7 +564,7 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     latestReleaseKey: 'live',
     kind: 'button',
     tone: 'quiet',
-    label: 'One profile',
+    label: 'One Profile',
     helper: 'One place for songs, videos, shows, and business.',
     releaseActionLabel: 'Listen',
     showSubscriptionConfirmedBanner: false,
