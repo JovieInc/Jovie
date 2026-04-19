@@ -249,7 +249,7 @@ export function NewLandingSections() {
                       <PhoneFrame className='h-[440px] w-[210px] lg:h-[500px] lg:w-[238px]'>
                         <div className='relative h-full w-full'>
                           <Image
-                            src='/product-screenshots/profile-phone.png'
+                            src='/product-screenshots/tim-white-profile-listen-phone.png'
                             alt='Mobile artist profile preview with fan actions and listening destinations'
                             fill
                             priority
@@ -266,7 +266,7 @@ export function NewLandingSections() {
                       <PhoneFrame className='h-[360px] w-[172px]'>
                         <div className='relative h-full w-full'>
                           <Image
-                            src='/product-screenshots/profile-phone.png'
+                            src='/product-screenshots/tim-white-profile-listen-phone.png'
                             alt='Mobile artist profile preview with fan actions and listening destinations'
                             fill
                             priority

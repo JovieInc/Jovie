@@ -17,7 +17,7 @@
  * @tag @drawer @profile @green
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
@@ -28,6 +28,75 @@ import {
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const TEST_PRESS_PHOTO_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8s6sAAAAASUVORK5CYII=';
+const PROFILE_DRAWER_SCROLL_REGION_TEST_ID =
+  'profile-contact-tabbed-card-scroll-region';
+const PROFILE_DRAWER_LOWER_SETTINGS_TEST_ID =
+  'profile-contact-lower-settings-control';
+
+async function assertDrawerScrollToShowLowerSettings(
+  page: Page,
+  viewport: Readonly<{ width: number; height: number }>
+) {
+  await page.setViewportSize(viewport);
+
+  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90_000,
+  });
+  await waitForHydration(page);
+
+  await page.getByRole('tab', { name: 'About' }).click();
+
+  const scrollRegion = page.getByTestId(PROFILE_DRAWER_SCROLL_REGION_TEST_ID);
+  const lowerSettingsControl = page.getByTestId(
+    PROFILE_DRAWER_LOWER_SETTINGS_TEST_ID
+  );
+
+  await scrollRegion.waitFor({ state: 'visible' });
+  await expect(lowerSettingsControl).toBeVisible({ timeout: 30_000 });
+
+  await expect
+    .poll(
+      async () =>
+        await scrollRegion.evaluate(
+          element => element.scrollHeight - element.clientHeight
+        ),
+      { timeout: 30_000 }
+    )
+    .toBeGreaterThan(0);
+
+  const regionMetrics = await scrollRegion.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(regionMetrics.scrollHeight).toBeGreaterThan(
+    regionMetrics.clientHeight
+  );
+
+  const regionBox = await scrollRegion.boundingBox();
+  const beforeBox = await lowerSettingsControl.boundingBox();
+  expect(regionBox).not.toBeNull();
+  expect(beforeBox).not.toBeNull();
+  expect((beforeBox?.y ?? 0) + (beforeBox?.height ?? 0)).toBeGreaterThan(
+    (regionBox?.y ?? 0) + (regionBox?.height ?? 0)
+  );
+
+  await scrollRegion.evaluate(element => {
+    element.scrollTop = element.scrollHeight;
+  });
+
+  const afterScrollTop = await scrollRegion.evaluate(
+    element => element.scrollTop
+  );
+  expect(afterScrollTop).toBeGreaterThan(regionMetrics.scrollTop);
+
+  const afterBox = await lowerSettingsControl.boundingBox();
+  expect(afterBox).not.toBeNull();
+  expect((afterBox?.y ?? 0) + (afterBox?.height ?? 0)).toBeLessThanOrEqual(
+    (regionBox?.y ?? 0) + (regionBox?.height ?? 0) + 2
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab rendering
@@ -96,6 +165,24 @@ test.describe('Profile drawer — tab rendering', () => {
       document.body.innerText.toLowerCase()
     );
     expect(body).not.toMatch(/application error|something went wrong/);
+  });
+
+  test('About tab scrolls to lower settings content on desktop', async ({
+    page,
+  }) => {
+    await assertDrawerScrollToShowLowerSettings(page, {
+      width: 1280,
+      height: 800,
+    });
+  });
+
+  test('About tab scrolls to lower settings content on mobile', async ({
+    page,
+  }) => {
+    await assertDrawerScrollToShowLowerSettings(page, {
+      width: 390,
+      height: 844,
+    });
   });
 
   test('About tab uploads and deletes a press photo', async ({ page }) => {

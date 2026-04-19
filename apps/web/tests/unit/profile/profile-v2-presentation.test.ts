@@ -9,7 +9,7 @@ describe('resolveProfileV2Presentation', () => {
   it.each([
     ['profile', { initialOverlay: null, scrollTarget: null }],
     ['tour', { initialOverlay: null, scrollTarget: 'tour' }],
-    ['tip', { initialOverlay: 'tip', scrollTarget: null }],
+    ['pay', { initialOverlay: 'pay', scrollTarget: null }],
     ['about', { initialOverlay: null, scrollTarget: 'about' }],
     ['listen', { initialOverlay: 'listen', scrollTarget: null }],
     ['subscribe', { initialOverlay: 'subscribe', scrollTarget: null }],

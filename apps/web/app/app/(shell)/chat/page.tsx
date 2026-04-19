@@ -15,8 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * Chat page — renders with zero server-side data dependencies.
  *
  * Apple Music connection status defaults to disconnected and hydrates
- * client-side via the dashboard context provider. The DeferredChatPageClient
- * wrapper code-splits the heavy chat bundle (~640 lines + AI SDK).
+ * client-side via the dashboard context provider. DeferredChatPageClient keeps
+ * the shared /app and /app/chat render path identical.
  *
  * Note: skeleton-to-content time (~800ms) is dominated by the shared shell
  * layout (DashboardShellContent) resolving dashboard data, not this page.

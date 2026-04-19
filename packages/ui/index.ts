@@ -83,7 +83,6 @@ export type {
   CommonDropdownProps,
   CommonDropdownRadioGroup,
   CommonDropdownRadioItem,
-  CommonDropdownSelectProps,
   CommonDropdownSeparator,
   CommonDropdownSize,
   CommonDropdownSubmenu,

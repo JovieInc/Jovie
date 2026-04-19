@@ -73,6 +73,7 @@ export function ProfilePreview({
     >
       <div className='relative h-full w-full'>
         <StaticArtistPage
+          presentation='compact-preview'
           mode='profile'
           artist={mockArtist}
           socialLinks={socialLinks}

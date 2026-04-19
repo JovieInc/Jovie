@@ -35,7 +35,7 @@ describe('claim invite follow-up founder copy', () => {
     expect(first).toContain('Just bumping this in case you missed it.');
     expect(first).toContain("Saw you're on Linktree");
     expect(first).toContain(
-      'Claim it here: https://jov.ie/tomriver/claim?token=claim-token-123'
+      'Claim it here: https://jov.ie/claim/claim-token-123'
     );
     expect(first).toContain(
       "If you try it, let me know what you think. If you claim it and message me, I'll get it verified."
@@ -61,9 +61,7 @@ describe('claim invite follow-up founder copy', () => {
     expect(html).toContain(
       "Even if you don't end up using it, a quick reply on what turned you off would be super helpful."
     );
-    expect(html).toContain(
-      'href="https://jov.ie/tomriver/claim?token=claim-token-123"'
-    );
+    expect(html).toContain('href="https://jov.ie/claim/claim-token-123"');
     expect(html).not.toContain('href="https://jov.ie/tomriver"');
   });
 

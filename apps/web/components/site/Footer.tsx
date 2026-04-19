@@ -34,7 +34,7 @@ export function Footer({
       themeShortcutKey={themeShortcutKey}
       links={[
         { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
-        { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms of Service' },
+        { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
       ]}
     />
   );

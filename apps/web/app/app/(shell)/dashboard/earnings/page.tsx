@@ -13,5 +13,5 @@ export default async function EarningsPage() {
     );
   }
 
-  redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#tips`);
+  redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`);
 }

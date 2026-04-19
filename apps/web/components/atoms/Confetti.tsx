@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 /* ------------------------------------------------------------------ */
 /*  Shared confetti animation system                                  */
 /*                                                                    */
@@ -11,12 +9,11 @@ import { useMemo } from 'react';
 
 const DEFAULT_COUNT = 40;
 const DEFAULT_COLORS = [
-  'var(--linear-accent)',
+  'var(--color-accent)',
   'var(--color-success)',
-  '#f59e0b',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
+  'var(--color-warning)',
+  'var(--color-info)',
+  'var(--color-accent-blue)',
 ];
 
 export interface ConfettiParticle {
@@ -89,10 +86,7 @@ export function ConfettiOverlay({
   colors = DEFAULT_COLORS,
   viewport = false,
 }: ConfettiOverlayProps = {}) {
-  const particles = useMemo(
-    () => generateParticles(count, colors),
-    [count, colors]
-  );
+  const particles = generateParticles(count, colors);
 
   return (
     <>

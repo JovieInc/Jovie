@@ -239,6 +239,20 @@
       "when": 1776055016627,
       "tag": "0033_wet_zzzax",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1776300136185,
+      "tag": "0034_youthful_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1776300243139,
+      "tag": "0035_tranquil_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

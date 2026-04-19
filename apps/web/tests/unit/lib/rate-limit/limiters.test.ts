@@ -31,7 +31,8 @@ vi.mock('@/lib/rate-limit/rate-limiter', () => {
   }
   return {
     RateLimiter: FakeRateLimiter,
-    createRateLimiter: (config: unknown) => new FakeRateLimiter(config),
+    createRateLimiter: (config: unknown, _options?: unknown) =>
+      new FakeRateLimiter(config),
   };
 });
 
@@ -49,6 +50,20 @@ vi.mock('@/lib/rate-limit/config', () => ({
       limit: 5,
       window: '1 m',
       prefix: 'artwork_upload',
+    },
+    albumArtGeneration: {
+      name: 'Album Art Generation',
+      limit: 6,
+      window: '1 d',
+      prefix: 'album_art_generation',
+      requireRedis: true,
+    },
+    albumArtGenerationBurst: {
+      name: 'Album Art Generation Burst',
+      limit: 2,
+      window: '1 m',
+      prefix: 'album_art_generation_burst',
+      requireRedis: true,
     },
     api: { name: 'API', limit: 100, window: '1 m', prefix: 'api_calls' },
     onboarding: {
@@ -299,6 +314,8 @@ describe('limiters.ts', () => {
       const expectedKeys = [
         'avatarUpload',
         'artworkUpload',
+        'albumArtGeneration',
+        'albumArtGenerationBurst',
         'api',
         'onboarding',
         'handleCheck',

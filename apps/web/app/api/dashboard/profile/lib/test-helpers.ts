@@ -7,14 +7,13 @@
 
 import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 import { NO_STORE_HEADERS } from './constants';
+import { getProfileByClerkId, updateProfileRecords } from './db-operations';
 
 export interface TestProfileUpdateParams {
   clerkUserId: string;
+  dbProfileUpdates: Record<string, unknown>;
   usernameUpdate?: string;
   displayNameForUserUpdate?: string;
   avatarUrl?: string;
@@ -22,10 +21,22 @@ export interface TestProfileUpdateParams {
 
 export async function handleTestProfileUpdate({
   clerkUserId,
+  dbProfileUpdates,
   usernameUpdate,
   displayNameForUserUpdate,
   avatarUrl,
 }: TestProfileUpdateParams) {
+  const existingProfileRecord = await getProfileByClerkId(clerkUserId);
+  const existingProfile = existingProfileRecord?.profile ?? null;
+  const usernameChanged =
+    typeof usernameUpdate === 'string' &&
+    usernameUpdate !== existingProfile?.username;
+  const displayNameChanged =
+    typeof displayNameForUserUpdate === 'string' &&
+    displayNameForUserUpdate !== existingProfile?.displayName;
+  const avatarChanged =
+    typeof avatarUrl === 'string' && avatarUrl !== existingProfile?.avatarUrl;
+
   let clerk: Awaited<ReturnType<typeof clerkClient>> | null = null;
   try {
     clerk = await clerkClient();
@@ -34,10 +45,10 @@ export async function handleTestProfileUpdate({
     clerk = null;
   }
 
-  if (usernameUpdate) {
+  if (usernameChanged) {
     await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
   }
-  if (displayNameForUserUpdate && clerk?.users?.updateUser) {
+  if (displayNameChanged && clerk?.users?.updateUser) {
     const nameParts = displayNameForUserUpdate.split(' ');
     const firstName = nameParts.shift() ?? displayNameForUserUpdate;
     const lastName = nameParts.join(' ').trim();
@@ -46,7 +57,7 @@ export async function handleTestProfileUpdate({
       lastName: lastName || undefined,
     });
   }
-  if (avatarUrl && clerk?.users?.updateUserProfileImage) {
+  if (avatarChanged && clerk?.users?.updateUserProfileImage) {
     const avatarResponse = await fetch(avatarUrl, {
       signal: AbortSignal.timeout(10000),
     });
@@ -59,31 +70,21 @@ export async function handleTestProfileUpdate({
     });
   }
 
-  // Trigger mocked DB returning() to satisfy test expectations
-  type OptionalDb = {
-    update?: (table: typeof creatorProfiles) => {
-      set?: (values: Partial<typeof creatorProfiles.$inferInsert>) => {
-        from?: (table: typeof users) => {
-          where?: (predicate: unknown) => {
-            returning?: () => unknown;
-          };
-        };
-      };
-    };
-  };
+  const updateResult = await updateProfileRecords({
+    clerkUserId,
+    dbProfileUpdates,
+    displayNameForUserUpdate,
+  });
 
-  const maybeDb = db as unknown as OptionalDb | undefined;
-  const updater = maybeDb?.update?.(creatorProfiles);
-  const chained = updater
-    ?.set?.({ updatedAt: new Date() })
-    ?.from?.(users)
-    ?.where?.(() => true);
-  chained?.returning?.();
+  if (updateResult instanceof NextResponse) {
+    return updateResult;
+  }
+
   const responseProfile = {
-    userId: 'user_123',
-    username: usernameUpdate ?? 'new-handle',
-    displayName: displayNameForUserUpdate ?? 'Test User',
-    usernameNormalized: (usernameUpdate ?? 'new-handle').toLowerCase(),
+    userId: updateResult.updatedProfile.userId,
+    username: updateResult.updatedProfile.username,
+    displayName: updateResult.updatedProfile.displayName,
+    usernameNormalized: updateResult.updatedProfile.usernameNormalized,
   };
   return NextResponse.json(
     { profile: responseProfile },

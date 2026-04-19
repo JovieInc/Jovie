@@ -2,6 +2,7 @@ import {
   Activity,
   Banknote,
   Briefcase,
+  Cable,
   CalendarDays,
   CheckSquare,
   FolderKanban,
@@ -15,6 +16,7 @@ import {
   Music,
   PieChart,
   Settings,
+  Share2,
   ShieldCheck,
   SquarePen,
   UserCircle,
@@ -165,9 +167,11 @@ const adminIconById = {
   overview: LayoutDashboard,
   people: Users,
   growth: FolderKanban,
+  platform_connections: Cable,
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  share_studio: Share2,
 } as const;
 
 function buildAdminNavigationItems(

@@ -87,7 +87,7 @@ function getDomainPrefixStyle(size: ClaimHandleSize) {
   if (size === 'hero') {
     return {
       fontSize: '15px',
-      fontWeight: 460,
+      fontWeight: 450,
       letterSpacing: '-0.016em',
       color: 'var(--linear-text-tertiary)',
       fontFamily: 'inherit',
@@ -117,7 +117,7 @@ function getInputStyle(size: ClaimHandleSize, isAvailable: boolean) {
   if (isHero) {
     return {
       fontSize: '16px',
-      fontWeight: 500,
+      fontWeight: 510,
       letterSpacing: '-0.022em',
       color,
     };
@@ -266,7 +266,7 @@ export function ClaimHandleForm({
         <>
           <span>Claim @{handle}</span>
           <ChevronRight
-            className='h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5'
+            className='h-3.5 w-3.5 transition-transform duration-slow group-hover:translate-x-0.5'
             aria-hidden='true'
           />
         </>
@@ -304,7 +304,7 @@ export function ClaimHandleForm({
       <div
         className={cn(
           'claim-input-row',
-          'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'relative flex w-full items-center gap-2 transition-all duration-slower ease-[cubic-bezier(0.16,1,0.3,1)]',
           sizeRoundingClass,
           isAvailable && 'claim-input-row--available'
         )}
@@ -341,7 +341,7 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-name'
+            placeholder='you'
             required
             autoCapitalize='none'
             autoCorrect='off'
@@ -368,7 +368,7 @@ export function ClaimHandleForm({
           data-testid={submitButtonTestId}
           aria-busy={checkingAvail || navigating}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-slow focus-ring-themed',
             buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'
@@ -388,7 +388,7 @@ export function ClaimHandleForm({
           id='handle-hint'
           data-testid='claim-handle-status'
           className={cn(
-            'mt-2 pl-1 transition-colors duration-200',
+            'mt-2 pl-1 transition-colors duration-slow',
             helperToneClass
           )}
           aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}

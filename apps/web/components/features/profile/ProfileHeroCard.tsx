@@ -104,7 +104,7 @@ export function ArtistHero({
   const heroPearlClassName =
     'border border-white/12 bg-white/8 shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-2xl';
   const primaryActionClassName =
-    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-[15px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-[transform,opacity] duration-200 hover:opacity-94 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-[15px] font-[590] tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-[transform,opacity] duration-slow hover:opacity-94 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
     <section
@@ -136,7 +136,7 @@ export function ArtistHero({
           <div className='flex items-start gap-2'>
             {spotlightLabel && spotlightValue ? (
               <div className={`${heroPearlClassName} rounded-full px-3.5 py-2`}>
-                <p className='text-[0.72rem] font-[560] tracking-[0.01em] text-white/52'>
+                <p className='text-[0.72rem] font-[590] tracking-[0.01em] text-white/52'>
                   {spotlightLabel}
                 </p>
                 <p className='mt-0.5 text-[13px] font-[590] tracking-[-0.015em] text-white/90 md:text-sm'>
@@ -190,7 +190,7 @@ export function ArtistHero({
           <div className='flex items-start justify-between gap-4'>
             <div className='min-w-0 space-y-2 text-left'>
               {eyebrow ? (
-                <p className='text-[12px] font-[560] tracking-[0.01em] text-white/58'>
+                <p className='text-[12px] font-[590] tracking-[0.01em] text-white/58'>
                   {eyebrow}
                 </p>
               ) : null}

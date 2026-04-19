@@ -36,12 +36,12 @@ export function parseYouTubeUrl(url: string): ParsedYouTubeUrl | null {
     let candidate: string | null = null;
 
     if (host === 'youtu.be' || host === 'www.youtu.be') {
-      candidate = parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+      candidate = parsed.pathname.split('/').find(Boolean) ?? null;
     } else {
       candidate = parsed.searchParams.get('v');
       if (!candidate) {
-        const pathMatch = parsed.pathname.match(
-          /^\/(?:embed|shorts)\/([a-zA-Z0-9_-]{11})\/?$/
+        const pathMatch = /^\/(?:embed|shorts)\/([a-zA-Z0-9_-]{11})\/?$/.exec(
+          parsed.pathname
         );
         candidate = pathMatch?.[1] ?? null;
       }

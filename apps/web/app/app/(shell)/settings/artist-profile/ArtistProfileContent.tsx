@@ -4,8 +4,8 @@ import { ExternalLink, PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ProfileSettingsLoading } from '@/components/molecules/SettingsLoadingSkeleton';
+import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
-import { SettingsTipsSection } from '@/features/dashboard/organisms/SettingsTipsSection';
 import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
@@ -71,7 +71,7 @@ export function ArtistProfileContent() {
             onArtistUpdate={setArtist}
             onRefresh={() => router.refresh()}
           />
-          <SettingsTipsSection />
+          <SettingsPaySection />
           <ShopifyStoreCard />
         </div>
       </SettingsSection>

@@ -51,7 +51,7 @@ export const LEGAL = {
 
 export const COPYRIGHT_YEAR = new Date().getFullYear();
 export const getCopyrightText = (year?: number) =>
-  `© ${year ?? COPYRIGHT_YEAR} ${LEGAL_ENTITY_NAME}`;
+  `© ${year ?? COPYRIGHT_YEAR}`;
 
 // Re-export from canonical source for backward compatibility
 export { SOCIAL_PLATFORMS, type SocialPlatform } from './platforms';

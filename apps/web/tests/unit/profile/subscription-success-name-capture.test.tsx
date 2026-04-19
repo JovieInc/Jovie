@@ -9,7 +9,7 @@ import { SubscriptionSuccess } from '@/features/profile/artist-notifications-cta
 
 const mockMutateAsync = vi.fn();
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => ({
     mutateAsync: mockMutateAsync,
   }),

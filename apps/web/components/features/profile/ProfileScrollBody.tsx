@@ -2,15 +2,19 @@
 
 import { HandCoins, Mail, MapPin } from 'lucide-react';
 import { type RefObject, useState } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
 } from '@/features/profile/artist-notifications-cta';
+import {
+  profilePrimaryPillClassName,
+  profileSecondaryPillClassName,
+} from '@/features/profile/artist-notifications-cta/shared';
 import { ProfileFeaturedCard } from '@/features/profile/ProfileFeaturedCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -48,16 +52,18 @@ const condensedDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
+    <p className='text-[13px] font-[590] tracking-[-0.015em] text-secondary-token'>
       {children}
     </p>
   );
 }
 
 const panelClassName =
-  'rounded-[28px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] px-5 py-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
+  'rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] px-5 py-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl';
 const flatSurfaceClassName =
-  'rounded-[26px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl';
+  'rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl';
+const profileActionPrimaryClassName = `${profilePrimaryPillClassName} min-h-11 px-4 py-2.5`;
+const profileActionSecondaryClassName = `${profileSecondaryPillClassName} min-h-11 px-4 py-2.5`;
 
 function ArtistBioSection({
   artist,
@@ -189,7 +195,7 @@ function TourDateRow({
     <article
       className={`${flatSurfaceClassName} grid gap-4 px-4 py-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center`}
     >
-      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[20px] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
+      <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[var(--profile-drawer-radius-desktop)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
         <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
           {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
             new Date(tourDate.startDate)
@@ -219,13 +225,15 @@ function TourDateRow({
           href={tourDate.ticketUrl as string}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-4 py-2.5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[var(--profile-pearl-shadow)] transition-[opacity,transform] hover:opacity-92 active:scale-[0.985]'
+          className={profileActionPrimaryClassName}
           onClick={handleTicketClick}
         >
           Tickets
         </a>
       ) : (
-        <span className='inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-medium tracking-[-0.015em] text-tertiary-token shadow-[var(--profile-pearl-shadow)]'>
+        <span
+          className={`${profileActionSecondaryClassName} text-tertiary-token`}
+        >
           {tourDate.ticketStatus === 'sold_out' ? 'Sold out' : 'No tickets'}
         </span>
       )}
@@ -271,7 +279,7 @@ function TourSection({
         {tourDates.length > 4 ? (
           <button
             type='button'
-            className='inline-flex min-h-11 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
+            className={profileActionSecondaryClassName}
             onClick={() => setExpanded(current => !current)}
           >
             {expanded
@@ -306,7 +314,7 @@ function UtilityRail({
         {hasContacts ? (
           <button
             type='button'
-            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
+            className={`${profileActionSecondaryClassName} gap-2`}
             onClick={onContactClick}
           >
             <Mail className='h-4 w-4' aria-hidden='true' />
@@ -316,11 +324,11 @@ function UtilityRail({
         {hasTip ? (
           <button
             type='button'
-            className='inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 py-2.5 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,transform] hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985]'
+            className={`${profileActionSecondaryClassName} gap-2`}
             onClick={onTipClick}
           >
             <HandCoins className='h-4 w-4' aria-hidden='true' />
-            Tip
+            Pay
           </button>
         ) : null}
       </div>

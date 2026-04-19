@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ProfileShell } from '@/components/organisms/profile-shell';
+import { ProfileShell } from '@/components/organisms/profile-shell/ProfileShell';
 import type { ProfileMode } from '@/features/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -16,8 +16,8 @@ type ArtistPageShellProps = {
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
   readonly mode?: ProfileMode;
-  readonly showTipButton?: boolean;
-  readonly isTipModeActive?: boolean;
+  readonly showPayButton?: boolean;
+  readonly isPayModeActive?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
   readonly isTourModeActive?: boolean;
@@ -43,8 +43,8 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   children,
   showSocialBar = true,
   mode,
-  showTipButton = false,
-  isTipModeActive = false,
+  showPayButton = false,
+  isPayModeActive = false,
   showBackButton = false,
   showTourButton = false,
   isTourModeActive = false,
@@ -65,8 +65,8 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       subtitle={subtitle}
       showSocialBar={showSocialBar}
       mode={mode}
-      showTipButton={showTipButton}
-      isTipModeActive={isTipModeActive}
+      showPayButton={showPayButton}
+      isPayModeActive={isPayModeActive}
       showBackButton={showBackButton}
       showTourButton={showTourButton}
       isTourModeActive={isTourModeActive}

@@ -5,6 +5,7 @@ import { Button, CommonDropdown, Input } from '@jovie/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
@@ -403,10 +404,19 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             </Button>
             <Button
               type='submit'
+              disabled={loading}
               variant='primary'
               className='w-full sm:w-auto'
+              aria-busy={loading}
             >
-              Save Social Links
+              {loading ? (
+                <div className='flex items-center justify-center space-x-2'>
+                  <LoadingSpinner size='sm' tone='inverse' label='Saving' />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                'Save Social Links'
+              )}
             </Button>
           </div>
         </form>

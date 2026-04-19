@@ -104,7 +104,7 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
     const demoAudience = readFileSync(
-      join(ROOT, 'components/features/demo/DemoAudienceSection.tsx'),
+      join(ROOT, 'components/features/demo/DemoAudienceWorkspace.tsx'),
       'utf-8'
     );
 
@@ -117,8 +117,8 @@ describe('surface elevation guardrails', () => {
     expect(chatSurface).toContain("frame='none'");
     expect(demoShowcaseSurface).toContain('AppShellContentPanel');
     expect(demoShowcaseSurface).toContain("frame='none'");
-    expect(demoAudience).toContain('AppShellContentPanel');
-    expect(demoAudience).toContain("frame='none'");
+    expect(demoAudience).toContain('DashboardAudienceWorkspace');
+    expect(demoAudience).toContain("analyticsMode='static'");
   });
 
   it('routes onboarding variants through OnboardingExperienceShell', () => {
@@ -146,6 +146,9 @@ describe('surface elevation guardrails', () => {
     expect(onboardingLoading).toContain('OnboardingExperienceShell');
     expect(onboardingLoading).toContain("stageVariant='flat'");
     expect(demoOnboarding).toContain('OnboardingExperienceShell');
+    expect(demoOnboarding).toContain('OnboardingHandleStep');
+    expect(demoOnboarding).toContain('OnboardingDspStep');
+    expect(demoOnboarding).toContain('OnboardingProfileReviewStep');
     expect(demoShowcaseSurface).toContain('DemoOnboardingShowcase');
   });
 
@@ -204,7 +207,7 @@ describe('surface elevation guardrails', () => {
     const earningsView = readFileSync(
       join(
         ROOT,
-        'components/features/dashboard/dashboard-tipping/DashboardTipping.tsx'
+        'components/features/dashboard/dashboard-pay/DashboardPay.tsx'
       ),
       'utf-8'
     );

@@ -31,8 +31,9 @@ describe('claim invite founder copy', () => {
       'I got sick of sending fans to a generic Linktree page and losing people there'
     );
     expect(text).toContain("Saw you're on Linktree");
+    expect(text).toContain('https://jov.ie/tomriver');
     expect(text).toContain(
-      'https://jov.ie/tomriver/claim?token=claim-token-123'
+      'Claim it here: https://jov.ie/claim/claim-token-123'
     );
     expect(text).toContain('No pressure to use it');
     expect(text).toContain('Even if you hate it');
@@ -64,10 +65,8 @@ describe('claim invite founder copy', () => {
       "P.S. If you claim it and message me, I'll get your profile verified."
     );
     expect(html).toContain('https://jov.ie/tomriver');
-    expect(html).toContain(
-      'href="https://jov.ie/tomriver/claim?token=claim-token-123"'
-    );
-    expect(html).not.toContain('href="https://jov.ie/tomriver"');
+    expect(html).toContain('href="https://jov.ie/claim/claim-token-123"');
+    expect(html).toContain('href="https://jov.ie/tomriver"');
   });
 
   it('returns the updated subject in the full email payload', () => {

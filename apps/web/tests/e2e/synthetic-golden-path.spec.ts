@@ -186,7 +186,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       { path: '/', name: 'Homepage' },
       { path: '/dualipa', name: 'Profile Page' },
       { path: '/dualipa?mode=listen', name: 'Listen Mode' },
-      { path: '/dualipa?mode=tip', name: 'Tip Mode' },
+      { path: '/dualipa?mode=pay', name: 'Pay Mode' },
       { path: '/sign-up', name: 'Sign Up' },
     ];
 

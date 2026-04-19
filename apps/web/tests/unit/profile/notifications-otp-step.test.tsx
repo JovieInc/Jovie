@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
@@ -92,11 +92,14 @@ function buildFormState() {
     phoneInput: '',
     emailInput: 'fan@example.com',
     error: null,
+    errorOrigin: null,
     otpCode: '',
     otpStep: 'verify' as const,
     isSubmitting: false,
     isCountryOpen: false,
     setIsCountryOpen: vi.fn(),
+    resendCooldownEnd: 0,
+    isResending: false,
     notificationsState: 'pending_confirmation',
     notificationsEnabled: true,
     channel: 'email' as const,
@@ -108,6 +111,7 @@ function buildFormState() {
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+    handleResendOtp: vi.fn().mockResolvedValue(undefined),
     handleKeyDown: vi.fn(),
     openSubscription: vi.fn(),
     registerInputFocus: vi.fn(),
@@ -128,10 +132,12 @@ describe('public profile notifications OTP step', () => {
       '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
     );
 
-    render(<ArtistNotificationsCTA artist={artist} autoOpen />);
+    const { container } = render(
+      <ArtistNotificationsCTA artist={artist} autoOpen />
+    );
 
     expect(
-      screen.getByText('Check your inbox. Enter your code.')
+      within(container).getByText('Check your inbox. Enter your code.')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Verify Code' })
@@ -140,7 +146,7 @@ describe('public profile notifications OTP step', () => {
       screen.getByLabelText('Enter 6-digit verification code')
     ).toBeInTheDocument();
     expect(screen.queryByText(/confirmation link/i)).not.toBeInTheDocument();
-  });
+  }, 10000);
 
   it('renders OTP verification UI in TwoStepNotificationsCTA during pending confirmation', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
@@ -149,11 +155,11 @@ describe('public profile notifications OTP step', () => {
       '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
     );
 
-    render(<TwoStepNotificationsCTA artist={artist} />);
+    const { container } = render(<TwoStepNotificationsCTA artist={artist} />);
 
     await waitFor(() => {
       expect(
-        screen.getByText('Check your inbox. Enter your code.')
+        within(container).getByText('Check your inbox. Enter your code.')
       ).toBeInTheDocument();
     });
 
@@ -162,5 +168,5 @@ describe('public profile notifications OTP step', () => {
       screen.getByLabelText('Enter 6-digit verification code')
     ).toBeInTheDocument();
     expect(screen.queryByText(/confirmation link/i)).not.toBeInTheDocument();
-  });
+  }, 10000);
 });

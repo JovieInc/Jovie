@@ -186,6 +186,21 @@ describe('@critical ReleaseLandingPage', () => {
     );
   });
 
+  it('renders only one audio preview when a verified preview is available', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        release={{
+          ...defaultProps.release,
+          previewUrl: 'https://example.com/preview.mp3',
+          previewVerification: 'verified',
+        }}
+      />
+    );
+
+    expect(screen.getAllByTestId('audio-preview')).toHaveLength(1);
+  });
+
   it('shows empty state when no providers have URLs', () => {
     const noUrlProviders = [
       {

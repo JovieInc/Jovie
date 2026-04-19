@@ -22,6 +22,7 @@ import {
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
+  SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
   waitForImages,
   waitForSettle,
@@ -196,26 +197,41 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
+  await page.clock.setFixedTime(
+    new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
+  );
+  await page.emulateMedia({
+    reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
+  });
   await page.setViewportSize(viewport);
   await page.goto(scenario.route, {
     waitUntil: 'domcontentloaded',
     timeout: TIMEOUTS.NAVIGATION,
   });
 
-  const initialWaitSelector =
-    scenario.interaction === 'open-first-release'
-      ? '[data-testid="releases-matrix"]'
-      : scenario.waitFor;
+  const isOpenFirstRelease =
+    scenario.interaction === 'open-first-release' ||
+    scenario.interaction === 'open-first-release-dsps';
+  const initialWaitSelector = isOpenFirstRelease
+    ? '[data-testid="releases-matrix"]'
+    : scenario.waitFor;
   const initialWait = page.locator(initialWaitSelector).first();
   await expect(initialWait).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
 
-  if (scenario.interaction === 'open-first-release') {
+  if (isOpenFirstRelease) {
     await waitForImages(page, 'table').catch(() => {});
     await waitForSettle(page, 2000);
     await page.locator('[data-testid="release-row"]').first().click();
     await expect(page.locator(scenario.waitFor).first()).toBeVisible({
       timeout: TIMEOUTS.SIDEBAR_VISIBLE,
     });
+
+    if (scenario.interaction === 'open-first-release-dsps') {
+      const dspsTab = page.getByTestId('drawer-tab-dsps');
+      await dspsTab.click();
+      await waitForSettle(page);
+      await expect(dspsTab).toHaveAttribute('aria-selected', 'true');
+    }
   }
 
   await waitForImages(page).catch(() => {});

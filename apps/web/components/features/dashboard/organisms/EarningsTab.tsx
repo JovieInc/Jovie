@@ -24,7 +24,11 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { type TipperRow, useEarningsQuery } from '@/lib/queries';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
-import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
+import {
+  generateQrCodeDataUrl,
+  generateQrCodeSvg,
+  qrCodeDataUrlToBlob,
+} from '@/lib/utils/qr-code';
 
 // =============================================================================
 // Constants
@@ -176,7 +180,7 @@ export function EarningsTab() {
 
   const tipUrl = useMemo(() => {
     if (!handle) return '';
-    return `${BASE_URL}/${handle}/tip`;
+    return `${BASE_URL}/${handle}/pay`;
   }, [handle]);
 
   // ── QR generation state ──────────────────────────
@@ -220,8 +224,7 @@ export function EarningsTab() {
     setIsDownloadingPng(true);
     try {
       const dataUrl = await generateQrCodeDataUrl(tipUrl, QR_PRINT_SIZE);
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
+      const blob = qrCodeDataUrlToBlob(dataUrl);
       downloadBlob(blob, `jovie-tip-${handle}.png`);
       notifications.success('PNG downloaded');
     } catch {

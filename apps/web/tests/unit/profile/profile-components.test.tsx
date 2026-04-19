@@ -111,7 +111,11 @@ describe('ClaimBanner', () => {
   it('renders banner with profile name', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
-      <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
+      <ClaimBanner
+        profileHandle='testartist'
+        displayName='Test Artist'
+        ctaHref='/signup?handle=testartist'
+      />
     );
 
     expect(screen.getByTestId('claim-banner')).toBeDefined();
@@ -121,7 +125,11 @@ describe('ClaimBanner', () => {
   it('has proper accessibility attributes', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
-      <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
+      <ClaimBanner
+        profileHandle='testartist'
+        displayName='Test Artist'
+        ctaHref='/signup?handle=testartist'
+      />
     );
 
     const banner = screen.getByTestId('claim-banner');
@@ -129,7 +137,7 @@ describe('ClaimBanner', () => {
 
     const cta = screen.getByTestId('claim-banner-cta');
     expect(cta.getAttribute('aria-label')).toBe(
-      'Claim profile for Test Artist'
+      'Claim Profile for Test Artist'
     );
   });
 
@@ -141,7 +149,12 @@ describe('ClaimBanner', () => {
     });
 
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
-    render(<ClaimBanner profileHandle='testartist' />);
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/signup?redirect_url=%2Fonboarding'
+      />
+    );
 
     const cta = screen.getByTestId('claim-banner-cta');
     const href = cta.getAttribute('href');
@@ -153,10 +166,15 @@ describe('ClaimBanner', () => {
 
   it('falls back to handle when displayName not provided', async () => {
     const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
-    render(<ClaimBanner profileHandle='testartist' />);
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        ctaHref='/signup?handle=testartist'
+      />
+    );
 
     const cta = screen.getByTestId('claim-banner-cta');
-    expect(cta.getAttribute('aria-label')).toBe('Claim profile for testartist');
+    expect(cta.getAttribute('aria-label')).toBe('Claim Profile for testartist');
   });
 });
 

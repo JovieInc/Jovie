@@ -55,7 +55,7 @@ export default function Image() {
         style={{
           width: 60,
           height: 3,
-          background: '#7170ff',
+          background: '#8b1eff',
           borderRadius: 4,
           marginTop: 32,
         }}

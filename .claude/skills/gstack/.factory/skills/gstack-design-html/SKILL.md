@@ -85,6 +85,14 @@ fi
 _ROUTING_DECLINED=$($GSTACK_BIN/gstack-config get routing_declined 2>/dev/null || echo "false")
 echo "HAS_ROUTING: $_HAS_ROUTING"
 echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
+# Vendoring deprecation: detect if CWD has a vendored gstack copy
+_VENDORED="no"
+if [ -d ".factory/skills/gstack" ] && [ ! -L ".factory/skills/gstack" ]; then
+  if [ -f ".factory/skills/gstack/VERSION" ] || [ -d ".factory/skills/gstack/.git" ]; then
+    _VENDORED="yes"
+  fi
+fi
+echo "VENDORED_GSTACK: $_VENDORED"
 # Detect spawned session (OpenClaw or other orchestrator)
 [ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true
 ```
@@ -212,6 +220,38 @@ If B: run `$GSTACK_BIN/gstack-config set routing_declined true`
 Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
 
 This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
+
+If `VENDORED_GSTACK` is `yes`: This project has a vendored copy of gstack at
+`.factory/skills/gstack/`. Vendoring is deprecated. We will not keep vendored copies
+up to date, so this project's gstack will fall behind.
+
+Use AskUserQuestion (one-time per project, check for `~/.gstack/.vendoring-warned-$SLUG` marker):
+
+> This project has gstack vendored in `.factory/skills/gstack/`. Vendoring is deprecated.
+> We won't keep this copy up to date, so you'll fall behind on new features and fixes.
+>
+> Want to migrate to team mode? It takes about 30 seconds.
+
+Options:
+- A) Yes, migrate to team mode now
+- B) No, I'll handle it myself
+
+If A:
+1. Run `git rm -r .factory/skills/gstack/`
+2. Run `echo '.factory/skills/gstack/' >> .gitignore`
+3. Run `$GSTACK_BIN/gstack-team-init required` (or `optional`)
+4. Run `git add .claude/ .gitignore CLAUDE.md && git commit -m "chore: migrate gstack from vendored to team mode"`
+5. Tell the user: "Done. Each developer now runs: `cd $GSTACK_ROOT && ./setup --team`"
+
+If B: say "OK, you're on your own to keep the vendored copy up to date."
+
+Always run (regardless of choice):
+```bash
+eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)" 2>/dev/null || true
+touch ~/.gstack/.vendoring-warned-${SLUG:-unknown}
+```
+
+This only happens once per project. If the marker file exists, skip entirely.
 
 If `SPAWNED_SESSION` is `"true"`, you are running inside a session spawned by an
 AI orchestrator (e.g., OpenClaw). In spawned sessions:
@@ -544,6 +584,91 @@ Commands:
 MUST be saved to `~/.gstack/projects/$SLUG/designs/`, NEVER to `.context/`,
 `docs/designs/`, `/tmp/`, or any project-local directory. Design artifacts are USER
 data, not project files. They persist across branches, conversations, and workspaces.
+
+## UX Principles: How Users Actually Behave
+
+These principles govern how real humans interact with interfaces. They are observed
+behavior, not preferences. Apply them before, during, and after every design decision.
+
+### The Three Laws of Usability
+
+1. **Don't make me think.** Every page should be self-evident. If a user stops
+   to think "What do I click?" or "What does this mean?", the design has failed.
+   Self-evident > self-explanatory > requires explanation.
+
+2. **Clicks don't matter, thinking does.** Three mindless, unambiguous clicks
+   beat one click that requires thought. Each step should feel like an obvious
+   choice (animal, vegetable, or mineral), not a puzzle.
+
+3. **Omit, then omit again.** Get rid of half the words on each page, then get
+   rid of half of what's left. Happy talk (self-congratulatory text) must die.
+   Instructions must die. If they need reading, the design has failed.
+
+### How Users Actually Behave
+
+- **Users scan, they don't read.** Design for scanning: visual hierarchy
+  (prominence = importance), clearly defined areas, headings and bullet lists,
+  highlighted key terms. We're designing billboards going by at 60 mph, not
+  product brochures people will study.
+- **Users satisfice.** They pick the first reasonable option, not the best.
+  Make the right choice the most visible choice.
+- **Users muddle through.** They don't figure out how things work. They wing
+  it. If they accomplish their goal by accident, they won't seek the "right" way.
+  Once they find something that works, no matter how badly, they stick to it.
+- **Users don't read instructions.** They dive in. Guidance must be brief,
+  timely, and unavoidable, or it won't be seen.
+
+### Billboard Design for Interfaces
+
+- **Use conventions.** Logo top-left, nav top/left, search = magnifying glass.
+  Don't innovate on navigation to be clever. Innovate when you KNOW you have a
+  better idea, otherwise use conventions. Even across languages and cultures,
+  web conventions let people identify the logo, nav, search, and main content.
+- **Visual hierarchy is everything.** Related things are visually grouped. Nested
+  things are visually contained. More important = more prominent. If everything
+  shouts, nothing is heard. Start with the assumption everything is visual noise,
+  guilty until proven innocent.
+- **Make clickable things obviously clickable.** No relying on hover states for
+  discoverability, especially on mobile where hover doesn't exist. Shape, location,
+  and formatting (color, underlining) must signal clickability without interaction.
+- **Eliminate noise.** Three sources: too many things shouting for attention
+  (shouting), things not organized logically (disorganization), and too much stuff
+  (clutter). Fix noise by removal, not addition.
+- **Clarity trumps consistency.** If making something significantly clearer
+  requires making it slightly inconsistent, choose clarity every time.
+
+### Navigation as Wayfinding
+
+Users on the web have no sense of scale, direction, or location. Navigation
+must always answer: What site is this? What page am I on? What are the major
+sections? What are my options at this level? Where am I? How can I search?
+
+Persistent navigation on every page. Breadcrumbs for deep hierarchies.
+Current section visually indicated. The "trunk test": cover everything except
+the navigation. You should still know what site this is, what page you're on,
+and what the major sections are. If not, the navigation has failed.
+
+### The Goodwill Reservoir
+
+Users start with a reservoir of goodwill. Every friction point depletes it.
+
+**Deplete faster:** Hiding info users want (pricing, contact, shipping). Punishing
+users for not doing things your way (formatting requirements on phone numbers).
+Asking for unnecessary information. Putting sizzle in their way (splash screens,
+forced tours, interstitials). Unprofessional or sloppy appearance.
+
+**Replenish:** Know what users want to do and make it obvious. Tell them what they
+want to know upfront. Save them steps wherever possible. Make it easy to recover
+from errors. When in doubt, apologize.
+
+### Mobile: Same Rules, Higher Stakes
+
+All the above applies on mobile, just more so. Real estate is scarce, but never
+sacrifice usability for space savings. Affordances must be VISIBLE: no cursor
+means no hover-to-discover. Touch targets must be big enough (44px minimum).
+Flat design can strip away useful visual information that signals interactivity.
+Prioritize ruthlessly: things needed in a hurry go close at hand, everything
+else a few taps away with an obvious path to get there.
 
 ## SETUP (run this check BEFORE any browse command)
 

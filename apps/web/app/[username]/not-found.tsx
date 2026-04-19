@@ -6,6 +6,7 @@ export default function NotFound() {
   return (
     <PublicPageShell mainClassName='bg-base'>
       <MarketingContainer
+        data-testid='not-found'
         width='page'
         className='flex min-h-[calc(100vh-var(--public-shell-header-offset))] items-center justify-center py-16'
       >

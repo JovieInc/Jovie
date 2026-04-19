@@ -6,7 +6,7 @@ const ROOT = process.cwd();
 const TARGET_DIRS = [
   join(ROOT, 'app', '(marketing)'),
   join(ROOT, 'components', 'features', 'home'),
-  join(ROOT, 'components', 'features', 'tips'),
+  join(ROOT, 'components', 'features', 'pay'),
 ] as const;
 
 const LEGACY_CTA_PATTERNS = [

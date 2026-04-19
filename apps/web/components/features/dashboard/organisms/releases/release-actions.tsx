@@ -4,8 +4,12 @@ import { Icon } from '@/components/atoms/Icon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { buildCopyMenuItems } from '@/features/ui/CopyableField';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import {
+  getTrackedShareIcon,
+  groupTrackedPresetsBySource,
+} from '@/lib/share/tracked-sources';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
+import { ALL_UTM_PRESETS, buildUTMContext, buildUTMUrl } from '@/lib/utm';
 
 const menuIcon = (
   name:
@@ -16,6 +20,7 @@ const menuIcon = (
     | 'Lock'
     | 'Clock'
     | 'Music'
+    | 'Sparkles'
     | 'Trash2'
     | 'Copy'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
@@ -40,6 +45,8 @@ export interface BuildReleaseActionsOptions {
   readonly onCopyQrCode?: () => void;
   /** Custom icon for QR code action (lucide-react QrCode is not in the Icon atom) */
   readonly qrCodeIcon?: ReactNode;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
 }
 
 function buildShareItems(
@@ -93,16 +100,67 @@ function buildShareItems(
     },
   ];
 
-  const utmShareItems = getUTMShareContextMenuItems({
+  const trackedContext = buildUTMContext({
     smartLinkUrl,
-    context: buildUTMContext({
-      smartLinkUrl,
-      releaseSlug: release.slug,
-      releaseTitle: release.title,
-      artistName,
-      releaseDate: release.releaseDate,
-    }),
+    releaseSlug: release.slug,
+    releaseTitle: release.title,
+    artistName,
+    releaseDate: release.releaseDate,
   });
+  const utmShareItems: ContextMenuItemType[] = [
+    {
+      id: 'tracked-share-submenu',
+      label: 'Tracked Links',
+      icon: menuIcon('Link2'),
+      items: groupTrackedPresetsBySource(ALL_UTM_PRESETS).map(sourceGroup => {
+        if (sourceGroup.presets.length === 1) {
+          const preset = sourceGroup.presets[0];
+          return {
+            id: `tracked-${preset.id}`,
+            label: sourceGroup.label,
+            icon: getTrackedShareIcon(sourceGroup.source),
+            onClick: () => {
+              const result = buildUTMUrl({
+                url: smartLinkUrl,
+                params: preset.params,
+                context: trackedContext,
+              });
+              void onCopy(
+                result.url.replace(getBaseUrl(), ''),
+                preset.label,
+                `tracked-share-${preset.id}-${release.id}`
+              );
+            },
+          } satisfies ContextMenuItemType;
+        }
+
+        return {
+          id: `tracked-group-${sourceGroup.source}`,
+          label: sourceGroup.label,
+          icon: getTrackedShareIcon(sourceGroup.source),
+          items: sourceGroup.presets.map(
+            preset =>
+              ({
+                id: `tracked-${preset.id}`,
+                label: preset.label,
+                onClick: () => {
+                  const result = buildUTMUrl({
+                    url: smartLinkUrl,
+                    params: preset.params,
+                    context: trackedContext,
+                  });
+                  void onCopy(
+                    result.url.replace(getBaseUrl(), ''),
+                    preset.label,
+                    `tracked-share-${preset.id}-${release.id}`
+                  );
+                },
+              }) satisfies ContextMenuItemType
+          ),
+        } satisfies ContextMenuItemType;
+      }),
+    },
+  ];
 
   if (utmShareItems.length > 0) {
     items.push({ type: 'separator' }, ...utmShareItems);
@@ -159,6 +217,8 @@ export function buildReleaseActions({
   onDelete,
   onCopyQrCode,
   qrCodeIcon,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
@@ -192,6 +252,16 @@ export function buildReleaseActions({
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
+    ...(canGenerateAlbumArt && onGenerateAlbumArt
+      ? [
+          {
+            id: 'generate-album-art',
+            label: 'Generate Album Art',
+            icon: menuIcon('Sparkles'),
+            onClick: () => onGenerateAlbumArt(release),
+          } satisfies ContextMenuItemType,
+        ]
+      : []),
     {
       type: 'separator',
     },

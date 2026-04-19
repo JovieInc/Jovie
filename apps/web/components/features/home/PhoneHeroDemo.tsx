@@ -6,11 +6,11 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PhoneFrame } from './PhoneFrame';
 import { TIM_WHITE_PROFILE } from './tim-white';
 
-type ProfileTab = 'listen' | 'tip' | 'tour';
+type ProfileTab = 'listen' | 'pay' | 'tour';
 
 const TABS: ReadonlyArray<{ id: ProfileTab; label: string }> = [
   { id: 'listen', label: 'Listen' },
-  { id: 'tip', label: 'Tip' },
+  { id: 'pay', label: 'Pay' },
   { id: 'tour', label: 'Tour' },
 ];
 
@@ -72,23 +72,23 @@ function ListenContent() {
   );
 }
 
-function TipContent() {
+function PayContent() {
   return (
     <div className='flex flex-col gap-2.5'>
       <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-white/40'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {['$3', '$5', '$10'].map(amt => (
+        {['$5', '$10', '$20'].map(amt => (
           <div
             key={amt}
             className='aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5'
             style={{
               backgroundColor:
-                amt === '$5' ? 'rgb(247,248,248)' : 'rgba(255,255,255,0.04)',
-              color: amt === '$5' ? 'rgb(8,9,10)' : 'rgb(247,248,248)',
+                amt === '$10' ? 'rgb(247,248,248)' : 'rgba(255,255,255,0.04)',
+              color: amt === '$10' ? 'rgb(8,9,10)' : 'rgb(247,248,248)',
               border:
-                amt === '$5'
+                amt === '$10'
                   ? '1px solid transparent'
                   : '1px solid rgba(255,255,255,0.06)',
             }}
@@ -97,7 +97,7 @@ function TipContent() {
               className='text-[9px] font-medium uppercase tracking-wider'
               style={{
                 color:
-                  amt === '$5' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
+                  amt === '$10' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
               }}
             >
               USD
@@ -151,7 +151,7 @@ function TourContent() {
 
 const TAB_CONTENT: Record<ProfileTab, React.ReactNode> = {
   listen: <ListenContent />,
-  tip: <TipContent />,
+  pay: <PayContent />,
   tour: <TourContent />,
 };
 

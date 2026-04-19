@@ -108,6 +108,28 @@ describe('Public Profile Page Logic', () => {
         'getPublicTourDates(profile.id)'
       );
     });
+
+    it('reads a confirmed playlist fallback from profile settings without live search', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'getConfirmedFeaturedPlaylistFallback(profileSettings)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchGoogleCSE');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        'discoverThisIsPlaylistCandidate'
+      );
+    });
+  });
+
+  describe('public claim banner handling', () => {
+    it('reads search params for mode handling', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'const resolvedSearchParams = await searchParams;'
+      );
+    });
+
+    it('delegates claim banner query handling to the client wrapper', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+    });
   });
 
   describe('generateProfileStructuredData', () => {
@@ -480,9 +502,9 @@ describe('Public Profile Page Logic', () => {
   describe('Profile page mode logic', () => {
     it.each([
       ['profile', 'Artist'],
-      ['tip', 'Send a tip'],
+      ['pay', 'Support'],
       ['listen', 'Listen now'],
-      ['subscribe', 'Get notified'],
+      ['subscribe', 'Turn on notifications'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
       expect(getProfileModeSubtitle(mode)).toBe(expectedSubtitle);
     });
@@ -491,15 +513,25 @@ describe('Public Profile Page Logic', () => {
       expect(getProfileModeSubtitle('unknown')).toBe('Artist');
     });
 
-    it('passes social links through so compact profile tipping can derive from venmo links', () => {
+    it('passes social links and pay button flag through to StaticArtistPage', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('socialLinks={links}');
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('showTipButton=');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'showPayButton={showPayButton}'
+      );
     });
 
     it('shows back button only for non-profile modes', () => {
       const modes = profileModes.filter(mode => mode !== 'contact');
       const showBackButton = modes.map(m => m !== 'profile');
-      expect(showBackButton).toEqual([false, true, true, true, true, true]);
+      expect(showBackButton).toEqual([
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]);
     });
   });
 

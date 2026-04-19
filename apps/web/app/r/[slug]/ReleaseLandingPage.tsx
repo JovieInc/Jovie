@@ -27,14 +27,15 @@ import {
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
   SmartLinkShell,
-  useSmartLinkShare,
 } from '@/features/release/SmartLinkShell';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import type {
   PreviewSource,
   PreviewVerification,
   ProviderConfidence,
   ProviderKey,
 } from '@/lib/discography/types';
+import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
   appendUTMParamsToUrl,
@@ -93,6 +94,7 @@ interface ReleaseLandingPageProps
     } | null;
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
+    readonly initialMenuOpen?: boolean;
   }> {}
 
 function SmartLinkClaimBanner({
@@ -228,9 +230,16 @@ export function ReleaseLandingPage({
   parentRelease = null,
   claimBanner = null,
   downloadUrl = null,
+  initialMenuOpen = false,
 }: Readonly<ReleaseLandingPageProps>) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
+  const [shareOpen, setShareOpen] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(initialMenuOpen);
+  }, [initialMenuOpen]);
+
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
@@ -250,6 +259,40 @@ export function ReleaseLandingPage({
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
+  const shareSlug = tracking?.smartLinkSlug ?? 'release';
+  const sharePathname = artist.handle
+    ? `/${artist.handle}/${shareSlug}`
+    : tracking?.smartLinkSlug
+      ? `/r/${tracking.smartLinkSlug}`
+      : undefined;
+  const shareContext = useMemo(
+    () =>
+      buildReleaseShareContext({
+        username: artist.handle ?? 'release',
+        slug: shareSlug,
+        title: release.title,
+        artistName: artist.name,
+        artworkUrl: release.artworkUrl,
+        pathname: sharePathname,
+        storyQueryParams: artist.handle
+          ? undefined
+          : {
+              slug: shareSlug,
+              title: release.title,
+              artistName: artist.name,
+              pathname: sharePathname ?? `/r/${shareSlug}`,
+              artworkUrl: release.artworkUrl,
+            },
+      }),
+    [
+      artist.handle,
+      artist.name,
+      release.artworkUrl,
+      release.title,
+      sharePathname,
+      shareSlug,
+    ]
+  );
   const hasPreview = Boolean(release.previewUrl);
   const shouldShowPreview =
     hasPreview &&
@@ -279,10 +322,6 @@ export function ReleaseLandingPage({
       );
     },
     [artist.handle, tracking]
-  );
-
-  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
-    setMenuOpen(false)
   );
 
   return (
@@ -341,21 +380,6 @@ export function ReleaseLandingPage({
             />
           )}
 
-          {shouldShowPreview && (
-            <div className='mt-3'>
-              <SmartLinkAudioPreview
-                contentId={tracking?.contentId ?? release.title}
-                title={release.title}
-                artistName={artist.name}
-                artworkUrl={release.artworkUrl}
-                previewUrl={release.previewUrl ?? null}
-                isrc={release.isrc}
-                previewVerification={release.previewVerification}
-                previewSource={release.previewSource}
-              />
-            </div>
-          )}
-
           <div className='space-y-2'>
             {clickableProviders.map(provider => {
               const logoConfig = DSP_LOGO_CONFIG[provider.key];
@@ -396,13 +420,15 @@ export function ReleaseLandingPage({
         open={menuOpen}
         onOpenChange={setMenuOpen}
         title='Menu'
+        dataTestId='release-landing-menu-drawer'
       >
         <div className='flex flex-col gap-0.5'>
           <button
             type='button'
             className={SMART_LINK_MENU_ITEM_CLASS}
             onClick={() => {
-              handleShare();
+              setMenuOpen(false);
+              setShareOpen(true);
             }}
           >
             <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
@@ -432,6 +458,18 @@ export function ReleaseLandingPage({
             </Link>
           ) : null}
         </div>
+      </ProfileDrawerShell>
+
+      <ProfileDrawerShell
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title='Share'
+        subtitle='Share this release'
+      >
+        <PublicShareActionList
+          context={shareContext}
+          onActionComplete={() => setShareOpen(false)}
+        />
       </ProfileDrawerShell>
 
       {/* Credits drawer */}

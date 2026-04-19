@@ -490,17 +490,27 @@ async function waitForAnyVisible(
     return null;
   }
 
-  const waitedSelector = await Promise.any(
-    selectors.map(async selector => {
-      await page.locator(selector).first().waitFor({
-        state: 'visible',
-        timeout: timeoutMs,
-      });
-      return selector;
-    })
-  );
+  const deadline = Date.now() + timeoutMs;
 
-  return waitedSelector;
+  while (Date.now() < deadline) {
+    for (const selector of selectors) {
+      const locator = page.locator(selector);
+      const count = await locator.count().catch(() => 0);
+
+      for (let index = 0; index < count; index += 1) {
+        const candidate = locator.nth(index);
+        if (await candidate.isVisible().catch(() => false)) {
+          return selector;
+        }
+      }
+    }
+
+    await page.waitForTimeout(50);
+  }
+
+  throw new Error(
+    `Timed out waiting for one of these selectors to become visible: ${selectors.join(', ')}`
+  );
 }
 
 async function waitForVisibleTrigger(

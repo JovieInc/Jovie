@@ -1,34 +1,46 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   primaryProviderKeys,
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
-import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+import { DashboardPay } from '@/features/dashboard/dashboard-pay';
+import { InsightsPanelView } from '@/features/dashboard/insights/InsightsPanel';
+import { GroupedLinksManager } from '@/features/dashboard/organisms/GroupedLinksManager';
+import { convertDbLinkToDetected } from '@/features/dashboard/organisms/links/utils/link-transformers';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
 import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep';
 import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesExperience';
-import { DashboardAnalyticsDemo } from '@/features/home/demo/DashboardAnalyticsDemo';
-import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDemo';
-import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
+import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
+import { DemoTimWhiteProfileSurface } from './DemoTimWhiteProfileSurface';
+import {
+  DEMO_EARNINGS_RESPONSE,
+  DEMO_ENRICHED_PROFILE,
+  DEMO_HANDLE_VALIDATION,
+  DEMO_INSIGHTS,
+  DEMO_PROFILE_SOCIAL_LINKS,
+} from './demo-surface-fixtures';
+import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
 } from './mock-release-data';
+import { SettingsDemoHarness } from './SettingsDemoHarness';
 import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
@@ -47,22 +59,6 @@ type ReleaseShowcaseState = (typeof RELEASE_SHOWCASE_STATES)[number];
 interface DemoShowcaseSurfaceProps {
   readonly surface: DemoRenderableSurfaceId;
 }
-
-const HANDLE_VALIDATION_MOCK = {
-  available: true,
-  checking: false,
-  error: null,
-  clientValid: true,
-  suggestions: ['calvindemo', 'calvinharrisdemo'],
-};
-
-const PROFILE_REVIEW_DATA: EnrichedProfileData = {
-  name: INTERNAL_DJ_DEMO_PERSONA.profile.displayName,
-  imageUrl: INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc,
-  bio: INTERNAL_DJ_DEMO_PERSONA.profile.bio,
-  genres: [...INTERNAL_DJ_DEMO_PERSONA.profile.genres],
-  followers: INTERNAL_DJ_DEMO_PERSONA.profile.spotifyFollowers ?? 184_000,
-};
 
 const DEMO_RELEASE_EXPERIENCE_ADAPTER = {
   mode: 'demo',
@@ -192,27 +188,66 @@ export function DemoShowcaseSurface({
   const [handleInput, setHandleInput] = useState(
     INTERNAL_DJ_DEMO_PERSONA.profile.handle
   );
+  const [selectedInsightCategory, setSelectedInsightCategory] = useState<
+    InsightCategory | 'all'
+  >('all');
   const noop = useCallback(() => {}, []);
   const searchParams = useSearchParams();
+  const demoInsights = useMemo(
+    () =>
+      selectedInsightCategory === 'all'
+        ? DEMO_INSIGHTS
+        : DEMO_INSIGHTS.filter(
+            insight => insight.category === selectedInsightCategory
+          ),
+    [selectedInsightCategory]
+  );
+  const demoDetectedLinks = useMemo(
+    () => DEMO_PROFILE_SOCIAL_LINKS.map(convertDbLinkToDetected),
+    []
+  );
 
   switch (surface) {
     case 'analytics':
       return (
-        <DemoShowcasePanel testId='demo-showcase-analytics'>
-          <DashboardAnalyticsDemo />
-        </DemoShowcasePanel>
+        <DemoAuthShell>
+          <InsightsPanelView
+            insights={demoInsights}
+            isLoading={false}
+            error={null}
+            selectedCategory={selectedInsightCategory}
+            onCategoryChange={setSelectedInsightCategory}
+            onGenerate={noop}
+            isGenerating={false}
+            testId='demo-showcase-analytics'
+          />
+        </DemoAuthShell>
       );
     case 'earnings':
       return (
-        <DemoShowcasePanel testId='demo-showcase-earnings'>
-          <DashboardEarningsDemo />
-        </DemoShowcasePanel>
+        <SettingsDemoHarness
+          dashboardData={DEMO_DASHBOARD_DATA}
+          earningsData={DEMO_EARNINGS_RESPONSE}
+        >
+          <div data-testid='demo-showcase-earnings'>
+            <DashboardPay />
+          </div>
+        </SettingsDemoHarness>
       );
     case 'links':
       return (
-        <DemoShowcasePanel testId='demo-showcase-links'>
-          <DashboardLinksDemo />
-        </DemoShowcasePanel>
+        <SettingsDemoHarness shell='page' testId='demo-showcase-links'>
+          <div className='flex min-h-0 flex-1'>
+            <GroupedLinksManager
+              initialLinks={demoDetectedLinks}
+              creatorName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+              isMusicProfile
+              suggestionsEnabled={false}
+              sidebarOpen={false}
+              className='flex-1'
+            />
+          </div>
+        </SettingsDemoHarness>
       );
     case 'releases': {
       const requestedState = searchParams.get('state');
@@ -230,10 +265,14 @@ export function DemoShowcaseSurface({
       );
     case 'release-landing':
       return <DemoReleaseLandingSurface />;
+    case 'release-tracked-links':
+      return <DemoReleaseTrackedLinksSurface />;
     case 'release-presave':
       return <DemoReleasePresaveSurface />;
     case 'release-tasks':
       return <DemoReleaseTasksSurface />;
+    case 'tim-white-profile':
+      return <DemoTimWhiteProfileSurface />;
     case 'onboarding-handle':
       return (
         <DemoOnboardingShowcase
@@ -245,7 +284,7 @@ export function DemoShowcaseSurface({
             prompt='This is how fans will find and remember you.'
             handleInput={handleInput}
             isHydrated
-            handleValidation={HANDLE_VALIDATION_MOCK}
+            handleValidation={DEMO_HANDLE_VALIDATION}
             stateError={null}
             isSubmitting={false}
             isTransitioning={false}
@@ -275,13 +314,13 @@ export function DemoShowcaseSurface({
           <OnboardingProfileReviewStep
             title='Your profile'
             prompt='Review your profile before going live.'
-            enrichedProfile={PROFILE_REVIEW_DATA}
+            enrichedProfile={DEMO_ENRICHED_PROFILE}
             handle='soravale'
             onGoToDashboard={noop}
             isEnriching={false}
-            existingAvatarUrl={PROFILE_REVIEW_DATA.imageUrl}
-            existingBio={PROFILE_REVIEW_DATA.bio}
-            existingGenres={PROFILE_REVIEW_DATA.genres}
+            existingAvatarUrl={DEMO_ENRICHED_PROFILE.imageUrl}
+            existingBio={DEMO_ENRICHED_PROFILE.bio}
+            existingGenres={DEMO_ENRICHED_PROFILE.genres}
             isStepResume
           />
         </DemoOnboardingShowcase>

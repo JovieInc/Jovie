@@ -43,6 +43,7 @@ jobs:
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
+      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
@@ -60,7 +61,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -73,7 +74,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -84,7 +85,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -133,6 +134,13 @@ jobs:
             echo "run_onboarding_lighthouse=false" >> $GITHUB_OUTPUT
           fi
 
+          ADMIN_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.admin\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/admin/|apps/web/components/features/admin/)'
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ADMIN_LIGHTHOUSE_PATTERN"; then
+            echo "run_admin_lighthouse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
+          fi
+
           # E2E paths
           E2E_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$E2E_PATTERN"; then
@@ -156,6 +164,7 @@ jobs:
             echo "run_build=false" >> "$GITHUB_OUTPUT"
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
+            echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -433,7 +442,7 @@ jobs:
 
       - name: Upload Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-artifact/connection.json
@@ -554,7 +563,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # Gates on fast checks (typecheck, lint, guardrails), unit tests, public-route build, and Lighthouse audits.
-    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-pr]
+    needs: [ci-fast, ci-unit-tests, ci-build-public, ci-lighthouse-dashboard-pr, ci-lighthouse-onboarding-pr, ci-lighthouse-admin-pr, ci-lighthouse-pr]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -566,12 +575,14 @@ jobs:
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
           ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
+          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
           PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
+          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
           echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
 
           # ci-fast must succeed (or be skipped when path-gated with no app files changed)
@@ -600,6 +611,12 @@ jobs:
           # Onboarding Lighthouse — path-gated, so skipped when no onboarding files changed
           if [[ "$ONBOARDING_LIGHTHOUSE_RESULT" != "success" && "$ONBOARDING_LIGHTHOUSE_RESULT" != "skipped" ]]; then
             echo "❌ ci-lighthouse-onboarding-pr did not pass (result: $ONBOARDING_LIGHTHOUSE_RESULT)"
+            exit 1
+          fi
+
+          # Admin Lighthouse — path-gated, so skipped when no admin files changed
+          if [[ "$ADMIN_LIGHTHOUSE_RESULT" != "success" && "$ADMIN_LIGHTHOUSE_RESULT" != "skipped" ]]; then
+            echo "❌ ci-lighthouse-admin-pr did not pass (result: $ADMIN_LIGHTHOUSE_RESULT)"
             exit 1
           fi
 
@@ -674,7 +691,7 @@ jobs:
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
           path: /tmp/nextjs-build.tar
@@ -750,7 +767,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: failure()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -995,7 +1012,7 @@ jobs:
 
       - name: Upload dashboard Lighthouse artifacts
         if: always() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lighthouse-dashboard-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/dashboard-pr/
@@ -1126,10 +1143,144 @@ jobs:
 
       - name: Upload onboarding Lighthouse artifacts
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lighthouse-onboarding-pr-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.lighthouseci/onboarding-pr/
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  ci-lighthouse-admin-pr:
+    name: Lighthouse (admin PR)
+    # Do NOT depend on neon-db — it only runs on push / testing-labeled / drizzle PRs,
+    # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
+    # its own ephemeral branch below and does not reuse the shared neon-db branch.
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: admin-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        id: resolve-admin-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-admin-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Build app for admin Lighthouse
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run authenticated admin Lighthouse
+        run: |
+          cd apps/web
+
+          if [ -z "$E2E_CLERK_USER_ID" ]; then
+            echo "E2E_CLERK_USER_ID empty (no E2E_ADMIN_CLERK_USER_ID secret) — skipping admin Lighthouse."
+            exit 0
+          fi
+
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found — admin Lighthouse cannot start."
+            exit 1
+          fi
+
+          node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          echo "Waiting for standalone server..."
+          SERVER_READY=false
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Server failed to start within 30s."
+            exit 1
+          fi
+
+          pnpm run test:lighthouse:admin:pr
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-admin-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-admin-ci
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_ADMIN_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_ADMIN_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_ADMIN_CLERK_USER_PASSWORD }}
+
+      - name: Upload admin Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse-admin-pr-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/.lighthouseci/admin-pr/
           if-no-files-found: ignore
           retention-days: 3
 
@@ -1461,7 +1612,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check-creds.outputs.skip != 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: post-deploy-auth-smoke-${{ github.run_id }}
           path: |
@@ -1522,7 +1673,7 @@ jobs:
 
       - name: Upload build manifest
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         continue-on-error: true
         with:
           name: build-manifest
@@ -1640,6 +1791,11 @@ jobs:
 
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          TURBO_SCM_HEAD: ${{ github.sha }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: |
           # Only collect coverage on main branch pushes — PRs diff against main baseline
           COVERAGE_FLAG=""
@@ -1647,7 +1803,7 @@ jobs:
             COVERAGE_FLAG="--coverage"
           fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
-          export NODE_OPTIONS="--max-old-space-size=4096"
+          export NODE_OPTIONS="--max-old-space-size=2048"
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
@@ -1673,17 +1829,15 @@ jobs:
             # --passWithNoTests: some shards may have no files matching the filter
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction" $OUTPUT_FLAG
           fi
-        env:
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          TURBO_SCM_HEAD: ${{ github.sha }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1838,7 +1992,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -1948,7 +2102,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -2085,7 +2239,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -2368,7 +2522,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -2376,7 +2530,7 @@ jobs:
 
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
@@ -2435,16 +2589,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel@50.22.1
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v1.8
+        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
-        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
       - name: Build (PR preview)
-        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -2466,17 +2618,14 @@ jobs:
             echo "Using stub database URL for UI-only deployment"
           fi
 
-          # Deploy preview with DATABASE_URL injected only for this deployment
-          deployment_url=$(vercel deploy --prebuilt --archive=tgz \
+          bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
             --env DATABASE_URL="$POOLED_URL" \
-            --env GIT_BRANCH="${GIT_BRANCH}" \
-            --token $VERCEL_TOKEN)
-
-          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+            --env GIT_BRANCH="${GIT_BRANCH}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ALLOW_SOURCE_FALLBACK: '1'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -2520,7 +2669,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Post CI summary to PR
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
@@ -2841,7 +2990,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: smoke-required-report-${{ github.run_id }}
           path: |
@@ -2945,8 +3094,6 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel@50.22.1
       - name: DB safety check (production - preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
@@ -2972,60 +3119,33 @@ jobs:
         # merge commit message. The Slack drift notification in deploy-notify
         # fires when verify fails but deploy proceeds (bypass alert).
         continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
-      - name: Upgrade corepack
-        run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v1.8
+        uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
-        run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
       - name: Build (preview target for staging verification)
-        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
-          # Retry up to 3 times for transient Vercel failures
-          for attempt in 1 2 3; do
-            echo "Deploy attempt $attempt/3"
-            if deploy_output="$(vercel deploy --prebuilt --archive=tgz \
-              --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
-              --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}" \
-              --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
-              deploy_exit=0
-            else
-              deploy_exit=$?
-            fi
-            echo "$deploy_output"
-            if [ "$deploy_exit" -eq 0 ]; then
-              deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
-              if [ -z "$deploy_url" ]; then
-                echo "Deploy succeeded but no preview URL was found in Vercel output"
-                exit 1
-              fi
-              echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
-              echo "Deploy succeeded on attempt $attempt"
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "Deploy failed, retrying in 10s..."
-              sleep 10
-            fi
-          done
-          echo "Deploy failed after 3 attempts"
-          exit 1
+          bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+            --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
+            --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Alias preview to staging.jov.ie
         run: |
-          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
+          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -3061,15 +3181,15 @@ jobs:
       name: Production – jovie
       url: https://jov.ie
     steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel@50.22.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Promote verified staging to production
         run: |
           # Use the staging alias directly — GitHub Actions masks job outputs
           # containing secret substrings (org name in Vercel URLs), so we
           # cannot rely on deploy_url passed between jobs.
           set +e
-          promote_output=$(vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
+          promote_output=$(./node_modules/.bin/vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
           promote_exit_code=$?
           set -e
 

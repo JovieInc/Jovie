@@ -1,7 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { type BrowserContext, chromium, type Page } from 'playwright';
+import { pathToFileURL } from 'node:url';
+import {
+  type Browser,
+  type BrowserContext,
+  chromium,
+  type Page,
+} from 'playwright';
 import { APP_ROUTES } from '../constants/routes';
 import { getAlternativeSlugs } from '../content/alternatives';
 import { getComparisonSlugs } from '../content/comparisons';
@@ -71,6 +77,18 @@ const BASE_URL =
   process.env.ROUTE_QA_BASE_URL?.trim() || 'http://localhost:3000';
 const ROUTE_FILTER = process.env.ROUTE_QA_FILTER?.trim().toLowerCase() || null;
 const ROUTE_LIMIT = Number.parseInt(process.env.ROUTE_QA_LIMIT || '', 10);
+const ROUTE_CASE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_CASE_TIMEOUT_MS || '',
+  10
+);
+const TEST_AUTH_PROBE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_TEST_AUTH_PROBE_TIMEOUT_MS || '',
+  10
+);
+const CLOSE_TIMEOUT_MS = Number.parseInt(
+  process.env.ROUTE_QA_CLOSE_TIMEOUT_MS || '',
+  10
+);
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -86,6 +104,35 @@ const ERROR_SELECTORS = [
   '[data-testid="dashboard-error"]',
   '.next-error-h1',
 ];
+
+interface NotFoundSignalInput {
+  readonly responseStatus: number;
+  readonly finalUrl: string;
+  readonly bodyText: string;
+  readonly title: string;
+  readonly hasNotFoundTestId: boolean;
+}
+
+export function isNotFoundLike({
+  responseStatus,
+  finalUrl,
+  bodyText,
+  title,
+  hasNotFoundTestId,
+}: Readonly<NotFoundSignalInput>) {
+  const loweredTitle = title.toLowerCase();
+
+  return (
+    responseStatus === 404 ||
+    finalUrl.includes('/not-found') ||
+    hasNotFoundTestId ||
+    loweredTitle.includes('not found') ||
+    bodyText.includes('page not found') ||
+    bodyText.includes('content not found') ||
+    bodyText.includes("doesn't exist") ||
+    bodyText.includes("couldn't find")
+  );
+}
 
 function toRouteTemplate(filePath: string): string {
   const relativePath = path.relative(APP_DIR, filePath);
@@ -205,7 +252,7 @@ function buildDynamicCase(
   };
 }
 
-async function expandDynamicRoute(
+export async function expandDynamicRoute(
   route: string,
   source: string
 ): Promise<RouteCase[]> {
@@ -508,6 +555,28 @@ async function expandDynamicRoute(
     ];
   }
 
+  if (route === '/[username]/[slug]/download') {
+    const resolvedPath = await resolveSeededPublicReleasePath({
+      path: '/[username]/[slug]',
+      seedProfile: 'e2e-test-user',
+    } as never);
+    return [
+      buildDynamicCase(
+        `${resolvedPath}/download`,
+        `${source} -> seeded release download`,
+        route
+      ),
+      buildDynamicCase(
+        `/${MISSING_PUBLIC_USERNAME}/missing-release/download`,
+        `${source} -> missing release download`,
+        route,
+        {
+          expectedState: 'not-found',
+        }
+      ),
+    ];
+  }
+
   if (route === '/[username]/[...slug]') {
     const resolvedPath = await resolveSeededPublicCatchAllPath({
       path: route,
@@ -583,7 +652,11 @@ async function buildRouteMatrix(): Promise<RouteCase[]> {
   return [...dedupedCases.values()];
 }
 
-async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
+export async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
+  const timeoutMs = Number.isFinite(TEST_AUTH_PROBE_TIMEOUT_MS)
+    ? TEST_AUTH_PROBE_TIMEOUT_MS
+    : 15_000;
+
   try {
     const response = await fetch(
       new URL('/api/dev/test-auth/session', BASE_URL),
@@ -591,6 +664,7 @@ async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
         headers: {
           Accept: 'application/json',
         },
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
 
@@ -609,11 +683,10 @@ async function getTestAuthAvailability(): Promise<TestAuthAvailability | null> {
       reason: typeof payload.reason === 'string' ? payload.reason : null,
     };
   } catch (error) {
-    return {
-      enabled: false,
-      trustedHost: false,
-      reason: `Auth bootstrap probe failed: ${(error as Error).message}`,
-    };
+    console.warn(
+      `[route-qa] Auth bootstrap probe failed after ${timeoutMs}ms: ${(error as Error).message}`
+    );
+    return null;
   }
 }
 
@@ -698,6 +771,35 @@ async function collectPageErrors(page: Page): Promise<string[]> {
   ];
 }
 
+export function resolveRouteCaseTimeoutMs() {
+  return Number.isFinite(ROUTE_CASE_TIMEOUT_MS)
+    ? ROUTE_CASE_TIMEOUT_MS
+    : 120_000;
+}
+
+export async function settleWithTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number
+): Promise<
+  | { readonly timedOut: false; readonly result: T }
+  | { readonly timedOut: true; readonly result?: undefined }
+> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation.then(result => ({ timedOut: false as const, result })),
+      new Promise<{ readonly timedOut: true }>(resolve => {
+        timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function runRouteCase(
   context: BrowserContext,
   routeCase: RouteCase
@@ -722,6 +824,8 @@ async function runRouteCase(
   }
 
   const page = await context.newPage();
+  page.setDefaultNavigationTimeout(45_000);
+  page.setDefaultTimeout(15_000);
   const consoleErrors: string[] = [];
 
   page.on('console', message => {
@@ -739,94 +843,134 @@ async function runRouteCase(
   let title = '';
   let screenshotPath: string | undefined;
   let pageErrors: string[] = [];
+  const caseTimeoutMs = resolveRouteCaseTimeoutMs();
 
   try {
-    const response = await page.goto(targetUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 45_000,
-    });
-    await waitForStablePage(page);
-    finalUrl = page.url();
-    title = await page.title().catch(() => '');
-    const bodyText = (
-      await page
-        .locator('body')
-        .innerText()
-        .catch(() => '')
-    ).toLowerCase();
-    pageErrors = await collectPageErrors(page);
+    const routeRun = settleWithTimeout(
+      (async () => {
+        const response = await page.goto(targetUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: 45_000,
+        });
+        await waitForStablePage(page);
+        finalUrl = page.url();
+        title = await page.title().catch(() => '');
+        const bodyText = (
+          await page
+            .locator('body')
+            .innerText()
+            .catch(() => '')
+        ).toLowerCase();
+        const hasNotFoundTestId = await page
+          .locator('[data-testid="not-found"]')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        pageErrors = await collectPageErrors(page);
 
-    const hasMainContent = await page
-      .locator('main, body')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const responseStatus = response?.status() ?? 0;
-    const notFoundLike =
-      responseStatus === 404 ||
-      finalUrl.includes('/not-found') ||
-      bodyText.includes('page not found') ||
-      bodyText.includes("doesn't exist") ||
-      bodyText.includes("couldn't find");
+        const hasMainContent = await page
+          .locator('main, body')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const responseStatus = response?.status() ?? 0;
+        const notFoundLike = isNotFoundLike({
+          responseStatus,
+          finalUrl,
+          bodyText,
+          title,
+          hasNotFoundTestId,
+        });
 
-    const unauthorizedLike = await page
-      .locator('text=/unauthorized|sign in as an admin|valid kiosk token/i')
-      .first()
-      .isVisible()
-      .catch(() => false);
+        const unauthorizedLike = await page
+          .locator('text=/unauthorized|sign in as an admin|valid kiosk token/i')
+          .first()
+          .isVisible()
+          .catch(() => false);
 
-    let status: ResultStatus = 'pass';
-    const findings: string[] = [...pageErrors];
+        let status: ResultStatus = 'pass';
+        const findings: string[] = [...pageErrors];
 
-    if (!hasMainContent) {
-      status = 'fail';
-      findings.push('No visible main content');
-    }
+        if (!hasMainContent) {
+          status = 'fail';
+          findings.push('No visible main content');
+        }
 
-    if (routeCase.expectedState === 'not-found') {
-      if (!notFoundLike) {
-        status = 'fail';
-        findings.push(
-          'Expected a not-found style state but did not observe one.'
-        );
-      }
-    } else if (routeCase.expectedState === 'unauthorized') {
-      if (!unauthorizedLike && responseStatus >= 400) {
-        status = 'fail';
-        findings.push(
-          `Expected an unauthorized fallback but received HTTP ${responseStatus}.`
-        );
-      }
-    } else if (responseStatus >= 400) {
-      status = 'fail';
-      findings.push(`HTTP ${responseStatus}`);
-    }
+        if (routeCase.expectedState === 'not-found') {
+          if (!notFoundLike) {
+            status = 'fail';
+            findings.push(
+              'Expected a not-found style state but did not observe one.'
+            );
+          }
+        } else if (routeCase.expectedState === 'unauthorized') {
+          if (!unauthorizedLike && responseStatus >= 400) {
+            status = 'fail';
+            findings.push(
+              `Expected an unauthorized fallback but received HTTP ${responseStatus}.`
+            );
+          }
+        } else if (responseStatus >= 400) {
+          status = 'fail';
+          findings.push(`HTTP ${responseStatus}`);
+        }
 
-    if (pageErrors.length > 0 && routeCase.expectedState === 'ok') {
-      status = 'fail';
-    }
+        if (pageErrors.length > 0 && routeCase.expectedState === 'ok') {
+          status = 'fail';
+        }
 
-    if (status !== 'pass') {
+        if (status !== 'pass') {
+          screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
+          await page
+            .screenshot({ path: screenshotPath, fullPage: true })
+            .catch(() => undefined);
+        }
+
+        return {
+          id: routeCase.id,
+          lane: routeCase.lane,
+          path: routeCase.path,
+          source: routeCase.source,
+          authPersona: routeCase.authPersona,
+          status,
+          finalUrl,
+          title,
+          consoleErrors,
+          pageErrors: findings,
+          screenshotPath,
+          notes: routeCase.notes,
+        } satisfies RouteResult;
+      })(),
+      caseTimeoutMs
+    );
+    const settledResult = await routeRun;
+
+    if (settledResult.timedOut) {
+      finalUrl = page.url() || finalUrl;
       screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
       await page
         .screenshot({ path: screenshotPath, fullPage: true })
         .catch(() => undefined);
+
+      return {
+        id: routeCase.id,
+        lane: routeCase.lane,
+        path: routeCase.path,
+        source: routeCase.source,
+        authPersona: routeCase.authPersona,
+        status: 'fail',
+        finalUrl,
+        title,
+        consoleErrors,
+        pageErrors: [
+          `Route timed out after ${caseTimeoutMs}ms while waiting for the page to stabilize.`,
+        ],
+        screenshotPath,
+        notes: routeCase.notes,
+      };
     }
 
-    return {
-      id: routeCase.id,
-      lane: routeCase.lane,
-      path: routeCase.path,
-      source: routeCase.source,
-      authPersona: routeCase.authPersona,
-      status,
-      finalUrl,
-      title,
-      consoleErrors,
-      pageErrors: findings,
-      screenshotPath,
-      notes: routeCase.notes,
-    };
+    return settledResult.result;
   } catch (error) {
     screenshotPath = path.join(SCREENSHOT_DIR, `${routeCase.id}.png`);
     await page
@@ -914,6 +1058,13 @@ async function writeArtifacts(
   await fs.writeFile(path.join(OUTPUT_ROOT, 'findings-ledger.md'), markdown);
 }
 
+async function flushStandardStreams() {
+  await Promise.all([
+    new Promise<void>(resolve => process.stdout.write('', () => resolve())),
+    new Promise<void>(resolve => process.stderr.write('', () => resolve())),
+  ]);
+}
+
 async function main() {
   await fs.rm(OUTPUT_ROOT, { recursive: true, force: true });
   await fs.mkdir(OUTPUT_ROOT, { recursive: true });
@@ -923,38 +1074,78 @@ async function main() {
     authAvailability
   );
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 960 },
-    colorScheme: 'dark',
-  });
-
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
   const results: RouteResult[] = [];
-  for (const routeCase of routeCases) {
-    const result = await runRouteCase(context, routeCase);
-    results.push(result);
-    const marker =
-      result.status === 'pass'
-        ? 'PASS'
-        : result.status === 'blocked'
-          ? 'BLOCK'
-          : 'FAIL';
-    console.log(`${marker} ${routeCase.path}`);
-  }
+  let exitCode = 1;
+  let fatalError: unknown = null;
+  const closeTimeoutMs = Number.isFinite(CLOSE_TIMEOUT_MS)
+    ? CLOSE_TIMEOUT_MS
+    : 5_000;
+  try {
+    browser = await chromium.launch({ headless: true });
+    context = await browser.newContext({
+      viewport: { width: 1440, height: 960 },
+      colorScheme: 'dark',
+    });
 
-  await context.close();
-  await browser.close();
-  await writeArtifacts(routeCases, results);
+    for (const routeCase of routeCases) {
+      const result = await runRouteCase(context, routeCase);
+      results.push(result);
+      const marker =
+        result.status === 'pass'
+          ? 'PASS'
+          : result.status === 'blocked'
+            ? 'BLOCK'
+            : 'FAIL';
+      console.log(`${marker} ${routeCase.path}`);
+    }
 
-  const summary = summarizeResults(results);
-  console.log(
-    `Route QA complete. Pass=${summary.pass} Fail=${summary.fail} Blocked=${summary.blocked}`
-  );
-  console.log(`Artifacts: ${OUTPUT_ROOT}`);
+    const summary = summarizeResults(results);
+    console.log(
+      `Route QA complete. Pass=${summary.pass} Fail=${summary.fail} Blocked=${summary.blocked}`
+    );
+    console.log(`Artifacts: ${OUTPUT_ROOT}`);
 
-  if (summary.fail > 0) {
+    exitCode = summary.fail > 0 ? 1 : 0;
+    process.exitCode = exitCode;
+  } catch (error) {
+    fatalError = error;
     process.exitCode = 1;
+    console.error(error);
+  } finally {
+    if (context) {
+      const contextClose = await settleWithTimeout(
+        context.close().catch(() => undefined),
+        closeTimeoutMs
+      );
+      if (contextClose.timedOut) {
+        console.warn(
+          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
+        );
+      }
+    }
+
+    if (browser) {
+      const browserClose = await settleWithTimeout(
+        browser.close().catch(() => undefined),
+        closeTimeoutMs
+      );
+      if (browserClose.timedOut) {
+        console.warn(
+          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser.`
+        );
+      }
+    }
+
+    await writeArtifacts(routeCases, results);
   }
+
+  await flushStandardStreams();
+  process.exit(fatalError ? 1 : exitCode);
 }
 
-void main();
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  void main();
+}

@@ -1,10 +1,10 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { groupReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import {
   artists,
@@ -16,7 +16,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 export async function fetchReleaseCreditsAction(
   releaseId: string
 ): Promise<SmartLinkCreditGroup[]> {
-  const { userId } = await auth();
+  const { userId } = await getOptionalAuth();
   if (!userId) {
     return [];
   }

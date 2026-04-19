@@ -60,6 +60,29 @@ describe('dashboard drawer chrome', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('audience member drawer uses the tabbed card as the scroll region', () => {
+    const { container } = render(
+      <AudienceMemberSidebar
+        member={audienceMember}
+        isOpen={true}
+        onClose={() => undefined}
+        contextMenuItems={[]}
+      />
+    );
+
+    const shellBody = container.querySelector('[data-scroll-strategy="child"]');
+    const tabbedCard = screen.getByTestId('audience-member-tabbed-card');
+    const scrollRegion = screen.getByTestId(
+      'audience-member-tabbed-card-scroll-region'
+    );
+
+    expect(shellBody).toBeInTheDocument();
+    expect(shellBody).not.toHaveClass('overflow-y-auto');
+    expect(tabbedCard.closest('.min-h-full')).toBeNull();
+    expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
+    expect(scrollRegion).toHaveClass('overflow-y-auto');
+  });
+
   it('presence drawer keeps close inside the overflow menu and drops decorative label', () => {
     render(
       <DspPresenceSidebar

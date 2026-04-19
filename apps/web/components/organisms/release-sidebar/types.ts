@@ -61,6 +61,8 @@ export interface ReleaseSidebarProps {
   >;
   /** Artist name to display in the sidebar header */
   readonly artistName?: string | null;
+  readonly canGenerateAlbumArt?: boolean;
+  readonly onGenerateAlbumArt?: (release: Release) => void;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   /** Whether a release refresh operation is currently in progress */
@@ -148,4 +150,6 @@ export interface ReleaseSidebarProps {
   readonly tracksOverride?: ReleaseSidebarTrack[];
   /** Optional static analytics data used instead of the live sidebar API */
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
+  /** Disable live credits fetching for auth-free mirrors like /demo. */
+  readonly showCredits?: boolean;
 }

@@ -1,3 +1,10 @@
+import {
+  type DynamicToolUIPart,
+  isToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from 'ai';
+import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ChatInsightSummary } from '@/types/insights';
 
 export interface ArtistContext {
@@ -80,50 +87,122 @@ export interface SocialLinkRemovalToolResult {
   readonly url: string;
 }
 
-export interface ToolInvocationPart {
-  type: 'tool-invocation';
-  toolInvocationId: string;
-  toolName: string;
-  state: 'call' | 'result' | 'partial-call';
-  args?: Record<string, unknown>;
-  result?: Record<string, unknown>;
-  toolInvocation?: {
-    readonly toolName: string;
-    readonly state: string;
-  };
+export interface ChatAlbumArtCandidate {
+  readonly id: string;
+  readonly styleId: string;
+  readonly styleLabel: string;
+  readonly previewUrl: string;
+  readonly fullResUrl: string;
 }
 
-export function isToolInvocationPart(
-  part: unknown
-): part is ToolInvocationPart {
-  if (typeof part !== 'object' || part === null) {
-    return false;
-  }
-  const candidate = part as Partial<ToolInvocationPart>;
+function isChatAlbumArtCandidate(
+  candidate: unknown
+): candidate is ChatAlbumArtCandidate {
   return (
-    candidate.type === 'tool-invocation' &&
-    typeof candidate.toolInvocationId === 'string' &&
-    candidate.toolInvocationId.length > 0 &&
-    typeof candidate.toolName === 'string' &&
-    candidate.toolName.length > 0 &&
-    (candidate.state === 'call' ||
-      candidate.state === 'result' ||
-      candidate.state === 'partial-call')
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof (candidate as Record<string, unknown>).id === 'string' &&
+    typeof (candidate as Record<string, unknown>).styleId === 'string' &&
+    typeof (candidate as Record<string, unknown>).styleLabel === 'string' &&
+    typeof (candidate as Record<string, unknown>).previewUrl === 'string' &&
+    typeof (candidate as Record<string, unknown>).fullResUrl === 'string'
   );
 }
 
-export interface MessagePart {
-  readonly type: string;
-  readonly text?: string;
-  readonly toolInvocation?: {
-    readonly toolName: string;
-    readonly state: string;
-  };
-  /** File attachment URL (data URL or blob URL). Present when type === 'file'. */
-  readonly url?: string;
-  /** MIME type of the file attachment. Present when type === 'file'. */
-  readonly mediaType?: string;
+export type ChatAlbumArtToolResult =
+  | {
+      readonly success: false;
+      readonly retryable: boolean;
+      readonly error: string;
+    }
+  | {
+      readonly success: true;
+      readonly state: 'needs_release_target';
+      readonly releaseTitle: string | null;
+      readonly artistName: string;
+      readonly suggestedReleases: ReadonlyArray<{
+        readonly id: string;
+        readonly title: string;
+      }>;
+    }
+  | {
+      readonly success: true;
+      readonly state: 'generated';
+      readonly releaseId: string | null;
+      readonly releaseTitle: string;
+      readonly artistName: string;
+      readonly generationId: string;
+      readonly hasExistingArtwork: boolean;
+      readonly candidates: readonly ChatAlbumArtCandidate[];
+    };
+
+export function isChatAlbumArtToolResult(
+  result: unknown
+): result is ChatAlbumArtToolResult {
+  if (typeof result !== 'object' || result === null) {
+    return false;
+  }
+
+  const candidate = result as Record<string, unknown>;
+  if (candidate.success === false) {
+    return (
+      typeof candidate.retryable === 'boolean' &&
+      typeof candidate.error === 'string'
+    );
+  }
+
+  if (candidate.success !== true || typeof candidate.state !== 'string') {
+    return false;
+  }
+
+  if (candidate.state === 'needs_release_target') {
+    return (
+      (candidate.releaseTitle === null ||
+        typeof candidate.releaseTitle === 'string') &&
+      typeof candidate.artistName === 'string' &&
+      Array.isArray(candidate.suggestedReleases) &&
+      candidate.suggestedReleases.every(
+        release =>
+          typeof release === 'object' &&
+          release !== null &&
+          typeof (release as Record<string, unknown>).id === 'string' &&
+          typeof (release as Record<string, unknown>).title === 'string'
+      )
+    );
+  }
+
+  if (candidate.state === 'generated') {
+    return (
+      (candidate.releaseId === null ||
+        typeof candidate.releaseId === 'string') &&
+      typeof candidate.releaseTitle === 'string' &&
+      typeof candidate.artistName === 'string' &&
+      typeof candidate.generationId === 'string' &&
+      typeof candidate.hasExistingArtwork === 'boolean' &&
+      Array.isArray(candidate.candidates) &&
+      candidate.candidates.every(isChatAlbumArtCandidate)
+    );
+  }
+
+  return false;
 }
+
+export type JovieToolPart = ToolUIPart | DynamicToolUIPart;
+
+export function isJovieToolPart(part: unknown): part is JovieToolPart {
+  if (
+    typeof part !== 'object' ||
+    part === null ||
+    !('type' in part) ||
+    typeof part.type !== 'string'
+  ) {
+    return false;
+  }
+
+  return isToolUIPart(part as UIMessage['parts'][number]);
+}
+
+export type MessagePart = UIMessage['parts'][number];
 
 /** Shape of file attachments passed to AI SDK's sendMessage. */
 export interface FileUIPart {
@@ -133,21 +212,19 @@ export interface FileUIPart {
 }
 
 /** User-friendly labels for AI tool invocations shown during streaming. */
-export const TOOL_LABELS: Record<string, string> = {
-  proposeProfileEdit: 'Editing profile...',
-  proposeAvatarUpload: 'Preparing photo upload...',
-  proposeSocialLink: 'Adding link...',
-  proposeSocialLinkRemoval: 'Removing link...',
-  showTopInsights: 'Checking your signals...',
-  checkCanvasStatus: 'Checking canvas status...',
-  suggestRelatedArtists: 'Finding related artists...',
-  generateCanvasPlan: 'Planning canvas video...',
-  createPromoStrategy: 'Building promo strategy...',
-  markCanvasUploaded: 'Updating canvas status...',
-  createRelease: 'Creating release...',
-  submitFeedback: 'Submitting feedback...',
-  generateReleasePitch: 'Generating pitches...',
-};
+export const TOOL_LABELS: Record<string, string> = (() => {
+  const labels: Record<string, string> = {};
+  const registry = TOOL_UI_REGISTRY as Record<
+    string,
+    { readonly label: string; readonly loadingTitle?: string }
+  >;
+
+  for (const [toolName, config] of Object.entries(registry)) {
+    labels[toolName] = config.loadingTitle ?? config.label;
+  }
+
+  return labels;
+})();
 
 /** A chat suggestion card with icon, label, and prompt */
 export interface ChatSuggestion {

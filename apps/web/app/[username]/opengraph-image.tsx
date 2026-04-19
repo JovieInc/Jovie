@@ -31,7 +31,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
 
     // Limit to 2MB to avoid memory pressure in edge runtime
     const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+    if (contentLength && Number.parseInt(contentLength, 10) > 2 * 1024 * 1024) {
       return null;
     }
 
@@ -43,7 +43,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     const CHUNK = 8192;
     const chunks: string[] = [];
     for (let i = 0; i < bytes.length; i += CHUNK) {
-      chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+      chunks.push(String.fromCodePoint(...bytes.subarray(i, i + CHUNK)));
     }
     return `data:${contentType};base64,${btoa(chunks.join(''))}`;
   } catch {

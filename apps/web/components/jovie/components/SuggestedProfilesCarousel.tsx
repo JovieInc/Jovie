@@ -302,6 +302,7 @@ function SuggestionCard({
   readonly onNext: () => void;
 }) {
   const isAvatar = suggestion.type === 'avatar';
+  const isPlaylistFallback = suggestion.type === 'playlist_fallback';
   const iconPlatform =
     ICON_PLATFORM_MAP[suggestion.platform] ?? suggestion.platform;
 
@@ -351,7 +352,7 @@ function SuggestionCard({
               target='_blank'
               rel='noopener noreferrer'
               className='shrink-0 rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
-              aria-label={`Open ${suggestion.platformLabel} profile`}
+              aria-label={`Open ${suggestion.platformLabel} link`}
             >
               <ExternalLink className='h-3.5 w-3.5' />
             </a>
@@ -413,7 +414,7 @@ function SuggestionCard({
             ) : (
               <X className='h-4 w-4' />
             )}
-            {isAvatar ? 'Skip' : 'Not me'}
+            {isAvatar ? 'Skip' : isPlaylistFallback ? 'Dismiss' : 'Not me'}
           </button>
           <button
             type='button'
@@ -432,7 +433,11 @@ function SuggestionCard({
             ) : (
               <Check className='h-4 w-4' />
             )}
-            {isAvatar ? 'Use photo' : "That's me"}
+            {isAvatar
+              ? 'Use photo'
+              : isPlaylistFallback
+                ? 'Use Playlist'
+                : "That's me"}
           </button>
         </div>
       </div>
@@ -522,6 +527,8 @@ export function SuggestedProfilesCarousel({
     heading = 'Welcome';
   } else if (current.type === 'avatar') {
     heading = 'Choose your profile photo';
+  } else if (current.type === 'playlist_fallback') {
+    heading = 'Playlist suggestion';
   } else {
     heading = 'We found profiles that might be yours';
   }

@@ -73,32 +73,6 @@ const OnboardingV2Form = dynamic(
   }
 );
 
-/** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
-const PENDING_CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
-
-/**
- * Read the pendingClaim handle from sessionStorage (pure, no side effects).
- * Returns the handle string or empty string if none found / expired.
- */
-function readPendingClaimHandle(): string {
-  try {
-    const raw = globalThis.sessionStorage?.getItem('pendingClaim');
-    if (!raw) return '';
-
-    const parsed = JSON.parse(raw) as { handle?: string; ts?: number };
-    if (
-      !parsed.handle ||
-      typeof parsed.handle !== 'string' ||
-      (parsed.ts && Date.now() - parsed.ts > PENDING_CLAIM_MAX_AGE_MS)
-    ) {
-      return '';
-    }
-    return parsed.handle;
-  } catch {
-    return '';
-  }
-}
-
 interface OnboardingFormWrapperProps {
   readonly assumeInitialHandleAvailable?: boolean;
   readonly initialDisplayName?: string;
@@ -109,11 +83,8 @@ interface OnboardingFormWrapperProps {
   readonly shouldAutoSubmitHandle?: boolean;
   readonly initialProfileId?: string | null;
   readonly initialResumeStep?: string | null;
-  /** Existing profile avatar URL for step-resume users */
   readonly existingAvatarUrl?: string | null;
-  /** Existing profile bio for step-resume users */
   readonly existingBio?: string | null;
-  /** Existing profile genres for step-resume users */
   readonly existingGenres?: string[] | null;
 }
 
@@ -135,35 +106,13 @@ export function OnboardingFormWrapper({
   // need to wait for the client-only pendingClaim reconciliation pass.
   const [isHydrated, setIsHydrated] = useState(() => Boolean(initialHandle));
 
-  // Resolve the handle synchronously on first render to avoid a key-change
-  // remount that causes a visible layout shift.  sessionStorage is available
-  // during the initial client render (CSR after server HTML hydration), so
-  // reading it eagerly is safe and keeps the form key stable.
-  const [resolvedHandle] = useState(() => {
-    if (initialHandle) return initialHandle;
-    return readPendingClaimHandle() || initialHandle;
-  });
-
-  // Clean up the consumed pendingClaim entry in an effect (not in the
-  // useState initializer) to avoid a side effect during render, which
-  // React StrictMode would execute twice.
   useEffect(() => {
     if (!isHydrated) {
       setIsHydrated(true);
     }
   }, [isHydrated]);
 
-  useEffect(() => {
-    if (resolvedHandle && resolvedHandle !== initialHandle) {
-      try {
-        globalThis.sessionStorage?.removeItem('pendingClaim');
-      } catch {
-        // sessionStorage may be unavailable in restricted contexts
-      }
-    }
-  }, [resolvedHandle, initialHandle]);
-
-  // Stable key — never changes after mount, preventing full-form CLS.
+  const resolvedHandle = initialHandle;
   const formKey = resolvedHandle || '__empty__';
   const isResumeFlow = Boolean(initialResumeStep || initialProfileId);
 
@@ -174,6 +123,7 @@ export function OnboardingFormWrapper({
     >
       {isResumeFlow ? (
         <OnboardingV2Form
+          assumeInitialHandleAvailable={assumeInitialHandleAvailable}
           key={formKey}
           initialDisplayName={initialDisplayName}
           initialHandle={resolvedHandle}

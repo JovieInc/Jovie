@@ -10,7 +10,7 @@ import {
 } from './motion-helpers';
 import type { AnimatedArtistPageProps } from './types';
 import { useAnimatedArtistPage } from './useAnimatedArtistPage';
-import { extractVenmoUsername, findVenmoLink, TIP_AMOUNTS } from './utils';
+import { extractVenmoUsername, findVenmoLink, PAY_AMOUNTS } from './utils';
 
 const AnimatedListenInterface = dynamic(
   () =>
@@ -20,8 +20,8 @@ const AnimatedListenInterface = dynamic(
   { ssr: false }
 );
 
-const VenmoTipSelector = dynamic(
-  () => import('@/features/profile/VenmoTipSelector'),
+const VenmoPaySelector = dynamic(
+  () => import('@/features/profile/VenmoPaySelector'),
   { ssr: false }
 );
 
@@ -50,7 +50,7 @@ export function AnimatedArtistPage({
   socialLinks,
   contacts,
   subtitle,
-  showTipButton,
+  showPayButton,
   showBackButton,
   enableDynamicEngagement = false,
 }: AnimatedArtistPageProps) {
@@ -62,7 +62,7 @@ export function AnimatedArtistPage({
     socialLinks,
     contacts,
     subtitle,
-    showTipButton: showTipButton && tippingEnabled,
+    showPayButton: showPayButton && tippingEnabled,
     showBackButton,
     enableDynamicEngagement,
   });
@@ -82,16 +82,16 @@ export function AnimatedArtistPage({
           </div>
         );
 
-      case 'tip': {
+      case 'pay': {
         if (!tippingEnabled) {
           return (
             <motion.div {...fadeUpProps}>
               <div className='space-y-4 text-center'>
                 <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
                   <p className='text-sm text-secondary-token' role='alert'>
-                    Tipping is not available yet. We&apos;re focused on getting
+                    Payments not available yet. We&apos;re focused on getting
                     the core Jovie profile experience right before launching
-                    tipping.
+                    payments.
                   </p>
                 </div>
               </div>
@@ -104,23 +104,23 @@ export function AnimatedArtistPage({
 
         return (
           <motion.div {...fadeUpProps}>
-            <main className='space-y-4' aria-labelledby='tipping-title'>
-              <h1 id='tipping-title' className='sr-only'>
-                Tip {viewModel.artist.name}
+            <main className='space-y-4' aria-labelledby='pay-title'>
+              <h1 id='pay-title' className='sr-only'>
+                Support {viewModel.artist.name}
               </h1>
 
               {venmoLink ? (
-                <VenmoTipSelector
+                <VenmoPaySelector
                   venmoLink={venmoLink}
                   venmoUsername={venmoUsername ?? undefined}
-                  amounts={[...TIP_AMOUNTS]}
+                  amounts={[...PAY_AMOUNTS]}
                   className='w-full max-w-sm'
                 />
               ) : (
                 <div className='text-center'>
                   <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
                     <p className='text-sm text-secondary-token' role='alert'>
-                      Venmo tipping is not available for this artist yet.
+                      Venmo payments not available for this artist yet.
                     </p>
                   </div>
                 </div>

@@ -36,6 +36,8 @@ export interface RateLimitConfig {
   prefix: string;
   /** Whether to enable Upstash analytics */
   analytics?: boolean;
+  /** Whether the limiter must fail closed without Redis */
+  requireRedis?: boolean;
 }
 
 /**

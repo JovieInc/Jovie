@@ -6,7 +6,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function gotoLanding(page: import('@playwright/test').Page) {
   await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(2000);
+  await page.getByTestId('homepage-v2-hero').waitFor({ state: 'visible' });
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -21,114 +21,77 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
-async function stubGtag(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    if (!globalThis.sessionStorage.getItem('__gtagCalls')) {
-      globalThis.sessionStorage.setItem('__gtagCalls', '[]');
-    }
-
-    (
-      globalThis as typeof globalThis & {
-        gtag?: (...args: unknown[]) => void;
-      }
-    ).gtag = (...args: unknown[]) => {
-      const stored = globalThis.sessionStorage.getItem('__gtagCalls') ?? '[]';
-      const calls = JSON.parse(stored) as unknown[];
-      calls.push(args);
-      globalThis.sessionStorage.setItem('__gtagCalls', JSON.stringify(calls));
-    };
-  });
-}
-
-async function getTrackedEvents(
-  page: import('@playwright/test').Page
-): Promise<string[]> {
-  return page.evaluate(() => {
-    const stored = globalThis.sessionStorage.getItem('__gtagCalls') ?? '[]';
-    const calls = JSON.parse(stored) as Array<[string, string]>;
-    return calls.map(call => call[1]);
-  });
-}
-
 test.describe('/new landing page', () => {
   test.beforeEach(async ({ page }) => {
     await blockAnalytics(page);
   });
 
-  test('renders the simplified premium sections with live profile assets', async ({
+  test('renders the staged homepage v2 sections and product nav', async ({
     page,
   }) => {
     await gotoLanding(page);
 
-    await expect(page.getByTestId('homepage-shell')).toBeVisible();
-    await expect(page.getByTestId('hero-heading')).toBeVisible();
-    await expect(page.getByTestId('landing-hero-cta')).toBeVisible();
-    await expect(page.getByTestId('landing-hero-screenshot')).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Artist Profiles', exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Pricing', exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Support', exact: true })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-hero')).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-v2-hero-primary-cta')
+    ).toBeVisible();
 
     await expect(
-      page.getByRole('heading', { name: /drop more music/i })
+      page.getByRole('heading', { name: /make every release feel bigger/i })
     ).toBeVisible();
     await expect(
       page.getByText(
-        /smart links, artist profiles, release automation, and audience proof/i
+        /artist profiles, smart links, fan capture, and reactivation/i
       )
     ).toBeVisible();
 
-    await expect(page.getByTestId('landing-release-section')).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-spotlight')).toBeVisible();
     await expect(
-      page.getByTestId('landing-release-proof-imported')
+      page.getByTestId('homepage-v2-capture-reactivate')
     ).toBeVisible();
-    await expect(
-      page.getByTestId('landing-release-proof-fans-notified')
-    ).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-power-grid')).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
 
-    const desktopProfileImage = page.getByAltText(
-      'Desktop artist profile showing smart links, fan capture, tour dates, and tipping'
-    );
-    const phoneProfileImage = page.locator(
-      'img[alt="Mobile artist profile preview with fan actions and listening destinations"]:visible'
-    );
-
-    await page
-      .getByRole('heading', { name: 'One page. Every fan.' })
-      .scrollIntoViewIfNeeded();
-    await expect(desktopProfileImage).toBeVisible();
-    await expect(desktopProfileImage).toHaveAttribute(
-      'src',
-      /profile-desktop\.png/
-    );
-    await expect
-      .poll(() =>
-        desktopProfileImage.evaluate(
-          image => (image as HTMLImageElement).naturalWidth
-        )
-      )
-      .toBeGreaterThan(0);
-
-    await expect(phoneProfileImage).toBeVisible();
-    await expect(phoneProfileImage).toHaveAttribute(
-      'src',
-      /profile-phone\.png/
-    );
-    await expect
-      .poll(() =>
-        phoneProfileImage.evaluate(
-          image => (image as HTMLImageElement).naturalWidth
-        )
-      )
-      .toBeGreaterThan(0);
-
-    await expect(page.getByTestId('landing-profile-section')).toBeVisible();
     await expect(
-      page.getByTestId('landing-profile-proof-owned-contacts')
+      page.getByRole('heading', {
+        name: 'One system for the whole release cycle.',
+      })
     ).toBeVisible();
     await expect(
-      page.getByTestId('landing-profile-proof-top-source')
+      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
     ).toBeVisible();
-    await expect(page.getByTestId('landing-release-screenshot')).toBeVisible();
     await expect(
-      page.getByTestId('landing-profile-desktop-screenshot')
+      page.getByRole('heading', {
+        name: 'Capture every fan. Send them every release automatically.',
+      })
     ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
+      0
+    );
+
+    await expect(
+      page.getByTestId('homepage-v2-release-pages-preview')
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'See Artist Profiles' })
+    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
+    await expect(
+      page.getByRole('link', { name: 'See audience features' })
+    ).toHaveAttribute(
+      'href',
+      `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`
+    );
     await expect(page.locator('body')).not.toContainText('Page not found');
 
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
@@ -137,80 +100,54 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('tracks the hero CTA and navigates to signup', async ({ page }) => {
-    await stubGtag(page);
+  test('navigates hero CTA to signup', async ({ page }) => {
     await gotoLanding(page);
 
-    await page.getByTestId('landing-hero-cta').click();
+    await page.getByTestId('homepage-v2-hero-primary-cta').click();
 
     await expect(page).toHaveURL(/\/signup$/);
-    expect(await getTrackedEvents(page)).toContain('landing_cta_get_started');
   });
 
-  test('tracks the claim CTA and preserves the onboarding redirect', async ({
-    page,
-  }) => {
-    await stubGtag(page);
-    await page.route('**/api/handle/check?**', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ available: true }),
-      })
-    );
-
+  test('routes deep links to artist profiles anchors', async ({ page }) => {
     await gotoLanding(page);
-    await page
-      .getByRole('textbox', { name: /choose your handle/i })
-      .fill('releasefanclub');
-
-    await page.getByTestId('landing-claim-submit').click();
-
-    await expect(page).toHaveURL(
-      /\/signup\?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub/
-    );
-    expect(await getTrackedEvents(page)).toContain('landing_cta_claim_handle');
-
-    const pendingClaim = await page.evaluate(() => {
-      const stored = globalThis.sessionStorage.getItem('pendingClaim');
-      return stored ? JSON.parse(stored) : null;
-    });
-    expect(pendingClaim).toMatchObject({
-      handle: 'releasefanclub',
-    });
-    expect(pendingClaim).toEqual(
-      expect.objectContaining({
-        handle: 'releasefanclub',
-        ts: expect.any(Number),
-      })
-    );
+    await page.getByRole('link', { name: 'See audience features' }).click();
+    await expect(page).toHaveURL(/\/artist-profiles#capture-every-fan$/);
   });
 
-  test('uses pill-styled hero CTA and stable release proof layout', async ({
+  test('shows canonical pricing teaser and no live link for release pages', async ({
     page,
   }) => {
     await gotoLanding(page);
 
-    const heroCta = page.getByTestId('landing-hero-cta');
-    await expect(heroCta).toHaveClass(/rounded-full/);
-
-    const releaseSection = page.getByTestId('landing-release-section');
-    await expect(releaseSection).toBeVisible();
-    await expect(releaseSection).toHaveScreenshot(
-      'landing-release-section.png'
+    await expect(page.getByTestId('homepage-v2-pricing-free')).toContainText(
+      'Free'
+    );
+    await expect(page.getByTestId('homepage-v2-pricing-free')).toContainText(
+      '$0'
+    );
+    await expect(page.getByTestId('homepage-v2-pricing-pro')).toContainText(
+      'Pro'
+    );
+    await expect(page.getByTestId('homepage-v2-pricing-pro')).toContainText(
+      '$39/mo'
+    );
+    await expect(
+      page.getByTestId('homepage-v2-release-pages-preview')
+    ).toContainText('Preview');
+    await expect(page.getByRole('link', { name: 'Release Pages' })).toHaveCount(
+      0
     );
   });
 
-  test('keeps the hero layout sharp on mobile', async ({ page }) => {
-    await blockAnalytics(page);
+  test('keeps the hero and pricing visible on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await gotoLanding(page);
 
-    await expect(page.getByTestId('homepage-shell')).toBeVisible();
-    await expect(page.getByTestId('landing-hero-cta')).toBeVisible();
-    await expect(page.getByTestId('landing-hero-screenshot')).toBeVisible();
-    await expect(page.getByTestId('homepage-shell')).toHaveScreenshot(
-      'landing-hero-mobile.png'
-    );
+    await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-v2-hero-primary-cta')
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
   });
 });

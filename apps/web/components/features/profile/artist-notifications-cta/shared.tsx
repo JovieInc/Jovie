@@ -1,19 +1,32 @@
 'use client';
 
-import { Skeleton } from '@jovie/ui';
-import { CheckCircle2, Mail } from 'lucide-react';
+import {
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@jovie/ui';
+import { AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 import Link from 'next/link';
 import {
   type CSSProperties,
+  type Dispatch,
+  type MutableRefObject,
+  type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
   useState,
 } from 'react';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { track } from '@/lib/analytics';
-import { useUpdateSubscriberNameMutation } from '@/lib/queries';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useUpdateSubscriberNameMutation } from '@/lib/queries/useNotificationStatusQuery';
 import { cn } from '@/lib/utils';
 import type { NotificationSubscriptionState } from '@/types/notifications';
+import type { SubscriptionErrorOrigin } from './useSubscriptionForm';
 
 /** Prevents synthetic font weight rendering for better typography */
 export const noFontSynthesisStyle: CSSProperties = {
@@ -26,25 +39,52 @@ export const subscriptionHeadingClassName =
 export const subscriptionDisclaimerClassName =
   'text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
 
+export const profilePrimaryPillClassName =
+  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+
+export const profileSecondaryPillClassName =
+  'inline-flex h-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-[15px] font-[580] tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--profile-pearl-bg-hover)] hover:border-[color:var(--profile-pearl-border)] hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+
+export const profileQuietIconButtonClassName =
+  'border-transparent bg-transparent text-white/72 shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_86%,transparent)] hover:text-white focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,transparent)] focus-visible:text-white active:bg-[var(--profile-pearl-bg-active)] active:text-white';
+
 export const subscriptionComposerSurfaceClassName =
-  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_8px_20px_rgba(15,17,24,0.06)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-200 ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
+  'rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] shadow-[0_10px_22px_rgba(15,17,24,0.08)] backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-slow ease-out dark:shadow-[0_10px_24px_rgba(0,0,0,0.18)]';
 
 export const subscriptionComposerFocusClassName =
-  'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_10px_24px_rgba(15,17,24,0.08)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
+  'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_14px_30px_rgba(15,17,24,0.12)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
 
 export const subscriptionInputClassName =
-  'h-12 w-full bg-transparent px-2 text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-0';
+  'h-12 w-full bg-transparent px-2 text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
 
-export const subscriptionPrimaryActionClassName =
-  'inline-flex h-12 shrink-0 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-none transition-[background-color,color,opacity] duration-200 ease-out hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+export const subscriptionPrimaryActionClassName = `${profilePrimaryPillClassName} shrink-0`;
 
-export const subscriptionMutedActionClassName =
-  'inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] px-4 text-[15px] font-[560] tracking-[-0.015em] text-primary-token shadow-[var(--profile-pearl-shadow)] transition-[background-color,opacity,transform] duration-150 hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+export const subscriptionMutedActionClassName = `${profileSecondaryPillClassName} h-10 shrink-0 px-4`;
 
 export const subscriptionPrimaryLinkClassName = cn(
   subscriptionPrimaryActionClassName,
   'h-12 w-full justify-center px-6'
 );
+
+export const subscriptionFeedbackRailClassName =
+  'flex min-h-5 items-center justify-between gap-2 px-1';
+
+export const subscriptionFeedbackCopyClassName =
+  'text-[11px] leading-4 tracking-[-0.01em] text-secondary-token/68';
+
+export const subscriptionErrorTextClassName =
+  'text-[12px] leading-4 tracking-[-0.012em] text-red-400';
+
+export const subscriptionSuccessTextClassName =
+  'text-[12px] leading-4 tracking-[-0.012em] text-emerald-400';
+
+export const subscriptionDesktopErrorAffordanceClassName =
+  'inline-flex items-center gap-1.5 text-red-400';
+
+interface UseSubscriptionErrorFeedbackOptions {
+  readonly error: string | null;
+  readonly errorOrigin: SubscriptionErrorOrigin;
+}
 
 interface SubscriptionPearlComposerProps {
   readonly leftSlot?: React.ReactNode;
@@ -53,6 +93,52 @@ interface SubscriptionPearlComposerProps {
   readonly layout?: 'inline' | 'stacked';
   readonly className?: string;
   readonly dataTestId?: string;
+}
+
+interface SubscriptionFeedbackRailProps {
+  readonly message?: ReactNode;
+  readonly sideAction?: ReactNode;
+  readonly messageClassName?: string;
+}
+
+interface SubscriptionOtpResendActionProps {
+  readonly resendCooldownEnd: number;
+  readonly isResending: boolean;
+  readonly onResend: () => void;
+}
+
+interface OtpResendConfirmationOptions {
+  readonly handleResendOtp: () => Promise<boolean>;
+  readonly confirmTimeoutRef: MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null>;
+  readonly setConfirmMessage: Dispatch<SetStateAction<string | null>>;
+}
+
+export function clearOtpConfirmTimeout(
+  confirmTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
+) {
+  const confirmTimeout = confirmTimeoutRef.current;
+  if (confirmTimeout) {
+    clearTimeout(confirmTimeout);
+    confirmTimeoutRef.current = null;
+  }
+}
+
+export function requestOtpResendConfirmation({
+  handleResendOtp,
+  confirmTimeoutRef,
+  setConfirmMessage,
+}: OtpResendConfirmationOptions) {
+  void handleResendOtp().then(didResend => {
+    if (!didResend) {
+      return;
+    }
+
+    setConfirmMessage('Code sent!');
+    clearOtpConfirmTimeout(confirmTimeoutRef);
+    confirmTimeoutRef.current = setTimeout(() => setConfirmMessage(null), 2000);
+  });
 }
 
 export function SubscriptionPearlComposer({
@@ -103,6 +189,134 @@ export function SubscriptionPearlComposer({
         ) : null}
       </div>
     </div>
+  );
+}
+
+export function SubscriptionFeedbackRail({
+  message,
+  sideAction,
+  messageClassName,
+}: SubscriptionFeedbackRailProps) {
+  return (
+    <div className={subscriptionFeedbackRailClassName}>
+      <div
+        className={cn(
+          'min-w-0 flex-1',
+          subscriptionFeedbackCopyClassName,
+          message ? 'opacity-100' : 'opacity-0',
+          messageClassName
+        )}
+      >
+        {message ?? <span aria-hidden='true'>.</span>}
+      </div>
+      {sideAction ? <div className='shrink-0'>{sideAction}</div> : null}
+    </div>
+  );
+}
+
+export function useSubscriptionErrorFeedback({
+  error,
+  errorOrigin,
+}: UseSubscriptionErrorFeedbackOptions) {
+  const isDesktop = useBreakpoint('md');
+  const { error: showError } = useNotifications();
+  const lastToastKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!error) {
+      lastToastKeyRef.current = null;
+      return;
+    }
+
+    if (!isDesktop || !errorOrigin || errorOrigin === 'blur') {
+      return;
+    }
+
+    const toastKey = `${errorOrigin}:${error}`;
+    if (lastToastKeyRef.current === toastKey) {
+      return;
+    }
+
+    lastToastKeyRef.current = toastKey;
+    showError(error);
+  }, [error, errorOrigin, isDesktop, showError]);
+
+  return {
+    isDesktop,
+    showInlineErrorCopy: !isDesktop,
+    shouldShowDesktopTooltip:
+      Boolean(error) && isDesktop && errorOrigin !== 'blur',
+  };
+}
+
+export function SubscriptionDesktopErrorIndicator({
+  error,
+}: Readonly<{
+  error: string;
+}>) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip defaultOpen>
+        <TooltipTrigger asChild>
+          <span
+            className={subscriptionDesktopErrorAffordanceClassName}
+            role='alert'
+            aria-live='assertive'
+          >
+            <AlertCircle className='h-3.5 w-3.5' aria-hidden='true' />
+            <span className='sr-only'>{error}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent
+          side='bottom'
+          className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
+        >
+          {error}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+export function SubscriptionOtpResendAction({
+  resendCooldownEnd,
+  isResending,
+  onResend,
+}: SubscriptionOtpResendActionProps) {
+  const [now, setNow] = useState(Date.now());
+  const remaining = Math.max(0, Math.ceil((resendCooldownEnd - now) / 1000));
+  const canResend = remaining === 0 && !isResending;
+
+  useEffect(() => {
+    if (resendCooldownEnd <= Date.now()) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldownEnd]);
+
+  if (canResend) {
+    return (
+      <button
+        type='button'
+        className='text-[11px] leading-4 text-primary-token/72 underline underline-offset-2 transition-colors hover:text-primary-token'
+        onClick={onResend}
+      >
+        Resend code
+      </button>
+    );
+  }
+
+  if (isResending) {
+    return (
+      <span className='text-[11px] leading-4 text-secondary-token/55'>
+        Sending...
+      </span>
+    );
+  }
+
+  return (
+    <span className='text-[11px] leading-4 text-secondary-token/55'>
+      Resend in 0:{remaining.toString().padStart(2, '0')}
+    </span>
   );
 }
 
@@ -222,7 +436,7 @@ export function SubscriptionSuccess({
   if (canCaptureName && (phase === 'ask' || phase === 'saving')) {
     return (
       <div
-        className={`space-y-3 transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+        className={`space-y-3 transition-all duration-slower ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
       >
         <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
           <CheckCircle2
@@ -233,7 +447,7 @@ export function SubscriptionSuccess({
         </p>
 
         <p
-          className='text-center text-[13px] font-[560] tracking-[-0.015em] text-primary-token/88'
+          className='text-center text-[13px] font-[590] tracking-[-0.015em] text-primary-token/88'
           style={noFontSynthesisStyle}
         >
           What should we call you?
@@ -285,7 +499,7 @@ export function SubscriptionSuccess({
   // Personalized success (name was saved)
   if (phase === 'saved' && savedName) {
     return (
-      <div className='space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300'>
+      <div className='space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-slower'>
         <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
           <CheckCircle2
             className='h-4 w-4 shrink-0 text-green-600 dark:text-green-400'
@@ -296,7 +510,7 @@ export function SubscriptionSuccess({
         {handle ? (
           <Link
             href={`/${handle}?mode=listen`}
-            prefetch
+            prefetch={false}
             className={subscriptionPrimaryLinkClassName}
           >
             Listen Now
@@ -309,7 +523,7 @@ export function SubscriptionSuccess({
   // Default success (skipped or no name capture)
   return (
     <div
-      className={`space-y-3 ${phase === 'skipped' ? 'animate-in fade-in duration-300' : ''}`}
+      className={`space-y-3 ${phase === 'skipped' ? 'animate-in fade-in duration-slower' : ''}`}
     >
       <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
         <CheckCircle2
@@ -321,7 +535,7 @@ export function SubscriptionSuccess({
       {handle ? (
         <Link
           href={`/${handle}?mode=listen`}
-          prefetch
+          prefetch={false}
           className={subscriptionPrimaryLinkClassName}
         >
           Listen Now

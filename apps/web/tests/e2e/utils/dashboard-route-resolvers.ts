@@ -60,29 +60,53 @@ interface ConversationsListResponse {
   }>;
 }
 
+interface BrowserFetchInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+  readonly body?: string;
+}
+
 async function fetchJsonFromPage<T>(
   page: Page,
   input: string,
-  init?: RequestInit
+  init?: BrowserFetchInit
 ): Promise<{
   readonly ok: boolean;
   readonly status: number;
   readonly data: T;
 }> {
   return page.evaluate(
-    async ({ requestInput, requestInit }) => {
-      const response = await fetch(requestInput, {
-        credentials: 'same-origin',
-        ...requestInit,
-      });
-      const data = (await response.json().catch(() => ({}))) as T;
-      return {
-        ok: response.ok,
-        status: response.status,
-        data,
-      };
+    async ({ target, requestInit }) => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
+      try {
+        const response = await fetch(target, {
+          method: requestInit?.method,
+          headers: requestInit?.headers,
+          body: requestInit?.body,
+          signal: controller.signal,
+        });
+        const rawBody = await response.text().catch(() => '');
+        let data = {} as T;
+        if (rawBody.trim().length > 0) {
+          try {
+            data = JSON.parse(rawBody) as T;
+          } catch {
+            data = {} as T;
+          }
+        }
+
+        return {
+          ok: response.ok,
+          status: response.status,
+          data,
+        };
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
     },
-    { requestInput: input, requestInit: init }
+    { target: input, requestInit: init }
   );
 }
 

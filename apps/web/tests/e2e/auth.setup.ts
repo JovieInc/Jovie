@@ -1,134 +1,13 @@
-import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
-import { expect, test as setup } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
-import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
-import {
-  TEST_AUTH_BYPASS_MODE,
-  TEST_MODE_COOKIE,
-  TEST_PERSONA_COOKIE,
-  TEST_USER_ID_COOKIE,
-} from '@/lib/auth/test-mode';
-import { primeVercelBypassCookie } from '../helpers/vercel-preview';
-import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
+import { test as setup } from '@playwright/test';
+import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
 
 const AUTH_FILE = 'tests/.auth/user.json';
-const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolveSleep => {
-    setTimeout(resolveSleep, ms);
-  });
-}
-
-function getRequestedBypassPersona(): DevTestAuthPersona | null {
-  const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
-  if (
-    persona === 'creator' ||
-    persona === 'creator-ready' ||
-    persona === 'admin'
-  ) {
-    return persona;
-  }
-  return null;
-}
-
-function canFallbackToBypassUserId(persona: DevTestAuthPersona | null) {
-  return persona === 'creator' || persona === 'creator-ready';
-}
-
-async function resolveBypassUserId(
-  cookieBaseUrl: string,
-  fallbackUserId: string,
-  persona: DevTestAuthPersona | null
-): Promise<string> {
-  if (!persona) {
-    return fallbackUserId;
-  }
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const response = await fetch(
-        new URL('/api/dev/test-auth/session', cookieBaseUrl),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to resolve ${persona} test-auth session`);
-      }
-
-      const payload = (await response.json()) as { userId?: string | null };
-      return payload.userId?.trim() || fallbackUserId;
-    } catch (error) {
-      if (attempt === 3) {
-        if (canFallbackToBypassUserId(persona)) {
-          console.warn(
-            `[auth.setup] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
-          );
-          return fallbackUserId;
-        }
-
-        throw error;
-      }
-
-      await sleep(500 * attempt);
-    }
-  }
-
-  return fallbackUserId;
-}
 
 setup.describe.configure({ mode: 'serial' });
 
-setup.setTimeout(240_000); // 4min to handle Turbopack cold-start compilation
+setup.setTimeout(360_000); // 6min to absorb local cold-start compilation plus Clerk bootstrap
 
-setup('authenticate', async ({ page, baseURL }) => {
-  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
-    console.log('  Test auth bypass enabled, skipping Clerk auth bootstrap');
-    const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
-    const persona = getRequestedBypassPersona();
-    const cookieBaseUrl = baseURL ?? process.env.BASE_URL;
-    if (!cookieBaseUrl || !testUserId) {
-      throw new Error(
-        'E2E_USE_TEST_AUTH_BYPASS requires both baseURL/BASE_URL and E2E_CLERK_USER_ID.'
-      );
-    }
-    const resolvedUserId = await resolveBypassUserId(
-      cookieBaseUrl,
-      testUserId,
-      persona
-    );
-    await page.context().addCookies([
-      {
-        name: TEST_MODE_COOKIE,
-        value: TEST_AUTH_BYPASS_MODE,
-        url: cookieBaseUrl,
-        sameSite: 'Lax',
-      },
-      {
-        name: TEST_USER_ID_COOKIE,
-        value: resolvedUserId,
-        url: cookieBaseUrl,
-        sameSite: 'Lax',
-      },
-      ...(persona
-        ? [
-            {
-              name: TEST_PERSONA_COOKIE,
-              value: persona,
-              url: cookieBaseUrl,
-              sameSite: 'Lax' as const,
-            },
-          ]
-        : []),
-    ]);
-    await page.context().storageState({ path: AUTH_FILE });
-    return;
-  }
-
+setup('authenticate', async ({ page }) => {
   const username = process.env.E2E_CLERK_USER_USERNAME;
   const password = process.env.E2E_CLERK_USER_PASSWORD;
 
@@ -139,160 +18,23 @@ setup('authenticate', async ({ page, baseURL }) => {
     return;
   }
 
-  // 1. Set up testing token BEFORE navigation
-  await setupClerkTestingToken({ page });
-
-  await primeVercelBypassCookie(
-    page,
-    baseURL ?? process.env.BASE_URL,
-    APP_ROUTES.SIGNIN
-  ).catch(() => {
-    console.log(
-      '  Preview bypass priming failed, continuing with direct signin'
-    );
-  });
-
-  // 2. Navigate to sign-in page (has ClerkProvider).
-  // Cold dev compilation can exceed 60s, so match the more resilient smoke helper.
-  await smokeNavigateWithRetry(page, APP_ROUTES.SIGNIN, {
-    timeout: 60_000,
-    retries: 1,
-  });
-
-  // 3. Wait for Clerk JS to load from CDN before calling clerk.signIn()
-  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
-  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
-  await page
-    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
-    .catch(() => {
-      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
-    });
-
-  // 4. Sign in using appropriate strategy
-  // Wrap in try/catch to handle "already signed in" from testing token
   try {
-    if (username.includes('+clerk_test')) {
-      await clerk.signIn({
-        page,
-        signInParams: { strategy: 'email_code', identifier: username },
-      });
-    } else if (password) {
-      // Try password strategy first, fall back to email_code if disabled
-      try {
-        await clerk.signIn({
-          page,
-          signInParams: {
-            strategy: 'password',
-            identifier: username,
-            password,
-          },
-        });
-      } catch (strategyError) {
-        const strategyMsg =
-          strategyError instanceof Error
-            ? strategyError.message
-            : String(strategyError);
-        if (strategyMsg.includes('strategy')) {
-          console.log(
-            '  Password strategy not available, falling back to email_code'
-          );
-          await clerk.signIn({
-            page,
-            signInParams: { strategy: 'email_code', identifier: username },
-          });
-        } else {
-          throw strategyError;
-        }
-      }
-    } else {
-      await page.context().storageState({ path: AUTH_FILE });
-      return;
-    }
+    await signInUser(page, { username, password });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('already signed in')) {
-      console.log('  Already signed in via testing token, continuing...');
-    } else if (
-      msg.includes('strategy') ||
-      msg.includes('infinite redirect') ||
-      msg.includes('instance keys') ||
-      msg.includes('test email') ||
-      msg.includes('Timeout') ||
-      msg.includes('timeout')
+    if (
+      error instanceof ClerkTestError &&
+      ['CLERK_SETUP_FAILED', 'CLERK_NOT_READY', 'MISSING_CREDENTIALS'].includes(
+        error.code
+      )
     ) {
-      // Clerk configuration issue — write empty auth state so tests with
-      // their own auth (e.g., admin tests) can still run independently.
       console.log(
-        `  Auth setup failed (${msg.substring(0, 120)}), writing empty auth state`
+        `  Auth setup failed (${error.message.substring(0, 120)}), writing empty auth state`
       );
       await page.context().storageState({ path: AUTH_FILE });
       return;
-    } else {
-      throw error;
     }
+    throw error;
   }
-
-  // 5. Navigate to a stable authenticated shell route to verify auth.
-  // Profile data can fail independently of auth and should not be the auth probe.
-  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
-    timeout: 120_000,
-    retries: 2,
-  });
-
-  // 6. Wait for dashboard to be usable, dismissing Next.js dev error overlays
-  // Turbopack cold compilation + hydration mismatch (nonce attr) can block the page.
-  // Strategy: dismiss overlays, reload once if the page is stuck.
-  let hasReloaded = false;
-  await expect(async () => {
-    // Dismiss Next.js error overlay if present
-    const overlay = page.locator(
-      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
-    );
-    if (await overlay.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await page.keyboard.press('Escape');
-      await page
-        .waitForFunction(
-          () =>
-            !document.querySelector(
-              '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
-            ),
-          { timeout: 5000 }
-        )
-        .catch(() => {});
-    }
-    // Click "Try again" on error boundary if present
-    const tryAgain = page.getByRole('button', { name: 'Try again' });
-    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
-      await tryAgain.click();
-      await page
-        .waitForLoadState('domcontentloaded', { timeout: 10000 })
-        .catch(() => {});
-    }
-    // If nav still not visible and we haven't reloaded, try a full page reload
-    // This reliably recovers from stuck error overlays and Turbopack issues
-    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const chatComposer = page
-      .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
-      )
-      .first();
-    const main = page.locator('main').first();
-    const isShellReady = async () =>
-      (page.url().includes('/app') &&
-        !page.url().includes('/signin') &&
-        !page.url().includes('/sign-in') &&
-        !page.url().includes('/onboarding') &&
-        (await main.isVisible().catch(() => false))) ||
-      (await dashNav.isVisible().catch(() => false)) ||
-      (await userButton.isVisible().catch(() => false)) ||
-      (await chatComposer.isVisible().catch(() => false));
-    if (!(await isShellReady()) && !hasReloaded) {
-      hasReloaded = true;
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    }
-    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
-  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
 
   // 7. Save authenticated session
   await page.context().storageState({ path: AUTH_FILE });

@@ -101,6 +101,12 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
       contentStillVisible,
       'Drawer content should be hidden after close'
     ).toBe(false);
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
+    await expect(
+      page.getByRole('button', { name: /close/i }).first()
+    ).toBeHidden();
+    await expect(drawerContent).toBeHidden();
 
     await assertProfileRestored(page);
   });
@@ -116,7 +122,7 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    const trigger = page.locator('[data-testid="tip-trigger"]').first();
+    const trigger = page.locator('[data-testid="pay-trigger"]').first();
 
     if (!(await trigger.isVisible().catch(() => false))) {
       test.skip(true, 'Tip trigger not visible — skipping');

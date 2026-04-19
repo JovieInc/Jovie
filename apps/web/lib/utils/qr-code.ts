@@ -52,3 +52,20 @@ export async function generateQrCodeSvg(
     type: 'svg',
   });
 }
+
+export function qrCodeDataUrlToBlob(dataUrl: string): Blob {
+  const [metadata, base64Data] = dataUrl.split(',');
+  if (!metadata?.startsWith('data:') || !base64Data) {
+    throw new Error('Invalid QR code data URL');
+  }
+
+  const mimeType = /^data:([^;]+)/.exec(metadata)?.[1] ?? 'image/png';
+  const binary = atob(base64Data);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.codePointAt(index) ?? 0;
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}

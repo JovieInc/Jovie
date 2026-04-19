@@ -1,14 +1,19 @@
 'use client';
 
-import { Bell, CalendarDays, Info, Mail, Music2, Ticket } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  Disc3,
+  Info,
+  Mail,
+  Music2,
+  Ticket,
+} from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { TipSelector } from '@/components/molecules/TipSelector';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { PaySelector } from '@/components/molecules/PaySelector';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
@@ -18,6 +23,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
@@ -71,8 +77,8 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
     subtitle: 'Get notified about new releases and shows.',
     icon: Bell,
   },
-  tip: {
-    title: 'Tip',
+  pay: {
+    title: 'Pay',
     subtitle: 'Send support instantly with Venmo.',
     icon: Ticket,
   },
@@ -81,9 +87,14 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
     subtitle: 'Upcoming shows and ticket links.',
     icon: CalendarDays,
   },
+  releases: {
+    title: 'Releases',
+    subtitle: 'Full discography and streaming links.',
+    icon: Disc3,
+  },
 };
 
-const TIP_AMOUNTS = [3, 5, 7];
+const PAY_AMOUNTS = [5, 10, 20];
 
 function ProfileModeFallback({
   title,
@@ -135,7 +146,7 @@ function ProfileModeDrawerContactList({
         return (
           <div
             key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[26px] border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-[background-color,border-color] duration-150 ease-out hover:bg-white/[0.05]'
+            className='flex items-center justify-between gap-4 rounded-[var(--profile-inner-radius)] border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-[background-color,border-color] duration-normal ease-out hover:bg-white/[0.05]'
             data-testid='contact-drawer-item'
           >
             {primaryHref ? (
@@ -234,7 +245,7 @@ export function ProfileModeDrawer({
           contacts_count: contacts.length,
         });
         break;
-      case 'tip':
+      case 'pay':
         track('tip_drawer_open', { handle: artist.handle });
         // @ts-expect-error joviePixel is injected by JoviePixel
         globalThis.joviePixel?.track?.('tip_page_view');
@@ -344,21 +355,30 @@ export function ProfileModeDrawer({
 
       {activeMode === 'tour' ? (
         <div data-testid='profile-mode-drawer-tour'>
-          <TourDrawerContent artist={artist} tourDates={tourDates} compact />
+          <TourDrawerContent artist={artist} tourDates={tourDates} />
         </div>
       ) : null}
 
-      {activeMode === 'tip' ? (
-        <div data-testid='profile-mode-drawer-tip'>
+      {activeMode === 'releases' ? (
+        <div data-testid='profile-mode-drawer-releases'>
+          <ProfileModeFallback
+            title='Releases'
+            description='Full discography and streaming links.'
+          />
+        </div>
+      ) : null}
+
+      {activeMode === 'pay' ? (
+        <div data-testid='profile-mode-drawer-pay'>
           {hasValidVenmoLink ? (
-            <TipSelector
-              amounts={TIP_AMOUNTS}
+            <PaySelector
+              amounts={PAY_AMOUNTS}
               onContinue={handleTipAmountSelected}
               paymentLabel='Venmo'
             />
           ) : (
             <ProfileModeFallback
-              title='Tipping is not available yet'
+              title='Payments not available yet'
               description='This profile has not added a public Venmo link.'
             />
           )}

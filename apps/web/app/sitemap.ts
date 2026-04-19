@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
@@ -150,7 +151,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     },
     {
-      url: `${BASE_URL}/tips`,
+      url: `${BASE_URL}${APP_ROUTES.PAY}`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,

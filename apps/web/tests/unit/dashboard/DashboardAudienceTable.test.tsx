@@ -335,6 +335,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(() => {
       expect(capturedColumnVisibility).toEqual({
         location: false,
+        source: false,
         value: false,
         engagement: false,
         lastSeen: false,
@@ -397,6 +398,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(() => {
       expect(capturedColumnVisibility).toEqual({
         location: false,
+        source: false,
         value: false,
         engagement: false,
         lastSeen: false,

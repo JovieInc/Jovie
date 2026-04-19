@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   TippingEmptyState,
   TippingMetricsSkeleton,
-} from '@/features/tipping/EmptyStates';
+} from '@/features/pay/EmptyStates';
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -20,7 +20,7 @@ describe('TippingEmptyState', () => {
     expect(screen.getByText('No Venmo Account Connected')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Connect your Venmo account to start receiving tips from your fans.'
+        'Connect your Venmo account to start receiving payments from your fans.'
       )
     ).toBeInTheDocument();
     expect(
@@ -31,14 +31,14 @@ describe('TippingEmptyState', () => {
   it('renders pending-metrics empty state correctly', () => {
     render(<TippingEmptyState type='pending-metrics' animate={false} />);
 
-    expect(screen.getByText('Tipping Metrics Coming Soon')).toBeInTheDocument();
+    expect(screen.getByText('Payment Metrics Coming Soon')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Your tipping metrics will appear here once you receive your first tip.'
+        'Your payment metrics will appear here once you receive your first payment.'
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByAltText('Illustration of pending tipping metrics')
+      screen.getByAltText('Illustration of pending payment metrics')
     ).toBeInTheDocument();
   });
 

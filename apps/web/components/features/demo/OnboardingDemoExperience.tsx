@@ -1,12 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DemoAuthShell } from './DemoAuthShell';
-import { OnboardingDemoContent } from './OnboardingDemoContent';
-import type { StepId } from './OnboardingDemoSteps';
+import { DemoClientProviders } from './DemoClientProviders';
+import {
+  type DemoOnboardingStepId,
+  OnboardingDemoContent,
+} from './OnboardingDemoContent';
 
 export function OnboardingDemoExperience() {
-  const [currentStep, setCurrentStep] = useState<StepId>('handle');
+  const [currentStep, setCurrentStep] =
+    useState<DemoOnboardingStepId>('handle');
   const [isRevealing, setIsRevealing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,7 +31,7 @@ export function OnboardingDemoExperience() {
   }, []);
 
   return (
-    <DemoAuthShell>
+    <DemoClientProviders>
       {!isComplete && (
         <OnboardingDemoContent
           currentStep={currentStep}
@@ -37,6 +40,6 @@ export function OnboardingDemoExperience() {
           onFinish={handleFinish}
         />
       )}
-    </DemoAuthShell>
+    </DemoClientProviders>
   );
 }

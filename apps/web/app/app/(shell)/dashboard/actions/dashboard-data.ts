@@ -243,9 +243,7 @@ async function buildBioLinkActivation(
 
     for (const eventRow of eventRows) {
       const eventType = eventRow.eventType as BioLinkActivationEventType;
-      if (timestamps[eventType] === null) {
-        timestamps[eventType] = eventRow.createdAt;
-      }
+      timestamps[eventType] ??= eventRow.createdAt;
     }
   }
 

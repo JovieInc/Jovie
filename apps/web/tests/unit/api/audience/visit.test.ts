@@ -11,6 +11,7 @@ const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -47,7 +48,7 @@ vi.mock('@/lib/analytics/tracking-rate-limit', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
-  captureError: vi.fn(),
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/analytics/tracking-token', () => ({
@@ -82,6 +83,7 @@ describe('POST /api/audience/visit', () => {
     mockIsTrackingTokenEnabled.mockReturnValue(false);
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
     mockDoesTableExist.mockResolvedValue(true);
+    mockCaptureError.mockReset();
   });
 
   it('returns 429 when rate limited', async () => {
@@ -105,6 +107,20 @@ describe('POST /api/audience/visit', () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toBe('Rate limit exceeded');
+  });
+
+  it('returns 400 when the request body is empty', async () => {
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON');
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
   });
 
   it('silently filters bot traffic', async () => {
@@ -507,6 +523,46 @@ describe('POST /api/audience/visit', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.fingerprint).toBeDefined();
+  });
+
+  it('fails soft when optional persistence degrades after fingerprint resolution', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+    mockWithSystemIngestionSession.mockRejectedValue(
+      new Error('analytics persistence unavailable')
+    );
+
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.degraded).toBe(true);
+    expect(data.fingerprint).toBeDefined();
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Audience visit persistence degraded',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/audience/visit',
+        method: 'POST',
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      })
+    );
   });
 
   it('writes one activated event for Instagram-sourced visits inside the activation window', async () => {

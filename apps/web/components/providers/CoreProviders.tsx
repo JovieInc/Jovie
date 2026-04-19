@@ -5,7 +5,7 @@ import { PacerProvider } from '@tanstack/react-pacer';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { env } from '@/lib/env-client';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
@@ -24,8 +24,25 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   return <>{children}</>;
 }
 
+// Deferral delay shared by the keyboard-shortcut listeners and the monitoring
+// chunk imports. 300ms gives the first-paint burst of work room to finish
+// before we schedule optional side effects. Users do not press `t` or `/`,
+// nor do monitoring chunks need to arrive, within this window of boot.
+const BOOT_DEFERRED_WORK_DELAY_MS = 300;
+const KEYBOARD_SHORTCUT_ATTACH_DELAY_MS = BOOT_DEFERRED_WORK_DELAY_MS;
+
 function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
+
+  // Keep the listener referentially stable — reading the current theme +
+  // setter from a ref — so the useEffect below does not re-run and
+  // re-defer the listener attachment every time resolvedTheme changes.
+  // Without the ref, pressing `t` within 300ms of a theme toggle would
+  // do nothing while the new setTimeout was pending.
+  const themeRef = useRef({ resolvedTheme, setTheme });
+  useEffect(() => {
+    themeRef.current = { resolvedTheme, setTheme };
+  }, [resolvedTheme, setTheme]);
 
   useEffect(() => {
     if (!isEnabled) return;
@@ -37,14 +54,20 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
       if (isFormElement(event.target)) return;
 
       event.preventDefault();
-      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+      const { resolvedTheme: currentTheme, setTheme: setCurrentTheme } =
+        themeRef.current;
+      setCurrentTheme(currentTheme === 'dark' ? 'light' : 'dark');
     }
 
-    globalThis.addEventListener('keydown', handleKeyDown);
+    const attachHandle = setTimeout(() => {
+      globalThis.addEventListener('keydown', handleKeyDown);
+    }, KEYBOARD_SHORTCUT_ATTACH_DELAY_MS);
+
     return () => {
+      clearTimeout(attachHandle);
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme, isEnabled]);
+  }, [isEnabled]);
 
   return null;
 }
@@ -95,8 +118,12 @@ function SearchKeyboardShortcut() {
       });
     }
 
-    globalThis.addEventListener('keydown', handleKeyDown);
+    const attachHandle = setTimeout(() => {
+      globalThis.addEventListener('keydown', handleKeyDown);
+    }, KEYBOARD_SHORTCUT_ATTACH_DELAY_MS);
+
     return () => {
+      clearTimeout(attachHandle);
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -155,44 +182,56 @@ function CoreProvidersInner({
     });
     logger.groupEnd();
 
-    // Initialize Web Vitals tracking for performance monitoring
     let cleanupWebVitals: (() => void) | undefined;
     let isUnmounted = false;
 
-    import('@/lib/monitoring/web-vitals')
-      .then(({ initWebVitals }) => {
-        const cleanup = initWebVitals(metric => {
-          // Create a custom event for the performance dashboard
-          if (typeof window !== 'undefined') {
-            const event = new CustomEvent('web-vitals', { detail: metric });
-            window.dispatchEvent(event);
-          }
-        });
-
-        if (isUnmounted) {
-          cleanup();
-          return;
-        }
-
-        cleanupWebVitals = cleanup;
-      })
-      .catch(error => {
-        logger.error('Failed to initialize Web Vitals:', error);
-      });
-
-    // Initialize other performance monitoring in production
-    if (process.env.NODE_ENV === 'production') {
-      import('@/lib/monitoring/client')
-        .then(({ initAllMonitoring }) => {
-          initAllMonitoring();
-        })
-        .catch(error => {
-          logger.error('Failed to initialize monitoring:', error);
-        });
+    // useEffect only runs on the client, so we can dispatch unconditionally.
+    function dispatchWebVital(metric: unknown) {
+      const event = new CustomEvent('web-vitals', { detail: metric });
+      globalThis.dispatchEvent(event);
     }
+
+    function handleWebVitalsReady(
+      mod: typeof import('@/lib/monitoring/web-vitals')
+    ) {
+      const cleanup = mod.initWebVitals(dispatchWebVital);
+      if (isUnmounted) {
+        cleanup();
+        return;
+      }
+      cleanupWebVitals = cleanup;
+    }
+
+    function handleMonitoringReady(
+      mod: typeof import('@/lib/monitoring/client')
+    ) {
+      if (isUnmounted) return;
+      mod.initAllMonitoring();
+    }
+
+    // Defer monitoring chunks past initial provider hydration so they do
+    // not contend with main-thread work during first paint. Web Vitals
+    // still captures FCP/LCP/CLS because the underlying PerformanceObserver
+    // subscriptions use `{ buffered: true }` to replay early entries.
+    const handle = setTimeout(() => {
+      import('@/lib/monitoring/web-vitals')
+        .then(handleWebVitalsReady)
+        .catch(error => {
+          logger.error('Failed to initialize Web Vitals:', error);
+        });
+
+      if (process.env.NODE_ENV === 'production') {
+        import('@/lib/monitoring/client')
+          .then(handleMonitoringReady)
+          .catch(error => {
+            logger.error('Failed to initialize monitoring:', error);
+          });
+      }
+    }, BOOT_DEFERRED_WORK_DELAY_MS);
 
     return () => {
       isUnmounted = true;
+      clearTimeout(handle);
       cleanupWebVitals?.();
     };
   }, [enableMonitoring]);
@@ -249,6 +288,7 @@ function CoreProvidersInner({
 
 /** Marketing route prefixes where analytics are disabled */
 const MARKETING_PREFIXES = [
+  '/artist-notifications',
   '/blog',
   '/changelog',
   '/engagement-engine',

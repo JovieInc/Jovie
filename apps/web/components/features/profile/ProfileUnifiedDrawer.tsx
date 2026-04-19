@@ -6,6 +6,7 @@ import {
   BellOff,
   CalendarDays,
   ChevronRight,
+  Disc3,
   Info,
   Mail,
   Share2,
@@ -14,21 +15,22 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { TipSelector } from '@/components/molecules/TipSelector';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import {
-  ArtistNotificationsCTA,
-  TwoStepNotificationsCTA,
-} from '@/features/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import {
   extractVenmoUsername,
   isAllowedVenmoUrl,
 } from '@/features/profile/utils/venmo';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { ShareContext } from '@/lib/share/types';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -36,17 +38,27 @@ import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { AboutSection } from './AboutSection';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import {
+  PROFILE_DRAWER_DANGER_ITEM_CLASS,
+  PROFILE_DRAWER_MENU_ITEM_CLASS,
+  PROFILE_DRAWER_META_CLASS,
+  PROFILE_DRAWER_TITLE_CLASS,
+  PROFILE_DRAWER_TOGGLE_ROW_CLASS,
+} from './profile-drawer-classes';
+import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
 
 export type DrawerView =
   | 'menu'
+  | 'share'
   | 'notifications'
   | 'about'
   | 'listen'
   | 'subscribe'
   | 'contact'
-  | 'tip'
-  | 'tour';
+  | 'pay'
+  | 'tour'
+  | 'releases';
 
 interface DrawerMeta {
   readonly title: string;
@@ -55,6 +67,10 @@ interface DrawerMeta {
 
 const VIEW_META: Record<DrawerView, DrawerMeta> = {
   menu: { title: 'Menu' },
+  share: {
+    title: 'Share',
+    subtitle: 'Share this profile',
+  },
   notifications: {
     title: 'Notifications',
     subtitle: 'Choose what you hear about.',
@@ -75,13 +91,17 @@ const VIEW_META: Record<DrawerView, DrawerMeta> = {
     title: 'Contact',
     subtitle: 'Management, booking, press, and more.',
   },
-  tip: {
-    title: 'Tip',
+  pay: {
+    title: 'Pay',
     subtitle: 'Send support instantly with Venmo.',
   },
   tour: {
     title: 'Tour Dates',
     subtitle: 'Upcoming shows and ticket links.',
+  },
+  releases: {
+    title: 'Releases',
+    subtitle: 'Discography',
   },
 };
 
@@ -100,7 +120,7 @@ interface ProfileUnifiedDrawerProps {
   readonly onTogglePref: (key: NotificationContentType) => void;
   readonly onUnsubscribe: () => void;
   readonly isUnsubscribing: boolean;
-  readonly onShare: () => void;
+  readonly shareContext: ShareContext;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly hasAbout: boolean;
@@ -111,15 +131,15 @@ interface ProfileUnifiedDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
+  readonly hasReleases: boolean;
+  readonly releases?: readonly PublicRelease[];
   /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
   readonly onRevealNotifications?: () => void;
 }
 
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
-const TIP_AMOUNTS = [3, 5, 7];
+const PAY_AMOUNTS = [5, 10, 20];
 
 function ContactList({
   artistHandle,
@@ -145,21 +165,18 @@ function ContactList({
         const primaryHref = getActionHref(primary);
 
         return (
-          <div
-            key={contact.id}
-            className='flex items-center justify-between gap-4 rounded-[14px] px-4 py-3'
-          >
+          <div key={contact.id} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
             {primaryHref ? (
               <a
                 href={primaryHref}
                 className='flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left'
                 onClick={() => trackAction(primary, contact)}
               >
-                <span className='text-[14px] font-[470] text-white/88'>
+                <span className={PROFILE_DRAWER_TITLE_CLASS}>
                   {contact.roleLabel}
                 </span>
                 {contact.secondaryLabel ? (
-                  <span className='text-[11px] font-[400] text-white/40'>
+                  <span className={PROFILE_DRAWER_META_CLASS}>
                     {contact.secondaryLabel}
                   </span>
                 ) : null}
@@ -177,7 +194,7 @@ function ContactList({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/80'
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-normal hover:bg-white/[0.08] hover:text-white/80'
                     aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
                     onClick={() => trackAction(channel, contact)}
                   >
@@ -186,6 +203,136 @@ function ContactList({
                 );
               })}
             </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const YEAR_HEADER_THRESHOLD = 15;
+
+function formatReleaseType(type: string): string {
+  switch (type) {
+    case 'single':
+      return 'Single';
+    case 'ep':
+      return 'EP';
+    case 'album':
+      return 'Album';
+    case 'compilation':
+      return 'Compilation';
+    case 'live':
+      return 'Live';
+    case 'mixtape':
+      return 'Mixtape';
+    case 'music_video':
+      return 'Video';
+    default:
+      return 'Release';
+  }
+}
+
+function ReleasesDrawerContent({
+  releases,
+  artistHandle,
+  artistName,
+}: {
+  readonly releases: readonly PublicRelease[];
+  readonly artistHandle: string;
+  readonly artistName: string;
+}) {
+  const ownerNameLower = artistName.toLowerCase();
+
+  // Pre-compute which releases get a year header (no mutation during render)
+  const yearHeaderSet = useMemo(() => {
+    const years = new Set(
+      releases
+        .map(r =>
+          r.releaseDate
+            ? new Date(r.releaseDate).getUTCFullYear().toString()
+            : null
+        )
+        .filter(Boolean)
+    );
+    if (releases.length < YEAR_HEADER_THRESHOLD || years.size < 2) {
+      return new Set<string>();
+    }
+    const headers = new Set<string>();
+    let prev: string | null = null;
+    for (const release of releases) {
+      const year = release.releaseDate
+        ? new Date(release.releaseDate).getUTCFullYear().toString()
+        : null;
+      if (year && year !== prev) {
+        headers.add(release.id);
+        prev = year;
+      }
+    }
+    return headers;
+  }, [releases]);
+
+  return (
+    <div
+      className='flex flex-col gap-0.5'
+      data-testid='profile-mode-drawer-releases'
+    >
+      {releases.map(release => {
+        if (!release.slug) return null;
+
+        const year = release.releaseDate
+          ? new Date(release.releaseDate).getUTCFullYear().toString()
+          : null;
+        const showHeader = yearHeaderSet.has(release.id);
+
+        const collabs = release.artistNames
+          .filter(name => name.toLowerCase() !== ownerNameLower)
+          .join(', ');
+
+        const metaParts = [formatReleaseType(release.releaseType), year].filter(
+          Boolean
+        );
+
+        const ariaLabel = collabs
+          ? `View ${release.title} by ${collabs}`
+          : `View ${release.title}`;
+
+        return (
+          <div key={release.id}>
+            {showHeader ? (
+              <div className='px-4 pb-1 pt-4 text-[11px] font-[510] text-white/30'>
+                {year}
+              </div>
+            ) : null}
+            <a
+              href={`/${artistHandle}/${release.slug}`}
+              className='flex items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 transition-colors duration-normal active:bg-white/[0.06]'
+              aria-label={ariaLabel}
+            >
+              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+                <ImageWithFallback
+                  src={release.artworkUrl}
+                  alt={release.title}
+                  fill
+                  sizes='40px'
+                  className='object-cover'
+                />
+              </div>
+              <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+                <span className={`truncate ${PROFILE_DRAWER_TITLE_CLASS}`}>
+                  {release.title}
+                </span>
+                <span className={PROFILE_DRAWER_META_CLASS}>
+                  {collabs ? `${collabs} \u00b7 ` : ''}
+                  {metaParts.join(' \u00b7 ')}
+                  {release.releaseType === 'music_video' ? (
+                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-[510] text-white/50'>
+                      Video
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            </a>
           </div>
         );
       })}
@@ -208,7 +355,7 @@ export function ProfileUnifiedDrawer({
   onTogglePref,
   onUnsubscribe,
   isUnsubscribing,
-  onShare,
+  shareContext,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   hasAbout,
@@ -219,19 +366,54 @@ export function ProfileUnifiedDrawer({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  hasReleases,
+  releases = [],
   onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
-  const meta = VIEW_META[view];
+  const visibleReleases = useMemo(
+    () => releases.filter(r => Boolean(r.slug)),
+    [releases]
+  );
+  const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
+
+  const releasesSubtitle = useMemo(() => {
+    if (visibleReleases.length === 0) return 'Discography';
+    const counts: Record<string, number> = {};
+    for (const r of visibleReleases) {
+      const type = r.releaseType === 'music_video' ? 'video' : r.releaseType;
+      counts[type] = (counts[type] ?? 0) + 1;
+    }
+    const labels: Record<string, string> = {
+      single: 'single',
+      ep: 'EP',
+      album: 'album',
+      compilation: 'compilation',
+      live: 'live',
+      mixtape: 'mixtape',
+      video: 'video',
+      other: 'release',
+    };
+    const parts = Object.entries(counts)
+      .filter(([, count]) => count > 0)
+      .map(
+        ([type, count]) =>
+          `${count} ${labels[type] ?? 'release'}${count > 1 ? 's' : ''}`
+      );
+    return parts.join(', ');
+  }, [visibleReleases]);
+
+  const meta =
+    view === 'releases' && canOpenReleasesDrawer
+      ? { title: 'Releases', subtitle: releasesSubtitle }
+      : VIEW_META[view === 'releases' ? 'menu' : view];
+  const renderedView =
+    view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      if (!next) {
-        // Reset to menu when drawer closes
-        setTimeout(() => onViewChange('menu'), 200);
-      }
       onOpenChange(next);
     },
-    [onOpenChange, onViewChange]
+    [onOpenChange]
   );
 
   const navigateTo = useCallback(
@@ -240,11 +422,6 @@ export function ProfileUnifiedDrawer({
     },
     [onViewChange]
   );
-
-  const handleShareAndClose = useCallback(() => {
-    handleOpenChange(false);
-    onShare();
-  }, [handleOpenChange, onShare]);
 
   // Track mode views
   useEffect(() => {
@@ -259,15 +436,27 @@ export function ProfileUnifiedDrawer({
           contacts_count: contacts.length,
         });
         break;
-      case 'tip':
+      case 'pay':
         track('tip_drawer_open', { handle: artist.handle });
         // @ts-expect-error joviePixel is injected by JoviePixel
         globalThis.joviePixel?.track?.('tip_page_view');
         break;
+      case 'releases':
+        track('releases_drawer_open', {
+          handle: artist.handle,
+          releases_count: visibleReleases.length,
+        });
+        break;
       default:
         break;
     }
-  }, [open, view, artist.handle, contacts.length]);
+  }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
+
+  useEffect(() => {
+    if (view === 'releases' && !canOpenReleasesDrawer) {
+      onViewChange('menu');
+    }
+  }, [canOpenReleasesDrawer, onViewChange, view]);
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -309,19 +498,19 @@ export function ProfileUnifiedDrawer({
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
-          key={view}
+          key={renderedView}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.15, ease: [0.32, 0, 0.67, 1] }}
         >
-          {view === 'menu' && (
+          {renderedView === 'menu' && (
             <div className='flex flex-col gap-0.5' role='menu'>
               <button
                 type='button'
                 role='menuitem'
-                className={menuItemClass}
-                onClick={handleShareAndClose}
+                className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+                onClick={() => navigateTo('share')}
               >
                 <Share2 className={iconClass} />
                 Share Profile
@@ -331,7 +520,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('about')}
                 >
                   <Info className={iconClass} />
@@ -339,11 +528,23 @@ export function ProfileUnifiedDrawer({
                 </button>
               ) : null}
 
+              {canOpenReleasesDrawer ? (
+                <button
+                  type='button'
+                  role='menuitem'
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+                  onClick={() => navigateTo('releases')}
+                >
+                  <Disc3 className={iconClass} />
+                  Releases
+                </button>
+              ) : null}
+
               {hasTourDates ? (
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('tour')}
                 >
                   <CalendarDays className={iconClass} />
@@ -355,11 +556,11 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
-                  onClick={() => navigateTo('tip')}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+                  onClick={() => navigateTo('pay')}
                 >
                   <Ticket className={iconClass} />
-                  Tip
+                  Pay
                 </button>
               ) : null}
 
@@ -367,7 +568,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => navigateTo('contact')}
                 >
                   <Mail className={iconClass} />
@@ -379,7 +580,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={`${menuItemClass} justify-between`}
+                  className={`${PROFILE_DRAWER_MENU_ITEM_CLASS} justify-between`}
                   onClick={() => navigateTo('notifications')}
                 >
                   <span className='flex items-center gap-3'>
@@ -392,7 +593,7 @@ export function ProfileUnifiedDrawer({
                 <button
                   type='button'
                   role='menuitem'
-                  className={menuItemClass}
+                  className={PROFILE_DRAWER_MENU_ITEM_CLASS}
                   onClick={() => {
                     if (onRevealNotifications) {
                       handleOpenChange(false);
@@ -410,18 +611,22 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'notifications' && (
+          {renderedView === 'share' && (
+            <PublicShareActionList
+              context={shareContext}
+              onActionComplete={() => handleOpenChange(false)}
+            />
+          )}
+
+          {renderedView === 'notifications' && (
             <div className='flex flex-col gap-1'>
               {NOTIFICATION_CONTENT_TYPES.map(pref => (
-                <div
-                  key={pref.key}
-                  className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
-                >
+                <div key={pref.key} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
                   <div className='flex flex-col gap-0.5'>
-                    <span className='text-[14px] font-[470] text-white/88'>
+                    <span className={PROFILE_DRAWER_TITLE_CLASS}>
                       {pref.label}
                     </span>
-                    <span className='text-[11px] font-[400] text-white/40'>
+                    <span className={PROFILE_DRAWER_META_CLASS}>
                       {pref.description}
                     </span>
                   </div>
@@ -439,7 +644,7 @@ export function ProfileUnifiedDrawer({
               <button
                 type='button'
                 role='menuitem'
-                className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
+                className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
@@ -451,7 +656,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'listen' && (
+          {renderedView === 'listen' && (
             <div
               className='flex justify-center'
               data-testid='profile-mode-drawer-listen'
@@ -465,7 +670,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'subscribe' && (
+          {renderedView === 'subscribe' && (
             <div data-testid='profile-mode-drawer-subscribe'>
               {subscribeTwoStep ? (
                 <TwoStepNotificationsCTA artist={artist} startExpanded />
@@ -481,7 +686,7 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'contact' && (
+          {renderedView === 'contact' && (
             <ContactList
               artistHandle={artist.handle}
               contacts={contacts}
@@ -489,7 +694,7 @@ export function ProfileUnifiedDrawer({
             />
           )}
 
-          {view === 'about' && (
+          {renderedView === 'about' && (
             <div data-testid='profile-mode-drawer-about'>
               <AboutSection
                 artist={artist}
@@ -500,28 +705,32 @@ export function ProfileUnifiedDrawer({
             </div>
           )}
 
-          {view === 'tour' && (
+          {renderedView === 'tour' && (
             <div data-testid='profile-mode-drawer-tour'>
-              <TourDrawerContent
-                artist={artist}
-                tourDates={tourDates}
-                compact
-              />
+              <TourDrawerContent artist={artist} tourDates={tourDates} />
             </div>
           )}
 
-          {view === 'tip' && (
-            <div data-testid='profile-mode-drawer-tip'>
+          {renderedView === 'releases' && canOpenReleasesDrawer && (
+            <ReleasesDrawerContent
+              releases={visibleReleases}
+              artistHandle={artist.handle}
+              artistName={artist.name}
+            />
+          )}
+
+          {renderedView === 'pay' && (
+            <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
-                <TipSelector
-                  amounts={TIP_AMOUNTS}
+                <PaySelector
+                  amounts={PAY_AMOUNTS}
                   onContinue={handleTipAmountSelected}
                   paymentLabel='Venmo'
                 />
               ) : (
-                <div className='rounded-[24px] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
+                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
                   <p className='text-sm font-[590] text-white/88'>
-                    Tipping is not available yet
+                    Payments not available yet
                   </p>
                   <p className='mt-2 text-sm leading-6 text-white/54'>
                     This profile has not added a public Venmo link.

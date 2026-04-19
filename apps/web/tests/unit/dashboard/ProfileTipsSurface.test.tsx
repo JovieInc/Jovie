@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
+import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
 import { resolveProfileMonetizationSummary } from '@/lib/profile-monetization';
 import { fastRender } from '@/tests/utils/fast-render';
 
-const { mockUseCodeFlag, mockCopyToClipboard } = vi.hoisted(() => ({
-  mockUseCodeFlag: vi.fn(),
+const { mockUseAppFlag, mockCopyToClipboard } = vi.hoisted(() => ({
+  mockUseAppFlag: vi.fn(),
   mockCopyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
@@ -12,8 +12,8 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => <img {...props} alt='' />,
 }));
 
-vi.mock('@/lib/feature-flags/client', () => ({
-  useCodeFlag: (flagName: string) => mockUseCodeFlag(flagName),
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: (flagName: string) => mockUseAppFlag(flagName),
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -73,8 +73,8 @@ const renderCases = [
       totalReceivedCents: 0,
       monthReceivedCents: 0,
     }),
-    heading: 'Tips Off',
-    action: 'Set Up Tips',
+    heading: 'Payments Off',
+    action: 'Set Up Payments',
   },
   {
     name: 'setup_incomplete',
@@ -109,8 +109,8 @@ const renderCases = [
       totalReceivedCents: 0,
       monthReceivedCents: 0,
     }),
-    heading: 'Tips Live',
-    action: 'Copy Tip Link',
+    heading: 'Payments Live',
+    action: 'Copy Pay Link',
   },
   {
     name: 'traffic_no_tips',
@@ -127,8 +127,8 @@ const renderCases = [
       totalReceivedCents: 0,
       monthReceivedCents: 0,
     }),
-    heading: 'Tips Live',
-    action: 'Copy Tip Link',
+    heading: 'Payments Live',
+    action: 'Copy Pay Link',
   },
   {
     name: 'active',
@@ -145,15 +145,15 @@ const renderCases = [
       totalReceivedCents: 23500,
       monthReceivedCents: 12000,
     }),
-    heading: 'Tips Live',
-    action: 'Copy Tip Link',
+    heading: 'Payments Live',
+    action: 'Copy Pay Link',
   },
 ] as const;
 
-describe('ProfileTipsSurface', () => {
+describe('ProfilePaySurface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseCodeFlag.mockReturnValue(false);
+    mockUseAppFlag.mockReturnValue(false);
   });
 
   describe.each(['settings', 'drawer'] as const)('%s variant', variant => {
@@ -163,7 +163,7 @@ describe('ProfileTipsSurface', () => {
       action,
     }) => {
       const { getByText, getByRole, getByTestId } = fastRender(
-        <ProfileTipsSurface
+        <ProfilePaySurface
           summary={summary}
           variant={variant}
           {...baseCallbacks}
@@ -177,7 +177,7 @@ describe('ProfileTipsSurface', () => {
   });
 
   it('uses Set Up Payments copy when Stripe Connect is enabled', () => {
-    mockUseCodeFlag.mockReturnValue(true);
+    mockUseAppFlag.mockReturnValue(true);
 
     const summary = resolveProfileMonetizationSummary({
       username: 'artist',
@@ -194,13 +194,13 @@ describe('ProfileTipsSurface', () => {
     });
 
     const { getByRole } = fastRender(
-      <ProfileTipsSurface summary={summary} {...baseCallbacks} />
+      <ProfilePaySurface summary={summary} {...baseCallbacks} />
     );
 
     expect(getByRole('button', { name: 'Set Up Payments' })).toBeDefined();
   });
 
-  it('shows analytics CTA when tip traffic exists', () => {
+  it('shows analytics CTA when payment traffic exists', () => {
     const summary = resolveProfileMonetizationSummary({
       username: 'artist',
       stripeConnectEnabled: false,
@@ -216,15 +216,15 @@ describe('ProfileTipsSurface', () => {
     });
 
     const { getByRole } = fastRender(
-      <ProfileTipsSurface summary={summary} {...baseCallbacks} />
+      <ProfilePaySurface summary={summary} {...baseCallbacks} />
     );
 
     expect(
-      getByRole('button', { name: 'View tip traffic in Analytics' })
+      getByRole('button', { name: 'View payment traffic in Analytics' })
     ).toBeDefined();
   });
 
-  it('hides analytics CTA when no tip traffic exists', () => {
+  it('hides analytics CTA when no payment traffic exists', () => {
     const summary = resolveProfileMonetizationSummary({
       username: 'artist',
       stripeConnectEnabled: false,
@@ -240,11 +240,11 @@ describe('ProfileTipsSurface', () => {
     });
 
     const { queryByRole } = fastRender(
-      <ProfileTipsSurface summary={summary} {...baseCallbacks} />
+      <ProfilePaySurface summary={summary} {...baseCallbacks} />
     );
 
     expect(
-      queryByRole('button', { name: 'View tip traffic in Analytics' })
+      queryByRole('button', { name: 'View payment traffic in Analytics' })
     ).toBeNull();
   });
 
@@ -264,7 +264,7 @@ describe('ProfileTipsSurface', () => {
     });
 
     const { container } = fastRender(
-      <ProfileTipsSurface summary={summary} {...baseCallbacks} />
+      <ProfilePaySurface summary={summary} {...baseCallbacks} />
     );
 
     const liveRegion = container.querySelector('[aria-live="polite"]');

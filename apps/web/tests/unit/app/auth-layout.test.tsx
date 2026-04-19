@@ -4,42 +4,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface RenderAuthLayoutOptions {
   readonly clerkMockFlag?: string;
-  readonly forwardedHost?: string;
-  readonly forwardedProto?: string;
-  readonly publishableKey?: string;
-  readonly stagingPublishableKey?: string;
-  readonly stagingSecretKey?: string;
+  readonly resolvedPublishableKey?: string;
 }
-
-const originalStagingPublishableKey = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-const originalStagingSecretKey = process.env.CLERK_SECRET_KEY_STAGING;
 
 async function renderAuthRouteLayout({
   clerkMockFlag = '0',
-  forwardedHost = 'jov.ie',
-  forwardedProto = 'https',
-  publishableKey,
-  stagingPublishableKey,
-  stagingSecretKey,
+  resolvedPublishableKey,
 }: RenderAuthLayoutOptions) {
   vi.resetModules();
-
-  if (stagingPublishableKey === undefined) {
-    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  } else {
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = stagingPublishableKey;
-  }
-
-  if (stagingSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY_STAGING;
-  } else {
-    process.env.CLERK_SECRET_KEY_STAGING = stagingSecretKey;
-  }
 
   vi.doMock('@/lib/env-public', () => ({
     publicEnv: {
       NEXT_PUBLIC_CLERK_MOCK: clerkMockFlag,
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: publishableKey,
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: resolvedPublishableKey,
       NEXT_PUBLIC_PROFILE_HOSTNAME: 'jov.ie',
       NEXT_PUBLIC_PROFILE_URL: 'https://jov.ie',
       NEXT_PUBLIC_APP_URL: 'https://jov.ie',
@@ -48,36 +25,24 @@ async function renderAuthRouteLayout({
     },
   }));
 
-  vi.doMock('@/lib/feature-flags/client', () => ({
-    FeatureFlagsProvider: ({ children }: { children: ReactNode }) => (
-      <>{children}</>
-    ),
+  vi.doMock('@/lib/flags/client', () => ({
+    AppFlagProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  }));
+
+  vi.doMock('@/lib/flags/server', () => ({
+    getAppFlagsSnapshot: vi.fn().mockResolvedValue({}),
+  }));
+
+  vi.doMock('@/lib/auth/staging-clerk-keys', () => ({
+    resolvePublishableKeyFromHeaders: vi
+      .fn()
+      .mockResolvedValue(resolvedPublishableKey),
   }));
 
   vi.doMock('@/components/providers/AuthClientProviders', () => ({
     AuthClientProviders: ({ children }: { children: ReactNode }) => (
       <div data-testid='auth-client-providers'>{children}</div>
     ),
-  }));
-
-  const mockHeaders: Record<string, string> = {
-    host: forwardedHost,
-    'x-forwarded-host': forwardedHost,
-    'x-forwarded-proto': forwardedProto,
-  };
-  // Simulate what middleware does: set the pre-resolved publishable key header.
-  // On staging hosts, middleware resolves staging keys separately so we only
-  // set the header for non-staging hosts (matching production behavior).
-  const isStagingHost = forwardedHost.startsWith('staging.');
-  if (publishableKey && !isStagingHost) {
-    mockHeaders['x-clerk-publishable-key'] = publishableKey;
-  }
-  if (stagingPublishableKey && isStagingHost) {
-    mockHeaders['x-clerk-publishable-key'] = stagingPublishableKey;
-  }
-
-  vi.doMock('next/headers', () => ({
-    headers: async () => new Headers(mockHeaders),
   }));
 
   vi.doMock('@/features/auth', () => ({
@@ -99,25 +64,13 @@ async function renderAuthRouteLayout({
 }
 
 afterEach(() => {
-  if (originalStagingPublishableKey === undefined) {
-    delete process.env.CLERK_PUBLISHABLE_KEY_STAGING;
-  } else {
-    process.env.CLERK_PUBLISHABLE_KEY_STAGING = originalStagingPublishableKey;
-  }
-
-  if (originalStagingSecretKey === undefined) {
-    delete process.env.CLERK_SECRET_KEY_STAGING;
-  } else {
-    process.env.CLERK_SECRET_KEY_STAGING = originalStagingSecretKey;
-  }
-
   vi.resetModules();
   vi.clearAllMocks();
 });
 
 describe('auth route layout', () => {
   it('renders the unavailable fallback instead of auth children when Clerk is unavailable', async () => {
-    await renderAuthRouteLayout({ publishableKey: undefined });
+    await renderAuthRouteLayout({ resolvedPublishableKey: undefined });
 
     expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
     expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
@@ -127,11 +80,9 @@ describe('auth route layout', () => {
     expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
   });
 
-  it('renders auth children for private http forwarded locations when real Clerk keys exist', async () => {
+  it('renders auth children for private forwarded locations when the resolver returns a live key', async () => {
     await renderAuthRouteLayout({
-      publishableKey: 'pk_test_example',
-      forwardedHost: '[::1]:3000, localhost:3000',
-      forwardedProto: 'HTTP, https',
+      resolvedPublishableKey: 'pk_test_example',
     });
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
@@ -142,7 +93,9 @@ describe('auth route layout', () => {
   });
 
   it('renders auth children through AuthClientProviders when Clerk is available', async () => {
-    await renderAuthRouteLayout({ publishableKey: 'pk_test_example' });
+    await renderAuthRouteLayout({
+      resolvedPublishableKey: 'pk_test_example',
+    });
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
     expect(screen.getByTestId('auth-child')).toBeInTheDocument();
@@ -151,10 +104,9 @@ describe('auth route layout', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders the unavailable fallback on staging when staging runtime keys are missing', async () => {
+  it('renders the unavailable fallback on staging when the resolver returns no key', async () => {
     await renderAuthRouteLayout({
-      forwardedHost: 'staging.jov.ie',
-      publishableKey: 'pk_live_prod_example',
+      resolvedPublishableKey: undefined,
     });
 
     expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
@@ -164,12 +116,9 @@ describe('auth route layout', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders auth children on staging when staging runtime keys exist', async () => {
+  it('renders auth children on staging when the resolver returns a staging key', async () => {
     await renderAuthRouteLayout({
-      forwardedHost: 'staging.jov.ie',
-      publishableKey: 'pk_live_prod_example',
-      stagingPublishableKey: 'pk_live_staging_example',
-      stagingSecretKey: 'sk_live_staging_example',
+      resolvedPublishableKey: 'pk_live_staging_example',
     });
 
     expect(screen.getByTestId('auth-client-providers')).toBeInTheDocument();
@@ -182,7 +131,7 @@ describe('auth route layout', () => {
   it('renders the unavailable fallback when Clerk mock mode is enabled', async () => {
     await renderAuthRouteLayout({
       clerkMockFlag: '1',
-      publishableKey: 'pk_test_example',
+      resolvedPublishableKey: 'pk_test_example',
     });
 
     expect(screen.getByTestId('auth-layout')).toBeInTheDocument();

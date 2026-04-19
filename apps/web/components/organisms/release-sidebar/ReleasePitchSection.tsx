@@ -72,6 +72,7 @@ interface ReleasePitchSectionProps {
   readonly releaseId: string;
   readonly existingPitches?: GeneratedPitches | null;
   readonly onPitchesGenerated?: (pitches: GeneratedPitches) => void;
+  readonly variant?: 'card' | 'flat';
 }
 
 function CopyButton({
@@ -118,6 +119,7 @@ export function ReleasePitchSection({
   releaseId,
   existingPitches,
   onPitchesGenerated,
+  variant = 'card',
 }: ReleasePitchSectionProps) {
   const [pitches, setPitches] = useState<GeneratedPitches | null>(
     existingPitches ?? null
@@ -198,7 +200,12 @@ export function ReleasePitchSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'space-y-2.5',
+        variant === 'card' && 'p-3'
+      )}
       testId='release-pitch-card'
     >
       <div className='flex items-center justify-between'>

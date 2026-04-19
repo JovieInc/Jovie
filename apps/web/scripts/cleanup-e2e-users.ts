@@ -161,7 +161,7 @@ async function cleanupDatabaseRecords(
   const { neon } = await import('@neondatabase/serverless');
   const { eq } = await import('drizzle-orm');
   const { drizzle } = await import('drizzle-orm/neon-http');
-  const schema = await import('@/lib/db/schema');
+  const schema = await import('../lib/db/schema');
 
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });

@@ -32,8 +32,8 @@ export function PublicProfileTemplate({
         subtitle={viewModel.subtitle}
         mode={viewModel.mode}
         showSocialBar={definition.shell.showSocialBar}
-        showTipButton={viewModel.showTipButton}
-        isTipModeActive={viewModel.isTipModeActive}
+        showPayButton={viewModel.showPayButton}
+        isPayModeActive={viewModel.isPayModeActive}
         showBackButton={viewModel.showBackButton}
         showTourButton={viewModel.showTourButton}
         isTourModeActive={viewModel.isTourModeActive}

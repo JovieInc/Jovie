@@ -7,6 +7,11 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
+import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
+import type {
+  ChatPersistenceMessage,
+  PendingToolPersistenceEnvelope,
+} from '@/lib/chat/tool-events';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   FetchError,
@@ -16,6 +21,7 @@ import {
   useCreateConversationMutation,
 } from '@/lib/queries';
 import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
+import { logger } from '@/lib/utils/logger';
 
 import {
   extractPersistableToolCalls,
@@ -90,11 +96,9 @@ export function useJovieChat({
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
-  const pendingMessagesRef = useRef<{
-    userMessage: string;
-    assistantMessage: string;
-    toolCalls?: Record<string, unknown>[];
-  } | null>(null);
+  const pendingMessagesRef = useRef<PendingToolPersistenceEnvelope | null>(
+    null
+  );
   const pendingInitialSendRef = useRef<{
     text: string;
     files?: FileUIPart[];
@@ -362,27 +366,17 @@ export function useJovieChat({
     }
 
     const assistantText = getMessageText(lastAssistantMessage.parts);
-    if (!assistantText) {
-      // Assistant message exists but has no text yet - leave pending
+    const toolCalls = extractPersistableToolCalls(lastAssistantMessage.parts);
+
+    if (!assistantText && (!toolCalls || toolCalls.length === 0)) {
+      // Assistant message exists but has no persisted text or tool payload yet - leave pending
       return;
     }
-
-    // Extract tool calls for persistence
-    const toolCalls = extractPersistableToolCalls(
-      lastAssistantMessage.parts as Array<{
-        type: string;
-        [key: string]: unknown;
-      }>
-    );
 
     const { userMessage } = pendingMessagesRef.current;
 
     // Build messages to persist - user message may be empty if already persisted during conversation creation
-    const messagesToPersist: Array<{
-      role: 'user' | 'assistant';
-      content: string;
-      toolCalls?: Record<string, unknown>[];
-    }> = [];
+    const messagesToPersist: ChatPersistenceMessage[] = [];
 
     if (userMessage) {
       messagesToPersist.push({ role: 'user', content: userMessage });
@@ -401,6 +395,8 @@ export function useJovieChat({
       },
       {
         onSuccess: data => {
+          pendingMessagesRef.current = null;
+          setIsSubmitting(false);
           queryClient.invalidateQueries({
             queryKey: queryKeys.chat.conversation(activeConversationId),
           });
@@ -412,6 +408,25 @@ export function useJovieChat({
           // start polling so the title auto-updates in sidebar + header.
           if (data?.titlePending) {
             setTitlePollingSince(Date.now());
+          }
+
+          if (!assistantText && toolCalls && toolCalls.length > 0) {
+            addBreadcrumb({
+              category: 'ai-chat',
+              message: 'Persisted tool-only assistant response',
+              level: 'info',
+              data: {
+                conversationId: activeConversationId,
+                toolCount: toolCalls.length,
+              },
+            });
+          }
+
+          if (deferredNavigationRef.current) {
+            const { callback, conversationId: navConversationId } =
+              deferredNavigationRef.current;
+            deferredNavigationRef.current = null;
+            callback(navConversationId);
           }
         },
         onError: err => {
@@ -442,7 +457,7 @@ export function useJovieChat({
               },
             });
           }
-          console.error('[useJovieChat] Failed to save messages:', err);
+          logger.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
             message:
@@ -450,22 +465,10 @@ export function useJovieChat({
             errorCode: 'MESSAGE_PERSIST_FAILED',
             failedMessage: lastAttemptedMessageRef.current,
           });
+          setIsSubmitting(false);
         },
       }
     );
-
-    // Successfully extracted and dispatched — clear pending
-    pendingMessagesRef.current = null;
-    setIsSubmitting(false);
-
-    // Fire deferred navigation now that the stream is complete and messages are persisted.
-    // This prevents the route change from killing the in-flight AI response (JOV-1233).
-    if (deferredNavigationRef.current) {
-      const { callback, conversationId: navConversationId } =
-        deferredNavigationRef.current;
-      deferredNavigationRef.current = null;
-      callback(navConversationId);
-    }
   }, [
     status,
     activeConversationId,
@@ -492,7 +495,6 @@ export function useJovieChat({
         // Only store pending ref to persist the assistant response.
         pendingMessagesRef.current = {
           userMessage: '', // Empty - already persisted via initialMessage
-          assistantMessage: '', // Will be filled when response completes
         };
 
         // Store the send payload for the effect that fires after activeConversationId updates.
@@ -539,7 +541,7 @@ export function useJovieChat({
             },
           });
         }
-        console.error('[useJovieChat] Failed to create conversation:', err);
+        logger.error('[useJovieChat] Failed to create conversation:', err);
         setChatError({
           type: 'server',
           message:
@@ -626,7 +628,6 @@ export function useJovieChat({
         // Store pending message for persistence (both user and assistant)
         pendingMessagesRef.current = {
           userMessage: trimmedText,
-          assistantMessage: '', // Will be filled when response completes
         };
       } else {
         // No active conversation — create one first, then return
@@ -702,6 +703,30 @@ export function useJovieChat({
     },
     [rateLimitedSubmitter]
   );
+
+  useEffect(() => {
+    const pendingPrompt = consumePendingChatPrompt();
+    if (!pendingPrompt) return;
+
+    rateLimitedSubmitter.maybeExecute({ text: pendingPrompt });
+  }, [rateLimitedSubmitter]);
+
+  useEffect(() => {
+    const handlePromptEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+      if (!detail?.prompt) return;
+
+      rateLimitedSubmitter.maybeExecute({ text: detail.prompt });
+    };
+
+    globalThis.addEventListener('jovie-chat-submit-prompt', handlePromptEvent);
+    return () => {
+      globalThis.removeEventListener(
+        'jovie-chat-submit-prompt',
+        handlePromptEvent
+      );
+    };
+  }, [rateLimitedSubmitter]);
 
   return {
     // State

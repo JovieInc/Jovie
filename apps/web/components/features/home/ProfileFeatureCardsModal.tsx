@@ -17,8 +17,8 @@ const FEATURES = [
     title: 'Opinionated design',
     imageSrc: '/images/feature_design_linear_grey_notext_1344x1280.webp',
     imageAlt: 'Opinionated design preview',
-    headline: 'Designed to convert.',
-    body: 'A clean, premium layout that makes the next step obvious—built to turn attention into real fan actions.',
+    headline: 'Opinionated by Design.',
+    body: 'A clean, premium layout that makes the next step obvious without giving artists enough rope to hurt conversion.',
   },
   {
     id: 'setup',

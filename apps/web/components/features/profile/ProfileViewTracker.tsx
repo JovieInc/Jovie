@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 interface ProfileViewTrackerProps {

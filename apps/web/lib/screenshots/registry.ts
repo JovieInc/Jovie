@@ -1,3 +1,4 @@
+import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
 import type {
   ScreenshotConsumer,
@@ -28,6 +29,23 @@ const ADMIN_MARKETING_AND_INVESTOR = [
   'marketing-export',
   'investor-ready',
 ] as const satisfies readonly ScreenshotConsumer[];
+
+const ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS =
+  ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER.map(section => {
+    const selector = `[data-testid="${section.testId}"]`;
+
+    return {
+      id: section.screenshotScenarioId,
+      title: `Artist Profile ${section.label} Section`,
+      route: '/artist-profiles',
+      waitFor: selector,
+      captureTarget: 'locator' as const,
+      captureSelector: selector,
+      reducedMotion:
+        section.screenshotScenarioId ===
+        'artist-profile-capture-section-desktop',
+    };
+  });
 
 interface ScreenshotScenarioInput
   extends Omit<
@@ -120,6 +138,138 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
       publicExportPath: 'release-take-me-over-phone.png',
     },
+    {
+      id: 'artist-spec-audience-quality-desktop',
+      title: 'Artist Spec — Audience Quality',
+      route: '/demo/showcase/settings?capture=quality',
+      waitFor: '[data-testid="demo-settings-audience-quality-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-settings-audience-quality-capture"]',
+      publicExportPath: 'artist-spec-audience-quality-desktop.png',
+    },
+    {
+      id: 'artist-spec-opinionated-design-mobile',
+      title: 'Artist Spec — Opinionated Design',
+      route: '/demo/showcase/tim-white-profile',
+      waitFor: '[data-testid="profile-compact-shell"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="profile-compact-shell"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-spec-opinionated-design-mobile.png',
+    },
+    {
+      id: 'artist-spec-creator-menu-mobile',
+      title: 'Artist Spec — Creator Activation',
+      route: '/demo/showcase/release-landing?capture=creator-menu',
+      waitFor: '[data-testid="demo-release-creator-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-release-creator-capture"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-spec-creator-menu-mobile.png',
+    },
+    {
+      id: 'artist-spec-geo-insights-desktop',
+      title: 'Artist Spec — Geo Insights',
+      route: '/demo/audience?capture=geo',
+      waitFor: '[data-testid="demo-audience-capture-geo"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-audience-capture-geo"]',
+      publicExportPath: 'artist-spec-geo-insights-desktop.png',
+    },
+    {
+      id: 'artist-spec-sync-settings-desktop',
+      title: 'Artist Spec — Sync Settings',
+      route: '/demo/showcase/settings?capture=sync',
+      waitFor: '[data-testid="demo-settings-sync-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-settings-sync-capture"]',
+      publicExportPath: 'artist-spec-sync-settings-desktop.png',
+    },
+    {
+      id: 'artist-spec-press-assets-mobile',
+      title: 'Artist Spec — Press Assets',
+      route: '/demo/showcase/tim-white-profile?mode=about&capture=press-assets',
+      waitFor: '[data-testid="demo-press-assets-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-press-assets-capture"]',
+      viewport: 'mobile',
+      publicExportPath: 'artist-spec-press-assets-mobile.png',
+    },
+    {
+      id: 'artist-spec-tracked-links-desktop',
+      title: 'Artist Spec — UTM Builder',
+      route: '/demo/showcase/release-tracked-links',
+      waitFor: '[data-testid="demo-release-tracked-links-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-release-tracked-links-capture"]',
+      publicExportPath: 'artist-spec-tracked-links-desktop.png',
+    },
+    ...ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS,
+    {
+      id: 'tim-white-profile-tour-mobile',
+      title: 'Tim White Profile — Tour',
+      route: '/demo/showcase/tim-white-profile?mode=tour',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-tour-phone.png',
+    },
+    {
+      id: 'tim-white-profile-pay-mobile',
+      title: 'Tim White Profile — Pay',
+      route: '/demo/showcase/tim-white-profile?mode=pay',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-pay-phone.png',
+    },
+    {
+      id: 'tim-white-profile-presave-mobile',
+      title: 'Tim White Profile — Presave Countdown',
+      route: '/demo/showcase/tim-white-profile?release=presave',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-presave-phone.png',
+      fixedNow: '2026-04-15T12:00:00.000Z',
+    },
+    {
+      id: 'tim-white-profile-live-mobile',
+      title: 'Tim White Profile — Latest Release',
+      route: '/demo/showcase/tim-white-profile?release=live',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-live-phone.png',
+    },
+    {
+      id: 'tim-white-profile-video-mobile',
+      title: 'Tim White Profile — Music Video',
+      route: '/demo/showcase/tim-white-profile?release=video',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-video-phone.png',
+    },
+    {
+      id: 'tim-white-profile-subscribe-mobile',
+      title: 'Tim White Profile — Subscribe',
+      route: '/demo/showcase/tim-white-profile?mode=subscribe',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-subscribe-phone.png',
+    },
+    {
+      id: 'tim-white-profile-contact-mobile',
+      title: 'Tim White Profile — Contact',
+      route: '/demo/showcase/tim-white-profile?mode=contact',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-contact-phone.png',
+    },
+    {
+      id: 'tim-white-profile-listen-mobile',
+      title: 'Tim White Profile — Listen',
+      route: '/demo/showcase/tim-white-profile?mode=listen',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-listen-phone.png',
+    },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {
@@ -146,6 +296,16 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       captureSelector: '[data-testid="release-sidebar"]',
       interaction: 'open-first-release',
       publicExportPath: 'release-sidebar-detail.png',
+    },
+    {
+      id: 'dashboard-release-sidebar-platforms-desktop',
+      title: 'Release Sidebar Platforms',
+      route: '/demo',
+      waitFor: '[data-testid="release-tabbed-card"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="release-tabbed-card"]',
+      interaction: 'open-first-release-dsps',
+      publicExportPath: 'release-sidebar-platforms.png',
     },
     {
       id: 'dashboard-audience-desktop',

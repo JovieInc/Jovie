@@ -13,6 +13,7 @@ interface ReleaseTargetPlaylistsSectionProps {
   readonly targetPlaylists?: string[];
   readonly onSave?: (releaseId: string, playlists: string[]) => Promise<void>;
   readonly readOnly?: boolean;
+  readonly variant?: 'card' | 'flat';
 }
 
 function parsePlaylistInput(value: string): string[] {
@@ -31,6 +32,7 @@ export function ReleaseTargetPlaylistsSection({
   targetPlaylists,
   onSave,
   readOnly = false,
+  variant = 'card',
 }: ReleaseTargetPlaylistsSectionProps) {
   const initialValue = joinPlaylists(targetPlaylists);
   const [value, setValue] = useState(initialValue);
@@ -60,7 +62,12 @@ export function ReleaseTargetPlaylistsSection({
 
   return (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCardSm, 'space-y-2.5 p-3')}
+      variant={variant}
+      className={cn(
+        variant === 'card' && LINEAR_SURFACE.drawerCardSm,
+        'space-y-2.5',
+        variant === 'card' && 'p-3'
+      )}
       testId='release-target-playlists-card'
     >
       <div className='flex items-center justify-between'>
@@ -68,7 +75,7 @@ export function ReleaseTargetPlaylistsSection({
           htmlFor={`target-playlists-${releaseId}`}
           className='text-[11px] font-medium text-secondary-token'
         >
-          Target playlists
+          Target Playlists
         </label>
         {isSaving && (
           <Loader2 className='h-3 w-3 animate-spin text-tertiary-token' />

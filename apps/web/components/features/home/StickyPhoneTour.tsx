@@ -80,7 +80,7 @@ function StickyPhoneTourFallback({
                           className='font-mono tracking-[-0.02em]'
                           style={{
                             fontSize: isActive ? '20px' : '15px',
-                            fontWeight: isActive ? 600 : 400,
+                            fontWeight: isActive ? 590 : 400,
                             color: isActive
                               ? 'var(--linear-text-primary)'
                               : 'var(--linear-text-secondary)',

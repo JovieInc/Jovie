@@ -122,6 +122,17 @@ vi.mock('@/lib/queries', () => ({
   useVerifyEmailOtpMutation: () => ({ mutateAsync: vi.fn() }),
 }));
 
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
+  useUpdateSubscriberNameMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  }),
+  useUpdateSubscriberBirthdayMutation: () => ({
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  }),
+}));
+
 const artist: Artist = {
   id: 'artist-1',
   owner_user_id: 'owner-1',
@@ -142,6 +153,7 @@ function buildFormState(overrides = {}) {
     phoneInput: '',
     emailInput: '',
     error: null,
+    errorOrigin: null,
     otpCode: '',
     otpStep: 'input' as const,
     isSubmitting: false,
@@ -378,7 +390,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
   });
 
-  it('wraps content in min-h-[48px] container', async () => {
+  it('wraps content in min-h-[116px] container', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -388,7 +400,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     render(<ProfileInlineNotificationsCTA artist={artist} />);
 
     const container = screen.getByTestId('profile-inline-cta');
-    expect(container.className).toContain('min-h-[48px]');
+    expect(container.className).toContain('min-h-[116px]');
   });
 
   it('disables OTP submit button when error is present', async () => {

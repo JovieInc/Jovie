@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@jovie/ui';
-import { AlertCircle, Mail, Phone } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -15,16 +9,23 @@ import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  clearOtpConfirmTimeout,
   noFontSynthesisStyle,
+  profileQuietIconButtonClassName,
+  requestOtpResendConfirmation,
+  SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
+  SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   SubscriptionSuccess,
   subscriptionComposerFocusClassName,
-  subscriptionDisclaimerClassName,
   subscriptionHeadingClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
+  subscriptionSuccessTextClassName,
+  useSubscriptionErrorFeedback,
 } from './shared';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
@@ -46,7 +47,7 @@ function ListenNowCTA({
     return (
       <Link
         href={listenHref}
-        prefetch
+        prefetch={false}
         className={subscriptionPrimaryLinkClassName}
       >
         Listen Now
@@ -57,7 +58,7 @@ function ListenNowCTA({
   return (
     <Link
       href={listenHref}
-      prefetch
+      prefetch={false}
       className={subscriptionPrimaryLinkClassName}
     >
       Listen Now
@@ -82,7 +83,7 @@ function ChannelToggle({
   return (
     <button
       type='button'
-      className='flex h-12 items-center justify-center rounded-full px-3 text-primary-token/68 transition-colors hover:text-primary-token focus-visible:outline-none'
+      className={`flex h-10 w-10 items-center justify-center rounded-full ${profileQuietIconButtonClassName} transition-colors focus-visible:outline-none`}
       aria-label={
         channel === 'sms' ? 'Switch to email updates' : 'Switch to text updates'
       }
@@ -244,58 +245,6 @@ function getFormHeading(otpStep: string): string {
     : 'Never miss a release.';
 }
 
-/**
- * Footer with disclaimer text and error tooltip.
- */
-function FormFooter({
-  disclaimerId,
-  isInputFocused,
-  error,
-}: Readonly<{
-  disclaimerId: string;
-  isInputFocused: boolean;
-  error: string | null;
-}>) {
-  const showDisclaimer = isInputFocused && !error;
-  return (
-    <div className='relative min-h-5'>
-      <p
-        id={disclaimerId}
-        className={`${subscriptionDisclaimerClassName} text-[11px] leading-4 tracking-wide transition-opacity duration-200 ${
-          showDisclaimer ? 'opacity-100' : 'opacity-0'
-        } text-center`}
-        style={noFontSynthesisStyle}
-        aria-hidden={!showDisclaimer}
-      >
-        No spam. Opt-out anytime.
-      </p>
-
-      {error && (
-        <TooltipProvider delayDuration={0}>
-          <Tooltip defaultOpen>
-            <TooltipTrigger asChild>
-              <span
-                className='absolute right-0 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
-                role='alert'
-                aria-live='assertive'
-              >
-                <AlertCircle className='h-4 w-4' aria-hidden='true' />
-                <span className='sr-only'>{error}</span>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent
-              side='bottom'
-              className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
-            >
-              {error}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
-  );
-}
-
 /** Whether the fallback CTA should be shown instead of the subscribe form. */
 function shouldShowFallbackCTA(
   notificationsEnabled: boolean,
@@ -342,6 +291,7 @@ export function ArtistNotificationsCTA({
   autoOpen = false,
   forceExpanded = false,
   hideListenFallback = false,
+  source,
 }: ArtistNotificationsCTAProps) {
   const {
     country,
@@ -349,11 +299,14 @@ export function ArtistNotificationsCTA({
     phoneInput,
     emailInput,
     error,
+    errorOrigin,
     otpCode,
     otpStep,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
+    resendCooldownEnd,
+    isResending,
     handleChannelChange,
     handlePhoneChange,
     handleEmailChange,
@@ -361,6 +314,7 @@ export function ArtistNotificationsCTA({
     handleOtpChange,
     handleSubscribe,
     handleVerifyOtp,
+    handleResendOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
@@ -370,12 +324,19 @@ export function ArtistNotificationsCTA({
     registerInputFocus,
     hydrationStatus,
     smsEnabled,
-  } = useSubscriptionForm({ artist });
+  } = useSubscriptionForm({ artist, source });
 
   const inputId = useId();
   const disclaimerId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showInlineErrorCopy, shouldShowDesktopTooltip } =
+    useSubscriptionErrorFeedback({
+      error,
+      errorOrigin,
+    });
 
   useInputFocusRegistration(inputRef, registerInputFocus);
   usePhoneInputConstraint(country.dialCode, phoneInput, handlePhoneChange);
@@ -386,6 +347,9 @@ export function ArtistNotificationsCTA({
     notificationsState,
     openSubscription
   );
+  useEffect(() => {
+    return () => clearOtpConfirmTimeout(confirmTimeoutRef);
+  }, []);
 
   const showsSubscribeForm = isSubscribeFormVisible(
     notificationsEnabled,
@@ -557,6 +521,7 @@ export function ArtistNotificationsCTA({
               onBlur={handleInputBlur}
               onKeyDown={handleKeyDown}
               disabled={isSubmitting}
+              aria-invalid={error ? true : undefined}
               autoComplete={inputConfig.autoComplete}
               maxLength={inputConfig.maxLength}
               style={noFontSynthesisStyle}
@@ -565,10 +530,49 @@ export function ArtistNotificationsCTA({
         )}
       </SubscriptionPearlComposer>
 
-      <FormFooter
-        disclaimerId={disclaimerId}
-        isInputFocused={isInputFocused}
-        error={error}
+      <SubscriptionFeedbackRail
+        message={
+          error && showInlineErrorCopy ? (
+            <span id={disclaimerId} role='alert'>
+              {error}
+            </span>
+          ) : confirmMessage ? (
+            <span
+              id={disclaimerId}
+              className={subscriptionSuccessTextClassName}
+            >
+              {confirmMessage}
+            </span>
+          ) : otpStep === 'verify' ? (
+            <span id={disclaimerId}>
+              Enter the 6-digit code we sent to your email.
+            </span>
+          ) : isInputFocused ? (
+            <span id={disclaimerId}>No spam. Opt-out anytime.</span>
+          ) : null
+        }
+        sideAction={
+          otpStep === 'verify' ? (
+            <>
+              {error && shouldShowDesktopTooltip ? (
+                <SubscriptionDesktopErrorIndicator error={error} />
+              ) : null}
+              <SubscriptionOtpResendAction
+                resendCooldownEnd={resendCooldownEnd}
+                isResending={isResending}
+                onResend={() => {
+                  requestOtpResendConfirmation({
+                    handleResendOtp,
+                    confirmTimeoutRef,
+                    setConfirmMessage,
+                  });
+                }}
+              />
+            </>
+          ) : error && shouldShowDesktopTooltip ? (
+            <SubscriptionDesktopErrorIndicator error={error} />
+          ) : null
+        }
       />
     </div>
   );

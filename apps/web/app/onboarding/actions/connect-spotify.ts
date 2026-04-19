@@ -6,9 +6,18 @@ import {
   revalidatePath,
   revalidateTag,
 } from 'next/cache';
+import { cookies } from 'next/headers';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import {
+  clearPendingClaimContext,
+  readPendingClaimContext,
+} from '@/lib/claim/context';
+import { claimPrebuiltProfileForUser } from '@/lib/claim/finalize';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
@@ -22,8 +31,11 @@ import {
   processMusicFetchEnrichmentJob,
 } from '@/lib/dsp-enrichment/jobs';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
+import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { runBackgroundSyncOperations } from './sync';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -134,18 +146,17 @@ async function markSpotifyImportFailed(profileId: string): Promise<void> {
 async function getOwnedProfile(profileId: string, clerkUserId: string) {
   const [profile] = await db
     .select({
+      dbUserId: users.id,
       handle: creatorProfiles.usernameNormalized,
       id: creatorProfiles.id,
+      isClaimed: creatorProfiles.isClaimed,
       settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(
-      and(
-        eq(creatorProfiles.id, profileId),
-        eq(users.clerkId, clerkUserId),
-        eq(creatorProfiles.isClaimed, true)
-      )
+      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
     )
     .limit(1);
 
@@ -178,6 +189,38 @@ export async function connectOnboardingSpotifyArtist(
   }
 
   const profile = await getOwnedProfile(params.profileId, userId);
+  const pendingClaim = await readPendingClaimContext({
+    username: profile.handle,
+  });
+  const isDirectClaimAwaitingMatch =
+    pendingClaim?.mode === 'direct_profile' &&
+    pendingClaim.creatorProfileId === profile.id &&
+    profile.isClaimed !== true;
+
+  if (isDirectClaimAwaitingMatch && !pendingClaim.expectedSpotifyArtistId) {
+    return {
+      success: false,
+      importing: false,
+      message: 'This profile needs a claim link before it can be claimed.',
+      imported: 0,
+      artistName: params.artistName,
+    };
+  }
+
+  if (
+    isDirectClaimAwaitingMatch &&
+    pendingClaim.expectedSpotifyArtistId !== params.spotifyArtistId
+  ) {
+    return {
+      success: false,
+      importing: false,
+      message:
+        'Please choose the Spotify artist already attached to this profile.',
+      imported: 0,
+      artistName: params.artistName,
+    };
+  }
+
   const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
   const [existingClaim] = await db
     .select({ id: creatorProfiles.id })
@@ -201,20 +244,82 @@ export async function connectOnboardingSpotifyArtist(
   }
 
   try {
-    await db
-      .update(creatorProfiles)
-      .set({
-        spotifyId: params.spotifyArtistId,
-        spotifyUrl: params.spotifyArtistUrl,
-        settings: {
-          ...currentSettings,
-          spotifyArtistName: params.artistName,
-          spotifyImportStatus: 'importing',
-          spotifyImportTotal: 0,
+    if (isDirectClaimAwaitingMatch) {
+      await withDbSessionTx(
+        async tx => {
+          await claimPrebuiltProfileForUser(tx, {
+            userId: profile.dbUserId,
+            creatorProfileId: profile.id,
+            expectedUsername: profile.handle,
+            displayName:
+              params.artistName ||
+              (currentSettings.spotifyArtistName as string) ||
+              profile.handle,
+            source: 'direct_profile_spotify_match',
+            finalizeOnboarding: true,
+          });
+
+          await tx
+            .update(creatorProfiles)
+            .set({
+              spotifyId: params.spotifyArtistId,
+              spotifyUrl: params.spotifyArtistUrl,
+              settings: {
+                ...currentSettings,
+                spotifyArtistName: params.artistName,
+                spotifyImportStatus: 'importing',
+                spotifyImportTotal: 0,
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, profile.id));
         },
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+        { clerkUserId: userId }
+      );
+
+      const cookieStore = await cookies();
+      cookieStore.set('jovie_onboarding_complete', '1', {
+        httpOnly: true,
+        secure: isSecureEnv(),
+        sameSite: 'lax',
+        maxAge: 120,
+        path: '/',
+      });
+
+      await Promise.allSettled([
+        clearPendingClaimContext(),
+        invalidateProfileCache(profile.handle),
+        invalidateProxyUserStateCache(userId),
+      ]);
+      runBackgroundSyncOperations(userId, profile.handle);
+      void import('./activate-trial')
+        .then(({ activateTrial }) => activateTrial(userId))
+        .catch(error => {
+          void captureError(
+            'activateTrial failed after direct profile claim',
+            error,
+            {
+              action: 'connectOnboardingSpotifyArtist',
+              creatorProfileId: profile.id,
+            }
+          );
+        });
+    } else {
+      await db
+        .update(creatorProfiles)
+        .set({
+          spotifyId: params.spotifyArtistId,
+          spotifyUrl: params.spotifyArtistUrl,
+          settings: {
+            ...currentSettings,
+            spotifyArtistName: params.artistName,
+            spotifyImportStatus: 'importing',
+            spotifyImportTotal: 0,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+    }
   } catch (error) {
     if (isSpotifyIdUniqueViolation(error)) {
       return {
@@ -336,6 +441,13 @@ export async function connectOnboardingSpotifyArtist(
         }
       );
     }
+
+    void refreshFeaturedPlaylistFallbackCandidate({
+      profileId: profile.id,
+      usernameNormalized: profile.handle,
+      artistName: params.artistName,
+      artistSpotifyId: params.spotifyArtistId,
+    });
   };
 
   const runSpotifyImport = async (): Promise<SpotifyImportResult> => {

@@ -1,5 +1,6 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -11,13 +12,14 @@ import {
   type ProfileSaveState,
 } from './contracts';
 import { getProfileMode, getProfileModeDefinition } from './registry';
+import type { PublicRelease } from './releases/types';
 
 interface BuildProfilePublicViewModelInput {
   readonly mode: string | null | undefined;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
-  readonly showTipButton?: boolean;
+  readonly showPayButton?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
@@ -33,11 +35,13 @@ interface BuildProfilePublicViewModelInput {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly showFooter?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
   readonly showNotificationButton?: boolean;
   readonly subtitle?: string;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export function buildProfilePublicViewModel({
@@ -45,11 +49,12 @@ export function buildProfilePublicViewModel({
   artist,
   socialLinks,
   contacts,
-  showTipButton = false,
+  showPayButton = false,
   autoOpenCapture,
   enableDynamicEngagement = false,
   latestRelease,
   profileSettings,
+  featuredPlaylistFallback,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   pressPhotos = [],
@@ -64,6 +69,7 @@ export function buildProfilePublicViewModel({
   showTourButton,
   showNotificationButton,
   subtitle,
+  releases,
 }: BuildProfilePublicViewModelInput): ProfilePublicViewModel {
   const resolvedMode = getProfileMode(mode);
   const definition = getProfileModeDefinition(resolvedMode);
@@ -74,8 +80,8 @@ export function buildProfilePublicViewModel({
     socialLinks,
     contacts,
     subtitle: subtitle ?? definition.subtitle,
-    showTipButton,
-    isTipModeActive: resolvedMode === 'tip',
+    showPayButton,
+    isPayModeActive: resolvedMode === 'pay',
     showBackButton: showBackButton ?? definition.shell.showBackButton,
     showTourButton: showTourButton ?? definition.shell.showTourButton,
     isTourModeActive: resolvedMode === 'tour',
@@ -95,6 +101,8 @@ export function buildProfilePublicViewModel({
     showSubscriptionConfirmedBanner,
     showShopButton,
     profileSettings,
+    featuredPlaylistFallback,
+    releases,
   };
 }
 

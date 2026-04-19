@@ -1,5 +1,6 @@
 export { DashboardAudienceTableUnified as DashboardAudienceTable } from './DashboardAudienceTableUnified';
 export type {
+  AudienceActionAdapter,
   AudienceFilters,
   AudienceMode,
   AudienceRow,

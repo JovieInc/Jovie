@@ -5,6 +5,233 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.158] - 2026-04-17
+
+> Staged homepage and pricing refresh work is ready to review again, the mobile public profile hero is cleaner and more stable, and preview deploys keep working even when Vercel rejects oversized prebuilt uploads.
+
+### Added
+
+- Added the staged `/new` homepage route, shared marketing story primitives, and the data-driven homepage v2 copy/config stack so the refreshed landing experience can be reviewed behind a noindex route.
+
+### Changed
+
+- Refreshed `/pricing` with the new comparison-table and mobile-plan layout, updated staged marketing navigation/footer wiring, and swapped the demo founder persona assets to the canonical Calvin Harris image set used in the new marketing surfaces.
+- Reworked the mobile public profile hero stack to prioritize notification capture, simplify the top-fold shell, and align the latest release treatment with the quieter pearl-style profile system.
+
+### Fixed
+
+- [internal] Hardened the preview deploy flow so Vercel falls back from impossible oversized prebuilt uploads to a source deploy, and made the postbuild asset sync script survive `.vercelignore` filtering.
+- [internal] Fixed the mobile public profile listen drawer accessibility contract by injecting stable hidden drawer labels at the content root, which removes the Next dev overlay issue on `?mode=listen`.
+- [internal] Fixed the inline mobile notifications flow so the revealed email field reliably receives focus after the hero CTA animates open, which keeps the primary public-profile conversion step feeling responsive.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.158`.
+
+## [26.4.157] - 2026-04-17
+
+> Preview deploys now survive the Vercel oversized-prebuilt edge case, so PR review links keep generating even when the archive upload path fails first.
+
+### Fixed
+
+- [internal] Updated the shared Vercel deploy wrapper to count `.vercel/output` files, skip the plain `--prebuilt` fallback once output exceeds Vercel's `15000`-file cap, and fall back to a source deploy instead of retrying an impossible path.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.157`.
+
+## [26.4.156] - 2026-04-16
+
+> Homepage and Artist Profile surfaces now inherit the refreshed design-system timing, weights, and profile shell tokens, and the PR preview deploy path now survives Vercel archive upload failures without stalling review.
+
+### Changed
+
+- Homepage marketing interactions now use the shared motion-duration and font-weight tokens, so claim-handle flows, search states, demo proof, and CTA surfaces animate on the same rhythm as the refreshed design system.
+- Artist Profile cards, drawers, skeletons, and notification controls now read the canonical profile radius and action tokens instead of hardcoded pixel radii, which keeps the public profile shell aligned with the latest pearl surface system.
+- [internal] Added `--profile-card-radius` and `--profile-inner-radius` to the shared design system and aligned the profile layout contract test to the tokenized shell radius.
+- [internal] Extracted the shared profile drawer action classes into a single token-backed module so menu, notifications, releases, and contact rows stay aligned and Sonar duplication stays below the new-code gate.
+
+### Fixed
+
+- [internal] Reconciled the local home/profile polish pass against the latest `origin/main` design refresh without restoring deleted homepage proof-strip chrome or older profile surface values.
+- [internal] Rebalanced shared subscription, contact, and drawer surface styling to the current pearl token set so mobile and desktop profile CTAs render with the same shell geometry.
+- [internal] Restored the positioned Bento card shell, tokenized the remaining profile skeleton and drawer rows, and cleaned the waitlist route/button casing follow-up so the design-system pass matches the latest review feedback exactly.
+- [internal] Added a reusable Vercel prebuilt deploy wrapper that retries archive uploads and falls back to plain prebuilt deploys, which unblocks preview and staging deploys when Vercel rejects the archived upload path.
+
+## [26.4.155] - 2026-04-16
+
+> Dropdown submenus now keep a stable width and row alignment even when optional icons are absent.
+
+### Fixed
+
+- [internal] `CommonDropdown` submenus now inherit the trigger row width when no explicit submenu width is provided, which keeps nested menus aligned with their parent entry in the shared dropdown system.
+- [internal] Added regression coverage for inherited submenu width, explicit width overrides, and icon-less submenu row structure so shared dropdown menus keep consistent sizing across future refactors.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.155`.
+
+## [26.4.154.2] - 2026-04-16
+
+> Public demo and screenshot pages now stay aligned with the real product screens, so review links and captures reflect the UI the team is actually shipping.
+
+### Added
+
+- [internal] Added canonical surface ownership metadata and demo parity coverage for shared dashboard screenshot routes.
+
+### Changed
+
+- [internal] `/demo/audience`, analytics, settings, links, earnings, and onboarding demo flows now render shared app surfaces with fixture-backed data instead of separate demo-only panels.
+- [internal] Homepage smart-link proof now uses a generated product screenshot instead of mounting a live demo widget.
+
+### Fixed
+
+- [internal] Demo releases no longer request live-auth-only release credits on the public route.
+- [internal] Demo audience fixtures are now deterministic, which removes hydration drift while keeping hot-reload parity stable.
+
+## [26.4.154.1] - 2026-04-16
+
+> Admins can now connect and promote a Spotify publisher account, configure playlist engine eligibility, and generate pending playlist reviews without enabling live automation.
+
+### Added
+
+- Added the Admin Platform Connections page with Spotify Publisher and Playlist Engine controls.
+- Added admin system settings for playlist publisher and engine eligibility state.
+- [internal] Added focused unit coverage for platform connection helpers, Spotify token lookup, cron gating, and the admin UI smoke path.
+
+### Changed
+
+- [internal] Playlist generation cron now uses the admin database toggle and eligibility interval instead of the playlist feature flag.
+- [internal] Jovie Spotify token resolution now prefers the configured admin publisher and falls back to the legacy env system account when present.
+### Fixed
+
+- [internal] Moved playlist cadence persistence into the durable generation path so cron lease retries cannot create duplicate pending playlists after a partial success.
+- [internal] Split the Admin Platform Connections client into smaller Spotify and engine tab components and resolved follow-up review comments around control labels and button state logic.
+- [internal] Reduced hidden homepage hero rendering work to improve the public Lighthouse margin on the landing page.
+
+## [26.4.154.0] - 2026-04-15
+
+> Audience now explains fan activity with verified, source-aware language and trackable QR links.
+
+### Added
+
+- Added structured audience actions with evidence-safe sentence rendering, so Spotify, Apple, and YouTube clicks render as checked-out or opened activity instead of overclaiming listens or watches.
+- Added creator-owned source groups and source links for QR and short-link attribution, so audience activity shows where scans and link visits came from.
+- Added audience source creation and share actions from the existing dashboard share pattern: Copy Link, Open Link, and Download QR Code.
+- [internal] Added `/s/[code]` redirects, UTM appending, scan counting, and missing-code handling for source links.
+- [internal] Added tests for audience activity grammar, source-link code generation, audience table rendering, redirect behavior, and structured tracking expectations.
+
+### Changed
+
+- [internal] Updated audience click, visit, track, subscription, and activity-feed paths to write structured audience events while preserving legacy latest-action projections.
+- Updated the audience table and member sidebar to show Source, Last Activity, tokenized activity language, and combined QR/UTM/referrer source rows.
+
+### Fixed
+
+- [internal] Fixed Source menu triggering in the Audience header by using a Radix-compatible header action button.
+- [internal] Fixed QR PNG downloads by converting generated data URLs locally instead of fetching `data:` URLs blocked by CSP.
+
+## [26.4.153.7] - 2026-04-16
+
+> Artist Profiles now uses real Tim White profile screenshots for proof, with cleaner demo chrome and a more focused fan-capture story.
+
+### Added
+
+- [internal] Added Tim White profile screenshot scenarios and public exports for tour, pay, presave, live, video, subscribe, and listen states.
+- [internal] Added generated Artist Profile section screenshots for the adaptive, outcomes, monetization, capture, opinionated, and setup sections.
+- [internal] Added regression coverage for profile release drawer gating and UTC release-year rendering.
+
+### Changed
+
+- Reworked the Artist Profiles adaptive section around the “One profile. Adapts to every fan.” thesis with one-line mode pills and captured product shots.
+- Rebuilt the Capture Every Fan section as a restrained audience-intelligence surface with opt-in action and slow audience rails.
+- Updated the Built for artists spec wall with a Dedicated release pages tile.
+- Updated the outcomes headline to “Built for artists.”
+- Made the Artist Profiles FAQ keep only one item open at a time.
+- Hid demo-only profile chrome from the Tim White marketing screenshots while keeping live public profile behavior unchanged.
+
+### Removed
+
+- [internal] Removed stale fake `artist-profile-mode-*` screenshot routes and exports.
+- Removed the duplicated lower logo row from the Artist Profiles proof section.
+## [26.4.153.6] - 2026-04-15
+
+> Internal drawer inspector cleanup keeps the shared right-drawer foundation stable for follow-up UI work.
+
+### Fixed
+
+- [internal] Addressed drawer inspector review feedback around collapsible section state updates, card header alignment, client boundaries, and test placement.
+
+## [26.4.153.5] - 2026-04-15
+
+> The Artist Profiles final call-to-action now has more breathing room, so the closing claim section feels calmer and less cramped.
+
+### Changed
+
+- Increased the final Artist Profiles claim section spacing for a more generous closing layout.
+
+### Fixed
+
+- Fixed Profile navigation on chat routes so sidebar and mobile Profile clicks open the right drawer from preview-panel state without requiring a profile query parameter.
+- Cleared stale chat preview data while profile drawer hydration is inactive so reopened drawers do not briefly show the previous profile.
+- Added regression coverage for Profile nav click behavior, state-open drawer hydration, profile deep-link hydration, and inactive preview-data cleanup.
+
+## [26.4.153.4] - 2026-04-15
+
+> Release drawers now use compact inspector cards, and public profile releases now fail safely with timezone-consistent year rendering.
+
+### Changed
+
+- Reorganized the release drawer from tabs into a Linear-style inspector card stack with shared metadata row alignment.
+- Public profile release fetch now uses a fail-safe helper so telemetry/reporting errors do not break page rendering.
+- Release year extraction now uses UTC year semantics across profile and release matrix surfaces.
+- Profile drawer release navigation now gates on visible navigable releases instead of raw release presence flags.
+
+### Fixed
+
+- Public release-lite query now returns an explicit public DTO and serializes release dates as ISO strings before crossing server-client boundaries.
+
+## [26.4.153.3] - 2026-04-15
+
+> Homepage demo proof now uses canonical featured artists, and the add-release CTA remains clearly visible on dark surfaces.
+
+### Changed
+
+- Homepage logo bar now renders as a bolder full-width black proof band with larger solid-white label logos.
+- Refined the Artist Profiles spec wall into a quieter signal-router layout with flat accent icons and focused product-specific tiles.
+- Updated Artist Profiles page copy for the 60-second setup section and real artist workflow proof heading.
+- Updated homepage demo proof fallbacks to use Tim White, David Guetta, and Kaskade.
+
+### Fixed
+
+- Increased contrast on the add-release sidebar footer CTA so the Create Release button stays visible on dark surfaces.
+- Isolated auth layout unit tests from ambient Doppler Clerk runtime keys so staging fallback assertions stay deterministic.
+
+## [26.4.153.2] - 2026-04-15
+
+> Dropdown menus are now more consistent across the app, with better search, keyboard behavior, and loading states. Drawer detail panes also have a cleaner shared layout for compact record details. Theme setup also happens earlier so pages avoid the brief visual mismatch on load.
+
+### Added
+
+- [internal] Shared drawer inspector card, stack, and fixed label/value grid primitives for Linear-style detail panes.
+- Shared dropdown menus now support consistent loading, selected, active, danger, trailing content, count, and searchable nested states through the common dropdown primitive
+- Recursive dropdown search now supports submenu-local filters, custom radio-item matching, and regression coverage for keyboard search flows
+
+### Changed
+
+- [internal] Common dropdown rendering is split into focused renderer, item renderer, type, and utility modules so future menu variants reuse the same styles and behavior
+- Common dropdown, context menu, and submenu surfaces now draw from the same centralized menu style tokens
+
+### Fixed
+
+- Searchable dropdowns preserve keyboard access: Escape clears search before closing, arrow navigation can leave the search field, Enter can activate the first result, and clear keeps focus in the input
+- Controlled dropdown close no longer emits duplicate empty search callbacks, while the legacy `onSearch` callback remains limited to non-empty queries
+- Theme initialization runs before first paint without reintroducing the local hydration mismatch
+
+## [26.4.153.1] - 2026-04-13
+
+### Added
+
+- Agent guardrail: "No Redundant Chrome" rule (4d) prevents AI agents from adding duplicate titles, headers, and card wrappers inside containers that already provide them
+- Container lookup table mapping EntitySidebarShell, Sheet/Dialog, Card, DrawerSurfaceCard, and DashboardHeader to the chrome they provide
+- Mechanical 4-step checklist for agents to verify container-aware design before PRs
+
+### Changed
+
+- Subtraction Principle (4b) now explicitly requires reading parent container chrome before building child components
+- No AI-Slop rule (4c) now names specific parent surfaces (Sheet, Drawer, existing Card) instead of generic "every block"
+
 ## [26.4.153.0] - 2026-04-13
 
 ### Added

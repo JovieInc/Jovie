@@ -81,6 +81,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
             >
               <div className='w-full h-full overflow-y-auto'>
                 <StaticArtistPage
+                  presentation='compact-preview'
                   mode='profile'
                   artist={artist}
                   socialLinks={previewSocialLinks}

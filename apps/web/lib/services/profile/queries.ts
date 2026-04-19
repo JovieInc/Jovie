@@ -17,10 +17,10 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
-import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
+import { logger } from '@/lib/utils/logger';
 import type {
   ProfileData,
   ProfileSocialLink,
@@ -96,6 +96,7 @@ const MAX_CONTACTS = 50;
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
+const PROFILE_EDGE_CACHE_TIMEOUT_MS = 1500;
 const KNOWN_PROBE_USERNAMES = new Set([
   '.env',
   'phpmyadmin',
@@ -209,10 +210,14 @@ export async function getProfileSocialLinks(
     .limit(MAX_SOCIAL_LINKS);
 
   if (links.length === MAX_SOCIAL_LINKS) {
-    captureWarning('[profile-service] MAX_SOCIAL_LINKS limit hit', undefined, {
-      profileId,
-      count: links.length,
-    });
+    logger.warn(
+      'MAX_SOCIAL_LINKS limit hit',
+      {
+        profileId,
+        count: links.length,
+      },
+      'profile-service'
+    );
   }
 
   return links;
@@ -258,10 +263,14 @@ export async function getProfileContacts(
       .limit(MAX_CONTACTS);
 
     if (contacts.length === MAX_CONTACTS) {
-      captureWarning('[profile-service] MAX_CONTACTS limit hit', undefined, {
-        profileId,
-        count: contacts.length,
-      });
+      logger.warn(
+        'MAX_CONTACTS limit hit',
+        {
+          profileId,
+          count: contacts.length,
+        },
+        'profile-service'
+      );
     }
 
     return contacts;
@@ -275,8 +284,10 @@ export async function getProfileContacts(
       errorMessage.includes('does not exist') ||
       causeMessage.includes('does not exist')
     ) {
-      captureWarning(
-        '[profile-service] creator_contacts table does not exist, returning empty'
+      logger.warn(
+        'creator_contacts table does not exist, returning empty',
+        undefined,
+        'profile-service'
       );
       return [];
     }
@@ -318,7 +329,7 @@ export async function getProfileWithLinks(
         return reviveProfileDates(cached);
       }
     } catch (error) {
-      captureWarning('[profile-service] Redis cache read failed', error);
+      logger.warn('Redis cache read failed', error, 'profile-service');
       // Fall through to database query
     }
   }
@@ -337,12 +348,13 @@ export async function getProfileWithLinks(
       ),
     ]);
   } catch (error) {
-    captureWarning(
-      '[profile-service] Profile query failed or timed out',
-      error,
+    logger.warn(
+      'Profile query failed or timed out',
       {
+        error,
         username: normalizedUsername,
-      }
+      },
+      'profile-service'
     );
     return null;
   }
@@ -355,7 +367,7 @@ export async function getProfileWithLinks(
         ex: PROFILE_CACHE_TTL_SECONDS,
       })
       .catch(error => {
-        captureWarning('[profile-service] Redis cache write failed', error);
+        logger.warn('Redis cache write failed', error, 'profile-service');
       });
   }
 
@@ -496,12 +508,13 @@ async function selectProfileWithLegacyFallback(
   try {
     return await selectProfileWithUser(normalizedUsername);
   } catch (error) {
-    captureWarning(
-      '[profile-service] Falling back to legacy profile query',
-      error,
+    logger.warn(
+      'Falling back to legacy profile query',
       {
+        error,
         username: normalizedUsername,
-      }
+      },
+      'profile-service'
     );
 
     const [legacyProfile] = await db
@@ -606,14 +619,16 @@ async function fetchProfileFromDatabase(
 export async function invalidateProfileEdgeCache(
   usernameNormalized: string
 ): Promise<void> {
-  const redis = getRedis();
+  const redis = getRedis({
+    signal: AbortSignal.timeout(PROFILE_EDGE_CACHE_TIMEOUT_MS),
+  });
   if (!redis) return;
 
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${usernameNormalized.toLowerCase()}`;
   try {
     await redis.del(cacheKey);
   } catch (error) {
-    captureWarning('[profile-service] Failed to invalidate edge cache', error);
+    logger.warn('Failed to invalidate edge cache', error, 'profile-service');
   }
 }
 

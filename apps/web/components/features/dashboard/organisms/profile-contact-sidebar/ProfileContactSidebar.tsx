@@ -24,7 +24,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { ProfileTipsSurface } from '@/features/dashboard/molecules/ProfileTipsSurface';
+import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
@@ -75,7 +75,7 @@ function buildTabOptions(hasSuggestions: boolean) {
           ...tab,
           label: (
             <span className='inline-flex items-center gap-1.5'>
-              Music
+              <span>Music</span>
               <span className='h-1.5 w-1.5 rounded-full bg-accent' />
             </span>
           ),
@@ -499,7 +499,7 @@ export function ProfileContactSidebar() {
       nextParams.set('addLink', '1');
       const nextSearch = nextParams.toString();
       const searchSuffix = nextSearch ? `?${nextSearch}` : '';
-      router.replace(`${pathname}${searchSuffix}#tips`, {
+      router.replace(`${pathname}${searchSuffix}#pay`, {
         scroll: false,
       });
     }
@@ -648,7 +648,7 @@ export function ProfileContactSidebar() {
         headerMode='minimal'
         hideMinimalHeaderBar
       >
-        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+        <div className='space-y-2.5 pt-0.5'>
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
@@ -718,101 +718,97 @@ export function ProfileContactSidebar() {
         />
       }
     >
-      <div className='flex min-h-full flex-col'>
-        <div className='min-h-0 flex-1'>
-          <DrawerTabbedCard
-            testId='profile-contact-tabbed-card'
-            className='mt-2.5'
-            tabs={
-              <DrawerTabs
-                value={resolvedCategory}
-                onValueChange={value =>
-                  setSelectedCategory(value as CategoryOption | 'about')
-                }
-                options={tabOptions}
-                ariaLabel='Profile sidebar view'
-                actions={
-                  supportsAddAction ? (
-                    <AppIconButton
-                      type='button'
-                      onClick={() => handleAddLink(resolvedCategory)}
-                      className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
-                      ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
-                    >
-                      <Plus className='h-3.5 w-3.5' />
-                    </AppIconButton>
-                  ) : undefined
-                }
-                actionsClassName='h-[26px] w-[26px]'
-                overflowMode='scroll'
-                distribution='intrinsic'
-              />
+      <DrawerTabbedCard
+        testId='profile-contact-tabbed-card'
+        className='mt-2.5'
+        tabs={
+          <DrawerTabs
+            value={resolvedCategory}
+            onValueChange={value =>
+              setSelectedCategory(value as CategoryOption | 'about')
             }
-            contentClassName='pt-2'
-          >
-            {resolvedCategory === 'about' ? (
-              <ProfileAboutTab
-                bio={bio}
-                genres={genres}
-                location={location}
-                hometown={hometown}
-                activeSinceYear={activeSinceYear}
-                allowPhotoDownloads={allowPhotoDownloads}
-                showOldReleases={showOldReleases}
-                pressPhotos={pressPhotos}
-                onBioChange={handleBioChange}
-                onLocationChange={handleLocationChange}
-                onHometownChange={handleHometownChange}
-                onGenresChange={handleGenresChange}
-                onPressPhotoUpload={handlePressPhotoUpload}
-                onPressPhotoDelete={handlePressPhotoDelete}
-              />
-            ) : (
-              <>
-                {resolvedCategory === 'earnings' && monetizationSummary ? (
-                  <div className='mb-2.5'>
-                    <ProfileTipsSurface
-                      summary={monetizationSummary}
-                      variant='drawer'
-                      onSetUsername={handleSetUsername}
-                      onSetUpTips={handleSetUpTips}
-                      onManagePayments={handleManagePayments}
-                      onViewAnalytics={handleViewAnalytics}
-                    />
-                  </div>
-                ) : null}
-                <ProfileLinkList
-                  links={links}
-                  selectedCategory={resolvedCategory as CategoryOption}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  dspConnections={dspConnections}
-                  profileId={selectedProfile?.id}
-                  surface='plain'
+            options={tabOptions}
+            ariaLabel='Profile sidebar view'
+            actions={
+              supportsAddAction ? (
+                <AppIconButton
+                  type='button'
+                  onClick={() => handleAddLink(resolvedCategory)}
+                  className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                  ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+                >
+                  <Plus className='h-3.5 w-3.5' />
+                </AppIconButton>
+              ) : undefined
+            }
+            actionsClassName='h-[26px] w-[26px]'
+            overflowMode='scroll'
+            distribution='intrinsic'
+          />
+        }
+        contentClassName='pt-2'
+      >
+        {resolvedCategory === 'about' ? (
+          <ProfileAboutTab
+            bio={bio}
+            genres={genres}
+            location={location}
+            hometown={hometown}
+            activeSinceYear={activeSinceYear}
+            allowPhotoDownloads={allowPhotoDownloads}
+            showOldReleases={showOldReleases}
+            pressPhotos={pressPhotos}
+            onBioChange={handleBioChange}
+            onLocationChange={handleLocationChange}
+            onHometownChange={handleHometownChange}
+            onGenresChange={handleGenresChange}
+            onPressPhotoUpload={handlePressPhotoUpload}
+            onPressPhotoDelete={handlePressPhotoDelete}
+          />
+        ) : (
+          <>
+            {resolvedCategory === 'earnings' && monetizationSummary ? (
+              <div className='mb-2.5'>
+                <ProfilePaySurface
+                  summary={monetizationSummary}
+                  variant='drawer'
+                  onSetUsername={handleSetUsername}
+                  onSetUpTips={handleSetUpTips}
+                  onManagePayments={handleManagePayments}
+                  onViewAnalytics={handleViewAnalytics}
                 />
+              </div>
+            ) : null}
+            <ProfileLinkList
+              links={links}
+              selectedCategory={resolvedCategory as CategoryOption}
+              onAddLink={handleAddLink}
+              onRemoveLink={handleRemoveLink}
+              dspConnections={dspConnections}
+              profileId={selectedProfile?.id}
+              surface='plain'
+            />
 
-                {isAddingLink && (
-                  <div className='mt-2.5'>
-                    <SidebarLinkInput
-                      categoryFilter={
-                        resolvedCategory === 'social' ||
-                        resolvedCategory === 'dsp' ||
-                        resolvedCategory === 'earnings'
-                          ? resolvedCategory
-                          : 'social'
-                      }
-                      existingPlatforms={existingPlatformIds}
-                      onAdd={handleSmartAddLink}
-                      onCancel={() => setIsAddingLink(false)}
-                      creatorName={previewData.displayName}
-                    />
-                  </div>
-                )}
-              </>
+            {isAddingLink && (
+              <div className='mt-2.5'>
+                <SidebarLinkInput
+                  categoryFilter={
+                    resolvedCategory === 'social' ||
+                    resolvedCategory === 'dsp' ||
+                    resolvedCategory === 'earnings'
+                      ? resolvedCategory
+                      : 'social'
+                  }
+                  existingPlatforms={existingPlatformIds}
+                  onAdd={handleSmartAddLink}
+                  onCancel={() => setIsAddingLink(false)}
+                  creatorName={previewData.displayName}
+                />
+              </div>
             )}
-          </DrawerTabbedCard>
-        </div>
-      </div>
+          </>
+        )}
+      </DrawerTabbedCard>
     </EntitySidebarShell>
   );
 }

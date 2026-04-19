@@ -263,6 +263,16 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     utilityRoot: true,
     includeInFastHealth: true,
   },
+  {
+    id: 'share-studio',
+    name: 'Admin Share Studio',
+    path: APP_ROUTES.ADMIN_SHARE_STUDIO,
+    rootTestId: 'admin-share-studio-page',
+    snapshotSlug: 'admin-share-studio',
+    primaryWorkspace: false,
+    utilityRoot: true,
+    includeInFastHealth: false,
+  },
 ] as const;
 
 export const ADMIN_REDIRECT_SURFACES: readonly AdminRedirectDescriptor[] =

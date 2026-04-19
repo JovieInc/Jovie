@@ -1,6 +1,4 @@
 'use client';
-
-import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
   parseAsString,
@@ -19,24 +17,11 @@ import {
   AudiencePanelProvider,
   useAudiencePanel,
 } from './AudiencePanelContext';
-import { AudienceTableLoadingShell } from './dashboard-audience-table/AudienceTableLoadingShell';
+import { DashboardAudienceWorkspace } from './DashboardAudienceWorkspace';
 import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
-
-const DashboardAudienceTable = dynamic(
-  () =>
-    import('@/features/dashboard/organisms/dashboard-audience-table').then(
-      mod => ({
-        default: mod.DashboardAudienceTable,
-      })
-    ),
-  {
-    loading: () => <AudienceTableLoadingShell />,
-    ssr: false,
-  }
-);
 
 export type AudienceMode = 'members' | 'subscribers';
 
@@ -225,7 +210,7 @@ function DashboardAudienceClientInner({
         className='flex h-full min-h-0 flex-col'
       >
         <div className='flex-1 min-h-0 flex flex-col'>
-          <DashboardAudienceTable
+          <DashboardAudienceWorkspace
             mode={mode}
             view={view}
             rows={rows}

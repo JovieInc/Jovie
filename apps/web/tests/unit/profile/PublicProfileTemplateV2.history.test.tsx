@@ -6,6 +6,19 @@ import { PublicProfileTemplateV2 } from '@/components/features/profile/templates
 const mockMergedDSPs = [{ key: 'spotify' }];
 const scrollIntoViewMock = vi.fn();
 
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    ProfileNotificationsContext: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
+    },
+  })
+);
+
+vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
+  useProfileShell: () => ({ notificationsContextValue: null }),
+}));
+
 vi.mock('@/components/organisms/profile-shell', () => ({
   ProfileNotificationsContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -72,9 +85,9 @@ vi.mock('@/features/profile/ListenDrawer', () => ({
   ),
 }));
 
-vi.mock('@/features/profile/TipDrawer', () => ({
-  TipDrawer: ({ open }: { open: boolean }) => (
-    <div data-testid='tip-drawer'>{open ? 'open' : 'closed'}</div>
+vi.mock('@/features/profile/PayDrawer', () => ({
+  PayDrawer: ({ open }: { open: boolean }) => (
+    <div data-testid='pay-drawer'>{open ? 'open' : 'closed'}</div>
   ),
 }));
 
@@ -171,15 +184,15 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tip' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('tip-drawer')).toHaveTextContent('open');
-      expect(window.location.search).toContain('mode=tip');
+      expect(screen.getByTestId('pay-drawer')).toHaveTextContent('open');
+      expect(window.location.search).toContain('mode=pay');
     });
 
     window.history.pushState(null, '', '/tim?ff_profile_v2=1');
     window.dispatchEvent(new PopStateEvent('popstate'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('tip-drawer')).toHaveTextContent('closed');
+      expect(screen.getByTestId('pay-drawer')).toHaveTextContent('closed');
     });
   });
 
@@ -232,10 +245,10 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     });
   });
 
-  it('maps legacy tip mode to the tip drawer', async () => {
+  it('maps pay mode to the pay drawer', async () => {
     render(
       <PublicProfileTemplateV2
-        mode='tip'
+        mode='pay'
         artist={artist}
         socialLinks={tipLinks}
         contacts={contacts}
@@ -244,7 +257,7 @@ describe('PublicProfileTemplateV2 history behavior', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('tip-drawer')).toHaveTextContent('open');
+      expect(screen.getByTestId('pay-drawer')).toHaveTextContent('open');
     });
   });
 

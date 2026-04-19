@@ -49,7 +49,7 @@ export function HeroClaimHandle({
             className='shrink-0 select-none'
             style={{
               fontSize: '15px',
-              fontWeight: 460,
+              fontWeight: 450,
               letterSpacing: '-0.016em',
               color: 'var(--linear-text-tertiary)',
               fontFamily: 'inherit',
@@ -64,10 +64,10 @@ export function HeroClaimHandle({
             autoCorrect='off'
             className='min-w-0 flex-1 bg-transparent placeholder:text-quaternary-token focus-visible:outline-none'
             name='handle'
-            placeholder='your-name'
+            placeholder='you'
             style={{
               fontSize: '16px',
-              fontWeight: 500,
+              fontWeight: 510,
               letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
             }}
@@ -76,7 +76,7 @@ export function HeroClaimHandle({
         </div>
 
         <button
-          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-all duration-200 hover:brightness-110 active:scale-[0.98] focus-ring-themed'
+          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-all duration-slow hover:brightness-110 active:scale-[0.98] focus-ring-themed'
           data-testid={submitButtonTestId}
           style={FALLBACK_BUTTON_STYLE}
           type='submit'

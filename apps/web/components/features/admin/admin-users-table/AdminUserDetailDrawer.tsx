@@ -132,6 +132,7 @@ export function AdminUserDetailDrawer({
       isOpen={hasUser}
       width={400}
       ariaLabel='User details'
+      scrollStrategy='shell'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar

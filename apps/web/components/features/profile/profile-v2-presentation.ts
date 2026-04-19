@@ -14,8 +14,8 @@ export function resolveProfileV2Presentation(
   switch (mode) {
     case 'tour':
       return { initialOverlay: null, scrollTarget: 'tour' };
-    case 'tip':
-      return { initialOverlay: 'tip', scrollTarget: null };
+    case 'pay':
+      return { initialOverlay: 'pay', scrollTarget: null };
     case 'about':
       return { initialOverlay: null, scrollTarget: 'about' };
     case 'listen':

@@ -10,16 +10,21 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
 
-vi.mock('@/lib/utm', () => ({
-  buildUTMContext: () => ({}),
-  getUTMShareContextMenuItems: () => [
-    {
-      id: 'utm-share-submenu',
-      label: 'Copy with UTM',
-      items: [],
-    },
-  ],
-}));
+vi.mock('@/lib/utm', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/utm')>();
+
+  return {
+    ...actual,
+    buildUTMContext: () => ({}),
+    getUTMShareContextMenuItems: () => [
+      {
+        id: 'utm-share-submenu',
+        label: 'Copy with UTM',
+        items: [],
+      },
+    ],
+  };
+});
 
 function createRelease(
   overrides: Partial<ReleaseViewModel> = {}

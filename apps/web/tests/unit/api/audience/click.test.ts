@@ -173,6 +173,19 @@ describe('POST /api/audience/click', () => {
     expect(data.error).toBe('Rate limit exceeded');
   });
 
+  it('returns 400 when the request body is empty', async () => {
+    const request = new NextRequest('http://localhost/api/audience/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON');
+  });
+
   it('returns 400 for invalid payload', async () => {
     const request = new NextRequest('http://localhost/api/audience/click', {
       method: 'POST',

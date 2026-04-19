@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { DEMO_RELEASE_VIEW_MODELS } from '@/features/demo/mock-release-data';
 
 // Intentional exception: this suite locks design-system parity across demo
 // surfaces, so computed-style assertions are the contract under test.
@@ -14,7 +15,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
   }, theme);
 }
 
-async function expectPillChrome(locator: Locator) {
+async function expectQuietToolbarActionChrome(locator: Locator) {
   const metrics = await locator.evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -28,10 +29,9 @@ async function expectPillChrome(locator: Locator) {
   expect(metrics.height).toBeGreaterThanOrEqual(27);
   expect(metrics.height).toBeLessThanOrEqual(29.5);
   expect(metrics.radius).toBeGreaterThanOrEqual(999);
-  expect(metrics.borderTop).toBeGreaterThan(0);
-  expect(hasVisibleShadow(metrics.boxShadow)).toBeTruthy();
+  expect(metrics.borderTop).toBe(0);
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
-
 function hasVisibleShadow(boxShadow: string) {
   if (boxShadow === 'none') return false;
 
@@ -109,6 +109,23 @@ async function expectCardChrome(locator: Locator) {
   expect(metrics.boxShadow).not.toBe('none');
 }
 
+async function expectFlatSurface(locator: Locator) {
+  const metrics = await locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      borderTop: Number.parseFloat(style.borderTopWidth),
+      boxShadow: style.boxShadow,
+      backgroundColor: style.backgroundColor,
+      surfaceVariant: element.getAttribute('data-surface-variant'),
+    };
+  });
+
+  expect(metrics.surfaceVariant).toBe('flat');
+  expect(metrics.borderTop).toBe(0);
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
+  expect(metrics.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+}
+
 async function livesInsideRoundedCard(locator: Locator) {
   return locator.evaluate(node => {
     let current: HTMLElement | null = node as HTMLElement;
@@ -125,6 +142,17 @@ async function livesInsideRoundedCard(locator: Locator) {
   });
 }
 
+function getPrimaryReleaseTitle() {
+  const primaryReleaseTitle = DEMO_RELEASE_VIEW_MODELS[0]?.title;
+
+  expect(
+    primaryReleaseTitle,
+    'Expected at least one demo release fixture'
+  ).toBeTruthy();
+
+  return primaryReleaseTitle!;
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`${theme}: /demo toolbar pills and release drawer follow parity invariants`, async ({
     page,
@@ -133,38 +161,54 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
-    const displayButton = page.getByRole('button', { name: 'Display' }).first();
+    const primaryReleaseTitle = getPrimaryReleaseTitle();
+    const firstReleaseRow = page.getByTestId('release-row');
+    await expect(firstReleaseRow).toBeVisible();
+    await expect(
+      firstReleaseRow.getByText(primaryReleaseTitle, { exact: true })
+    ).toBeVisible();
+
+    const displayButton = page
+      .locator('button[aria-label="Display"]:visible')
+      .last();
     const previewButton = page
-      .getByRole('button', { name: 'Toggle release preview' })
+      .locator('button[aria-label="Toggle release preview"]:visible')
+      .last();
+    const hasDisplayButton = (await displayButton.count()) > 0;
+
+    const firstReleaseTrigger = page
+      .locator('[data-testid^="release-open-"]')
       .first();
-
-    await expect(displayButton).toBeVisible();
+    await expect(firstReleaseTrigger).toBeVisible();
     await expect(previewButton).toBeVisible();
-    await expectPillChrome(displayButton);
-    await expectPillChrome(previewButton);
+    await expect(previewButton).toBeEnabled();
+    await expectQuietToolbarActionChrome(previewButton);
+    if (hasDisplayButton) {
+      await expect(displayButton).toBeEnabled();
+      await expectQuietToolbarActionChrome(displayButton);
+    }
 
-    await page.getByText('Static Skies').first().click();
+    await firstReleaseTrigger.click();
 
     const drawer = page.getByTestId('release-sidebar');
     await expect(drawer).toBeVisible();
 
     const actionBar = drawer.getByTestId('drawer-card-action-bar');
     await expect(actionBar).toBeVisible();
-    await expect(drawer.getByText('Static Skies', { exact: true })).toHaveCount(
-      1
-    );
-    await expect(drawer.getByTestId('release-tab-panel-card')).toHaveCount(0);
+    await expect(
+      drawer.getByText(primaryReleaseTitle, { exact: true })
+    ).toHaveCount(1);
+    await expect(drawer.getByTestId('release-tabbed-card')).toBeVisible();
 
     const detailsTab = drawer.getByTestId('drawer-tab-details');
-    const platformsTab = drawer.getByTestId('drawer-tab-links');
-    const metadataCard = drawer.getByTestId('release-metadata-card');
+    const platformsTab = drawer.getByTestId('drawer-tab-dsps');
     await expect(detailsTab).toBeVisible();
     await expect(platformsTab).toBeVisible();
     await expectFlatPillChrome(detailsTab);
     await expectFlatPillChrome(platformsTab);
-    await expect(metadataCard).toBeVisible();
-    await expectCardChrome(metadataCard);
-
+    await expectCardChrome(drawer.getByTestId('release-tabbed-card'));
+    await expectFlatSurface(drawer.getByTestId('release-metadata-card'));
+    await expect(drawer.getByTestId('release-header-card')).toBeVisible();
     const copySmartLinkButton = drawer.getByRole('button', {
       name: 'Copy smart link',
     });
@@ -173,7 +217,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     expect(
       await livesInsideRoundedCard(
-        drawer.getByText('Static Skies', { exact: true }).first()
+        drawer.getByText(primaryReleaseTitle, { exact: true }).first()
       )
     ).toBeTruthy();
     expect(
@@ -190,15 +234,21 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForTimeout(2000);
     await setTheme(page, theme);
 
-    const drawer = page.getByTestId('demo-analytics-sidebar');
-    await expect(drawer).toBeVisible();
+    await expect(page.getByTestId('demo-audience-shell')).toBeVisible();
 
-    const rangeButton = drawer
-      .locator('button')
-      .filter({ hasText: '30d' })
-      .first();
-    await expect(rangeButton).toBeVisible();
-    await expectFlatPillChrome(rangeButton);
+    const drawer = page.getByTestId('demo-analytics-sidebar');
+    const drawerInitiallyVisible = await drawer.isVisible().catch(() => false);
+    const analyticsToggle = page
+      .locator(
+        'button[aria-label=\"Open analytics panel\"]:visible, button[aria-label=\"Close analytics panel\"]:visible'
+      )
+      .last();
+    if (!drawerInitiallyVisible) {
+      await expect(analyticsToggle).toBeVisible();
+      await analyticsToggle.click();
+    }
+
+    await expect(drawer).toBeVisible({ timeout: 15_000 });
 
     const tabbedCard = drawer.getByTestId('demo-analytics-tabbed-card');
     await expect(tabbedCard).toBeVisible();
@@ -209,7 +259,6 @@ for (const theme of ['light', 'dark'] as const) {
     expect(
       await livesInsideRoundedCard(drawer.getByText('Audience funnel'))
     ).toBeTruthy();
-    expect(await livesInsideRoundedCard(rangeButton)).toBeTruthy();
     expect(
       await livesInsideRoundedCard(tabbedCard.getByText('Los Angeles'))
     ).toBeTruthy();

@@ -63,6 +63,10 @@ vi.mock('@/lib/notifications/service', () => ({
   sendNotification: vi.fn().mockResolvedValue({ delivered: [] }),
 }));
 
+vi.mock('@/lib/notifications/suppression', () => ({
+  isEmailSuppressed: vi.fn().mockResolvedValue({ suppressed: false }),
+}));
+
 vi.mock('@/lib/notifications/validation', () => ({
   normalizeSubscriptionEmail: vi.fn(email =>
     email?.includes('@') ? email.toLowerCase() : null
@@ -78,6 +82,10 @@ vi.mock('@/lib/ingestion/session', () => ({
 
 vi.mock('@/app/api/audience/lib/audience-utils', () => ({
   createFingerprint: vi.fn().mockReturnValue('fingerprint-123'),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
 }));
 
 // Import once after all mocks are set up
@@ -118,6 +126,59 @@ describe('notifications/domain', () => {
       });
 
       expect(result.body.success).toBe(false);
+    });
+
+    it('keeps the subscribe success path when audience enrichment fails', async () => {
+      const artistId = '123e4567-e89b-12d3-a456-426614174000';
+      const { db } = await import('@/lib/db');
+      const { withSystemIngestionSession } = await import(
+        '@/lib/ingestion/session'
+      );
+      const { captureError } = await import('@/lib/error-tracking');
+
+      vi.mocked(db.limit)
+        .mockResolvedValueOnce([
+          {
+            id: artistId,
+            displayName: 'Test Artist',
+            username: 'testartist',
+            creatorIsPro: true,
+            creatorClerkId: null,
+            settings: null,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      vi.mocked(withSystemIngestionSession).mockRejectedValueOnce(
+        new Error('column "latest_referrer_url" does not exist')
+      );
+
+      const result = await subscribeToNotificationsDomain(
+        {
+          artist_id: artistId,
+          email: 'fan@example.com',
+          channel: 'email',
+          source: 'profile_inline',
+        },
+        {
+          headers: new Headers({
+            'user-agent': 'Vitest',
+            referer: 'http://localhost:3001/tim',
+          }),
+        }
+      );
+
+      expect(result.status).toBe(200);
+      expect(result.body.success).toBe(true);
+      expect(result.body.pendingConfirmation).toBe(true);
+      expect(captureError).toHaveBeenCalledWith(
+        'Notifications audience member upsert failed (best-effort)',
+        expect.any(Error),
+        expect.objectContaining({
+          artistId,
+          email: 'fan@example.com',
+        })
+      );
     });
   });
 

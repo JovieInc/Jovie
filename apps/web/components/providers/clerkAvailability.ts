@@ -32,7 +32,13 @@ export function shouldBypassClerk(
     : globalThis.location
 ): boolean {
   const normalizedKey = publishableKey?.trim();
+  const allowRealClerkForLocalE2E =
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' &&
+    clerkMockFlag !== '1' &&
+    normalizedKey !== undefined &&
+    !isMockPublishableKey(normalizedKey);
   const shouldBypassForPrivateOrigin =
+    !allowRealClerkForLocalE2E &&
     shouldDisableClerkProxyForLocation(locationLike);
 
   return (

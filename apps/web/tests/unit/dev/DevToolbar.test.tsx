@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 const mockSetTheme = vi.fn();
 
@@ -8,27 +9,22 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: mockSetTheme }),
 }));
 
-const FF_OVERRIDES_KEY = '__ff_overrides';
-
 function setLocalOverrides(overrides: Record<string, boolean>) {
   localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(overrides));
 }
 
-vi.mock('@/lib/feature-flags/shared', () => ({
-  FF_OVERRIDES_KEY: '__ff_overrides',
-  CODE_FLAG_KEYS: {
+vi.mock('@/lib/flags/contracts', () => ({
+  APP_FLAG_OVERRIDE_KEYS: {
     CLAIM_HANDLE: 'code:CLAIM_HANDLE',
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
-    PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
   },
-  FEATURE_FLAGS: {
+  APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     THREADS_ENABLED: false,
-    PWA_INSTALL_BANNER: false,
   },
 }));
 
@@ -295,13 +291,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Should show "5 of 5" initially (all 5 code flags)
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      // Should show "4 of 4" initially (all 4 code flags)
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
     });
 
     it('clears search when clear button is clicked', () => {
@@ -311,11 +307,11 @@ describe('DevToolbar', () => {
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
     });
 
     it('does not show clear button when search is empty', () => {
@@ -343,7 +339,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const sourceLabels = screen.getAllByText(/^code$/);
-      expect(sourceLabels.length).toBe(5); // all code flags
+      expect(sourceLabels.length).toBe(4); // all code flags
     });
   });
 

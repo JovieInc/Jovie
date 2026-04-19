@@ -206,7 +206,7 @@ async function buildAttachments(ctx: BuildContext): Promise<{
   }
 
   const attachments: SubmissionAttachment[] = [
-    buildXperiReleaseSheetAttachment(canonical),
+    await buildXperiReleaseSheetAttachment(canonical),
     {
       kind: artwork!.kind,
       filename: artwork!.filename,

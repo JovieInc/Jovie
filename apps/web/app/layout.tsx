@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
@@ -94,6 +93,7 @@ export const metadata: Metadata = {
   },
   other: {
     'application-name': APP_NAME,
+    'apple-mobile-web-app-capable': 'yes',
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',
@@ -138,12 +138,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read CSP nonce. headers() opts into dynamic rendering which breaks ISR pages
-  // ("Page changed from static to dynamic at runtime"). Only call headers() when
-  // we know we're in a fully dynamic context (authenticated app routes). Public
-  // ISR pages (profiles, smart links) don't need nonce — CSP uses hashes instead.
-  const nonce = undefined;
-
   const isE2EClientRuntime =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
@@ -208,11 +202,8 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
-        <Script
-          src='/theme-init.js'
-          strategy='beforeInteractive'
-          nonce={nonce}
-        />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Theme init must run before first paint and stays static in /public. */}
+        <script src='/theme-init.js' />
       </head>
       <body className={bodyClassName}>
         {FlagBadgeProvider ? (

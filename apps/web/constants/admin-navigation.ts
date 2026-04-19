@@ -32,9 +32,11 @@ export type AdminWorkspaceId =
   | 'overview'
   | 'people'
   | 'growth'
+  | 'platform_connections'
   | 'activity'
   | 'investors'
-  | 'screenshots';
+  | 'screenshots'
+  | 'share_studio';
 
 export type AdminNavigationSection = 'workspaces' | 'utilities';
 
@@ -50,12 +52,14 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
   'people',
   'growth',
+  'platform_connections',
   'activity',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'screenshots',
+  'share_studio',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
@@ -81,6 +85,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'workspaces',
   },
   {
+    id: 'platform_connections',
+    label: 'Platform Connections',
+    href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
+    description: 'Spotify publisher and playlist generation controls',
+    section: 'workspaces',
+  },
+  {
     id: 'activity',
     label: 'Activity',
     href: APP_ROUTES.ADMIN_ACTIVITY,
@@ -99,6 +110,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'share_studio',
+    label: 'Share Studio',
+    href: APP_ROUTES.ADMIN_SHARE_STUDIO,
+    description: 'Preview story assets, payloads, and tracked share outputs',
     section: 'utilities',
   },
 ] as const;

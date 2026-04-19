@@ -1,5 +1,12 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import type { AudienceSourceType } from '@/lib/audience/activity-types';
+import {
+  resolveAudienceClickEventType,
+  resolveAudienceClickObjectType,
+  resolveAudienceClickVerb,
+} from '@/lib/audience/click-event-helpers';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -19,7 +26,6 @@ import {
   deriveIntentLevel,
   getActionWeight,
   mergeAudienceTags,
-  trimHistory,
 } from '../audience/lib/audience-utils';
 import { validateTrackRequest } from './validation';
 
@@ -211,17 +217,10 @@ async function upsertAudienceMember(
   }
 
   const now = new Date();
-  const existingActions = Array.isArray(resolvedMember.latestActions)
-    ? resolvedMember.latestActions
-    : [];
-  const actionEntry = {
-    label: ACTION_LABELS[opts.linkType] ?? 'interacted',
-    type: opts.linkType,
-    platform: opts.target,
-    emoji: ACTION_ICONS[opts.linkType] ?? '⭐',
-    timestamp: now.toISOString(),
-  };
-  const latestActions = trimHistory([actionEntry, ...existingActions], 5);
+  const existingActionCount = Array.isArray(resolvedMember.latestActions)
+    ? resolvedMember.latestActions.length
+    : 0;
+  const actionCount = Math.min(existingActionCount + 1, 5);
   const weight = getActionWeight(opts.linkType);
   const tags = mergeAudienceTags(resolvedMember.tags, audienceTags);
   const isBotMember = tags.includes('bot');
@@ -230,7 +229,7 @@ async function upsertAudienceMember(
     : (resolvedMember.engagementScore ?? 0) + weight;
   const intentLevel = isBotMember
     ? 'low'
-    : deriveIntentLevel(resolvedMember.visits ?? 0, latestActions.length);
+    : deriveIntentLevel(resolvedMember.visits ?? 0, actionCount);
 
   await tx
     .update(audienceMembers)
@@ -239,7 +238,6 @@ async function upsertAudienceMember(
       updatedAt: now,
       engagementScore: updatedScore,
       intentLevel,
-      latestActions,
       deviceType: opts.audienceDeviceType,
       geoCity: opts.geoCity ?? resolvedMember.geoCity ?? null,
       geoCountry: opts.geoCountry ?? resolvedMember.geoCountry ?? null,
@@ -254,20 +252,6 @@ async function upsertAudienceMember(
 
   return resolvedMember.id;
 }
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 function getRawTipAmount(
   context: Record<string, unknown> | undefined
@@ -308,6 +292,47 @@ function buildClickMetadata(
   return metadata;
 }
 
+function resolveTrackSourceKind(
+  resolvedSource: string | undefined
+): AudienceSourceType | null {
+  if (resolvedSource === 'qr') return 'qr';
+  if (resolvedSource === 'short_link') return 'short_link';
+  if (resolvedSource === 'utm') return 'utm';
+  if (resolvedSource === 'referrer') return 'referrer';
+  if (resolvedSource === 'social') return 'social';
+  if (resolvedSource === 'email') return 'email';
+  if (resolvedSource === 'sms') return 'sms';
+  if (resolvedSource === 'direct') return 'direct';
+  if (resolvedSource === 'unknown') return 'unknown';
+  return null;
+}
+
+function formatTrackSourceLabel(source: string): string {
+  return source
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map(segment =>
+      segment.length <= 3
+        ? segment.toUpperCase()
+        : `${segment[0]?.toUpperCase() ?? ''}${segment.slice(1)}`
+    )
+    .join(' ');
+}
+
+function resolveTrackSourceLabel(
+  resolvedSource: string | undefined
+): string | undefined {
+  if (!resolvedSource) return undefined;
+  if (resolvedSource === 'qr') return 'QR Code';
+  if (resolvedSource === 'short_link') return 'Short Link';
+  if (resolvedSource === 'utm') return 'UTM Campaign';
+  if (resolvedSource === 'preferred_dsp') return 'Preferred DSP';
+  if (resolvedSource === 'sounds') return 'Sounds Page';
+  if (resolvedSource === 'link') return 'Short Link';
+  if (resolvedSource === 'redirect') return 'Redirect';
+  return formatTrackSourceLabel(resolvedSource);
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting: Check IP-based rate limit for track events
@@ -327,7 +352,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Validate request using extracted validation module
     const validationResult = validateTrackRequest(body);
@@ -396,7 +429,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const [clickEvent] = await withSystemIngestionSession(async tx => {
+    const trackingResult = await withSystemIngestionSession(async tx => {
       // Only create/update audience member records when marketing consent is given
       const audienceMemberId = hasMarketingConsent
         ? await upsertAudienceMember(tx, {
@@ -441,10 +474,28 @@ export async function POST(request: NextRequest) {
         })
         .returning({ id: clickEvents.id });
 
-      return insertedClickEvent ? [insertedClickEvent] : [];
+      if (insertedClickEvent && audienceMemberId) {
+        await recordAudienceEvent(tx, {
+          creatorProfileId: profile.id,
+          audienceMemberId,
+          eventType: resolveAudienceClickEventType(linkType, context),
+          verb: resolveAudienceClickVerb(linkType),
+          confidence: 'observed',
+          sourceKind: resolveTrackSourceKind(resolvedSource),
+          sourceLabel: resolveTrackSourceLabel(resolvedSource),
+          objectType: resolveAudienceClickObjectType(linkType, context),
+          objectId: context?.contentId ?? linkId ?? null,
+          objectLabel: context?.smartLinkSlug ?? target,
+          clickEventId: insertedClickEvent.id,
+          platform: context?.provider ?? target,
+          properties: metadata,
+        });
+      }
+
+      return { clickEvent: insertedClickEvent, audienceMemberId };
     });
 
-    if (!clickEvent) {
+    if (!trackingResult.clickEvent) {
       await captureError(
         'Failed to insert click event',
         new Error('Database insert returned no data'),
@@ -482,7 +533,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, id: clickEvent.id },
+      { success: true, id: trackingResult.clickEvent.id },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

@@ -5,8 +5,11 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockClearPendingShell,
+  mockOpenPreviewPanel,
+  mockRouterPush,
   mockShowPendingShell,
   mockToastInfo,
+  mockTogglePreviewPanel,
   mockUsePathname,
   renderDashboardNav,
   resetDashboardNavTestMocks,
@@ -75,7 +78,7 @@ describe('DashboardNav interactions', () => {
     expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
-  it('profile button is clickable and opens drawer', async () => {
+  it('profile button toggles the drawer when already on chat', async () => {
     const user = userEvent.setup();
 
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
@@ -84,7 +87,21 @@ describe('DashboardNav interactions', () => {
     const profileButton = screen.getByRole('button', { name: 'Profile' });
     await user.click(profileButton);
 
-    expect(profileButton).toBeDefined();
+    expect(mockTogglePreviewPanel).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('profile button navigates to chat before opening the drawer off chat routes', async () => {
+    const user = userEvent.setup();
+
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_AUDIENCE);
+    renderDashboardNav({ renderFn: render });
+
+    await user.click(screen.getByRole('button', { name: 'Profile' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
+    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
+    expect(mockTogglePreviewPanel).not.toHaveBeenCalled();
   });
 
   it('shows the releases pending shell once for a pointer click', async () => {

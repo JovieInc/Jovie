@@ -1,6 +1,6 @@
 {
   "name": "@jovie/docs",
-  "version": "26.4.142",
+  "version": "26.4.158",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -25,6 +25,6 @@
   "devDependencies": {
     "@types/react": "^19.2.14",
     "pagefind": "^1.5.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }

@@ -52,6 +52,8 @@ export interface EntitySidebarShellProps {
 
   /** Main scrollable content */
   readonly children: ReactNode;
+  /** Controls whether scroll is owned by the shell body or a child region. */
+  readonly scrollStrategy?: 'child' | 'shell';
 
   /** Footer slot — pinned to bottom of drawer */
   readonly footer?: ReactNode;
@@ -74,7 +76,8 @@ export interface EntitySidebarShellProps {
  * Standard layout rule: persistent content → tabs → tab content.
  * In minimal mode, the entity header stays pinned above the scrollable region,
  * while callers compose tab controls into the main content card.
- * Only tab-specific children scroll.
+ * Child-owned scroll is the default so tabbed cards can own their own scroll
+ * region. Use shell scroll only for stacked inspector content.
  *
  *  ┌─────────────────────────┐
  *  │ DrawerHeader (title +   │  shrink-0
@@ -106,6 +109,7 @@ export function EntitySidebarShell({
   minimalTabsPlacement = 'card',
   tabsContainerClassName,
   children,
+  scrollStrategy = 'child',
   footer,
   footerSurface = 'card',
   isEmpty = false,
@@ -157,6 +161,15 @@ export function EntitySidebarShell({
         <div className='shrink-0 px-3 py-2.5 lg:mx-0'>{footer}</div>
       );
   }
+  const shellScrollClassName =
+    'flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0';
+  const childScrollClassName = 'flex flex-1 min-h-0 flex-col lg:px-0 lg:pt-0';
+  const bodyClassName =
+    scrollStrategy === 'shell' ? shellScrollClassName : childScrollClassName;
+  const bodyChildrenClassName =
+    scrollStrategy === 'shell'
+      ? 'space-y-2.5'
+      : 'flex min-h-0 flex-1 flex-col space-y-2.5';
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -226,15 +239,18 @@ export function EntitySidebarShell({
         ) : null}
 
         {isEmpty ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
+          <div className={bodyClassName} data-scroll-strategy={scrollStrategy}>
             <DrawerSurfaceCard variant='card' className='p-4'>
               <DrawerEmptyState message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
-              <div className='space-y-2.5'>{children}</div>
+            <div
+              className={bodyClassName}
+              data-scroll-strategy={scrollStrategy}
+            >
+              <div className={bodyChildrenClassName}>{children}</div>
             </div>
 
             {footerNode}

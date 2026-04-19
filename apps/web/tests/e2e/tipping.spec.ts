@@ -182,7 +182,7 @@ test.describe('Tipping MVP', () => {
         await tipButton.click();
 
         // Verify we're on the tip page
-        await page.waitForURL('**/testartist?mode=tip', {
+        await page.waitForURL('**/testartist?mode=pay', {
           timeout: SMOKE_TIMEOUTS.URL_STABLE,
         });
 
@@ -222,7 +222,7 @@ test.describe('Tipping MVP', () => {
           route.fulfill({ status: 200, body: '{}' })
         );
         // Visit the profile page and wait for hydration (not networkidle)
-        await page.goto('/testartist?mode=tip', {
+        await page.goto('/testartist?mode=pay', {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });
@@ -304,7 +304,7 @@ test.describe('Tipping MVP', () => {
           route.fulfill({ status: 200, body: '{}' })
         );
         // Visit the tip page and wait for hydration (not networkidle)
-        await page.goto('/testartist?mode=tip', {
+        await page.goto('/testartist?mode=pay', {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });
@@ -374,7 +374,7 @@ test.describe('Tipping MVP', () => {
           route.fulfill({ status: 200, body: '{}' })
         );
         // Visit the tip page and wait for hydration (not networkidle)
-        await page.goto('/testartist?mode=tip', {
+        await page.goto('/testartist?mode=pay', {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });

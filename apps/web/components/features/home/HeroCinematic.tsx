@@ -169,7 +169,7 @@ export function HeroCinematic({
         {['/profile', '/tour', '/tip', '/listen'].map((label, i) => (
           <span
             key={label}
-            className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
+            className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-slower'
             style={{
               backgroundColor:
                 i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',

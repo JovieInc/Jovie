@@ -23,12 +23,21 @@ describe('profile mode route redirects', () => {
     expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tour');
   });
 
-  it('redirects to the canonical tip mode URL without server search params', async () => {
+  it('redirects to the canonical pay mode URL without server search params', async () => {
     await redirectToProfileMode(
       Promise.resolve({ username: 'testartist' }),
-      'tip'
+      'pay'
     );
 
-    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tip');
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=pay');
+  });
+
+  it('redirects to the canonical releases mode URL', async () => {
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
+      'releases'
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=releases');
   });
 });

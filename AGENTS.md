@@ -286,6 +286,7 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 ### 4b. Subtraction Principle (Tim White Canon)
 
 - UI cleanup must follow the subtraction principle: remove before adding
+- Before building a child component, open the parent container file and list what chrome (title, header, card surface, borders) it already renders — then omit those from the child
 - When a screen feels messy, agents should first look for duplicated labels, redundant helper text, nested containers, extra borders, repeated actions, and unnecessary variants
 - Prefer one clear heading, one clear action cluster, and one clear surface hierarchy instead of layering multiple decorative cues
 - If an existing label, icon, placeholder, or layout already communicates the action, remove the extra explanatory UI around it
@@ -297,11 +298,41 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
-- Do **NOT** wrap every block in rounded cards or bordered boxes just to create structure; first solve hierarchy with spacing, alignment, type, and surface contrast
+- For marketing sections, the default composition is: one headline, one subhead, one visual. Do not add eyebrow text, labels, proof bars, separators, helper rows, or extra wrapper cards unless a human explicitly asks for that exact element
+- Eyebrow text is banned by default on marketing pages. Only add an eyebrow when a human explicitly requests it for that exact section
+- Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast
+- Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed
 - Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
 - Avoid the common AI mockup pattern of tiny uppercase eyebrow + long explanatory paragraph inside a large rounded bordered card
 - Prefer one compact, well-set label and one clear body line over stacked label, headline, description, and chrome all saying the same thing
+- When revising a marketing layout and the direction is unclear, do not add explanatory copy or chrome as a hedge. The fallback is subtraction: headline, subhead, one visual
 - When implementing or revising UI, compare the result against this smell test: if it looks like a generic AI admin template, it is off-style and should be simplified
+
+### 4d. No Redundant Chrome (Container-Aware Design)
+
+Before adding a title, header, card wrapper, or label to a component, **read the parent container** that will render it. Containers already provide chrome — do not duplicate it.
+
+| Container | Chrome it provides | Do NOT add inside it |
+|---|---|---|
+| `EntitySidebarShell` | `DrawerHeader` via `title` prop | Card header or heading repeating the drawer title |
+| `Sheet` / `Dialog` | `SheetHeader` / `DialogHeader` + title | Second heading or Card wrapping the body content |
+| `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
+| `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
+| `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name (see §No Duplicate Page Titles) |
+
+**Checklist (run before every UI component PR):**
+
+1. **Read the mount point** — open the parent layout/page and identify what container renders your component. What title, header, and surface does it already provide?
+2. **Grep for repeated text** — search the route tree for your title/label string. If the same label appears 3+ times on one screen, deduplicate.
+3. **Check surface nesting** — if the parent is already a Card, Sheet, or `DrawerSurfaceCard`, do not wrap children in another Card. Use `variant='flat'` or plain `div`.
+4. **One heading per visual section** — a section gets exactly one title. If the container already renders one, your component renders zero.
+
+**Banned patterns:**
+- `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
+- `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
+- Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
+
+This is 4b (subtraction principle) applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
 ### 5. Conventional Commits Required
 

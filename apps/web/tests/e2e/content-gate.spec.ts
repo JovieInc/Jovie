@@ -279,10 +279,10 @@ test.describe('Content Gate — Public Pages', () => {
         tokenGatedRedirect: true,
       },
       {
-        path: '/engagement-engine',
-        name: 'Engagement engine',
-        expectedUrl: /\/engagement-engine$/,
-        readyText: /attention is the bottleneck|always-on engagement/i,
+        path: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        name: 'Artist notifications',
+        expectedUrl: /\/artist-notifications$/,
+        readyText: /reach every fan|automatically/i,
         minLength: 150,
       },
       {

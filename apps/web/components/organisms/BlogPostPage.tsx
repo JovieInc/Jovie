@@ -3,11 +3,13 @@ import { BlogAuthorCard } from '@/app/(marketing)/blog/components/BlogAuthorCard
 import { BlogRelatedPosts } from '@/app/(marketing)/blog/components/BlogRelatedPosts';
 import { BlogTableOfContents } from '@/app/(marketing)/blog/components/BlogTableOfContents';
 import { CategoryPill } from '@/app/(marketing)/blog/components/CategoryPill';
+import { PublicShareMenu } from '@/components/features/share/PublicShareMenu';
 import { MarketingContainer } from '@/components/marketing';
 import { Avatar } from '@/components/molecules/Avatar';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import type { BlogPost, BlogPostSummary } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import { buildBlogShareContext } from '@/lib/share/context';
 import type { TocEntry } from '@/types/docs';
 
 export interface BlogPostPageProps {
@@ -34,6 +36,12 @@ export function BlogPostPage({
   relatedPosts,
   relatedAuthors,
 }: BlogPostPageProps) {
+  const shareContext = buildBlogShareContext({
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+  });
+
   return (
     <article className='min-h-screen'>
       {/* Header Section */}
@@ -79,6 +87,19 @@ export function BlogPostPage({
                 <CategoryPill category={post.category} />
               </>
             )}
+            <span className='text-quaternary-token'>·</span>
+            <PublicShareMenu
+              context={shareContext}
+              title='Share'
+              trigger={
+                <button
+                  type='button'
+                  className='text-sm font-medium text-tertiary-token transition-colors duration-200 hover:text-primary-token'
+                >
+                  Share
+                </button>
+              }
+            />
           </div>
 
           {/* Title */}

@@ -16,8 +16,9 @@ import {
   SMART_LINK_MENU_ICON_CLASS,
   SMART_LINK_MENU_ITEM_CLASS,
   SmartLinkShell,
-  useSmartLinkShare,
 } from '@/features/release/SmartLinkShell';
+import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import { buildReleaseShareContext } from '@/lib/share/context';
 import type { Artist } from '@/types/db';
 import { PreSaveActions } from './PreSaveActions';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
@@ -63,10 +64,14 @@ export function UnreleasedReleaseHero({
 }: UnreleasedReleaseHeroProps) {
   const artistData = mapToArtistType(artist);
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const handleShare = useSmartLinkShare(release.title, artist.name, () =>
-    setMenuOpen(false)
-  );
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareContext = buildReleaseShareContext({
+    username: artist.handle,
+    slug: release.slug,
+    title: release.title,
+    artistName: artist.name,
+    artworkUrl: release.artworkUrl,
+  });
 
   return (
     <ReleaseNotificationsProvider artist={artistData}>
@@ -119,12 +124,26 @@ export function UnreleasedReleaseHero({
           <button
             type='button'
             className={SMART_LINK_MENU_ITEM_CLASS}
-            onClick={() => handleShare()}
+            onClick={() => {
+              setMenuOpen(false);
+              setShareOpen(true);
+            }}
           >
             <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
             Share
           </button>
         </div>
+      </ProfileDrawerShell>
+      <ProfileDrawerShell
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title='Share'
+        subtitle='Share this release'
+      >
+        <PublicShareActionList
+          context={shareContext}
+          onActionComplete={() => setShareOpen(false)}
+        />
       </ProfileDrawerShell>
     </ReleaseNotificationsProvider>
   );

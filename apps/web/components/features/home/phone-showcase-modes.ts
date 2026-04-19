@@ -26,12 +26,12 @@ export const PHONE_SHOWCASE_MODES: readonly PhoneShowcaseModeData[] = [
     summary: 'Show the nearest date.',
   },
   {
-    id: 'tip',
+    id: 'pay',
     headline: 'Turn in-person moments into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
-    outcome: 'Earn tips',
-    summary: 'Turn scans into tips.',
+      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.',
+    outcome: 'Earn',
+    summary: 'Turn scans into payments.',
   },
   {
     id: 'listen',

@@ -38,7 +38,7 @@ export async function HeroExampleProfiles() {
                 href={`/${creator.handle}`}
                 className='group relative flex shrink-0 flex-col items-center'
               >
-                <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 group-hover:border-neutral-400 dark:group-hover:border-neutral-500 transition-colors duration-150'>
+                <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 group-hover:border-neutral-400 dark:group-hover:border-neutral-500 transition-colors duration-normal'>
                   <Image
                     src={creator.src}
                     alt={creator.name}
@@ -50,7 +50,7 @@ export async function HeroExampleProfiles() {
                   />
                 </div>
 
-                <p className='mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-100 transition-colors duration-150'>
+                <p className='mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-100 transition-colors duration-normal'>
                   @{creator.handle}
                 </p>
               </Link>
@@ -62,7 +62,7 @@ export async function HeroExampleProfiles() {
         <div className='mt-6 text-center'>
           <Link
             href='/explore'
-            className='inline-flex items-center gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-150'
+            className='inline-flex items-center gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-normal'
           >
             View all creators
           </Link>

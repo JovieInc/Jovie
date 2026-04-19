@@ -1,25 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { Suspense } from 'react';
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Container } from '@/components/site/Container';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { DSP_CONFIGS } from '@/lib/dsp';
-
-/* ------------------------------------------------------------------ */
-/*  Lazy-load the real ReleaseTable (heavy component, below-fold)       */
-/* ------------------------------------------------------------------ */
-
-const DemoRealReleasesPanel = dynamic(
-  () =>
-    import('@/features/demo/DemoRealReleasesPanel').then(
-      m => m.DemoRealReleasesPanel
-    ),
-  { ssr: false }
-);
 
 /* ------------------------------------------------------------------ */
 /*  DSP platforms shown on the floating smart link card                  */
@@ -31,33 +17,6 @@ const SMART_LINK_DSPS = [
   'youtube_music',
   'amazon_music',
 ] as const;
-
-/* ------------------------------------------------------------------ */
-/*  Skeleton loader — shown while real table loads                       */
-/* ------------------------------------------------------------------ */
-
-function ReleasesTableSkeleton() {
-  return (
-    <div className='bg-surface-0 p-5'>
-      {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const).map((id, i) => (
-        <div
-          key={id}
-          className='flex items-center gap-4 py-3'
-          style={{
-            borderBottom:
-              i < 5 ? '1px solid var(--linear-border-subtle)' : undefined,
-          }}
-        >
-          <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2 animate-pulse' />
-          <div className='flex-1 space-y-2'>
-            <div className='h-3 w-32 rounded bg-surface-2 animate-pulse' />
-            <div className='h-2.5 w-20 rounded bg-surface-2 animate-pulse' />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Section                                                             */
@@ -102,7 +61,7 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Product Mockup — side-by-side layout */}
           <div className='mt-16 md:mt-20 mx-auto w-full'>
             <div className='flex flex-col md:flex-row gap-6 md:items-start'>
-              {/* Dashboard window — real ReleaseTable */}
+              {/* Dashboard window — screenshot captured from /demo */}
               <div
                 className='relative overflow-hidden rounded-t-xl md:rounded-t-2xl rounded-b-none flex-1 min-w-0'
                 style={{
@@ -146,11 +105,16 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='w-[52px]' />
                 </div>
 
-                {/* Real ReleaseTable — capped height with fade */}
+                {/* Demo capture from the shared /demo route */}
                 <div className='relative h-[420px] overflow-hidden'>
-                  <Suspense fallback={<ReleasesTableSkeleton />}>
-                    <DemoRealReleasesPanel />
-                  </Suspense>
+                  <Image
+                    src='/product-screenshots/releases-dashboard-full.png'
+                    alt='Jovie releases dashboard showing the live shared releases workspace'
+                    fill
+                    priority={false}
+                    className='object-cover object-top'
+                    sizes='(min-width: 768px) 70vw, 100vw'
+                  />
 
                   {/* Bottom gradient fade */}
                   <div

@@ -1,4 +1,5 @@
 import localFont from 'next/font/local';
+import '../(home)/home.css';
 import './marketing-utilities.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';

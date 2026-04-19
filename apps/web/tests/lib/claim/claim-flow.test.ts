@@ -165,53 +165,36 @@ describe('Claim Flow Logic', () => {
   });
 
   describe('redirect URL generation', () => {
-    function generateClaimPath(username: string, token: string): string {
-      return `/${encodeURIComponent(username)}/claim?token=${encodeURIComponent(token)}`;
+    function generateClaimResolverPath(token: string): string {
+      return `/claim/${encodeURIComponent(token)}`;
     }
 
     function generateAuthRedirectUrl(
       authPath: '/signin' | '/signup',
-      username: string,
       token: string
     ): string {
-      const claimPath = generateClaimPath(username, token);
+      const claimPath = generateClaimResolverPath(token);
       return `${authPath}?redirect_url=${encodeURIComponent(claimPath)}`;
     }
 
-    it('generates direct claim URL for signed-in users', () => {
-      const claimPath = generateClaimPath('testartist', 'test-token');
-      expect(claimPath).toBe('/testartist/claim?token=test-token');
+    it('generates resolver claim URL for outbound links', () => {
+      const claimPath = generateClaimResolverPath('test-token');
+      expect(claimPath).toBe('/claim/test-token');
     });
 
     it('generates signin URL with redirect for signed-out users', () => {
-      const url = generateAuthRedirectUrl(
-        '/signin',
-        'testartist',
-        'test-token'
-      );
-      expect(url).toBe(
-        '/signin?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-token'
-      );
+      const url = generateAuthRedirectUrl('/signin', 'test-token');
+      expect(url).toBe('/signin?redirect_url=%2Fclaim%2Ftest-token');
     });
 
     it('generates signup URL with redirect for signed-out users', () => {
-      const url = generateAuthRedirectUrl(
-        '/signup',
-        'testartist',
-        'test-token'
-      );
-      expect(url).toBe(
-        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-token'
-      );
+      const url = generateAuthRedirectUrl('/signup', 'test-token');
+      expect(url).toBe('/signup?redirect_url=%2Fclaim%2Ftest-token');
     });
 
     it('properly encodes special characters', () => {
-      const url = generateAuthRedirectUrl(
-        '/signin',
-        'testartist',
-        'token/with&special'
-      );
-      expect(url).toContain('token%3Dtoken%252Fwith%2526special');
+      const url = generateAuthRedirectUrl('/signin', 'token/with&special');
+      expect(url).toContain('%2Fclaim%2Ftoken%252Fwith%2526special');
     });
   });
 

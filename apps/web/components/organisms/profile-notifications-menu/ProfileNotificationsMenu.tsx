@@ -19,7 +19,7 @@ import {
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
-import { useUpdateContentPreferencesMutation } from '@/lib/queries';
+import { useUpdateContentPreferencesMutation } from '@/lib/queries/useNotificationStatusQuery';
 import {
   NOTIFICATION_CONTENT_TYPES,
   type NotificationChannel,

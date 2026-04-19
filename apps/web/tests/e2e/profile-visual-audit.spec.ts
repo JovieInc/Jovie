@@ -83,7 +83,7 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
   },
   {
     id: 'tip',
-    path: `/${TIP_PROFILE}?mode=tip`,
+    path: `/${TIP_PROFILE}?mode=pay`,
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
     shells: ['legacy', 'v2'],
   },

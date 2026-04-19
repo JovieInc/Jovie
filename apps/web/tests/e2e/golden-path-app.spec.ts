@@ -1,17 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
   buildValidOnboardingHandle,
-  completeOnboardingV2,
   createFreshUser,
   ensureDbUser,
   ensureServerAuthenticated,
   hasRealEnv,
   interceptTrackingCalls,
   purgeStaleClerkTestUsers,
-  waitForSpotifyImport,
+  seedOnboardedCreatorProfile,
 } from './helpers/e2e-helpers';
-import { setTestUserPlan } from './helpers/plan-helpers';
 import {
   smokeNavigateWithRetry,
   waitForHydration,
@@ -29,8 +28,8 @@ import {
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const TEST_SPOTIFY_ARTIST = {
-  id: '6M2wZ9GZgrQXHCFfjv46we',
-  url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
+  id: '4Uwpa6zW3zzCSQvooQNksm',
+  url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
 };
 
 /* ------------------------------------------------------------------ */
@@ -76,53 +75,20 @@ test.describe('Golden Path: Welcome Message', () => {
       clerkUserId
     );
 
-    // Navigate to onboarding
-    await smokeNavigateWithRetry(
-      page,
-      `/onboarding?handle=${onboardingHandle}`,
-      {
-        timeout: 45_000,
-        retries: 2,
-      }
-    );
-
-    await expect(
-      page.locator('[data-testid="onboarding-form-wrapper"]')
-    ).toBeVisible({ timeout: 20_000 });
-
-    // Handle step
-    const handleEl = page.getByLabel('Claim your handle');
-    await expect(handleEl).toBeVisible({ timeout: 10_000 });
-    await expect
-      .poll(async () => (await handleEl.inputValue()).trim(), {
-        timeout: 20_000,
-      })
-      .toBe(onboardingHandle);
-
-    await completeOnboardingV2(page, TEST_SPOTIFY_ARTIST.url, {
+    await seedOnboardedCreatorProfile({
       clerkUserId,
-      expectedHandle: onboardingHandle,
+      handle: onboardingHandle,
+      displayName: 'Golden Path',
+      spotifyId: TEST_SPOTIFY_ARTIST.id,
+      spotifyUrl: TEST_SPOTIFY_ARTIST.url,
     });
 
     await ensureServerAuthenticated(page, clerkUserId);
-    await page.goto('/app', {
-      waitUntil: 'commit',
+    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
       timeout: 60_000,
+      retries: 2,
     });
-
-    // Wait for dashboard
     await expect(page).toHaveURL(/\/app/, { timeout: 30_000 });
-
-    // Wait for onboarding to complete
-    await expect
-      .poll(
-        async () => {
-          const state = await waitForSpotifyImport(clerkUserId);
-          return state?.onboarding_completed_at ? 'ready' : 'pending';
-        },
-        { timeout: 60_000, intervals: [2_000, 5_000, 10_000] }
-      )
-      .toBe('ready');
 
     // Bootstrap the onboarding welcome thread directly, then verify the message.
     const welcomeChatResponse = await page.request.post(
@@ -162,6 +128,10 @@ test.describe('Golden Path: Welcome Message', () => {
 test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({ page }) => {
+    await ensureSignedInUser(page);
+  });
+
   test('releases page loads', async ({ page }) => {
     await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
       timeout: 60_000,
@@ -197,7 +167,27 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/presence/, { timeout: 15_000 });
+    await expect
+      .poll(
+        () => {
+          const currentUrl = new URL(page.url());
+          if (
+            currentUrl.pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE &&
+            currentUrl.searchParams.get('tab') === 'music'
+          ) {
+            return 'settings-music';
+          }
+
+          if (currentUrl.pathname === APP_ROUTES.PRESENCE) {
+            return 'presence';
+          }
+
+          return currentUrl.pathname;
+        },
+        { timeout: 15_000 }
+      )
+      .toMatch(/presence|settings-music/);
+
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
     });
@@ -245,10 +235,19 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
     await expect(careerHighlightsField).toBeVisible({ timeout: 15_000 });
 
     const testValue = `Golden path test ${Date.now()}`;
-    await careerHighlightsField.fill(testValue);
 
-    // Trigger auto-save via blur, then verify persistence after reload.
-    await careerHighlightsField.blur();
+    // Start waiting before editing so the test does not miss a fast save, and
+    // allow extra time for local dev-route compilation on the first PUT.
+    const saveResponse = page.waitForResponse(
+      response =>
+        response.url().includes('/api/dashboard/profile') &&
+        response.request().method() === 'PUT',
+      { timeout: 60_000 }
+    );
+    await careerHighlightsField.fill(testValue);
+    await careerHighlightsField.press('Tab');
+    expect((await saveResponse).ok()).toBeTruthy();
+
     await expect
       .poll(
         async () => {
@@ -272,6 +271,10 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
 test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({ page }) => {
+    await ensureSignedInUser(page);
+  });
+
   test('chat page loads', async ({ page }) => {
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
       timeout: 60_000,
@@ -284,11 +287,11 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     });
   });
 
-  test('user can send a message and receive a response', async ({ page }) => {
+  test('user can send a message and receive a response', async ({
+    page,
+    context,
+  }) => {
     test.setTimeout(60_000);
-
-    await setTestUserPlan(page, 'pro');
-    await page.reload({ waitUntil: 'networkidle' });
 
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
       timeout: 60_000,
@@ -303,20 +306,43 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });
 
-    // Send a test message
-    await chatInput.fill('Hello, can you help me?');
+    const profileResponse = await page.request.get('/api/dashboard/profile');
+    expect(profileResponse.ok()).toBeTruthy();
+    const profilePayload = (await profileResponse.json()) as {
+      profile?: {
+        usernameNormalized?: string | null;
+      };
+    };
+    const expectedProfilePath = `/${profilePayload.profile?.usernameNormalized ?? ''}`;
+    expect(profilePayload.profile?.usernameNormalized).toBeTruthy();
+
+    // Use a deterministic command so this assertion is not gated on model latency.
+    await chatInput.fill('preview profile');
     const sendButton = page.getByRole('button', { name: /send message/i });
     await expect(sendButton).toBeEnabled({ timeout: 5_000 });
     const assistantMessages = page.locator('[data-role="assistant"]');
     const previousAssistantCount = await assistantMessages.count();
+    const popupPromise = context.waitForEvent('page', { timeout: 15_000 });
     await sendButton.click();
 
     await expect
-      .poll(() => assistantMessages.count(), { timeout: 60_000 })
+      .poll(() => assistantMessages.count(), { timeout: 15_000 })
       .toBeGreaterThan(previousAssistantCount);
     await expect(assistantMessages.nth(previousAssistantCount)).toBeVisible({
       timeout: 15_000,
     });
+
+    const previewPage = await popupPromise;
+    await previewPage.waitForLoadState('domcontentloaded');
+    await expect(previewPage).toHaveURL(
+      new RegExp(`${expectedProfilePath.replace('/', '\\/')}([?#].*)?$`),
+      { timeout: 15_000 }
+    );
+    await previewPage.close();
+
+    await expect(assistantMessages.nth(previousAssistantCount)).toContainText(
+      /profile/i
+    );
   });
 
   test('audio dictation toggle is present', async ({ page }) => {

@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import TipPromo from '@/components/organisms/TipPromo';
+import PayPromo from '@/components/organisms/PayPromo';
 
-describe('TipPromo', () => {
+describe('PayPromo', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
@@ -16,27 +16,27 @@ describe('TipPromo', () => {
   it('renders null when NEXT_PUBLIC_FEATURE_TIPS is not "true"', () => {
     // Test with undefined
     delete process.env.NEXT_PUBLIC_FEATURE_TIPS;
-    render(<TipPromo />);
-    expect(screen.queryByText('Tip, instantly.')).not.toBeInTheDocument();
+    render(<PayPromo />);
+    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
 
     // Test with "false"
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'false';
-    render(<TipPromo />);
-    expect(screen.queryByText('Tip, instantly.')).not.toBeInTheDocument();
+    render(<PayPromo />);
+    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
 
     // Test with empty string
     process.env.NEXT_PUBLIC_FEATURE_TIPS = '';
-    render(<TipPromo />);
-    expect(screen.queryByText('Tip, instantly.')).not.toBeInTheDocument();
+    render(<PayPromo />);
+    expect(screen.queryByText('Pay, instantly.')).not.toBeInTheDocument();
   });
 
   it('renders the component when NEXT_PUBLIC_FEATURE_TIPS is "true"', () => {
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
 
-    render(<TipPromo />);
+    render(<PayPromo />);
 
     // Check main heading with emphasis
-    expect(screen.getByText('Tip,')).toBeInTheDocument();
+    expect(screen.getByText('Pay,')).toBeInTheDocument();
     expect(screen.getByText('instantly.')).toBeInTheDocument();
 
     // Check description text
@@ -49,16 +49,16 @@ describe('TipPromo', () => {
     // Check CTA button
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
     expect(ctaButton).toBeInTheDocument();
-    expect(ctaButton).toHaveAttribute('href', '/tim/tip');
+    expect(ctaButton).toHaveAttribute('href', '/tim/pay');
   });
 
   it('has correct styling classes when rendered', () => {
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
 
-    render(<TipPromo />);
+    render(<PayPromo />);
 
     // Check section has dark background and white text
-    const section = screen.getByText('Tip,').closest('section');
+    const section = screen.getByText('Pay,').closest('section');
     expect(section).toHaveClass('bg-zinc-900', 'text-white');
 
     // Check CTA button styling - CTAButton uses bg-surface-1 base with hover:bg-surface-2
@@ -67,20 +67,20 @@ describe('TipPromo', () => {
     expect(ctaButton).toHaveClass('hover:bg-(--color-btn-secondary-hover)');
   });
 
-  it('contains "Tip, instantly." heading when feature flag is enabled', () => {
+  it('contains "Pay, instantly." heading when feature flag is enabled', () => {
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
 
-    render(<TipPromo />);
+    render(<PayPromo />);
 
     // This specifically tests the requirement from the problem statement
     const heading = screen.getByRole('heading', { level: 2 });
-    expect(heading).toHaveTextContent('Tip, instantly.');
+    expect(heading).toHaveTextContent('Pay, instantly.');
   });
 
   it('has responsive design classes', () => {
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
 
-    render(<TipPromo />);
+    render(<PayPromo />);
 
     // Check responsive text sizing - SectionHeading with size="xl" has these classes
     const heading = screen.getByRole('heading', { level: 2 });
@@ -94,9 +94,9 @@ describe('TipPromo', () => {
   it('has the correct link destination', () => {
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'true';
 
-    render(<TipPromo />);
+    render(<PayPromo />);
 
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
-    expect(ctaButton).toHaveAttribute('href', '/tim/tip');
+    expect(ctaButton).toHaveAttribute('href', '/tim/pay');
   });
 });

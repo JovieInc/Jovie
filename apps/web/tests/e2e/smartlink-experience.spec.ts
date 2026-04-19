@@ -19,7 +19,6 @@ import { expect, test } from '@playwright/test';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const TEST_PROFILE = 'dualipa';
-const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 // DSP buttons render as: <button aria-label="Open in Spotify app...">Open in Spotify</button>
 const DSP_BUTTON_SELECTOR =
@@ -36,11 +35,6 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
 }
 
 test.describe('SmartLink — Fan Experience', () => {
-  test.skip(
-    FAST_ITERATION,
-    'SmartLink listen-mode coverage duplicates smoke-public and content-gate in the fast lane'
-  );
-
   test.beforeEach(async ({ page }) => {
     await blockAnalytics(page);
   });

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import DemoAudienceSection from '@/features/demo/DemoAudienceSection';
-import { DemoAuthShell } from '@/features/demo/DemoAuthShell';
+import { DemoAudienceWorkspace } from '@/features/demo/DemoAudienceWorkspace';
 
 export const metadata: Metadata = {
   title: 'Jovie Demo – Audience',
@@ -8,12 +7,8 @@ export const metadata: Metadata = {
     'See Jovie audience CRM in action. Explore fan intelligence, source tracking, and segments — no sign-up required.',
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = false;
 
 export default function DemoAudiencePage() {
-  return (
-    <DemoAuthShell>
-      <DemoAudienceSection />
-    </DemoAuthShell>
-  );
+  return <DemoAudienceWorkspace />;
 }

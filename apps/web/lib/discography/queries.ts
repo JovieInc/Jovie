@@ -41,6 +41,15 @@ export interface ReleaseWithProviders extends DiscogRelease {
   trackSummary?: TrackSummary;
 }
 
+export interface PublicDiscogReleaseLite {
+  id: string;
+  title: string;
+  slug: string | null;
+  releaseType: DiscogRelease['releaseType'];
+  releaseDate: string | null;
+  artworkUrl: string | null;
+}
+
 export interface UpsertReleaseInput {
   creatorProfileId: string;
   title: string;
@@ -320,6 +329,50 @@ export async function getReleaseStatsByUsername(
     releaseCount: countResult[0]?.count ?? 0,
     topReleaseTitles: topReleases.map(release => release.title),
   };
+}
+
+/**
+ * Lightweight release list for public profile display.
+ * Returns releases with artist names but skips provider links and track summaries.
+ * Sorted newest-first (DESC NULLS LAST) so null dates appear at the end.
+ * Capped at 200 releases to bound serialisation cost.
+ */
+export async function getReleasesForProfileLite(
+  creatorProfileId: string
+): Promise<Array<PublicDiscogReleaseLite & { artistNames: string[] }>> {
+  const releases = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      releaseType: discogReleases.releaseType,
+      releaseDate: discogReleases.releaseDate,
+      artworkUrl: discogReleases.artworkUrl,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        isNull(discogReleases.deletedAt),
+        ne(discogReleases.status, 'draft'),
+        // Intentionally includes music videos for the public releases drawer.
+        drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+      )
+    )
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .limit(200);
+
+  if (releases.length === 0) return [];
+
+  const artistNamesByRelease = await getArtistNamesForReleases(
+    releases.map(r => r.id)
+  );
+
+  return releases.map(release => ({
+    ...release,
+    releaseDate: release.releaseDate?.toISOString() ?? null,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+  }));
 }
 
 /**

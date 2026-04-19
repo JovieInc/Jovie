@@ -63,7 +63,7 @@ export function ProblemSolutionSection() {
             <Link href='/onboarding' onClick={handleClick}>
               <span>Request Early Access</span>
               <svg
-                className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1'
+                className='ml-2 h-4 w-4 transition-transform duration-slow group-hover:translate-x-1'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'

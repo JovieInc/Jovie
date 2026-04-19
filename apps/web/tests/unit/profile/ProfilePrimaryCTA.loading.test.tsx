@@ -37,6 +37,27 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    useProfileNotifications: () => ({
+      state: 'idle',
+      setState: vi.fn(),
+      hydrationStatus: 'idle',
+      hasStoredContacts: false,
+      notificationsEnabled: true,
+      channel: 'email',
+      setChannel: vi.fn(),
+      subscribedChannels: { email: false, sms: false },
+      setSubscribedChannels: vi.fn(),
+      subscriptionDetails: { email: '' },
+      setSubscriptionDetails: vi.fn(),
+      openSubscription: vi.fn(),
+      registerInputFocus: vi.fn(),
+    }),
+  })
+);
+
 vi.mock('@/components/organisms/profile-shell', () => ({
   useProfileNotifications: () => ({
     state: 'idle',

@@ -42,6 +42,14 @@ export function assertRepoSuccess(
   );
 }
 
+function isWorktreeClaimError(result: CommandExecutionResult) {
+  const combinedOutput = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  return (
+    combinedOutput.includes('already used by worktree') &&
+    combinedOutput.includes(OVERNIGHT_BASE_BRANCH)
+  );
+}
+
 export function assertPreflightClean() {
   assertRepoSuccess(
     runRepoCommand(['gh', 'auth', 'status']),
@@ -61,23 +69,40 @@ export function assertPreflightClean() {
   }
 }
 
-export function prepareBaseBranch() {
+export function prepareBaseBranch(
+  runCommand: typeof runRepoCommand = runRepoCommand
+) {
   assertRepoSuccess(
-    runRepoCommand(['git', 'fetch', 'origin', OVERNIGHT_BASE_BRANCH]),
+    runCommand(['git', 'fetch', 'origin', OVERNIGHT_BASE_BRANCH]),
     'Failed to fetch the base branch.'
   );
+  const checkoutBaseBranch = runCommand([
+    'git',
+    'checkout',
+    OVERNIGHT_BASE_BRANCH,
+  ]);
+  if (checkoutBaseBranch.code !== 0) {
+    if (!isWorktreeClaimError(checkoutBaseBranch)) {
+      assertRepoSuccess(
+        checkoutBaseBranch,
+        `Failed to checkout ${OVERNIGHT_BASE_BRANCH}.`
+      );
+    }
+
+    assertRepoSuccess(
+      runCommand([
+        'git',
+        'checkout',
+        '--detach',
+        `origin/${OVERNIGHT_BASE_BRANCH}`,
+      ]),
+      `Failed to detach onto origin/${OVERNIGHT_BASE_BRANCH}.`
+    );
+    return;
+  }
+
   assertRepoSuccess(
-    runRepoCommand(['git', 'checkout', OVERNIGHT_BASE_BRANCH]),
-    `Failed to checkout ${OVERNIGHT_BASE_BRANCH}.`
-  );
-  assertRepoSuccess(
-    runRepoCommand([
-      'git',
-      'pull',
-      '--ff-only',
-      'origin',
-      OVERNIGHT_BASE_BRANCH,
-    ]),
+    runCommand(['git', 'pull', '--ff-only', 'origin', OVERNIGHT_BASE_BRANCH]),
     `Failed to fast-forward ${OVERNIGHT_BASE_BRANCH}.`
   );
 }

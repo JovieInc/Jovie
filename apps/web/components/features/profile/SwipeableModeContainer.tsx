@@ -2,7 +2,6 @@
 
 import { CalendarDays, MapPin } from 'lucide-react';
 import { useMemo } from 'react';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/features/profile/AboutSection';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
 import {
@@ -11,12 +10,13 @@ import {
 } from '@/features/profile/ProfileFeaturedCard';
 import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
-import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
+import VenmoPaySelector from '@/features/profile/VenmoPaySelector';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
-const TIP_AMOUNTS = [3, 5, 7];
+const PAY_AMOUNTS = [5, 10, 20];
 
 interface SwipeableModeContainerProps {
   readonly artist: Artist;
@@ -108,9 +108,9 @@ function ProfilePane({
         <button
           type='button'
           onClick={onSubscribeClick}
-          className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0'
+          className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-normal hover:border-subtle hover:bg-surface-0'
         >
-          Get notified
+          Get Notified
         </button>
       </div>
     </div>
@@ -204,16 +204,16 @@ function TipPane({
   if (!venmoLink) {
     return (
       <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
-        Tipping is not available for this artist yet.
+        Payments not available for this artist yet.
       </div>
     );
   }
 
   return (
-    <VenmoTipSelector
+    <VenmoPaySelector
       venmoLink={venmoLink}
       venmoUsername={venmoUsername ?? undefined}
-      amounts={TIP_AMOUNTS}
+      amounts={PAY_AMOUNTS}
     />
   );
 }
@@ -286,7 +286,7 @@ export function SwipeableModeContainer({
                 allowPhotoDownloads={allowPhotoDownloads}
               />
             ) : null}
-            {mode === 'tip' ? <TipPane socialLinks={socialLinks} /> : null}
+            {mode === 'pay' ? <TipPane socialLinks={socialLinks} /> : null}
           </section>
         ))}
       </div>

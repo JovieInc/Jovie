@@ -77,7 +77,7 @@ describe('ProfileShell accessibility contract', () => {
           ] as PublicContact[]
         }
         showTourButton
-        showTipButton
+        showPayButton
         showShopButton
       />
     );
@@ -93,6 +93,6 @@ describe('ProfileShell accessibility contract', () => {
     expect(
       screen.getByRole('button', { name: 'Tour Dates' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tip' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeInTheDocument();
   });
 });

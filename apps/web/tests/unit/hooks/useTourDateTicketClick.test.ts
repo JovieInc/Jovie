@@ -4,7 +4,7 @@ const { mockMutate } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useTrackingMutation', () => ({
   useTrackingMutation: vi.fn(() => ({ mutate: mockMutate })),
 }));
 

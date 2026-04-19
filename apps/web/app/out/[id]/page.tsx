@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { cache } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -19,9 +20,24 @@ interface PageProps
     }>;
   }> {}
 
+const getCachedWrappedLink = cache(async (shortId: string) =>
+  getWrappedLink(shortId)
+);
+
 export async function generateMetadata({
-  params: _params,
+  params,
 }: Readonly<PageProps>): Promise<Metadata> {
+  const { id: shortId } = await params;
+
+  if (!shortId || shortId.length > 20) {
+    return { title: 'Not Found' };
+  }
+
+  const wrappedLink = await getCachedWrappedLink(shortId);
+  if (!wrappedLink) {
+    return { title: 'Not Found' };
+  }
+
   return {
     title: 'Link Confirmation Required',
     description: 'This link requires confirmation before proceeding.',
@@ -45,7 +61,7 @@ export default async function InterstitialPage({
     notFound();
   }
 
-  const wrappedLink = await getWrappedLink(shortId);
+  const wrappedLink = await getCachedWrappedLink(shortId);
 
   if (!wrappedLink) {
     notFound();

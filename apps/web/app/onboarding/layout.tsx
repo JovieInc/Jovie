@@ -1,7 +1,8 @@
 import '../(auth)/auth-utilities.css';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 import { resolveUserState } from '@/lib/auth/gate';
-import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +12,11 @@ export default async function OnboardingLayout({
   children: React.ReactNode;
 }>) {
   await resolveUserState();
+  const initialFlags = await getAppFlagsSnapshot();
 
   return (
     <ResolvedClientProviders>
-      <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+      <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
     </ResolvedClientProviders>
   );
 }

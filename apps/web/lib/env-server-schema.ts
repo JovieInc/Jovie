@@ -44,6 +44,7 @@ export const ServerEnvSchema = z.object({
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
+  JOVIE_SYSTEM_CLERK_USER_ID: z.string().optional(),
   APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
 
   // Bandsintown configuration
@@ -151,6 +152,12 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // xAI / Grok image generation
+  XAI_API_KEY: z.string().optional(),
+  ALBUM_ART_IMAGE_MODEL: z.string().optional(),
+  ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
+  ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -198,6 +205,7 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
+  'JOVIE_SYSTEM_CLERK_USER_ID',
   'APPLE_MUSIC_DEVELOPER_TOKEN',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
@@ -256,6 +264,10 @@ export const ENV_KEYS = [
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'XAI_API_KEY',
+  'ALBUM_ART_IMAGE_MODEL',
+  'ALBUM_ART_GENERATION_DAILY_LIMIT',
+  'ALBUM_ART_GENERATION_BURST_LIMIT',
   'JOVIE_DEV_MEMORY_MONITOR',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',

@@ -10,10 +10,13 @@ import {
   TEST_USER_ID_COOKIE,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode';
+import { ensureClerkTestUser } from '@/lib/testing/test-user-provision.server';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
+const CLERK_BOOTSTRAP_NAV_TIMEOUT_MS = 60_000;
+const CLERK_BOOTSTRAP_NAV_RETRIES = 3;
 
 function isTestAuthBypassEnabled(): boolean {
   return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
@@ -481,6 +484,87 @@ export async function waitForAuthenticatedHealth(
     .toBe('authenticated');
 }
 
+async function navigateToClerkSignIn(page: Page): Promise<void> {
+  await page.request
+    .get('/signin', {
+      failOnStatusCode: false,
+      timeout: 120_000,
+    })
+    .catch(() => {});
+
+  await smokeNavigateWithRetry(page, '/signin', {
+    timeout: CLERK_BOOTSTRAP_NAV_TIMEOUT_MS,
+    retries: CLERK_BOOTSTRAP_NAV_RETRIES,
+    waitUntil: 'commit',
+  });
+
+  await page
+    .waitForLoadState('domcontentloaded', {
+      timeout: CLERK_BOOTSTRAP_NAV_TIMEOUT_MS,
+    })
+    .catch(() => {});
+}
+
+async function waitForClerkSignInApi(page: Page): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ready = await page
+      .waitForFunction(
+        () => {
+          const clerkInstance = (
+            window as {
+              Clerk?: {
+                loaded?: boolean;
+                client?: {
+                  signIn?: {
+                    create?: unknown;
+                  };
+                };
+                setActive?: unknown;
+              };
+            }
+          ).Clerk;
+
+          return Boolean(
+            clerkInstance?.loaded &&
+              typeof clerkInstance.client?.signIn?.create === 'function' &&
+              typeof clerkInstance.setActive === 'function'
+          );
+        },
+        { timeout: 20_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
+
+    if (ready) {
+      return true;
+    }
+
+    const retryButton = page.getByRole('button', { name: 'Retry now' });
+    if (await retryButton.isVisible().catch(() => false)) {
+      await retryButton.click().catch(() => {});
+    } else {
+      await page
+        .reload({
+          waitUntil: 'domcontentloaded',
+          timeout: CLERK_BOOTSTRAP_NAV_TIMEOUT_MS,
+        })
+        .catch(() => {});
+    }
+  }
+
+  return false;
+}
+
+function isMissingClerkAccountError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /couldn't find your account/i.test(message) ||
+    /cannot find your account/i.test(message) ||
+    /account.*not found/i.test(message) ||
+    /identifier.*not found/i.test(message)
+  );
+}
+
 async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
   await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
     timeout: 120_000,
@@ -668,6 +752,137 @@ export function hasClerkOriginMismatchSignal(
   );
 }
 
+function buildSeededTestUserProfile(email: string): {
+  username: string;
+  firstName: string;
+  lastName: string;
+} {
+  const localPart = email.split('@')[0] ?? 'e2e';
+  const baseUsername = localPart
+    .replaceAll(/[^a-z0-9]+/gi, '-')
+    .replaceAll(/^-+|-+$/g, '')
+    .slice(0, 48);
+
+  if (localPart.startsWith('browse')) {
+    return {
+      username: baseUsername || 'browse-test-user',
+      firstName: 'Browse',
+      lastName: 'Test',
+    };
+  }
+
+  return {
+    username: baseUsername || 'e2e-test-user',
+    firstName: 'E2E',
+    lastName: 'Test',
+  };
+}
+
+async function ensureClerkTestEmailUserExists(email: string): Promise<void> {
+  const { username, firstName, lastName } = buildSeededTestUserProfile(email);
+
+  await ensureClerkTestUser({
+    email,
+    username,
+    firstName,
+    lastName,
+    fallbackClerkId: process.env.E2E_CLERK_USER_ID?.trim() || undefined,
+    metadata: {
+      role: 'e2e',
+      env: 'test',
+      purpose: 'Auto-provisioned Playwright auth bootstrap user',
+    },
+  });
+}
+
+/**
+ * Sign in an existing Clerk test-email user without relying on the rendered UI.
+ * This avoids flaky hidden/detached button behavior on the hosted Clerk widget.
+ */
+async function signInExistingTestEmailSession(
+  page: Page,
+  email: string
+): Promise<void> {
+  const result = await page.evaluate(async targetEmail => {
+    const clerkInstance = (
+      window as {
+        Clerk?: {
+          client?: {
+            signIn?: {
+              create?: (args: { identifier: string }) => Promise<{
+                supportedFirstFactors?: Array<{
+                  strategy?: string | null;
+                  emailAddressId?: string | null;
+                }>;
+                prepareFirstFactor?: (args: {
+                  strategy: 'email_code';
+                  emailAddressId: string;
+                }) => Promise<unknown>;
+                attemptFirstFactor?: (args: {
+                  strategy: 'email_code';
+                  code: string;
+                }) => Promise<{
+                  createdSessionId?: string | null;
+                  status?: string | null;
+                }>;
+              }>;
+            };
+          };
+          setActive?: (args: { session: string }) => Promise<void>;
+          session?: { id?: string | null } | null;
+          user?: { id?: string | null } | null;
+        };
+      }
+    ).Clerk;
+
+    if (!clerkInstance?.client?.signIn?.create || !clerkInstance.setActive) {
+      throw new Error('Clerk sign-in API not initialized');
+    }
+
+    const signIn = await clerkInstance.client.signIn.create({
+      identifier: targetEmail,
+    });
+
+    const emailFactor = signIn.supportedFirstFactors?.find(
+      factor =>
+        factor.strategy === 'email_code' &&
+        typeof factor.emailAddressId === 'string' &&
+        factor.emailAddressId.length > 0
+    );
+
+    if (!emailFactor?.emailAddressId) {
+      throw new Error('Clerk email_code factor unavailable for test email');
+    }
+
+    await signIn.prepareFirstFactor({
+      strategy: 'email_code',
+      emailAddressId: emailFactor.emailAddressId,
+    });
+
+    const attempt = await signIn.attemptFirstFactor({
+      strategy: 'email_code',
+      code: '424242',
+    });
+
+    if (!attempt.createdSessionId) {
+      throw new Error(
+        `Clerk email_code sign-in completed with status "${attempt.status ?? 'unknown'}" but no session was created`
+      );
+    }
+
+    await clerkInstance.setActive({ session: attempt.createdSessionId });
+
+    return {
+      sessionId: clerkInstance.session?.id ?? attempt.createdSessionId ?? null,
+      userId: clerkInstance.user?.id ?? null,
+    };
+  }, email);
+
+  if (!result.sessionId || !result.userId) {
+    throw new Error('Clerk test-email sign-in did not activate a session');
+  }
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -803,10 +1018,7 @@ export async function signInUser(
 
   // Navigate to a page that loads ClerkProvider
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
-  await smokeNavigateWithRetry(page, '/signin', {
-    timeout: 120_000,
-    retries: 2,
-  });
+  await navigateToClerkSignIn(page);
 
   if (isClerkHandshakeUrl(page.url())) {
     throw new ClerkTestError(
@@ -815,25 +1027,32 @@ export async function signInUser(
     );
   }
 
-  // Wait for Clerk JS to load from CDN before calling clerk.signIn()
-  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
-  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
-  await page
-    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
-    .catch(() => {
-      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
-    });
+  // Cold local compiles can reach the auth loading shell before Clerk's sign-in
+  // client API is actually ready. Wait for the concrete API surface we need.
+  const clerkSignInReady = await waitForClerkSignInApi(page);
+  if (!clerkSignInReady) {
+    throw new ClerkTestError(
+      'Clerk sign-in API never became ready on /signin.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   try {
     // Use the official Clerk testing helper
     // The @clerk/testing library has built-in support for email_code strategy
     // with +clerk_test emails (automatically uses code 424242)
     if (username.includes('+clerk_test')) {
-      // For test emails with +clerk_test suffix, use email_code strategy
-      await clerk.signIn({
-        page,
-        signInParams: { strategy: 'email_code', identifier: username },
-      });
+      await ensureClerkTestEmailUserExists(username);
+
+      try {
+        await signInExistingTestEmailSession(page, username);
+      } catch (error) {
+        if (isMissingClerkAccountError(error)) {
+          await createOrReuseTestUserSession(page, username);
+        } else {
+          throw error;
+        }
+      }
     } else if (password) {
       // For real test users with passwords, try password strategy first,
       // then fall back to email_code if the Clerk instance disabled passwords

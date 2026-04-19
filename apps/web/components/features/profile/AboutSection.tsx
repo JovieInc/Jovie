@@ -73,7 +73,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-[14px] font-[470] text-white/40'>
+        <p className='text-[14px] font-[450] text-white/40'>
           No information available yet.
         </p>
       </div>
@@ -127,7 +127,7 @@ export function AboutSection({
       )}
 
       {hasPressPhotos && (
-        <div>
+        <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
             <h2 className='text-[13px] font-[510] text-white/70'>
               Press photos
@@ -157,10 +157,11 @@ export function AboutSection({
                     onClick={() => {
                       void downloadPressPhoto(photo, artist, index);
                     }}
-                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors duration-150 hover:bg-black/40 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors duration-normal hover:bg-black/40 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={
-                      'Download ' +
-                      (photo.originalFilename ?? `press photo ${index + 1}`)
+                      photo.originalFilename
+                        ? `Download ${photo.originalFilename}`
+                        : `Download press photo ${index + 1}`
                     }
                   >
                     <Download className='h-4 w-4' />

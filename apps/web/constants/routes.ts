@@ -81,11 +81,13 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_REVIEW: '/app/admin/outreach/review',
   ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
+  ADMIN_SHARE_STUDIO: '/app/admin/share-studio',
   ADMIN_RELEASES: '/app/admin/releases',
   ADMIN_USERS_BAN: '/app/admin/users/ban',
   ADMIN_USERS_UNBAN: '/app/admin/users/unban',
   ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
   ADMIN_PLAYLISTS: '/app/admin/playlists',
+  ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
 
   // System
   UNAVAILABLE: '/unavailable',
@@ -95,6 +97,7 @@ export const APP_ROUTES = {
   ABOUT: '/about',
   AI: '/ai',
   ALTERNATIVES: '/alternatives',
+  ARTIST_NOTIFICATIONS: '/artist-notifications',
   ARTIST_PROFILES: '/artist-profiles',
   BLOG: '/blog',
   BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',
@@ -110,7 +113,7 @@ export const APP_ROUTES = {
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
   SUPPORT: '/support',
-  TIPS: '/tips',
+  PAY: '/pay',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',

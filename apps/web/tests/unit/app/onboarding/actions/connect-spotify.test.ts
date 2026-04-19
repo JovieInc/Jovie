@@ -10,6 +10,9 @@ const hoisted = vi.hoisted(() => {
   const processMusicFetchEnrichmentJobMock = vi
     .fn()
     .mockResolvedValue(undefined);
+  const refreshFeaturedPlaylistFallbackCandidateMock = vi
+    .fn()
+    .mockResolvedValue(undefined);
   const captureErrorMock = vi.fn();
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
@@ -17,6 +20,21 @@ const hoisted = vi.hoisted(() => {
   const revalidateTagMock = vi.fn();
   const noStoreMock = vi.fn();
   const isBlacklistedSpotifyIdMock = vi.fn().mockReturnValue(false);
+  const readPendingClaimContextMock = vi.fn().mockResolvedValue(null);
+  const clearPendingClaimContextMock = vi.fn().mockResolvedValue(undefined);
+  const claimPrebuiltProfileForUserMock = vi.fn().mockResolvedValue(undefined);
+  const withDbSessionTxMock = vi.fn(async callback =>
+    callback({
+      update: updateMock,
+    })
+  );
+  const invalidateProfileCacheMock = vi.fn().mockResolvedValue(undefined);
+  const invalidateProxyUserStateCacheMock = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  const runBackgroundSyncOperationsMock = vi.fn();
+  const cookiesSetMock = vi.fn();
+  const cookiesMock = vi.fn().mockResolvedValue({ set: cookiesSetMock });
 
   const selectMock = vi.fn(() => {
     const result = selectResults.shift() ?? [];
@@ -46,14 +64,24 @@ const hoisted = vi.hoisted(() => {
     noStoreMock,
     processDspArtistDiscoveryJobStandaloneMock,
     processMusicFetchEnrichmentJobMock,
+    refreshFeaturedPlaylistFallbackCandidateMock,
+    readPendingClaimContextMock,
     revalidatePathMock,
     revalidateTagMock,
     selectMock,
     selectResults,
     syncReleasesFromSpotifyMock,
     trackServerEventMock,
+    clearPendingClaimContextMock,
+    claimPrebuiltProfileForUserMock,
+    invalidateProfileCacheMock,
+    invalidateProxyUserStateCacheMock,
+    runBackgroundSyncOperationsMock,
+    cookiesMock,
+    cookiesSetMock,
     updateMock,
     updateSetArgs,
+    withDbSessionTxMock,
   };
 });
 
@@ -61,6 +89,10 @@ vi.mock('next/cache', () => ({
   revalidatePath: hoisted.revalidatePathMock,
   revalidateTag: hoisted.revalidateTagMock,
   unstable_noStore: hoisted.noStoreMock,
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: hoisted.cookiesMock,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -71,6 +103,27 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.getCachedAuthMock,
+}));
+
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: hoisted.invalidateProxyUserStateCacheMock,
+}));
+
+vi.mock('@/lib/auth/session', () => ({
+  withDbSessionTx: hoisted.withDbSessionTxMock,
+}));
+
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateProfileCache: hoisted.invalidateProfileCacheMock,
+}));
+
+vi.mock('@/lib/claim/context', () => ({
+  clearPendingClaimContext: hoisted.clearPendingClaimContextMock,
+  readPendingClaimContext: hoisted.readPendingClaimContextMock,
+}));
+
+vi.mock('@/lib/claim/finalize', () => ({
+  claimPrebuiltProfileForUser: hoisted.claimPrebuiltProfileForUserMock,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -102,10 +155,18 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     userId: 'userId',
     usernameNormalized: 'usernameNormalized',
   },
+  profilePhotos: {
+    id: 'id',
+  },
 }));
 
 vi.mock('@/lib/discography/spotify-import', () => ({
   syncReleasesFromSpotify: hoisted.syncReleasesFromSpotifyMock,
+}));
+
+vi.mock('@/lib/profile/featured-playlist-fallback', () => ({
+  refreshFeaturedPlaylistFallbackCandidate:
+    hoisted.refreshFeaturedPlaylistFallbackCandidateMock,
 }));
 
 vi.mock('@/lib/dsp-enrichment/jobs', () => ({
@@ -118,8 +179,16 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureErrorMock,
 }));
 
+vi.mock('@/lib/env-server', () => ({
+  isSecureEnv: vi.fn().mockReturnValue(false),
+}));
+
 vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: hoisted.trackServerEventMock,
+}));
+
+vi.mock('@/app/onboarding/actions/sync', () => ({
+  runBackgroundSyncOperations: hoisted.runBackgroundSyncOperationsMock,
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
@@ -133,9 +202,12 @@ vi.mock('@/lib/spotify/blacklist', () => ({
 function queueOwnedProfile(settings: Record<string, unknown> = {}) {
   hoisted.selectResults.push([
     {
+      dbUserId: 'db_user_123',
       handle: 'artist',
       id: 'profile_123',
+      isClaimed: false,
       settings,
+      spotifyId: null,
     },
   ]);
 }
@@ -155,6 +227,7 @@ describe('connectOnboardingSpotifyArtist', () => {
     hoisted.updateSetArgs.length = 0;
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_123' });
     hoisted.isBlacklistedSpotifyIdMock.mockReturnValue(false);
+    hoisted.readPendingClaimContextMock.mockResolvedValue(null);
   });
 
   it('waits for inline import and enrichment before succeeding', async () => {
@@ -194,6 +267,14 @@ describe('connectOnboardingSpotifyArtist', () => {
       hoisted.processDspArtistDiscoveryJobStandaloneMock
     ).toHaveBeenCalledOnce();
     expect(hoisted.processMusicFetchEnrichmentJobMock).toHaveBeenCalledOnce();
+    expect(
+      hoisted.refreshFeaturedPlaylistFallbackCandidateMock
+    ).toHaveBeenCalledWith({
+      artistName: 'Artist Name',
+      artistSpotifyId: 'artist_spotify_id',
+      profileId: 'profile_123',
+      usernameNormalized: 'artist',
+    });
     expect(hoisted.updateSetArgs[1]).toMatchObject({
       settings: expect.objectContaining({
         spotifyArtistName: 'Artist Name',
@@ -281,6 +362,60 @@ describe('connectOnboardingSpotifyArtist', () => {
         action: 'connectOnboardingSpotifyArtist',
         creatorProfileId: 'profile_123',
       })
+    );
+  });
+
+  it('runs background sync after direct-profile claim finalization', async () => {
+    queueOwnedProfile();
+    queueNoExistingClaim();
+    queueLatestSettings({ spotifyImportStatus: 'importing' });
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    hoisted.syncReleasesFromSpotifyMock.mockResolvedValue({
+      imported: 1,
+      releases: [{ id: 'release_1' }],
+      success: true,
+      total: 1,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(hoisted.claimPrebuiltProfileForUserMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'profile_123',
+        expectedUsername: 'artist',
+        source: 'direct_profile_spotify_match',
+      })
+    );
+    expect(hoisted.clearPendingClaimContextMock).toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).toHaveBeenCalledWith(
+      'jovie_onboarding_complete',
+      '1',
+      expect.objectContaining({
+        httpOnly: true,
+        maxAge: 120,
+        path: '/',
+      })
+    );
+    expect(hoisted.runBackgroundSyncOperationsMock).toHaveBeenCalledWith(
+      'clerk_123',
+      'artist'
     );
   });
 });

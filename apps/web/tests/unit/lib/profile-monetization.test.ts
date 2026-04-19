@@ -81,7 +81,7 @@ describe('resolveProfileMonetizationSummary', () => {
 
     expect(summary.paymentState).toBe('ready_no_activity');
     expect(summary.provider).toBe('venmo');
-    expect(summary.tipUrl).toContain('/artist/tip');
+    expect(summary.tipUrl).toContain('/artist/pay');
   });
 
   it('resolves traffic_no_tips when fans visit but have not tipped yet', () => {

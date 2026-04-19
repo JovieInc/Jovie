@@ -44,7 +44,6 @@ const CANVAS_STATUS_CONFIG: Record<
 
 const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 const METADATA_ROW_PROPS = {
-  labelWidth: 74,
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
@@ -52,11 +51,11 @@ const METADATA_TEXT_CLASSNAME =
 const METADATA_MUTED_TEXT_CLASSNAME =
   'text-[11px] leading-[15px] text-tertiary-token';
 const METADATA_LABEL_CLASSNAME =
-  'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';
+  'text-[11px] font-[500] leading-[15px] tracking-normal text-quaternary-token';
 const METADATA_VALUE_CLASSNAME =
   'text-[12px] leading-[16px] text-secondary-token';
 const METADATA_BADGE_CLASSNAME =
-  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
+  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-normal shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_DISPLAY_VALUE_CLASSNAME =
@@ -86,7 +85,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-[9.5px] font-[510] tracking-[-0.01em] text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-[9.5px] font-[510] tracking-normal text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -226,7 +225,7 @@ export function ReleaseMetadata({
                 emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
                 inputClassName={cn(
                   METADATA_INPUT_CLASSNAME,
-                  'font-mono tracking-[0.02em]'
+                  'font-mono tracking-normal'
                 )}
               />
             }
@@ -268,7 +267,7 @@ export function ReleaseMetadata({
                 emptyClassName={METADATA_MUTED_TEXT_CLASSNAME}
                 inputClassName={cn(
                   METADATA_INPUT_CLASSNAME,
-                  'font-mono tracking-[0.02em]'
+                  'font-mono tracking-normal'
                 )}
               />
             }
@@ -483,7 +482,7 @@ export function ReleaseMetadata({
                     <Badge
                       key={genre}
                       variant='secondary'
-                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-[-0.01em] text-secondary-token shadow-none'
+                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-normal text-secondary-token shadow-none'
                     >
                       {genre}
                     </Badge>

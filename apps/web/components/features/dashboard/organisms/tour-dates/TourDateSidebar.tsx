@@ -11,7 +11,6 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
@@ -30,6 +29,7 @@ import {
   useTourDateAnalyticsQuery,
   useUpdateTourDateMutation,
 } from '@/lib/queries';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatISODate } from '@/lib/utils/date-formatting';
 import { buildTourDateActions } from './tour-date-actions';
@@ -234,6 +234,7 @@ export function TourDateSidebar({
       <EntitySidebarShell
         isOpen={Boolean(tourDate)}
         ariaLabel='Edit tour date'
+        scrollStrategy='shell'
         onClose={onClose}
         headerMode='minimal'
         hideMinimalHeaderBar

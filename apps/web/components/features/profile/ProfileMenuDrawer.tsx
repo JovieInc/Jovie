@@ -15,6 +15,13 @@ import { useCallback, useState } from 'react';
 import type { NotificationContentType } from '@/types/notifications';
 import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import {
+  PROFILE_DRAWER_DANGER_ITEM_CLASS,
+  PROFILE_DRAWER_MENU_ITEM_CLASS,
+  PROFILE_DRAWER_META_CLASS,
+  PROFILE_DRAWER_TITLE_CLASS,
+  PROFILE_DRAWER_TOGGLE_ROW_CLASS,
+} from './profile-drawer-classes';
 
 interface ProfileMenuDrawerProps {
   readonly open: boolean;
@@ -36,8 +43,6 @@ interface ProfileMenuDrawerProps {
   readonly hasContacts: boolean;
 }
 
-const menuItemClass =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
 const iconClass = 'h-[16px] w-[16px] text-white/40';
 
 export function ProfileMenuDrawer({
@@ -84,17 +89,16 @@ export function ProfileMenuDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={view === 'menu' ? 'Menu' : 'Notifications'}
-      subtitle={
-        view === 'notifications' ? 'Choose what you hear about.' : undefined
-      }
+      subtitle={view === 'notifications' ? 'Choose your updates.' : undefined}
       onBack={view === 'notifications' ? () => setView('menu') : undefined}
+      navigationLevel={view === 'notifications' ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
     >
       {view === 'menu' ? (
         <div className='flex flex-col gap-0.5'>
           <button
             type='button'
-            className={menuItemClass}
+            className={PROFILE_DRAWER_MENU_ITEM_CLASS}
             onClick={() => handleAction(onShare)}
           >
             <Share2 className={iconClass} />
@@ -104,7 +108,7 @@ export function ProfileMenuDrawer({
           {hasAbout ? (
             <button
               type='button'
-              className={menuItemClass}
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
               onClick={() => handleAction(onOpenAbout)}
             >
               <Info className={iconClass} />
@@ -115,7 +119,7 @@ export function ProfileMenuDrawer({
           {hasTourDates ? (
             <button
               type='button'
-              className={menuItemClass}
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
               onClick={() => handleAction(onOpenTour)}
             >
               <CalendarDays className={iconClass} />
@@ -126,18 +130,18 @@ export function ProfileMenuDrawer({
           {hasTip ? (
             <button
               type='button'
-              className={menuItemClass}
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
               onClick={() => handleAction(onOpenTip)}
             >
               <Ticket className={iconClass} />
-              Tip
+              Pay
             </button>
           ) : null}
 
           {hasContacts ? (
             <button
               type='button'
-              className={menuItemClass}
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
               onClick={() => handleAction(onOpenContact)}
             >
               <Mail className={iconClass} />
@@ -148,7 +152,7 @@ export function ProfileMenuDrawer({
           {isSubscribed ? (
             <button
               type='button'
-              className={`${menuItemClass} justify-between`}
+              className={`${PROFILE_DRAWER_MENU_ITEM_CLASS} justify-between`}
               onClick={() => setView('notifications')}
             >
               <span className='flex items-center gap-3'>
@@ -160,26 +164,21 @@ export function ProfileMenuDrawer({
           ) : (
             <button
               type='button'
-              className={menuItemClass}
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
               onClick={() => handleAction(onOpenSubscribe)}
             >
               <Bell className={iconClass} />
-              Get Notified
+              Turn on notifications
             </button>
           )}
         </div>
       ) : (
         <div className='flex flex-col gap-1'>
           {NOTIFICATION_CONTENT_TYPES.map(pref => (
-            <div
-              key={pref.key}
-              className='flex w-full items-center justify-between rounded-[14px] px-4 py-3 text-left'
-            >
+            <div key={pref.key} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
               <div className='flex flex-col gap-0.5'>
-                <span className='text-[14px] font-[470] text-white/88'>
-                  {pref.label}
-                </span>
-                <span className='text-[11px] font-[400] text-white/40'>
+                <span className={PROFILE_DRAWER_TITLE_CLASS}>{pref.label}</span>
+                <span className={PROFILE_DRAWER_META_CLASS}>
                   {pref.description}
                 </span>
               </div>
@@ -196,7 +195,7 @@ export function ProfileMenuDrawer({
 
           <button
             type='button'
-            className='flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-red-400/85 transition-colors duration-150 active:bg-white/[0.06]'
+            className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
             onClick={onUnsubscribe}
             disabled={isUnsubscribing}
           >

@@ -67,7 +67,7 @@ vi.mock('motion/react', async importOriginal => {
   };
 });
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => ({
     mutateAsync: vi.fn(),
   }),
@@ -99,11 +99,14 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     phoneInput: '',
     emailInput: '',
     error: null,
+    errorOrigin: null,
     otpCode: '',
     otpStep: 'input' as const,
     isSubmitting: false,
     isCountryOpen: false,
     setIsCountryOpen: vi.fn(),
+    resendCooldownEnd: 0,
+    isResending: false,
     notificationsState: 'idle',
     notificationsEnabled: true,
     channel: 'email' as const,
@@ -115,6 +118,7 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+    handleResendOtp: vi.fn().mockResolvedValue(undefined),
     handleKeyDown: vi.fn(),
     openSubscription: vi.fn(),
     registerInputFocus: vi.fn(),
@@ -267,8 +271,7 @@ describe('ArtistNotificationsCTA subscription form states', () => {
 
       const alert = screen.getByRole('alert');
       expect(alert).toBeInTheDocument();
-      // The error icon is inside the alert span
-      expect(alert.querySelector('svg')).toBeInTheDocument();
+      expect(alert).toHaveTextContent('Invalid verification code');
     });
   });
 

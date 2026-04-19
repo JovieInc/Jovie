@@ -6,14 +6,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write
   contents: read
-  pull-requests: read
 
 jobs:
   monitor:
     name: Detect stalled or failing CI on main
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       summary: ${{ steps.evaluate.outputs.summary }}
@@ -23,7 +25,7 @@ jobs:
     steps:
       - name: Evaluate main CI health
         id: evaluate
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           STUCK_THRESHOLD_MINUTES: '45'
           NO_SUCCESS_THRESHOLD_HOURS: '3'

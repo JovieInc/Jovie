@@ -89,6 +89,7 @@
 | `/api/audience/opt-in` | POST | `public` | Fan opt-in to notifications |
 | `/api/audience/unsubscribe` | GET, POST | `public` | Unsubscribe from notifications |
 | `/api/audience/visit` | POST | `public` | Track profile visit |
+| `/s/[code]` | GET | `public` | Track source link or QR scan and redirect |
 
 ### Billing
 
@@ -183,6 +184,10 @@
 | `/api/dashboard/activity/recent` | GET | `auth` | Recent activity feed |
 | `/api/dashboard/analytics` | GET | `auth` | Analytics overview |
 | `/api/dashboard/audience/members` | GET | `auth` | Audience member list |
+| `/api/dashboard/audience/source-groups` | GET, POST | `auth` | Audience source group management |
+| `/api/dashboard/audience/source-groups/[id]` | PATCH | `auth` | Update audience source group |
+| `/api/dashboard/audience/source-links` | POST | `auth` | Create trackable source or QR link |
+| `/api/dashboard/audience/source-links/[id]` | PATCH | `auth` | Update trackable source or QR link |
 | `/api/dashboard/audience/subscribers` | GET | `auth` | Subscriber list |
 | `/api/dashboard/contacts` | GET, POST | `auth` | Contact management |
 | `/api/dashboard/earnings` | GET | `auth` | Earnings overview |

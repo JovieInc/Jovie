@@ -15,8 +15,14 @@
       "assertMatrix": [
         {
           "matchingUrlPattern": ".*",
-          "preset": "lighthouse:no-pwa",
+          "preset": "lighthouse:recommended",
           "assertions": {
+            "categories:pwa": [
+              "warn",
+              {
+                "minScore": 0.7
+              }
+            ],
             "interactive": [
               "warn",
               {

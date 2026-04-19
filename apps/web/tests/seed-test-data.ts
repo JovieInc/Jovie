@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import {
@@ -244,11 +244,6 @@ type SeededReleaseValues = Pick<
   | 'label'
   | 'sourceType'
 >;
-
-function isDuplicateKeyError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('duplicate key value');
-}
 
 function isMissingRelationError(error: unknown, relationName: string): boolean {
   const message = (
@@ -870,54 +865,16 @@ async function seedReleasesForProfile(
   );
 
   async function ensureRelease(values: SeededReleaseValues) {
-    const [existingRelease] = await db
-      .select({ id: discogReleases.id })
-      .from(discogReleases)
-      .where(
-        and(
-          eq(discogReleases.creatorProfileId, values.creatorProfileId),
-          eq(discogReleases.slug, values.slug)
-        )
-      )
-      .limit(1);
+    const [release] = await db
+      .insert(discogReleases)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [discogReleases.creatorProfileId, discogReleases.slug],
+        set: { ...values, updatedAt: new Date() },
+      })
+      .returning({ id: discogReleases.id });
 
-    if (existingRelease) {
-      await db
-        .update(discogReleases)
-        .set({ ...values, updatedAt: new Date() })
-        .where(eq(discogReleases.id, existingRelease.id));
-      return existingRelease.id;
-    }
-
-    try {
-      const [createdRelease] = await db
-        .insert(discogReleases)
-        .values(values)
-        .returning({ id: discogReleases.id });
-      return createdRelease.id;
-    } catch (error) {
-      if (!isDuplicateKeyError(error)) throw error;
-
-      const [racedRelease] = await db
-        .select({ id: discogReleases.id })
-        .from(discogReleases)
-        .where(
-          and(
-            eq(discogReleases.creatorProfileId, values.creatorProfileId),
-            eq(discogReleases.slug, values.slug)
-          )
-        )
-        .limit(1);
-
-      if (!racedRelease) throw error;
-
-      await db
-        .update(discogReleases)
-        .set({ ...values, updatedAt: new Date() })
-        .where(eq(discogReleases.id, racedRelease.id));
-
-      return racedRelease.id;
-    }
+    return release.id;
   }
 
   for (const release of TEST_RELEASES) {

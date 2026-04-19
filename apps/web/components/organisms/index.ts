@@ -35,6 +35,7 @@ export type { HowItWorksSectionProps } from './HowItWorksSection';
 export { HowItWorksSection } from './HowItWorksSection';
 export type { ListenSectionProps } from './ListenSection';
 export { ListenSection } from './ListenSection';
+export { PaySection } from './PaySection';
 export { ProfileSection } from './ProfileSection';
 export type {
   ProfileNotificationsContextValue,
@@ -66,7 +67,6 @@ export type {
 } from './SmartHandleInput';
 export { SmartHandleInput } from './SmartHandleInput';
 export { SocialBar } from './SocialBar';
-export { TipSection } from './TipSection';
 export type {
   UserButtonProps,
   UserDisplayInfo,

@@ -5,11 +5,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { PublicShareMenu } from '@/components/features/share/PublicShareMenu';
 import { MarketingContainer } from '@/components/marketing';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildPlaylistShareContext } from '@/lib/share/context';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const dynamicParams = false;
@@ -141,6 +143,12 @@ export default async function PlaylistPage({
   const spotifyUrl = playlist.spotifyPlaylistId
     ? `https://open.spotify.com/playlist/${playlist.spotifyPlaylistId}`
     : null;
+  const shareContext = buildPlaylistShareContext({
+    slug,
+    title: playlist.title,
+    coverImageUrl: playlist.coverImageUrl,
+    editorialNote: playlist.editorialNote ?? playlist.description,
+  });
 
   // JSON-LD: MusicPlaylist schema
   const playlistJsonLd = {
@@ -256,6 +264,21 @@ export default async function PlaylistPage({
               Jovie
             </Link>
           </p>
+          <div className='mt-3'>
+            <PublicShareMenu
+              context={shareContext}
+              title='Share'
+              align='center'
+              trigger={
+                <button
+                  type='button'
+                  className='text-[13px] font-[450] text-white/50 transition-colors hover:text-white/80'
+                >
+                  Share
+                </button>
+              }
+            />
+          </div>
 
           {/* Description */}
           {playlist.description && (

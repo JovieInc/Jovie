@@ -12,6 +12,7 @@ export interface DrawerAsyncToggleProps {
   readonly successMessage?: (enabled: boolean) => string;
   readonly className?: string;
   readonly density?: 'default' | 'compact';
+  readonly testId?: string;
 }
 
 export function DrawerAsyncToggle({
@@ -22,6 +23,7 @@ export function DrawerAsyncToggle({
   successMessage,
   className,
   density = 'default',
+  testId,
 }: DrawerAsyncToggleProps) {
   const [checked, setChecked] = useState(externalChecked);
   const [isPending, setIsPending] = useState(false);
@@ -56,6 +58,7 @@ export function DrawerAsyncToggle({
       ariaLabel={ariaLabel}
       className={className}
       density={density}
+      testId={testId}
     />
   );
 }

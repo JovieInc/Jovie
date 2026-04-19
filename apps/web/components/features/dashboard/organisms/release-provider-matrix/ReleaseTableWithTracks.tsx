@@ -9,18 +9,13 @@ import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createExpandableReleaseCellRenderer,
   createRightMetaCellRenderer,
 } from './utils/release-table-renderers';
-
-const MobileReleaseList = lazy(() =>
-  import('./MobileReleaseList').then(m => ({
-    default: m.MobileReleaseList,
-  }))
-);
 
 const TrackRowsContainer = lazy(() =>
   import(
@@ -50,6 +45,8 @@ export function ReleaseTableWithTracks({
   artistName,
   onCopy,
   onEdit,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -79,11 +76,21 @@ export function ReleaseTableWithTracks({
         release,
         onEdit,
         onCopy,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
       }),
-    [onEdit, onCopy, artistName, isSmartLinkLocked, getSmartLinkLockReason]
+    [
+      onEdit,
+      onCopy,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
+      artistName,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    ]
   );
 
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
@@ -202,7 +209,7 @@ export function ReleaseTableWithTracks({
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const directYear = String(release.releaseDate).match(/^(\d{4})/)?.[1];
+        const directYear = /^(\d{4})/.exec(String(release.releaseDate))?.[1];
         if (directYear) {
           return directYear;
         }
@@ -261,23 +268,17 @@ export function ReleaseTableWithTracks({
     }
 
     return (
-      <Suspense
-        fallback={
-          <div className='border-b border-(--linear-app-frame-seam) px-4 py-3 text-[12px] text-secondary-token'>
-            Loading releases...
-          </div>
-        }
-      >
-        <MobileReleaseList
-          releases={releases}
-          artistName={artistName}
-          onEdit={onEdit}
-          onCopy={onCopy}
-          isSmartLinkLocked={isSmartLinkLocked}
-          getSmartLinkLockReason={getSmartLinkLockReason}
-          groupByYear={groupByYear}
-        />
-      </Suspense>
+      <MobileReleaseListLazy
+        releases={releases}
+        artistName={artistName}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
+        isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
+        groupByYear={groupByYear}
+      />
     );
   }
 

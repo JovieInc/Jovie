@@ -45,12 +45,22 @@ vi.mock('@/lib/db/schema/content', () => ({
     slug: 'discogReleases.slug',
     artworkUrl: 'discogReleases.artworkUrl',
     releaseDate: 'discogReleases.releaseDate',
+    sourceType: 'discogReleases.sourceType',
   },
   providerLinks: {
     ownerType: 'providerLinks.ownerType',
     releaseId: 'providerLinks.releaseId',
     providerId: 'providerLinks.providerId',
     url: 'providerLinks.url',
+  },
+}));
+
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: {
+    id: 'users.id',
+    billingVersion: 'users.billingVersion',
+    trialNotificationsSent: 'users.trialNotificationsSent',
+    updatedAt: 'users.updatedAt',
   },
 }));
 
@@ -76,6 +86,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'creatorProfiles.id',
     displayName: 'creatorProfiles.displayName',
+    isClaimed: 'creatorProfiles.isClaimed',
+    settings: 'creatorProfiles.settings',
+    spotifyId: 'creatorProfiles.spotifyId',
+    userId: 'creatorProfiles.userId',
     username: 'creatorProfiles.username',
     usernameNormalized: 'creatorProfiles.usernameNormalized',
   },
@@ -129,6 +143,9 @@ function createPendingNotificationsChain(result: unknown) {
 function createWhereResolvedChain(result: unknown) {
   return {
     from: vi.fn().mockReturnValue({
+      leftJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(result),
+      }),
       where: vi.fn().mockResolvedValue(result),
     }),
   };
@@ -164,7 +181,21 @@ describe('sendPendingNotifications', () => {
         ])
       )
       .mockReturnValueOnce(createWhereResolvedChain([]))
-      .mockReturnValueOnce(createWhereResolvedChain([]))
+      .mockReturnValueOnce(
+        createWhereResolvedChain([
+          {
+            id: 'creator_1',
+            displayName: 'Creator One',
+            isClaimed: true,
+            ownerUserId: 'user_1',
+            settings: { spotifyImportStatus: 'complete' },
+            spotifyId: 'spotify_1',
+            trialNotificationsSent: 0,
+            username: 'creatorone',
+            usernameNormalized: 'creatorone',
+          },
+        ])
+      )
       .mockReturnValueOnce(createWhereResolvedChain([]))
       .mockReturnValueOnce(createWhereResolvedChain([]));
 

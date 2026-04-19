@@ -4,12 +4,13 @@ import { Download, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { env } from '@/lib/env-client';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
   type VersionMismatchInfo,
 } from '@/lib/hooks/useVersionMonitor';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 
 const DISMISSAL_KEY = 'jovie-version-update-dismissed';
 const NOTIFICATION_DELAY_MS = 10_000;
@@ -25,7 +26,9 @@ const NOTIFICATION_DELAY_MS = 10_000;
  */
 export function SidebarInstallBanner() {
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const pwaInstallEnabled = useCodeFlag('PWA_INSTALL_BANNER');
+  const { isPro, isTrialing } = usePlanGate();
+  const isPaidPro = isPro && !isTrialing;
+  const pwaInstallEnabled = useAppFlag('PWA_INSTALL_BANNER');
 
   const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
 
@@ -125,8 +128,9 @@ export function SidebarInstallBanner() {
     );
   }
 
-  // Fall back to PWA install banner (gated by feature flag)
-  if (!pwaInstallEnabled || !canPrompt) return null;
+  // Fall back to PWA install banner (only for paid Pro users, not trials, and
+  // gated behind the runtime flag).
+  if (!pwaInstallEnabled || !isPaidPro || !canPrompt) return null;
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>

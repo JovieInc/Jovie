@@ -1,12 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React, { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
+const mockUseReducedMotion = vi.fn(() => true);
 
 vi.mock('motion/react', async () => {
   await import('react');
@@ -37,7 +38,11 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/hooks/useReducedMotion', () => ({
+  useReducedMotion: (...args: unknown[]) => mockUseReducedMotion(...args),
+}));
+
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberBirthdayMutation: () =>
     mockUpdateSubscriberBirthdayMutation(),
   useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
@@ -95,19 +100,24 @@ describe('ProfileInlineNotificationsCTA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
+    mockUseReducedMotion.mockReturnValue(true);
 
     mockUseSubscriptionForm.mockReturnValue({
       emailInput: '',
       error: null,
+      errorOrigin: null,
       otpCode: '',
       otpStep: 'input',
       isSubmitting: false,
+      resendCooldownEnd: 0,
+      isResending: false,
       handleChannelChange: vi.fn(),
       handleEmailChange: vi.fn(),
       handleFieldBlur: vi.fn(),
       handleOtpChange: vi.fn(),
       handleSubscribe: vi.fn().mockResolvedValue(undefined),
       handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      handleResendOtp: vi.fn().mockResolvedValue(undefined),
       notificationsState: 'success',
       notificationsEnabled: true,
       openSubscription: vi.fn(),
@@ -124,6 +134,10 @@ describe('ProfileInlineNotificationsCTA', () => {
       isPending: false,
       mutateAsync: vi.fn().mockResolvedValue(undefined),
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders a subscribed-state button with compact success copy', () => {
@@ -175,6 +189,48 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(onManageNotifications).toHaveBeenCalledTimes(1);
   });
 
+  it('focuses the email input after the reveal transition completes', () => {
+    vi.useFakeTimers();
+    mockUseReducedMotion.mockReturnValue(false);
+
+    mockUseSubscriptionForm.mockReturnValue({
+      emailInput: '',
+      error: null,
+      errorOrigin: null,
+      otpCode: '',
+      otpStep: 'input',
+      isSubmitting: false,
+      resendCooldownEnd: 0,
+      isResending: false,
+      handleChannelChange: vi.fn(),
+      handleEmailChange: vi.fn(),
+      handleFieldBlur: vi.fn(),
+      handleOtpChange: vi.fn(),
+      handleSubscribe: vi.fn().mockResolvedValue(undefined),
+      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      handleResendOtp: vi.fn().mockResolvedValue(undefined),
+      notificationsState: 'idle',
+      notificationsEnabled: true,
+      openSubscription: vi.fn(),
+      hydrationStatus: 'done',
+      subscribedChannels: {},
+    });
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    const emailInput = screen.getByTestId('inline-email-input');
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(emailInput).toHaveFocus();
+  });
+
   it('does not auto-open preferences on pointer focus alone', () => {
     const onManageNotifications = vi.fn();
 
@@ -197,20 +253,24 @@ describe('ProfileInlineNotificationsCTA', () => {
 
   // Regression: OTP input never appeared when notificationsState became pending_confirmation
   // Found by /investigate on 2026-04-10
-  it('renders OTP input when notificationsState is pending_confirmation after email submit', () => {
+  it('renders OTP input when notificationsState is pending_confirmation after email submit', async () => {
     // Start in idle state so the CTA button appears
     mockUseSubscriptionForm.mockReturnValue({
       emailInput: '',
       error: null,
+      errorOrigin: null,
       otpCode: '',
       otpStep: 'input',
       isSubmitting: false,
+      resendCooldownEnd: 0,
+      isResending: false,
       handleChannelChange: vi.fn(),
       handleEmailChange: vi.fn(),
       handleFieldBlur: vi.fn(),
       handleOtpChange: vi.fn(),
       handleSubscribe: vi.fn().mockResolvedValue(undefined),
       handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      handleResendOtp: vi.fn().mockResolvedValue(undefined),
       notificationsState: 'idle',
       notificationsEnabled: true,
       openSubscription: vi.fn(),
@@ -231,15 +291,19 @@ describe('ProfileInlineNotificationsCTA', () => {
     mockUseSubscriptionForm.mockReturnValue({
       emailInput: 'test@example.com',
       error: null,
+      errorOrigin: null,
       otpCode: '',
       otpStep: 'verify',
       isSubmitting: false,
+      resendCooldownEnd: 0,
+      isResending: false,
       handleChannelChange: vi.fn(),
       handleEmailChange: vi.fn(),
       handleFieldBlur: vi.fn(),
       handleOtpChange: vi.fn(),
       handleSubscribe: vi.fn().mockResolvedValue(undefined),
       handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
+      handleResendOtp: vi.fn().mockResolvedValue(undefined),
       notificationsState: 'pending_confirmation',
       notificationsEnabled: true,
       openSubscription: vi.fn(),
@@ -250,10 +314,14 @@ describe('ProfileInlineNotificationsCTA', () => {
     rerender(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     // The OTP input should be rendered
-    expect(screen.getByTestId('mock-otp-input')).toBeInTheDocument();
+    const otpInput = screen.getByTestId('mock-otp-input');
+    expect(otpInput).toBeInTheDocument();
     expect(
       screen.getByLabelText(/enter 6-digit verification code/i)
     ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(otpInput).toHaveFocus();
+    });
   });
 
   it('does not create a reopen loop when focus returns after closing the drawer', () => {

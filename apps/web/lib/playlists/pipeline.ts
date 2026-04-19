@@ -13,10 +13,15 @@
  * Publishing to Spotify happens separately after admin approval.
  */
 
+import { randomUUID } from 'node:crypto';
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
+import { sql as drizzleSql } from 'drizzle-orm';
+import {
+  calculateNextEligibleAt,
+  getPlaylistEngineSettings,
+} from '@/lib/admin/platform-connections';
 import { db } from '@/lib/db';
-import { joviePlaylists, joviePlaylistTracks } from '@/lib/db/schema/playlists';
 import { captureError } from '@/lib/error-tracking';
 import {
   generatePlaylistSlug,
@@ -51,19 +56,28 @@ export interface PipelineResult {
  * Run the full playlist generation pipeline.
  * Creates a playlist in "pending" status for admin review.
  */
-export async function generatePlaylist(): Promise<PipelineResult> {
+interface GeneratePlaylistOptions {
+  readonly skipComplianceCheck?: boolean;
+  readonly recordCadenceOnSuccess?: boolean;
+}
+
+export async function generatePlaylist(
+  options: GeneratePlaylistOptions = {}
+): Promise<PipelineResult> {
   const startTime = Date.now();
 
   try {
     // Step 1: Compliance check
-    const shouldGenerate = await shouldGenerateToday();
-    if (!shouldGenerate) {
-      return {
-        success: true,
-        skipped: true,
-        skipReason: 'Compliance cadence check: skipping today',
-        durationMs: Date.now() - startTime,
-      };
+    if (!options.skipComplianceCheck) {
+      const shouldGenerate = await shouldGenerateToday();
+      if (!shouldGenerate) {
+        return {
+          success: true,
+          skipped: true,
+          skipReason: 'Compliance cadence check: skipping today',
+          durationMs: Date.now() - startTime,
+        };
+      }
     }
 
     // Step 2: Generate concept
@@ -122,44 +136,25 @@ export async function generatePlaylist(): Promise<PipelineResult> {
     // TODO: Upload fullResBuffer to CDN and get URL
     // For now, we'll store the cover art URL after Spotify upload
     const coverImageUrl = null;
+    const coverImageUrlForDb: string | null = coverImageUrl ?? null;
 
-    const [playlist] = await db
-      .insert(joviePlaylists)
-      .values({
-        title: concept.title,
-        description: concept.description,
-        slug,
-        theme: concept.title,
-        genreTags: concept.genreTags,
-        moodTags: concept.moodTags,
-        trackCount: curated.trackCount,
-        coverImageUrl,
-        editorialNote: concept.editorialNote,
-        llmPrompt: JSON.stringify({
-          concept: concept.title,
-          genreTags: concept.genreTags,
-          candidateCount: candidates.length,
-          jovieArtistCount: jovieArtistTracks.length,
-          unsplashQuery: concept.unsplashQuery,
-          coverTextWords: concept.coverTextWords,
-        }),
-        llmModel: 'haiku+sonnet',
-        status: 'pending',
-        statusChangedAt: new Date(),
-      })
-      .returning({ id: joviePlaylists.id });
+    const playlistId = randomUUID();
+    const generatedAt = new Date();
+    const llmPrompt = JSON.stringify({
+      concept: concept.title,
+      genreTags: concept.genreTags,
+      candidateCount: candidates.length,
+      jovieArtistCount: jovieArtistTracks.length,
+      unsplashQuery: concept.unsplashQuery,
+      coverTextWords: concept.coverTextWords,
+    });
 
-    if (!playlist) {
-      throw new Error('Failed to insert playlist into database');
-    }
-
-    // Insert tracks
     const trackInserts = curated.trackIds.map((trackId, index) => {
       const candidate = trackLookup.get(trackId);
       const jovieTrack = jovieTrackLookup.get(trackId);
 
       return {
-        playlistId: playlist.id,
+        playlistId,
         spotifyTrackId: trackId,
         position: index + 1,
         artistName: jovieTrack?.artist ?? candidate?.artist ?? 'Unknown Artist',
@@ -169,9 +164,179 @@ export async function generatePlaylist(): Promise<PipelineResult> {
         isJovieArtist: !!jovieTrack,
       };
     });
+    const trackInsertsJson = JSON.stringify(
+      trackInserts.map(track => ({
+        spotify_track_id: track.spotifyTrackId,
+        position: track.position,
+        artist_name: track.artistName,
+        track_name: track.trackName,
+        spotify_artist_id: track.spotifyArtistId,
+        jovie_profile_id: track.jovieProfileId,
+        is_jovie_artist: track.isJovieArtist,
+      }))
+    );
 
-    if (trackInserts.length > 0) {
-      await db.insert(joviePlaylistTracks).values(trackInserts);
+    if (options.recordCadenceOnSuccess) {
+      const settings = await getPlaylistEngineSettings();
+      const nextEligibleAt = calculateNextEligibleAt(
+        generatedAt,
+        settings.intervalValue,
+        settings.intervalUnit
+      );
+
+      // Schema reference: `@/lib/db/schema/playlists.joviePlaylists`
+      // Schema reference: `@/lib/db/schema/playlists.joviePlaylistTracks`
+      // Schema reference: `@/lib/db/schema/admin.adminSystemSettings`
+      await db.execute(drizzleSql`
+        WITH inserted_playlist AS (
+          INSERT INTO "jovie_playlists" (
+            "id",
+            "title",
+            "description",
+            "slug",
+            "theme",
+            "genre_tags",
+            "mood_tags",
+            "track_count",
+            "cover_image_url",
+            "editorial_note",
+            "llm_prompt",
+            "llm_model",
+            "status",
+            "status_changed_at"
+          ) VALUES (
+            ${playlistId},
+            ${concept.title},
+            ${concept.description},
+            ${slug},
+            ${concept.title},
+            ${concept.genreTags},
+            ${concept.moodTags},
+            ${curated.trackCount},
+            ${coverImageUrlForDb},
+            ${concept.editorialNote},
+            ${llmPrompt},
+            ${'haiku+sonnet'},
+            ${'pending'},
+            ${generatedAt}
+          )
+          RETURNING "id"
+        ),
+        inserted_tracks AS (
+          INSERT INTO "jovie_playlist_tracks" (
+            "playlist_id",
+            "spotify_track_id",
+            "position",
+            "artist_name",
+            "track_name",
+            "spotify_artist_id",
+            "jovie_profile_id",
+            "is_jovie_artist"
+          )
+          SELECT
+            inserted_playlist."id",
+            track."spotify_track_id",
+            track."position",
+            track."artist_name",
+            track."track_name",
+            track."spotify_artist_id",
+            track."jovie_profile_id"::uuid,
+            track."is_jovie_artist"
+          FROM inserted_playlist
+          CROSS JOIN jsonb_to_recordset(${trackInsertsJson}::jsonb) AS track(
+            "spotify_track_id" text,
+            "position" integer,
+            "artist_name" text,
+            "track_name" text,
+            "spotify_artist_id" text,
+            "jovie_profile_id" text,
+            "is_jovie_artist" boolean
+          )
+        )
+        INSERT INTO "admin_system_settings" (
+          "id",
+          "playlist_last_generated_at",
+          "playlist_next_eligible_at",
+          "updated_at"
+        ) VALUES (
+          ${1},
+          ${generatedAt},
+          ${nextEligibleAt},
+          ${generatedAt}
+        )
+        ON CONFLICT ("id") DO UPDATE SET
+          "playlist_last_generated_at" = EXCLUDED."playlist_last_generated_at",
+          "playlist_next_eligible_at" = EXCLUDED."playlist_next_eligible_at",
+          "updated_at" = EXCLUDED."updated_at"
+      `);
+    } else {
+      // Schema reference: `@/lib/db/schema/playlists.joviePlaylists`
+      // Schema reference: `@/lib/db/schema/playlists.joviePlaylistTracks`
+      await db.execute(drizzleSql`
+        WITH inserted_playlist AS (
+          INSERT INTO "jovie_playlists" (
+            "id",
+            "title",
+            "description",
+            "slug",
+            "theme",
+            "genre_tags",
+            "mood_tags",
+            "track_count",
+            "cover_image_url",
+            "editorial_note",
+            "llm_prompt",
+            "llm_model",
+            "status",
+            "status_changed_at"
+          ) VALUES (
+            ${playlistId},
+            ${concept.title},
+            ${concept.description},
+            ${slug},
+            ${concept.title},
+            ${concept.genreTags},
+            ${concept.moodTags},
+            ${curated.trackCount},
+            ${coverImageUrlForDb},
+            ${concept.editorialNote},
+            ${llmPrompt},
+            ${'haiku+sonnet'},
+            ${'pending'},
+            ${generatedAt}
+          )
+          RETURNING "id"
+        )
+        INSERT INTO "jovie_playlist_tracks" (
+          "playlist_id",
+          "spotify_track_id",
+          "position",
+          "artist_name",
+          "track_name",
+          "spotify_artist_id",
+          "jovie_profile_id",
+          "is_jovie_artist"
+        )
+        SELECT
+          inserted_playlist."id",
+          track."spotify_track_id",
+          track."position",
+          track."artist_name",
+          track."track_name",
+          track."spotify_artist_id",
+          track."jovie_profile_id"::uuid,
+          track."is_jovie_artist"
+        FROM inserted_playlist
+        CROSS JOIN jsonb_to_recordset(${trackInsertsJson}::jsonb) AS track(
+          "spotify_track_id" text,
+          "position" integer,
+          "artist_name" text,
+          "track_name" text,
+          "spotify_artist_id" text,
+          "jovie_profile_id" text,
+          "is_jovie_artist" boolean
+        )
+      `);
     }
 
     // Store cover art base64 temporarily for publish step
@@ -180,7 +345,7 @@ export async function generatePlaylist(): Promise<PipelineResult> {
 
     return {
       success: true,
-      playlistId: playlist.id,
+      playlistId,
       title: concept.title,
       trackCount: curated.trackCount,
       durationMs: Date.now() - startTime,

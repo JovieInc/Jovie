@@ -56,6 +56,18 @@ export {
   type DrawerInlineIconButtonProps,
 } from './DrawerInlineIconButton';
 export {
+  DrawerInspectorCard,
+  type DrawerInspectorCardProps,
+} from './DrawerInspectorCard';
+export {
+  DrawerInspectorGrid,
+  type DrawerInspectorGridProps,
+} from './DrawerInspectorGrid';
+export {
+  DrawerInspectorStack,
+  type DrawerInspectorStackProps,
+} from './DrawerInspectorStack';
+export {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   type DrawerLinkSectionProps,

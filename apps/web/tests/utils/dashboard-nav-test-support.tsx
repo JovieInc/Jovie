@@ -18,11 +18,18 @@ export const mockUsePlanGate = vi.fn(() => ({
 export const mockToastInfo = vi.fn();
 export const mockShowPendingShell = vi.fn();
 export const mockClearPendingShell = vi.fn();
+export const mockRouterPush = vi.fn();
+export const mockOpenPreviewPanel = vi.fn();
+export const mockTogglePreviewPanel = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
   useParams: () => ({}),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({
+    push: (...args: unknown[]) => mockRouterPush(...args),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -50,9 +57,9 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: false,
-    open: vi.fn(),
+    open: (...args: unknown[]) => mockOpenPreviewPanel(...args),
     close: vi.fn(),
-    toggle: vi.fn(),
+    toggle: (...args: unknown[]) => mockTogglePreviewPanel(...args),
   }),
   usePreviewPanelData: () => ({
     data: null,
@@ -61,9 +68,9 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
     isOpen: false,
     activeTab: null,
     data: null,
-    open: vi.fn(),
+    open: (...args: unknown[]) => mockOpenPreviewPanel(...args),
     close: vi.fn(),
-    toggle: vi.fn(),
+    toggle: (...args: unknown[]) => mockTogglePreviewPanel(...args),
   }),
 }));
 
@@ -154,6 +161,9 @@ export function resetDashboardNavTestMocks() {
   mockToastInfo.mockReset();
   mockShowPendingShell.mockReset();
   mockClearPendingShell.mockReset();
+  mockRouterPush.mockReset();
+  mockOpenPreviewPanel.mockReset();
+  mockTogglePreviewPanel.mockReset();
 }
 
 export function renderDashboardNav({

@@ -232,6 +232,7 @@ interface LateArrival {
 }
 
 interface OnboardingV2FormProps {
+  readonly assumeInitialHandleAvailable?: boolean;
   readonly existingAvatarUrl?: string | null;
   readonly existingBio?: string | null;
   readonly existingGenres?: string[] | null;
@@ -754,6 +755,7 @@ function OnboardingSidebar({
 }
 
 export function OnboardingV2Form({
+  assumeInitialHandleAvailable = false,
   existingAvatarUrl = null,
   existingBio = null,
   existingGenres = null,
@@ -810,7 +812,8 @@ export function OnboardingV2Form({
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
-      assumeInitialHandleAvailable: Boolean(initialProfileId),
+      assumeInitialHandleAvailable:
+        assumeInitialHandleAvailable || Boolean(initialProfileId),
       fullName: initialDisplayName,
       normalizedInitialHandle,
     });

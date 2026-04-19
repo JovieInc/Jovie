@@ -155,6 +155,8 @@ describe('completeOnboarding', () => {
       get: vi.fn().mockReturnValue(null),
     });
     hoisted.cookiesMock.mockResolvedValue({
+      delete: vi.fn(),
+      get: vi.fn().mockReturnValue(undefined),
       set: vi.fn(),
     });
     hoisted.enforceOnboardingRateLimitMock.mockResolvedValue(undefined);

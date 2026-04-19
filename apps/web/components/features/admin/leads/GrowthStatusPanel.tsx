@@ -3,7 +3,7 @@
 import { Switch } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { startTransition } from 'react';
+import { type ReactNode, startTransition } from 'react';
 import { toast } from 'sonner';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
@@ -39,32 +39,37 @@ export function GrowthStatusPanel() {
 
   const isBusy = settingsQuery.isLoading || updateSettingsMutation.isPending;
 
+  let headerActions: ReactNode = null;
+  if (settings) {
+    headerActions = (
+      <div className='flex items-center gap-2'>
+        <span className='text-[12px] font-[560] text-secondary-token'>
+          {settings.enabled ? 'On' : 'Off'}
+        </span>
+        <Switch
+          checked={settings.enabled}
+          disabled={isBusy}
+          onCheckedChange={checked => {
+            startTransition(() => {
+              void togglePipeline(checked);
+            });
+          }}
+          aria-label='Toggle Growth automation'
+        />
+      </div>
+    );
+  } else if (isBusy) {
+    headerActions = (
+      <Loader2 className='size-4 animate-spin text-tertiary-token' />
+    );
+  }
+
   return (
     <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Growth Status'
         subtitle='Keep the pipeline on, verify today’s throughput, and turn it off when needed.'
-        actions={
-          settings ? (
-            <div className='flex items-center gap-2'>
-              <span className='text-[12px] font-[560] text-secondary-token'>
-                {settings.enabled ? 'On' : 'Off'}
-              </span>
-              <Switch
-                checked={settings.enabled}
-                disabled={isBusy}
-                onCheckedChange={checked => {
-                  startTransition(() => {
-                    void togglePipeline(checked);
-                  });
-                }}
-                aria-label='Toggle Growth automation'
-              />
-            </div>
-          ) : isBusy ? (
-            <Loader2 className='size-4 animate-spin text-tertiary-token' />
-          ) : null
-        }
+        actions={headerActions}
         className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         actionsClassName='shrink-0'
       />

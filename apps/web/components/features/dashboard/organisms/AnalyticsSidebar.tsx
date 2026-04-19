@@ -15,7 +15,10 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import type { AnalyticsRange } from '@/types/analytics';
+import type {
+  AnalyticsRange,
+  DashboardAnalyticsResponse,
+} from '@/types/analytics';
 
 /**
  * Calculate conversion rate between two funnel stages.
@@ -39,7 +42,7 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: '30d', label: '30d' },
 ];
 
-type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
+export type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
 
 const ANALYTICS_TAB_OPTIONS = [
   { value: 'cities' as const, label: 'Cities' },
@@ -235,19 +238,34 @@ export interface AnalyticsSidebarProps {
   readonly onClose: () => void;
 }
 
-export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
-  const [range, setRange] = useState<AnalyticsRange>('30d');
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+export interface AnalyticsSidebarViewProps extends AnalyticsSidebarProps {
+  readonly data: DashboardAnalyticsResponse | null | undefined;
+  readonly loading: boolean;
+  readonly isFetching?: boolean;
+  readonly range: AnalyticsRange;
+  readonly onRangeChange: (range: AnalyticsRange) => void;
+  readonly showRangeControl?: boolean;
+  readonly activeTab: AnalyticsTab;
+  readonly onActiveTabChange: (tab: AnalyticsTab) => void;
+  readonly testId?: string;
+  readonly tabbedCardTestId?: string;
+}
 
-  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
-    range,
-    view: 'full',
-    enabled: true,
-  });
-
-  const loading = isLoading;
+export function AnalyticsSidebarView({
+  isOpen,
+  onClose,
+  data,
+  loading,
+  isFetching = false,
+  range,
+  onRangeChange,
+  showRangeControl = true,
+  activeTab,
+  onActiveTabChange,
+  testId = 'analytics-sidebar',
+  tabbedCardTestId = 'analytics-sidebar-tabbed-card',
+}: AnalyticsSidebarViewProps) {
   const showTipLinkVisits = (data?.tip_link_visits ?? 0) > 0;
-
   const stages = [
     { label: 'Profile Views', value: data?.profile_views ?? 0 },
     { label: 'Unique Visitors', value: data?.unique_users ?? 0 },
@@ -258,7 +276,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Analytics'
-      data-testid='analytics-sidebar'
+      data-testid={testId}
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeader={
@@ -280,14 +298,16 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                   Views, clicks, and top traffic sources.
                 </p>
               </div>
-              <AppSegmentControl
-                value={range}
-                onValueChange={setRange}
-                options={RANGE_OPTIONS}
-                size='sm'
-                className='shrink-0'
-                aria-label='Analytics time range'
-              />
+              {showRangeControl ? (
+                <AppSegmentControl
+                  value={range}
+                  onValueChange={onRangeChange}
+                  options={RANGE_OPTIONS}
+                  size='sm'
+                  className='shrink-0'
+                  aria-label='Analytics time range'
+                />
+              ) : null}
             </div>
           </div>
         </DrawerSurfaceCard>
@@ -295,42 +315,44 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     >
       <div
         className={cn(
-          'space-y-2 transition-opacity duration-150',
+          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
-        {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-        <FunnelCard stages={stages} loading={loading} />
+        <div className='shrink-0 space-y-2'>
+          {/* Funnel waterfall — vertical bars show dropoff at a glance */}
+          <FunnelCard stages={stages} loading={loading} />
 
-        {/* Engagement — compact 2-col, secondary to the funnel */}
-        <DrawerStatGrid variant='card'>
-          <div className='px-3 py-2'>
-            <StatTile
-              label='Link Clicks'
-              value={formatMetricValue(loading, data?.total_clicks)}
-            />
-          </div>
-          <div className='px-3 py-2'>
-            <StatTile
-              label='Listen Clicks'
-              value={formatMetricValue(loading, data?.listen_clicks)}
-            />
-          </div>
-          {showTipLinkVisits ? (
+          {/* Engagement — compact 2-col, secondary to the funnel */}
+          <DrawerStatGrid variant='card'>
             <div className='px-3 py-2'>
               <StatTile
-                label='Tip Link Visits'
-                value={formatMetricValue(loading, data?.tip_link_visits)}
+                label='Link Clicks'
+                value={formatMetricValue(loading, data?.total_clicks)}
               />
             </div>
-          ) : null}
-        </DrawerStatGrid>
+            <div className='px-3 py-2'>
+              <StatTile
+                label='Listen Clicks'
+                value={formatMetricValue(loading, data?.listen_clicks)}
+              />
+            </div>
+            {showTipLinkVisits ? (
+              <div className='px-3 py-2'>
+                <StatTile
+                  label='Tip Link Visits'
+                  value={formatMetricValue(loading, data?.tip_link_visits)}
+                />
+              </div>
+            ) : null}
+          </DrawerStatGrid>
+        </div>
         <DrawerTabbedCard
-          testId='analytics-sidebar-tabbed-card'
+          testId={tabbedCardTestId}
           tabs={
             <DrawerTabs
               value={activeTab}
-              onValueChange={value => setActiveTab(value as AnalyticsTab)}
+              onValueChange={onActiveTabChange}
               options={ANALYTICS_TAB_OPTIONS}
               className='w-full'
               ariaLabel='Analytics data tabs'
@@ -390,5 +412,60 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         </DrawerTabbedCard>
       </div>
     </EntitySidebarShell>
+  );
+}
+
+export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
+  const [range, setRange] = useState<AnalyticsRange>('30d');
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+
+  const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
+    range,
+    view: 'full',
+    enabled: true,
+  });
+
+  return (
+    <AnalyticsSidebarView
+      isOpen={isOpen}
+      onClose={onClose}
+      data={data}
+      loading={isLoading}
+      isFetching={isFetching}
+      range={range}
+      onRangeChange={setRange}
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
+    />
+  );
+}
+
+export function StaticAnalyticsSidebar({
+  isOpen,
+  onClose,
+  data,
+  testId = 'demo-analytics-sidebar',
+  tabbedCardTestId = 'demo-analytics-tabbed-card',
+}: AnalyticsSidebarProps & {
+  readonly data: DashboardAnalyticsResponse;
+  readonly testId?: string;
+  readonly tabbedCardTestId?: string;
+}) {
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('cities');
+
+  return (
+    <AnalyticsSidebarView
+      isOpen={isOpen}
+      onClose={onClose}
+      data={data}
+      loading={false}
+      range='30d'
+      onRangeChange={() => {}}
+      showRangeControl={false}
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
+      testId={testId}
+      tabbedCardTestId={tabbedCardTestId}
+    />
   );
 }

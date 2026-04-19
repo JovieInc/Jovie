@@ -3,11 +3,10 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
-import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 // Dynamic import to exclude ThemeToggle from bundle when not used
@@ -24,22 +23,9 @@ const FOOTER_COLUMNS = [
     id: 'product',
     heading: 'Product',
     links: [
-      { href: '/#release', label: 'Smart Links' },
-      { href: '/#profile', label: 'Artist Profile' },
-      { href: '/#release', label: 'Release Automation' },
-      { href: '/#audience', label: 'Audience Intelligence' },
-      { href: '/#ai', label: 'AI Assistant' },
+      { href: '/artist-profiles', label: 'Artist Profiles' },
       { href: '/pricing', label: 'Pricing' },
-    ],
-  },
-  {
-    id: 'features',
-    heading: 'Features',
-    links: [
-      { href: '/#release', label: 'Analytics' },
-      { href: '/#profile', label: 'Fan Capture' },
-      { href: '/#profile', label: 'Tipping' },
-      { href: '/#profile', label: 'Tour Dates' },
+      { href: '/support', label: 'Support' },
     ],
   },
   {
@@ -51,16 +37,19 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
-    id: 'resources',
-    heading: 'Resources',
-    links: [{ href: '/support', label: 'Support' }],
+    id: 'account',
+    heading: 'Account',
+    links: [
+      { href: '/signin', label: 'Log in' },
+      { href: '/signup', label: 'Get started' },
+    ],
   },
   {
-    id: 'connect',
-    heading: 'Connect',
+    id: 'legal',
+    heading: 'Legal',
     links: [
-      { href: 'https://x.com/jovieapp', label: 'X (Twitter)' },
-      { href: 'https://instagram.com/jovieapp', label: 'Instagram' },
+      { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+      { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
     ],
   },
 ] as const;
@@ -91,7 +80,7 @@ export function Footer({
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useCodeFlag('ENABLE_LIGHT_MODE');
+  const isLightModeEnabled = useAppFlag('ENABLE_LIGHT_MODE');
   const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
@@ -152,26 +141,23 @@ export function Footer({
         <div
           className={cn(
             containerSize === 'homepage'
-              ? 'px-5 sm:px-6 lg:px-[77px]'
+              ? 'px-5 sm:px-6 lg:px-0'
               : 'mx-auto px-6 lg:px-8',
-            'pt-14 pb-14',
+            'pt-16 pb-14',
             maxWidthClass
           )}
         >
-          <div className='flex flex-col items-center gap-12 lg:gap-16 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:items-start'>
-            <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
+          <div className='grid gap-12 lg:grid-cols-[96px_minmax(0,1fr)] lg:gap-20'>
+            <div className='flex flex-col items-start text-left'>
               <FooterBranding
                 variant='linear'
                 showCTA={false}
                 mark={brandingMark}
-                className={cn(
-                  'items-center sm:items-start',
-                  brandingMark === 'icon' ? 'sm:justify-start' : ''
-                )}
+                className='items-start'
               />
             </div>
 
-            <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-3 sm:gap-8 sm:text-left lg:grid-cols-5 lg:gap-10'>
+            <div className='grid w-full grid-cols-2 gap-x-10 gap-y-10 text-left sm:grid-cols-4 sm:gap-x-12 lg:gap-x-16'>
               {FOOTER_COLUMNS.map(col => (
                 <nav key={col.id} aria-labelledby={`footer-${col.id}-heading`}>
                   <h2
@@ -181,7 +167,7 @@ export function Footer({
                   >
                     {col.heading}
                   </h2>
-                  <ul className='flex flex-col gap-0.5'>
+                  <ul className='flex flex-col gap-2.5'>
                     {col.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
                         <Link
@@ -203,16 +189,9 @@ export function Footer({
             </div>
           </div>
 
-          <div className='mt-16'>
-            <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
-              <Copyright
-                variant='light'
-                className='order-2 text-[11px] leading-[16px] font-normal tracking-[-0.01em] sm:order-1'
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              />
-              <div className='flex items-center gap-4 order-1 sm:order-2'>
+          <div className='mt-14'>
+            <div className='flex flex-col items-start gap-4 border-t border-white/8 pt-6 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex items-center gap-4'>
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
@@ -229,11 +208,14 @@ export function Footer({
                 >
                   Terms
                 </Link>
-                <CookieSettingsFooterButton
-                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)] cursor-pointer'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                />
               </div>
+              <Copyright
+                variant='light'
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
+                style={{
+                  color: 'var(--linear-text-tertiary)',
+                }}
+              />
             </div>
           </div>
         </div>
@@ -258,7 +240,7 @@ export function Footer({
       <div
         className={cn(
           containerSize === 'homepage'
-            ? 'px-5 sm:px-6 lg:px-[77px]'
+            ? 'px-5 sm:px-6 lg:px-0'
             : 'mx-auto px-6 lg:px-8',
           'flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
           CONTAINER_SIZES[containerSize]
@@ -266,19 +248,6 @@ export function Footer({
       >
         {config.layout === 'horizontal' && (
           <>
-            <div
-              className={`flex flex-col items-center md:items-start ${variant === 'minimal' ? 'space-y-1' : 'space-y-2'}`}
-            >
-              <Copyright
-                variant={config.colorVariant}
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              />
-              {/* Removed "Made for musicians" tagline — tightened per JOV-1094 */}
-            </div>
-
             <div
               className={`flex items-center ${variant === 'minimal' ? 'gap-3' : 'gap-4'}`}
             >
@@ -295,10 +264,6 @@ export function Footer({
                       {link.label}
                     </Link>
                   ))}
-                  <CookieSettingsFooterButton
-                    className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)] cursor-pointer'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  />
                 </nav>
               )}
               {effectiveShowThemeToggle && (
@@ -320,6 +285,13 @@ export function Footer({
                 </>
               )}
             </div>
+            <Copyright
+              variant={config.colorVariant}
+              className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
+              style={{
+                color: 'var(--linear-text-tertiary)',
+              }}
+            />
           </>
         )}
       </div>

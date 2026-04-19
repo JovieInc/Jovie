@@ -37,12 +37,12 @@ test.describe
         // Check that the TipPromo section is visible
         const tipSection = page
           .locator('section')
-          .filter({ hasText: 'Tip, instantly' });
+          .filter({ hasText: 'Pay, instantly' });
         await expect(tipSection).toBeVisible();
 
         // Check the main heading
         await expect(
-          page.getByRole('heading', { name: 'Tip, instantly.' })
+          page.getByRole('heading', { name: 'Pay, instantly.' })
         ).toBeVisible();
 
         // Check the description text
@@ -57,13 +57,13 @@ test.describe
         // Check the "See it live" button
         const ctaButton = page.getByRole('link', { name: 'See it live' });
         await expect(ctaButton).toBeVisible();
-        await expect(ctaButton).toHaveAttribute('href', '/tim/tip');
+        await expect(ctaButton).toHaveAttribute('href', '/tim/pay');
       });
 
       test('has correct styling and appearance', async ({ page }) => {
         const tipSection = page
           .locator('section')
-          .filter({ hasText: 'Tip, instantly' });
+          .filter({ hasText: 'Pay, instantly' });
 
         // Check section background color
         await expect(tipSection).toHaveClass(/bg-zinc-900/);
@@ -80,7 +80,7 @@ test.describe
         // Ensure the TipPromo appears before the footer
         const tipSection = page
           .locator('section')
-          .filter({ hasText: 'Tip, instantly' });
+          .filter({ hasText: 'Pay, instantly' });
         const preFooterCTA = page
           .locator('section')
           .filter({ hasText: 'Stop designing. Start converting.' });
@@ -105,12 +105,12 @@ test.describe
 
         const tipSection = page
           .locator('section')
-          .filter({ hasText: 'Tip, instantly' });
+          .filter({ hasText: 'Pay, instantly' });
         await expect(tipSection).toBeVisible();
 
         // Check that text is still readable
         await expect(
-          page.getByRole('heading', { name: 'Tip, instantly.' })
+          page.getByRole('heading', { name: 'Pay, instantly.' })
         ).toBeVisible();
         await expect(
           page.getByRole('link', { name: 'See it live' })
@@ -147,11 +147,11 @@ test.describe
         // Check that the TipPromo section is not visible
         const tipSection = page
           .locator('section')
-          .filter({ hasText: 'Tip, instantly' });
+          .filter({ hasText: 'Pay, instantly' });
         await expect(tipSection).not.toBeVisible();
 
         // Also check that the specific text is not present
-        await expect(page.getByText('Tip, instantly.')).not.toBeVisible();
+        await expect(page.getByText('Pay, instantly.')).not.toBeVisible();
         await expect(
           page.getByRole('link', { name: 'See it live' })
         ).not.toBeVisible();

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 
 export function useTipPageTracking({
   artistHandle,
@@ -23,7 +23,7 @@ export function useTipPageTracking({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistHandle) return;
-    if (mode !== 'tip') return;
+    if (mode !== 'pay') return;
 
     trackTipRef.current.mutate({
       handle: artistHandle,

@@ -5,10 +5,13 @@ const {
   mockAttributeLeadSignupFromClerkUserId,
   mockCacheHandleAvailability,
   mockCaptureError,
+  mockClaimPrebuiltProfileForUser,
+  mockClearPendingClaimContext,
   mockCreateProfileForExistingUser,
   mockCreateUserAndProfile,
   mockDeactivateOrphanedProfiles,
   mockEnforceOnboardingRateLimit,
+  mockEnsureOnboardingUserRow,
   mockEnsureEmailAvailable,
   mockEnsureHandleAvailable,
   mockExtractClientIP,
@@ -24,7 +27,9 @@ const {
   mockLogOnboardingError,
   mockNormalizeUsername,
   mockProfileIsPublishable,
+  mockReadPendingClaimContext,
   mockRedirect,
+  mockReservePrebuiltProfileForUser,
   mockResolveClerkIdentity,
   mockRunBackgroundSyncOperations,
   mockUpdateExistingProfile,
@@ -37,10 +42,13 @@ const {
   mockAttributeLeadSignupFromClerkUserId: vi.fn(),
   mockCacheHandleAvailability: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockClaimPrebuiltProfileForUser: vi.fn(),
+  mockClearPendingClaimContext: vi.fn(),
   mockCreateProfileForExistingUser: vi.fn(),
   mockCreateUserAndProfile: vi.fn(),
   mockDeactivateOrphanedProfiles: vi.fn(),
   mockEnforceOnboardingRateLimit: vi.fn(),
+  mockEnsureOnboardingUserRow: vi.fn(),
   mockEnsureEmailAvailable: vi.fn(),
   mockEnsureHandleAvailable: vi.fn(),
   mockExtractClientIP: vi.fn(),
@@ -58,9 +66,11 @@ const {
   ),
   mockNormalizeUsername: vi.fn(),
   mockProfileIsPublishable: vi.fn(),
+  mockReadPendingClaimContext: vi.fn(),
   mockRedirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
+  mockReservePrebuiltProfileForUser: vi.fn(),
   mockResolveClerkIdentity: vi.fn(),
   mockRunBackgroundSyncOperations: vi.fn(),
   mockUpdateExistingProfile: vi.fn(),
@@ -92,6 +102,17 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/auth/clerk-identity', () => ({
   resolveClerkIdentity: mockResolveClerkIdentity,
+}));
+
+vi.mock('@/lib/claim/context', () => ({
+  clearPendingClaimContext: mockClearPendingClaimContext,
+  readPendingClaimContext: mockReadPendingClaimContext,
+}));
+
+vi.mock('@/lib/claim/finalize', () => ({
+  claimPrebuiltProfileForUser: mockClaimPrebuiltProfileForUser,
+  ensureOnboardingUserRow: mockEnsureOnboardingUserRow,
+  reservePrebuiltProfileForUser: mockReservePrebuiltProfileForUser,
 }));
 
 vi.mock('@/lib/auth/proxy-state', () => ({
@@ -194,6 +215,7 @@ describe('completeOnboarding', () => {
       avatarUrl: 'https://images.test/avatar.png',
       email: 'artist@example.com',
     });
+    mockReadPendingClaimContext.mockResolvedValue(null);
     mockExtractClientIP.mockReturnValue('127.0.0.1');
     mockIsContentClean.mockReturnValue(true);
     mockWithRetry.mockImplementation(async (fn: () => Promise<unknown>) =>
@@ -215,8 +237,14 @@ describe('completeOnboarding', () => {
     });
     mockEnsureEmailAvailable.mockResolvedValue(undefined);
     mockEnsureHandleAvailable.mockResolvedValue(undefined);
+    mockEnsureOnboardingUserRow.mockResolvedValue({ id: 'db-user-123' });
     mockFetchExistingUser.mockResolvedValue(null);
     mockFetchExistingProfile.mockResolvedValue(null);
+    mockClaimPrebuiltProfileForUser.mockResolvedValue({
+      username: 'artist',
+      status: 'updated',
+      profileId: 'profile-123',
+    });
     mockCreateUserAndProfile.mockResolvedValue({
       username: 'artist',
       status: 'created',
@@ -228,6 +256,11 @@ describe('completeOnboarding', () => {
       profileId: 'profile-123',
     });
     mockUpdateExistingProfile.mockResolvedValue({
+      username: 'artist',
+      status: 'updated',
+      profileId: 'profile-123',
+    });
+    mockReservePrebuiltProfileForUser.mockResolvedValue({
       username: 'artist',
       status: 'updated',
       profileId: 'profile-123',
@@ -311,6 +344,65 @@ describe('completeOnboarding', () => {
       expect.objectContaining({ route: 'onboarding' })
     );
     expect(mockLogOnboardingError).toHaveBeenCalled();
+  });
+
+  it('claims the exact prebuilt profile for token-backed pending claims', async () => {
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'profile-claim-123',
+      username: 'artist',
+      claimTokenHash: 'hash',
+      leadId: 'lead-123',
+      expectedSpotifyArtistId: 'spotify-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await completeOnboarding({
+      username: 'artist',
+      displayName: 'Artist',
+      redirectToDashboard: false,
+    });
+
+    expect(mockClaimPrebuiltProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'profile-claim-123',
+        displayName: 'Artist',
+        expectedUsername: 'artist',
+        source: 'token_backed_onboarding',
+      })
+    );
+    expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockClearPendingClaimContext).toHaveBeenCalled();
+  });
+
+  it('reserves the prebuilt profile for direct pending claims', async () => {
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile-claim-456',
+      username: 'artist',
+      expectedSpotifyArtistId: 'spotify-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await completeOnboarding({
+      username: 'artist',
+      displayName: 'Artist',
+      redirectToDashboard: false,
+    });
+
+    expect(mockReservePrebuiltProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'profile-claim-456',
+        displayName: 'Artist',
+        expectedUsername: 'artist',
+      })
+    );
+    expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
 
   it('creates a new user profile, caches completion, and keeps side effects non-blocking', async () => {

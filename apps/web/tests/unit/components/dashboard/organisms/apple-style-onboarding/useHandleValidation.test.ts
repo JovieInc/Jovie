@@ -135,6 +135,28 @@ describe('useHandleValidation', () => {
     expect(result.current.handleValidation.available).toBe(true);
   });
 
+  it('keeps a trusted seeded handle available after a transient network failure', async () => {
+    const { result } = renderHook(() =>
+      useHandleValidation({
+        assumeInitialHandleAvailable: true,
+        normalizedInitialHandle: 'claimed-handle',
+        fullName: 'Taylor Swift',
+      })
+    );
+
+    await act(async () => {
+      result.current.validateHandle('claimed-handle');
+    });
+
+    act(() => {
+      validateApiState.callbacks.onError?.(new Error('Failed to fetch'));
+    });
+
+    expect(result.current.handleValidation.available).toBe(true);
+    expect(result.current.handleValidation.error).toBeNull();
+    expect(result.current.handleValidation.checking).toBe(false);
+  });
+
   it('retries transient aborts for the current handle within the retry budget', async () => {
     vi.useFakeTimers();
     const retryValidate = vi.fn().mockResolvedValue(undefined);

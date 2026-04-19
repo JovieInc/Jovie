@@ -41,7 +41,7 @@ export function ProfileNotificationsButton({
     <CircleIconButton
       ref={buttonRef}
       size='md'
-      variant='pearl'
+      variant='pearlQuiet'
       className={
         isActive
           ? 'relative bg-[var(--profile-pearl-bg-active)] text-primary-token'

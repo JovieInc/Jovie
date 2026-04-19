@@ -1,7 +1,11 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/utils';
+
+type DrawerPropertyRowStyle = CSSProperties & {
+  gridTemplateColumns: string;
+};
 
 export interface DrawerPropertyRowProps {
   readonly label: ReactNode;
@@ -19,7 +23,7 @@ export interface DrawerPropertyRowProps {
 export function DrawerPropertyRow({
   label,
   value,
-  labelWidth = 76,
+  labelWidth,
   size = 'md',
   align = 'center',
   interactive = false,
@@ -32,21 +36,26 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[20px] gap-1.5 rounded-[6px] px-1.5 py-px',
-      label: 'text-[10px] leading-[13px] tracking-normal',
-      value: 'text-[11.5px] leading-[15px]',
+      container: 'min-h-[22px] gap-2 rounded-[6px] px-1 py-px',
+      label: 'text-[11px] leading-[15px] tracking-normal',
+      value: 'text-[12px] leading-[16px] tracking-normal',
     },
     md: {
-      container: 'min-h-[22px] gap-1.5 rounded-[6px] px-1.5 py-px',
-      label: 'text-[10px] leading-[13px] tracking-normal',
-      value: 'text-[11.5px] leading-[15px]',
+      container: 'min-h-[24px] gap-2 rounded-[6px] px-1 py-0.5',
+      label: 'text-[11px] leading-[15px] tracking-normal',
+      value: 'text-[12px] leading-[16px] tracking-normal',
     },
   } as const;
 
   const styles = sizeClasses[size];
 
-  const gridStyle = useMemo(
-    () => ({ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }),
+  const gridStyle = useMemo<DrawerPropertyRowStyle>(
+    () => ({
+      gridTemplateColumns:
+        typeof labelWidth === 'number'
+          ? `${labelWidth}px minmax(0, 1fr)`
+          : 'var(--drawer-inspector-label-width, 92px) minmax(0, 1fr)',
+    }),
     [labelWidth]
   );
 
@@ -75,7 +84,7 @@ export function DrawerPropertyRow({
       </span>
       <span
         className={cn(
-          'min-w-0 text-secondary-token',
+          'min-w-0 font-[460] text-primary-token',
           styles.value,
           valueClassName
         )}

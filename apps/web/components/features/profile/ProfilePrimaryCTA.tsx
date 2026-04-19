@@ -4,9 +4,12 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { CTAButton } from '@/components/molecules/CTAButton';
-import { useProfileNotifications } from '@/components/organisms/profile-shell';
+import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
-import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
+import {
+  profilePrimaryPillClassName,
+  SubscriptionFormSkeleton,
+} from '@/features/profile/artist-notifications-cta/shared';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
 import {
@@ -26,7 +29,9 @@ const ctaLoadingFallback = (
 
 const ArtistNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
+    ).then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }
@@ -34,7 +39,9 @@ const ArtistNotificationsCTA = dynamic(
 
 const TwoStepNotificationsCTA = dynamic(
   () =>
-    import('@/features/profile/artist-notifications-cta').then(mod => ({
+    import(
+      '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
+    ).then(mod => ({
       default: mod.TwoStepNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }
@@ -72,8 +79,7 @@ type ProfilePrimaryCTAProps = {
   readonly subscribeTwoStep?: boolean;
 };
 
-const ctaLinkClass =
-  'inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--profile-pearl-primary-bg)] px-8 py-3.5 text-[15px] font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[var(--profile-pearl-shadow)] transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-92 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
+const ctaLinkClass = `${profilePrimaryPillClassName} w-full gap-2 px-8`;
 
 export function ProfilePrimaryCTA({
   artist,

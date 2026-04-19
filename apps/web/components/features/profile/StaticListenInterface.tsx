@@ -14,15 +14,17 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
+import type { ProfileRenderMode } from './contracts';
 
 interface StaticListenInterfaceProps {
   readonly artist: Artist;
   readonly handle: string;
   readonly dspsOverride?: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }
 
 /**
@@ -38,8 +40,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   handle,
   dspsOverride,
   enableDynamicEngagement = false,
+  renderMode = 'interactive',
 }: StaticListenInterfaceProps) {
-  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
+  const enableDevicePriority = useAppFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   const dsps = useMemo(() => {
     const countryCode =
@@ -74,6 +77,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   // No sanitization needed - this removes the ~70KB isomorphic-dompurify dependency.
 
   const handleDSPClick = async (dsp: AvailableDSP) => {
+    if (renderMode !== 'interactive') {
+      return;
+    }
+
     if (isLoading) return;
 
     setIsLoading(true);
@@ -141,6 +148,8 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
     }
   };
 
+  const isPreview = renderMode === 'preview';
+
   return (
     <div className='w-full max-w-sm'>
       {/* DSP Buttons */}
@@ -160,10 +169,18 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             return (
               <SmartLinkProviderButton
                 key={dsp.key}
-                onClick={() => handleDSPClick(dsp)}
+                onClick={() => {
+                  void handleDSPClick(dsp);
+                }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 iconPath={logoConfig?.iconPath}
-                className={isSelected || isLoading ? 'opacity-60' : undefined}
+                className={
+                  isPreview
+                    ? 'pointer-events-none opacity-88'
+                    : isSelected || isLoading
+                      ? 'opacity-60'
+                      : undefined
+                }
               />
             );
           })

@@ -1,8 +1,8 @@
 import { CalendarDays, MapPin, Play, Ticket } from 'lucide-react';
 import Link from 'next/link';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
 type ReleaseSummary = {
@@ -58,7 +58,7 @@ export function ProfileFeaturedCard({
 
   if (featuredContent.kind === 'release') {
     const releaseYear = featuredContent.release.releaseDate
-      ? new Date(featuredContent.release.releaseDate).getFullYear()
+      ? new Date(featuredContent.release.releaseDate).getUTCFullYear()
       : null;
     const releaseTypeLabel =
       featuredContent.release.releaseType === 'ep'
@@ -67,9 +67,9 @@ export function ProfileFeaturedCard({
           featuredContent.release.releaseType.slice(1);
 
     return (
-      <section className='overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>
+      <section className='overflow-hidden rounded-[var(--profile-card-radius)] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>
         <div className='grid gap-5 p-4 sm:grid-cols-[112px_minmax(0,1fr)] sm:items-center sm:p-5'>
-          <div className='relative aspect-square overflow-hidden rounded-[22px] border border-white/10 bg-surface-2 shadow-[0_20px_35px_rgba(0,0,0,0.18)]'>
+          <div className='relative aspect-square overflow-hidden rounded-[var(--radius-3xl)] border border-white/10 bg-surface-2 shadow-[0_20px_35px_rgba(0,0,0,0.18)]'>
             <ImageWithFallback
               src={featuredContent.release.artworkUrl}
               alt={`${featuredContent.release.title} artwork`}
@@ -119,9 +119,9 @@ export function ProfileFeaturedCard({
       .join(', ');
 
     return (
-      <section className='overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>
+      <section className='overflow-hidden rounded-[var(--profile-card-radius)] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>
         <div className='grid gap-5 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-5'>
-          <div className='flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center rounded-[24px] border border-white/10 bg-black/15 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
+          <div className='flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center rounded-[var(--profile-drawer-radius-mobile)] border border-white/10 bg-black/15 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
             <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
               {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
                 new Date(tourDate.startDate)

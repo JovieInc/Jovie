@@ -1,23 +1,26 @@
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import type { PublicRelease } from './releases/types';
 
 export const PROFILE_MODE_KEYS = [
   'profile',
   'listen',
-  'tip',
+  'pay',
   'subscribe',
   'about',
   'contact',
   'tour',
+  'releases',
 ] as const;
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
 
-export const SWIPEABLE_MODES = ['profile', 'tour', 'tip', 'about'] as const;
+export const SWIPEABLE_MODES = ['profile', 'tour', 'pay', 'about'] as const;
 
 export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
 
@@ -34,7 +37,7 @@ export function supportsProfileV2Mode(
 
 export const PROFILE_V2_OVERLAY_MODES = [
   'listen',
-  'tip',
+  'pay',
   'subscribe',
   'contact',
 ] as const;
@@ -42,6 +45,61 @@ export const PROFILE_V2_OVERLAY_MODES = [
 export type ProfileV2OverlayMode =
   | (typeof PROFILE_V2_OVERLAY_MODES)[number]
   | null;
+
+export type ProfileRenderMode = 'interactive' | 'preview';
+
+export type ProfileSurfacePresentation = 'standalone' | 'embedded';
+
+export type ProfileShowcaseStateId =
+  | 'streams-latest'
+  | 'streams-presave'
+  | 'streams-release-day'
+  | 'streams-video'
+  | 'fans-opt-in'
+  | 'fans-confirmed'
+  | 'fans-song-alert'
+  | 'fans-show-alert'
+  | 'tips-open'
+  | 'tips-apple-pay'
+  | 'tips-thank-you'
+  | 'tips-followup'
+  | 'tour'
+  | 'contact'
+  | 'catalog';
+
+export type ProfileShowcaseDrawerView =
+  | 'listen'
+  | 'subscribe'
+  | 'tour'
+  | 'pay'
+  | 'contact'
+  | null;
+
+export interface ProfilePreviewNotificationsState {
+  readonly kind?: 'button' | 'input' | 'status';
+  readonly tone: 'quiet' | 'compose' | 'success';
+  readonly label: string;
+  readonly helper?: string;
+  readonly value?: string;
+  readonly actionLabel?: string;
+}
+
+export interface ProfilePreviewOverlayState {
+  readonly kind: 'email-preview' | 'apple-pay' | 'thank-you';
+  readonly title: string;
+  readonly body: string;
+  readonly accentLabel?: string;
+}
+
+export interface ProfileShowcaseState {
+  readonly id: ProfileShowcaseStateId;
+  readonly drawerView: ProfileShowcaseDrawerView;
+  readonly latestReleaseKey: 'none' | 'presave' | 'live';
+  readonly releaseActionLabel?: string;
+  readonly notifications: ProfilePreviewNotificationsState;
+  readonly showSubscriptionConfirmedBanner: boolean;
+  readonly previewOverlay?: ProfilePreviewOverlayState | null;
+}
 
 export interface ProfileModeShellConfig {
   readonly showBackButton: boolean;
@@ -64,8 +122,8 @@ export interface ProfilePublicViewModel {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
-  readonly showTipButton: boolean;
-  readonly isTipModeActive: boolean;
+  readonly showPayButton: boolean;
+  readonly isPayModeActive: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton: boolean;
   readonly isTourModeActive: boolean;
@@ -86,6 +144,8 @@ export interface ProfilePublicViewModel {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  readonly releases?: readonly PublicRelease[];
 }
 
 export interface ProfileIdentityFields {

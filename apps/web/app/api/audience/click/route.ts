@@ -9,6 +9,12 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import {
+  resolveAudienceClickEventType,
+  resolveAudienceClickObjectType,
+  resolveAudienceClickVerb,
+} from '@/lib/audience/click-event-helpers';
+import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -25,26 +31,11 @@ import {
   deriveIntentLevel,
   getActionWeight,
   mergeAudienceTags,
-  trimHistory,
 } from '../lib/audience-utils';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 type AudienceMemberRecord = {
   id: string;
@@ -156,7 +147,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     const parsed = clickSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -310,18 +309,10 @@ export async function POST(request: NextRequest) {
         throw new Error('Unable to resolve audience member');
       }
 
-      const existingActions = Array.isArray(member.latestActions)
-        ? member.latestActions
-        : [];
-      const actionEntry = {
-        label: actionLabel ?? ACTION_LABELS[linkType] ?? 'interacted',
-        type: linkType,
-        platform: platform ?? linkType,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
-        timestamp: now.toISOString(),
-      };
-      const latestActions = trimHistory([actionEntry, ...existingActions], 5);
-      const actionCount = latestActions.length;
+      const existingActionCount = Array.isArray(member.latestActions)
+        ? member.latestActions.length
+        : 0;
+      const actionCount = Math.min(existingActionCount + 1, 5);
       const weight = getActionWeight(linkType);
       const tags = mergeAudienceTags(member.tags, audienceTags);
       const isBotMember = tags.includes('bot');
@@ -366,7 +357,6 @@ export async function POST(request: NextRequest) {
           updatedAt: now,
           engagementScore: updatedScore,
           intentLevel,
-          latestActions,
           deviceType: normalizedDevice,
           geoCity: city ?? member.geoCity ?? null,
           geoCountry: country ?? member.geoCountry ?? null,
@@ -375,6 +365,28 @@ export async function POST(request: NextRequest) {
             (member.spotifyConnected ?? false) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, member.id));
+
+      await recordAudienceEvent(tx, {
+        creatorProfileId: profileId,
+        audienceMemberId: member.id,
+        eventType: resolveAudienceClickEventType(linkType, metadata),
+        verb: resolveAudienceClickVerb(linkType),
+        confidence: 'observed',
+        sourceKind: null,
+        sourceLabel: undefined,
+        objectType: resolveAudienceClickObjectType(linkType, metadata),
+        objectId:
+          typeof metadataWithTipValue.contentId === 'string'
+            ? metadataWithTipValue.contentId
+            : linkId,
+        objectLabel:
+          actionLabel ??
+          (typeof metadataWithTipValue.target === 'string'
+            ? metadataWithTipValue.target
+            : platform),
+        platform,
+        properties: metadataWithTipValue,
+      });
     });
 
     return NextResponse.json(

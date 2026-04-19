@@ -5,18 +5,18 @@ const {
   mockCanAccessTasksWorkspace,
   mockDbSelect,
   mockDbRows,
+  mockGetCurrentUserProfile,
   mockGetCurrentUserEntitlements,
   mockNotFound,
-  mockRequireProfileId,
 } = vi.hoisted(() => ({
   mockCanAccessTasksWorkspace: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbRows: { rows: [] as Array<Record<string, unknown>> },
+  mockGetCurrentUserProfile: vi.fn(),
   mockGetCurrentUserEntitlements: vi.fn(),
   mockNotFound: vi.fn(() => {
     throw new Error('NOT_FOUND');
   }),
-  mockRequireProfileId: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -51,8 +51,8 @@ vi.mock('@/lib/entitlements/tasks-gate', () => ({
   canAccessTasksWorkspace: mockCanAccessTasksWorkspace,
 }));
 
-vi.mock('@/app/app/(shell)/dashboard/requireProfileId', () => ({
-  requireProfileId: mockRequireProfileId,
+vi.mock('@/lib/auth/session', () => ({
+  getCurrentUserProfile: mockGetCurrentUserProfile,
 }));
 
 vi.mock('@/components/features/dashboard/release-tasks', () => ({
@@ -109,9 +109,13 @@ async function renderResolvedTasksContent() {
 describe('release tasks page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireProfileId.mockResolvedValue('profile_1');
+    mockGetCurrentUserProfile.mockResolvedValue({
+      id: 'profile_1',
+      onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+    });
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAdmin: false,
+      canAccessTasksWorkspace: false,
       canAccessMetadataSubmissionAgent: false,
     });
     setupReleaseQueryRows([
@@ -134,7 +138,11 @@ describe('release tasks page', () => {
   });
 
   it('renders the release task page for entitled users', async () => {
-    mockCanAccessTasksWorkspace.mockResolvedValueOnce(true);
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      isAdmin: false,
+      canAccessTasksWorkspace: true,
+      canAccessMetadataSubmissionAgent: false,
+    });
 
     await renderResolvedTasksContent();
 

@@ -165,6 +165,166 @@ body:has(.profile-viewport) {
   }
 }
 
+/* Shared CTA reveal + step-stack motion primitives */
+
+:root {
+  --motion-reveal-duration: 220ms;
+  --motion-reveal-duration-fast: 180ms;
+  --motion-reveal-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-ui="cta-reveal"] {
+  --cta-reveal-radius: 999px;
+  --cta-reveal-border: color-mix(
+    in srgb,
+    var(--linear-text-primary) 8%,
+    transparent
+  );
+  --cta-reveal-border-active: color-mix(
+    in srgb,
+    var(--linear-text-primary) 13%,
+    transparent
+  );
+  --cta-reveal-surface: color-mix(
+    in srgb,
+    var(--linear-text-primary) 4%,
+    transparent
+  );
+  --cta-reveal-surface-active: color-mix(
+    in srgb,
+    var(--linear-text-primary) 7%,
+    transparent
+  );
+  --cta-reveal-shadow: 0 10px 28px rgba(6, 10, 16, 0.1);
+  --cta-reveal-shadow-active: 0 16px 36px rgba(6, 10, 16, 0.16);
+}
+
+[data-ui="cta-reveal"] .cta-reveal-shell {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-height: var(--cta-reveal-min-height, 56px);
+  border: 1px solid var(--cta-reveal-border);
+  border-radius: var(--cta-reveal-radius);
+  background: var(--cta-reveal-surface);
+  box-shadow: var(--cta-reveal-shadow);
+  overflow: clip;
+  transition:
+    border-color var(--motion-reveal-duration) var(--motion-reveal-ease),
+    background-color var(--motion-reveal-duration) var(--motion-reveal-ease),
+    box-shadow var(--motion-reveal-duration) var(--motion-reveal-ease);
+}
+
+[data-ui="cta-reveal"][data-visual-state="expanded"] .cta-reveal-shell,
+[data-ui="cta-reveal"][data-visual-state="submitting"] .cta-reveal-shell,
+[data-ui="cta-reveal"][data-visual-state="error"] .cta-reveal-shell,
+[data-ui="cta-reveal"][data-visual-state="success"] .cta-reveal-shell {
+  border-color: var(--cta-reveal-border-active);
+  background: var(--cta-reveal-surface-active);
+  box-shadow: var(--cta-reveal-shadow-active);
+}
+
+[data-ui="cta-reveal"] .cta-reveal-panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  transition:
+    opacity var(--motion-reveal-duration) var(--motion-reveal-ease),
+    clip-path var(--motion-reveal-duration) var(--motion-reveal-ease),
+    visibility var(--motion-reveal-duration) step-end;
+}
+
+[data-ui="cta-reveal"] .cta-reveal-panel--cta {
+  opacity: 1;
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
+  visibility: visible;
+}
+
+[data-ui="cta-reveal"] .cta-reveal-panel--form,
+[data-ui="cta-reveal"] .cta-reveal-panel--status {
+  opacity: 0;
+  clip-path: inset(0 0 0 calc(100% - 3.25rem) round var(--cta-reveal-radius));
+  visibility: hidden;
+  pointer-events: none;
+}
+
+[data-ui="cta-reveal"][data-visual-state="expanded"] .cta-reveal-panel--cta,
+[data-ui="cta-reveal"][data-visual-state="submitting"] .cta-reveal-panel--cta,
+[data-ui="cta-reveal"][data-visual-state="error"] .cta-reveal-panel--cta,
+[data-ui="cta-reveal"][data-visual-state="success"] .cta-reveal-panel--cta {
+  opacity: 0;
+  clip-path: inset(0 calc(100% - 3.25rem) 0 0 round var(--cta-reveal-radius));
+  visibility: hidden;
+  pointer-events: none;
+}
+
+[data-ui="cta-reveal"][data-visual-state="expanded"] .cta-reveal-panel--form,
+[data-ui="cta-reveal"][data-visual-state="submitting"] .cta-reveal-panel--form,
+[data-ui="cta-reveal"][data-visual-state="error"] .cta-reveal-panel--form {
+  opacity: 1;
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
+  visibility: visible;
+  pointer-events: auto;
+}
+
+[data-ui="cta-reveal"][data-visual-state="success"] .cta-reveal-panel--status {
+  opacity: 1;
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
+  visibility: visible;
+  pointer-events: auto;
+}
+
+[data-ui="cta-reveal"] .cta-reveal-support {
+  min-height: 20px;
+  transition:
+    opacity var(--motion-reveal-duration-fast) var(--motion-reveal-ease),
+    transform var(--motion-reveal-duration-fast) var(--motion-reveal-ease);
+}
+
+[data-ui="cta-reveal"] .cta-reveal-support:empty {
+  opacity: 0;
+  transform: translateY(-2px);
+}
+
+[data-ui="step-stack"] .step-stack-track {
+  position: relative;
+}
+
+[data-ui="step-stack"] .step-stack-panel {
+  transition:
+    opacity var(--motion-reveal-duration) var(--motion-reveal-ease),
+    transform var(--motion-reveal-duration) var(--motion-reveal-ease),
+    visibility var(--motion-reveal-duration) step-end;
+}
+
+[data-ui="step-stack"] .step-stack-panel[data-active="true"] {
+  position: relative;
+  inset: auto;
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+[data-ui="step-stack"] .step-stack-panel[data-active="false"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: none;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui="cta-reveal"] .cta-reveal-shell,
+  [data-ui="cta-reveal"] .cta-reveal-panel,
+  [data-ui="cta-reveal"] .cta-reveal-support,
+  [data-ui="step-stack"] .step-stack-panel {
+    transition-duration: 1ms !important;
+    transform: none !important;
+  }
+}
+
 /* PWA standalone mode polish — native-feel when installed */
 @media (display-mode: standalone) {
   body {
@@ -1009,6 +1169,20 @@ body {
       box-shadow: inset 0 -1px 0 0 var(--linear-border-strong);
     }
   }
+
+  .btn-linear-login {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    &:hover,
+    &:focus-visible,
+    &:active {
+      background-color: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+  }
+
   /* Linear Nav Signup Button - filled inverted style matching Linear header */
   .btn-linear-signup {
     position: relative;
@@ -1598,10 +1772,10 @@ body {
   }
   /* Micro-animations */
   .card-hover {
-    @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+    @apply transform transition-all duration-slow ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
     --tw-ring-color: var(--color-accent);
   }
   .btn-press {
@@ -2043,6 +2217,43 @@ body {
   .grid-item:hover {
     transform: none;
     box-shadow: none;
+  }
+}
+
+@keyframes artist-profile-mode-drawer-open {
+  from {
+    opacity: 0;
+    transform: translateY(42px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes artist-profile-mode-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.artist-profile-mode-drawer {
+  animation: artist-profile-mode-drawer-open 420ms
+    cubic-bezier(0.22, 0.84, 0.22, 1) both;
+  transform-origin: bottom center;
+}
+
+.artist-profile-mode-scrim {
+  animation: artist-profile-mode-scrim-in 300ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artist-profile-mode-drawer,
+  .artist-profile-mode-scrim {
+    animation: none;
   }
 }
 

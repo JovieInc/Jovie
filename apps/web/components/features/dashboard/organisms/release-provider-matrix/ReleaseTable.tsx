@@ -8,18 +8,13 @@ import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { useSortingManager } from './hooks/useSortingManager';
+import { MobileReleaseListLazy } from './MobileReleaseListLazy';
 import type { ReleaseTableProps } from './ReleaseTable.types';
 import { getReleaseContextMenuItems } from './utils/release-context-actions';
 import {
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
 } from './utils/release-table-renderers';
-
-const MobileReleaseList = lazy(() =>
-  import('./MobileReleaseList').then(m => ({
-    default: m.MobileReleaseList,
-  }))
-);
 
 const ReleaseTableWithTracks = lazy(() =>
   import('./ReleaseTableWithTracks').then(m => ({
@@ -50,6 +45,8 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   onDelete,
+  canGenerateAlbumArt,
+  onGenerateAlbumArt,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
@@ -77,6 +74,8 @@ export function ReleaseTable({
         onEdit,
         onCopy,
         onDelete,
+        canGenerateAlbumArt,
+        onGenerateAlbumArt,
         artistName,
         isSmartLinkLocked,
         getSmartLinkLockReason,
@@ -85,6 +84,8 @@ export function ReleaseTable({
       onEdit,
       onCopy,
       onDelete,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
       artistName,
       isSmartLinkLocked,
       getSmartLinkLockReason,
@@ -191,7 +192,7 @@ export function ReleaseTable({
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        const year = new Date(release.releaseDate).getFullYear();
+        const year = new Date(release.releaseDate).getUTCFullYear();
         return Number.isNaN(year) ? 'Unknown' : year.toString();
       },
       getGroupLabel: (year: string) => year,
@@ -213,6 +214,8 @@ export function ReleaseTable({
           artistName={artistName}
           onCopy={onCopy}
           onEdit={onEdit}
+          canGenerateAlbumArt={canGenerateAlbumArt}
+          onGenerateAlbumArt={onGenerateAlbumArt}
           columnVisibility={columnVisibility}
           rowHeight={rowHeight}
           onFocusedRowChange={onFocusedRowChange}
@@ -244,23 +247,17 @@ export function ReleaseTable({
     }
 
     return (
-      <Suspense
-        fallback={
-          <div className='border-b border-(--linear-app-frame-seam) px-4 py-3 text-[12px] text-secondary-token'>
-            Loading releases...
-          </div>
-        }
-      >
-        <MobileReleaseList
-          releases={releases}
-          artistName={artistName}
-          onEdit={onEdit}
-          onCopy={onCopy}
-          isSmartLinkLocked={isSmartLinkLocked}
-          getSmartLinkLockReason={getSmartLinkLockReason}
-          groupByYear={groupByYear}
-        />
-      </Suspense>
+      <MobileReleaseListLazy
+        releases={releases}
+        artistName={artistName}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        canGenerateAlbumArt={canGenerateAlbumArt}
+        onGenerateAlbumArt={onGenerateAlbumArt}
+        isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
+        groupByYear={groupByYear}
+      />
     );
   }
 

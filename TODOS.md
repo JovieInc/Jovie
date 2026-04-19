@@ -329,6 +329,17 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 ---
 
+## Creator-facing playlist OAuth and ownership
+
+**What:** Extend the admin-only playlist Spotify bootstrap into the final creator-facing model: `/jovie` system profile ownership, multi-artist Spotify OAuth, playlist ownership mapping, playlist preview/diff before generation, generation history UI, saved playlist presets/templates, and creator-facing controls.
+
+**Why:** The first implementation intentionally only lets an admin connect a Jovie publisher account and bootstrap pending playlist generation. The public product needs creator-level ownership and safer preview/review controls before it becomes self-serve.
+
+**Priority:** P2
+**Depends on:** Admin Platform Connections bootstrap.
+
+---
+
 ## Post-upgrade pixel pre-fill from Linktree detection
 
 **What:** When a creator upgrades to Pro, check if `discoveredPixels` has data (from Linktree ingestion). If so, surface their detected pixel IDs in the post-checkout celebration flow or first Settings > Audience visit: "We found your Facebook Pixel 123456 — enable it?" Pre-fill the `creatorPixels` row with the discovered ID on confirm.

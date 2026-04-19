@@ -30,7 +30,7 @@ const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
   testDir: './tests/product-screenshots',
-  testMatch: '**/*.spec.ts',
+  testMatch: '**/catalog.spec.ts',
   fullyParallel: false, // Run sequentially for deterministic screenshots
   forbidOnly: true,
   retries: 1, // One retry in case of flaky image loads

@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { cloneElement, isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { TipDrawer } from '@/features/profile/TipDrawer';
+import { PayDrawer } from '@/features/profile/PayDrawer';
 
 vi.mock('vaul', () => ({
   Drawer: {
@@ -26,10 +27,32 @@ vi.mock('vaul', () => ({
     Content: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
-    Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-    Description: ({ children }: { children: React.ReactNode }) => (
-      <p>{children}</p>
-    ),
+    Title: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    } & Record<string, unknown>) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <h2 {...props}>{children}</h2>
+      ),
+    Description: ({
+      children,
+      asChild,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    } & Record<string, unknown>) =>
+      asChild && isValidElement(children) ? (
+        cloneElement(children, props)
+      ) : (
+        <p {...props}>{children}</p>
+      ),
   },
 }));
 
@@ -37,8 +60,8 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/components/molecules/TipSelector', () => ({
-  TipSelector: () => <div>tip selector</div>,
+vi.mock('@/components/molecules/PaySelector', () => ({
+  PaySelector: () => <div>pay selector</div>,
 }));
 
 vi.mock('@/features/profile/StaticListenInterface', () => ({
@@ -58,7 +81,7 @@ describe('profile drawers dismiss behavior', () => {
       .mockImplementation(() => undefined);
 
     render(
-      <TipDrawer
+      <PayDrawer
         open
         onOpenChange={onOpenChange}
         artistName='A'

@@ -18,6 +18,24 @@ export const TOOL_SCHEMAS = {
       'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',
     inputSchema: z.object({}),
   },
+  generateAlbumArt: {
+    description:
+      'Generate three album art options for a release. Use when the artist asks to generate album artwork or cover art.',
+    inputSchema: z.object({
+      releaseTitle: z.string().max(200).optional(),
+      releaseId: z.string().uuid().optional(),
+      styleId: z
+        .enum([
+          'neo_pop_collage',
+          'chrome_noir',
+          'analog_dream',
+          'minimal_icon',
+        ])
+        .optional(),
+      prompt: z.string().max(500).optional(),
+      createRelease: z.boolean().optional(),
+    }),
+  },
 
   proposeSocialLink: {
     description:

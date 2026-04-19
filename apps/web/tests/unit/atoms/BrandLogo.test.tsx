@@ -39,20 +39,21 @@ describe('BrandLogo', () => {
   it('renders auto tone with no inline color style on wrapper', () => {
     const { container } = render(<BrandLogo tone='auto' />);
     const wrapper = container.querySelector('span');
-    expect(wrapper).not.toHaveStyle({ color: '#fff' });
-    expect(wrapper).not.toHaveStyle({ color: '#635aff' });
+    expect(wrapper).not.toHaveStyle({ color: 'var(--color-accent)' });
+    expect(wrapper).not.toHaveClass('text-white');
+    expect(wrapper).not.toHaveClass('text-accent');
   });
 
-  it('renders white tone with white color on wrapper', () => {
+  it('renders white tone with token-backed class on wrapper', () => {
     const { container } = render(<BrandLogo tone='white' />);
     const wrapper = container.querySelector('span');
-    expect(wrapper).toHaveStyle({ color: '#fff' });
+    expect(wrapper).toHaveClass('text-white');
   });
 
-  it('renders color tone with brand purple on wrapper', () => {
+  it('renders color tone with accent token class on wrapper', () => {
     const { container } = render(<BrandLogo tone='color' />);
     const wrapper = container.querySelector('span');
-    expect(wrapper).toHaveStyle({ color: '#635aff' });
+    expect(wrapper).toHaveClass('text-accent');
   });
 
   it('renders muted tone with muted class on wrapper', () => {

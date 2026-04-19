@@ -86,7 +86,7 @@ export function DashboardMockup({
             ref={el => {
               if (rowRefs) rowRefs.current[i] = el;
             }}
-            className='transition-colors duration-300'
+            className='transition-colors duration-slower'
             style={{
               backgroundColor: isActive
                 ? 'rgba(255,255,255,0.035)'
@@ -126,7 +126,7 @@ export function DashboardMockup({
               </div>
 
               <div
-                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-300'
+                className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-slower'
                 style={{
                   backgroundColor: isActive
                     ? 'rgba(255,255,255,0.07)'
@@ -153,7 +153,7 @@ export function DashboardMockup({
                   ref={el => {
                     if (urlRefs) urlRefs.current[i] = el;
                   }}
-                  className='font-mono text-xs transition-colors duration-300'
+                  className='font-mono text-xs transition-colors duration-slower'
                   style={{
                     color: isActive
                       ? 'var(--linear-text-secondary)'

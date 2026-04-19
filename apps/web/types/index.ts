@@ -307,6 +307,7 @@ export interface UserEntitlements {
   canAccessAdPixels: boolean;
   canBeVerified: boolean;
   aiCanUseTools: boolean;
+  canGenerateAlbumArt: boolean;
   canCreateManualReleases: boolean;
   canAccessTasksWorkspace: boolean;
   canGenerateReleasePlans: boolean;

@@ -111,7 +111,7 @@ describe('signup page', () => {
     ).toHaveAttribute('href', APP_ROUTES.LEGAL_PRIVACY);
   });
 
-  it('keeps signup claim persistence active for handle claims', async () => {
+  it('shows handle availability without writing pending claim session state', async () => {
     searchParamsState.value = 'handle=TestHandle';
 
     render(<SignUpPage />);
@@ -128,10 +128,7 @@ describe('signup page', () => {
     expect(
       await screen.findByText('@testhandle is available. Sign up to claim it.')
     ).toBeInTheDocument();
-
-    expect(JSON.parse(sessionStorage.getItem('pendingClaim') ?? '{}')).toEqual(
-      expect.objectContaining({ handle: 'testhandle' })
-    );
+    expect(sessionStorage.getItem('pendingClaim')).toBeNull();
   });
 
   it('shows the oauth compatibility banner and removes only oauth_error from the URL', async () => {

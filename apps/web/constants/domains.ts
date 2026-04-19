@@ -51,13 +51,16 @@ export function getProfileUrl(handle: string): string {
 }
 
 /**
- * Build a tip page URL for a given handle
- * @returns Full URL like https://jov.ie/handle/tip?source=qr
+ * Build a pay page URL for a given handle
+ * @returns Full URL like https://jov.ie/handle/pay?source=qr
  */
-export function getTipUrl(handle: string, source?: 'qr' | 'link'): string {
-  const baseUrl = `${BASE_URL}/${handle}/tip`;
+export function getPayUrl(handle: string, source?: 'qr' | 'link'): string {
+  const baseUrl = `${BASE_URL}/${handle}/pay`;
   return source ? `${baseUrl}?source=${source}` : baseUrl;
 }
+
+/** @deprecated Use getPayUrl instead */
+export const getTipUrl = getPayUrl;
 
 /**
  * Build an app/dashboard URL

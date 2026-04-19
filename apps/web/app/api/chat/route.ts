@@ -22,6 +22,7 @@ import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -30,9 +31,29 @@ import {
 } from '@/lib/intent-detection';
 import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
+  albumArtGenerationBurstLimiter,
+  albumArtGenerationLimiter,
   checkAiChatRateLimitForPlan,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
+import {
+  buildAlbumArtBackgroundPrompt,
+  generateAlbumArtBackgrounds,
+} from '@/lib/services/album-art/provider-xai';
+import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
+import {
+  uploadAlbumArtCandidate,
+  uploadAlbumArtManifest,
+} from '@/lib/services/album-art/storage';
+import {
+  ALBUM_ART_STYLES,
+  getAlbumArtStyle,
+} from '@/lib/services/album-art/styles';
+import type {
+  AlbumArtCandidate,
+  AlbumArtStyleId,
+  SuggestedReleaseTarget,
+} from '@/lib/services/album-art/types';
 import {
   buildCanvasMetadata,
   getCanvasStatusFromMetadata,
@@ -46,7 +67,7 @@ import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /** Maximum allowed message length (characters) */
 const MAX_MESSAGE_LENGTH = 4000;
@@ -202,6 +223,70 @@ function findReleaseByTitle(
     releases.find(r => r.title.toLowerCase().includes(lower)) ??
     null
   );
+}
+
+function normalizeReleaseTitle(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+function toSuggestedReleaseTarget(
+  release: ReleaseContext
+): SuggestedReleaseTarget {
+  return {
+    id: release.id,
+    title: release.title,
+    releaseDate: release.releaseDate,
+    artworkUrl: release.artworkUrl,
+  };
+}
+
+function resolveAlbumArtReleaseTarget(
+  releases: ReleaseContext[],
+  input: { releaseId?: string; releaseTitle?: string }
+):
+  | { status: 'resolved'; release: ReleaseContext }
+  | {
+      status: 'needs_target';
+      suggestedReleases: readonly SuggestedReleaseTarget[];
+    } {
+  if (input.releaseId) {
+    const release = releases.find(item => item.id === input.releaseId);
+    if (release) return { status: 'resolved', release };
+  }
+
+  if (!input.releaseTitle?.trim()) {
+    return {
+      status: 'needs_target',
+      suggestedReleases: releases.slice(0, 8).map(toSuggestedReleaseTarget),
+    };
+  }
+
+  const normalized = normalizeReleaseTitle(input.releaseTitle);
+  const exact = releases.find(
+    release => normalizeReleaseTitle(release.title) === normalized
+  );
+  if (exact) return { status: 'resolved', release: exact };
+
+  const fuzzy = releases.filter(release => {
+    const title = normalizeReleaseTitle(release.title);
+    return title.includes(normalized) || normalized.includes(title);
+  });
+
+  if (fuzzy.length === 1) {
+    return { status: 'resolved', release: fuzzy[0] };
+  }
+
+  return {
+    status: 'needs_target',
+    suggestedReleases: (fuzzy.length > 0 ? fuzzy : releases)
+      .slice(0, 8)
+      .map(toSuggestedReleaseTarget),
+  };
 }
 
 /** Format available release titles for error messages. */
@@ -648,6 +733,225 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
       }
 
       return buildCanvasPlan(release, motionPreference);
+    },
+  });
+}
+
+function createGenerateAlbumArtTool(params: {
+  readonly profileId: string | null;
+  readonly clerkUserId: string;
+  readonly artistName: string;
+  readonly canGenerateAlbumArt: boolean;
+}) {
+  return tool({
+    description:
+      'Generate three album art options for a release. Use this when the artist asks to generate, create, or design album artwork or cover art. If no matching release exists, return a target-selection result so the client can ask whether to create a release or attach the art to an existing release.',
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('Release title to generate album art for, if known.'),
+      releaseId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+          'Exact release ID when the request came from a release menu.'
+        ),
+      styleId: z
+        .enum([
+          'neo_pop_collage',
+          'chrome_noir',
+          'analog_dream',
+          'minimal_icon',
+        ])
+        .optional()
+        .describe('Visual style preset for the generated cover.'),
+      prompt: z
+        .string()
+        .max(500)
+        .optional()
+        .describe('Optional extra visual direction from the artist.'),
+      createRelease: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set true when the artist wants to generate candidates for a new release that does not exist yet.'
+        ),
+    }),
+    execute: async ({
+      releaseTitle,
+      releaseId,
+      styleId,
+      prompt,
+      createRelease,
+    }) => {
+      if (!params.profileId) {
+        return {
+          success: false as const,
+          retryable: false,
+          error: 'Profile ID required',
+        };
+      }
+      if (!params.canGenerateAlbumArt) {
+        return {
+          success: false as const,
+          retryable: false,
+          error: 'Album art generation requires a Pro plan.',
+        };
+      }
+
+      const releases = await fetchReleasesForChat(params.profileId);
+      const target = resolveAlbumArtReleaseTarget(releases, {
+        releaseId,
+        releaseTitle,
+      });
+
+      if (target.status === 'needs_target' && !createRelease) {
+        return {
+          success: true as const,
+          state: 'needs_release_target' as const,
+          releaseTitle: releaseTitle ?? null,
+          artistName: params.artistName,
+          suggestedReleases: target.suggestedReleases,
+        };
+      }
+
+      if (createRelease && !releaseTitle?.trim()) {
+        return {
+          success: true as const,
+          state: 'needs_release_target' as const,
+          releaseTitle: null,
+          artistName: params.artistName,
+          suggestedReleases:
+            target.status === 'needs_target' ? target.suggestedReleases : [],
+        };
+      }
+
+      const burstLimit = await albumArtGenerationBurstLimiter.limit(
+        params.clerkUserId
+      );
+      if (!burstLimit.success) {
+        return {
+          success: false as const,
+          retryable: true,
+          error:
+            burstLimit.reason ??
+            'Album art generation limit reached. Please try again later.',
+        };
+      }
+
+      const dailyLimit = await albumArtGenerationLimiter.limit(
+        params.clerkUserId
+      );
+      if (!dailyLimit.success) {
+        return {
+          success: false as const,
+          retryable: true,
+          error:
+            dailyLimit.reason ??
+            'Album art generation limit reached. Please try again later.',
+        };
+      }
+
+      try {
+        const style = getAlbumArtStyle(styleId as AlbumArtStyleId | undefined);
+        const generationId = randomUUID();
+        const targetRelease =
+          target.status === 'resolved'
+            ? target.release
+            : {
+                id: null,
+                title: releaseTitle?.trim() || 'Untitled Release',
+                artworkUrl: null,
+              };
+        const providerPrompt = buildAlbumArtBackgroundPrompt({
+          releaseTitle: targetRelease.title,
+          artistName: params.artistName,
+          style,
+          prompt,
+        });
+        const generated = await generateAlbumArtBackgrounds({
+          prompt: providerPrompt,
+        });
+        const now = new Date().toISOString();
+        const candidates: AlbumArtCandidate[] = [];
+
+        for (const [index, background] of generated.images.entries()) {
+          const candidateId = randomUUID();
+          const rendered = await renderAlbumArtCandidate({
+            background,
+            releaseTitle: targetRelease.title,
+            artistName: params.artistName,
+            style,
+          });
+          const urls = await uploadAlbumArtCandidate({
+            profileId: params.profileId,
+            generationId,
+            candidateId,
+            fullRes: rendered.fullRes,
+            preview: rendered.preview,
+          });
+
+          candidates.push({
+            id: candidateId,
+            generationId,
+            styleId: style.id,
+            styleLabel: style.label,
+            previewUrl: urls.previewUrl,
+            fullResUrl: urls.fullResUrl,
+            generatedAt: now,
+            provider: 'xai',
+            model: generated.model,
+            releaseTitle: targetRelease.title,
+            artistName: params.artistName,
+            prompt: providerPrompt,
+          });
+
+          if (index >= 2) break;
+        }
+
+        await uploadAlbumArtManifest({
+          generationId,
+          profileId: params.profileId,
+          releaseId: targetRelease.id,
+          releaseTitle: targetRelease.title,
+          artistName: params.artistName,
+          provider: 'xai',
+          model: generated.model,
+          styleId: style.id,
+          prompt: providerPrompt,
+          candidates,
+          createdAt: now,
+        });
+
+        return {
+          success: true as const,
+          state: 'generated' as const,
+          generationId,
+          releaseId: targetRelease.id,
+          releaseTitle: targetRelease.title,
+          artistName: params.artistName,
+          hasExistingArtwork: Boolean(targetRelease.artworkUrl),
+          candidates,
+          styles: Object.values(ALBUM_ART_STYLES).map(item => ({
+            id: item.id,
+            label: item.label,
+            description: item.description,
+          })),
+        };
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: 'album-art-generation' },
+          extra: { profileId: params.profileId, releaseId, releaseTitle },
+        });
+        return {
+          success: false as const,
+          retryable: true,
+          error: 'Unable to generate album art. Please try again.',
+        };
+      }
     },
   });
 }
@@ -1189,7 +1493,10 @@ function buildFreeChatTools(
 function buildChatTools(
   artistContext: ArtistContext,
   resolvedProfileId: string | null,
-  insightsEnabled: boolean
+  insightsEnabled: boolean,
+  clerkUserId: string,
+  canGenerateAlbumArt: boolean,
+  albumArtEnabled: boolean
 ) {
   return {
     ...(insightsEnabled
@@ -1203,6 +1510,16 @@ function buildChatTools(
       resolvedProfileId
     ),
     generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+    ...(albumArtEnabled && canGenerateAlbumArt
+      ? {
+          generateAlbumArt: createGenerateAlbumArtTool({
+            profileId: resolvedProfileId,
+            clerkUserId,
+            artistName: artistContext.displayName,
+            canGenerateAlbumArt,
+          }),
+        }
+      : {}),
     createPromoStrategy: createPromoStrategyTool(
       artistContext,
       resolvedProfileId
@@ -1510,6 +1827,7 @@ export async function POST(req: Request) {
 
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
+    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);
@@ -1517,7 +1835,14 @@ export async function POST(req: Request) {
     const tools = planLimits.booleans.aiCanUseTools
       ? {
           ...freeTools,
-          ...buildChatTools(artistContext, resolvedProfileId, insightsEnabled),
+          ...buildChatTools(
+            artistContext,
+            resolvedProfileId,
+            insightsEnabled,
+            userId,
+            currentUserEntitlements?.canGenerateAlbumArt ?? false,
+            albumArtEnabled
+          ),
         }
       : freeTools;
 

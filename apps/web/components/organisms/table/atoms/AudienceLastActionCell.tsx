@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -26,6 +27,29 @@ function resolveActionIcon(label: string | null | undefined): string {
   return 'Sparkles';
 }
 
+function deriveActionLabel(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string | null {
+  if (renderedAction.kind === 'sentence') return renderedAction.text;
+  if (lastAction)
+    return capitalizeFirst(lastAction.label?.trim()) || 'Unknown action';
+  return null;
+}
+
+function deriveActionIcon(
+  renderedAction:
+    | ReturnType<typeof renderAudienceEventSentence>
+    | { kind: 'empty' },
+  lastAction: AudienceAction | undefined
+): string {
+  if (renderedAction.kind === 'sentence') return renderedAction.icon;
+  if (lastAction) return resolveActionIcon(lastAction.label);
+  return 'Clock';
+}
+
 export function AudienceLastActionCell({
   actions,
   lastSeenAt,
@@ -38,10 +62,11 @@ export function AudienceLastActionCell({
   }
 
   const lastAction = actions[0];
-  const actionLabel = lastAction
-    ? capitalizeFirst(lastAction.label?.trim()) || 'Unknown action'
-    : null;
-  const iconName = lastAction ? resolveActionIcon(lastAction.label) : 'Clock';
+  const renderedAction = lastAction
+    ? renderAudienceEventSentence(lastAction)
+    : { kind: 'empty' as const };
+  const actionLabel = deriveActionLabel(renderedAction, lastAction);
+  const iconName = deriveActionIcon(renderedAction, lastAction);
 
   return (
     <div

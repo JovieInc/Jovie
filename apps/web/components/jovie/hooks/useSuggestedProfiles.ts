@@ -138,6 +138,10 @@ export function useSuggestedProfiles(
           url = `/api/suggestions/avatars/${suggestion.id}/select`;
           body = { profileId };
           break;
+        case 'playlist_fallback':
+          url = `/api/suggestions/playlist-fallback/${suggestion.id}/approve`;
+          body = { profileId };
+          break;
       }
 
       const res = await fetch(url, {
@@ -180,6 +184,10 @@ export function useSuggestedProfiles(
           break;
         case 'avatar':
           url = `/api/suggestions/avatars/${suggestion.id}/dismiss`;
+          body = { profileId };
+          break;
+        case 'playlist_fallback':
+          url = `/api/suggestions/playlist-fallback/${suggestion.id}/reject`;
           body = { profileId };
           break;
       }

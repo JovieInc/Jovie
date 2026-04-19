@@ -124,7 +124,7 @@ function ListenContent() {
       {dsps.map(dsp => (
         <div
           key={dsp.name}
-          className='flex items-center justify-between rounded-xl bg-surface-1 px-3 py-2.5'
+          className='flex items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'
         >
           <span className='text-[12px] font-medium text-primary-token'>
             {dsp.name}
@@ -136,17 +136,17 @@ function ListenContent() {
   );
 }
 
-function TipContent() {
+function PayContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {([3, 5, 7] as const).map((amount, i) => (
+        {([5, 10, 20] as const).map((amount, i) => (
           <div
             key={amount}
-            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center ${
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-[999px] text-center ${
               i === 1
                 ? 'bg-surface-2 text-primary-token shadow-sm'
                 : 'bg-surface-1 text-primary-token'
@@ -173,7 +173,7 @@ function TourContent() {
   const show = MOCK_TOUR_DATES[0];
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <div className='flex w-full items-center justify-between rounded-xl px-3 py-2.5 bg-surface-1'>
+      <div className='flex w-full items-center justify-between rounded-full bg-surface-1 px-3 py-2.5'>
         <div className='min-w-0'>
           <p className='text-[13px] font-medium text-primary-token truncate'>
             {show.venue}
@@ -195,7 +195,7 @@ function ProfileContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       {/* Horizontal release card — album art left, action right */}
-      <div className='flex items-center gap-3 rounded-xl bg-surface-1 p-2.5'>
+      <div className='flex items-center gap-3 rounded-full bg-surface-1 p-2.5'>
         <div
           className='h-14 w-14 shrink-0 overflow-hidden rounded-lg shadow-sm'
           style={{
@@ -211,7 +211,7 @@ function ProfileContent() {
             New Single
           </p>
         </div>
-        <span className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
+        <span className='shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'>
           Listen
         </span>
       </div>
@@ -222,10 +222,10 @@ function ProfileContent() {
 /** Pre-built mode content keyed by mode ID. */
 export const MODE_CONTENT: Record<string, React.ReactNode> = {
   listen: <ListenContent />,
-  tip: <TipContent />,
+  pay: <PayContent />,
   tour: <TourContent />,
   profile: <ProfileContent />,
 };
 
 /** Mode IDs in display order. */
-export const MODE_IDS = ['profile', 'tour', 'tip', 'listen'] as const;
+export const MODE_IDS = ['profile', 'tour', 'pay', 'listen'] as const;

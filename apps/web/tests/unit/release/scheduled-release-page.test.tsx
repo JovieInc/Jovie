@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { cloneElement, isValidElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 type LinkProps = {
@@ -36,8 +37,13 @@ vi.mock('@/features/profile/artist-notifications-cta', () => ({
 
 const shareSpy = vi.fn();
 
-vi.mock('@/features/release/SmartLinkShell', () => ({
-  useSmartLinkShare: () => shareSpy,
+vi.mock('@/features/share/PublicShareMenu', () => ({
+  PublicShareMenu: ({ trigger }: { readonly trigger: React.ReactNode }) =>
+    isValidElement(trigger)
+      ? cloneElement(trigger, {
+          onClick: () => shareSpy(),
+        })
+      : null,
 }));
 
 vi.mock('@/features/release/ReleaseCountdown', () => ({

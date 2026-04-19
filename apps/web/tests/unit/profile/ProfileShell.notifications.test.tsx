@@ -51,10 +51,10 @@ describe('ProfileShell notification trigger', () => {
     vi.clearAllMocks();
     routerPushMock.mockReset();
     window.localStorage.clear();
-    window.history.replaceState(null, '', '/testartist?mode=tip');
+    window.history.replaceState(null, '', '/testartist?mode=pay');
   });
 
-  it('routes bell clicks from tip mode to subscribe mode when there are no active subscriptions', () => {
+  it('routes bell clicks from pay mode to subscribe mode when there are no active subscriptions', () => {
     renderWithQueryClient(
       <ProfileShell
         artist={makeArtist()}
@@ -73,7 +73,7 @@ describe('ProfileShell notification trigger', () => {
     window.history.replaceState(
       null,
       '',
-      '/testartist?mode=tip&source=someSource'
+      '/testartist?mode=pay&source=someSource'
     );
 
     renderWithQueryClient(

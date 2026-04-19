@@ -18,6 +18,14 @@ const PROFILE_COMPACT_TEMPLATE = join(
   'templates',
   'ProfileCompactTemplate.tsx'
 );
+const PROFILE_COMPACT_SURFACE = join(
+  process.cwd(),
+  'components',
+  'features',
+  'profile',
+  'templates',
+  'ProfileCompactSurface.tsx'
+);
 
 describe('profile shell token contract', () => {
   it('defines the shared profile shell aliases in the design system', () => {
@@ -38,6 +46,10 @@ describe('profile shell token contract', () => {
     expect(drawerShellContents).toContain('--profile-drawer-radius-mobile');
     expect(drawerShellContents).toContain('--profile-shell-max-width');
     expect(compactTemplateContents).toContain('--profile-shell-card-radius');
-    expect(compactTemplateContents).toContain('--profile-action-radius');
+    const compactSurfaceContents = readFileSync(
+      PROFILE_COMPACT_SURFACE,
+      'utf8'
+    );
+    expect(compactSurfaceContents).toContain('--profile-action-radius');
   });
 });

@@ -114,7 +114,7 @@ function formatTitleFromSlug(slug: string): string {
 }
 
 function stripHtmlH1Blocks(html: string): string {
-  return html.replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, '');
+  return html.replaceAll(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi, '');
 }
 
 async function readBlogPostFile(slug: string): Promise<{
@@ -170,7 +170,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
 
   const slugs = entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-    .map(entry => entry.name.replace(/\.md$/, ''));
+    .map(entry => entry.name.slice(0, -3));
 
   const posts = await Promise.all(
     slugs.map(async slug => {
@@ -210,5 +210,5 @@ export const getBlogPostSlugs = cache(async (): Promise<string[]> => {
   }
   return entries
     .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
-    .map(entry => entry.name.replace(/\.md$/, ''));
+    .map(entry => entry.name.slice(0, -3));
 });

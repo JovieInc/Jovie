@@ -12,9 +12,10 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const WEB_ROOT = join(import.meta.dirname, '..');
+const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = join(
   WEB_ROOT,
   '../../docs/performance/bundle-baseline.json'

@@ -25,7 +25,7 @@ global.localStorage = {
   },
 } as unknown as Storage;
 
-vi.mock('@/lib/queries', () => ({
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useNotificationStatusQuery: (...args: unknown[]) => mockStatusQuery(...args),
   useUnsubscribeNotificationsMutation: () => ({
     mutateAsync: mockUnsubscribeMutation,

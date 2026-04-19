@@ -39,12 +39,12 @@ const MODES: ModeData[] = [
     outcome: 'Sell tickets',
   },
   {
-    id: 'tip',
+    id: 'pay',
     headline: 'Turn in-person moments into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
-    slug: 'tip',
-    outcome: 'Earn tips',
+      'When someone scans your QR code after a set, Jovie opens the fastest payment flow instead of another menu of links.',
+    slug: 'pay',
+    outcome: 'Earn',
   },
   {
     id: 'listen',
@@ -297,7 +297,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <span
                         key={mode.id}
-                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-300'
+                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-slower'
                         style={{
                           borderColor:
                             i === activeIndex
@@ -382,7 +382,7 @@ export function DeeplinksGrid() {
                         className='font-mono tracking-[-0.02em]'
                         style={{
                           fontSize: i === activeIndex ? '20px' : '15px',
-                          fontWeight: i === activeIndex ? 600 : 400,
+                          fontWeight: i === activeIndex ? 590 : 400,
                           color:
                             i === activeIndex
                               ? 'var(--linear-text-primary)'
@@ -446,7 +446,7 @@ export function DeeplinksGrid() {
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
-                moment: listen, tip, tour, or subscribe.
+                moment: listen, pay, tour, or subscribe.
               </p>
             </div>
 

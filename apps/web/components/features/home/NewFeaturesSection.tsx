@@ -97,7 +97,7 @@ export function NewFeaturesSection() {
           {outcomes.map(outcome => (
             <div
               key={outcome.title}
-              className='p-6 rounded-2xl border border-subtle bg-surface-1 hover:bg-surface-2 hover:border-default transition-colors duration-200'
+              className='p-6 rounded-2xl border border-subtle bg-surface-1 hover:bg-surface-2 hover:border-default transition-colors duration-slow'
             >
               <h3 className='text-base font-semibold text-primary-token'>
                 {outcome.title}

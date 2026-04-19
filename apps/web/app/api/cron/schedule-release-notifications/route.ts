@@ -2,6 +2,7 @@ import {
   and,
   asc,
   sql as drizzleSql,
+  eq,
   gt,
   gte,
   inArray,
@@ -11,10 +12,13 @@ import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
-import { discogReleases } from '@/lib/db/schema/content';
+import { users } from '@/lib/db/schema/auth';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { captureError } from '@/lib/error-tracking';
+import { getReleaseNotificationEligibility } from '@/lib/notifications/release-eligibility';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -57,32 +61,6 @@ type NotificationInsertValue = {
   dedupKey: string;
   metadata: { releaseTitle: string | null; channel: string };
 };
-
-/** Fetch eligible creator IDs based on plan entitlements. */
-async function getEligibleCreatorIds(
-  creatorProfileIds: string[]
-): Promise<Set<string> | null> {
-  const eligible = new Set<string>();
-  try {
-    const entitlementsMap =
-      await getBatchCreatorEntitlements(creatorProfileIds);
-    for (const [profileId, { entitlements }] of entitlementsMap) {
-      if (entitlements.booleans.canSendNotifications) {
-        eligible.add(profileId);
-      }
-    }
-  } catch (error) {
-    logger.warn(
-      '[schedule-release-notifications] Batch entitlements lookup failed, preserving releases for retry',
-      {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        creatorCount: creatorProfileIds.length,
-      }
-    );
-    return null;
-  }
-  return eligible;
-}
 
 const SUBSCRIBER_PAGE_SIZE = 500;
 const INSERT_BATCH_SIZE = 500;
@@ -231,6 +209,7 @@ export async function scheduleReleaseNotifications(): Promise<{
       creatorProfileId: discogReleases.creatorProfileId,
       title: discogReleases.title,
       releaseDate: discogReleases.releaseDate,
+      sourceType: discogReleases.sourceType,
     })
     .from(discogReleases)
     .where(
@@ -248,28 +227,123 @@ export async function scheduleReleaseNotifications(): Promise<{
   const creatorProfileIds = [
     ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
   ];
+  const releaseIds = [...new Set(upcomingReleases.map(r => r.id))];
 
-  const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
-  if (!eligibleCreatorIds) {
+  let entitlementsMap: Awaited<ReturnType<typeof getBatchCreatorEntitlements>>;
+  try {
+    entitlementsMap = await getBatchCreatorEntitlements(creatorProfileIds);
+  } catch (error) {
+    logger.warn(
+      '[schedule-release-notifications] Batch entitlements lookup failed, preserving releases for retry',
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        creatorCount: creatorProfileIds.length,
+      }
+    );
     throw new Error(
       'Creator entitlements lookup failed while scheduling release notifications'
     );
   }
 
-  // Filter to only eligible releases
-  const eligibleReleases = upcomingReleases.filter(r =>
-    eligibleCreatorIds.has(r.creatorProfileId)
+  const [creatorRows, smartLinkRows] = await Promise.all([
+    db
+      .select({
+        id: creatorProfiles.id,
+        isClaimed: creatorProfiles.isClaimed,
+        settings: creatorProfiles.settings,
+        spotifyId: creatorProfiles.spotifyId,
+        trialNotificationsSent: users.trialNotificationsSent,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`),
+    db
+      .select({
+        releaseId: providerLinks.releaseId,
+      })
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
+        )
+      ),
+  ]);
+
+  const subscriberCountRows = await db
+    .select({
+      creatorProfileId: notificationSubscriptions.creatorProfileId,
+      verifiedSubscriberCount: drizzleSql<number>`COUNT(*)`.mapWith(Number),
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        drizzleSql`${notificationSubscriptions.creatorProfileId} = ANY(${creatorProfileIds})`,
+        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
+        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+      )
+    )
+    .groupBy(notificationSubscriptions.creatorProfileId);
+
+  const eligibleCreatorIds = new Set(
+    [...entitlementsMap.entries()]
+      .filter(([, value]) => value.entitlements.booleans.canSendNotifications)
+      .map(([profileId]) => profileId)
   );
+
+  const creatorMap = new Map(creatorRows.map(row => [row.id, row]));
+  const subscriberCountMap = new Map(
+    subscriberCountRows.map(row => [
+      row.creatorProfileId,
+      row.verifiedSubscriberCount,
+    ])
+  );
+  const smartLinkReleaseIds = new Set(
+    smartLinkRows.flatMap(row => (row.releaseId ? [row.releaseId] : []))
+  );
+
+  const eligibleReleases = upcomingReleases.filter(release => {
+    if (!eligibleCreatorIds.has(release.creatorProfileId)) {
+      return false;
+    }
+
+    const creator = creatorMap.get(release.creatorProfileId);
+    const entitlements = entitlementsMap.get(release.creatorProfileId);
+    if (!creator || !entitlements) {
+      return false;
+    }
+
+    const spotifyImportStatus =
+      typeof creator.settings?.spotifyImportStatus === 'string'
+        ? creator.settings.spotifyImportStatus
+        : null;
+    const eligibility = getReleaseNotificationEligibility({
+      canSendNotifications:
+        entitlements.entitlements.booleans.canSendNotifications,
+      hasSmartLink: smartLinkReleaseIds.has(release.id),
+      isClaimed: creator.isClaimed === true,
+      isTrialing: entitlements.plan === 'trial',
+      releaseSourceType: release.sourceType,
+      spotifyId: creator.spotifyId,
+      spotifyImportStatus,
+      trialNotificationsSent: creator.trialNotificationsSent ?? 0,
+      verifiedSubscriberCount:
+        subscriberCountMap.get(release.creatorProfileId) ?? 0,
+    });
+
+    return eligibility.eligible;
+  });
   const skippedCount = upcomingReleases.length - eligibleReleases.length;
   if (skippedCount > 0) {
     logger.info(
-      `[schedule-release-notifications] Skipped ${skippedCount} releases from free-plan creators`
+      `[schedule-release-notifications] Skipped ${skippedCount} ineligible releases`
     );
   }
 
   if (eligibleReleases.length === 0) {
     logger.info(
-      '[schedule-release-notifications] No eligible releases after plan check'
+      '[schedule-release-notifications] No eligible releases after eligibility checks'
     );
     return { scheduled: 0, releasesFound: upcomingReleases.length };
   }

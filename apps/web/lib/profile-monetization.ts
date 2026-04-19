@@ -1,4 +1,4 @@
-import { getTipUrl } from '@/constants/domains';
+import { getPayUrl } from '@/constants/domains';
 import { APP_ROUTES, type AppRoute } from '@/constants/routes';
 
 export type ProfilePaymentState =
@@ -75,19 +75,19 @@ function buildNarrative(
 ): string {
   switch (paymentState) {
     case 'needs_profile_url':
-      return 'Tip links and QR codes need a public profile URL.';
+      return 'Pay links and QR codes need a public profile URL.';
     case 'not_setup':
-      return 'Fans cannot tip until payouts are configured.';
+      return 'Fans cannot pay until payouts are configured.';
     case 'setup_incomplete':
       return provider === 'stripe'
         ? 'Connected, payouts are not live yet.'
-        : 'Finish setup to start receiving tips.';
+        : 'Finish setup to start receiving payments.';
     case 'ready_no_activity':
       return 'No visits yet. Share your link or QR to start.';
     case 'traffic_no_tips':
-      return `${formatCount(tipVisits, 'fan opened', 'fans opened')} your tip link. No tips yet.`;
+      return `${formatCount(tipVisits, 'fan opened', 'fans opened')} your pay link. No payments yet.`;
     case 'active':
-      return `${formatCount(tipsReceived, 'fan tipped', 'fans tipped')} you ${formatCurrency(totalReceivedCents)} total.`;
+      return `${formatCount(tipsReceived, 'fan paid', 'fans paid')} you ${formatCurrency(totalReceivedCents)} total.`;
   }
 }
 
@@ -98,13 +98,13 @@ export function getProfileMonetizationHeading(
     case 'needs_profile_url':
       return 'Finish Your Profile URL';
     case 'not_setup':
-      return 'Tips Off';
+      return 'Payments Off';
     case 'setup_incomplete':
       return 'Finish Payments Setup';
     case 'ready_no_activity':
     case 'traffic_no_tips':
     case 'active':
-      return 'Tips Live';
+      return 'Payments Live';
   }
 }
 
@@ -116,13 +116,13 @@ export function getProfileMonetizationPrimaryActionLabel(
     case 'needs_profile_url':
       return 'Set Username';
     case 'not_setup':
-      return stripeConnectEnabled ? 'Set Up Payments' : 'Set Up Tips';
+      return 'Set Up Payments';
     case 'setup_incomplete':
       return 'Complete Setup';
     case 'ready_no_activity':
     case 'traffic_no_tips':
     case 'active':
-      return 'Copy Tip Link';
+      return 'Copy Pay Link';
   }
 }
 
@@ -188,7 +188,7 @@ export function resolveProfileMonetizationSummary(
 
   const tipUrl =
     hasProfileUrl && (stripeReady || hasVenmoSetup)
-      ? getTipUrl(normalizedUsername)
+      ? getPayUrl(normalizedUsername)
       : null;
 
   return {

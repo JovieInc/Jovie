@@ -68,7 +68,7 @@ export function getTipThankYouText(data: TipThankYouTemplateData): string {
 
   return `${greeting}
 
-Your ${amount} tip means the world to ${artistName}. Thank you for your support!
+Your ${amount} support means the world to ${artistName}. Thank you!
 
 Check out more from ${artistName}: ${profileUrl}
 
@@ -222,7 +222,7 @@ export function getTipThankYouHtml(data: TipThankYouTemplateData): string {
                 ${greeting}
               </p>
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-                Your ${amount} tip means the world to ${safeArtistName}. Thank you for your generous support.
+                Your ${amount} support means the world to ${safeArtistName}. Thank you for your generous support.
               </p>
 
               <!-- Profile Link -->

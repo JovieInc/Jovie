@@ -56,15 +56,16 @@ export function SegmentedDigitBox({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[18px] border font-[620] tracking-[-0.035em] transition-[transform,border-color,background-color,box-shadow] duration-150',
+        'relative flex items-center justify-center rounded-[18px] border font-[620] tracking-[-0.035em] transition-[border-color,background-color,box-shadow] duration-150',
         boxSizeClassName,
-        'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-primary-token shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl',
+        'border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
         isFocused
-          ? 'scale-[1.01] border-[color:var(--profile-pearl-bg-active)] bg-[var(--profile-pearl-bg-active)] ring-2 ring-[rgb(var(--focus-ring))]/20'
+          ? 'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] ring-2 ring-[rgb(var(--focus-ring))]/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
           : 'hover:bg-[var(--profile-pearl-bg-hover)]',
-        error && 'border-red-500/55 ring-2 ring-red-500/12',
+        error &&
+          'border-red-500/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,rgba(127,29,29,0.12))] ring-2 ring-red-500/14',
         disabled && 'opacity-50 cursor-not-allowed',
-        'active:scale-[0.985]'
+        'active:bg-[var(--profile-pearl-bg-hover)]'
       )}
     >
       <input

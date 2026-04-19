@@ -4,11 +4,16 @@ import { SimpleTooltip } from '@jovie/ui';
 import { Globe, Music, Search } from 'lucide-react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-import type { AudienceReferrer, AudienceUtmParams } from '@/types';
+import type {
+  AudienceAction,
+  AudienceReferrer,
+  AudienceUtmParams,
+} from '@/types';
 
 export interface AudienceSourceCellProps {
   readonly referrerHistory: AudienceReferrer[];
   readonly utmParams?: AudienceUtmParams;
+  readonly actions?: AudienceAction[];
   readonly className?: string;
 }
 
@@ -83,8 +88,12 @@ function formatUtmSourceLabel(utm: AudienceUtmParams): string | null {
 
 function resolveSource(
   referrerHistory: AudienceReferrer[],
-  utmParams?: AudienceUtmParams
+  utmParams?: AudienceUtmParams,
+  actions?: AudienceAction[]
 ): string {
+  const actionSource = actions?.[0]?.sourceLabel;
+  if (actionSource) return actionSource;
+
   const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;
   if (utmLabel) return utmLabel;
 
@@ -107,9 +116,10 @@ function getIconForSource(label: string): React.ReactElement {
 export function AudienceSourceCell({
   referrerHistory,
   utmParams,
+  actions,
   className,
 }: AudienceSourceCellProps) {
-  const sourceLabel = resolveSource(referrerHistory, utmParams);
+  const sourceLabel = resolveSource(referrerHistory, utmParams, actions);
   const icon = getIconForSource(sourceLabel);
 
   return (

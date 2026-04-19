@@ -28,7 +28,7 @@ import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/Setting
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
 import { publicEnv } from '@/lib/env-public';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -66,7 +66,7 @@ function getFocusedSettingsHref(sectionId: string): string {
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
     case 'data-privacy':
-      return APP_ROUTES.SETTINGS_DELETE_ACCOUNT;
+      return APP_ROUTES.SETTINGS_DATA_PRIVACY;
     case 'artist-profile':
       return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
     case 'contacts':
@@ -193,7 +193,7 @@ export function SettingsPolished({
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
-  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
+  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
 
   const renderAccountSection = useCallback(
     () =>

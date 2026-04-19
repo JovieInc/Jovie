@@ -353,8 +353,8 @@ test.describe('Profile Modes @smoke @critical', () => {
             closeSelector: page.getByRole('button', { name: 'Close' }).first(),
           },
           {
-            selector: page.locator('[data-testid="tip-trigger"]').first(),
-            openedText: /tip\s+dua lipa/i,
+            selector: page.locator('[data-testid="pay-trigger"]').first(),
+            openedText: /support\s+dua lipa/i,
             closeSelector: page.getByRole('button', { name: 'Close' }).first(),
           },
           {

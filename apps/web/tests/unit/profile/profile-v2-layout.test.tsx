@@ -42,7 +42,7 @@ describe('profile V2 layout constraints', () => {
     );
 
     expect(screen.getByTestId('profile-viewport-shell')).toHaveClass(
-      'md:rounded-[30px]'
+      'md:rounded-[var(--profile-shell-card-radius)]'
     );
   });
 

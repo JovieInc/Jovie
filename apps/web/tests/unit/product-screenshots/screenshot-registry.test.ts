@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 import { SCREENSHOT_SCENARIOS } from '../../../lib/screenshots/registry';
+
+const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
+  'tim-white-profile-tour-mobile',
+  'tim-white-profile-pay-mobile',
+  'tim-white-profile-presave-mobile',
+  'tim-white-profile-live-mobile',
+  'tim-white-profile-video-mobile',
+  'tim-white-profile-subscribe-mobile',
+  'tim-white-profile-contact-mobile',
+  'tim-white-profile-listen-mobile',
+] as const;
 
 describe('screenshot registry', () => {
   it('uses unique scenario ids', () => {
@@ -37,6 +49,20 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('keeps canonical screenshot scenarios backed by declared demo mirrors', () => {
+    for (const surface of CANONICAL_SURFACES) {
+      expect(surface.sourceComponent.length).toBeGreaterThan(0);
+
+      for (const screenshotId of surface.screenshotIds) {
+        const scenario = SCREENSHOT_SCENARIOS.find(
+          currentScenario => currentScenario.id === screenshotId
+        );
+
+        expect(scenario?.route).toBe(surface.demoRoute);
+      }
+    }
+  });
+
   it('leaves non-canonical captures unassigned', () => {
     const nonCanonicalScenarios = SCREENSHOT_SCENARIOS.filter(
       scenario => scenario.canonicalSurfaceId === undefined
@@ -48,5 +74,69 @@ describe('screenshot registry', () => {
       expect(scenario.canonicalSurfaceLabel).toBeUndefined();
       expect(scenario.canonicalSurfaceReviewRoute).toBeUndefined();
     }
+  });
+
+  it('keeps artist profile section screenshots in page order', () => {
+    const expectedIds = ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER.flatMap(
+      section =>
+        section.screenshotScenarioId ? [section.screenshotScenarioId] : []
+    );
+    const actualIds = SCREENSHOT_SCENARIOS.map(scenario => scenario.id).filter(
+      id => expectedIds.includes(id)
+    );
+
+    expect(actualIds).toEqual(expectedIds);
+
+    for (const section of ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === section.screenshotScenarioId
+      );
+
+      expect(scenario?.route).toBe('/artist-profiles');
+      expect(scenario?.captureTarget).toBe('locator');
+      expect(scenario?.captureSelector).toBe(
+        `[data-testid="${section.testId}"]`
+      );
+      expect(scenario?.waitFor).toBe(`[data-testid="${section.testId}"]`);
+    }
+  });
+
+  it('registers the power features section screenshot scenario', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario =>
+        currentScenario.id === 'artist-profile-power-features-section-desktop'
+    );
+
+    expect(scenario?.title).toBe('Artist Profile Power Features Section');
+    expect(scenario?.route).toBe('/artist-profiles');
+    expect(scenario?.captureSelector).toBe(
+      '[data-testid="artist-profile-section-spec-wall"]'
+    );
+  });
+
+  it('uses Tim White profile screenshots as the artist mode source of truth', () => {
+    const scenarioIds = new Set(
+      SCREENSHOT_SCENARIOS.map(scenario => scenario.id)
+    );
+
+    for (const id of TIM_WHITE_PROFILE_SCREENSHOT_IDS) {
+      expect(scenarioIds.has(id)).toBe(true);
+    }
+
+    for (const scenario of SCREENSHOT_SCENARIOS) {
+      expect(scenario.id.startsWith('artist-profile-mode-')).toBe(false);
+      expect(
+        scenario.publicExportPath?.startsWith('artist-profile-mode-') ?? false
+      ).toBe(false);
+    }
+  });
+
+  it('freezes the capture section screenshot on the subscribed state', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario =>
+        currentScenario.id === 'artist-profile-capture-section-desktop'
+    );
+
+    expect(scenario?.reducedMotion).toBe(true);
   });
 });

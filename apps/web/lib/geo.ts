@@ -54,5 +54,76 @@ function toRadians(degrees: number): number {
 
 /**
  * Threshold for "Near You" badge in kilometers (~100 miles).
+ * @deprecated Use calculateLocalNearbyRadius() for density-aware thresholds.
  */
 export const NEAR_YOU_THRESHOLD_KM = 160;
+
+// Density-aware proximity constants
+export const DENSE_RADIUS_MILES = 50;
+export const SPARSE_RADIUS_MILES = 150;
+export const DENSITY_SCAN_MILES = 200;
+export const DENSITY_THRESHOLD = 3;
+
+/**
+ * Calculate the nearby radius based on venue density around the user's nearest venue.
+ *
+ * Algorithm:
+ * 1. Find the user's nearest venue
+ * 2. Count how many OTHER venues are within DENSITY_SCAN_MILES of that nearest venue
+ * 3. If count >= DENSITY_THRESHOLD: dense cluster → small radius (50mi)
+ * 4. Otherwise: sparse area → large radius (150mi)
+ *
+ * This avoids a global classification problem where a dense European cluster
+ * would shrink the radius for a fan near an isolated US date.
+ */
+export function calculateLocalNearbyRadius(
+  userLocation: Coordinates,
+  allVenueCoords: Coordinates[]
+): number {
+  if (allVenueCoords.length === 0) {
+    return SPARSE_RADIUS_MILES;
+  }
+
+  // Find the nearest venue to the user
+  let nearestIdx = 0;
+  let nearestDist = Infinity;
+
+  for (let i = 0; i < allVenueCoords.length; i++) {
+    const dist = calculateDistanceMiles(userLocation, allVenueCoords[i]);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearestIdx = i;
+    }
+  }
+
+  const nearestVenue = allVenueCoords[nearestIdx];
+
+  // Count other venues within DENSITY_SCAN_MILES of the nearest venue
+  let neighborCount = 0;
+  for (let i = 0; i < allVenueCoords.length; i++) {
+    if (i === nearestIdx) continue;
+    const dist = calculateDistanceMiles(nearestVenue, allVenueCoords[i]);
+    if (dist <= DENSITY_SCAN_MILES) {
+      neighborCount++;
+    }
+  }
+
+  return neighborCount >= DENSITY_THRESHOLD
+    ? DENSE_RADIUS_MILES
+    : SPARSE_RADIUS_MILES;
+}
+
+/**
+ * Check if a venue is near the user given a specific radius.
+ */
+export function isNearUser(
+  userLocation: Coordinates,
+  venueLocation: Coordinates,
+  radiusMiles: number
+): { isNearby: boolean; distanceMiles: number } {
+  const distanceMiles = calculateDistanceMiles(userLocation, venueLocation);
+  return {
+    isNearby: distanceMiles <= radiusMiles,
+    distanceMiles,
+  };
+}

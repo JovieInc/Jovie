@@ -142,4 +142,39 @@ describe('EntitySidebarShell', () => {
     expect(footerContainer).not.toHaveAttribute('data-variant', 'card');
     expect(footerContainer).toHaveClass('px-3', 'py-2.5');
   });
+
+  it('defaults to child-owned scrolling for drawer body content', () => {
+    const { container } = render(
+      <EntitySidebarShell isOpen ariaLabel='Child scroll drawer'>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const body = container.querySelector('[data-scroll-strategy="child"]');
+
+    expect(body).toBeInTheDocument();
+    expect(body).not.toHaveClass('overflow-y-auto');
+    expect(body).toHaveClass('flex', 'flex-1', 'min-h-0', 'flex-col');
+  });
+
+  it('preserves shell-owned scrolling when explicitly requested', () => {
+    const { container } = render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Shell scroll drawer'
+        scrollStrategy='shell'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const body = container.querySelector('[data-scroll-strategy="shell"]');
+
+    expect(body).toBeInTheDocument();
+    expect(body).toHaveClass(
+      'overflow-y-auto',
+      'overflow-x-hidden',
+      'overscroll-contain'
+    );
+  });
 });

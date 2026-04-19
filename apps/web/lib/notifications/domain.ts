@@ -213,6 +213,31 @@ async function upsertAudienceMember(
   });
 }
 
+async function upsertAudienceMemberBestEffort(
+  artist_id: string,
+  normalizedEmail: string,
+  ipAddress: string | null,
+  userAgent: string | null
+): Promise<void> {
+  try {
+    await upsertAudienceMember(
+      artist_id,
+      normalizedEmail,
+      ipAddress,
+      userAgent
+    );
+  } catch (error) {
+    void captureError(
+      'Notifications audience member upsert failed (best-effort)',
+      error,
+      {
+        artistId: artist_id,
+        email: normalizedEmail,
+      }
+    );
+  }
+}
+
 interface ArtistProfileResult {
   profile: {
     id: string;
@@ -546,7 +571,7 @@ async function firePostSubscribeActions({
 }): Promise<void> {
   if (dynamicEnabled && normalizedEmail) {
     const ua = getHeader(headers, 'user-agent') || null;
-    await upsertAudienceMember(
+    await upsertAudienceMemberBestEffort(
       artist_id,
       normalizedEmail,
       ipAddress ?? null,

@@ -2,7 +2,7 @@
  * ReleasesPageClient Tests
  * @critical — Client-first releases page with TanStack Query cache
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock dashboard context
@@ -12,6 +12,22 @@ const mockProfile = {
   appleMusicId: null,
   settings: {},
 };
+
+vi.mock('next/dynamic', () => ({
+  default: (loader: () => Promise<{ default: unknown }>) => {
+    let Component: React.ComponentType<Record<string, unknown>> | null = null;
+    const promise = loader().then(mod => {
+      Component = (mod.default ?? mod) as React.ComponentType<
+        Record<string, unknown>
+      >;
+    });
+    // Block-free: vitest hoists mocks, so the promise resolves before render
+    return (props: Record<string, unknown>) => {
+      if (!Component) throw promise;
+      return <Component {...props} />;
+    };
+  },
+}));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({ selectedProfile: mockProfile }),
@@ -88,13 +104,13 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.data = [];
   });
 
-  it('renders ReleasesExperience when data loaded', () => {
+  it('renders ReleasesExperience when data loaded', async () => {
     mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = false;
 
     render(<ReleasesPageClient />);
-    const exp = screen.getByTestId('releases-experience');
+    const exp = await waitFor(() => screen.getByTestId('releases-experience'));
     expect(exp).toBeDefined();
     expect(exp.getAttribute('data-count')).toBe('2');
 

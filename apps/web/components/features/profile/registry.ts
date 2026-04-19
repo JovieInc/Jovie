@@ -28,10 +28,10 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
         showFooter: true,
       },
     },
-    tip: {
-      mode: 'tip',
-      subtitle: 'Send a tip',
-      pathSegment: 'tip',
+    pay: {
+      mode: 'pay',
+      subtitle: 'Support',
+      pathSegment: 'pay',
       shell: {
         showBackButton: true,
         showSocialBar: false,
@@ -42,7 +42,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     subscribe: {
       mode: 'subscribe',
-      subtitle: 'Get notified',
+      subtitle: 'Turn on notifications',
       pathSegment: 'subscribe',
       shell: {
         showBackButton: true,
@@ -88,6 +88,18 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
         showFooter: true,
       },
     },
+    releases: {
+      mode: 'releases',
+      subtitle: 'Discography',
+      pathSegment: 'releases',
+      shell: {
+        showBackButton: true,
+        showSocialBar: false,
+        showNotificationButton: true,
+        showTourButton: true,
+        showFooter: true,
+      },
+    },
   };
 
 export function isProfileMode(
@@ -97,6 +109,7 @@ export function isProfileMode(
 }
 
 export function getProfileMode(value: string | null | undefined): ProfileMode {
+  if (value === 'tip') return 'pay';
   return isProfileMode(value) ? value : 'profile';
 }
 
