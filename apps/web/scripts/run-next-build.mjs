@@ -8,7 +8,7 @@ const shouldUseWebpack =
 const hasExplicitHeapLimit = /\b--max-old-space-size=\d+\b/.test(
   process.env.NODE_OPTIONS ?? ''
 );
-const defaultHeapMb = shouldUseWebpack ? '12288' : '8192';
+const defaultHeapMb = shouldUseWebpack ? '14336' : '8192';
 const args = shouldUseWebpack
   ? ['build', '--webpack']
   : ['build', '--turbopack'];
