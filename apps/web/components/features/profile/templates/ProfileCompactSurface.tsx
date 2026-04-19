@@ -476,7 +476,7 @@ export function ProfileCompactSurface({
             <SubscriptionConfirmedBanner />
           ) : null}
 
-          <div className='min-h-[52px]'>
+          <div className='min-h-[52px] rounded-[var(--profile-action-radius)]'>
             <ProfilePrimaryActionCard
               artist={artist}
               latestRelease={latestRelease}
