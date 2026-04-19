@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import ArtistNotificationsPage from '@/app/(marketing)/artist-notifications/page';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_ORDER } from '@/data/artistNotificationsPageOrder';
 
@@ -72,12 +73,9 @@ describe('ArtistNotificationsPage', () => {
         'Subscribers go straight to the latest release.'
       )
     ).toBeInTheDocument();
-    expect(
-      reactivationSection.queryByText('New music')
-    ).not.toBeInTheDocument();
-    expect(
-      reactivationSection.queryByText('Show near due')
-    ).not.toBeInTheDocument();
+    for (const row of ARTIST_NOTIFICATIONS_COPY.reactivation.workflow.rows) {
+      expect(reactivationSection.getByText(row.trigger)).toBeInTheDocument();
+    }
     expect(
       reactivationSection.queryByText('Video Live')
     ).not.toBeInTheDocument();

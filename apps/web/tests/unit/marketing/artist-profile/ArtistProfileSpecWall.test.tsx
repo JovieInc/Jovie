@@ -59,7 +59,7 @@ describe('ArtistProfileSpecWall', () => {
     if (richAnalyticsCard) {
       expect(
         within(richAnalyticsCard).getByRole('img', {
-          name: 'Rich analytics funnel preview',
+          name: ARTIST_PROFILE_SPEC_TILES[0].screenshotAlt,
         })
       ).toBeInTheDocument();
     }
