@@ -60,11 +60,10 @@ export function identify(userId: string, traits?: Record<string, unknown>) {
 
 // Re-export client hooks from feature-flags module
 export {
-  useCodeFlag as useFeatureFlag,
-  useCodeFlagWithLoading as useFeatureFlagWithLoading,
-} from '@/lib/feature-flags/client';
-export type { CodeFlagName as FeatureFlagName } from '@/lib/feature-flags/shared';
-export { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+  useAppFlag as useFeatureFlag,
+  useAppFlagWithLoading as useFeatureFlagWithLoading,
+} from '@/lib/flags/client';
+export type { AppFlagName as FeatureFlagName } from '@/lib/flags/contracts';
 
 /**
  * Track the "magic moment" — when a profile has all 4 key elements:

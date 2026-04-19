@@ -21,6 +21,7 @@ const SPEC_TILE_ACCENTS: Record<MarketingFeatureTile['accent'], string> = {
 
 type AccentStyle = CSSProperties & {
   readonly '--tile-accent': string;
+  readonly '--tile-accent-secondary': string;
 };
 
 interface ArtistProfileSpecWallProps {
@@ -110,6 +111,94 @@ function IconBadgeVisual({
   );
 }
 
+const ANALYTICS_FLOATER_STAGES = [
+  { label: 'Profile Views', value: '42.8K', width: '100%' },
+  { label: 'Unique Visitors', value: '28.2K', width: '66%' },
+  { label: 'Followers', value: '6.4K', width: '15%' },
+] as const;
+
+function AnalyticsFunnelHeroVisual() {
+  return (
+    <div
+      role='img'
+      aria-label='Rich analytics funnel preview'
+      className='relative flex h-full min-h-[12.75rem] items-end justify-center overflow-hidden rounded-[1.15rem] pt-2 sm:min-h-[14.5rem] sm:pt-4'
+    >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-[8%] top-[10%] h-28 w-28 rounded-full opacity-85 blur-3xl sm:h-36 sm:w-36'
+        style={{
+          background:
+            'radial-gradient(circle, color-mix(in srgb, var(--tile-accent) 34%, transparent) 0%, transparent 72%)',
+        }}
+      />
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute bottom-[18%] right-[10%] h-24 w-24 rounded-full opacity-80 blur-3xl sm:h-32 sm:w-32'
+        style={{
+          background:
+            'radial-gradient(circle, color-mix(in srgb, var(--tile-accent-secondary) 34%, transparent) 0%, transparent 74%)',
+        }}
+      />
+      <div className='relative w-full max-w-[30rem] px-1 pb-1 sm:px-3 sm:pb-2'>
+        <div className='relative overflow-hidden rounded-[1.4rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(17,20,28,0.96),rgba(8,10,16,0.92))] px-4 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:px-5 sm:py-5'>
+          <div className='absolute inset-x-0 top-0 h-px bg-white/12' />
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-10 top-0 h-20 blur-2xl'
+            style={{
+              background:
+                'linear-gradient(90deg, color-mix(in srgb, var(--tile-accent) 20%, transparent), color-mix(in srgb, var(--tile-accent-secondary) 18%, transparent))',
+            }}
+          />
+          <div className='relative space-y-3 sm:space-y-3.5'>
+            {ANALYTICS_FLOATER_STAGES.map((stage, index) => (
+              <div key={stage.label} className='space-y-1.5 sm:space-y-2'>
+                <div className='flex items-center justify-between gap-3'>
+                  <div className='flex min-w-0 items-center gap-2'>
+                    <span className='truncate text-[11px] font-medium tracking-[-0.01em] text-secondary-token sm:text-[11.5px]'>
+                      {stage.label}
+                    </span>
+                    {index > 0 ? (
+                      <span className='inline-flex items-center rounded-full border border-white/6 bg-[color-mix(in_srgb,var(--tile-accent-secondary)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[color:var(--tile-accent-secondary)] sm:text-[10px]'>
+                        {stage.width}
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className='shrink-0 text-[15px] font-semibold tracking-[-0.03em] text-primary-token sm:text-[17px]'>
+                    {stage.value}
+                  </span>
+                </div>
+                <div className='h-2 rounded-full bg-white/[0.06] sm:h-2.5'>
+                  <div
+                    className='relative h-full rounded-full'
+                    style={{
+                      width: stage.width,
+                      background:
+                        'linear-gradient(90deg, color-mix(in srgb, var(--tile-accent) 96%, white 4%), color-mix(in srgb, var(--tile-accent-secondary) 88%, transparent))',
+                      boxShadow:
+                        '0 0 18px color-mix(in srgb, var(--tile-accent) 22%, transparent)',
+                    }}
+                  >
+                    <span
+                      aria-hidden='true'
+                      className='absolute inset-y-0 right-0 w-6 rounded-full blur-md'
+                      style={{
+                        background:
+                          'color-mix(in srgb, var(--tile-accent-secondary) 50%, transparent)',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArtistProfilePowerFeatureTile({
   tile,
 }: Readonly<{
@@ -117,6 +206,7 @@ function ArtistProfilePowerFeatureTile({
 }>) {
   const style: AccentStyle = {
     '--tile-accent': SPEC_TILE_ACCENTS[tile.accent],
+    '--tile-accent-secondary': SPEC_TILE_ACCENTS.purple,
   };
 
   return (
@@ -146,6 +236,9 @@ function ArtistProfilePowerFeatureTile({
           </p>
         </div>
         <div className='relative z-10 mt-5 flex-1'>
+          {tile.visual === 'analytics-funnel-hero' ? (
+            <AnalyticsFunnelHeroVisual />
+          ) : null}
           {tile.visual === 'button-chip' ? (
             <ButtonChipVisual
               chipIcon={tile.chipIcon}

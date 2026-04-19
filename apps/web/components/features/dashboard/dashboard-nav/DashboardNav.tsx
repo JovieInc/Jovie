@@ -17,7 +17,7 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
@@ -86,7 +86,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const threadsEnabled = useCodeFlag('THREADS_ENABLED');
+  const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -179,20 +179,30 @@ export function DashboardNav(_: DashboardNavProps) {
       return;
     }
 
-    releasesPrefetchedProfileIdRef.current = profileId;
-    router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
-    void import('@/features/dashboard/organisms/release-provider-matrix').catch(
-      () => {
-        releasesPrefetchedProfileIdRef.current = null;
-      }
-    );
-    void import('@/lib/queries/prefetch-dashboard')
-      .then(({ prefetchForRoute }) =>
-        prefetchForRoute('releases', queryClient, profileId)
-      )
-      .catch(() => {
+    // Defer the eager releases prefetch past initial dashboard paint so the
+    // shell can hydrate without competing with a background chunk fetch +
+    // TanStack Query warmup. Matches the hover-prefetch debounce pattern
+    // used by handlePrefetch below. The prefetched marker is written inside
+    // the timer so a cleanup that fires before the timer runs (fast route
+    // change) leaves the ref null and a later visit will retry.
+    const handle = setTimeout(() => {
+      releasesPrefetchedProfileIdRef.current = profileId;
+      router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
+      void import(
+        '@/features/dashboard/organisms/release-provider-matrix'
+      ).catch(() => {
         releasesPrefetchedProfileIdRef.current = null;
       });
+      void import('@/lib/queries/prefetch-dashboard')
+        .then(({ prefetchForRoute }) =>
+          prefetchForRoute('releases', queryClient, profileId)
+        )
+        .catch(() => {
+          releasesPrefetchedProfileIdRef.current = null;
+        });
+    }, 300);
+
+    return () => clearTimeout(handle);
   }, [isDemo, pathname, profileId, queryClient, router]);
 
   const handlePrefetch = useCallback(

@@ -24,6 +24,8 @@ ideation/
 **/*.spec.tsx
 **/tests/
 **/e2e/
+!apps/web/lib/e2e/
+!apps/web/lib/e2e/runtime.ts
 **/playwright/
 playwright-report/
 test-results/
@@ -42,10 +44,22 @@ chromatic.config.json
 *.pem
 .DS_Store
 .eslintcache
+.cache/
+**/.cache/
+.next/
+**/.next/
+.turbo/
+**/.turbo/
+node_modules/
+**/node_modules/
 scripts/
 *.mjs
 *.cjs
 cleanup_old_branches*.sh
+
+# Build-critical web postbuild script
+!apps/web/scripts/
+!apps/web/scripts/sync-standalone-assets.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
 !apps/web/scripts/

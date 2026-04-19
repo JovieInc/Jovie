@@ -1,7 +1,9 @@
 import 'server-only';
 
-import { sql as drizzleSql } from 'drizzle-orm';
-import { type IsolationLevel, validateClerkUserId } from '@/lib/auth/session';
+import {
+  type IsolationLevel,
+  setTransactionSessionUserId,
+} from '@/lib/auth/session';
 import { type DbOrTransaction } from '@/lib/db';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 
@@ -16,20 +18,13 @@ export async function withSystemIngestionSession<T>(
   operation: (tx: DbOrTransaction) => Promise<T>,
   options?: { isolationLevel?: IsolationLevel }
 ): Promise<T> {
-  validateClerkUserId(SYSTEM_INGESTION_USER);
-
   return runLegacyDbTransaction(
     async tx => {
-      // Set the session variable within the transaction
-      try {
-        await tx.execute(
-          drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
-        );
-      } catch {
-        await tx.execute(
-          drizzleSql`SET LOCAL app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
-        );
-      }
+      await setTransactionSessionUserId(
+        tx,
+        SYSTEM_INGESTION_USER,
+        'withSystemIngestionSession_set_config_failed'
+      );
 
       return operation(tx);
     },

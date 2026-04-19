@@ -16,7 +16,10 @@ export type ScreenshotConsumer =
   | 'marketing-export'
   | 'investor-ready';
 
-export type ScreenshotInteraction = 'none' | 'open-first-release';
+export type ScreenshotInteraction =
+  | 'none'
+  | 'open-first-release'
+  | 'open-first-release-dsps';
 
 export type ScreenshotCaptureTarget = 'page' | 'locator';
 

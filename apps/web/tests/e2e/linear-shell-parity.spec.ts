@@ -32,7 +32,6 @@ async function expectQuietToolbarActionChrome(locator: Locator) {
   expect(metrics.borderTop).toBe(0);
   expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
-
 function hasVisibleShadow(boxShadow: string) {
   if (boxShadow === 'none') return false;
 
@@ -110,6 +109,23 @@ async function expectCardChrome(locator: Locator) {
   expect(metrics.boxShadow).not.toBe('none');
 }
 
+async function expectFlatSurface(locator: Locator) {
+  const metrics = await locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      borderTop: Number.parseFloat(style.borderTopWidth),
+      boxShadow: style.boxShadow,
+      backgroundColor: style.backgroundColor,
+      surfaceVariant: element.getAttribute('data-surface-variant'),
+    };
+  });
+
+  expect(metrics.surfaceVariant).toBe('flat');
+  expect(metrics.borderTop).toBe(0);
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
+  expect(metrics.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+}
+
 async function livesInsideRoundedCard(locator: Locator) {
   return locator.evaluate(node => {
     let current: HTMLElement | null = node as HTMLElement;
@@ -160,6 +176,10 @@ for (const theme of ['light', 'dark'] as const) {
       .last();
     const hasDisplayButton = (await displayButton.count()) > 0;
 
+    const firstReleaseTrigger = page
+      .locator('[data-testid^="release-open-"]')
+      .first();
+    await expect(firstReleaseTrigger).toBeVisible();
     await expect(previewButton).toBeVisible();
     await expect(previewButton).toBeEnabled();
     await expectQuietToolbarActionChrome(previewButton);
@@ -168,7 +188,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expectQuietToolbarActionChrome(displayButton);
     }
 
-    await previewButton.click();
+    await firstReleaseTrigger.click();
 
     const drawer = page.getByTestId('release-sidebar');
     await expect(drawer).toBeVisible();
@@ -176,13 +196,19 @@ for (const theme of ['light', 'dark'] as const) {
     const actionBar = drawer.getByTestId('drawer-card-action-bar');
     await expect(actionBar).toBeVisible();
     await expect(
-      drawer.getByText(primaryReleaseTitle, { exact: true }).first()
-    ).toBeVisible();
-    await expect(drawer.getByTestId('release-header-card')).toBeVisible();
-    const metadataCard = drawer.getByTestId('release-metadata-card');
-    await expect(metadataCard).toBeVisible();
-    await expectCardChrome(metadataCard);
+      drawer.getByText(primaryReleaseTitle, { exact: true })
+    ).toHaveCount(1);
+    await expect(drawer.getByTestId('release-tabbed-card')).toBeVisible();
 
+    const detailsTab = drawer.getByTestId('drawer-tab-details');
+    const platformsTab = drawer.getByTestId('drawer-tab-dsps');
+    await expect(detailsTab).toBeVisible();
+    await expect(platformsTab).toBeVisible();
+    await expectFlatPillChrome(detailsTab);
+    await expectFlatPillChrome(platformsTab);
+    await expectCardChrome(drawer.getByTestId('release-tabbed-card'));
+    await expectFlatSurface(drawer.getByTestId('release-metadata-card'));
+    await expect(drawer.getByTestId('release-header-card')).toBeVisible();
     const copySmartLinkButton = drawer.getByRole('button', {
       name: 'Copy smart link',
     });

@@ -8,6 +8,66 @@ import {
 } from '@/features/home/home-surface-seed';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
+vi.mock('@/features/home/HomeAdaptiveProfileStory', () => ({
+  HomeAdaptiveProfileStory: () =>
+    createElement(
+      'div',
+      undefined,
+      createElement('section', undefined, 'Built for artists'),
+      createElement('section', undefined, 'Trust the profile you share')
+    ),
+}));
+
+vi.mock('@/features/home/HomeEngageBentoSection', () => ({
+  HomeEngageBentoSection: () =>
+    createElement(
+      'section',
+      undefined,
+      createElement('h2', undefined, 'Engage.'),
+      createElement('p', undefined, 'Smart links that stay current.')
+    ),
+}));
+
+vi.mock('@/features/home/HomeAutoNotifySection', () => ({
+  HomeAutoNotifySection: () =>
+    createElement(
+      'section',
+      undefined,
+      createElement('h2', undefined, 'Notify every fan. Automatically.')
+    ),
+}));
+
+vi.mock('@/features/home/HomeFanRelationshipSection', () => ({
+  HomeFanRelationshipSection: () =>
+    createElement(
+      'section',
+      undefined,
+      createElement('h2', undefined, 'Turn action into a relationship.'),
+      createElement('p', undefined, 'Recognize the people who care.')
+    ),
+}));
+
+vi.mock('@/features/home/HomeLiveProofSection', () => ({
+  HomeLiveProofSection: () => createElement('section', undefined, 'Live proof'),
+}));
+
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();

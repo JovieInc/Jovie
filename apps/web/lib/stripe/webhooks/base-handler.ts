@@ -106,7 +106,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    * 3. If active: Validates price ID, looks up plan, upgrades user (isPro = true)
    *
    * Error Handling:
-   * - Throws on unrecoverable errors (missing price ID, unknown plan)
+   * - Throws on unrecoverable errors (missing price ID)
+   * - Skips with a captured critical error on unknown plans so webhook delivery
+   *   can be acknowledged without retry storms when Stripe price config drifts
    * - Returns error result on billing update failures
    *
    * @param options - Processing options including subscription, user ID, and event metadata
@@ -241,7 +243,11 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
           route: '/api/stripe/webhooks',
         }
       );
-      throw new Error(`Unknown price ID: ${priceId}`);
+      return {
+        success: true,
+        skipped: true,
+        reason: 'unknown_price_id',
+      };
     }
 
     // Update user's billing status

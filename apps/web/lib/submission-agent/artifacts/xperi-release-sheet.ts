@@ -1,4 +1,4 @@
-import { utils, write } from 'xlsx';
+import ExcelJS from 'exceljs';
 import type {
   CanonicalSubmissionContext,
   SubmissionAttachment,
@@ -60,9 +60,9 @@ export function getXperiReferenceId(
   return release.upc?.trim() || release.id;
 }
 
-export function buildXperiReleaseSheetAttachment(
+export async function buildXperiReleaseSheetAttachment(
   canonical: CanonicalSubmissionContext
-): SubmissionAttachment {
+): Promise<SubmissionAttachment> {
   if (!canonical.release) {
     throw new Error('Xperi release sheet requires a release');
   }
@@ -93,18 +93,16 @@ export function buildXperiReleaseSheetAttachment(
     ]);
   }
 
-  const worksheet = utils.aoa_to_sheet(rows);
-  const workbook = utils.book_new();
-  utils.book_append_sheet(workbook, worksheet, 'AlbumTrack');
-  const workbookBuffer = write(workbook, {
-    bookType: 'xlsx',
-    type: 'buffer',
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('AlbumTrack');
+  rows.forEach(row => {
+    worksheet.addRow(row);
   });
-  if (!Buffer.isBuffer(workbookBuffer)) {
-    throw new TypeError('Expected xlsx write to return a Buffer');
-  }
 
-  const buffer = workbookBuffer;
+  const workbookBuffer = await workbook.xlsx.writeBuffer();
+  const buffer = Buffer.isBuffer(workbookBuffer)
+    ? workbookBuffer
+    : Buffer.from(workbookBuffer);
   const contentBase64 = buffer.toString('base64');
 
   return {

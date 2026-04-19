@@ -77,6 +77,10 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     releaseType: release.releaseType,
     isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),
     totalTracks: release.totalTracks,
+    totalDiscs: Math.max(
+      1,
+      ...(release.tracks ?? []).map(track => track.discNumber)
+    ),
     totalDurationMs: release.totalDurationMs,
     upc: release.upc,
     label: release.label ?? null,

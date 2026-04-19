@@ -212,8 +212,7 @@ body:has(.profile-viewport) {
   transition:
     border-color var(--motion-reveal-duration) var(--motion-reveal-ease),
     background-color var(--motion-reveal-duration) var(--motion-reveal-ease),
-    box-shadow var(--motion-reveal-duration) var(--motion-reveal-ease),
-    transform var(--motion-reveal-duration-fast) var(--motion-reveal-ease);
+    box-shadow var(--motion-reveal-duration) var(--motion-reveal-ease);
 }
 
 [data-ui="cta-reveal"][data-visual-state="expanded"] .cta-reveal-shell,
@@ -225,29 +224,25 @@ body:has(.profile-viewport) {
   box-shadow: var(--cta-reveal-shadow-active);
 }
 
-[data-ui="cta-reveal"] .cta-reveal-shell:focus-within {
-  transform: translateY(-1px);
-}
-
 [data-ui="cta-reveal"] .cta-reveal-panel {
   grid-area: 1 / 1;
   min-width: 0;
   transition:
     opacity var(--motion-reveal-duration) var(--motion-reveal-ease),
-    transform var(--motion-reveal-duration) var(--motion-reveal-ease),
+    clip-path var(--motion-reveal-duration) var(--motion-reveal-ease),
     visibility var(--motion-reveal-duration) step-end;
 }
 
 [data-ui="cta-reveal"] .cta-reveal-panel--cta {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
   visibility: visible;
 }
 
 [data-ui="cta-reveal"] .cta-reveal-panel--form,
 [data-ui="cta-reveal"] .cta-reveal-panel--status {
   opacity: 0;
-  transform: translateY(6px) scale(0.985);
+  clip-path: inset(0 0 0 calc(100% - 3.25rem) round var(--cta-reveal-radius));
   visibility: hidden;
   pointer-events: none;
 }
@@ -257,7 +252,7 @@ body:has(.profile-viewport) {
 [data-ui="cta-reveal"][data-visual-state="error"] .cta-reveal-panel--cta,
 [data-ui="cta-reveal"][data-visual-state="success"] .cta-reveal-panel--cta {
   opacity: 0;
-  transform: scale(0.985) translateY(-4px);
+  clip-path: inset(0 calc(100% - 3.25rem) 0 0 round var(--cta-reveal-radius));
   visibility: hidden;
   pointer-events: none;
 }
@@ -266,14 +261,14 @@ body:has(.profile-viewport) {
 [data-ui="cta-reveal"][data-visual-state="submitting"] .cta-reveal-panel--form,
 [data-ui="cta-reveal"][data-visual-state="error"] .cta-reveal-panel--form {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
   visibility: visible;
   pointer-events: auto;
 }
 
 [data-ui="cta-reveal"][data-visual-state="success"] .cta-reveal-panel--status {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  clip-path: inset(0 0 0 0 round var(--cta-reveal-radius));
   visibility: visible;
   pointer-events: auto;
 }
@@ -305,7 +300,7 @@ body:has(.profile-viewport) {
   position: relative;
   inset: auto;
   opacity: 1;
-  transform: translateY(0);
+  transform: none;
   visibility: visible;
   pointer-events: auto;
   z-index: 1;
@@ -315,7 +310,7 @@ body:has(.profile-viewport) {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: translateY(4px);
+  transform: none;
   visibility: hidden;
   pointer-events: none;
 }

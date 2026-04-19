@@ -219,8 +219,8 @@ test.describe('Releases Dashboard Chaos', () => {
       await firstRow.click();
 
       const sidebar = await waitForReleaseSidebar(page);
-      await sidebar.getByTestId('drawer-tab-links').click();
-      await sidebar.getByTestId('drawer-tab-tasks').click();
+      await sidebar.getByTestId('drawer-tab-dsps').click();
+      await sidebar.getByRole('button', { name: 'Tasks' }).click();
       await sidebar.focus();
       await sidebar.press('Escape');
       await expect(sidebar).not.toBeVisible();

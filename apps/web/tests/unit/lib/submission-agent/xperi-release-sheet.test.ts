@@ -1,5 +1,5 @@
+import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { read, utils } from 'xlsx';
 import { buildXperiReleaseSheetAttachment } from '@/lib/submission-agent/artifacts/xperi-release-sheet';
 import type { CanonicalSubmissionContext } from '@/lib/submission-agent/types';
 
@@ -47,23 +47,30 @@ function makeCanonicalContext(): CanonicalSubmissionContext {
 }
 
 describe('buildXperiReleaseSheetAttachment', () => {
-  it('creates an xlsx attachment with the official Xperi columns', () => {
-    const attachment = buildXperiReleaseSheetAttachment(makeCanonicalContext());
+  it('creates an xlsx attachment with the official Xperi columns', async () => {
+    const attachment = await buildXperiReleaseSheetAttachment(
+      makeCanonicalContext()
+    );
 
     expect(attachment.filename).toBe('123456789012.xlsx');
     expect(attachment.mimeType).toContain('spreadsheetml');
     expect(attachment.contentBase64).toBeTruthy();
 
-    const workbook = read(Buffer.from(attachment.contentBase64!, 'base64'), {
-      type: 'buffer',
-    });
-    const worksheet = workbook.Sheets.AlbumTrack;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(Buffer.from(attachment.contentBase64!, 'base64'));
+    const worksheet = workbook.getWorksheet('AlbumTrack');
     expect(worksheet).toBeDefined();
 
-    const rows = utils.sheet_to_json<(string | number)[]>(worksheet, {
-      header: 1,
-      raw: false,
-    });
+    const rows = worksheet!
+      .getSheetValues()
+      .slice(1)
+      .map(row => {
+        if (!Array.isArray(row)) {
+          return [];
+        }
+
+        return row.slice(1) as Array<string | number>;
+      });
 
     expect(rows[0]).toEqual([
       'Type',

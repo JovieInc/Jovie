@@ -6,7 +6,8 @@ import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
-import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { getAppFlagsSnapshot } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import {
@@ -32,7 +33,8 @@ import {
  * Ban check runs in parallel with the dashboard data fetch — banned users
  * are rare enough that blocking every page load for them isn't worth it.
  *
- * Feature flags are now code-level (no Statsig), so no async bootstrap needed.
+ * Runtime app flags are snapshotted server-side for dynamic shell routes so
+ * client consumers see the same values on first paint.
  */
 export async function DashboardShellContent({
   userId,
@@ -94,9 +96,13 @@ export async function DashboardShellContent({
     return shellContents;
   }
 
+  const initialFlags = await getAppFlagsSnapshot({ userId });
+
   return (
     <HydrateClient state={getDehydratedState()}>
-      <FeatureFlagsProvider>{shellContents}</FeatureFlagsProvider>
+      <AppFlagProvider initialFlags={initialFlags}>
+        {shellContents}
+      </AppFlagProvider>
     </HydrateClient>
   );
 }

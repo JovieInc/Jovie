@@ -121,4 +121,12 @@ describe('TrackRow', () => {
       audioUrl: 'https://cdn.example.com/track.mp3',
     });
   });
+
+  it('keeps canonical track numbers in the release matrix row', () => {
+    renderTrackRow({
+      track: createTrack({ id: 'track-9', trackNumber: 9 }),
+    });
+
+    expect(screen.getByText('9.')).toBeInTheDocument();
+  });
 });

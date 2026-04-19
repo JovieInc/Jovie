@@ -106,6 +106,7 @@ try_mode() {
 }
 
 plain_prebuilt_limit=15000
+plain_prebuilt_requested="${VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK:-false}"
 prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
 can_use_plain_prebuilt=true
@@ -117,6 +118,10 @@ elif [ "$prebuilt_file_count" -gt "$plain_prebuilt_limit" ]; then
   can_use_plain_prebuilt=false
 fi
 
+if [ "$plain_prebuilt_requested" != "true" ]; then
+  can_use_plain_prebuilt=false
+fi
+
 if [ "$has_prebuilt_output" = true ]; then
   echo "Prebuilt output file count: $prebuilt_file_count"
 else
@@ -124,6 +129,7 @@ else
 fi
 resolve_vercel_cmd
 echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
+echo "Plain prebuilt fallback requested: $plain_prebuilt_requested"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 
 deploy_modes=()
@@ -161,6 +167,9 @@ for mode in "${deploy_modes[@]}"; do
         echo "Falling back to source deployment."
       elif [ "$can_use_plain_prebuilt" = true ]; then
         echo "Plain prebuilt upload failed; falling back to source deployment."
+      elif [ "$plain_prebuilt_requested" != "true" ]; then
+        echo "Skipping plain prebuilt fallback because it is opt-in only for this repo."
+        echo "Falling back to source deployment."
       else
         echo "Skipping plain prebuilt fallback because Vercel rejects more than ${plain_prebuilt_limit} files and .vercel/output has ${prebuilt_file_count} files."
         echo "Falling back to source deployment."
