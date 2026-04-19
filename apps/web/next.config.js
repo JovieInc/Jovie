@@ -5,6 +5,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
+const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
@@ -31,18 +32,22 @@ const nextConfig = {
   },
   // Never ship source maps to browsers (Sentry plugin uploads them separately)
   productionBrowserSourceMaps: false,
-  output: 'standalone',
+  output: isVercelPreview ? undefined : 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  outputFileTracingRoot: isVercelPreview
+    ? undefined
+    : path.join(__dirname, '../../'),
   // Node 22 standalone tracing can miss Sentry's runtime interception deps when
   // Turbopack externalizes them for instrumentation. Keep them in the traced
   // server bundle so public-route smoke and Lighthouse boots do not 500.
-  outputFileTracingIncludes: {
-    '/*': [
-      '../../node_modules/.pnpm/node_modules/import-in-the-middle/**/*',
-      '../../node_modules/.pnpm/node_modules/require-in-the-middle/**/*',
-    ],
-  },
+  outputFileTracingIncludes: isVercelPreview
+    ? undefined
+    : {
+        '/*': [
+          '../../node_modules/.pnpm/node_modules/import-in-the-middle/**/*',
+          '../../node_modules/.pnpm/node_modules/require-in-the-middle/**/*',
+        ],
+      },
   // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations

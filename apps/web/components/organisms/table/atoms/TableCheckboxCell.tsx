@@ -42,6 +42,15 @@ function isLegacyProps<TData = unknown>(
   return 'checked' in props && 'onChange' in props;
 }
 
+function resolveCheckboxState(
+  checked: boolean,
+  indeterminate: boolean
+): boolean | 'indeterminate' {
+  if (checked) return true;
+  if (indeterminate) return 'indeterminate';
+  return false;
+}
+
 // Normalize header checkbox state to string format
 function normalizeHeaderState(
   headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' | boolean
@@ -167,7 +176,7 @@ function LegacyCheckboxCell({
           )}
         >
           <Checkbox
-            checked={checked ? true : indeterminate ? 'indeterminate' : false}
+            checked={resolveCheckboxState(checked, indeterminate)}
             onCheckedChange={(value: boolean | 'indeterminate') =>
               onChange(value === true)
             }
