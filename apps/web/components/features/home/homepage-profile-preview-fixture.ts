@@ -13,6 +13,91 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
 
+type HomepageContactInput = {
+  readonly id: string;
+  readonly role: PublicContact['role'];
+  readonly roleLabel: string;
+  readonly territorySummary: string;
+  readonly territoryCount: number;
+  readonly territories: readonly string[];
+  readonly companyLabel: string;
+  readonly contactName: string;
+  readonly emailAddress: string;
+};
+
+const createHomepageContact = ({
+  id,
+  role,
+  roleLabel,
+  territorySummary,
+  territoryCount,
+  territories,
+  companyLabel,
+  contactName,
+  emailAddress,
+}: HomepageContactInput): PublicContact => ({
+  id,
+  role,
+  roleLabel,
+  territorySummary,
+  territoryCount,
+  territories: [...territories],
+  companyLabel,
+  contactName,
+  secondaryLabel: companyLabel,
+  primaryContactLabel: contactName,
+  channels: [
+    {
+      type: 'email',
+      encoded: `mailto:${emailAddress}`,
+      preferred: true,
+    },
+  ],
+});
+
+type HomepageShowcaseStateInput = {
+  readonly id: ProfileShowcaseStateId;
+  readonly latestReleaseKey: ProfileShowcaseState['latestReleaseKey'];
+  readonly kind: string;
+  readonly tone: string;
+  readonly label: string;
+  readonly helper: string;
+  readonly value?: string;
+  readonly releaseActionLabel?: string;
+  readonly drawerView?: ProfileShowcaseState['drawerView'];
+  readonly previewOverlay?: ProfileShowcaseState['previewOverlay'];
+  readonly showSubscriptionConfirmedBanner: boolean;
+};
+
+const createShowcaseState = ({
+  id,
+  latestReleaseKey,
+  kind,
+  tone,
+  label,
+  helper,
+  value,
+  releaseActionLabel,
+  drawerView = null,
+  previewOverlay = null,
+  showSubscriptionConfirmedBanner,
+}: HomepageShowcaseStateInput): ProfileShowcaseState =>
+  ({
+    id,
+    drawerView,
+    latestReleaseKey,
+    ...(releaseActionLabel ? { releaseActionLabel } : {}),
+    notifications: {
+      kind,
+      tone,
+      label,
+      helper,
+      ...(value ? { value } : {}),
+    },
+    showSubscriptionConfirmedBanner,
+    previewOverlay,
+  }) as ProfileShowcaseState;
+
 export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   id: 'homepage-preview-artist',
   owner_user_id: 'homepage-preview-owner',
@@ -85,7 +170,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
   ] as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_CONTACTS: readonly PublicContact[] = [
-  {
+  createHomepageContact({
     id: 'homepage-contact-booking',
     role: 'bookings',
     roleLabel: 'Booking',
@@ -94,17 +179,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_CONTACTS: readonly PublicContact[] = [
     territories: ['North America', 'Europe'],
     companyLabel: 'Nightshift Touring',
     contactName: 'Lina Park',
-    secondaryLabel: 'Nightshift Touring',
-    primaryContactLabel: 'Lina Park',
-    channels: [
-      {
-        type: 'email',
-        encoded: 'mailto:booking@timwhite.com',
-        preferred: true,
-      },
-    ],
-  },
-  {
+    emailAddress: 'booking@timwhite.com',
+  }),
+  createHomepageContact({
     id: 'homepage-contact-management',
     role: 'management',
     roleLabel: 'Management',
@@ -113,17 +190,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_CONTACTS: readonly PublicContact[] = [
     territories: ['Worldwide'],
     companyLabel: 'Northstar Management',
     contactName: 'Mason Clarke',
-    secondaryLabel: 'Northstar Management',
-    primaryContactLabel: 'Mason Clarke',
-    channels: [
-      {
-        type: 'email',
-        encoded: 'mailto:management@timwhite.com',
-        preferred: true,
-      },
-    ],
-  },
-  {
+    emailAddress: 'management@timwhite.com',
+  }),
+  createHomepageContact({
     id: 'homepage-contact-press',
     role: 'press_pr',
     roleLabel: 'Press',
@@ -132,17 +201,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_CONTACTS: readonly PublicContact[] = [
     territories: ['United States', 'United Kingdom'],
     companyLabel: 'Daylight PR',
     contactName: 'Avery Quinn',
-    secondaryLabel: 'Daylight PR',
-    primaryContactLabel: 'Avery Quinn',
-    channels: [
-      {
-        type: 'email',
-        encoded: 'mailto:press@timwhite.com',
-        preferred: true,
-      },
-    ],
-  },
-  {
+    emailAddress: 'press@timwhite.com',
+  }),
+  createHomepageContact({
     id: 'homepage-contact-brand',
     role: 'brand_partnerships',
     roleLabel: 'Brand Partnerships',
@@ -151,17 +212,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_CONTACTS: readonly PublicContact[] = [
     territories: ['Worldwide'],
     companyLabel: 'Jovie Partnerships',
     contactName: 'Aria Bennett',
-    secondaryLabel: 'Jovie Partnerships',
-    primaryContactLabel: 'Aria Bennett',
-    channels: [
-      {
-        type: 'email',
-        encoded: 'mailto:brands@timwhite.com',
-        preferred: true,
-      },
-    ],
-  },
-] as const;
+    emailAddress: 'brands@timwhite.com',
+  }),
+];
 
 export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
   [
@@ -248,367 +301,280 @@ export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
 export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   Record<ProfileShowcaseStateId, ProfileShowcaseState>
 > = {
-  'streams-latest': {
+  'streams-latest': createShowcaseState({
     id: 'streams-latest',
-    drawerView: null,
     latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Latest release live',
+    helper: 'The newest song stays one tap away.',
     releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Latest release live',
-      helper: 'The newest song stays one tap away.',
-    },
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'streams-presave': {
+  }),
+  'streams-presave': createShowcaseState({
     id: 'streams-presave',
-    drawerView: null,
     latestReleaseKey: 'presave',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Presave is live',
-      helper: 'The same link now leads to the countdown.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Presave is live',
+    helper: 'The same link now leads to the countdown.',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'streams-release-day': {
+  }),
+  'streams-release-day': createShowcaseState({
     id: 'streams-release-day',
-    drawerView: null,
     latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'success',
+    label: 'Release day live',
+    helper: 'The newest release is now the thing fans see first.',
     releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'button',
-      tone: 'success',
-      label: 'Release day live',
-      helper: 'The newest release is now the thing fans see first.',
-    },
-    showSubscriptionConfirmedBanner: false,
     previewOverlay: {
       kind: 'email-preview',
       title: 'Out now: Take Me Over',
       body: 'Take Me Over is live now. Listen in one tap.',
       accentLabel: 'Release alert',
     },
-  },
-  'streams-video': {
-    id: 'streams-video',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    releaseActionLabel: 'Watch',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Video live',
-      helper: 'The same profile now leads with the video.',
-    },
     showSubscriptionConfirmedBanner: false,
+  }),
+  'streams-video': createShowcaseState({
+    id: 'streams-video',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Video live',
+    helper: 'The same profile now leads with the video.',
+    releaseActionLabel: 'Watch',
     previewOverlay: {
       kind: 'email-preview',
       title: 'Watch: This Is Love',
       body: 'This Is Love is live now. Watch from the same link.',
       accentLabel: 'Video alert',
     },
-  },
-  'tour-nearby': {
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'tour-nearby': createShowcaseState({
     id: 'tour-nearby',
-    drawerView: null,
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Nearby show',
-      helper: 'Lead with the local date when there is no newer release.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Nearby show',
+    helper: 'Lead with the local date when there is no newer release.',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'playlist-fallback': {
+  }),
+  'playlist-fallback': createShowcaseState({
     id: 'playlist-fallback',
-    drawerView: null,
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Playlist fallback',
-      helper: 'Fall back to a real playlist when there is no release or tour.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Playlist fallback',
+    helper: 'Fall back to a real playlist when there is no release or tour.',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'listen-fallback': {
+  }),
+  'listen-fallback': createShowcaseState({
     id: 'listen-fallback',
-    drawerView: null,
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Listen fallback',
-      helper: 'Keep a clean listen action live when nothing else should lead.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Listen fallback',
+    helper: 'Keep a clean listen action live when nothing else should lead.',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'fans-opt-in': {
+  }),
+  'fans-opt-in': createShowcaseState({
     id: 'fans-opt-in',
-    drawerView: null,
     latestReleaseKey: 'live',
-    notifications: {
-      kind: 'input',
-      tone: 'compose',
-      label: 'Turn on notifications',
-      helper:
-        'Fans turn on notifications once. After that, Jovie keeps working.',
-      value: 'fan@example.com',
-    },
+    kind: 'input',
+    tone: 'compose',
+    label: 'Turn on notifications',
+    helper: 'Fans turn on notifications once. After that, Jovie keeps working.',
+    value: 'fan@example.com',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'fans-confirmed': {
+  }),
+  'fans-confirmed': createShowcaseState({
     id: 'fans-confirmed',
-    drawerView: null,
     latestReleaseKey: 'live',
-    notifications: {
-      kind: 'status',
-      tone: 'success',
-      label: 'Notifications on',
-      helper: 'Every new song, video, or show reaches them automatically.',
-      value: 'fan@example.com',
-    },
+    kind: 'status',
+    tone: 'success',
+    label: 'Notifications on',
+    helper: 'Every new song, video, or show reaches them automatically.',
+    value: 'fan@example.com',
     showSubscriptionConfirmedBanner: true,
-    previewOverlay: null,
-  },
-  'fans-song-alert': {
+  }),
+  'fans-song-alert': createShowcaseState({
     id: 'fans-song-alert',
-    drawerView: null,
     latestReleaseKey: 'live',
+    kind: 'status',
+    tone: 'success',
+    label: 'Notifications on',
+    helper: 'New music reaches the same fans automatically.',
     releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'status',
-      tone: 'success',
-      label: 'Notifications on',
-      helper: 'New music reaches the same fans automatically.',
-    },
-    showSubscriptionConfirmedBanner: true,
     previewOverlay: {
       kind: 'email-preview',
       title: 'New music from Tim White',
       body: 'Take Me Over is live now. Listen from the same link.',
       accentLabel: 'Inbox',
     },
-  },
-  'fans-show-alert': {
-    id: 'fans-show-alert',
-    drawerView: null,
-    latestReleaseKey: 'none',
-    notifications: {
-      kind: 'status',
-      tone: 'success',
-      label: 'Notifications on',
-      helper: 'Shows reach the same fans without another signup.',
-    },
     showSubscriptionConfirmedBanner: true,
+  }),
+  'fans-show-alert': createShowcaseState({
+    id: 'fans-show-alert',
+    latestReleaseKey: 'none',
+    kind: 'status',
+    tone: 'success',
+    label: 'Notifications on',
+    helper: 'Shows reach the same fans without another signup.',
     previewOverlay: {
       kind: 'email-preview',
       title: 'Playing Los Angeles this Friday',
       body: 'The next local show reaches the fans already following along.',
       accentLabel: 'Show alert',
     },
-  },
-  'subscribe-email': {
-    id: 'subscribe-email',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'input',
-      tone: 'compose',
-      label: 'Email address',
-      helper: 'One clean line from CTA to email capture.',
-      value: 'fan@example.com',
-    },
-    showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'subscribe-otp': {
-    id: 'subscribe-otp',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'otp',
-      tone: 'compose',
-      label: 'Enter the 6-digit code from your email',
-      helper: 'OTP stays in the same inline shell.',
-      value: '142683',
-    },
-    showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'subscribe-otp-error': {
-    id: 'subscribe-otp-error',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'otp',
-      tone: 'error',
-      label: 'Enter the 6-digit code from your email',
-      helper: 'That code was invalid. Try again.',
-      value: '142680',
-    },
-    showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'subscribe-name': {
-    id: 'subscribe-name',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'name',
-      tone: 'compose',
-      label: 'Name',
-      helper: 'Name capture keeps the same footprint.',
-      value: 'Ava Lopez',
-    },
-    showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'subscribe-birthday': {
-    id: 'subscribe-birthday',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'birthday',
-      tone: 'compose',
-      label: 'Birthday',
-      helper: 'Birthday capture stays inline too.',
-      value: '05/17/1994',
-    },
-    showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'subscribe-done': {
-    id: 'subscribe-done',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    notifications: {
-      kind: 'status',
-      tone: 'success',
-      label: 'Notifications on',
-      helper: 'The done state keeps the exact same footprint.',
-    },
     showSubscriptionConfirmedBanner: true,
-    previewOverlay: null,
-  },
-  tour: {
+  }),
+  'subscribe-email': createShowcaseState({
+    id: 'subscribe-email',
+    latestReleaseKey: 'live',
+    kind: 'input',
+    tone: 'compose',
+    label: 'Email address',
+    helper: 'One clean line from CTA to email capture.',
+    value: 'fan@example.com',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'subscribe-otp': createShowcaseState({
+    id: 'subscribe-otp',
+    latestReleaseKey: 'live',
+    kind: 'otp',
+    tone: 'compose',
+    label: 'Enter the 6-digit code from your email',
+    helper: 'OTP stays in the same inline shell.',
+    value: '142683',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'subscribe-otp-error': createShowcaseState({
+    id: 'subscribe-otp-error',
+    latestReleaseKey: 'live',
+    kind: 'otp',
+    tone: 'error',
+    label: 'Enter the 6-digit code from your email',
+    helper: 'That code was invalid. Try again.',
+    value: '142680',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'subscribe-name': createShowcaseState({
+    id: 'subscribe-name',
+    latestReleaseKey: 'live',
+    kind: 'name',
+    tone: 'compose',
+    label: 'Name',
+    helper: 'Name capture keeps the same footprint.',
+    value: 'Ava Lopez',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'subscribe-birthday': createShowcaseState({
+    id: 'subscribe-birthday',
+    latestReleaseKey: 'live',
+    kind: 'birthday',
+    tone: 'compose',
+    label: 'Birthday',
+    helper: 'Birthday capture stays inline too.',
+    value: '05/17/1994',
+    showSubscriptionConfirmedBanner: false,
+  }),
+  'subscribe-done': createShowcaseState({
+    id: 'subscribe-done',
+    latestReleaseKey: 'live',
+    kind: 'status',
+    tone: 'success',
+    label: 'Notifications on',
+    helper: 'The done state keeps the exact same footprint.',
+    showSubscriptionConfirmedBanner: true,
+  }),
+  tour: createShowcaseState({
     id: 'tour',
+    latestReleaseKey: 'none',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Next date live',
+    helper: 'Lead with the next date and open the full run from there.',
     drawerView: 'tour',
-    latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Next date live',
-      helper: 'Lead with the next date and open the full run from there.',
-    },
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'tips-open': {
+  }),
+  'tips-open': createShowcaseState({
     id: 'tips-open',
-    drawerView: 'pay',
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Get paid',
-      helper: 'Take payment in one tap.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Get paid',
+    helper: 'Take payment in one tap.',
+    drawerView: 'pay',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  'tips-apple-pay': {
+  }),
+  'tips-apple-pay': createShowcaseState({
     id: 'tips-apple-pay',
-    drawerView: 'pay',
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Apple Pay ready',
-      helper: 'Apple Pay keeps the moment moving.',
-    },
-    showSubscriptionConfirmedBanner: false,
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Apple Pay ready',
+    helper: 'Apple Pay keeps the moment moving.',
+    drawerView: 'pay',
     previewOverlay: {
       kind: 'apple-pay',
       title: 'Apple Pay',
       body: 'Tip Tim White $10',
       accentLabel: 'Double-click to pay',
     },
-  },
-  'tips-thank-you': {
-    id: 'tips-thank-you',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'button',
-      tone: 'success',
-      label: 'Say thanks',
-      helper: 'Turn support into a listener.',
-    },
     showSubscriptionConfirmedBanner: false,
+  }),
+  'tips-thank-you': createShowcaseState({
+    id: 'tips-thank-you',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'success',
+    label: 'Say thanks',
+    helper: 'Turn support into a listener.',
+    releaseActionLabel: 'Listen',
     previewOverlay: {
       kind: 'thank-you',
       title: 'Thanks for the tip',
       body: "Here's my latest song.",
       accentLabel: 'Say thanks',
     },
-  },
-  'tips-followup': {
-    id: 'tips-followup',
-    drawerView: null,
-    latestReleaseKey: 'live',
-    releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'button',
-      tone: 'success',
-      label: 'Turn support into a listener',
-      helper: 'The same moment can turn into the next listen.',
-    },
     showSubscriptionConfirmedBanner: false,
+  }),
+  'tips-followup': createShowcaseState({
+    id: 'tips-followup',
+    latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'success',
+    label: 'Turn support into a listener',
+    helper: 'The same moment can turn into the next listen.',
+    releaseActionLabel: 'Listen',
     previewOverlay: {
       kind: 'email-preview',
       title: 'Thanks for the tip',
       body: "Here's my latest song.",
       accentLabel: 'Follow-up',
     },
-  },
-  contact: {
+    showSubscriptionConfirmedBanner: false,
+  }),
+  contact: createShowcaseState({
     id: 'contact',
-    drawerView: 'contact',
     latestReleaseKey: 'none',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'Never miss a booking',
-      helper:
-        'If a talent buyer wants to book you, the contact is right there.',
-    },
+    kind: 'button',
+    tone: 'quiet',
+    label: 'Never miss a booking',
+    helper: 'If a talent buyer wants to book you, the contact is right there.',
+    drawerView: 'contact',
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-  catalog: {
+  }),
+  catalog: createShowcaseState({
     id: 'catalog',
-    drawerView: null,
     latestReleaseKey: 'live',
+    kind: 'button',
+    tone: 'quiet',
+    label: 'One profile',
+    helper: 'One place for songs, videos, shows, and business.',
     releaseActionLabel: 'Listen',
-    notifications: {
-      kind: 'button',
-      tone: 'quiet',
-      label: 'One profile',
-      helper: 'One place for songs, videos, shows, and business.',
-    },
     showSubscriptionConfirmedBanner: false,
-    previewOverlay: null,
-  },
-} as const;
+  }),
+};
