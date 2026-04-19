@@ -161,6 +161,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/(auth)/signup/page.tsx'),
       'utf-8'
     );
+    const signupPageClient = readFileSync(
+      join(ROOT, 'app/(auth)/signup/SignUpPageClient.tsx'),
+      'utf-8'
+    );
     const userCreationFailed = readFileSync(
       join(ROOT, 'app/error/user-creation-failed/page.tsx'),
       'utf-8'
@@ -175,7 +179,8 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(signinPage).toContain('<AuthLayout');
-    expect(signupPage).toContain('<AuthLayout');
+    expect(signupPage).toContain('SignUpPageClient');
+    expect(signupPageClient).toContain('<AuthLayout');
     expect(userCreationFailed).toContain('<AuthLayout');
     expect(onboardingCheckout).toContain('<AuthLayout');
     expect(waitlistSuccess).toContain('<AuthLayout');

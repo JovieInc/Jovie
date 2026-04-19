@@ -17,6 +17,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     return React.createElement('div', {
       'data-testid': 'profile-compact-template',
       'data-mode': props.mode,
+      'data-render-mode': props.renderMode,
       'data-artist-name': (props.artist as Artist)?.name,
       'data-show-subscription-confirmed-banner': String(
         props.showSubscriptionConfirmedBanner
@@ -84,6 +85,10 @@ describe('StaticArtistPage', () => {
     );
 
     expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-render-mode',
+      'interactive'
+    );
   });
 
   it('renders the compact preview presentation when requested', async () => {
@@ -104,6 +109,10 @@ describe('StaticArtistPage', () => {
     );
 
     expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-render-mode',
+      'preview'
+    );
   });
 
   it('forwards mode to the live compact presentation by default', async () => {

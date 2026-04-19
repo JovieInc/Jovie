@@ -8,18 +8,19 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import Stripe from 'stripe';
+import { env } from '@/lib/env-server';
 
 function getDefaultStripePriceId(): string | null {
   return (
-    process.env.STRIPE_PRICE_PRO_MONTHLY ||
-    process.env.STRIPE_PRICE_PRO_YEARLY ||
-    process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
-    process.env.STRIPE_PRICE_STANDARD_YEARLY ||
+    env.STRIPE_PRICE_PRO_MONTHLY ||
+    env.STRIPE_PRICE_PRO_YEARLY ||
+    env.STRIPE_PRICE_STANDARD_MONTHLY ||
+    env.STRIPE_PRICE_STANDARD_YEARLY ||
     null
   );
 }
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripeSecretKey = env.STRIPE_SECRET_KEY;
+const stripeWebhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
 export interface BillingStatus {
   isPro: boolean;

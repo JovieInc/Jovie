@@ -65,28 +65,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const controls = await getOperationalControls();
-    if (!controls.stripeWebhooksEnabled) {
-      await captureWarning(
-        'Stripe webhook received while webhook processing is disabled',
-        undefined,
-        { route: '/api/stripe/webhooks' }
-      );
-      return NextResponse.json(
-        {
-          error:
-            'Webhook processing is temporarily paused. Stripe should retry this event shortly.',
-        },
-        {
-          status: 503,
-          headers: {
-            ...NO_STORE_HEADERS,
-            'Retry-After': RETRY_AFTER_SERVICE,
-          },
-        }
-      );
-    }
-
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
 
@@ -113,6 +91,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const controls = await getOperationalControls();
+    if (!controls.stripeWebhooksEnabled) {
+      await captureWarning(
+        'Stripe webhook received while webhook processing is disabled',
+        undefined,
+        {
+          route: '/api/stripe/webhooks',
+          eventId: event.id,
+          eventType: event.type,
+        }
+      );
+      return NextResponse.json(
+        {
+          error:
+            'Webhook processing is temporarily paused. Stripe should retry this event shortly.',
+        },
+        {
+          status: 503,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': RETRY_AFTER_SERVICE,
+          },
+        }
       );
     }
 

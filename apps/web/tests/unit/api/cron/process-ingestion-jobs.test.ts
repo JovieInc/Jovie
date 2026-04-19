@@ -99,6 +99,31 @@ describe('GET /api/cron/process-ingestion-jobs', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
   });
 
+  it('returns a skipped success when cron fanout is disabled', async () => {
+    mockGetOperationalControls.mockResolvedValueOnce({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: false,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
+
+    const { GET } = await import('@/app/api/cron/process-ingestion-jobs/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-ingestion-jobs')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      skipped: true,
+      reason: 'cron_fanout_disabled',
+    });
+    expect(mockClaimPendingJobs).not.toHaveBeenCalled();
+    expect(mockProcessJob).not.toHaveBeenCalled();
+  });
+
   it('processes claimed jobs and returns an empty errors array on success', async () => {
     const { GET } = await import('@/app/api/cron/process-ingestion-jobs/route');
     const response = await GET(

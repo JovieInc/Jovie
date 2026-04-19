@@ -47,6 +47,7 @@ jobs:
         env:
           E2E_SYNTHETIC_USER_EMAIL: ${{ secrets.E2E_SYNTHETIC_USER_EMAIL }}
           E2E_SYNTHETIC_USER_PASSWORD: ${{ secrets.E2E_SYNTHETIC_USER_PASSWORD }}
+          E2E_SYNTHETIC_USER_CODE: ${{ secrets.E2E_SYNTHETIC_USER_CODE }}
         run: |
           missing=()
           for key in E2E_SYNTHETIC_USER_EMAIL E2E_SYNTHETIC_USER_PASSWORD; do
@@ -58,6 +59,10 @@ jobs:
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "Missing required synthetic secrets: ${missing[*]}"
             exit 1
+          fi
+
+          if [ -z "${E2E_SYNTHETIC_USER_CODE:-}" ]; then
+            echo "::warning::E2E_SYNTHETIC_USER_CODE is unset; the run will fail if the seeded Clerk user requires a verification code."
           fi
 
       - name: Run synthetic journey suite

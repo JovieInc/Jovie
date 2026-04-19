@@ -9,7 +9,7 @@ interface CopyrightProps {
   readonly year?: number;
 }
 
-const baseStyles = 'text-xs font-normal tracking-tight opacity-50';
+const baseStyles = 'text-xs font-normal tracking-tight';
 // Use semantic tokens for proper dark mode support
 const variantStyles = {
   light: 'text-quaternary-token',

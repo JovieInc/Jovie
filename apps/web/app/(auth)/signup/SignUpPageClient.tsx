@@ -62,7 +62,10 @@ function SignUpClaimDataPersistence() {
   }, [searchParams, handle]);
 
   useEffect(() => {
-    if (!handle || handle.length < 3) return;
+    if (!handle || handle.length < 3) {
+      setAvailability(null);
+      return;
+    }
 
     setAvailability('checking');
 
@@ -71,8 +74,18 @@ function SignUpClaimDataPersistence() {
       `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
       { signal: controller.signal }
     )
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          throw new Error(`Handle check failed: ${res.status}`);
+        }
+
+        return (await res.json()) as { available?: unknown };
+      })
       .then(data => {
+        if (typeof data.available !== 'boolean') {
+          throw new Error('Invalid handle check response');
+        }
+
         setAvailability(data.available ? 'available' : 'taken');
       })
       .catch((error: unknown) => {

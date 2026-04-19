@@ -39,24 +39,24 @@ export async function GET(request: Request) {
   });
   if (authError) return authError;
 
-  const controls = await getOperationalControls();
-  if (!controls.cronFanoutEnabled) {
-    return NextResponse.json(
-      {
-        ok: true,
-        skipped: true,
-        reason: 'cron_fanout_disabled',
-      },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
-  }
-
   return runMonitoredCron(
     {
       monitor: PROCESS_INGESTION_MONITOR,
       shouldFailResult: response => response.status !== 200,
     },
     async () => {
+      const controls = await getOperationalControls();
+      if (!controls.cronFanoutEnabled) {
+        return NextResponse.json(
+          {
+            ok: true,
+            skipped: true,
+            reason: 'cron_fanout_disabled',
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
       const now = new Date();
       let processed = 0;
       let attempted = 0;

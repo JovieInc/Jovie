@@ -5,6 +5,10 @@ const mockRunReconciliation = vi.hoisted(() => vi.fn());
 const mockCleanupExpiredKeys = vi.hoisted(() => vi.fn());
 const mockCleanupOrphanedPhotos = vi.hoisted(() => vi.fn());
 
+vi.mock('@sentry/nextjs', () => ({
+  captureCheckIn: vi.fn(() => 'check-in-id'),
+}));
+
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
 }));

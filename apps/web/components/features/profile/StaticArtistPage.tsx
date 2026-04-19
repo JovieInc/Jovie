@@ -74,6 +74,8 @@ export function StaticArtistPage({
   hideJovieBranding = false,
   hideMoreMenu = false,
 }: StaticArtistPageProps) {
+  const renderMode =
+    presentation === 'compact-preview' ? 'preview' : 'interactive';
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
@@ -106,6 +108,7 @@ export function StaticArtistPage({
     <ProfileCompactTemplate
       key={`${presentation}-${viewModel.artist.id}`}
       mode={viewModel.mode}
+      renderMode={renderMode}
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}
       contacts={viewModel.contacts}

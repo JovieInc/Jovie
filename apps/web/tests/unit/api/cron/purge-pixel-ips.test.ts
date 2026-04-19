@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockExecute = vi.hoisted(() => vi.fn());
 
+vi.mock('@sentry/nextjs', () => ({
+  captureCheckIn: vi.fn(() => 'check-in-id'),
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     execute: mockExecute,

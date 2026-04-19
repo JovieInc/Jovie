@@ -65,7 +65,7 @@ vi.mock('@/lib/auth/signup-claim-storage', () => ({
 global.fetch = fetchMock as unknown as typeof fetch;
 
 import { APP_ROUTES } from '@/constants/routes';
-import SignUpPage from '../../../app/(auth)/signup/page';
+import { SignUpPageClient } from '../../../app/(auth)/signup/SignUpPageClient';
 
 describe('signup page', () => {
   beforeEach(() => {
@@ -73,6 +73,7 @@ describe('signup page', () => {
     clerkSignUpMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
+      ok: true,
       json: async () => ({ available: true }),
     });
     persistSignupClaimValueMock.mockReset();
@@ -87,7 +88,7 @@ describe('signup page', () => {
   });
 
   it('renders Clerk SignUp with the expected auth props and legal links', async () => {
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
@@ -114,7 +115,7 @@ describe('signup page', () => {
   it('shows handle availability without writing pending claim session state', async () => {
     searchParamsState.value = 'handle=TestHandle';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -141,7 +142,7 @@ describe('signup page', () => {
     );
     const replaceStateSpy = vi.spyOn(globalThis.history, 'replaceState');
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'An account with this email already exists. Try signing in instead.'
@@ -168,7 +169,7 @@ describe('signup page', () => {
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
@@ -185,7 +186,7 @@ describe('signup page', () => {
     searchParamsState.value = 'plan=not-a-plan&handle=TestHandle';
     validatePlanMock.mockReturnValue(null);
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
@@ -204,7 +205,7 @@ describe('signup page', () => {
         throw new Error('quota exceeded');
       });
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     await waitFor(() => {
       expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
@@ -226,10 +227,11 @@ describe('signup page', () => {
   it('renders the taken-handle state when the requested handle is unavailable', async () => {
     searchParamsState.value = 'handle=TakenHandle';
     fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ available: false }),
     });
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(
       await screen.findByText(
@@ -242,7 +244,7 @@ describe('signup page', () => {
     searchParamsState.value = 'handle=BrokenHandle';
     fetchMock.mockRejectedValueOnce(new Error('network down'));
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(
       await screen.findByText(
@@ -260,7 +262,7 @@ describe('signup page', () => {
       '/signup?oauth_error=access_denied&redirect_url=%2Fonboarding%3Fhandle%3Dartist'
     );
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Required permissions were not granted. Please try again and accept all permissions.'

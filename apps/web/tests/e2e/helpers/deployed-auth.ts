@@ -15,15 +15,24 @@ export type SignInResult =
 
 type SignInNextStep = 'redirected' | 'password' | 'email_code' | 'unknown';
 
-export async function waitForClerk(page: Page): Promise<void> {
+export async function waitForClerk(
+  page: Page,
+  timeoutMs = Number(process.env.E2E_CLERK_WAIT_TIMEOUT_MS ?? '30000')
+): Promise<void> {
   await page
     .waitForFunction(
       () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
       undefined,
-      { timeout: 30_000 }
+      { timeout: timeoutMs }
     )
-    .catch(() => {
+    .catch(error => {
       // Clerk may not be available in all environments.
+      if (process.env.E2E_VERBOSE_AUTH === '1') {
+        console.warn('[deployed-auth] Clerk did not report ready', {
+          timeoutMs,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     });
 }
 

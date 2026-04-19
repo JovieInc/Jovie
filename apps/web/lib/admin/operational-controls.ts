@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { adminSystemSettings } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
@@ -8,6 +8,13 @@ import { captureWarning } from '@/lib/error-tracking';
 
 const SETTINGS_ROW_ID = 1;
 const CACHE_TTL_MS = 15_000;
+
+export const OPERATIONAL_CONTROL_KEYS = [
+  'signupEnabled',
+  'checkoutEnabled',
+  'stripeWebhooksEnabled',
+  'cronFanoutEnabled',
+] as const;
 
 export interface OperationalControls {
   readonly signupEnabled: boolean;
@@ -38,6 +45,9 @@ const FAIL_CLOSED_OPERATIONAL_CONTROLS: OperationalControls = {
   updatedByUserId: null,
 };
 
+// This cache is intentionally per-instance. Updates apply immediately in the
+// current runtime and may take up to CACHE_TTL_MS to propagate across other
+// warm instances.
 let operationalControlsCache: {
   readonly value: OperationalControls;
   readonly expiresAt: number;
@@ -151,36 +161,34 @@ export async function updateOperationalControls(
   input: UpdateOperationalControlsInput,
   updatedByClerkUserId: string | null
 ): Promise<OperationalControls> {
-  const current = await ensureSettingsRow();
+  await ensureSettingsRow();
   const updatedByUserId = await resolveUpdatedByUserId(updatedByClerkUserId);
   const now = new Date();
 
   const [updated] = await db
-    .insert(adminSystemSettings)
-    .values({
-      id: SETTINGS_ROW_ID,
-      signupEnabled: input.signupEnabled ?? current.signupEnabled,
-      checkoutEnabled: input.checkoutEnabled ?? current.checkoutEnabled,
+    .update(adminSystemSettings)
+    .set({
+      signupEnabled:
+        input.signupEnabled === undefined
+          ? drizzleSql`${adminSystemSettings.signupEnabled}`
+          : input.signupEnabled,
+      checkoutEnabled:
+        input.checkoutEnabled === undefined
+          ? drizzleSql`${adminSystemSettings.checkoutEnabled}`
+          : input.checkoutEnabled,
       stripeWebhooksEnabled:
-        input.stripeWebhooksEnabled ?? current.stripeWebhooksEnabled,
-      cronFanoutEnabled: input.cronFanoutEnabled ?? current.cronFanoutEnabled,
+        input.stripeWebhooksEnabled === undefined
+          ? drizzleSql`${adminSystemSettings.stripeWebhooksEnabled}`
+          : input.stripeWebhooksEnabled,
+      cronFanoutEnabled:
+        input.cronFanoutEnabled === undefined
+          ? drizzleSql`${adminSystemSettings.cronFanoutEnabled}`
+          : input.cronFanoutEnabled,
       operationalControlsUpdatedAt: now,
       operationalControlsUpdatedBy: updatedByUserId,
       updatedAt: now,
     })
-    .onConflictDoUpdate({
-      target: adminSystemSettings.id,
-      set: {
-        signupEnabled: input.signupEnabled ?? current.signupEnabled,
-        checkoutEnabled: input.checkoutEnabled ?? current.checkoutEnabled,
-        stripeWebhooksEnabled:
-          input.stripeWebhooksEnabled ?? current.stripeWebhooksEnabled,
-        cronFanoutEnabled: input.cronFanoutEnabled ?? current.cronFanoutEnabled,
-        operationalControlsUpdatedAt: now,
-        operationalControlsUpdatedBy: updatedByUserId,
-        updatedAt: now,
-      },
-    })
+    .where(eq(adminSystemSettings.id, SETTINGS_ROW_ID))
     .returning();
 
   if (!updated) {

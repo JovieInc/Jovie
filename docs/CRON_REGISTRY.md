@@ -69,7 +69,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/data-retention` | 300s | Standalone entry with enhanced auth | `daily-maintenance` |
 | `/api/cron/pixel-forwarding` | 60s | Forwards up to 500 pixel events to ad platforms | `frequent` |
 | `/api/cron/process-campaigns` | 60s | Processes drip campaign sends | `frequent` |
-| `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
+| `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `frequent` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 
 ## Adding Logic to an Existing Cron

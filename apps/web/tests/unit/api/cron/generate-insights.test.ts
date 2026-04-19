@@ -131,4 +131,31 @@ describe('GET /api/cron/generate-insights', () => {
     expect(data.stats.processed).toBe(6);
     expect(data.stats.insightsGenerated).toBe(6);
   });
+
+  it('returns a skipped success when cron fanout is disabled', async () => {
+    getOperationalControlsMock.mockResolvedValueOnce({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: false,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
+
+    const { GET } = await import('@/app/api/cron/generate-insights/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/generate-insights', {
+        headers: { authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      skipped: true,
+      reason: 'cron_fanout_disabled',
+    });
+    expect(createGenerationRunMock).not.toHaveBeenCalled();
+    expect(expireStaleInsightsMock).not.toHaveBeenCalled();
+  });
 });

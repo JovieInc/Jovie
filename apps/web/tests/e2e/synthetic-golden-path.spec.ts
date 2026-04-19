@@ -107,10 +107,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     await interceptTrackingRoutes(page);
 
     const criticalPages = [
-      { path: '/', name: 'Homepage' },
-      { path: '/signin', name: 'Sign In' },
-      { path: '/signup', name: 'Sign Up' },
-      { path: '/pricing', name: 'Pricing' },
+      { path: APP_ROUTES.HOME, name: 'Homepage' },
+      { path: APP_ROUTES.SIGNIN, name: 'Sign In' },
+      { path: APP_ROUTES.SIGNUP, name: 'Sign Up' },
+      { path: APP_ROUTES.PRICING, name: 'Pricing' },
     ];
 
     for (const { path, name } of criticalPages) {

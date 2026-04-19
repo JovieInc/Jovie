@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const AUTH_ROUTE_FILES = [
   join(process.cwd(), 'app', '(auth)', 'signin', 'page.tsx'),
   join(process.cwd(), 'app', '(auth)', 'signup', 'page.tsx'),
+  join(process.cwd(), 'app', '(auth)', 'signup', 'SignUpPageClient.tsx'),
   join(process.cwd(), 'app', '(auth)', 'signin', 'loading.tsx'),
   join(process.cwd(), 'app', '(auth)', 'signup', 'loading.tsx'),
 ] as const;
@@ -16,7 +17,8 @@ describe('auth shell contract guard', () => {
 
       if (
         !contents.includes('<AuthLayout') &&
-        !contents.includes('AuthPageSkeleton')
+        !contents.includes('AuthPageSkeleton') &&
+        !contents.includes('SignUpPageClient')
       ) {
         return true;
       }

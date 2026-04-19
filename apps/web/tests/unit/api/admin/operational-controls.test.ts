@@ -17,6 +17,12 @@ vi.mock('@/lib/admin/roles', () => ({
 vi.mock('@/lib/admin/operational-controls', () => ({
   getOperationalControls: mockGetOperationalControls,
   updateOperationalControls: mockUpdateOperationalControls,
+  OPERATIONAL_CONTROL_KEYS: [
+    'signupEnabled',
+    'checkoutEnabled',
+    'stripeWebhooksEnabled',
+    'cronFanoutEnabled',
+  ],
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -144,5 +150,97 @@ describe('admin operational controls route', () => {
         updatedByUserId: 'user_123',
       },
     });
+  });
+
+  it('returns 401 on PATCH when signed out', async () => {
+    mockGetOptionalAuth.mockResolvedValue({
+      userId: null,
+      sessionId: null,
+      orgId: null,
+    });
+
+    const { PATCH } = await import(
+      '@/app/api/admin/operational-controls/route'
+    );
+    const request = new NextRequest(
+      'http://localhost/api/admin/operational-controls',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signupEnabled: false }),
+      }
+    );
+
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(mockUpdateOperationalControls).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 on PATCH when the user is not admin', async () => {
+    mockIsAdmin.mockResolvedValue(false);
+
+    const { PATCH } = await import(
+      '@/app/api/admin/operational-controls/route'
+    );
+    const request = new NextRequest(
+      'http://localhost/api/admin/operational-controls',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signupEnabled: false }),
+      }
+    );
+
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'Forbidden' });
+    expect(mockUpdateOperationalControls).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 on PATCH when the body contains unknown keys', async () => {
+    const { PATCH } = await import(
+      '@/app/api/admin/operational-controls/route'
+    );
+    const request = new NextRequest(
+      'http://localhost/api/admin/operational-controls',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signupEnable: false }),
+      }
+    );
+
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Unknown operational control: signupEnable',
+    });
+    expect(mockUpdateOperationalControls).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 on PATCH when a control value is malformed', async () => {
+    const { PATCH } = await import(
+      '@/app/api/admin/operational-controls/route'
+    );
+    const request = new NextRequest(
+      'http://localhost/api/admin/operational-controls',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signupEnabled: 'nope' }),
+      }
+    );
+
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'signupEnabled must be a boolean',
+    });
+    expect(mockUpdateOperationalControls).not.toHaveBeenCalled();
   });
 });

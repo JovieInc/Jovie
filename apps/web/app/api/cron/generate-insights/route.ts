@@ -126,24 +126,24 @@ export async function GET(request: Request) {
   });
   if (authError) return authError;
 
-  const controls = await getOperationalControls();
-  if (!controls.cronFanoutEnabled) {
-    return NextResponse.json(
-      {
-        success: true,
-        skipped: true,
-        reason: 'cron_fanout_disabled',
-      },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
-  }
-
   return runMonitoredCron(
     {
       monitor: GENERATE_INSIGHTS_MONITOR,
       shouldFailResult: response => response.status !== 200,
     },
     async () => {
+      const controls = await getOperationalControls();
+      if (!controls.cronFanoutEnabled) {
+        return NextResponse.json(
+          {
+            success: true,
+            skipped: true,
+            reason: 'cron_fanout_disabled',
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
       const startTime = Date.now();
 
       try {

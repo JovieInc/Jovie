@@ -101,24 +101,26 @@ export async function GET(request: Request) {
   });
   if (authError) return authError;
 
-  const controls = await getOperationalControls();
-  if (!controls.cronFanoutEnabled) {
-    return NextResponse.json(
-      {
-        success: true,
-        skipped: true,
-        reason: 'cron_fanout_disabled',
-      },
-      { headers: NO_STORE_HEADERS }
-    );
-  }
-
   return runMonitoredCron(
     {
       monitor: FREQUENT_CRON_MONITOR,
       shouldFailResult: response => response.status !== 200,
     },
-    runFrequentCron
+    async () => {
+      const controls = await getOperationalControls();
+      if (!controls.cronFanoutEnabled) {
+        return NextResponse.json(
+          {
+            success: true,
+            skipped: true,
+            reason: 'cron_fanout_disabled',
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
+
+      return runFrequentCron();
+    }
   );
 }
 

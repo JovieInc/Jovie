@@ -10,6 +10,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import type {
   ProfileMode,
+  ProfileRenderMode,
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
@@ -36,6 +37,7 @@ import { ProfileCompactSurface } from './ProfileCompactSurface';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
+  readonly renderMode?: ProfileRenderMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
@@ -144,6 +146,7 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
 
 export function ProfileCompactTemplate({
   mode,
+  renderMode = 'interactive',
   artist,
   socialLinks,
   contacts,
@@ -568,7 +571,7 @@ export function ProfileCompactTemplate({
               data-testid='profile-compact-shell'
             >
               <ProfileCompactSurface
-                renderMode='interactive'
+                renderMode={renderMode}
                 presentation={drawerPresentation}
                 artist={artist}
                 socialLinks={socialLinks}

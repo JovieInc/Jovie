@@ -118,6 +118,31 @@ describe('POST /api/stripe/checkout', () => {
     });
   });
 
+  it('returns 503 when checkout is operationally disabled', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetOperationalControls.mockResolvedValueOnce({
+      signupEnabled: true,
+      checkoutEnabled: false,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_123' }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('30');
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it('creates checkout session for authenticated user', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

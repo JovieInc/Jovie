@@ -17,15 +17,18 @@ const mockSelect = vi.hoisted(() =>
   }))
 );
 const mockInsert = vi.hoisted(() => vi.fn());
+const mockUpdate = vi.hoisted(() => vi.fn());
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((left, right) => ({ left, right })),
+  sql: vi.fn(() => 'sql-expression'),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
+    update: mockUpdate,
   },
 }));
 
@@ -111,14 +114,14 @@ describe('getOperationalControls', () => {
       .mockResolvedValueOnce([{ id: 'db-user-123' }]);
 
     const mockReturning = vi.fn().mockResolvedValue([updatedRow]);
-    const mockOnConflictDoUpdate = vi.fn().mockReturnValue({
+    const mockWhere = vi.fn().mockReturnValue({
       returning: mockReturning,
     });
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: mockOnConflictDoUpdate,
+    const mockSet = vi.fn().mockReturnValue({
+      where: mockWhere,
     });
-    mockInsert.mockReturnValue({
-      values: mockValues,
+    mockUpdate.mockReturnValue({
+      set: mockSet,
     });
 
     const { invalidateOperationalControlsCache, updateOperationalControls } =
@@ -137,17 +140,11 @@ describe('getOperationalControls', () => {
       updatedByUserId: 'db-user-123',
     });
 
-    expect(mockValues).toHaveBeenCalledWith(
+    expect(mockSet).toHaveBeenCalledWith(
       expect.objectContaining({
         operationalControlsUpdatedBy: 'db-user-123',
       })
     );
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        set: expect.objectContaining({
-          operationalControlsUpdatedBy: 'db-user-123',
-        }),
-      })
-    );
+    expect(mockWhere).toHaveBeenCalledTimes(1);
   });
 });

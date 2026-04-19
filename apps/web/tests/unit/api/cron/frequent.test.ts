@@ -238,6 +238,34 @@ describe('GET /api/cron/frequent', () => {
     expect(data.results.sendNotifications.success).toBe(true);
   });
 
+  it('returns a skipped success when cron fanout is disabled', async () => {
+    mockGetOperationalControls.mockResolvedValueOnce({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: false,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
+
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      skipped: true,
+      reason: 'cron_fanout_disabled',
+    });
+    expect(mockScheduleReleaseNotifications).not.toHaveBeenCalled();
+    expect(mockSendPendingNotifications).not.toHaveBeenCalled();
+  });
+
   it('returns 207 when notification scheduling fails', async () => {
     mockScheduleReleaseNotifications.mockRejectedValue(
       new Error('entitlements unavailable')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getOperationalControls,
+  OPERATIONAL_CONTROL_KEYS,
   updateOperationalControls,
 } from '@/lib/admin/operational-controls';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
@@ -18,6 +19,8 @@ interface UpdateOperationalControlsBody {
   readonly stripeWebhooksEnabled?: boolean;
   readonly cronFanoutEnabled?: boolean;
 }
+
+const VALID_CONTROL_KEYS = new Set<string>(OPERATIONAL_CONTROL_KEYS);
 
 function formatControlsResponse(
   controls: Awaited<ReturnType<typeof getOperationalControls>>
@@ -41,6 +44,10 @@ function validateOperationalControlsBody(
   }
 
   for (const [key, value] of entries) {
+    if (!VALID_CONTROL_KEYS.has(key)) {
+      return `Unknown operational control: ${key}`;
+    }
+
     if (typeof value !== 'boolean') {
       return `${key} must be a boolean`;
     }

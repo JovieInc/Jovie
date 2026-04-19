@@ -17,15 +17,22 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 function getBillingCredentials() {
+  const email = process.env.E2E_DEPLOY_USER_EMAIL?.trim();
+  const password = process.env.E2E_DEPLOY_USER_PASSWORD?.trim();
+
+  if (!email || !password) {
+    return null;
+  }
+
   return {
-    email: process.env.E2E_DEPLOY_USER_EMAIL ?? '',
-    password: process.env.E2E_DEPLOY_USER_PASSWORD ?? '',
-    verificationCode: process.env.E2E_DEPLOY_USER_CODE ?? '',
+    email,
+    password,
+    verificationCode: process.env.E2E_DEPLOY_USER_CODE?.trim() || undefined,
   };
 }
 
-function getBillingPriceId(): string {
-  return process.env.E2E_STAGING_BILLING_PRICE_ID ?? '';
+function getBillingPriceId(): string | null {
+  return process.env.E2E_STAGING_BILLING_PRICE_ID?.trim() || null;
 }
 
 test.describe('Staging billing smoke @deploy-billing', () => {
@@ -39,6 +46,9 @@ test.describe('Staging billing smoke @deploy-billing', () => {
     if (!priceId) {
       test.skip(true, 'E2E_STAGING_BILLING_PRICE_ID is not configured');
     }
+    if (!credentials) {
+      test.skip(true, 'Staging deploy auth credentials are not configured');
+    }
 
     await page.goto(APP_ROUTES.SIGNIN, {
       waitUntil: 'domcontentloaded',
@@ -47,6 +57,11 @@ test.describe('Staging billing smoke @deploy-billing', () => {
     await waitForClerk(page);
 
     const result = await signInViaRenderedFlow(page, credentials);
+    if (result === 'verification-required') {
+      throw new Error(
+        'Staging billing smoke requires E2E_DEPLOY_USER_CODE for the current Clerk flow'
+      );
+    }
     expect(result).toBe('authenticated');
 
     await waitForHydration(page);
