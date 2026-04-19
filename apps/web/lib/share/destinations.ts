@@ -121,14 +121,13 @@ async function launchInstagramStory(
   }
 
   const downloaded = await downloadAsset(context);
-  return {
-    status: 'fallback',
-    helperText: downloaded
-      ? copied
-        ? 'Story asset downloaded and link copied. Add it in Instagram Stories.'
-        : 'Story asset downloaded. Copy the link manually for your story sticker.'
-      : 'Could not prepare the story asset. Try again.',
-  };
+  let helperText = 'Could not prepare the story asset. Try again.';
+  if (downloaded) {
+    helperText = copied
+      ? 'Story asset downloaded and link copied. Add it in Instagram Stories.'
+      : 'Story asset downloaded. Copy the link manually for your story sticker.';
+  }
+  return { status: 'fallback', helperText };
 }
 
 async function launchTwitter(
