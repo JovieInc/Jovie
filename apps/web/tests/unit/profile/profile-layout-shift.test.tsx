@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 /**
- * CLS-prevention tests: verify that min-h-* CSS classes are present
+ * CLS-prevention tests: verify that fixed-height wrapper classes are present
  * on wrapper containers in all component states. jsdom can't measure
  * pixels, so we assert class presence instead.
  */
@@ -193,7 +193,7 @@ describe('CLS-prevention: min-h CSS classes', () => {
     expect(container.querySelector('.min-h-\\[180px\\]')).toBeInTheDocument();
   });
 
-  it('ProfileInlineNotificationsCTA has min-h-[116px] on wrapper', async () => {
+  it('ProfileInlineNotificationsCTA has h-[72px] on wrapper', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -203,6 +203,6 @@ describe('CLS-prevention: min-h CSS classes', () => {
     render(<ProfileInlineNotificationsCTA artist={artist} />);
 
     const wrapper = screen.getByTestId('profile-inline-cta');
-    expect(wrapper.className).toContain('min-h-[116px]');
+    expect(wrapper.className).toContain('h-[72px]');
   });
 });

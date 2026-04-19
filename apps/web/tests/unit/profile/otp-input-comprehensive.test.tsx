@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/hooks/useHapticFeedback', () => ({
@@ -142,5 +143,90 @@ describe('OtpInput', () => {
     fireEvent.keyDown(inputs[2], { key: 'ArrowRight' });
 
     expect(document.activeElement).toBe(inputs[3]);
+  });
+
+  it('replaces a focused digit in place when the code is already full', () => {
+    function ControlledOtpInput() {
+      const [value, setValue] = useState('123456');
+      return <OtpInput value={value} onChange={setValue} autoFocus={false} />;
+    }
+
+    render(<ControlledOtpInput />);
+
+    const inputs = getDigitInputs();
+    inputs[2].focus();
+
+    fireEvent.change(inputs[2], { target: { value: '39' } });
+
+    expect(inputs.map(input => input.value)).toEqual([
+      '1',
+      '2',
+      '9',
+      '4',
+      '5',
+      '6',
+    ]);
+  });
+
+  it('keeps trailing digits intact when editing after an invalid full code', () => {
+    function ControlledOtpInput() {
+      const [value, setValue] = useState('123456');
+      return (
+        <OtpInput value={value} onChange={setValue} autoFocus={false} error />
+      );
+    }
+
+    render(<ControlledOtpInput />);
+
+    const inputs = getDigitInputs();
+    inputs[3].focus();
+
+    fireEvent.change(inputs[3], { target: { value: '47' } });
+
+    expect(inputs.map(input => input.value)).toEqual([
+      '1',
+      '2',
+      '3',
+      '7',
+      '5',
+      '6',
+    ]);
+  });
+
+  it('only fires onComplete when the completed code changes', () => {
+    function ControlledOtpInput({
+      onComplete,
+    }: Readonly<{ onComplete: (value: string) => void }>) {
+      const [value, setValue] = useState('123456');
+      return (
+        <OtpInput
+          value={value}
+          onChange={setValue}
+          onComplete={onComplete}
+          autoFocus={false}
+        />
+      );
+    }
+
+    const onComplete = vi.fn();
+    render(<ControlledOtpInput onComplete={onComplete} />);
+
+    const inputs = getDigitInputs();
+
+    inputs[5].focus();
+    fireEvent.change(inputs[5], { target: { value: '66' } });
+    expect(onComplete).not.toHaveBeenCalled();
+
+    fireEvent.change(inputs[5], { target: { value: '67' } });
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenLastCalledWith('123457');
+
+    fireEvent.change(inputs[5], { target: { value: '77' } });
+    expect(onComplete).not.toHaveBeenCalledTimes(2);
+
+    fireEvent.keyDown(inputs[5], { key: 'Backspace' });
+    fireEvent.change(getDigitInputs()[5], { target: { value: '77' } });
+    expect(onComplete).toHaveBeenCalledTimes(2);
+    expect(onComplete).toHaveBeenLastCalledWith('123457');
   });
 });

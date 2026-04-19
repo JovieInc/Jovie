@@ -269,9 +269,18 @@ test.describe('Artist Profiles Landing', () => {
     await expect(
       outcomesSection.getByRole('heading', { name: /sell out/i })
     ).toBeVisible();
+    await expect(outcomesSection.getByText('Tim White')).toBeVisible();
+    await expect(outcomesSection.getByText('w/ Cosmic Gate')).toBeVisible();
     await expect(
-      outcomesSection.getByText('Cosmic Gate & Tim White')
+      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
     ).toBeVisible();
+    await expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
+    ).toBeVisible();
+    await expect(
+      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
+    ).toBeVisible();
+    await expect(page.getByText('Wired to my latest release')).toHaveCount(0);
     const trustTop = await getDocumentY(trust);
     const outcomesTop = await getDocumentY(outcomesSection);
     const captureTop = await getDocumentY(captureSection);

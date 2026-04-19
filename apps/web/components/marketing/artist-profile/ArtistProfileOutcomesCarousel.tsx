@@ -3,6 +3,12 @@
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import {
+  HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+  HOMEPAGE_PROFILE_PREVIEW_RELEASES,
+  HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
+} from '@/features/home/homepage-profile-preview-fixture';
+import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
@@ -24,6 +30,11 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
 type OutcomeAccentStyle = CSSProperties & {
   readonly '--outcome-accent': string;
 };
+
+const SHOWCASE_VIEWER_LOCATION = {
+  latitude: 34.0522,
+  longitude: -118.2437,
+} as const;
 
 export function ArtistProfileOutcomesCarousel({
   outcomes,
@@ -103,9 +114,7 @@ function OutcomeCard({
         </div>
 
         <div className='mt-6 flex-1'>
-          {card.id === 'drive-streams' ? (
-            <DriveStreamsProof proof={proof.visualProofs.driveStreams} />
-          ) : null}
+          {card.id === 'drive-streams' ? <DriveStreamsProof /> : null}
           {card.id === 'sell-out' ? (
             <SellOutProof proof={proof.visualProofs.sellOut} />
           ) : null}
@@ -140,84 +149,63 @@ function ProofTag({
   );
 }
 
-function ProofCropCard({
-  alt,
-  className,
-  imageClassName,
+function ProofActionCardFrame({
   label,
-  objectPosition,
-  src,
+  children,
+  className,
 }: Readonly<{
-  alt: string;
-  className?: string;
-  imageClassName?: string;
   label: string;
-  objectPosition: string;
-  src: string;
+  children: React.ReactNode;
+  className?: string;
 }>) {
   return (
     <article
       className={cn(
-        'relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#090c11] shadow-[0_22px_54px_rgba(0,0,0,0.3)]',
+        'relative flex min-h-[12.5rem] overflow-hidden rounded-[1.28rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 shadow-[0_22px_54px_rgba(0,0,0,0.28)]',
         className
       )}
     >
-      <Image
-        alt={alt}
-        fill
-        sizes='(max-width: 768px) 100vw, 320px'
-        src={src}
-        className={cn('object-cover', imageClassName)}
-        style={{ objectPosition }}
-      />
-      <div
-        aria-hidden='true'
-        className='absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),transparent_24%,transparent_72%,rgba(0,0,0,0.32))]'
-      />
+      <div className='absolute inset-x-6 top-0 h-16 rounded-full bg-white/8 blur-3xl' />
       <ProofTag className='absolute left-3 top-3 z-10' label={label} />
+      <div className='relative z-10 mt-7 flex w-full items-center'>
+        {children}
+      </div>
     </article>
   );
 }
 
-function DriveStreamsProof({
-  proof,
-}: Readonly<{
-  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['driveStreams'];
-}>) {
+function DriveStreamsProof() {
   return (
-    <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-[1.06fr_0.94fr]'>
-      <ProofCropCard
-        alt={proof.liveScreenshotAlt}
-        className='min-h-[12.25rem]'
-        imageClassName='scale-[1.38]'
-        label='Latest release'
-        objectPosition='center 96%'
-        src={proof.liveScreenshotSrc}
-      />
-
-      <div className='flex h-full flex-col gap-3'>
-        <div className='rounded-[1.25rem] border border-white/10 bg-black/32 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'>
-          <p className='text-[1.2rem] font-semibold leading-[1.02] tracking-[-0.05em] text-white'>
-            {proof.title}
-          </p>
-          <p className='mt-1.5 text-[12.5px] font-medium text-white/62'>
-            {proof.artistName}
-          </p>
-          <div className='mt-3 flex flex-wrap gap-2'>
-            <ProofTag label={proof.liveLabel} />
-            <ProofTag label={proof.presaveLabel} />
-          </div>
-        </div>
-
-        <ProofCropCard
-          alt={proof.presaveScreenshotAlt}
-          className='min-h-[10.5rem] flex-1'
-          imageClassName='scale-[1.24]'
-          label='Countdown'
-          objectPosition='center 42%'
-          src={proof.presaveScreenshotSrc}
+    <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-2'>
+      <ProofActionCardFrame label='Latest release'>
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations={true}
+          renderMode='preview'
+          previewActionLabel='Listen'
+          size='showcase'
+          className='w-full'
+          dataTestId='artist-profile-drive-streams-live-card'
         />
-      </div>
+      </ProofActionCardFrame>
+
+      <ProofActionCardFrame label='Countdown'>
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.presave}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations={true}
+          renderMode='preview'
+          previewActionLabel='Listen'
+          size='showcase'
+          className='w-full'
+          dataTestId='artist-profile-drive-streams-presave-card'
+        />
+      </ProofActionCardFrame>
     </div>
   );
 }
@@ -228,41 +216,27 @@ function SellOutProof({
   proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['visualProofs']['sellOut'];
 }>) {
   return (
-    <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-[0.76fr_1.24fr]'>
-      <article className='relative min-h-[15.5rem] overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#090c11] shadow-[0_22px_54px_rgba(0,0,0,0.3)]'>
-        <Image
-          alt={proof.screenshotAlt}
-          fill
-          sizes='(max-width: 768px) 100vw, 220px'
-          src={proof.screenshotSrc}
-          className='object-cover object-top'
+    <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-[0.94fr_1.06fr]'>
+      <ProofActionCardFrame
+        label={proof.nearbyCardLabel}
+        className='bg-[linear-gradient(180deg,rgba(244,241,232,0.12),rgba(255,255,255,0.02))]'
+      >
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={null}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES}
+          hasPlayableDestinations={false}
+          renderMode='preview'
+          size='showcase'
+          viewerLocation={SHOWCASE_VIEWER_LOCATION}
+          className='w-full'
+          dataTestId='artist-profile-sell-out-tour-card'
         />
-        <div
-          aria-hidden='true'
-          className='absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.1),transparent_30%,rgba(0,0,0,0.24))]'
-        />
-      </article>
+      </ProofActionCardFrame>
 
-      <div className='flex h-full flex-col gap-3'>
-        <div className='self-end rounded-[1.2rem] bg-[#f4f1e8] p-4 text-black shadow-[0_22px_48px_rgba(0,0,0,0.26)] sm:max-w-[11.75rem]'>
-          <p className='text-[10px] font-semibold tracking-[0.08em] text-black/56'>
-            {proof.nearbyCardLabel}
-          </p>
-          <p className='mt-2.5 text-[1.55rem] font-semibold leading-none tracking-[-0.07em]'>
-            {proof.nearbyDate}
-          </p>
-          <p className='mt-2.5 text-[0.92rem] font-semibold leading-[1.08] tracking-[-0.03em]'>
-            {proof.nearbyVenue}
-          </p>
-          <p className='mt-1 text-[12px] leading-[1.35] text-black/58'>
-            {proof.nearbyLocation}
-          </p>
-          <span className='mt-3 inline-flex rounded-full bg-black px-2.75 py-1.25 text-[10.5px] font-semibold text-white'>
-            {proof.nearbyCtaLabel}
-          </span>
-        </div>
-
-        <div className='flex-1 rounded-[1.25rem] border border-white/10 bg-black/34 px-4 pb-4 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'>
+      <div className='flex-1 rounded-[1.25rem] border border-white/10 bg-black/34 px-4 pb-4 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'>
+        <div className='rounded-[1.05rem] border border-white/6 bg-white/[0.02] px-4 pb-2 pt-4 shadow-[0_18px_44px_rgba(0,0,0,0.2)]'>
           <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
             {proof.drawerTitle}
           </p>

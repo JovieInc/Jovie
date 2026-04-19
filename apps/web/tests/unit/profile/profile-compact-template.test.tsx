@@ -494,13 +494,13 @@ describe('ProfileCompactTemplate', () => {
 
     expect(
       screen.getByRole('link', {
-        name: `Open This Is playlist for ${mockArtist.name}`,
+        name: /This Is Tim White/,
       })
     ).toHaveAttribute(
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Open Playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open playlist')).toBeInTheDocument();
   });
 
   it('keeps the upcoming show CTA ahead of the playlist fallback', async () => {

@@ -218,7 +218,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     revealDate: '2026-04-18T07:00:00.000Z',
     releaseType: 'single',
     metadata: {
-      artistNames: ['Tim White', 'Erica Gibson'],
+      artistNames: ['Tim White', 'Cosmic Gate'],
     },
   },
   live: {
@@ -228,9 +228,21 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     releaseDate: '2024-10-01T07:00:00.000Z',
     releaseType: 'single',
     metadata: {
-      artistNames: ['Tim White', 'Erica Gibson'],
+      artistNames: ['Tim White', 'Cosmic Gate'],
     },
   },
+} as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
+  playlistId: 'playlist-this-is-tim-white',
+  title: 'This Is Tim White',
+  url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO0RjExample',
+  imageUrl: '/img/releases/the-deep-end.jpg',
+  artistSpotifyId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id ?? '4u',
+  source: 'serp_html',
+  discoveredAt: '2026-01-10T00:00:00.000Z',
+  searchQuery: 'site:open.spotify.com \"This Is Tim White\"',
+  confirmedAt: '2026-01-10T00:00:00.000Z',
 } as const;
 
 export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
@@ -301,6 +313,45 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       accentLabel: 'Video alert',
     },
   },
+  'tour-nearby': {
+    id: 'tour-nearby',
+    drawerView: null,
+    latestReleaseKey: 'none',
+    notifications: {
+      kind: 'button',
+      tone: 'quiet',
+      label: 'Nearby show',
+      helper: 'Lead with the local date when there is no newer release.',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'playlist-fallback': {
+    id: 'playlist-fallback',
+    drawerView: null,
+    latestReleaseKey: 'none',
+    notifications: {
+      kind: 'button',
+      tone: 'quiet',
+      label: 'Playlist fallback',
+      helper: 'Fall back to a real playlist when there is no release or tour.',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'listen-fallback': {
+    id: 'listen-fallback',
+    drawerView: null,
+    latestReleaseKey: 'none',
+    notifications: {
+      kind: 'button',
+      tone: 'quiet',
+      label: 'Listen fallback',
+      helper: 'Keep a clean listen action live when nothing else should lead.',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
   'fans-opt-in': {
     id: 'fans-opt-in',
     drawerView: null,
@@ -366,6 +417,89 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
       body: 'The next local show reaches the fans already following along.',
       accentLabel: 'Show alert',
     },
+  },
+  'subscribe-email': {
+    id: 'subscribe-email',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'input',
+      tone: 'compose',
+      label: 'Email address',
+      helper: 'One clean line from CTA to email capture.',
+      value: 'fan@example.com',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'subscribe-otp': {
+    id: 'subscribe-otp',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'otp',
+      tone: 'compose',
+      label: 'Enter the 6-digit code from your email',
+      helper: 'OTP stays in the same inline shell.',
+      value: '142683',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'subscribe-otp-error': {
+    id: 'subscribe-otp-error',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'otp',
+      tone: 'error',
+      label: 'Enter the 6-digit code from your email',
+      helper: 'That code was invalid. Try again.',
+      value: '142680',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'subscribe-name': {
+    id: 'subscribe-name',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'name',
+      tone: 'compose',
+      label: 'Name',
+      helper: 'Name capture keeps the same footprint.',
+      value: 'Ava Lopez',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'subscribe-birthday': {
+    id: 'subscribe-birthday',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'birthday',
+      tone: 'compose',
+      label: 'Birthday',
+      helper: 'Birthday capture stays inline too.',
+      value: '05/17/1994',
+    },
+    showSubscriptionConfirmedBanner: false,
+    previewOverlay: null,
+  },
+  'subscribe-done': {
+    id: 'subscribe-done',
+    drawerView: null,
+    latestReleaseKey: 'live',
+    notifications: {
+      kind: 'status',
+      tone: 'success',
+      label: 'Notifications on',
+      helper: 'The done state keeps the exact same footprint.',
+    },
+    showSubscriptionConfirmedBanner: true,
+    previewOverlay: null,
   },
   tour: {
     id: 'tour',

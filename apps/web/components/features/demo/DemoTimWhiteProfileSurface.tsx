@@ -3,14 +3,20 @@
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
+import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
-import type { ProfileMode } from '@/features/profile/contracts';
+import {
+  type ProfileMode,
+  type ProfileShowcaseStateId,
+} from '@/features/profile/contracts';
+import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
 import { isProfileMode } from '@/features/profile/registry';
 import {
   StaticArtistPage,
@@ -71,6 +77,48 @@ type DemoReleaseVariant = {
 const TIMESTAMP = new Date('2026-01-01T00:00:00.000Z');
 const RELEASE_VARIANT_KEYS = ['presave', 'live', 'video'] as const;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const SHOWCASE_VIEWER_LOCATION = {
+  latitude: 34.0522,
+  longitude: -118.2437,
+} as const;
+const DEMO_TIM_WHITE_SHOWCASE_MODES = ['cards', 'subscribe'] as const;
+const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
+  'streams-latest',
+  'streams-presave',
+  'streams-release-day',
+  'streams-video',
+  'tour-nearby',
+  'playlist-fallback',
+  'listen-fallback',
+  'fans-opt-in',
+  'fans-confirmed',
+  'fans-song-alert',
+  'fans-show-alert',
+  'subscribe-email',
+  'subscribe-otp',
+  'subscribe-otp-error',
+  'subscribe-name',
+  'subscribe-birthday',
+  'subscribe-done',
+  'tips-open',
+  'tips-apple-pay',
+  'tips-thank-you',
+  'tips-followup',
+  'tour',
+  'contact',
+  'catalog',
+] as const satisfies readonly ProfileShowcaseStateId[];
+const SUBSCRIBE_SHOWCASE_STATE_IDS = [
+  'fans-opt-in',
+  'subscribe-email',
+  'subscribe-otp',
+  'subscribe-otp-error',
+  'subscribe-name',
+  'subscribe-birthday',
+  'subscribe-done',
+] as const satisfies readonly ProfileShowcaseStateId[];
+
+type DemoTimWhiteShowcaseMode = (typeof DEMO_TIM_WHITE_SHOWCASE_MODES)[number];
 
 function getReleaseVariants(
   nowMs: number
@@ -135,16 +183,290 @@ function isValidRelease(value: string | null): value is ReleaseVariant {
   return RELEASE_VARIANT_KEYS.includes(value as ReleaseVariant);
 }
 
+function isDemoTimWhiteShowcaseMode(
+  value: string | null
+): value is DemoTimWhiteShowcaseMode {
+  return DEMO_TIM_WHITE_SHOWCASE_MODES.includes(
+    value as DemoTimWhiteShowcaseMode
+  );
+}
+
+function isProfileShowcaseStateId(
+  value: string | null
+): value is ProfileShowcaseStateId {
+  return DEMO_TIM_WHITE_SHOWCASE_STATE_IDS.includes(
+    value as ProfileShowcaseStateId
+  );
+}
+
+function DemoShowcaseShell({
+  title,
+  subtitle,
+  testId,
+  children,
+}: Readonly<{
+  title: string;
+  subtitle: string;
+  testId: string;
+  children: React.ReactNode;
+}>) {
+  return (
+    <DemoClientProviders>
+      <div data-testid={testId}>
+        <div className='min-h-screen bg-[#05070b] px-5 py-8 text-white sm:px-6 lg:px-8'>
+          <div className='mx-auto max-w-[1200px]'>
+            <div className='max-w-[42rem]'>
+              <p className='text-[11px] font-[600] tracking-[0.14em] text-white/42'>
+                Tim White Showcase
+              </p>
+              <h1 className='mt-3 text-[clamp(2rem,4vw,3.2rem)] font-[630] tracking-[-0.06em] text-white'>
+                {title}
+              </h1>
+              <p className='mt-3 max-w-[38rem] text-[14px] leading-[1.7] text-white/62'>
+                {subtitle}
+              </p>
+            </div>
+            <div className='mt-8'>{children}</div>
+          </div>
+        </div>
+      </div>
+    </DemoClientProviders>
+  );
+}
+
+function ActionCardShowcaseBoard() {
+  const nextTourViewerLocation = {
+    latitude: 40.7128,
+    longitude: -74.006,
+  } as const;
+
+  const cardShowcaseItems = [
+    {
+      id: 'release-live',
+      label: 'Latest release',
+      description:
+        'Real release metadata with album art and collaborator copy.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations={true}
+          renderMode='preview'
+          previewActionLabel='Listen'
+          size='showcase'
+          className='w-full'
+          dataTestId='tim-white-cards-release-live'
+        />
+      ),
+    },
+    {
+      id: 'release-countdown',
+      label: 'Countdown',
+      description: 'Future release state with the countdown card leading.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.presave}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations={true}
+          renderMode='preview'
+          previewActionLabel='Listen'
+          size='showcase'
+          className='w-full'
+          dataTestId='tim-white-cards-release-countdown'
+        />
+      ),
+    },
+    {
+      id: 'tour-nearby',
+      label: 'Nearby tour',
+      description: 'Geo-aware nearby date when there is no release to feature.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={null}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES}
+          hasPlayableDestinations={false}
+          renderMode='preview'
+          size='showcase'
+          viewerLocation={SHOWCASE_VIEWER_LOCATION}
+          className='w-full'
+          dataTestId='tim-white-cards-tour-nearby'
+        />
+      ),
+    },
+    {
+      id: 'tour-next',
+      label: 'Next tour',
+      description:
+        'Fallback upcoming date when the viewer is not near a venue.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={null}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES}
+          hasPlayableDestinations={false}
+          renderMode='preview'
+          size='showcase'
+          viewerLocation={nextTourViewerLocation}
+          resolveNearbyTour={false}
+          className='w-full'
+          dataTestId='tim-white-cards-tour-next'
+        />
+      ),
+    },
+    {
+      id: 'playlist-fallback',
+      label: 'Playlist fallback',
+      description: 'Real playlist fallback when there is no release or tour.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={null}
+          profileSettings={{ showOldReleases: true }}
+          featuredPlaylistFallback={HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK}
+          tourDates={[]}
+          hasPlayableDestinations={false}
+          renderMode='preview'
+          size='showcase'
+          className='w-full'
+          dataTestId='tim-white-cards-playlist-fallback'
+        />
+      ),
+    },
+    {
+      id: 'listen-fallback',
+      label: 'Listen fallback',
+      description:
+        'Clean listen CTA when the profile still has DSP destinations.',
+      card: (
+        <ProfilePrimaryActionCard
+          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          latestRelease={null}
+          profileSettings={{ showOldReleases: true }}
+          tourDates={[]}
+          hasPlayableDestinations={true}
+          renderMode='preview'
+          previewActionLabel='Listen'
+          size='showcase'
+          className='w-full'
+          dataTestId='tim-white-cards-listen-fallback'
+        />
+      ),
+    },
+  ] as const;
+
+  return (
+    <DemoShowcaseShell
+      testId='demo-showcase-tim-white-profile-cards'
+      title='Primary Action Card States'
+      subtitle='These are the exact Tim White card states the live profile and the marketing proof now share.'
+    >
+      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        {cardShowcaseItems.map(item => (
+          <article
+            key={item.id}
+            className='rounded-[28px] border border-white/8 bg-white/[0.03] p-4 shadow-[0_28px_84px_rgba(0,0,0,0.32)]'
+          >
+            <div className='mb-4'>
+              <h2 className='text-[18px] font-[620] tracking-[-0.04em] text-white'>
+                {item.label}
+              </h2>
+              <p className='mt-1 text-[12px] leading-[1.55] text-white/56'>
+                {item.description}
+              </p>
+            </div>
+            <div className='rounded-[24px] border border-white/8 bg-[#0b0f16] p-3'>
+              {item.card}
+            </div>
+          </article>
+        ))}
+      </div>
+    </DemoShowcaseShell>
+  );
+}
+
+function SubscribeShowcaseBoard() {
+  return (
+    <DemoShowcaseShell
+      testId='demo-showcase-tim-white-profile-subscribe'
+      title='Inline Notifications Flow'
+      subtitle='Each step keeps the same footprint so the subscribe flow can be reviewed without layout shift.'
+    >
+      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        {SUBSCRIBE_SHOWCASE_STATE_IDS.map(stateId => (
+          <article
+            key={stateId}
+            className='rounded-[28px] border border-white/8 bg-white/[0.03] p-4 shadow-[0_28px_84px_rgba(0,0,0,0.32)]'
+          >
+            <p className='mb-4 text-[14px] font-[600] tracking-[-0.03em] text-white'>
+              {stateId
+                .replace('subscribe-', '')
+                .replace('fans-opt-in', 'button')
+                .replaceAll('-', ' ')
+                .replace(/\b\w/g, match => match.toUpperCase())}
+            </p>
+            <div className='flex items-center justify-center'>
+              <HomeProfileShowcase
+                stateId={stateId}
+                presentation='full-phone'
+                compact
+                hideJovieBranding
+                hideMoreMenu
+                className='scale-[0.9] origin-top'
+              />
+            </div>
+          </article>
+        ))}
+      </div>
+    </DemoShowcaseShell>
+  );
+}
+
+function SingleStatePhonePreview({
+  stateId,
+}: Readonly<{ stateId: ProfileShowcaseStateId }>) {
+  return (
+    <DemoShowcaseShell
+      testId='demo-showcase-tim-white-profile-state'
+      title='Single Profile State'
+      subtitle='Use the state query param to pin one Tim White profile state for screenshots or focused review.'
+    >
+      <div className='flex items-center justify-center'>
+        <HomeProfileShowcase
+          stateId={stateId}
+          presentation='full-phone'
+          hideJovieBranding
+          hideMoreMenu
+        />
+      </div>
+    </DemoShowcaseShell>
+  );
+}
+
 export function DemoTimWhiteProfileSurface() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
   const releaseParam = searchParams.get('release');
   const captureMode = searchParams.get('capture');
+  const showcaseParam = searchParams.get('showcase');
+  const stateParam = searchParams.get('state');
 
   const mode: ProfileMode = isProfileMode(modeParam) ? modeParam : 'profile';
   const releaseKey: ReleaseVariant = isValidRelease(releaseParam)
     ? releaseParam
     : 'live';
+  const showcaseMode = isDemoTimWhiteShowcaseMode(showcaseParam)
+    ? showcaseParam
+    : null;
+  const showcaseState = isProfileShowcaseStateId(stateParam)
+    ? stateParam
+    : null;
   const releaseVariants = useMemo(() => getReleaseVariants(Date.now()), []);
   const latestRelease = makeDemoRelease(releaseVariants[releaseKey]);
 
@@ -204,6 +526,18 @@ export function DemoTimWhiteProfileSurface() {
         </div>
       </DemoClientProviders>
     );
+  }
+
+  if (showcaseMode === 'cards') {
+    return <ActionCardShowcaseBoard />;
+  }
+
+  if (showcaseMode === 'subscribe') {
+    return <SubscribeShowcaseBoard />;
+  }
+
+  if (showcaseState) {
+    return <SingleStatePhonePreview stateId={showcaseState} />;
   }
 
   return (

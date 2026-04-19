@@ -124,11 +124,14 @@ function getReleaseCollaboratorLine(
   return `w/ ${collaborators.join(', ')}`;
 }
 
-function getUpcomingTourDates(tourDates: readonly TourDateViewModel[]) {
-  const now = Date.now();
+function getUpcomingTourDates(
+  tourDates: readonly TourDateViewModel[],
+  now?: Date
+) {
+  const nowMs = (now ?? new Date()).getTime();
 
   return [...tourDates]
-    .filter(tourDate => new Date(tourDate.startDate).getTime() >= now)
+    .filter(tourDate => new Date(tourDate.startDate).getTime() >= nowMs)
     .sort(
       (left, right) =>
         new Date(left.startDate).getTime() - new Date(right.startDate).getTime()
@@ -296,8 +299,8 @@ export function ProfilePrimaryActionCard({
   now,
 }: Readonly<ProfilePrimaryActionCardProps>) {
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates),
-    [tourDates]
+    () => getUpcomingTourDates(tourDates, now),
+    [now, tourDates]
   );
   const nextTourDate = upcomingTourDates[0] ?? null;
   const releaseVisibility = useMemo(

@@ -34,4 +34,14 @@ export interface OtpInputProps {
    * Error message ID for aria-describedby association
    */
   readonly errorId?: string;
+  /**
+   * Visual density for the OTP boxes.
+   * @default 'default'
+   */
+  readonly size?: 'default' | 'compact';
+  /**
+   * Whether to render the mobile progress dots above the OTP boxes.
+   * @default true
+   */
+  readonly showProgressDots?: boolean;
 }

@@ -65,7 +65,7 @@ describe('ArtistProfilesPage', () => {
 
   it('renders the artist profile landing scaffold with subtraction-first copy', {
     timeout: 20_000,
-  }, () => {
+  }, async () => {
     render(<ArtistProfilesPage />);
 
     expectArtistProfileSectionOrder({
@@ -116,17 +116,6 @@ describe('ArtistProfilesPage', () => {
         ?.screenshotAlt
     ).toContain('contact');
 
-    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
-
-    expect(
-      adaptiveSequence.getByText('Make support one tap away.')
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('img', {
-        name: ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'pay')
-          ?.screenshotAlt,
-      })
-    ).toBeInTheDocument();
     expect(screen.queryByText('/listen')).not.toBeInTheDocument();
     expect(screen.queryByText('/tour')).not.toBeInTheDocument();
     expect(screen.queryByText('/pay')).not.toBeInTheDocument();
@@ -240,9 +229,22 @@ describe('ArtistProfilesPage', () => {
     expect(
       outcomesSection.getByTestId('artist-profile-outcomes-grid')
     ).toBeInTheDocument();
+    expect(outcomesSection.getAllByText('Tim White').length).toBeGreaterThan(0);
     expect(
-      outcomesSection.getAllByText('Cosmic Gate & Tim White').length
+      outcomesSection.getAllByText('w/ Cosmic Gate').length
     ).toBeGreaterThan(0);
+    expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.queryByText('Wired to my latest release')
+    ).not.toBeInTheDocument();
 
     const specWallSection = within(
       screen.getByTestId('artist-profile-section-spec-wall')

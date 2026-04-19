@@ -70,12 +70,21 @@ export function useSegmentedInput({
   const [isComplete, setIsComplete] = useState(false);
   const haptic = useHapticFeedback();
   const lastLengthRef = useRef(0);
+  const lastCompletedValueRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
       inputRefs.current[0].focus();
     }
   }, [autoFocus]);
+
+  useEffect(() => {
+    const sanitized = currentValue.replaceAll(/\D/g, '').slice(0, length);
+    lastLengthRef.current = sanitized.length;
+    setIsComplete(sanitized.length === length);
+    lastCompletedValueRef.current =
+      sanitized.length === length ? sanitized : null;
+  }, [currentValue, length]);
 
   const updateValue = useCallback(
     (newValue: string, shouldBlurOnComplete = false) => {
@@ -92,6 +101,7 @@ export function useSegmentedInput({
 
       if (sanitized.length < length) {
         setIsComplete(false);
+        lastCompletedValueRef.current = null;
       }
 
       lastLengthRef.current = sanitized.length;
@@ -101,7 +111,11 @@ export function useSegmentedInput({
       }
       onChange?.(sanitized);
 
-      if (sanitized.length === length) {
+      if (
+        sanitized.length === length &&
+        sanitized !== lastCompletedValueRef.current
+      ) {
+        lastCompletedValueRef.current = sanitized;
         onComplete?.(sanitized);
         if (shouldBlurOnComplete) {
           setTimeout(() => {
@@ -129,27 +143,32 @@ export function useSegmentedInput({
     (index: number, inputValue: string) => {
       const digits = inputValue.replaceAll(/\D/g, '');
 
-      if (digits.length > 1) {
-        handleMultiDigitInput(digits);
+      if (!digits) {
         return;
       }
 
-      const digit = digits.slice(-1);
+      const effectiveIndex =
+        index < currentValue.length || currentValue.length >= length
+          ? index
+          : Math.min(index, currentValue.length);
 
-      if (digit) {
-        // If typing into a position beyond the current value length,
-        // append the digit at the next available position instead of
-        // creating a sparse value (e.g., clicking box 5 when empty).
-        const effectiveIndex = Math.min(index, currentValue.length);
-        const chars = currentValue.split('');
-        chars[effectiveIndex] = digit;
-        const newValue = chars.join('');
-        updateValue(newValue);
-
-        const nextIndex = effectiveIndex + 1;
-        if (nextIndex < length) {
-          inputRefs.current[nextIndex]?.focus();
+      if (digits.length > 1) {
+        const isPasteLike =
+          digits.length >= length || currentValue.length === 0;
+        if (isPasteLike) {
+          handleMultiDigitInput(digits);
+          return;
         }
+      }
+
+      const digit = digits.slice(-1);
+      const chars = currentValue.split('');
+      chars[effectiveIndex] = digit;
+      updateValue(chars.join(''));
+
+      const nextIndex = effectiveIndex + 1;
+      if (nextIndex < length) {
+        inputRefs.current[nextIndex]?.focus();
       }
     },
     [currentValue, updateValue, handleMultiDigitInput, length]

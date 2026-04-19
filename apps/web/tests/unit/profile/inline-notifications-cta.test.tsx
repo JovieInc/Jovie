@@ -390,7 +390,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
   });
 
-  it('wraps content in min-h-[116px] container', async () => {
+  it('wraps content in fixed h-[72px] container', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -400,10 +400,10 @@ describe('ProfileInlineNotificationsCTA', () => {
     render(<ProfileInlineNotificationsCTA artist={artist} />);
 
     const container = screen.getByTestId('profile-inline-cta');
-    expect(container.className).toContain('min-h-[116px]');
+    expect(container.className).toContain('h-[72px]');
   });
 
-  it('disables OTP submit button when error is present', async () => {
+  it('keeps OTP submit enabled when the code is complete, even with an error', async () => {
     const formState = buildFormState({ notificationsState: 'idle' });
     mockUseSubscriptionForm.mockReturnValue(formState);
 
@@ -432,9 +432,73 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     rerender(<ProfileInlineNotificationsCTA artist={artist} />);
 
-    // Submit button should be disabled due to error
+    // Submit button stays available so the corrected code can replace in place.
     const submitBtn = screen.getByRole('button', { name: /submit/i });
-    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toBeEnabled();
+  });
+
+  it('auto-verifies a new completed OTP code once and ignores the same failed code on re-entry', async () => {
+    const handleVerifyOtp = vi.fn().mockResolvedValue(undefined);
+    const formState = buildFormState({
+      notificationsState: 'idle',
+      handleVerifyOtp,
+    });
+    mockUseSubscriptionForm.mockReturnValue(formState);
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '',
+        handleVerifyOtp,
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123456' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+    expect(handleVerifyOtp).toHaveBeenLastCalledWith('123456');
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        error: 'Invalid verification code',
+        handleVerifyOtp,
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123456' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123457' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(2);
+    expect(handleVerifyOtp).toHaveBeenLastCalledWith('123457');
   });
 
   it('shows resend link when OTP error is present', async () => {
