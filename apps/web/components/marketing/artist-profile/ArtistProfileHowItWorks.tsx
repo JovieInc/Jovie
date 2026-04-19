@@ -149,6 +149,7 @@ function BuildMoment({ accent }: Readonly<{ accent: string }>) {
       <div className='mt-3.5 space-y-2.5'>
         {PROVIDER_ROWS.map(provider => {
           const providerAccent = getAccentCssVars(provider.accent).solid;
+          const providerBorderColor = `color-mix(in srgb, ${providerAccent} 38%, transparent)`;
           const isIngesting = provider.status === 'Ingesting';
 
           return (
@@ -176,7 +177,7 @@ function BuildMoment({ accent }: Readonly<{ accent: string }>) {
                   background: isIngesting
                     ? 'rgba(0,0,0,0.34)'
                     : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${isIngesting ? `color-mix(in srgb, ${providerAccent} 38%, transparent)` : 'rgba(255,255,255,0.08)'}`,
+                  border: `1px solid ${isIngesting ? providerBorderColor : 'rgba(255,255,255,0.08)'}`,
                   color: isIngesting
                     ? `color-mix(in srgb, ${providerAccent} 72%, white)`
                     : 'rgba(255,255,255,0.74)',
