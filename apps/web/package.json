@@ -150,6 +150,7 @@
     "@floating-ui/react": "^0.27.19",
     "@headlessui/react": "^2.2.9",
     "@jovie/ui": "workspace:*",
+    "@next/env": "16.2.3",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
