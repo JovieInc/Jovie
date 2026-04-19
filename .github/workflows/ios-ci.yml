@@ -1,0 +1,90 @@
+name: iOS CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/ios/**'
+      - 'package.json'
+      - '.github/workflows/ios-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ios/**'
+      - 'package.json'
+      - '.github/workflows/ios-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Build And Test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Resolve Swift package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project apps/ios/Jovie.xcodeproj \
+            -scheme Jovie
+
+      - name: Select simulator destination
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DESTINATIONS="$(xcodebuild -showdestinations -project apps/ios/Jovie.xcodeproj -scheme Jovie 2>/dev/null || true)"
+
+          DESTINATION="$(
+            printf '%s\n' "$DESTINATIONS" | ruby -ne '
+              next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
+              os = Regexp.last_match(1)
+              name = Regexp.last_match(2).strip
+              if os.start_with?("18.")
+                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
+                exit
+              end
+            '
+          )"
+
+          if [[ -z "$DESTINATION" ]]; then
+            DESTINATION="$(
+              printf '%s\n' "$DESTINATIONS" | ruby -ne '
+                next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
+                os = Regexp.last_match(1)
+                name = Regexp.last_match(2).strip
+                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
+                exit
+              '
+            )"
+          fi
+
+          if [[ -z "$DESTINATION" ]]; then
+            echo "Unable to find an iOS Simulator destination."
+            echo "$DESTINATIONS"
+            exit 1
+          fi
+
+          echo "destination=$DESTINATION" >> "$GITHUB_OUTPUT"
+          echo "Using destination: $DESTINATION"
+
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -project apps/ios/Jovie.xcodeproj \
+            -scheme Jovie \
+            -destination '${{ steps.simulator.outputs.destination }}' \
+            CODE_SIGNING_ALLOWED=NO

@@ -330,6 +330,32 @@ describe('proxy.ts middleware', () => {
     });
   });
 
+  describe('private-origin Clerk handling', () => {
+    it('keeps Clerk middleware enabled for authenticated mobile APIs on localhost', async () => {
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.shouldBypassClerkForRequest.mockReturnValue(false);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/api/mobile/v1/me',
+        headers: {
+          'x-forwarded-host': 'localhost:3000',
+          'x-forwarded-proto': 'http',
+        },
+      });
+
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.shouldBypassClerkForRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowAuthRouteBypass: true,
+          forceBypass: false,
+          pathname: '/api/mobile/v1/me',
+        })
+      );
+    });
+  });
+
   describe('staging Clerk contract', () => {
     it('fails closed on staging auth routes when staging Clerk keys are missing', async () => {
       mocks.isStagingHost.mockReturnValue(true);

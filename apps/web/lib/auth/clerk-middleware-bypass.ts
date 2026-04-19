@@ -32,6 +32,7 @@ const AUTHENTICATED_API_PREFIXES = [
   '/api/dashboard',
   '/api/dsp',
   '/api/images',
+  '/api/mobile',
   '/api/metadata-submissions',
   '/api/onboarding',
   '/api/pre-save',

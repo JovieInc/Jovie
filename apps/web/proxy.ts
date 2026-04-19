@@ -8,6 +8,7 @@ import {
 import {
   getRequestLocationFromHeaders,
   shouldBypassClerk,
+  shouldDisableClerkProxyForLocation,
 } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
@@ -1324,15 +1325,22 @@ export default async function middleware(
   const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
   const { publishableKey: resolvedClerkPublishableKey } =
     resolveClerkKeys(hostname);
+  const requestLocation =
+    getRequestLocationFromHeaders(req.headers) ?? req.nextUrl;
+  const shouldDisableClerkProxyOnPrivateOrigin =
+    shouldDisableClerkProxyForLocation(requestLocation);
   const shouldForceBypassClerk = shouldBypassClerk(
     resolvedClerkPublishableKey,
     process.env.NEXT_PUBLIC_CLERK_MOCK,
-    getRequestLocationFromHeaders(req.headers) ?? req.nextUrl
+    requestLocation
   );
   const allowAuthRouteClerkBypass =
     shouldForceBypassClerk ||
+    shouldDisableClerkProxyOnPrivateOrigin ||
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const shouldForceBypassClerkForRequest =
+    shouldForceBypassClerk && !shouldDisableClerkProxyOnPrivateOrigin;
 
   if (
     shouldBypassClerkForRequest({
@@ -1340,7 +1348,7 @@ export default async function middleware(
       pathname,
       pathInfo: clerkPathInfo,
       cookies: req.cookies.getAll(),
-      forceBypass: shouldForceBypassClerk,
+      forceBypass: shouldForceBypassClerkForRequest,
     })
   ) {
     return handleRequest(req, null);
