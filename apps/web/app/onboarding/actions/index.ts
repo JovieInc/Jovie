@@ -435,10 +435,17 @@ export async function completeOnboarding({
       runBackgroundSyncOperations(userId, completion.username);
     }
 
-    // Step 9: Activate 14-day Pro trial (fire-and-forget)
+    // Step 9: Activate 14-day Pro trial as a bounded best-effort side effect.
     if (shouldFinalizeOnboarding) {
-      void import('./activate-trial').then(({ activateTrial }) =>
-        activateTrial(userId)
+      await runBoundedPostOnboardingSideEffect(
+        'activate_trial',
+        () =>
+          import('./activate-trial')
+            .then(({ activateTrial }) => activateTrial(userId))
+            .then(() => {}),
+        {
+          userId,
+        }
       );
     }
 
