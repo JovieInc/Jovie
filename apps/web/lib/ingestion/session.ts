@@ -20,16 +20,12 @@ export async function withSystemIngestionSession<T>(
 
   return runLegacyDbTransaction(
     async tx => {
-      // Set the session variable within the transaction
-      try {
-        await tx.execute(
-          drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
-        );
-      } catch {
-        await tx.execute(
-          drizzleSql`SET LOCAL app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
-        );
-      }
+      // Set the session variable within the transaction.
+      // Neon HTTP does not support SET LOCAL fallback outside a real transaction,
+      // so fail closed if transaction-scoped session state cannot be set.
+      await tx.execute(
+        drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
+      );
 
       return operation(tx);
     },
