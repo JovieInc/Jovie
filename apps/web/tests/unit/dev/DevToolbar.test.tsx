@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 const mockSetTheme = vi.fn();
 
@@ -8,21 +9,18 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: mockSetTheme }),
 }));
 
-const FF_OVERRIDES_KEY = '__ff_overrides';
-
 function setLocalOverrides(overrides: Record<string, boolean>) {
   localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(overrides));
 }
 
-vi.mock('@/lib/feature-flags/shared', () => ({
-  FF_OVERRIDES_KEY: '__ff_overrides',
-  CODE_FLAG_KEYS: {
+vi.mock('@/lib/flags/contracts', () => ({
+  APP_FLAG_OVERRIDE_KEYS: {
     CLAIM_HANDLE: 'code:CLAIM_HANDLE',
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
   },
-  FEATURE_FLAGS: {
+  APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,

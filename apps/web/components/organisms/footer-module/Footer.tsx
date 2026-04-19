@@ -6,7 +6,7 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 // Dynamic import to exclude ThemeToggle from bundle when not used
@@ -80,7 +80,7 @@ export function Footer({
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useCodeFlag('ENABLE_LIGHT_MODE');
+  const isLightModeEnabled = useAppFlag('ENABLE_LIGHT_MODE');
   const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 

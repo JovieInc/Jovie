@@ -8,7 +8,8 @@ import {
 } from '@/features/auth';
 import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 import { publicEnv } from '@/lib/env-public';
-import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,7 @@ export default async function AuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const initialFlags = await getAppFlagsSnapshot();
   const publishableKey = await resolvePublishableKeyFromHeaders();
   await headers();
   const isClerkUnavailable =
@@ -26,7 +28,7 @@ export default async function AuthLayout({
 
   if (isClerkUnavailable) {
     return (
-      <FeatureFlagsProvider>
+      <AppFlagProvider initialFlags={initialFlags}>
         <main id='main-content'>
           <AuthShellLayout
             formTitle='Auth unavailable'
@@ -36,15 +38,15 @@ export default async function AuthLayout({
             <AuthUnavailableCard />
           </AuthShellLayout>
         </main>
-      </FeatureFlagsProvider>
+      </AppFlagProvider>
     );
   }
 
   return (
     <AuthClientProviders forceEnableClerk publishableKey={publishableKey}>
-      <FeatureFlagsProvider>
+      <AppFlagProvider initialFlags={initialFlags}>
         <main id='main-content'>{children}</main>
-      </FeatureFlagsProvider>
+      </AppFlagProvider>
     </AuthClientProviders>
   );
 }

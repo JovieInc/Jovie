@@ -496,7 +496,7 @@ function CaptureActionPill({
                   ) : null}
                 </>
               ) : (
-                <span className='text-[12px] font-medium tracking-[-0.02em] text-white/36'>
+                <span className='text-[12px] font-medium tracking-[-0.02em] text-white/64'>
                   {capture.action.detail}
                 </span>
               )}

@@ -3,8 +3,8 @@ import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurf
 import { resolveProfileMonetizationSummary } from '@/lib/profile-monetization';
 import { fastRender } from '@/tests/utils/fast-render';
 
-const { mockUseCodeFlag, mockCopyToClipboard } = vi.hoisted(() => ({
-  mockUseCodeFlag: vi.fn(),
+const { mockUseAppFlag, mockCopyToClipboard } = vi.hoisted(() => ({
+  mockUseAppFlag: vi.fn(),
   mockCopyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
@@ -12,8 +12,8 @@ vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => <img {...props} alt='' />,
 }));
 
-vi.mock('@/lib/feature-flags/client', () => ({
-  useCodeFlag: (flagName: string) => mockUseCodeFlag(flagName),
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: (flagName: string) => mockUseAppFlag(flagName),
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -153,7 +153,7 @@ const renderCases = [
 describe('ProfilePaySurface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseCodeFlag.mockReturnValue(false);
+    mockUseAppFlag.mockReturnValue(false);
   });
 
   describe.each(['settings', 'drawer'] as const)('%s variant', variant => {
@@ -177,7 +177,7 @@ describe('ProfilePaySurface', () => {
   });
 
   it('uses Set Up Payments copy when Stripe Connect is enabled', () => {
-    mockUseCodeFlag.mockReturnValue(true);
+    mockUseAppFlag.mockReturnValue(true);
 
     const summary = resolveProfileMonetizationSummary({
       username: 'artist',

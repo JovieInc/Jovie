@@ -13,7 +13,7 @@ import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
 
@@ -24,7 +24,9 @@ export async function POST() {
   if (error) return error;
 
   // Check feature flag
-  if (!FEATURE_FLAGS.STRIPE_CONNECT_ENABLED) {
+  if (
+    !(await getAppFlagValue('STRIPE_CONNECT_ENABLED', { userId: clerkUserId }))
+  ) {
     return NextResponse.json(
       { error: 'Stripe Connect is not enabled' },
       { status: 403, headers: NO_STORE_HEADERS }

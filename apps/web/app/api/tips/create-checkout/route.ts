@@ -7,7 +7,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   createRateLimitHeaders,
@@ -132,9 +132,13 @@ export async function POST(req: NextRequest) {
       cancel_url: `${baseUrl}/${handle}/tip`,
     };
 
+    const stripeConnectEnabled = await getAppFlagValue(
+      'STRIPE_CONNECT_ENABLED'
+    );
+
     // Route tip directly to creator's Stripe Connect account when available
     if (
-      FEATURE_FLAGS.STRIPE_CONNECT_ENABLED &&
+      stripeConnectEnabled &&
       profile.stripeAccountId &&
       profile.stripePayoutsEnabled
     ) {
