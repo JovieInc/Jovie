@@ -105,10 +105,8 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
 ];
 
 const FAST_ITERATION_CASE_IDS = new Set<ProfileAuditCase['id']>([
-  // Fast-feedback smoke keeps the historically flaky deep-link and drawer paths.
-  // Base profile/listen coverage already lives in lighter public smoke specs.
-  'subscribe',
-  'subscribe-focus',
+  // Fast-feedback smoke keeps drawer/deep-link coverage that is not already
+  // exercised by the dedicated subscribe-flow smoke lane.
   'contact',
   'tip',
   'notifications',
