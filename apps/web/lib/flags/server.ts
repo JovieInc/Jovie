@@ -15,7 +15,6 @@ import {
   parseAppFlagOverrides,
 } from './overrides';
 import { APP_FLAG_REGISTRY, SUBSCRIBE_CTA_VARIANT_FLAG } from './registry';
-import { checkGateForUser, getExperiment, shutdownStatsig } from './statsig';
 
 function shouldHonorClientFlagOverrides(): boolean {
   return !(
@@ -103,4 +102,4 @@ export async function getSubscribeCTAVariant(
   });
 }
 
-export { checkGateForUser, getExperiment, shutdownStatsig };
+export { checkGateForUser, getExperiment, shutdownStatsig } from './statsig';

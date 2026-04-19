@@ -81,7 +81,6 @@ export function ProfilePreview({
           showBackButton={false}
           contacts={[]}
           showFooter={false}
-          autoOpenCapture={false}
         />
       </div>
     </div>
