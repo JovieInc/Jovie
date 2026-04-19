@@ -1,9 +1,11 @@
+import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SearchableSubmenuItem } from './searchable-submenu';
-import { SearchableList } from './searchable-submenu';
+import { SearchableList, SearchableSubmenu } from './searchable-submenu';
 
 // Sample items for testing
 const sampleItems: SearchableSubmenuItem[] = [
@@ -13,6 +15,19 @@ const sampleItems: SearchableSubmenuItem[] = [
   { id: 'item-4', label: 'Date', disabled: true },
   { id: 'item-5', label: 'Elderberry', shortcut: '⌘E' },
 ];
+
+const sampleSections = [
+  {
+    id: 'fruits',
+    label: 'Fruits',
+    items: sampleItems.slice(0, 3),
+  },
+  {
+    id: 'dates',
+    label: 'Dates',
+    items: sampleItems.slice(3),
+  },
+] as const;
 
 /**
  * Helper to get the visual items container (aria-hidden div with buttons).
@@ -32,6 +47,32 @@ function getItemButton(container: HTMLElement, label: string): HTMLElement {
   const visual = getVisualContainer(container);
   return within(visual).getByText(label).closest('button')!;
 }
+
+async function openSubmenu(triggerLabel = 'Choose Fruit') {
+  const user = userEvent.setup({ delay: null });
+  await user.click(screen.getByRole('button', { name: 'Open menu' }));
+  await user.click(screen.getByText(triggerLabel));
+  return user;
+}
+
+function renderInMenu(ui: ReactNode) {
+  return render(
+    <DropdownMenuPrimitive.Root modal={false}>
+      <DropdownMenuPrimitive.Trigger asChild>
+        <button type='button'>Open menu</button>
+      </DropdownMenuPrimitive.Trigger>
+      <DropdownMenuPrimitive.Portal>
+        <DropdownMenuPrimitive.Content forceMount>
+          {ui}
+        </DropdownMenuPrimitive.Content>
+      </DropdownMenuPrimitive.Portal>
+    </DropdownMenuPrimitive.Root>
+  );
+}
+
+beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 
 describe('SearchableList', () => {
   describe('Rendering', () => {
@@ -410,5 +451,167 @@ describe('SearchableList', () => {
       render(<SearchableList items={items} onSelect={vi.fn()} />);
       expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
     });
+  });
+});
+
+describe('SearchableSubmenu', () => {
+  it('opens the submenu, focuses search, and renders sections and footer', async () => {
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={vi.fn()}
+        footer={<div data-testid='submenu-footer'>Footer</div>}
+      />
+    );
+
+    await openSubmenu();
+
+    expect(screen.getByRole('combobox', { name: 'Search...' })).toHaveFocus();
+    expect(screen.getByText('Fruits')).toBeInTheDocument();
+    expect(screen.getByText('Dates')).toBeInTheDocument();
+    expect(screen.getByTestId('submenu-footer')).toBeInTheDocument();
+    expect(
+      screen.getByRole('listbox', { name: 'Choose Fruit results' })
+    ).toBeInTheDocument();
+  });
+
+  it('filters items, emits search changes, and clears the query', async () => {
+    const onSearchChange = vi.fn();
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={vi.fn()}
+        onSearchChange={onSearchChange}
+      />
+    );
+
+    await openSubmenu();
+    const search = screen.getByRole('combobox', { name: 'Search...' });
+    fireEvent.change(search, { target: { value: 'ban' } });
+
+    expect(onSearchChange).toHaveBeenCalledWith('ban');
+    expect(search).toHaveValue('ban');
+    expect(screen.getByText('Banana')).toBeInTheDocument();
+    expect(screen.queryByText('Apple')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect(onSearchChange).toHaveBeenLastCalledWith('');
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+  });
+
+  it('shows empty state when there are no sections', async () => {
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={[]}
+        onSelect={vi.fn()}
+        emptyMessage='Nothing here'
+      />
+    );
+
+    await openSubmenu();
+    expect(screen.getByText('Nothing here')).toBeInTheDocument();
+  });
+
+  it('shows loading state', async () => {
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={vi.fn()}
+        isLoading
+      />
+    );
+
+    await openSubmenu();
+
+    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
+  });
+
+  it('supports keyboard navigation and selects the highlighted item on Enter', async () => {
+    const onSelect = vi.fn();
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={onSelect}
+      />
+    );
+
+    await openSubmenu();
+    const search = screen.getByRole('combobox', { name: 'Search...' });
+
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    fireEvent.keyDown(search, { key: 'End' });
+    expect(search).toHaveAttribute('aria-activedescendant', 'item-item-5');
+
+    fireEvent.keyDown(search, { key: 'Home' });
+    expect(search).toHaveAttribute('aria-activedescendant', 'item-item-1');
+
+    fireEvent.keyDown(search, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith(sampleItems[0]);
+  });
+
+  it('clears search on escape', async () => {
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={vi.fn()}
+      />
+    );
+
+    await openSubmenu();
+    const search = screen.getByRole('combobox', { name: 'Search...' });
+    fireEvent.change(search, { target: { value: 'dat' } });
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+    expect(search).toHaveValue('');
+  });
+
+  it('does not select disabled items from the accessible listbox', async () => {
+    const onSelect = vi.fn();
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={onSelect}
+      />
+    );
+
+    await openSubmenu();
+    fireEvent.change(
+      screen.getByRole('listbox', { name: 'Choose Fruit results' }),
+      {
+        target: { value: 'item-4' },
+      }
+    );
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('supports selecting an item from the accessible listbox', async () => {
+    const onSelect = vi.fn();
+    renderInMenu(
+      <SearchableSubmenu
+        triggerLabel='Choose Fruit'
+        sections={sampleSections}
+        onSelect={onSelect}
+      />
+    );
+
+    await openSubmenu();
+    fireEvent.change(
+      screen.getByRole('listbox', { name: 'Choose Fruit results' }),
+      {
+        target: { value: 'item-2' },
+      }
+    );
+
+    expect(onSelect).toHaveBeenCalledWith(sampleItems[1]);
   });
 });
