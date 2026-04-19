@@ -72,7 +72,7 @@ Local `/browse` auth is bypass-first, not Clerk-form-first.
 ## Test Coverage Policy
 
 - Treat Codecov patch coverage as the PR readiness signal and project coverage as the regression ratchet.
-- During the rollout soak window, coverage statuses stay informational before becoming required checks in GitHub branch protection.
+- Codecov statuses are blocking in repo config; branch protection should require `codecov/project/default`, `codecov/patch/default`, `codecov/patch/critical`, and `E2E Smoke (PR Fast Feedback)` once each check has appeared recently in the repo.
 - Bug-fix PRs must add or update a regression test, or explain the exception in the PR body.
 - Add the `testing` label to billing, auth, entitlements, webhook, migration, and environment/config PRs so `E2E Smoke (PR Fast Feedback)` runs before merge.
 
