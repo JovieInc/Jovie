@@ -1,19 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockExecute, mockRunLegacyDbTransaction, mockValidateClerkUserId } =
-  vi.hoisted(() => ({
-    mockExecute: vi.fn(),
-    mockRunLegacyDbTransaction: vi.fn(
-      async (fn: (tx: { execute: typeof mockExecute }) => Promise<unknown>) => {
-        const tx = { execute: mockExecute } as const;
-        return fn(tx as never);
-      }
-    ),
-    mockValidateClerkUserId: vi.fn(),
-  }));
+const {
+  mockExecute,
+  mockRunLegacyDbTransaction,
+  mockSetTransactionSessionUserId,
+  mockValidateClerkUserId,
+} = vi.hoisted(() => ({
+  mockExecute: vi.fn(),
+  mockRunLegacyDbTransaction: vi.fn(
+    async (fn: (tx: { execute: typeof mockExecute }) => Promise<unknown>) => {
+      const tx = { execute: mockExecute } as const;
+      return fn(tx as never);
+    }
+  ),
+  mockSetTransactionSessionUserId: vi.fn(
+    async (
+      tx: { execute: typeof mockExecute },
+      userId: string,
+      _context: string
+    ) => {
+      mockValidateClerkUserId(userId);
+      return tx.execute({
+        sql: `SELECT set_config('app.clerk_user_id', '${userId}', true)`,
+      } as never);
+    }
+  ),
+  mockValidateClerkUserId: vi.fn(),
+}));
 
 vi.mock('@/lib/auth/session', () => ({
   validateClerkUserId: mockValidateClerkUserId,
+  setTransactionSessionUserId: mockSetTransactionSessionUserId,
 }));
 
 vi.mock('@/lib/db/legacy-transaction', () => ({
