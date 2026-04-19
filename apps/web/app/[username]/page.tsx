@@ -658,7 +658,7 @@ export default async function ArtistPage({
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
   ]);
-  const tourDates = tourDatesRaw.sort(
+  const tourDates = tourDatesRaw.toSorted(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
 

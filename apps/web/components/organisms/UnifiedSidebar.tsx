@@ -38,7 +38,7 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
@@ -116,7 +116,7 @@ function SettingsNavigation({
   section: string;
 }) {
   const { selectedProfile, isAdmin } = useDashboardData();
-  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
+  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
   const { data: cachedProfileData } = useDashboardProfileQuery();

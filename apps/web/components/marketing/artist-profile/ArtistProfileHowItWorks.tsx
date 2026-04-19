@@ -15,7 +15,6 @@ import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
-
 export function ArtistProfileHowItWorks({
   howItWorks,
 }: Readonly<ArtistProfileHowItWorksProps>) {

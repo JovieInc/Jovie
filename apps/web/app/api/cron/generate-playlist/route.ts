@@ -18,6 +18,7 @@ import {
 } from '@/lib/admin/platform-connections';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { generatePlaylist } from '@/lib/playlists/pipeline';
 
 export const runtime = 'nodejs';
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
   if (authError) return authError;
 
   const settings = await getPlaylistEngineSettings();
-  if (!settings.enabled) {
+  const playlistEngineEnabled = await getAppFlagValue('PLAYLIST_ENGINE');
+  if (!playlistEngineEnabled || !settings.enabled) {
     return NextResponse.json(
       { success: true, skipped: true, reason: 'Playlist engine is disabled' },
       { headers: NO_STORE }

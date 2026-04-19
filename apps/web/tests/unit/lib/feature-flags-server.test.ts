@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { STATSIG_GATE_KEYS } from '@/lib/feature-flags/shared';
+import { LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
 
 // Mock statsig-node before importing the module under test
 vi.mock('statsig-node', () => ({
@@ -25,18 +25,29 @@ describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    delete process.env.NODE_ENV;
+    delete process.env.VERCEL_ENV;
   });
 
   it('warns only once when server secret is missing across multiple checkGate calls', async () => {
     const { logger } = await import('@/lib/utils/logger');
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
-    const { checkGate } = await import('@/lib/feature-flags/server');
+    const { checkGateForUser } = await import('@/lib/flags/server');
 
     // Call checkGate multiple times — each internally calls initializeStatsig()
-    await checkGate('user-1', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
-    await checkGate('user-2', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
-    await checkGate('user-3', STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT);
+    await checkGateForUser(
+      'user-1',
+      LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    );
+    await checkGateForUser(
+      'user-2',
+      LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    );
+    await checkGateForUser(
+      'user-3',
+      LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+    );
 
     const statsigWarnings = warnSpy.mock.calls.filter(
       args =>
@@ -45,5 +56,41 @@ describe('Statsig server initialization', () => {
     );
 
     expect(statsigWarnings).toHaveLength(1);
+  });
+
+  it('ignores client override cookies in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+
+    vi.doMock('next/headers', () => ({
+      cookies: async () => ({
+        get: (name: string) =>
+          name === 'jovie_app_flag_overrides'
+            ? {
+                value: encodeURIComponent(
+                  JSON.stringify({ 'code:THREADS_ENABLED': true })
+                ),
+              }
+            : undefined,
+      }),
+    }));
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: {
+        THREADS_ENABLED: { run },
+      },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(getAppFlagValue('THREADS_ENABLED')).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

@@ -17,7 +17,7 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
@@ -86,7 +86,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const threadsEnabled = useCodeFlag('THREADS_ENABLED');
+  const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,

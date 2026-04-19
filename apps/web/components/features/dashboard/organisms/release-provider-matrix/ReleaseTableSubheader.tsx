@@ -16,7 +16,7 @@ import {
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
 import { RELEASE_VIEW_OPTIONS } from './ReleaseTable.types';
@@ -134,7 +134,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts from all (unfiltered) releases so counts stay stable
   const counts = useReleaseFilterCounts(allReleases);
-  const showToolbarExtras = useCodeFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
+  const showToolbarExtras = useAppFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
 
   return (
     <PageToolbar

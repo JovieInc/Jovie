@@ -1,19 +1,18 @@
 'use client';
 
 import { type ReactNode, useCallback } from 'react';
-import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
+import { useAppFlagOverrides } from '@/lib/flags/client';
 import {
-  CODE_FLAG_KEYS,
-  type CodeFlagName,
-  FEATURE_FLAGS,
-} from '@/lib/feature-flags/shared';
+  APP_FLAG_DEFAULTS,
+  APP_FLAG_OVERRIDE_KEYS,
+  type AppFlagName,
+} from '@/lib/flags/contracts';
 import { useFlagBadges } from './FlagBadgeContext';
 
 const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
 interface FlaggedProps {
-  /** The code flag name (must be a key of FEATURE_FLAGS) */
-  readonly name: CodeFlagName;
+  readonly name: AppFlagName;
   readonly children: ReactNode;
 }
 
@@ -23,18 +22,18 @@ interface FlaggedProps {
  */
 export function Flagged({ name, children }: FlaggedProps) {
   const badgeCtx = useFlagBadges();
-  const overrides = useFeatureFlagOverrides();
+  const overrides = useAppFlagOverrides();
 
   const toggleFlag = useCallback(() => {
     if (!overrides) return;
-    const overrideKey = CODE_FLAG_KEYS[name];
+    const overrideKey = APP_FLAG_OVERRIDE_KEYS[name];
     if (overrideKey in overrides.overrides) {
       // Currently overridden — toggle the override value
       const current = overrides.overrides[overrideKey];
       overrides.setOverride(overrideKey, !current);
     } else {
       // Not overridden — override to opposite of code default
-      overrides.setOverride(overrideKey, !FEATURE_FLAGS[name]);
+      overrides.setOverride(overrideKey, !APP_FLAG_DEFAULTS[name]);
     }
   }, [overrides, name]);
 
@@ -44,11 +43,11 @@ export function Flagged({ name, children }: FlaggedProps) {
   }
 
   // Determine current effective value
-  const overrideKey = CODE_FLAG_KEYS[name];
+  const overrideKey = APP_FLAG_OVERRIDE_KEYS[name];
   const isOverridden = overrides && overrideKey in overrides.overrides;
   const effectiveValue = isOverridden
     ? overrides.overrides[overrideKey]
-    : FEATURE_FLAGS[name];
+    : APP_FLAG_DEFAULTS[name];
 
   const outlineColor = effectiveValue
     ? 'outline-emerald-500/40'
