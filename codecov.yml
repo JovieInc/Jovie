@@ -17,8 +17,8 @@ coverage:
       default:
         target: auto
         threshold: 0.5%
-        # Soak window: report until branch protection is tightened after rollout.
-        informational: true
+        # Block regressions in the repo config; branch protection follows separately.
+        informational: false
         # Ratchet PRs against the existing main baseline.
         only_pulls: true
     # Patch coverage: coverage of new/modified lines
@@ -27,12 +27,12 @@ coverage:
         target: 80%
         threshold: 0%
         if_not_found: success
-        informational: true
+        informational: false
       critical:
         target: 95%
         threshold: 0%
         if_not_found: success
-        informational: true
+        informational: false
         paths:
           - apps/web/lib/stripe/**
           - apps/web/lib/billing/**
