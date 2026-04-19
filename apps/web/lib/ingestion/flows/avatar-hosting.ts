@@ -8,6 +8,12 @@
  */
 
 import { put as uploadBlob } from '@vercel/blob';
+import {
+  BLOCKED_HOSTNAMES,
+  INTERNAL_DOMAIN_SUFFIXES,
+  isPrivateIpAddress,
+  METADATA_HOSTNAMES,
+} from '@/lib/constants/url-safety';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
@@ -31,21 +37,19 @@ export function isSafeExternalHttpsUrl(input: string): boolean {
     if (parsed.protocol !== 'https:') return false;
 
     const hostname = parsed.hostname.toLowerCase();
-    if (hostname === 'localhost') return false;
-    if (hostname.endsWith('.local')) return false;
-    if (hostname.endsWith('.internal')) return false;
+    if (hostname.includes('%')) return false; // Reject IPv6 zone identifiers.
+    if (BLOCKED_HOSTNAMES.has(hostname)) return false;
+    if (INTERNAL_DOMAIN_SUFFIXES.some(suffix => hostname.endsWith(suffix))) {
+      return false;
+    }
+    if (METADATA_HOSTNAMES.has(hostname)) return false;
 
-    // Block link-local / metadata ranges explicitly (defense-in-depth).
-    // Note: this is ad-hoc; consider a dedicated SSRF filter library for comprehensive protection.
-    if (hostname.includes('%')) return false; // Reject IPv6 zone identifiers (e.g. fe80::1%en0)
-    if (/^\s*169\.254\.\d{1,3}\.\d{1,3}\s*$/.test(hostname)) return false;
-    // Block full IPv6 link-local range fe80::/10 (fe80–febf), but only for IPv6 literals.
+    // Block IP literals and link-local/private ranges explicitly (defense-in-depth).
+    if (isPrivateIpAddress(hostname)) return false;
+
+    // Keep a narrow check for additional IPv6 link-local forms that aren't
+    // captured by the canonical private-IP patterns above.
     if (hostname.includes(':') && /^fe[89ab]/i.test(hostname)) return false;
-
-    // Block raw IP addresses (IPv4/IPv6) to reduce SSRF risk.
-    // We intentionally do not DNS-resolve here.
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false;
-    if (hostname.includes(':')) return false;
 
     return true;
   } catch {
@@ -81,11 +85,11 @@ export async function copyAvatarToBlob(
     return null;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
     const response = await fetch(sourceUrl, { signal: controller.signal });
-    clearTimeout(timeout);
 
     if (!response.ok) {
       throw new Error(`Fetch failed with status ${response.status}`);
@@ -168,6 +172,8 @@ export async function copyAvatarToBlob(
       handle,
     });
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
