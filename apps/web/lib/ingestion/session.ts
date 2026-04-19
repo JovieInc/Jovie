@@ -1,10 +1,7 @@
 import 'server-only';
 
-import {
-  type IsolationLevel,
-  setTransactionSessionUserId,
-  validateClerkUserId,
-} from '@/lib/auth/session';
+import { sql as drizzleSql } from 'drizzle-orm';
+import { type IsolationLevel, validateClerkUserId } from '@/lib/auth/session';
 import { type DbOrTransaction } from '@/lib/db';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 
@@ -26,10 +23,8 @@ export async function withSystemIngestionSession<T>(
       // Set the session variable within the transaction.
       // Neon HTTP does not support SET LOCAL fallback outside a real transaction,
       // so fail closed if transaction-scoped session state cannot be set.
-      await setTransactionSessionUserId(
-        tx,
-        SYSTEM_INGESTION_USER,
-        'withSystemIngestionSession_set_config_failed'
+      await tx.execute(
+        drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
       );
 
       return operation(tx);
