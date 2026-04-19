@@ -40,6 +40,7 @@ jobs:
     outputs:
       run_build: ${{ steps.detect.outputs.run_build }}
       run_test: ${{ steps.detect.outputs.run_test }}
+      run_ui_coverage: ${{ steps.detect.outputs.run_ui_coverage }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse }}
@@ -61,7 +62,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_ui_coverage run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -74,7 +75,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_ui_coverage run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -85,7 +86,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_ui_coverage run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -111,6 +112,13 @@ jobs:
           else
             RUN_TEST=false
             echo "run_test=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          UI_COVERAGE_PATTERN='^(packages/ui/|packages/ui/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$UI_COVERAGE_PATTERN"; then
+            echo "run_ui_coverage=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_ui_coverage=false" >> "$GITHUB_OUTPUT"
           fi
 
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
@@ -166,6 +174,7 @@ jobs:
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_test=false" >> "$GITHUB_OUTPUT"
+            echo "run_ui_coverage=false" >> "$GITHUB_OUTPUT"
           fi
 
   ci-env-example-guard:
@@ -1859,9 +1868,20 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm --filter=@jovie/web run test:fast -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
 
-      - name: Run packages/ui unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo test --filter=@jovie/ui
+      - name: Run packages/ui unit tests with coverage
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/4' && (github.ref == 'refs/heads/main' || needs.ci-path-changes.outputs.run_ui_coverage == 'true')
+        run: pnpm --filter=@jovie/ui exec vitest run --coverage
+
+      - name: Upload packages/ui coverage to Codecov
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/4' && (github.ref == 'refs/heads/main' || needs.ci-path-changes.outputs.run_ui_coverage == 'true')
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v5
+        with:
+          files: packages/ui/coverage/lcov.info
+          flags: ui
+          name: ui-${{ github.sha }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')

@@ -57,6 +57,10 @@ flags:
     paths:
       - apps/web/
     carryforward: true
+  ui:
+    paths:
+      - packages/ui/
+    carryforward: true
 
 # Ignore patterns - files not considered for coverage
 ignore:
@@ -71,7 +75,6 @@ ignore:
   - "**/dist/**"
   - "**/__mocks__/**"
   - "**/storybook-static/**"
-  - "packages/ui/**"  # UI package has its own coverage if needed
 
 # Component management for better PR insights
 component_management:
