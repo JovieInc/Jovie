@@ -220,11 +220,7 @@ function SignUpPageContent() {
 
 export function SignUpPageClient() {
   return (
-    <AuthLayout
-      formTitle='Create your account'
-      showFormTitle={false}
-      showFooterPrompt={false}
-    >
+    <AuthLayout formTitle='Create your account' showFooterPrompt={false}>
       <Suspense fallback={<AuthFormSkeleton />}>
         <SignUpPageContent />
       </Suspense>
