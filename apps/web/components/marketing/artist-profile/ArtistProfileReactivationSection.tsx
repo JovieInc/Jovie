@@ -28,7 +28,6 @@ export function ArtistProfileReactivationSection({
           className='max-w-[46rem]'
           bodyClassName='mx-auto max-w-[35rem]'
         />
-
         <ArtistProfileReactivationVisual
           className='mt-12'
           notification={notification}
