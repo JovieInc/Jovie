@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui/atoms/popover';
-import { format, parse } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { CalendarIcon, Globe, MapPin } from 'lucide-react';
 import {
   type ComponentType,
@@ -147,11 +147,17 @@ export function TourDateSidebar({
   const handleSave = useCallback(async () => {
     if (!tourDate) return;
 
+    const startDate = parseISO(formData.startDate);
+    if (Number.isNaN(startDate.getTime())) {
+      toast.error('Please choose a valid tour date');
+      return;
+    }
+
     try {
       await updateMutation.mutateAsync({
         id: tourDate.id,
         title: formData.title || null,
-        startDate: new Date(formData.startDate).toISOString(),
+        startDate: startDate.toISOString(),
         startTime: formData.startTime || null,
         timezone: formData.timezone || null,
         venueName: formData.venueName,
@@ -185,6 +191,11 @@ export function TourDateSidebar({
   }, [tourDate, deleteMutation, onClose]);
 
   const isPending = updateMutation.isPending || deleteMutation.isPending;
+  const parsedStartDate = useMemo(() => {
+    if (!formData.startDate) return null;
+    const parsedDate = parseISO(formData.startDate);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }, [formData.startDate]);
 
   // Build sidebar overflow menu from canonical tour date actions
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
@@ -321,30 +332,15 @@ export function TourDateSidebar({
                         )}
                       >
                         <CalendarIcon className='h-3.5 w-3.5' />
-                        {formData.startDate
-                          ? format(
-                              parse(
-                                formData.startDate,
-                                'yyyy-MM-dd',
-                                new Date()
-                              ),
-                              'MMM d, yyyy'
-                            )
+                        {parsedStartDate
+                          ? format(parsedStartDate, 'MMM d, yyyy')
                           : 'Pick a date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className='w-auto p-0' align='start'>
                       <Calendar
                         mode='single'
-                        selected={
-                          formData.startDate
-                            ? parse(
-                                formData.startDate,
-                                'yyyy-MM-dd',
-                                new Date()
-                              )
-                            : undefined
-                        }
+                        selected={parsedStartDate ?? undefined}
                         onSelect={date => {
                           if (!date) return;
                           setFormData(prev => ({
