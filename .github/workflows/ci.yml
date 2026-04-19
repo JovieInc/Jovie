@@ -1815,8 +1815,8 @@ jobs:
           OUTPUT_FLAG="--outputFile=test-report.${SHARD_SLUG}.junit.xml"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running full test suite with coverage"
-            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            echo "🧪 PR/main: Running web unit suite with coverage"
+            pnpm --filter=@jovie/web run test:fast -- $VITEST_CI_FLAGS --coverage $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
@@ -2626,7 +2626,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ALLOW_SOURCE_FALLBACK: '1'
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: '1'
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -3143,6 +3143,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
       - name: Alias preview to staging.jov.ie
         run: |
