@@ -159,7 +159,7 @@ export function ArtistProfileHowItWorks({
                       className={cn(
                         'rounded-full px-2.5 py-1 text-[10px] font-semibold',
                         provider.status === 'Ingesting'
-                          ? 'bg-accent/12 text-accent'
+                          ? 'border border-accent/18 bg-[#20172e] text-[#d7b8ff]'
                           : 'bg-white/6 text-secondary-token'
                       )}
                     >

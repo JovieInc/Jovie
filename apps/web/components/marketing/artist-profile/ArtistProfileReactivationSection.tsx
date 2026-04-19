@@ -44,7 +44,7 @@ export function ArtistProfileReactivationSection({
                     <BellRing className='h-4 w-4' strokeWidth={1.9} />
                   </span>
                   <div className='min-w-0 flex-1'>
-                    <div className='flex items-center gap-2 text-[11px] text-white/42'>
+                    <div className='flex items-center gap-2 text-[11px] text-white/72'>
                       <p className='font-medium tracking-[-0.01em]'>
                         {notification.appName}
                       </p>
@@ -53,7 +53,7 @@ export function ArtistProfileReactivationSection({
                     <p className='mt-2 text-[14px] font-semibold tracking-[-0.03em] text-primary-token'>
                       {releaseOutput?.title ?? notification.title}
                     </p>
-                    <p className='mt-1.5 text-[12.5px] leading-[1.45] text-white/58'>
+                    <p className='mt-1.5 text-[12.5px] leading-[1.45] text-white/74'>
                       {releaseOutput?.detail ?? notification.detail}
                     </p>
                   </div>

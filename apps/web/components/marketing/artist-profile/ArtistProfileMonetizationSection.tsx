@@ -225,46 +225,55 @@ export function ArtistProfileMonetizationSection({
         </div>
 
         <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
-            <button
-              type='button'
-              onClick={() => {
-                scrollByDirection('prev');
-              }}
-              disabled={activeCardIndex === 0}
-              className={cn(
-                'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                activeCardIndex === 0
-                  ? 'cursor-not-allowed opacity-35'
-                  : 'hover:bg-white hover:text-black'
-              )}
-              aria-label='Scroll monetization left'
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </button>
+          <section
+            ref={scrollerRef}
+            data-testid='artist-profile-monetization-scroller'
+            aria-label='Monetization card carousel'
+            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] scroll-pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [&::-webkit-scrollbar]:hidden'
+          >
             <button
               type='button'
               onClick={() => {
                 scrollByDirection('next');
               }}
-              disabled={activeCardIndex === cards.length - 1}
-              className={cn(
-                'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                activeCardIndex === cards.length - 1
-                  ? 'cursor-not-allowed opacity-35'
-                  : 'hover:bg-white hover:text-black'
-              )}
-              aria-label='Scroll monetization right'
+              className='sr-only focus:not-sr-only focus:absolute focus:left-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] focus:top-4 focus:z-30 focus:rounded-full focus:border focus:border-black/12 focus:bg-[#f3efe6] focus:px-4 focus:py-2 focus:text-[12px] focus:font-semibold focus:text-black focus:shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
-              <ChevronRight className='h-4 w-4' />
+              Browse monetization cards
             </button>
-          </div>
-
-          <div
-            ref={scrollerRef}
-            data-testid='artist-profile-monetization-scroller'
-            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] scroll-pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [&::-webkit-scrollbar]:hidden'
-          >
+            <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
+              <button
+                type='button'
+                onClick={() => {
+                  scrollByDirection('prev');
+                }}
+                disabled={activeCardIndex === 0}
+                className={cn(
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  activeCardIndex === 0
+                    ? 'cursor-not-allowed opacity-35'
+                    : 'hover:bg-white hover:text-black'
+                )}
+                aria-label='Scroll monetization left'
+              >
+                <ChevronLeft className='h-4 w-4' />
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  scrollByDirection('next');
+                }}
+                disabled={activeCardIndex === cards.length - 1}
+                className={cn(
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  activeCardIndex === cards.length - 1
+                    ? 'cursor-not-allowed opacity-35'
+                    : 'hover:bg-white hover:text-black'
+                )}
+                aria-label='Scroll monetization right'
+              >
+                <ChevronRight className='h-4 w-4' />
+              </button>
+            </div>
             {cards.map((card, index) => (
               <MonetizationCard
                 key={card.id}
@@ -291,7 +300,7 @@ export function ArtistProfileMonetizationSection({
                 ) : null}
               </MonetizationCard>
             ))}
-          </div>
+          </section>
         </div>
       </div>
     </ArtistProfileSectionShell>
@@ -408,7 +417,7 @@ function CaptureFanVisual({
           <p className='text-[14px] font-semibold tracking-[-0.03em] text-white'>
             {card.fanName}
           </p>
-          <div className='mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/56'>
+          <div className='mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/72'>
             <MapPin className='h-3.5 w-3.5' strokeWidth={1.9} />
             {card.fanLocation}
           </div>
@@ -445,15 +454,15 @@ function SayThanksVisual({
             <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
               {card.appName}
             </p>
-            <p className='text-[11px] font-medium text-white/42'>now</p>
+            <p className='text-[11px] font-medium text-white/72'>now</p>
           </div>
-          <p className='mt-0.5 text-[11px] font-medium text-white/55'>
+          <p className='mt-0.5 text-[11px] font-medium text-white/72'>
             {card.sender}
           </p>
           <p className='mt-3 text-[13px] font-semibold leading-[1.28] tracking-[-0.03em] text-white'>
             {card.notificationTitle}
           </p>
-          <p className='mt-1.5 text-[12px] leading-[1.45] text-white/58'>
+          <p className='mt-1.5 text-[12px] leading-[1.45] text-white/74'>
             {card.notificationPreview}
           </p>
         </div>
@@ -501,7 +510,7 @@ function ReengageVisual({
                 <p className='text-[12.5px] font-semibold leading-[1.3] tracking-[-0.02em] text-white'>
                   {output.title}
                 </p>
-                <p className='mt-1.5 text-[11.5px] leading-[1.45] text-white/54'>
+                <p className='mt-1.5 text-[11.5px] leading-[1.45] text-white/72'>
                   {output.detail}
                 </p>
               </div>

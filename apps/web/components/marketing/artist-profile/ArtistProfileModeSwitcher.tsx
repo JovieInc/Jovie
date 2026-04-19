@@ -227,7 +227,7 @@ export function ArtistProfileModeSwitcher({
             size='sm'
             aria-label='Profile modes'
             className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
-            triggerClassName='min-w-0 px-2.5 data-[state=active]:text-black sm:px-3.5'
+            triggerClassName='min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
           />
         </div>
       </div>
@@ -237,8 +237,8 @@ export function ArtistProfileModeSwitcher({
           {activeMode ? (
             <motion.p
               key={activeMode.id}
-              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-[-0.03em] text-primary-token/92 sm:text-[15px]'
-              initial={{ opacity: 0 }}
+              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-[-0.03em] text-white/86 sm:text-[15px]'
+              initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{
