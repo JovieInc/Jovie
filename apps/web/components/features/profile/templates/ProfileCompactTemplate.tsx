@@ -10,6 +10,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import type {
   ProfileMode,
+  ProfileRenderMode,
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
@@ -65,6 +66,7 @@ interface ProfileCompactTemplateProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }
 
 function resolveDrawerView(
@@ -164,6 +166,7 @@ export function ProfileCompactTemplate({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  renderMode = 'interactive',
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
@@ -568,7 +571,7 @@ export function ProfileCompactTemplate({
               data-testid='profile-compact-shell'
             >
               <ProfileCompactSurface
-                renderMode='interactive'
+                renderMode={renderMode}
                 presentation={drawerPresentation}
                 artist={artist}
                 socialLinks={socialLinks}

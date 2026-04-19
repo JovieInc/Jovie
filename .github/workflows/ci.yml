@@ -1686,7 +1686,7 @@ jobs:
 
           if [ "$RUN_WITH_COVERAGE" = "true" ]; then
             echo "🧪 PR/main: Running web unit suite with coverage"
-            pnpm --filter=@jovie/web run test -- run --config=vitest.config.mts $VITEST_CI_FLAGS --coverage $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            pnpm --filter=@jovie/web run test:fast -- $VITEST_CI_FLAGS --coverage $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 Merge queue: Running fast web unit suite"
             pnpm --filter=@jovie/web run test:fast -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG

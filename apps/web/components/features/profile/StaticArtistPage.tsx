@@ -116,6 +116,9 @@ export function StaticArtistPage({
       genres={viewModel.genres}
       pressPhotos={viewModel.pressPhotos}
       allowPhotoDownloads={viewModel.allowPhotoDownloads}
+      renderMode={
+        presentation === 'compact-preview' ? 'preview' : 'interactive'
+      }
       photoDownloadSizes={viewModel.photoDownloadSizes}
       tourDates={viewModel.tourDates}
       visitTrackingToken={viewModel.visitTrackingToken}
