@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
 const mockUseUserSafe = vi.fn();
+const mockUpdateSubscriberBirthdayMutation = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -127,10 +128,8 @@ vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
-  useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
+  useUpdateSubscriberBirthdayMutation: () =>
+    mockUpdateSubscriberBirthdayMutation(),
 }));
 
 const artist: Artist = {
@@ -186,6 +185,10 @@ describe('ProfileInlineNotificationsCTA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseUserSafe.mockReturnValue({ user: null });
+    mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
   it('renders "Turn on notifications" button in cta step', async () => {
@@ -340,6 +343,55 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     const birthdayInput = screen.getByTestId('inline-birthday-input');
     expect(birthdayInput).toBeInTheDocument();
+  });
+
+  it('submits the completed birthday value from onComplete', async () => {
+    const birthdayMutation = vi.fn().mockResolvedValue(undefined);
+    mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: birthdayMutation,
+    });
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({ notificationsState: 'idle' })
+    );
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        emailInput: 'fan@test.com',
+        subscribedChannels: { email: true },
+      })
+    );
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    const nameInput = screen.getByTestId('inline-name-input');
+    fireEvent.keyDown(nameInput, { key: 'Enter' });
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    const birthdayInput = screen.getByTestId('inline-birthday-input');
+    fireEvent.change(birthdayInput, { target: { value: '01021990' } });
+
+    await waitFor(() => {
+      expect(birthdayMutation).toHaveBeenCalledWith({
+        artistId: artist.id,
+        email: 'fan@test.com',
+        birthday: '1990-01-02',
+      });
+    });
   });
 
   it('shows "Notifications on" in done step', async () => {

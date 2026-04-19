@@ -340,10 +340,10 @@ export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
   title: 'This Is Tim White',
   url: 'https://open.spotify.com/playlist/37i9dQZF1DZ06evO0RjExample',
   imageUrl: '/img/releases/the-deep-end.jpg',
-  artistSpotifyId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id ?? '4u',
+  artistSpotifyId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id,
   source: 'serp_html',
   discoveredAt: '2026-01-10T00:00:00.000Z',
-  searchQuery: 'site:open.spotify.com \"This Is Tim White\"',
+  searchQuery: 'site:open.spotify.com "This Is Tim White"',
   confirmedAt: '2026-01-10T00:00:00.000Z',
 } as const;
 

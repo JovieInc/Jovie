@@ -511,38 +511,41 @@ export function ProfileInlineNotificationsCTA({
     setStep('birthday');
   }, [nameInput, artist.id, artist.handle, nameMutation]);
 
-  const handleBirthdaySubmit = useCallback(async () => {
-    const digits = birthdayInput.replaceAll(/[^\d]/g, '');
-    if (digits.length < 8) {
-      if (!birthdayHintShown) {
-        setBirthdayHintShown(true);
+  const handleBirthdaySubmit = useCallback(
+    async (overrideDigits?: string) => {
+      const digits = (overrideDigits ?? birthdayInput).replaceAll(/[^\d]/g, '');
+      if (digits.length < 8) {
+        if (!birthdayHintShown) {
+          setBirthdayHintShown(true);
+          return;
+        }
+        setStep('done');
         return;
       }
+      const stored = birthdayDigitsToStorage(digits);
+      try {
+        await birthdayMutation.mutateAsync({
+          artistId: artist.id,
+          email: subscribedEmailRef.current,
+          birthday: stored,
+        });
+        track('birthday_capture_submitted', {
+          handle: artist.handle,
+          source: 'profile_inline_cta',
+        });
+      } catch {
+        // Best-effort — don't block the flow
+      }
       setStep('done');
-      return;
-    }
-    const stored = birthdayDigitsToStorage(digits);
-    try {
-      await birthdayMutation.mutateAsync({
-        artistId: artist.id,
-        email: subscribedEmailRef.current,
-        birthday: stored,
-      });
-      track('birthday_capture_submitted', {
-        handle: artist.handle,
-        source: 'profile_inline_cta',
-      });
-    } catch {
-      // Best-effort — don't block the flow
-    }
-    setStep('done');
-  }, [
-    birthdayInput,
-    birthdayHintShown,
-    artist.id,
-    artist.handle,
-    birthdayMutation,
-  ]);
+    },
+    [
+      birthdayInput,
+      birthdayHintShown,
+      artist.id,
+      artist.handle,
+      birthdayMutation,
+    ]
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -829,8 +832,8 @@ export function ProfileInlineNotificationsCTA({
                       setBirthdayInput(value);
                       if (birthdayHintShown) setBirthdayHintShown(false);
                     }}
-                    onComplete={() => {
-                      void handleBirthdaySubmit();
+                    onComplete={value => {
+                      void handleBirthdaySubmit(value);
                     }}
                     onSubmit={() => {
                       void handleBirthdaySubmit();
