@@ -85,7 +85,7 @@
     "biome:ci": "biome ci .",
     "biome:check": "biome check .",
     "clean": "rm -rf .next out dist coverage .nyc_output",
-    "postbuild": "next-sitemap && node ./scripts/sync-standalone-assets.mjs",
+    "postbuild": "next-sitemap && if [ \"${VERCEL_SKIP_STANDALONE_ASSET_SYNC:-false}\" = \"true\" ]; then echo 'Skipping standalone asset sync for Vercel build'; else node ./scripts/sync-standalone-assets.mjs; fi",
     "verify-artist-images": "node scripts/verify-artist-images.js",
     "update-artist-images": "node scripts/update-artist-images.js",
     "ensure-valid-artist-images": "node scripts/ensure-valid-artist-images.js",
