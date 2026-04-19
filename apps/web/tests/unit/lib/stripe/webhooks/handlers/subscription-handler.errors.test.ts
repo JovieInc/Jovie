@@ -184,8 +184,19 @@ describe('@critical SubscriptionHandler - Errors', () => {
         stripeEventTimestamp: new Date(),
       };
 
-      await expect(handler.handle(context)).rejects.toThrow(
-        'Unknown price ID: price_unknown'
+      await expect(handler.handle(context)).resolves.toMatchObject({
+        success: true,
+        skipped: true,
+        reason: 'unknown_price_id',
+      });
+
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Unknown price ID in subscription',
+        expect.any(Error),
+        expect.objectContaining({
+          route: '/api/stripe/webhooks',
+          priceId: 'price_unknown',
+        })
       );
     });
 

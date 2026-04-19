@@ -231,16 +231,21 @@ describe('@critical session.ts', () => {
       expect(result).toBe('tx_result');
     });
 
-    it('validates userId before executing transaction', async () => {
+    it('fails closed when transaction-scoped set_config fails', async () => {
       const { withDbSessionTx } = await import('@/lib/auth/session');
 
       const operation = vi.fn();
+      mockDbExecute.mockRejectedValueOnce(new Error('set_config unavailable'));
 
       await expect(
-        withDbSessionTx(operation, { clerkUserId: "invalid'; DROP--" })
-      ).rejects.toThrow('Invalid user ID format');
+        withDbSessionTx(operation, { clerkUserId: 'user_123' })
+      ).rejects.toThrow('set_config unavailable');
 
       expect(operation).not.toHaveBeenCalled();
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      expect(queryText).toContain("set_config('app.clerk_user_id'");
+      expect(queryText).not.toContain('SET LOCAL');
     });
   });
 
