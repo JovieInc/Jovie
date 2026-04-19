@@ -196,7 +196,7 @@ export function Footer({
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
                   className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  style={{ color: 'var(--linear-text-secondary)' }}
                 >
                   Privacy
                 </Link>
@@ -204,7 +204,7 @@ export function Footer({
                   href={APP_ROUTES.LEGAL_TERMS}
                   prefetch={false}
                   className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  style={{ color: 'var(--linear-text-secondary)' }}
                 >
                   Terms
                 </Link>
@@ -213,7 +213,8 @@ export function Footer({
                 variant='light'
                 className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
                 style={{
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--linear-text-secondary)',
+                  opacity: 1,
                 }}
               />
             </div>
@@ -258,8 +259,8 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       prefetch={false}
-                      className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)]'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
+                      className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+                      style={{ color: 'var(--linear-text-secondary)' }}
                     >
                       {link.label}
                     </Link>
@@ -289,7 +290,8 @@ export function Footer({
               variant={config.colorVariant}
               className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
               style={{
-                color: 'var(--linear-text-tertiary)',
+                color: 'var(--linear-text-secondary)',
+                opacity: 1,
               }}
             />
           </>
