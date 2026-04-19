@@ -59,15 +59,8 @@ vi.mock('@/lib/env-public', () => ({
   },
 }));
 
-vi.mock('@/lib/feature-flags/client', () => ({
-  useFeatureGate: () => false,
-  useCodeFlag: () => false,
-}));
-
-vi.mock('@/lib/feature-flags/shared', () => ({
-  FEATURE_FLAG_KEYS: {
-    STRIPE_CONNECT_ENABLED: 'stripe_connect_enabled',
-  },
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
 }));
 
 vi.mock('@/lib/queries', () => ({

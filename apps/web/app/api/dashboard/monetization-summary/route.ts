@@ -5,7 +5,7 @@ import {
 } from '@/app/app/(shell)/dashboard/actions';
 import { requireAuth } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { resolveProfileMonetizationSummary } from '@/lib/profile-monetization';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -22,9 +22,13 @@ export async function GET() {
       link => link.platform === 'venmo' && link.isActive !== false
     );
 
+    const stripeConnectEnabled = await getAppFlagValue(
+      'STRIPE_CONNECT_ENABLED'
+    );
+
     const payload = resolveProfileMonetizationSummary({
       username: dashboardData.selectedProfile?.username,
-      stripeConnectEnabled: FEATURE_FLAGS.STRIPE_CONNECT_ENABLED,
+      stripeConnectEnabled,
       stripeAccountId: dashboardData.selectedProfile?.stripeAccountId,
       stripeOnboardingComplete:
         dashboardData.selectedProfile?.stripeOnboardingComplete,

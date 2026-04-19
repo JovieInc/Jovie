@@ -14,7 +14,7 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 import type { ProfileRenderMode } from './contracts';
@@ -42,7 +42,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   enableDynamicEngagement = false,
   renderMode = 'interactive',
 }: StaticListenInterfaceProps) {
-  const enableDevicePriority = useCodeFlag('IOS_APPLE_MUSIC_PRIORITY');
+  const enableDevicePriority = useAppFlag('IOS_APPLE_MUSIC_PRIORITY');
 
   const dsps = useMemo(() => {
     const countryCode =

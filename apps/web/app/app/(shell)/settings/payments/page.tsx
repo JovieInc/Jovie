@@ -5,10 +5,10 @@ import { useEffect } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 
 export default function SettingsPaymentsPage() {
-  const isStripeConnectEnabled = useCodeFlag('STRIPE_CONNECT_ENABLED');
+  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
   const router = useRouter();
 
   useEffect(() => {

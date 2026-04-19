@@ -4,6 +4,7 @@ import { Download, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { env } from '@/lib/env-client';
+import { useAppFlag } from '@/lib/flags/client';
 import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
@@ -27,6 +28,7 @@ export function SidebarInstallBanner() {
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
   const { isPro, isTrialing } = usePlanGate();
   const isPaidPro = isPro && !isTrialing;
+  const pwaInstallEnabled = useAppFlag('PWA_INSTALL_BANNER');
 
   const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
 
@@ -126,8 +128,9 @@ export function SidebarInstallBanner() {
     );
   }
 
-  // Fall back to PWA install banner (only for paid Pro users, not trials)
-  if (!isPaidPro || !canPrompt) return null;
+  // Fall back to PWA install banner (only for paid Pro users, not trials, and
+  // gated behind the runtime flag).
+  if (!pwaInstallEnabled || !isPaidPro || !canPrompt) return null;
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
