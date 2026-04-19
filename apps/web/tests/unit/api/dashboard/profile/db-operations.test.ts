@@ -98,6 +98,51 @@ describe('updateProfileRecords', () => {
       })
     );
   });
+
+  it('loads the profile through the user lookup and creator_profiles relation', async () => {
+    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
+    createSelectChain([
+      {
+        profile: {
+          id: 'profile-1',
+          userId: 'user-1',
+          displayName: 'Test Artist',
+        },
+      },
+    ]);
+
+    const { getProfileByClerkId } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await getProfileByClerkId('clerk_123');
+
+    expect(mockGetUserByClerkId).toHaveBeenCalledWith(
+      expect.any(Object),
+      'clerk_123'
+    );
+    expect(mockDbSelect).toHaveBeenCalledWith({
+      profile: expect.any(Object),
+    });
+    expect(result).toEqual({
+      profile: {
+        id: 'profile-1',
+        userId: 'user-1',
+        displayName: 'Test Artist',
+      },
+    });
+  });
+
+  it('returns null when the Clerk user does not exist', async () => {
+    mockGetUserByClerkId.mockResolvedValue(null);
+
+    const { getProfileByClerkId } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    await expect(getProfileByClerkId('clerk_missing')).resolves.toBeNull();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProfileByClerkId', () => {
