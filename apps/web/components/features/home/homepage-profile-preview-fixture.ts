@@ -58,12 +58,12 @@ const createHomepageContact = ({
 type HomepageShowcaseStateInput = {
   readonly id: ProfileShowcaseStateId;
   readonly latestReleaseKey: ProfileShowcaseState['latestReleaseKey'];
-  readonly kind: string;
-  readonly tone: string;
-  readonly label: string;
-  readonly helper: string;
-  readonly value?: string;
-  readonly releaseActionLabel?: string;
+  readonly kind: ProfileShowcaseState['notifications']['kind'];
+  readonly tone: ProfileShowcaseState['notifications']['tone'];
+  readonly label: ProfileShowcaseState['notifications']['label'];
+  readonly helper: ProfileShowcaseState['notifications']['helper'];
+  readonly value?: ProfileShowcaseState['notifications']['value'];
+  readonly releaseActionLabel?: ProfileShowcaseState['releaseActionLabel'];
   readonly drawerView?: ProfileShowcaseState['drawerView'];
   readonly previewOverlay?: ProfileShowcaseState['previewOverlay'];
   readonly showSubscriptionConfirmedBanner: boolean;
@@ -81,22 +81,21 @@ const createShowcaseState = ({
   drawerView = null,
   previewOverlay = null,
   showSubscriptionConfirmedBanner,
-}: HomepageShowcaseStateInput): ProfileShowcaseState =>
-  ({
-    id,
-    drawerView,
-    latestReleaseKey,
-    ...(releaseActionLabel ? { releaseActionLabel } : {}),
-    notifications: {
-      kind,
-      tone,
-      label,
-      helper,
-      ...(value ? { value } : {}),
-    },
-    showSubscriptionConfirmedBanner,
-    previewOverlay,
-  }) as ProfileShowcaseState;
+}: HomepageShowcaseStateInput): ProfileShowcaseState => ({
+  id,
+  drawerView,
+  latestReleaseKey,
+  ...(releaseActionLabel ? { releaseActionLabel } : {}),
+  notifications: {
+    kind,
+    tone,
+    label,
+    helper,
+    ...(value ? { value } : {}),
+  },
+  showSubscriptionConfirmedBanner,
+  previewOverlay,
+});
 
 type HomepageShowcaseCoreInput = Omit<
   HomepageShowcaseStateInput,
