@@ -364,7 +364,7 @@ export function ArtistProfileReactivationVisual({
               <BellRing className='h-4 w-4' strokeWidth={1.9} />
             </span>
             <div className='min-w-0'>
-              <div className='flex items-center gap-2 text-[11px] text-white/36'>
+              <div className='flex items-center gap-2 text-[11px] text-white/60'>
                 <p className='font-medium tracking-[-0.01em]'>
                   {notification.appName}
                 </p>
@@ -496,7 +496,7 @@ function CaptureActionPill({
                   ) : null}
                 </>
               ) : (
-                <span className='text-[12px] font-medium tracking-[-0.02em] text-white/36'>
+                <span className='text-[12px] font-medium tracking-[-0.02em] text-white/64'>
                   {capture.action.detail}
                 </span>
               )}
