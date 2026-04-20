@@ -76,11 +76,11 @@ export function ArtistProfileSocialProof({
         </div>
       ) : null}
 
-      {!proofData.hasRealQuotes ? (
+      {proofData.hasRealQuotes ? null : (
         <p className='mt-6 text-[13px] leading-[1.65] text-tertiary-token'>
           {proofData.founderFallback}
         </p>
-      ) : null}
+      )}
     </ArtistProfileSectionShell>
   );
 }

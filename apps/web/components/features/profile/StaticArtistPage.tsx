@@ -22,7 +22,6 @@ export interface StaticArtistPageProps {
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
   readonly showFooter?: boolean;
-  readonly autoOpenCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes?: AvatarSize[];
