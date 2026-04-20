@@ -26,6 +26,7 @@ export function AudienceRowSelectionCell({
       )}
     >
       <div
+        role='presentation'
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
