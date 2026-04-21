@@ -30,12 +30,34 @@ const confirmSchema = z.object({
 });
 
 function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+/g, '')
-    .replaceAll(/-+$/g, '')
-    .slice(0, 80);
+  let slug = '';
+
+  for (const character of title.toLowerCase()) {
+    const isLowercaseLetter = character >= 'a' && character <= 'z';
+    const isDigit = character >= '0' && character <= '9';
+
+    if (isLowercaseLetter || isDigit) {
+      slug += character;
+      continue;
+    }
+
+    if (slug.length > 0 && !slug.endsWith('-')) {
+      slug += '-';
+    }
+  }
+
+  while (slug.endsWith('-')) {
+    slug = slug.slice(0, -1);
+  }
+
+  if (slug.length > 80) {
+    slug = slug.slice(0, 80);
+    while (slug.endsWith('-')) {
+      slug = slug.slice(0, -1);
+    }
+  }
+
+  return slug;
 }
 
 export async function POST(request: NextRequest) {
