@@ -69,18 +69,18 @@ export async function updateProfileRecords({
     .where(eq(creatorProfiles.userId, user.id))
     .returning();
 
-  if (displayNameForUserUpdate) {
-    await db
-      .update(users)
-      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
-  }
-
   if (!updatedProfile) {
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
+  }
+
+  if (displayNameForUserUpdate) {
+    await db
+      .update(users)
+      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
   }
 
   return {

@@ -99,6 +99,26 @@ describe('updateProfileRecords', () => {
     );
   });
 
+  it('does not update user name when profile update returns no row', async () => {
+    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
+    createSelectChain([]);
+    createUpdateChain([]);
+
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      clerkUserId: 'clerk_123',
+      displayNameForUserUpdate: 'Updated Name',
+      dbProfileUpdates: { location: 'Austin, TX' },
+    });
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+    expect(mockDbUpdate).toHaveBeenCalledWith(creatorProfiles);
+  });
+
   it('loads the profile through the user lookup and creator_profiles relation', async () => {
     mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
     createSelectChain([
