@@ -4,28 +4,33 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
+import {
+  linearPillFocusClassName,
+  linearPillIndicatorClassName,
+  linearPillLabelClassName,
+  linearPillSizeClassNames,
+  linearPillSurfaceClassName,
+} from '../lib/linear-pill';
 import { cn } from '../lib/utils';
 
-const segmentControlVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 shadow-none',
-  {
-    variants: {
-      variant: {
-        default: '',
-        ghost: 'border-transparent bg-transparent shadow-none',
-      },
-      size: {
-        sm: 'p-0.5',
-        md: 'p-1',
-        lg: 'p-1',
-      },
+const segmentControlVariants = cva('inline-flex items-center rounded-full', {
+  variants: {
+    variant: {
+      default: 'gap-1 border border-subtle bg-surface-1 shadow-none',
+      ghost: 'border-transparent bg-transparent shadow-none',
+      'linear-pill': linearPillSurfaceClassName,
     },
-    defaultVariants: {
-      variant: 'default',
-      size: 'sm',
+    size: {
+      sm: 'p-0.5',
+      md: 'p-1',
+      lg: 'p-1',
     },
-  }
-);
+  },
+  defaultVariants: {
+    variant: 'default',
+    size: 'sm',
+  },
+});
 
 const segmentTriggerVariants = cva(
   [
@@ -39,17 +44,37 @@ const segmentTriggerVariants = cva(
   ],
   {
     variants: {
+      variant: {
+        default: '',
+        ghost: '',
+        'linear-pill': cn(
+          linearPillLabelClassName,
+          linearPillFocusClassName,
+          'text-(--linear-text-tertiary) hover:text-(--linear-text-primary) data-[state=active]:text-(--linear-btn-primary-fg)'
+        ),
+      },
       size: {
         sm: 'h-7 px-2.5 text-[12px]',
         md: 'h-[28px] px-2.5 text-[13px]',
         lg: 'h-9 px-4 text-sm',
       },
+      layout: {
+        fill: 'flex-1',
+        hug: 'shrink-0',
+      },
     },
     defaultVariants: {
+      variant: 'default',
       size: 'sm',
+      layout: 'fill',
     },
   }
 );
+
+interface IndicatorLayout {
+  readonly width: number;
+  readonly x: number;
+}
 
 export interface SegmentControlOption<T extends string = string> {
   readonly value: T;
@@ -76,6 +101,10 @@ export interface SegmentControlProps<T extends string = string>
    */
   readonly size?: 'sm' | 'md' | 'lg';
   /**
+   * Whether tabs should stretch to fill the control or hug their label width
+   */
+  readonly layout?: 'fill' | 'hug';
+  /**
    * Accessible label for the segment control
    */
   readonly 'aria-label'?: string;
@@ -87,6 +116,10 @@ export interface SegmentControlProps<T extends string = string>
    * Additional class name for trigger buttons
    */
   readonly triggerClassName?: string;
+  /**
+   * Additional class name for the active indicator in linear pill mode
+   */
+  readonly indicatorClassName?: string;
 }
 
 /**
@@ -120,27 +153,133 @@ export function SegmentControl<T extends string = string>({
   options,
   variant,
   size = 'md',
+  layout = 'fill',
   'aria-label': ariaLabel,
   className,
   triggerClassName,
+  indicatorClassName,
 }: SegmentControlProps<T>) {
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const triggerRefs = React.useRef<Record<string, HTMLButtonElement | null>>(
+    {}
+  );
+  const [indicatorLayout, setIndicatorLayout] =
+    React.useState<IndicatorLayout | null>(null);
+
+  const syncIndicator = React.useCallback(() => {
+    if (variant !== 'linear-pill') {
+      setIndicatorLayout(null);
+      return;
+    }
+
+    const listNode = listRef.current;
+    const activeTrigger = triggerRefs.current[value];
+    if (!listNode || !activeTrigger) {
+      setIndicatorLayout(null);
+      return;
+    }
+
+    setIndicatorLayout({
+      width: activeTrigger.offsetWidth,
+      x: activeTrigger.offsetLeft,
+    });
+  }, [value, variant]);
+
+  React.useLayoutEffect(() => {
+    syncIndicator();
+  }, [syncIndicator, options]);
+
+  React.useEffect(() => {
+    if (variant !== 'linear-pill') {
+      return;
+    }
+
+    if (globalThis.ResizeObserver === undefined) {
+      globalThis.addEventListener('resize', syncIndicator);
+      return () => {
+        globalThis.removeEventListener('resize', syncIndicator);
+      };
+    }
+
+    const resizeObserver = new globalThis.ResizeObserver(() => {
+      syncIndicator();
+    });
+
+    if (listRef.current) {
+      resizeObserver.observe(listRef.current);
+    }
+
+    for (const option of options) {
+      const triggerNode = triggerRefs.current[option.value];
+      if (triggerNode) {
+        resizeObserver.observe(triggerNode);
+      }
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [options, syncIndicator, variant]);
+
+  React.useEffect(() => {
+    if (variant !== 'linear-pill' || typeof document === 'undefined') {
+      return;
+    }
+
+    const fonts = document.fonts;
+    if (fonts === undefined) {
+      return;
+    }
+
+    void fonts.ready.then(() => {
+      syncIndicator();
+    });
+  }, [syncIndicator, variant]);
+
+  const linearPillTriggerSizeClassName =
+    variant === 'linear-pill' ? linearPillSizeClassNames[size] : null;
+
   return (
     <Tabs.Root
       value={value}
       onValueChange={onValueChange as (value: string) => void}
-      className={cn(segmentControlVariants({ variant, size }), className)}
+      className={cn(
+        segmentControlVariants({ variant, size }),
+        layout === 'fill' ? 'w-full' : 'max-w-full',
+        className
+      )}
     >
-      <Tabs.List aria-label={ariaLabel} className='flex w-full'>
+      <Tabs.List
+        ref={listRef}
+        aria-label={ariaLabel}
+        className={cn(
+          'relative flex items-center',
+          layout === 'fill' ? 'w-full' : 'w-fit max-w-full'
+        )}
+      >
+        {variant === 'linear-pill' && indicatorLayout ? (
+          <div
+            aria-hidden='true'
+            className={cn(linearPillIndicatorClassName, indicatorClassName)}
+            style={{
+              transform: `translateX(${indicatorLayout.x}px)`,
+              width: `${indicatorLayout.width}px`,
+            }}
+          />
+        ) : null}
         {options.map(option => (
           <Tabs.Trigger
             key={option.value}
             value={option.value}
             disabled={option.disabled}
+            ref={node => {
+              triggerRefs.current[option.value] = node;
+            }}
             className={cn(
-              segmentTriggerVariants({ size }),
-              'flex-1',
-              // Smooth transition for background
-              'motion-safe:transition-[background-color,color,box-shadow] motion-safe:duration-150 motion-safe:ease-out',
+              segmentTriggerVariants({ layout, size, variant }),
+              linearPillTriggerSizeClassName,
+              variant !== 'linear-pill' &&
+                'motion-safe:transition-[background-color,color,box-shadow] motion-safe:duration-150 motion-safe:ease-out',
               triggerClassName
             )}
           >

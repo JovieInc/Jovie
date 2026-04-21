@@ -5,12 +5,12 @@ import type {
 } from '@/data/artistProfileFeatures';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
-import { HomeHero } from '@/features/home/HomeAdaptiveProfileStory';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
+import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
@@ -38,7 +38,7 @@ export function ArtistProfileLandingPage({
     return (
       <>
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-          <HomeHero showPhoneComposition={false} variant='artist-profile' />
+          <ArtistProfileHero hero={copy.hero} />
         </div>
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
           <HomeTrustSection />
@@ -50,10 +50,14 @@ export function ArtistProfileLandingPage({
   return (
     <>
       <ArtistProfileHeroAdaptiveIntro
+        hero={copy.hero}
         adaptive={copy.adaptive}
         phoneCaption={copy.hero.phoneCaption}
         phoneSubcaption={copy.hero.phoneSubcaption}
       />
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
+        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
+      </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection
           capture={copy.capture}
@@ -69,9 +73,6 @@ export function ArtistProfileLandingPage({
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
         <ArtistProfileMonetizationSection monetization={copy.monetization} />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
-        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
         <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />

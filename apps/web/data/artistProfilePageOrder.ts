@@ -49,6 +49,12 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       testId: 'artist-profile-section-trust',
     },
     {
+      id: 'outcomes',
+      label: 'Built for Artists',
+      testId: 'artist-profile-section-outcomes',
+      screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
+    },
+    {
       id: 'capture',
       label: 'Capture Every Fan',
       testId: 'artist-profile-section-capture',
@@ -67,14 +73,8 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-monetization-section-desktop',
     },
     {
-      id: 'outcomes',
-      label: 'Built for Artists',
-      testId: 'artist-profile-section-outcomes',
-      screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
-    },
-    {
       id: 'specWall',
-      label: 'Power Features',
+      label: 'Details That Matter',
       testId: 'artist-profile-section-spec-wall',
       screenshotScenarioId: 'artist-profile-power-features-section-desktop',
     },

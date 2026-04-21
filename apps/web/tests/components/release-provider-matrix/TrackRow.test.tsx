@@ -73,26 +73,32 @@ function createTrack(overrides: Partial<TrackViewModel> = {}): TrackViewModel {
 
 function renderTrackRow(props: Partial<ComponentProps<typeof TrackRow>> = {}) {
   const track = props.track ?? createTrack();
+  const renderMode = props.renderMode ?? 'table';
+  const row = (
+    <TrackRow
+      track={track}
+      providerConfig={providerConfig}
+      allProviders={['spotify', 'apple_music']}
+      columnCount={11}
+      columnVisibility={{
+        select: true,
+        release: true,
+        availability: true,
+        metrics: true,
+        primaryIsrc: true,
+        actions: true,
+      }}
+      {...props}
+    />
+  );
+
+  if (renderMode === 'stack') {
+    return render(row);
+  }
 
   return render(
     <table>
-      <tbody>
-        <TrackRow
-          track={track}
-          providerConfig={providerConfig}
-          allProviders={['spotify', 'apple_music']}
-          columnCount={11}
-          columnVisibility={{
-            select: true,
-            release: true,
-            availability: true,
-            metrics: true,
-            primaryIsrc: true,
-            actions: true,
-          }}
-          {...props}
-        />
-      </tbody>
+      <tbody>{row}</tbody>
     </table>
   );
 }
@@ -109,9 +115,11 @@ describe('TrackRow', () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
 
-    renderTrackRow({ onClick });
+    renderTrackRow({ onClick, renderMode: 'stack' });
 
-    await user.click(screen.getByTestId('track-row-track-1'));
+    await user.click(
+      screen.getByRole('button', { name: 'Open details for Open Skies' })
+    );
     expect(onClick).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Play Open Skies' }));

@@ -319,6 +319,8 @@ test.describe('Releases dashboard', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
 
     const { surface } = await ensureReleasesVisible(page);
 
@@ -457,5 +459,80 @@ test.describe('Releases dashboard', () => {
     await expect(
       page.getByRole('button', { name: 'Toggle release preview' })
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+  });
+
+  test('opens the add-release calendar and keeps expanded tracks bounded between release rows @nightly', async ({
+    page,
+  }) => {
+    test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.goto('/app/dashboard/releases', {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.NAVIGATION,
+    });
+
+    const { surface } = await ensureReleasesVisible(page);
+    expect(surface).toBe('desktop');
+
+    const expandButton = page
+      .getByRole('button', { name: 'Expand tracks' })
+      .first();
+    await expect(expandButton).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    await expandButton.click();
+
+    const trackStack = page
+      .locator('[data-testid^="release-track-stack-"]')
+      .first();
+    await expect(trackStack).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+
+    const releaseOpenButtons = page.locator('[data-testid^="release-open-"]');
+    await expect
+      .poll(() => releaseOpenButtons.count(), {
+        timeout: TIMEOUTS.ELEMENT_CHECK,
+      })
+      .toBeGreaterThan(1);
+
+    const trackStackBox = await trackStack.boundingBox();
+    const secondReleaseBox = await releaseOpenButtons.nth(1).boundingBox();
+
+    expect(trackStackBox).not.toBeNull();
+    expect(secondReleaseBox).not.toBeNull();
+    expect(secondReleaseBox!.y).toBeGreaterThan(
+      trackStackBox!.y + trackStackBox!.height - 2
+    );
+
+    const addReleaseButton = page.getByRole('button', {
+      name: 'Create a new release',
+    });
+    await expect(addReleaseButton).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
+    await addReleaseButton.click();
+
+    const addReleaseSidebar = page.getByTestId('add-release-sidebar');
+    await expect(addReleaseSidebar).toBeVisible({
+      timeout: TIMEOUTS.SIDEBAR_OPEN,
+    });
+    await expect(
+      addReleaseSidebar.getByTestId('add-release-details-card')
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+
+    await addReleaseSidebar
+      .getByRole('button', { name: /Pick a date/i })
+      .first()
+      .click();
+    await expect(
+      addReleaseSidebar.locator('[role="grid"]').first()
+    ).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
   });
 });

@@ -10,6 +10,7 @@ import { HomePhoneFrame } from './HomePhoneFrame';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
@@ -41,6 +42,11 @@ interface HomeProfileShowcaseProps {
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
 }
+
+const SHOWCASE_VIEWER_LOCATION = {
+  latitude: 34.0522,
+  longitude: -118.2437,
+} as const;
 
 function HomeProfileOverlayCard({
   stateId,
@@ -155,6 +161,30 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
   }
 }
 
+function getTourDates(stateId: ProfileShowcaseStateId) {
+  switch (stateId) {
+    case 'playlist-fallback':
+    case 'listen-fallback':
+      return [];
+    default:
+      return [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
+  }
+}
+
+function getFeaturedPlaylistFallback(stateId: ProfileShowcaseStateId) {
+  return stateId === 'playlist-fallback'
+    ? HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK
+    : null;
+}
+
+function getViewerLocation(stateId: ProfileShowcaseStateId) {
+  return stateId === 'tour-nearby' ? SHOWCASE_VIEWER_LOCATION : undefined;
+}
+
+function shouldResolveNearbyTour(stateId: ProfileShowcaseStateId) {
+  return stateId === 'tour-nearby';
+}
+
 function ShowcaseSurface({
   stateId,
   hideJovieBranding,
@@ -177,11 +207,14 @@ function ShowcaseSurface({
         contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
         latestRelease={getLatestRelease(state.id)}
         profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={getFeaturedPlaylistFallback(state.id)}
         genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres ?? []}
         photoDownloadSizes={[]}
         pressPhotos={[]}
         allowPhotoDownloads={false}
-        tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
+        tourDates={getTourDates(state.id)}
+        viewerLocation={getViewerLocation(state.id)}
+        resolveNearbyTour={shouldResolveNearbyTour(state.id)}
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
         drawerOpen={state.drawerView !== null}
         drawerView={state.drawerView ?? 'menu'}
@@ -195,7 +228,8 @@ function ShowcaseSurface({
         isSubscribed={
           state.id === 'fans-confirmed' ||
           state.id === 'fans-song-alert' ||
-          state.id === 'fans-show-alert'
+          state.id === 'fans-show-alert' ||
+          state.id === 'subscribe-done'
         }
         onTogglePref={() => {}}
         onUnsubscribe={() => {}}

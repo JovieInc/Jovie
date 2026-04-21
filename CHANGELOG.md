@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.159] - 2026-04-18
+
+> Tim White profile proof now uses the real action-card system, notification capture stays stable through every step, and the releases dashboard polish is ready to review on the same branch.
+
+### Added
+
+- Added shared Tim White profile action-card and demo review boards for latest release, countdown, nearby tour, next tour, playlist fallback, listen fallback, and inline subscription states.
+- Added focused regression coverage for Tim White profile cards, OTP recovery, fixed-height notification states, and the releases dashboard date-picker and action-menu polish.
+
+### Changed
+
+- Rebuilt the Artist Profile marketing page around real Tim White proof surfaces, including the adaptive hero, outcomes grid, spec-wall crops, how-it-works visuals, and proof styling.
+- Refined the public profile and home/demo fixtures so Tim White remains the canonical founder/profile identity, with collaboration credits rendered consistently as `w/ Cosmic Gate`.
+- Refreshed the add-release drawer and provider-matrix expansion rows to use the shared calendar picker and cleaner bounded child-row layout.
+- [internal] Adopted the latest runtime flag and Stripe-connect platform changes from `origin/main` while keeping the branch’s artist-profile QA fixes intact.
+
+### Fixed
+
+- Fixed the inline notifications composer so email, OTP, name, birthday, and done states keep one stable shell, and OTP recovery no longer loops or wipes trailing digits after an error.
+- Fixed artist-profile accessibility follow-ups, including hero mode contrast, ingesting badge contrast, reactivation and monetization muted text contrast, and keyboard access into the monetization scroller.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.159`.
+
 ## [26.4.158] - 2026-04-17
 
 > Staged homepage and pricing refresh work is ready to review again, the mobile public profile hero is cleaner and more stable, and preview deploys keep working even when Vercel rejects oversized prebuilt uploads.

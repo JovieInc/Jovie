@@ -28,7 +28,6 @@ import {
   SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
-  subscriptionComposerSurfaceClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
   subscriptionSuccessTextClassName,
@@ -40,7 +39,7 @@ type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
 type RevealVisualState = 'collapsed' | 'expanded' | 'submitting' | 'error';
 
 const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
-const revealButtonClassName = `${subscriptionComposerSurfaceClassName} flex h-12 w-full items-center gap-3 px-1 pl-4 text-left`;
+const inlineComposerWrapperClassName = 'h-[72px]';
 
 function getRevealVisualState(
   step: Step,
@@ -158,7 +157,8 @@ function BirthdayInput({
           onSubmit?.();
         }
       }}
-      className='h-12 w-full rounded-full bg-transparent px-2 text-center text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0'
+      autoComplete='bday'
+      className='h-12 w-full rounded-full bg-transparent px-3 text-left text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0'
     />
   );
 }
@@ -259,13 +259,34 @@ interface StepPanelProps {
 function StepPanel({ active, children, panelId }: Readonly<StepPanelProps>) {
   return (
     <div
-      className='step-stack-panel'
+      className='step-stack-panel h-full'
       data-active={active ? 'true' : 'false'}
       data-panel={panelId}
       aria-hidden={active ? undefined : true}
     >
       {children}
     </div>
+  );
+}
+
+function StepLayout({
+  active,
+  panelId,
+  shell,
+  rail,
+}: Readonly<{
+  active: boolean;
+  panelId: string;
+  shell: React.ReactNode;
+  rail?: React.ReactNode;
+}>) {
+  return (
+    <StepPanel active={active} panelId={panelId}>
+      <div className='flex h-full flex-col justify-between'>
+        <div>{shell}</div>
+        {rail ?? <SubscriptionFeedbackRail />}
+      </div>
+    </StepPanel>
   );
 }
 
@@ -318,6 +339,7 @@ export function ProfileInlineNotificationsCTA({
   const nameInputRef = useRef<HTMLInputElement>(null);
   const otpStepRef = useRef<HTMLDivElement>(null);
   const birthdayStepRef = useRef<HTMLDivElement>(null);
+  const revealShellRef = useRef<HTMLDivElement>(null);
   const inputId = useId();
   const { user } = useUserSafe();
   const prefersReducedMotion = useReducedMotion();
@@ -327,6 +349,7 @@ export function ProfileInlineNotificationsCTA({
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
   const subscribedEmailRef = useRef<string>('');
+  const lastAutoVerifiedCodeRef = useRef<string | null>(null);
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms
@@ -371,14 +394,7 @@ export function ProfileInlineNotificationsCTA({
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const focusDelay =
-      step === 'email'
-        ? prefersReducedMotion
-          ? 0
-          : 240
-        : prefersReducedMotion
-          ? 0
-          : 180;
+    const focusDelay = prefersReducedMotion ? 0 : 180;
 
     if (step === 'email') {
       timeoutId = globalThis.setTimeout(() => {
@@ -442,6 +458,12 @@ export function ProfileInlineNotificationsCTA({
     return () => clearOtpConfirmTimeout(confirmTimeoutRef);
   }, []);
 
+  useEffect(() => {
+    if (step !== 'otp') {
+      lastAutoVerifiedCodeRef.current = null;
+    }
+  }, [step]);
+
   const handleReveal = useCallback(() => {
     openSubscription();
     handleChannelChange('email');
@@ -463,8 +485,12 @@ export function ProfileInlineNotificationsCTA({
     onRegisterReveal?.(handleReveal);
   }, [onRegisterReveal, handleReveal]);
 
-  const handleEmailSubmit = useCallback(() => {
-    void handleSubscribe();
+  const handleEmailSubmit = useCallback(async () => {
+    try {
+      await handleSubscribe();
+    } catch (error) {
+      console.error('Failed to submit email step', error);
+    }
   }, [handleSubscribe]);
 
   const handleNameSubmit = useCallback(async () => {
@@ -489,38 +515,41 @@ export function ProfileInlineNotificationsCTA({
     setStep('birthday');
   }, [nameInput, artist.id, artist.handle, nameMutation]);
 
-  const handleBirthdaySubmit = useCallback(async () => {
-    const digits = birthdayInput.replaceAll(/[^\d]/g, '');
-    if (digits.length < 8) {
-      if (!birthdayHintShown) {
-        setBirthdayHintShown(true);
+  const handleBirthdaySubmit = useCallback(
+    async (overrideDigits?: string) => {
+      const digits = (overrideDigits ?? birthdayInput).replaceAll(/[^\d]/g, '');
+      if (digits.length < 8) {
+        if (!birthdayHintShown) {
+          setBirthdayHintShown(true);
+          return;
+        }
+        setStep('done');
         return;
       }
+      const stored = birthdayDigitsToStorage(digits);
+      try {
+        await birthdayMutation.mutateAsync({
+          artistId: artist.id,
+          email: subscribedEmailRef.current,
+          birthday: stored,
+        });
+        track('birthday_capture_submitted', {
+          handle: artist.handle,
+          source: 'profile_inline_cta',
+        });
+      } catch {
+        // Best-effort — don't block the flow
+      }
       setStep('done');
-      return;
-    }
-    const stored = birthdayDigitsToStorage(digits);
-    try {
-      await birthdayMutation.mutateAsync({
-        artistId: artist.id,
-        email: subscribedEmailRef.current,
-        birthday: stored,
-      });
-      track('birthday_capture_submitted', {
-        handle: artist.handle,
-        source: 'profile_inline_cta',
-      });
-    } catch {
-      // Best-effort — don't block the flow
-    }
-    setStep('done');
-  }, [
-    birthdayInput,
-    birthdayHintShown,
-    artist.id,
-    artist.handle,
-    birthdayMutation,
-  ]);
+    },
+    [
+      birthdayInput,
+      birthdayHintShown,
+      artist.id,
+      artist.handle,
+      birthdayMutation,
+    ]
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -532,6 +561,21 @@ export function ProfileInlineNotificationsCTA({
     },
     [step, handleEmailSubmit, handleNameSubmit, handleBirthdaySubmit]
   );
+
+  const handleRevealShellBlurCapture = useCallback(() => {
+    globalThis.setTimeout(() => {
+      if (step !== 'email') return;
+
+      const activeElement = document.activeElement;
+      if (revealShellRef.current?.contains(activeElement)) {
+        return;
+      }
+
+      if (!emailInput.trim() && !isSubmitting) {
+        setStep('cta');
+      }
+    }, 0);
+  }, [step, emailInput, isSubmitting]);
 
   const handleManageButtonFocus = useCallback(() => {
     if (!lastInteractionWasKeyboardRef.current) return;
@@ -561,6 +605,22 @@ export function ProfileInlineNotificationsCTA({
     [handleManageNotifications]
   );
 
+  const handleOtpComplete = useCallback(
+    async (value: string) => {
+      if (lastAutoVerifiedCodeRef.current === value) {
+        return;
+      }
+
+      lastAutoVerifiedCodeRef.current = value;
+      try {
+        await handleVerifyOtp(value);
+      } catch (error) {
+        console.error('Failed to verify OTP on completion', error);
+      }
+    },
+    [handleVerifyOtp]
+  );
+
   if (hydrationStatus === 'checking') {
     return <SubscriptionFormSkeleton />;
   }
@@ -573,71 +633,74 @@ export function ProfileInlineNotificationsCTA({
     <div
       data-testid='profile-inline-cta'
       data-ui='step-stack'
-      className='min-h-[116px]'
+      className={inlineComposerWrapperClassName}
     >
-      <div className='step-stack-track'>
-        <StepPanel active={revealActive} panelId='reveal'>
-          <div
-            data-ui='cta-reveal'
-            data-visual-state={revealVisualState}
-            style={
-              {
-                '--cta-reveal-min-height': '48px',
-                '--cta-reveal-border': 'transparent',
-                '--cta-reveal-border-active': 'transparent',
-                '--cta-reveal-surface': 'transparent',
-                '--cta-reveal-surface-active': 'transparent',
-                '--cta-reveal-shadow': 'none',
-                '--cta-reveal-shadow-active': 'none',
-              } as CSSProperties
-            }
-          >
-            <div className='cta-reveal-shell'>
-              <div className='cta-reveal-panel cta-reveal-panel--cta'>
-                <button
-                  type='button'
-                  onClick={handleReveal}
-                  className={revealButtonClassName}
-                  style={noFontSynthesisStyle}
-                >
-                  <span className='min-w-0 flex-1 truncate text-[15px] font-[590] tracking-[-0.02em] text-primary-token'>
-                    Turn on notifications
-                  </span>
-                  <span className={circularButtonClassName}>
+      <div className='step-stack-track h-full'>
+        <StepLayout
+          active={revealActive}
+          panelId='reveal'
+          shell={
+            <div
+              ref={revealShellRef}
+              data-ui='cta-reveal'
+              data-visual-state={revealVisualState}
+              onBlurCapture={handleRevealShellBlurCapture}
+              style={
+                {
+                  '--cta-reveal-min-height': '48px',
+                  '--cta-reveal-border': 'transparent',
+                  '--cta-reveal-border-active': 'transparent',
+                  '--cta-reveal-surface': 'transparent',
+                  '--cta-reveal-surface-active': 'transparent',
+                  '--cta-reveal-shadow': 'none',
+                  '--cta-reveal-shadow-active': 'none',
+                } as CSSProperties
+              }
+            >
+              <div className='cta-reveal-shell'>
+                <div className='cta-reveal-panel cta-reveal-panel--cta'>
+                  <button
+                    type='button'
+                    onClick={handleReveal}
+                    className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+                    style={noFontSynthesisStyle}
+                  >
                     <Bell className='h-4 w-4' />
-                  </span>
-                </button>
-              </div>
+                    Turn on notifications
+                  </button>
+                </div>
 
-              <div className='cta-reveal-panel cta-reveal-panel--form'>
-                <InlineInputStep
-                  inputRef={emailInputRef}
-                  inputId={`${inputId}-email`}
-                  testId='inline-email-input'
-                  composerTestId='inline-email-input-composer'
-                  label='Email address'
-                  type='email'
-                  inputMode='email'
-                  placeholder='your@email.com'
-                  value={emailInput}
-                  onChange={e => handleEmailChange(e.target.value)}
-                  onSubmit={handleEmailSubmit}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => {
-                    setIsInputFocused(false);
-                    handleFieldBlur();
-                  }}
-                  disabled={isSubmitting}
-                  submitting={isSubmitting}
-                  isFocused={isInputFocused}
-                  ariaInvalid={error ? true : undefined}
-                  autoComplete='email'
-                  maxLength={254}
-                />
+                <div className='cta-reveal-panel cta-reveal-panel--form'>
+                  <InlineInputStep
+                    inputRef={emailInputRef}
+                    inputId={`${inputId}-email`}
+                    testId='inline-email-input'
+                    composerTestId='inline-email-input-composer'
+                    label='Email address'
+                    type='email'
+                    inputMode='email'
+                    placeholder='your@email.com'
+                    value={emailInput}
+                    onChange={e => handleEmailChange(e.target.value)}
+                    onSubmit={handleEmailSubmit}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => {
+                      setIsInputFocused(false);
+                      handleFieldBlur();
+                    }}
+                    disabled={isSubmitting}
+                    submitting={isSubmitting}
+                    isFocused={isInputFocused}
+                    ariaInvalid={error ? true : undefined}
+                    autoComplete='email'
+                    maxLength={254}
+                  />
+                </div>
               </div>
             </div>
-
+          }
+          rail={
             <SubscriptionFeedbackRail
               message={
                 step === 'email' && error && showInlineErrorCopy ? (
@@ -652,46 +715,50 @@ export function ProfileInlineNotificationsCTA({
                 ) : null
               }
             />
-          </div>
-        </StepPanel>
+          }
+        />
 
-        <StepPanel active={step === 'otp'} panelId='otp'>
-          <div ref={otpStepRef}>
-            <SubscriptionPearlComposer
-              dataTestId='inline-otp-composer'
-              layout='stacked'
-              className='px-3 py-3'
-              action={
-                <CircularSubmitButton
-                  onClick={() => {
-                    handleVerifyOtp().catch(() => {});
-                  }}
-                  disabled={
-                    otpCode.length !== 6 || isSubmitting || Boolean(error)
-                  }
-                  submitting={isSubmitting}
-                />
-              }
-            >
-              <div className='px-2 py-2'>
-                <OtpInput
-                  value={otpCode}
-                  onChange={value => {
-                    handleOtpChange(value);
-                    if (confirmMessage) setConfirmMessage(null);
-                  }}
-                  onComplete={() => {
-                    if (!error) {
-                      handleVerifyOtp().catch(() => {});
-                    }
-                  }}
-                  autoFocus={step === 'otp'}
-                  aria-label='Enter 6-digit verification code'
-                  disabled={isSubmitting}
-                  error={Boolean(error)}
-                />
-              </div>
-            </SubscriptionPearlComposer>
+        <StepLayout
+          active={step === 'otp'}
+          panelId='otp'
+          shell={
+            <div ref={otpStepRef}>
+              <SubscriptionPearlComposer
+                dataTestId='inline-otp-composer'
+                action={
+                  <CircularSubmitButton
+                    onClick={async () => {
+                      try {
+                        await handleVerifyOtp();
+                      } catch (error) {
+                        console.error('Failed to verify OTP', error);
+                      }
+                    }}
+                    disabled={otpCode.length !== 6 || isSubmitting}
+                    submitting={isSubmitting}
+                  />
+                }
+              >
+                <div className='min-w-0 flex-1 px-1 py-1'>
+                  <OtpInput
+                    value={otpCode}
+                    onChange={value => {
+                      handleOtpChange(value);
+                      if (confirmMessage) setConfirmMessage(null);
+                    }}
+                    onComplete={handleOtpComplete}
+                    autoFocus={step === 'otp'}
+                    aria-label='Enter 6-digit verification code'
+                    disabled={isSubmitting}
+                    error={Boolean(error)}
+                    size='compact'
+                    showProgressDots={false}
+                  />
+                </div>
+              </SubscriptionPearlComposer>
+            </div>
+          }
+          rail={
             <SubscriptionFeedbackRail
               message={
                 error && showInlineErrorCopy ? (
@@ -723,57 +790,93 @@ export function ProfileInlineNotificationsCTA({
                 </>
               }
             />
-          </div>
-        </StepPanel>
+          }
+        />
 
-        <StepPanel active={step === 'name'} panelId='name'>
-          <InlineInputStep
-            inputRef={nameInputRef}
-            inputId={`${inputId}-name`}
-            testId='inline-name-input'
-            label='First name'
-            placeholder="What's your name?"
-            value={nameInput}
-            onChange={e => setNameInput(e.target.value)}
-            onSubmit={() => {
-              handleNameSubmit();
-            }}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-            disabled={nameMutation.isPending}
-            isFocused={isInputFocused}
-            autoComplete='given-name'
-            maxLength={100}
-          />
-          <SubscriptionFeedbackRail />
-        </StepPanel>
+        <StepLayout
+          active={step === 'name'}
+          panelId='name'
+          shell={
+            <InlineInputStep
+              inputRef={nameInputRef}
+              inputId={`${inputId}-name`}
+              testId='inline-name-input'
+              label='First name'
+              placeholder="What's your name?"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onSubmit={async () => {
+                try {
+                  await handleNameSubmit();
+                } catch (error) {
+                  console.error('Failed to submit name step', error);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              disabled={nameMutation.isPending}
+              submitting={nameMutation.isPending}
+              isFocused={isInputFocused}
+              autoComplete='given-name'
+              maxLength={100}
+            />
+          }
+        />
 
-        <StepPanel active={step === 'birthday'} panelId='birthday'>
-          <div ref={birthdayStepRef}>
-            <SubscriptionPearlComposer
-              dataTestId='inline-birthday-composer'
-              layout='stacked'
-              className='px-3 py-3'
-            >
-              <div className='px-2 py-2'>
-                <BirthdayInput
-                  value={birthdayInput}
-                  onChange={value => {
-                    setBirthdayInput(value);
-                    if (birthdayHintShown) setBirthdayHintShown(false);
-                  }}
-                  onComplete={() => {
-                    handleBirthdaySubmit();
-                  }}
-                  onSubmit={() => {
-                    handleBirthdaySubmit();
-                  }}
-                  autoFocus={step === 'birthday'}
-                  disabled={birthdayMutation.isPending}
-                />
-              </div>
-            </SubscriptionPearlComposer>
+        <StepLayout
+          active={step === 'birthday'}
+          panelId='birthday'
+          shell={
+            <div ref={birthdayStepRef}>
+              <SubscriptionPearlComposer
+                dataTestId='inline-birthday-composer'
+                action={
+                  <CircularSubmitButton
+                    onClick={async () => {
+                      try {
+                        await handleBirthdaySubmit();
+                      } catch (error) {
+                        console.error('Failed to submit birthday step', error);
+                      }
+                    }}
+                    disabled={birthdayMutation.isPending}
+                    submitting={birthdayMutation.isPending}
+                  />
+                }
+              >
+                <div className='min-w-0 flex-1'>
+                  <BirthdayInput
+                    value={birthdayInput}
+                    onChange={value => {
+                      setBirthdayInput(value);
+                      if (birthdayHintShown) setBirthdayHintShown(false);
+                    }}
+                    onComplete={async value => {
+                      try {
+                        await handleBirthdaySubmit(value);
+                      } catch (error) {
+                        console.error(
+                          'Failed to submit birthday completion',
+                          error
+                        );
+                      }
+                    }}
+                    onSubmit={async () => {
+                      try {
+                        await handleBirthdaySubmit();
+                      } catch (error) {
+                        console.error('Failed to submit birthday step', error);
+                      }
+                    }}
+                    autoFocus={step === 'birthday'}
+                    disabled={birthdayMutation.isPending}
+                  />
+                </div>
+              </SubscriptionPearlComposer>
+            </div>
+          }
+          rail={
             <SubscriptionFeedbackRail
               message={
                 birthdayHintShown ? (
@@ -783,32 +886,35 @@ export function ProfileInlineNotificationsCTA({
                 )
               }
             />
-          </div>
-        </StepPanel>
+          }
+        />
 
-        <StepPanel active={step === 'done'} panelId='done'>
-          <button
-            type='button'
-            data-testid='inline-notifications-on-button'
-            onClick={handleManageNotifications}
-            onFocus={handleManageButtonFocus}
-            onBlur={handleManageButtonBlur}
-            onKeyDown={handleManageButtonKeyDown}
-            className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
-            style={noFontSynthesisStyle}
-            aria-label='Manage notifications'
-            aria-haspopup='dialog'
-          >
-            <CheckCircle2
-              className='h-4 w-4 shrink-0 text-green-400'
-              aria-hidden='true'
-            />
-            <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
-              Notifications on
-            </span>
-          </button>
-          <SubscriptionFeedbackRail />
-        </StepPanel>
+        <StepLayout
+          active={step === 'done'}
+          panelId='done'
+          shell={
+            <button
+              type='button'
+              data-testid='inline-notifications-on-button'
+              onClick={handleManageNotifications}
+              onFocus={handleManageButtonFocus}
+              onBlur={handleManageButtonBlur}
+              onKeyDown={handleManageButtonKeyDown}
+              className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+              style={noFontSynthesisStyle}
+              aria-label='Manage notifications'
+              aria-haspopup='dialog'
+            >
+              <CheckCircle2
+                className='h-4 w-4 shrink-0 text-green-400'
+                aria-hidden='true'
+              />
+              <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
+                Notifications on
+              </span>
+            </button>
+          }
+        />
       </div>
     </div>
   );

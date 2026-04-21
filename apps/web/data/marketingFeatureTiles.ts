@@ -36,13 +36,15 @@ export interface MarketingIconBadgeFeatureTile
   readonly badgeLabel: string;
 }
 
-export interface MarketingAnalyticsFunnelHeroTile
+export interface MarketingMockPopoverFeatureTile
   extends MarketingFeatureTileBase {
-  readonly visual: 'analytics-funnel-hero';
+  readonly visual: 'mock-popover';
+  readonly popoverLabel: string;
+  readonly popoverItems: readonly string[];
 }
 
 export type MarketingFeatureTile =
   | MarketingButtonChipFeatureTile
-  | MarketingAnalyticsFunnelHeroTile
   | MarketingIconBadgeFeatureTile
+  | MarketingMockPopoverFeatureTile
   | MarketingScreenshotFeatureTile;

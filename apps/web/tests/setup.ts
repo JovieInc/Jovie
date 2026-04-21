@@ -30,6 +30,43 @@ vi.mock('react', async () => {
 // `server-only` throws when imported in non-Next runtimes; tests should noop it.
 vi.mock('server-only', () => ({}));
 
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  captureCheckIn: vi.fn(() => 'check-in-id'),
+  captureRequestError: vi.fn(),
+  captureRouterTransitionStart: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  withScope: vi.fn(),
+  setTag: vi.fn(),
+  setExtra: vi.fn(),
+  setUser: vi.fn(),
+  setContext: vi.fn(),
+  init: vi.fn(),
+  startSpan: vi.fn((_options, cb) => cb()),
+  getClient: vi.fn(() => undefined),
+  getCurrentScope: vi.fn(() => ({
+    setTag: vi.fn(),
+    setExtra: vi.fn(),
+    setLevel: vi.fn(),
+  })),
+  logger: {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+    disable: vi.fn(),
+    enable: vi.fn(),
+    isEnabled: vi.fn(() => false),
+  },
+  breadcrumbsIntegration: vi.fn(() => ({})),
+  replayIntegration: vi.fn(() => ({})),
+  vercelAIIntegration: vi.fn(() => ({})),
+  diagnoseSdkConnectivity: vi.fn(),
+}));
+
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();

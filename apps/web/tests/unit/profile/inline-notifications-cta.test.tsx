@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
 const mockUseUserSafe = vi.fn();
+const mockUpdateSubscriberBirthdayMutation = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -114,10 +115,6 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
-  useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
   useSubscribeNotificationsMutation: () => ({ mutateAsync: vi.fn() }),
   useVerifyEmailOtpMutation: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -127,10 +124,8 @@ vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
-  useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
+  useUpdateSubscriberBirthdayMutation: () =>
+    mockUpdateSubscriberBirthdayMutation(),
 }));
 
 const artist: Artist = {
@@ -186,6 +181,10 @@ describe('ProfileInlineNotificationsCTA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseUserSafe.mockReturnValue({ user: null });
+    mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
   it('renders "Turn on notifications" button in cta step', async () => {
@@ -342,6 +341,55 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(birthdayInput).toBeInTheDocument();
   });
 
+  it('submits the completed birthday value from onComplete', async () => {
+    const birthdayMutation = vi.fn().mockResolvedValue(undefined);
+    mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: birthdayMutation,
+    });
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({ notificationsState: 'idle' })
+    );
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        emailInput: 'fan@test.com',
+        subscribedChannels: { email: true },
+      })
+    );
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    const nameInput = screen.getByTestId('inline-name-input');
+    fireEvent.keyDown(nameInput, { key: 'Enter' });
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    const birthdayInput = screen.getByTestId('inline-birthday-input');
+    fireEvent.change(birthdayInput, { target: { value: '01021990' } });
+
+    await waitFor(() => {
+      expect(birthdayMutation).toHaveBeenCalledWith({
+        artistId: artist.id,
+        email: 'fan@test.com',
+        birthday: '1990-01-02',
+      });
+    });
+  });
+
   it('shows "Notifications on" in done step', async () => {
     // When already subscribed on mount, the component jumps straight to done
     mockUseSubscriptionForm.mockReturnValue(
@@ -390,7 +438,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
   });
 
-  it('wraps content in min-h-[116px] container', async () => {
+  it('wraps content in fixed h-[72px] container', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -400,10 +448,10 @@ describe('ProfileInlineNotificationsCTA', () => {
     render(<ProfileInlineNotificationsCTA artist={artist} />);
 
     const container = screen.getByTestId('profile-inline-cta');
-    expect(container.className).toContain('min-h-[116px]');
+    expect(container.className).toContain('h-[72px]');
   });
 
-  it('disables OTP submit button when error is present', async () => {
+  it('keeps OTP submit enabled when the code is complete, even with an error', async () => {
     const formState = buildFormState({ notificationsState: 'idle' });
     mockUseSubscriptionForm.mockReturnValue(formState);
 
@@ -432,9 +480,73 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     rerender(<ProfileInlineNotificationsCTA artist={artist} />);
 
-    // Submit button should be disabled due to error
+    // Submit button stays available so the corrected code can replace in place.
     const submitBtn = screen.getByRole('button', { name: /submit/i });
-    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toBeEnabled();
+  });
+
+  it('auto-verifies a new completed OTP code once and ignores the same failed code on re-entry', async () => {
+    const handleVerifyOtp = vi.fn().mockResolvedValue(undefined);
+    const formState = buildFormState({
+      notificationsState: 'idle',
+      handleVerifyOtp,
+    });
+    mockUseSubscriptionForm.mockReturnValue(formState);
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const { rerender } = render(
+      <ProfileInlineNotificationsCTA artist={artist} />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on notifications/i })
+    );
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '',
+        handleVerifyOtp,
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123456' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+    expect(handleVerifyOtp).toHaveBeenLastCalledWith('123456');
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'pending_confirmation',
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        error: 'Invalid verification code',
+        handleVerifyOtp,
+      })
+    );
+
+    rerender(<ProfileInlineNotificationsCTA artist={artist} />);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123456' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('Enter 6-digit verification code'), {
+      target: { value: '123457' },
+    });
+
+    expect(handleVerifyOtp).toHaveBeenCalledTimes(2);
+    expect(handleVerifyOtp).toHaveBeenLastCalledWith('123457');
   });
 
   it('shows resend link when OTP error is present', async () => {

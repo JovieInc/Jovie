@@ -65,6 +65,9 @@ test.describe('Artist Notifications Landing', () => {
       page.getByText('How does Jovie bring fans back?')
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-headline')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /ready to amplify\?/i })
+    ).toBeVisible();
     await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
       '/signup?plan=pro'

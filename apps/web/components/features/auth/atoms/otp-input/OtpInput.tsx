@@ -26,6 +26,8 @@ export function OtpInput({
   disabled = false,
   error = false,
   errorId,
+  size = 'default',
+  showProgressDots = true,
 }: OtpInputProps) {
   const autofillInputId = useId();
   const digitKeys = Array.from(
@@ -54,26 +56,37 @@ export function OtpInput({
     onComplete,
     autoFocus,
   });
+  const compact = size === 'compact';
+  const fieldsetClassName = compact
+    ? 'flex justify-center gap-1.5 border-0 p-0 m-0 relative z-10'
+    : 'flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0 relative z-10';
+  const boxSizeClassName = compact
+    ? 'h-10 w-[34px] text-[1rem] sm:h-10 sm:w-[34px] sm:text-[1rem]'
+    : 'h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]';
+  const textSizeClassName = compact
+    ? 'text-[1rem] sm:text-[1rem]'
+    : 'text-[1.22rem] sm:text-[1.3rem]';
 
   return (
     <div className='relative' ref={containerRef}>
-      {/* Progress indicator for mobile - shows how many digits entered */}
-      <div
-        className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5 sm:hidden'
-        aria-hidden='true'
-      >
-        {digitKeys.map((key, i) => (
-          <div
-            key={key}
-            className={cn(
-              'h-1 w-1 rounded-full transition-all duration-200',
-              i < currentValue.length
-                ? 'scale-125 bg-[var(--profile-pearl-primary-bg)]'
-                : 'bg-[color:var(--profile-pearl-border)]'
-            )}
-          />
-        ))}
-      </div>
+      {showProgressDots ? (
+        <div
+          className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5 sm:hidden'
+          aria-hidden='true'
+        >
+          {digitKeys.map((key, i) => (
+            <div
+              key={key}
+              className={cn(
+                'h-1 w-1 rounded-full transition-all duration-200',
+                i < currentValue.length
+                  ? 'scale-125 bg-[var(--profile-pearl-primary-bg)]'
+                  : 'bg-[color:var(--profile-pearl-border)]'
+              )}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {/*
         Autofill overlay input - positioned over the visible inputs to receive
@@ -105,7 +118,7 @@ export function OtpInput({
 
       {/* Visible digit inputs */}
       <fieldset
-        className='flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0 relative z-10'
+        className={fieldsetClassName}
         aria-label={ariaLabel}
         aria-describedby={errorId}
         onPaste={handlePaste}
@@ -132,8 +145,8 @@ export function OtpInput({
             ariaLabel={`Digit ${index + 1} of ${OTP_LENGTH}`}
             ariaDescribedBy={errorId}
             ariaInvalid={error || undefined}
-            boxSizeClassName='h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]'
-            textSizeClassName='text-[1.22rem] sm:text-[1.3rem]'
+            boxSizeClassName={boxSizeClassName}
+            textSizeClassName={textSizeClassName}
           />
         ))}
       </fieldset>

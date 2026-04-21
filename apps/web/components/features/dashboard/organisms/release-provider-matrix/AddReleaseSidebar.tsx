@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   Input,
   Select,
   SelectContent,
@@ -8,9 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui/atoms/popover';
+import { format, isValid, parse, startOfToday, subDays } from 'date-fns';
+import { CalendarIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
+import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
@@ -26,6 +35,7 @@ import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { ReleaseFields } from '@/components/organisms/release-sidebar/ReleaseFields';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -36,6 +46,17 @@ const RELEASE_TYPE_OPTIONS = [
 ] as const;
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
+
+function parseDateValue(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value, 'yyyy-MM-dd', new Date(0));
+  return isValid(parsed) ? parsed : undefined;
+}
+
+function formatDateValue(value: string): string {
+  const parsed = parseDateValue(value);
+  return parsed ? format(parsed, 'MMM d, yyyy') : 'Pick a date';
+}
 
 export interface AddReleaseSidebarProps {
   readonly isOpen: boolean;
@@ -70,18 +91,20 @@ export function AddReleaseSidebar({
 
   // Show reveal date field when release date is in the future
   const isFutureRelease = useMemo(() => {
-    if (!releaseDate) return false;
-    return new Date(releaseDate) > new Date();
+    const parsedReleaseDate = parseDateValue(releaseDate);
+    return parsedReleaseDate ? parsedReleaseDate > startOfToday() : false;
   }, [releaseDate]);
 
   // Auto-calculate reveal date default (30 days before release)
   const autoRevealDate = useMemo(() => {
-    if (!releaseDate || !isFutureRelease) return '';
-    const rd = new Date(releaseDate);
-    rd.setDate(rd.getDate() - 30);
-    const now = new Date();
-    const effective = rd > now ? rd : now;
-    return effective.toISOString().split('T')[0];
+    const parsedReleaseDate = parseDateValue(releaseDate);
+    if (!parsedReleaseDate || !isFutureRelease) return '';
+
+    const today = startOfToday();
+    const suggestedRevealDate = subDays(parsedReleaseDate, 30);
+    const effective = suggestedRevealDate > today ? suggestedRevealDate : today;
+
+    return format(effective, 'yyyy-MM-dd');
   }, [releaseDate, isFutureRelease]);
 
   // Auto-set reveal date when release date changes (only if user hasn't manually set one)
@@ -346,30 +369,66 @@ export function AddReleaseSidebar({
           </DrawerFormField>
 
           <DrawerFormField label='Release Date' htmlFor='release-date'>
-            <Input
-              id='release-date'
-              type='date'
-              value={releaseDate}
-              onChange={event => {
-                setReleaseDate(event.target.value);
-                setRevealDateManuallySet(false);
-              }}
-              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id='release-date'
+                  type='button'
+                  variant='outline'
+                  className={cn(
+                    'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-[12px] font-normal',
+                    !releaseDate && 'text-tertiary-token'
+                  )}
+                >
+                  <CalendarIcon className='h-3.5 w-3.5 shrink-0' />
+                  <span>{formatDateValue(releaseDate)}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className='w-auto p-0' align='start'>
+                <Calendar
+                  mode='single'
+                  selected={parseDateValue(releaseDate)}
+                  onSelect={date => {
+                    if (!date) return;
+                    setReleaseDate(format(date, 'yyyy-MM-dd'));
+                    setRevealDateManuallySet(false);
+                  }}
+                  autoFocus
+                />
+              </PopoverContent>
+            </Popover>
           </DrawerFormField>
 
           {isFutureRelease && (
             <DrawerFormField label='Reveal Date' htmlFor='reveal-date'>
-              <Input
-                id='reveal-date'
-                type='date'
-                value={revealDate}
-                onChange={event => {
-                  setRevealDate(event.target.value);
-                  setRevealDateManuallySet(true);
-                }}
-                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id='reveal-date'
+                    type='button'
+                    variant='outline'
+                    className={cn(
+                      'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-[12px] font-normal',
+                      !revealDate && 'text-tertiary-token'
+                    )}
+                  >
+                    <CalendarIcon className='h-3.5 w-3.5 shrink-0' />
+                    <span>{formatDateValue(revealDate)}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className='w-auto p-0' align='start'>
+                  <Calendar
+                    mode='single'
+                    selected={parseDateValue(revealDate)}
+                    onSelect={date => {
+                      if (!date) return;
+                      setRevealDate(format(date, 'yyyy-MM-dd'));
+                      setRevealDateManuallySet(true);
+                    }}
+                    autoFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <p className='mt-1 text-[11px] text-tertiary-token'>
                 Details hidden until this date (mystery page)
               </p>

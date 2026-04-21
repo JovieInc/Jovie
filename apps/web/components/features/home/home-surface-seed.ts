@@ -132,7 +132,7 @@ export const HOME_HERO_RELEASE_MOCK = HOME_RELEASE_DESTINATION_PRESAVE_MOCK;
 export const HOME_RELEASE_DESTINATION_LIVE_MOCK: HomepageReleaseMock = {
   id: 'take-me-over-live',
   title: 'Take Me Over',
-  artist: 'Tim White feat. Erica Gibson',
+  artist: 'Cosmic Gate & Tim White',
   releaseLabel: 'Released October 1, 2014',
   modeLabel: 'Live Smart Link',
   state: 'live',

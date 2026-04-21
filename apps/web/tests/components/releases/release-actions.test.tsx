@@ -49,19 +49,42 @@ function createRelease(
   };
 }
 
+function everyNestedItemHasIcon(items: readonly unknown[]): boolean {
+  return items.every(item => {
+    if (!item || typeof item !== 'object') {
+      return true;
+    }
+
+    if ('icon' in item && !item.icon) {
+      return false;
+    }
+
+    if ('items' in item && Array.isArray(item.items)) {
+      return everyNestedItemHasIcon(item.items);
+    }
+
+    return true;
+  });
+}
+
 describe('buildReleaseActions', () => {
-  it('keeps edit separate from copy/share actions', () => {
+  it('keeps edit separate from copy/share actions without extra separators', () => {
     const items = buildReleaseActions({
       release: createRelease(),
       onEdit: vi.fn(),
       onCopy: vi.fn(),
     });
 
+    const separators = items.filter(
+      item => 'type' in item && item.type === 'separator'
+    );
+
     expect(items[0]).toMatchObject({
       id: 'edit',
       label: 'Edit release links',
     });
     expect(items[1]).toEqual({ type: 'separator' });
+    expect(separators).toHaveLength(1);
     expect(items[2]).toMatchObject({
       id: 'share-link',
       label: 'Share link',
@@ -74,10 +97,15 @@ describe('buildReleaseActions', () => {
         expect.objectContaining({
           id: 'copy-smart-link',
           label: 'Copy smart link',
+          icon: expect.anything(),
         }),
       ])
     );
-    expect(items[4]).toMatchObject({
+    const metadataItem = items.find(
+      item => 'id' in item && item.id === 'copy-metadata'
+    );
+
+    expect(metadataItem).toMatchObject({
       id: 'copy-metadata',
       label: 'Copy metadata',
     });
@@ -143,8 +171,34 @@ describe('buildReleaseActions', () => {
         expect.objectContaining({
           id: 'open-spotify',
           label: 'Open in Spotify',
+          icon: expect.anything(),
         }),
       ])
     );
+  });
+
+  it('reuses source icons for tracked share submenu entries', () => {
+    const items = buildReleaseActions({
+      release: createRelease(),
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+    });
+
+    const shareMenu = items.find(
+      item => 'id' in item && item.id === 'share-link'
+    );
+    if (!shareMenu || !('items' in shareMenu)) {
+      throw new Error('Expected share submenu');
+    }
+
+    const trackedLinksItem = shareMenu.items.find(
+      item => 'id' in item && item.id === 'tracked-share-submenu'
+    );
+    if (!trackedLinksItem || !('items' in trackedLinksItem)) {
+      throw new Error('Expected tracked links submenu');
+    }
+
+    expect(trackedLinksItem.icon).toBeTruthy();
+    expect(everyNestedItemHasIcon(trackedLinksItem.items)).toBe(true);
   });
 });

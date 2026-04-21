@@ -1,14 +1,9 @@
 'use client';
 
+import { SegmentControl, type SegmentControlOption } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -21,11 +16,6 @@ interface ArtistProfileModeSwitcherProps {
   readonly showIntroHeading?: boolean;
 }
 
-interface RailFrame {
-  readonly left: number;
-  readonly width: number;
-}
-
 export function ArtistProfileModeSwitcher({
   adaptive,
   phoneCaption,
@@ -33,8 +23,6 @@ export function ArtistProfileModeSwitcher({
   showIntroHeading = true,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const tabRailRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const sequenceStartedRef = useRef(false);
   const manualSelectionRef = useRef(false);
@@ -42,9 +30,14 @@ export function ArtistProfileModeSwitcher({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [introVisible, setIntroVisible] = useState(false);
   const [tabsVisible, setTabsVisible] = useState(reducedMotion);
-  const [tabFrame, setTabFrame] = useState<RailFrame | null>(null);
   const activeMode =
     activeIndex === null ? null : (adaptive.modes[activeIndex] ?? null);
+  const modeOptions: readonly SegmentControlOption<string>[] =
+    adaptive.modes.map(mode => ({
+      value: mode.id,
+      label: mode.label,
+    }));
+  const selectedModeId = activeMode?.id ?? '__resting__';
 
   const clearSequenceTimers = useCallback(() => {
     for (const timer of sequenceTimersRef.current) {
@@ -52,30 +45,6 @@ export function ArtistProfileModeSwitcher({
     }
     sequenceTimersRef.current = [];
   }, []);
-
-  const syncActiveRails = useCallback(() => {
-    if (activeIndex === null) {
-      setTabFrame(null);
-      return;
-    }
-
-    const tabRail = tabRailRef.current;
-    const activeTab = tabRefs.current[activeIndex];
-    if (!tabRail || !activeTab) {
-      return;
-    }
-
-    const railRect = tabRail.getBoundingClientRect();
-    const activeRect = activeTab.getBoundingClientRect();
-    setTabFrame({
-      left: activeRect.left - railRect.left,
-      width: activeRect.width,
-    });
-  }, [activeIndex]);
-
-  useLayoutEffect(() => {
-    syncActiveRails();
-  }, [syncActiveRails]);
 
   const startSequence = useCallback(() => {
     if (manualSelectionRef.current || sequenceStartedRef.current) {
@@ -148,27 +117,6 @@ export function ArtistProfileModeSwitcher({
   }, [startSequence]);
 
   useEffect(() => {
-    if (globalThis.ResizeObserver === undefined) {
-      globalThis.addEventListener('resize', syncActiveRails);
-      return () => {
-        globalThis.removeEventListener('resize', syncActiveRails);
-      };
-    }
-
-    const resizeObserver = new globalThis.ResizeObserver(() => {
-      syncActiveRails();
-    });
-
-    if (tabRailRef.current) {
-      resizeObserver.observe(tabRailRef.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [syncActiveRails]);
-
-  useEffect(() => {
     return () => {
       clearSequenceTimers();
     };
@@ -177,7 +125,7 @@ export function ArtistProfileModeSwitcher({
   return (
     <div
       ref={rootRef}
-      className='artist-profile-mode-switcher mx-auto flex w-full max-w-[26rem] flex-col items-center text-center'
+      className='artist-profile-mode-switcher mx-auto flex w-full max-w-[32rem] flex-col items-center text-center'
     >
       {showIntroHeading ? (
         <motion.div
@@ -248,71 +196,49 @@ export function ArtistProfileModeSwitcher({
       </div>
 
       <div
-        ref={tabRailRef}
         className={cn(
-          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 flex w-fit max-w-full flex-nowrap items-center justify-start gap-0.5 overflow-x-auto rounded-full border border-white/14 bg-white/[0.04] p-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_36px_rgba(0,0,0,0.26)] transition-opacity duration-300 supports-[backdrop-filter]:bg-black/58 supports-[backdrop-filter]:backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-[29rem] px-0 transition-opacity duration-300',
           tabsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-5 top-px h-6 rounded-full bg-white/[0.05] blur-2xl'
+          className='pointer-events-none absolute inset-x-10 top-1/2 h-8 -translate-y-1/2 rounded-full bg-white/[0.08] blur-2xl'
         />
-        {tabFrame ? (
-          <motion.div
-            aria-hidden='true'
-            className='homepage-pill-primary pointer-events-none absolute inset-y-[3px] !px-0 shadow-[0_10px_22px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.78)]'
-            initial={false}
-            animate={{ x: tabFrame.left, width: tabFrame.width }}
-            style={{ boxSizing: 'border-box' }}
-            transition={
-              reducedMotion
-                ? { duration: 0.18, ease: 'easeOut' }
-                : {
-                    type: 'spring',
-                    stiffness: 380,
-                    damping: 32,
-                    mass: 0.72,
-                  }
-            }
+        <div className='w-full pb-1'>
+          <SegmentControl
+            value={selectedModeId}
+            onValueChange={nextModeId => {
+              manualSelectionRef.current = true;
+              clearSequenceTimers();
+              setTabsVisible(true);
+
+              const nextIndex = adaptive.modes.findIndex(
+                mode => mode.id === nextModeId
+              );
+
+              if (nextIndex >= 0) {
+                setActiveIndex(nextIndex);
+              }
+            }}
+            options={modeOptions}
+            variant='linear-pill'
+            layout='fill'
+            size='sm'
+            aria-label='Profile modes'
+            className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
+            triggerClassName='min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
           />
-        ) : null}
-        {adaptive.modes.map((mode, index) => {
-          const isActive = index === activeIndex;
-          return (
-            <button
-              key={mode.id}
-              type='button'
-              aria-pressed={isActive}
-              ref={node => {
-                tabRefs.current[index] = node;
-              }}
-              onClick={() => {
-                manualSelectionRef.current = true;
-                clearSequenceTimers();
-                setTabsVisible(true);
-                setActiveIndex(index);
-              }}
-              className={cn(
-                'relative z-10 inline-flex h-8 min-w-max shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3.25 text-center text-[11.5px] font-medium leading-none tracking-[-0.02em] transition-colors sm:h-9 sm:px-3.75 sm:text-[12.25px]',
-                isActive
-                  ? 'text-black'
-                  : 'text-secondary-token/88 hover:text-primary-token'
-              )}
-            >
-              {mode.label}
-            </button>
-          );
-        })}
+        </div>
       </div>
 
-      <div className='artist-profile-mode-switcher-active relative mx-auto mt-2.5 min-h-[2.2rem] w-full max-w-[20rem] px-2 sm:mt-3'>
+      <div className='artist-profile-mode-switcher-active relative mx-auto mt-2.5 min-h-[2.4rem] w-full max-w-[19rem] px-2 sm:mt-3'>
         <AnimatePresence initial={false}>
           {activeMode ? (
             <motion.p
               key={activeMode.id}
-              className='absolute inset-x-0 text-[14px] font-medium leading-[1.3] tracking-[-0.03em] text-primary-token/92 sm:text-[15px]'
-              initial={{ opacity: 0 }}
+              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-[-0.03em] text-white/86 sm:text-[15px]'
+              initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{
@@ -354,13 +280,13 @@ export function ArtistProfileModeSwitcher({
 
         @media (max-width: 640px) {
           .artist-profile-mode-switcher-tabs button {
-            font-size: 12px;
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
+            font-size: 11px;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
           }
 
           .artist-profile-mode-switcher-active {
-            min-height: 2.8rem;
+            min-height: 2.5rem;
           }
 
           .artist-profile-mode-switcher-active p {
