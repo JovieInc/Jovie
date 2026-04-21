@@ -758,11 +758,8 @@ function buildSeededTestUserProfile(email: string): {
   lastName: string;
 } {
   const localPart = email.split('@')[0] ?? 'e2e';
-  const baseUsername = localPart
-    .replaceAll(/[^a-z0-9]+/gi, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '')
-    .slice(0, 48);
+  const normalizedUsername = localPart.replaceAll(/[^a-z0-9]+/gi, '-');
+  const baseUsername = trimEdgeHyphens(normalizedUsername).slice(0, 48);
 
   if (localPart.startsWith('browse')) {
     return {
@@ -777,6 +774,21 @@ function buildSeededTestUserProfile(email: string): {
     firstName: 'E2E',
     lastName: 'Test',
   };
+}
+
+function trimEdgeHyphens(value: string): string {
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && value.charCodeAt(start) === 45) {
+    start += 1;
+  }
+
+  while (end > start && value.charCodeAt(end - 1) === 45) {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 async function ensureClerkTestEmailUserExists(email: string): Promise<void> {
