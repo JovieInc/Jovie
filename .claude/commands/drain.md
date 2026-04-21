@@ -189,17 +189,43 @@ for PR in $OPEN_PRS; do
 done
 ```
 
-### Fix branch-specific CI failures
+### Phase 3b: Parallel per-PR agents (MANDATORY for remaining failures)
 
-For each PR that still has failures after the rebase:
-1. Check out the branch
-2. Identify the failure (typecheck, lint, test, etc.)
-3. Fix it, commit, and push
-4. Wait for CI to go green, then enable auto-merge
+For every still-failing PR after Phase 3, spawn ONE Agent per PR IN PARALLEL using `isolation: "worktree"` and `mode: "bypassPermissions"`. Send all spawn calls in a single message (multiple Agent tool calls in one turn) so they run concurrently.
+
+Each agent's prompt must include:
+1. The PR number, title, head branch
+2. Current failing checks (name + log URL from `gh pr checks $PR`)
+3. Any unresolved bot/human review comments (fetch via `gh api repos/{owner}/{repo}/pulls/$PR/comments --paginate`)
+4. Instructions:
+   - Check out the PR's head branch in the worktree
+   - Rebase onto latest `main`; resolve conflicts preserving PR intent
+   - Run `pnpm --filter=@jovie/web exec tsc --noEmit`, `pnpm biome check apps/web`, and the failing test files locally
+   - Fix root causes (not symptoms); update tests only if they're wrong
+   - Address each unaddressed CodeRabbit / Greptile comment (fix or reply explaining why declined)
+   - Commit with conventional messages, push to the PR head branch
+   - Enable auto-merge via `gh pr merge $PR --auto`
+   - Report DONE / DONE_WITH_CONCERNS / BLOCKED with the specific reason
+
+Sample Agent tool call (repeat per PR, all in one message):
+
+```
+Agent({
+  subagent_type: "general-purpose",
+  isolation: "worktree",
+  mode: "bypassPermissions",
+  description: "Fix PR #<NUMBER>",
+  prompt: "<self-contained prompt with failures + comments + instructions>"
+})
+```
+
+Do NOT wait for one agent before spawning the next. Do NOT run them sequentially. The point of this phase is fan-out.
+
+After all agents return, re-run Phase 3 auto-merge enablement and report.
 
 ### Close stale or stuck PRs
 
-PRs that can't be fixed automatically:
+PRs that can't be fixed automatically (agent returns BLOCKED):
 - Close with a comment explaining why
 - Label as `needs-human` if human intervention is required
 
