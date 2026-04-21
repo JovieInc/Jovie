@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { HOMEPAGE_PROFILE_SHOWCASE_STATES } from '@/features/home/homepage-profile-preview-fixture';
 import { MARKETING_RENDER_ROUTE_SURFACES } from '@/features/home/MarketingRenderSurface';
 
+export const revalidate = false;
+
 const states = Object.keys(HOMEPAGE_PROFILE_SHOWCASE_STATES);
 
 export default function RendersIndexPage() {
