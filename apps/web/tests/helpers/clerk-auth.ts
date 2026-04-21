@@ -760,8 +760,8 @@ function buildSeededTestUserProfile(email: string): {
   const localPart = email.split('@')[0] ?? 'e2e';
   const baseUsername = localPart
     .replaceAll(/[^a-z0-9]+/gi, '-')
-    .replaceAll(/^-+/g, '')
-    .replaceAll(/-+$/g, '')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
     .slice(0, 48);
 
   if (localPart.startsWith('browse')) {

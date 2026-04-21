@@ -30,12 +30,23 @@ const confirmSchema = z.object({
 });
 
 function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+/g, '')
-    .replaceAll(/-+$/g, '')
-    .slice(0, 80);
+  const normalized = title.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-');
+  return trimEdgeHyphens(normalized).slice(0, 80);
+}
+
+function trimEdgeHyphens(value: string): string {
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && value.charCodeAt(start) === 45) {
+    start += 1;
+  }
+
+  while (end > start && value.charCodeAt(end - 1) === 45) {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 export async function POST(request: NextRequest) {
