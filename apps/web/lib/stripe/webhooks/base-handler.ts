@@ -234,11 +234,14 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
 
     const plan = getPlanFromPriceId(priceId);
     if (!plan) {
+      const customerId = getCustomerId(subscription.customer);
       await captureCriticalError(
         'Unknown price ID in subscription',
         new Error(`Unknown price ID: ${priceId}`),
         {
+          customerId,
           priceId,
+          subscriptionId: subscription.id,
           userId,
           route: '/api/stripe/webhooks',
         }
