@@ -214,11 +214,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         >
           {hasAppliedSelectedCandidate
             ? 'Applied'
-            : !result.releaseId
-              ? 'Create Release With Art'
-              : result.hasExistingArtwork
+            : result.releaseId
+              ? result.hasExistingArtwork
                 ? 'Replace Artwork'
-                : 'Use This Art'}
+                : 'Use This Art'
+              : 'Create Release With Art'}
         </Button>
         <Button
           type='button'

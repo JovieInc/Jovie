@@ -803,13 +803,13 @@ export function ReleaseSidebar({
               readOnly={readOnly}
               variant='flat'
             />
-            {!readOnly ? (
+            {readOnly ? null : (
               <ReleasePitchSection
                 releaseId={release.id}
                 existingPitches={release.generatedPitches}
                 variant='flat'
               />
-            ) : null}
+            )}
           </DrawerSection>
         </div>
       )}

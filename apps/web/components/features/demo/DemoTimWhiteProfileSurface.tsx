@@ -318,7 +318,7 @@ function formatSubscribeStateLabel(
     .replace('subscribe-', '')
     .replace('fans-opt-in', 'button')
     .replaceAll('-', ' ')
-    .replace(/\b\w/g, match => match.toUpperCase());
+    .replaceAll(/\b\w/g, match => match.toUpperCase());
 }
 
 function ActionCardShowcaseBoard() {
