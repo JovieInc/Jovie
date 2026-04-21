@@ -622,7 +622,15 @@ export function ProfileInlineNotificationsCTA({
   );
 
   if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
+    return (
+      <div
+        data-testid='profile-inline-cta'
+        data-ui='step-stack'
+        className='min-h-[116px]'
+      >
+        <SubscriptionFormSkeleton />
+      </div>
+    );
   }
 
   if (!notificationsEnabled) {
