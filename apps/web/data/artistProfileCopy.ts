@@ -797,13 +797,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           message: 'New release alert',
           destination: 'Latest release page',
         },
-        {
-          id: 'tour',
-          trigger: 'Show near due',
-          audience: 'Fans near the venue',
-          message: 'Nearby show alert',
-          destination: 'Ticket page',
-        },
       ],
     },
     outputs: [
