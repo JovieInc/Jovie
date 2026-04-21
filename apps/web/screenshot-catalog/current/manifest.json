@@ -262,8 +262,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-19T06:08:39.551Z",
-    "gitSha": "2834f1217127d1c720a0f645eac1613b2080472f",
+    "capturedAt": "2026-04-20T10:54:45.478Z",
+    "gitSha": "6e575314f2d250ded18855747120bbb5a8833585",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
