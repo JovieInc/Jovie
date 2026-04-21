@@ -12,7 +12,13 @@ Before running ANY command in this repo, run:
 ./scripts/setup.sh
 ```
 
-This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), and Doppler CLI, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+On Windows PowerShell, run the wrapper instead so Git for Windows Bash is used instead of the WSL launcher:
+
+```powershell
+.\scripts\setup.ps1
+```
+
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
@@ -25,6 +31,7 @@ Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
 - verify/install required tools
 - install dependencies
 - verify Doppler auth/config
+- verify GitHub CLI auth when present, including `GH_TOKEN`/`GITHUB_TOKEN` supplied by the environment or Doppler
 - avoid creating remote infrastructure by default
 
 Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.

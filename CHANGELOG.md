@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.160] - 2026-04-21
+
+> Windows agents can bootstrap the repo from PowerShell without hitting the WSL launcher, and PR automation now verifies GitHub auth before trying to move branches.
+
+### Added
+
+- Added a PowerShell setup wrapper that locates Git for Windows Bash and runs the existing bootstrap script from the correct shell.
+- Added setup-time GitHub CLI auth checks, including support for `GH_TOKEN` or `GITHUB_TOKEN` supplied by the environment or Doppler.
+
+### Changed
+
+- Documented the Windows setup path and captured the automation lesson so future PR train runs do not depend on local keyring access.
+
 ## [26.4.159] - 2026-04-18
 
 > Tim White profile proof now uses the real action-card system, notification capture stays stable through every step, and the releases dashboard polish is ready to review on the same branch.

@@ -367,7 +367,43 @@ else
   fi
 fi
 
-# ─── 7. Sync dev Clerk IDs ────────────────────────────────────────────────────
+# ─── 7. GitHub CLI auth ──────────────────────────────────────────────────────
+echo ""
+echo "── GitHub CLI auth ───────────────────────────────────────────────────"
+if ! command -v gh &>/dev/null; then
+  warn "GitHub CLI (gh) not found"
+  info "Install: winget install GitHub.cli  (Windows) or brew install gh (macOS)"
+  info "Some automation workflows, including PR train runs, require gh auth."
+else
+  if gh auth status -h github.com &>/dev/null 2>&1; then
+    success "GitHub CLI is authenticated for github.com"
+  else
+    GH_AUTH_OK=false
+    if [[ -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+      if GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" gh auth status -h github.com &>/dev/null 2>&1; then
+        GH_AUTH_OK=true
+      fi
+    elif command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" sh -c 'test -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}"' &>/dev/null 2>&1; then
+      if "${DOPPLER_LOCAL_RUN[@]}" gh auth status -h github.com &>/dev/null 2>&1; then
+        GH_AUTH_OK=true
+      fi
+    fi
+
+    if [[ "$GH_AUTH_OK" == "true" ]]; then
+      success "GitHub CLI can authenticate with GH_TOKEN/GITHUB_TOKEN"
+    else
+      warn "GitHub CLI is installed but not authenticated"
+      echo ""
+      echo "  To authenticate interactively:"
+      echo "    gh auth login"
+      echo ""
+      echo "  For automation, provide GH_TOKEN or GITHUB_TOKEN via the environment or Doppler."
+      info "PR train runs cannot update branches, promote drafts, or enable auto-merge without GitHub auth."
+    fi
+  fi
+fi
+
+# ─── 8. Sync dev Clerk IDs ───────────────────────────────────────────────────
 # The dev Clerk instance assigns different user IDs than production.
 # If the shared DB has production Clerk IDs, local auth will fail with
 # USER_CREATION_FAILED. This step syncs them automatically.
