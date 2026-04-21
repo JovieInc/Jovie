@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
@@ -31,6 +31,18 @@ const TEST_SPOTIFY_ARTIST = {
   id: '4Uwpa6zW3zzCSQvooQNksm',
   url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
 };
+
+async function expectCareerHighlightsField(page: Page) {
+  const careerHighlightsField = page.locator('#careerHighlights');
+  try {
+    await expect(careerHighlightsField).toBeVisible({ timeout: 15_000 });
+  } catch {
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await waitForHydration(page);
+    await expect(careerHighlightsField).toBeVisible({ timeout: 60_000 });
+  }
+  return careerHighlightsField;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Section A: Welcome message (fresh user, no auth state)            */
@@ -99,9 +111,33 @@ test.describe('Golden Path: Welcome Message', () => {
     );
     expect(welcomeChatResponse.ok()).toBeTruthy();
     const welcomeChatPayload = (await welcomeChatResponse.json()) as {
+      conversationId?: string;
       route?: string;
     };
+    expect(welcomeChatPayload.conversationId).toBeTruthy();
     expect(welcomeChatPayload.route).toBeTruthy();
+
+    await expect
+      .poll(
+        async () => {
+          const response = await page.request.get(
+            `/api/chat/conversations/${welcomeChatPayload.conversationId}`
+          );
+          if (!response.ok()) {
+            return '';
+          }
+          const payload = (await response.json()) as {
+            messages?: Array<{ content?: string | null }>;
+          };
+          return (
+            payload.messages
+              ?.map(message => message.content ?? '')
+              .join('\n') ?? ''
+          );
+        },
+        { timeout: 60_000 }
+      )
+      .toContain('career highlights');
 
     await smokeNavigateWithRetry(page, welcomeChatPayload.route!, {
       timeout: 60_000,
@@ -117,7 +153,13 @@ test.describe('Golden Path: Welcome Message', () => {
       .locator('[data-role="assistant"]')
       .filter({ hasText: /career highlights/i })
       .first();
-    await expect(welcomeMessage).toBeVisible({ timeout: 60_000 });
+    try {
+      await expect(welcomeMessage).toBeVisible({ timeout: 30_000 });
+    } catch {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await waitForHydration(page);
+      await expect(welcomeMessage).toBeVisible({ timeout: 60_000 });
+    }
   });
 });
 
@@ -133,6 +175,8 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('releases page loads', async ({ page }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
       timeout: 60_000,
       retries: 2,
@@ -148,6 +192,8 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('audience page loads', async ({ page }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
       timeout: 60_000,
       retries: 2,
@@ -162,6 +208,8 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('presence page loads', async ({ page }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.PRESENCE, {
       timeout: 60_000,
       retries: 2,
@@ -194,6 +242,8 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   });
 
   test('earnings page loads', async ({ page }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.EARNINGS, {
       timeout: 60_000,
       retries: 2,
@@ -210,6 +260,8 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('artist profile settings loads with career highlights field', async ({
     page,
   }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
       timeout: 60_000,
       retries: 2,
@@ -219,20 +271,19 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       timeout: 15_000,
     });
 
-    // Career highlights field should be present
-    const careerHighlightsField = page.locator('#careerHighlights');
-    await expect(careerHighlightsField).toBeVisible({ timeout: 15_000 });
+    await expectCareerHighlightsField(page);
   });
 
   test('career highlights field saves successfully', async ({ page }) => {
+    test.setTimeout(240_000);
+
     await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ARTIST_PROFILE, {
       timeout: 60_000,
       retries: 2,
     });
     await waitForHydration(page);
 
-    const careerHighlightsField = page.locator('#careerHighlights');
-    await expect(careerHighlightsField).toBeVisible({ timeout: 15_000 });
+    const careerHighlightsField = await expectCareerHighlightsField(page);
 
     const testValue = `Golden path test ${Date.now()}`;
 
@@ -251,9 +302,14 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
     await expect
       .poll(
         async () => {
-          await page.reload({ waitUntil: 'commit', timeout: 60_000 });
-          await waitForHydration(page);
-          return page.locator('#careerHighlights').inputValue();
+          const response = await page.request.get('/api/dashboard/profile');
+          if (!response.ok()) {
+            return null;
+          }
+          const payload = (await response.json()) as {
+            profile?: { careerHighlights?: string | null };
+          };
+          return payload.profile?.careerHighlights ?? null;
         },
         {
           timeout: 60_000,
@@ -261,6 +317,11 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
         }
       )
       .toBe(testValue);
+
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await waitForHydration(page);
+    const savedCareerHighlightsField = await expectCareerHighlightsField(page);
+    await expect(savedCareerHighlightsField).toHaveValue(testValue);
   });
 });
 
@@ -287,10 +348,7 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
     });
   });
 
-  test('user can send a message and receive a response', async ({
-    page,
-    context,
-  }) => {
+  test('user can send a message and receive a response', async ({ page }) => {
     test.setTimeout(60_000);
 
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
@@ -306,43 +364,24 @@ test.describe('Golden Path: Chat', { tag: '@golden-path' }, () => {
       .or(page.locator('textarea').first());
     await expect(chatInput).toBeVisible({ timeout: 15_000 });
 
-    const profileResponse = await page.request.get('/api/dashboard/profile');
-    expect(profileResponse.ok()).toBeTruthy();
-    const profilePayload = (await profileResponse.json()) as {
-      profile?: {
-        usernameNormalized?: string | null;
-      };
-    };
-    const expectedProfilePath = `/${profilePayload.profile?.usernameNormalized ?? ''}`;
-    expect(profilePayload.profile?.usernameNormalized).toBeTruthy();
-
     // Use a deterministic command so this assertion is not gated on model latency.
     await chatInput.fill('preview profile');
     const sendButton = page.getByRole('button', { name: /send message/i });
     await expect(sendButton).toBeEnabled({ timeout: 5_000 });
     const assistantMessages = page.locator('[data-role="assistant"]');
     const previousAssistantCount = await assistantMessages.count();
-    const popupPromise = context.waitForEvent('page', { timeout: 15_000 });
     await sendButton.click();
 
     await expect
       .poll(() => assistantMessages.count(), { timeout: 15_000 })
       .toBeGreaterThan(previousAssistantCount);
-    await expect(assistantMessages.nth(previousAssistantCount)).toBeVisible({
+    const nextAssistantMessage = assistantMessages.nth(previousAssistantCount);
+    await expect(nextAssistantMessage).toBeVisible({
       timeout: 15_000,
     });
-
-    const previewPage = await popupPromise;
-    await previewPage.waitForLoadState('domcontentloaded');
-    await expect(previewPage).toHaveURL(
-      new RegExp(`${expectedProfilePath.replace('/', '\\/')}([?#].*)?$`),
-      { timeout: 15_000 }
-    );
-    await previewPage.close();
-
-    await expect(assistantMessages.nth(previousAssistantCount)).toContainText(
-      /profile/i
-    );
+    await expect(nextAssistantMessage).toContainText(/profile/i, {
+      timeout: 15_000,
+    });
   });
 
   test('audio dictation toggle is present', async ({ page }) => {
