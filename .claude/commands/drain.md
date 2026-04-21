@@ -129,10 +129,46 @@ done
 
 After rebasing, audit drafts and duplicates before orchestrating:
 
-### Promote passing drafts to ready-for-review
+### Auto-review and promote cursor-bot drafts
+
+Cursor-bot (author `app/cursor`) produces small, narrowly-scoped fixes for linter hotspots, a11y regressions, Sonar flags, etc. No human is needed to land these — review the diff, approve if it's sensible, promote from draft, and enable auto-merge.
 
 ```bash
-DRAFT_PRS=$(gh pr list --state open --draft --json number --limit 100 --jq '.[].number')
+CURSOR_DRAFTS=$(gh pr list --state open --draft --author app/cursor --json number --limit 100 --jq '.[].number')
+
+for PR in $CURSOR_DRAFTS; do
+  echo "=== Reviewing cursor draft #$PR ==="
+  # Check scope: line count and files touched
+  DIFFSTAT=$(gh pr diff $PR --patch 2>/dev/null | diffstat -s 2>/dev/null || gh pr view $PR --json additions,deletions,changedFiles --jq '"\(.additions)+/\(.deletions)- across \(.changedFiles) files"')
+  echo "Scope: $DIFFSTAT"
+
+  # Inspect the diff — agent decides if it's a sensible narrow fix.
+  # RED FLAGS (do NOT auto-approve, leave as draft):
+  #  - touches >10 files
+  #  - modifies migrations, auth middleware, billing, or cron handlers
+  #  - changes public API surface or shared UI primitives
+  #  - weakens a CI gate (disabled tests, skipped assertions, raised thresholds without justification)
+  # GREEN FLAGS (auto-approve):
+  #  - narrow fix to a linter/sonar/a11y finding
+  #  - test-only or comment-only change
+  #  - internal refactor < 50 lines with no behavior change
+  gh pr diff $PR | head -400  # inspect
+
+  # If the diff looks good (agent's judgment):
+  gh pr ready $PR
+  gh pr merge $PR --auto
+
+  # Close duplicates: if multiple cursor drafts tackle the same file/issue,
+  # keep the lowest-numbered one and close the rest.
+done
+```
+
+If two cursor drafts touch the same file(s), close the later one as a duplicate (see below). Cursor often opens 2–3 variants of the same fix; pick the cleanest.
+
+### Promote other passing drafts
+
+```bash
+DRAFT_PRS=$(gh pr list --state open --draft --json number,author --limit 100 --jq '.[] | select(.author.login != "app/cursor") | .number')
 
 for PR in $DRAFT_PRS; do
   FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
