@@ -20,25 +20,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.159] - 2026-04-18
 
-> Tim White profile proof now uses the real action-card system, notification capture stays stable through every step, and the releases dashboard polish is ready to review on the same branch.
+> Launch readiness now has real runtime controls and stronger deploy truth signals: production synthetic monitoring uses the canonical seeded-user lane, staging promotion blocks on authenticated and billing journeys, cron health is durable in Sentry, and the launch runbooks now describe the actual operating model.
 
 ### Added
 
-- Added shared Tim White profile action-card and demo review boards for latest release, countdown, nearby tour, next tour, playlist fallback, listen fallback, and inline subscription states.
-- Added focused regression coverage for Tim White profile cards, OTP recovery, fixed-height notification states, and the releases dashboard date-picker and action-menu polish.
+- Added admin operational controls for signup availability, checkout entry, Stripe webhook processing, and high-risk cron fanout, backed by durable settings storage and a secured admin API.
+- Added a shared cron monitoring helper plus Sentry check-ins for the scheduled production cron routes.
+- Added a staging billing smoke test, deployed-auth helpers, and repo-tracked launch PRR and readiness scorecard docs.
 
 ### Changed
 
-- Rebuilt the Artist Profile marketing page around real Tim White proof surfaces, including the adaptive hero, outcomes grid, spec-wall crops, how-it-works visuals, and proof styling.
-- Refined the public profile and home/demo fixtures so Tim White remains the canonical founder/profile identity, with collaboration credits rendered consistently as `w/ Cosmic Gate`.
-- Refreshed the add-release drawer and provider-matrix expansion rows to use the shared calendar picker and cleaner bounded child-row layout.
-- [internal] Adopted the latest runtime flag and Stripe-connect platform changes from `origin/main` while keeping the branch’s artist-profile QA fixes intact.
+- Changed production synthetic monitoring to use the canonical synthetic Playwright config and seeded-user auth journey instead of the old hand-picked spec path.
+- Changed the staging deploy pipeline to run blocking auth and billing journey gates before production promotion, including explicit secret validation and staging Stripe env overrides.
+- Changed the signup route to honor the runtime availability control while preserving the existing Clerk sign-up UI in a client component.
+- Updated launch, cron, synthetic monitoring, and on-call docs to reflect the current `jov.ie` operating model and migration contract.
 
 ### Fixed
 
-- Fixed the inline notifications composer so email, OTP, name, birthday, and done states keep one stable shell, and OTP recovery no longer loops or wipes trailing digits after an error.
-- Fixed artist-profile accessibility follow-ups, including hero mode contrast, ingesting badge contrast, reactivation and monetization muted text contrast, and keyboard access into the monetization scroller.
-- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.159`.
+- [internal] Removed the unintended Playwright `auth-setup` dependency from the new staging gate jobs so they only exercise the deployed-auth flows they were meant to verify.
+- [internal] Fixed the admin operational-controls path to return proper `401`/`403` responses, fail closed when the controls row is unreadable, and persist the database user ID instead of a Clerk ID in audit metadata.
+- [internal] Synced the canonical version file, workspace package versions, `version.json`, and the changelog head to `26.4.159`.
 
 ## [26.4.158] - 2026-04-17
 

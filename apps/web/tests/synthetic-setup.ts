@@ -22,6 +22,8 @@ async function globalSetup() {
     E2E_SYNTHETIC_MODE: process.env.E2E_SYNTHETIC_MODE,
     E2E_ENVIRONMENT: process.env.E2E_ENVIRONMENT,
     BASE_URL: baseURL,
+    E2E_SYNTHETIC_USER_EMAIL: process.env.E2E_SYNTHETIC_USER_EMAIL,
+    E2E_SYNTHETIC_USER_PASSWORD: process.env.E2E_SYNTHETIC_USER_PASSWORD,
   };
 
   const missingVars = Object.entries(requiredEnvVars)

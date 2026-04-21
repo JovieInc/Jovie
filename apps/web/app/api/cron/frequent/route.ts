@@ -18,7 +18,9 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getOperationalControls } from '@/lib/admin/operational-controls';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { runMonitoredCron } from '@/lib/cron/monitoring';
 import { db } from '@/lib/db';
 import {
   discoveryKeywords,
@@ -50,6 +52,12 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const FREQUENT_CRON_MONITOR = {
+  slug: 'cron-frequent',
+  schedule: '*/15 * * * *',
+  maxRuntime: 1,
+  checkinMargin: 5,
+} as const;
 
 interface SubJobResult {
   success: boolean;
@@ -88,12 +96,34 @@ async function runSubJob(
 }
 
 export async function GET(request: Request) {
-  const startTime = Date.now();
-
   const authError = verifyCronRequest(request, {
     route: '/api/cron/frequent',
   });
   if (authError) return authError;
+
+  const controls = await getOperationalControls();
+  if (!controls.cronFanoutEnabled) {
+    return NextResponse.json(
+      {
+        success: true,
+        skipped: true,
+        reason: 'cron_fanout_disabled',
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return runMonitoredCron(
+    {
+      monitor: FREQUENT_CRON_MONITOR,
+      shouldFailResult: response => response.status !== 200,
+    },
+    runFrequentCron
+  );
+}
+
+async function runFrequentCron() {
+  const startTime = Date.now();
 
   const minute = new Date().getMinutes();
   const results: Record<string, SubJobResult> = {};

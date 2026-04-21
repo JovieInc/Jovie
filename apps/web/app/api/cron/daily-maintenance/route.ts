@@ -19,6 +19,7 @@
 import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { runMonitoredCron } from '@/lib/cron/monitoring';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { runReconciliation } from '../billing-reconciliation/route';
@@ -29,6 +30,12 @@ export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for all sub-jobs
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const DAILY_MAINTENANCE_MONITOR = {
+  slug: 'cron-daily-maintenance',
+  schedule: '0 0 * * *',
+  maxRuntime: 5,
+  checkinMargin: 15,
+} as const;
 
 interface SubJobResult {
   success: boolean;
@@ -56,60 +63,65 @@ async function runSubJob(
 }
 
 export async function GET(request: Request) {
-  const startTime = Date.now();
-
   const authError = verifyCronRequest(request, {
     route: '/api/cron/daily-maintenance',
   });
   if (authError) return authError;
 
-  const results: Record<string, SubJobResult> = {};
-
-  // 1. Cleanup orphaned photos
-  results.cleanupPhotos = await runSubJob(
-    'cleanupPhotos',
-    cleanupOrphanedPhotos
-  );
-
-  // 2. Cleanup expired idempotency keys
-  results.cleanupKeys = await runSubJob('cleanupKeys', async () => ({
-    deleted: await cleanupExpiredKeys(),
-  }));
-
-  // 3. Billing reconciliation (daily safety net for webhooks)
-  results.billingReconciliation = await runSubJob(
-    'billingReconciliation',
-    async () => {
-      const r = await runReconciliation();
-      return {
-        success: r.success,
-        stats: r.stats,
-        duration: r.duration,
-        errors: r.errors.length,
-      };
-    }
-  );
-
-  // 4. Data retention — Sundays only (heavy operation)
-  const isSunday = new Date().getDay() === 0;
-  results.dataRetention = isSunday
-    ? await runSubJob('dataRetention', runDataRetentionCleanup)
-    : { success: true, skipped: true };
-
-  const duration = Date.now() - startTime;
-  const allSuccessful = Object.values(results).every(r => r.success);
-
-  logger.info(`[daily-maintenance] Completed in ${duration}ms`, results);
-
-  return NextResponse.json(
+  return runMonitoredCron(
     {
-      success: allSuccessful,
-      results,
-      duration,
+      monitor: DAILY_MAINTENANCE_MONITOR,
+      shouldFailResult: response => response.status !== 200,
     },
-    {
-      status: allSuccessful ? 200 : 207,
-      headers: NO_STORE_HEADERS,
+    async () => {
+      const startTime = Date.now();
+      const results: Record<string, SubJobResult> = {};
+
+      results.cleanupPhotos = await runSubJob(
+        'cleanupPhotos',
+        cleanupOrphanedPhotos
+      );
+
+      results.cleanupKeys = await runSubJob('cleanupKeys', async () => ({
+        deleted: await cleanupExpiredKeys(),
+      }));
+
+      results.billingReconciliation = await runSubJob(
+        'billingReconciliation',
+        async () => {
+          const result = await runReconciliation();
+          return {
+            success: result.success,
+            stats: result.stats,
+            duration: result.duration,
+            errors: result.errors.length,
+          };
+        }
+      );
+
+      const isSunday = new Date().getDay() === 0;
+      results.dataRetention = isSunday
+        ? await runSubJob('dataRetention', runDataRetentionCleanup)
+        : { success: true, skipped: true };
+
+      const duration = Date.now() - startTime;
+      const allSuccessful = Object.values(results).every(
+        result => result.success
+      );
+
+      logger.info(`[daily-maintenance] Completed in ${duration}ms`, results);
+
+      return NextResponse.json(
+        {
+          success: allSuccessful,
+          results,
+          duration,
+        },
+        {
+          status: allSuccessful ? 200 : 207,
+          headers: NO_STORE_HEADERS,
+        }
+      );
     }
   );
 }

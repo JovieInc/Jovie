@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
+import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
+import { getOperationalControls } from '@/lib/admin/operational-controls';
 
 const ogTitle = `Sign up | ${APP_NAME}`;
 const description =
@@ -44,10 +47,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SignUpLayout({
+export default async function SignUpLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  noStore();
+
+  const controls = await getOperationalControls();
+  if (!controls.signupEnabled) {
+    return <UnavailablePage />;
+  }
+
   return children;
 }

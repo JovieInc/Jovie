@@ -26,10 +26,12 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { getOperationalControls } from '@/lib/admin/operational-controls';
 import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
 import {
   getHandler,
@@ -41,8 +43,6 @@ import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for Stripe SDK compatibility
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -65,6 +65,28 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const controls = await getOperationalControls();
+    if (!controls.stripeWebhooksEnabled) {
+      await captureWarning(
+        'Stripe webhook received while webhook processing is disabled',
+        undefined,
+        { route: '/api/stripe/webhooks' }
+      );
+      return NextResponse.json(
+        {
+          error:
+            'Webhook processing is temporarily paused. Stripe should retry this event shortly.',
+        },
+        {
+          status: 503,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': RETRY_AFTER_SERVICE,
+          },
+        }
+      );
+    }
+
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
 

@@ -2,6 +2,13 @@
 
 This runbook defines how Jovie responds to launch-critical production incidents.
 
+Related docs:
+
+- [Launch Gates](./launch/LAUNCH_GATES.md)
+- [Synthetic Monitoring](./SYNTHETIC_MONITORING.md)
+- [Production Readiness Review](./launch/PRODUCTION_READINESS_REVIEW.md)
+- [Readiness Scorecard](./launch/READINESS_SCORECARD.md)
+
 ## Scope
 
 Use this process for any production issue that impacts:

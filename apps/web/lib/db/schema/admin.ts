@@ -85,6 +85,16 @@ export const adminSystemSettings = pgTable('admin_system_settings', {
     .notNull(),
   playlistLastGeneratedAt: timestamp('playlist_last_generated_at'),
   playlistNextEligibleAt: timestamp('playlist_next_eligible_at'),
+  signupEnabled: boolean('signup_enabled').default(true).notNull(),
+  checkoutEnabled: boolean('checkout_enabled').default(true).notNull(),
+  stripeWebhooksEnabled: boolean('stripe_webhooks_enabled')
+    .default(true)
+    .notNull(),
+  cronFanoutEnabled: boolean('cron_fanout_enabled').default(true).notNull(),
+  operationalControlsUpdatedAt: timestamp('operational_controls_updated_at'),
+  operationalControlsUpdatedBy: uuid(
+    'operational_controls_updated_by'
+  ).references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

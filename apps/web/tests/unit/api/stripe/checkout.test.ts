@@ -9,6 +9,7 @@ const mockGetActivePriceIds = vi.hoisted(() => vi.fn());
 const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
 const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
+const mockGetOperationalControls = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -27,6 +28,10 @@ vi.mock('@/lib/stripe/client', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   ensureStripeCustomer: mockEnsureStripeCustomer,
+}));
+
+vi.mock('@/lib/admin/operational-controls', () => ({
+  getOperationalControls: mockGetOperationalControls,
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
@@ -52,6 +57,14 @@ describe('POST /api/stripe/checkout', () => {
     vi.resetModules();
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
+    mockGetOperationalControls.mockResolvedValue({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
     mockGetActivePriceIds.mockReturnValue(['price_123']);
     mockGetPriceMappingDetails.mockReturnValue({
       priceId: 'price_123',
@@ -192,7 +205,7 @@ describe('POST /api/stripe/checkout', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(503);
-    expect(response.headers.get('Retry-After')).toBe('5');
+    expect(response.headers.get('Retry-After')).toBe('30');
     expect(payload.error).toContain('temporarily unavailable');
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(3);
   });

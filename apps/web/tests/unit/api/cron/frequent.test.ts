@@ -16,6 +16,7 @@ const {
   mockProcessJob,
   mockSucceedJob,
   mockHandleIngestionJobFailure,
+  mockGetOperationalControls,
   mockWithSystemIngestionSession,
   mockProcessOutreachBatch,
 } = vi.hoisted(() => ({
@@ -34,8 +35,13 @@ const {
   mockProcessJob: vi.fn(),
   mockSucceedJob: vi.fn(),
   mockHandleIngestionJobFailure: vi.fn(),
+  mockGetOperationalControls: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
   mockProcessOutreachBatch: vi.fn(),
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureCheckIn: vi.fn(() => 'check-in-id'),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -67,6 +73,7 @@ vi.mock('@/lib/env-server', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
+  captureWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
@@ -78,6 +85,10 @@ vi.mock('@/lib/ingestion/processor', () => ({
 
 vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: mockWithSystemIngestionSession,
+}));
+
+vi.mock('@/lib/admin/operational-controls', () => ({
+  getOperationalControls: mockGetOperationalControls,
 }));
 
 vi.mock('@/lib/leads/auto-approve', () => ({
@@ -137,6 +148,14 @@ describe('GET /api/cron/frequent', () => {
     vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
+    mockGetOperationalControls.mockResolvedValue({
+      signupEnabled: true,
+      checkoutEnabled: true,
+      stripeWebhooksEnabled: true,
+      cronFanoutEnabled: true,
+      updatedAt: null,
+      updatedByUserId: null,
+    });
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
