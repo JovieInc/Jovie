@@ -113,12 +113,22 @@ export function buildMailtoHref(params: {
 }
 
 export function slugifyShareValue(input: string): string {
-  return input
+  const normalized = input
     .trim()
     .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, '-')
-    .replaceAll(/^-+/gu, '')
-    .replaceAll(/-+$/gu, '');
+    .replaceAll(/[^a-z0-9]+/gu, '-');
+
+  let start = 0;
+  while (start < normalized.length && normalized.charCodeAt(start) === 45) {
+    start += 1;
+  }
+
+  let end = normalized.length;
+  while (end > start && normalized.charCodeAt(end - 1) === 45) {
+    end -= 1;
+  }
+
+  return normalized.slice(start, end);
 }
 
 export function buildPublicShareFallbackText(context: ShareContext): string {
