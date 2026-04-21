@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ProductFunnelVisitBeacon } from '@/components/features/tracking/ProductFunnelVisitBeacon';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -116,7 +117,7 @@ function formatPlanPrice(planId: VisiblePlanId) {
 function getPlanCta(planId: VisiblePlanId) {
   if (planId === 'free') {
     return {
-      href: `${APP_ROUTES.SIGNUP}?plan=free`,
+      href: `${APP_ROUTES.SIGNUP}?plan=free&source=pricing_cta`,
       label: 'Start Free',
       variant: 'secondary' as const,
     };
@@ -124,14 +125,14 @@ function getPlanCta(planId: VisiblePlanId) {
 
   if (planId === 'pro') {
     return {
-      href: `${APP_ROUTES.SIGNUP}?plan=pro`,
+      href: `${APP_ROUTES.SIGNUP}?plan=pro&source=pricing_cta`,
       label: 'Start Pro Trial',
       variant: 'primary' as const,
     };
   }
 
   return {
-    href: `${APP_ROUTES.SIGNUP}?plan=max`,
+    href: `${APP_ROUTES.SIGNUP}?plan=max&source=pricing_cta`,
     label: 'Request Access',
     variant: 'secondary' as const,
   };
@@ -239,6 +240,7 @@ export default function PricingPage() {
 
   return (
     <MarketingPageShell>
+      <ProductFunnelVisitBeacon sourceSurface='pricing_cta' />
       <script type='application/ld+json'>
         {safeJsonLdStringify(PRICING_SCHEMA)}
       </script>
@@ -260,7 +262,7 @@ export default function PricingPage() {
               </p>
               <div className='mt-7 flex flex-wrap items-center gap-3'>
                 <Link
-                  href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                  href={`${APP_ROUTES.SIGNUP}?plan=free&source=pricing_cta`}
                   className='public-action-primary'
                 >
                   Start Free
@@ -503,7 +505,7 @@ export default function PricingPage() {
             </p>
             <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                href={`${APP_ROUTES.SIGNUP}?plan=free&source=pricing_cta`}
                 prefetch={false}
                 className='public-action-primary'
               >

@@ -17,6 +17,7 @@ import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
+import { recordProductFunnelEventForClerkUser } from '@/lib/product-funnel/events';
 import { activateReferral, getInternalUserId } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
@@ -149,6 +150,26 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
         logger.warn('Failed to attribute lead paid conversion on checkout', {
           userId,
           subscriptionId: subscription.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+
+      try {
+        await recordProductFunnelEventForClerkUser({
+          clerkUserId: userId,
+          eventType: 'payment_succeeded',
+          idempotencyKey: `payment_succeeded:${stripeEventId}`,
+          occurredAt: stripeEventTimestamp,
+          metadata: {
+            stripeEventId,
+            subscriptionId: subscription.id,
+            checkoutSessionId: session.id,
+          },
+        });
+      } catch (error) {
+        logger.warn('Failed to record payment_succeeded event', {
+          userId,
+          stripeEventId,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }

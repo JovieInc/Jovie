@@ -32,6 +32,7 @@ describe('DemoPublicProfileSurface', () => {
     expect(mockStaticArtistPage).toHaveBeenCalledTimes(1);
     expect(mockStaticArtistPage).toHaveBeenCalledWith(
       expect.objectContaining({
+        renderMode: 'preview',
         socialLinks: expect.arrayContaining([
           expect.objectContaining({
             platform: 'venmo',

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { ProductFunnelVisitBeacon } from '@/components/features/tracking/ProductFunnelVisitBeacon';
 import { Container } from '@/components/site/Container';
 import { APP_ROUTES } from '@/constants/routes';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
@@ -77,6 +78,7 @@ export function HomePageNarrative({
 
   return (
     <>
+      <ProductFunnelVisitBeacon sourceSurface='homepage_primary_cta' />
       <HomeAdaptiveProfileStory />
       {showSections && (
         <>

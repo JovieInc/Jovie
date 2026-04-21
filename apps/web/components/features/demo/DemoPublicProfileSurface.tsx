@@ -90,6 +90,7 @@ export function DemoPublicProfileSurface() {
       <div data-testid='demo-showcase-public-profile'>
         <StaticArtistPage
           presentation='compact-preview'
+          renderMode='preview'
           mode='profile'
           artist={DEMO_PUBLIC_ARTIST}
           socialLinks={[...DEMO_PUBLIC_SOCIAL_LINKS]}

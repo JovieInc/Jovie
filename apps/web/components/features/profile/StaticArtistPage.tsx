@@ -1,4 +1,7 @@
-import type { ProfileMode } from '@/features/profile/contracts';
+import type {
+  ProfileMode,
+  ProfileRenderMode,
+} from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
@@ -42,6 +45,7 @@ export interface StaticArtistPageProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly renderMode?: ProfileRenderMode;
 }
 
 export function StaticArtistPage({
@@ -72,6 +76,7 @@ export function StaticArtistPage({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  renderMode = 'interactive',
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -127,6 +132,7 @@ export function StaticArtistPage({
       releases={releases}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      renderMode={renderMode}
     />
   );
 }

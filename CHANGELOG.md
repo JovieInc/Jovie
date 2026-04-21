@@ -20,24 +20,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.159] - 2026-04-18
 
-> Tim White profile proof now uses the real action-card system, notification capture stays stable through every step, and the releases dashboard polish is ready to review on the same branch.
+> Admin now shows the real product funnel from visit through retention, with alerts and synthetic checks that make signup, onboarding, checkout, and payment breakage obvious instead of ambiguous.
 
 ### Added
 
-- Added shared Tim White profile action-card and demo review boards for latest release, countdown, nearby tour, next tour, playlist fallback, listen fallback, and inline subscription states.
-- Added focused regression coverage for Tim White profile cards, OTP recovery, fixed-height notification states, and the releases dashboard date-picker and action-menu polish.
+- Added a founder-facing Product Funnel dashboard on `/app/admin` with 24h, 7d, and 30d views across `visit`, signup, onboarding, activation, checkout, payment, and day-1/day-7 retention stages.
+- Added persistent product-funnel events, alert state, and synthetic monitor storage, plus a new `/api/funnel/track` endpoint for first-party visit, signup-start, onboarding-start, and app-session beacons.
+- Added a backend synthetic signup monitor and regression coverage for funnel alerts, cron evaluation, webhook emission, public claim tracking, and the new admin funnel surface.
 
 ### Changed
 
-- Rebuilt the Artist Profile marketing page around real Tim White proof surfaces, including the adaptive hero, outcomes grid, spec-wall crops, how-it-works visuals, and proof styling.
-- Refined the public profile and home/demo fixtures so Tim White remains the canonical founder/profile identity, with collaboration credits rendered consistently as `w/ Cosmic Gate`.
-- Refreshed the add-release drawer and provider-matrix expansion rows to use the shared calendar picker and cleaner bounded child-row layout.
-- [internal] Adopted the latest runtime flag and Stripe-connect platform changes from `origin/main` while keeping the branch’s artist-profile QA fixes intact.
+- Wired Clerk webhooks, onboarding completion, checkout creation, Stripe checkout success, homepage/pricing/claim entry surfaces, and authenticated app-shell mounts into one shared product-funnel event pipeline.
+- Updated the admin scoreboard to label the existing strip as `Outbound Funnel`, exclude synthetic traffic from founder-facing counts, show external engagement as a secondary metric, and note that Sentry owns the production error-rate alert.
+- Extended the frequent cron path to backfill deterministic funnel milestones, materialize retention stages, run the synthetic signup monitor, and evaluate Slack alerts for signup, onboarding, checkout, and synthetic failures.
 
 ### Fixed
 
-- Fixed the inline notifications composer so email, OTP, name, birthday, and done states keep one stable shell, and OTP recovery no longer loops or wipes trailing digits after an error.
-- Fixed artist-profile accessibility follow-ups, including hero mode contrast, ingesting badge contrast, reactivation and monetization muted text contrast, and keyboard access into the monetization scroller.
+- Fixed claim-intent visit tracking so the public claim banner emits the `claim_page` beacon from the mounted component instead of an unused path.
+- Fixed `/api/funnel/track` so anonymous loopback and public traffic no longer fail on strict auth, and hardened the admin funnel queries to degrade cleanly when the new schema is missing in a drifted environment.
 - [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.159`.
 
 ## [26.4.158] - 2026-04-17

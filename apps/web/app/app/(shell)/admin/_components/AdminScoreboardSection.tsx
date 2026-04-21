@@ -177,7 +177,7 @@ export async function AdminScoreboardSection() {
       {/* Funnel Pipeline */}
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeader
-          title='Funnel'
+          title='Outbound Funnel'
           subtitle='Last 7 days'
           density='compact'
           className='min-h-0 px-(--linear-app-header-padding-x) py-3'

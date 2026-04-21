@@ -16,6 +16,8 @@ import {
   AdminKpiSectionSkeleton,
   AdminOutreachSection,
   AdminOutreachSectionSkeleton,
+  AdminProductFunnelSection,
+  AdminProductFunnelSectionSkeleton,
   AdminScoreboardSection,
   AdminScoreboardSectionSkeleton,
   AdminUsageSection,
@@ -74,10 +76,21 @@ interface AdminPageProps {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+function isProductFunnelTimeRange(
+  value: string
+): value is '24h' | '7d' | '30d' {
+  return value === '24h' || value === '7d' || value === '30d';
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
   const rawView = typeof params.view === 'string' ? params.view : 'scoreboard';
   const view: AdminView = isAdminView(rawView) ? rawView : 'scoreboard';
+  const rawFunnelRange =
+    typeof params.funnelRange === 'string' ? params.funnelRange : '24h';
+  const funnelRange = isProductFunnelTimeRange(rawFunnelRange)
+    ? rawFunnelRange
+    : '24h';
 
   return (
     <AdminWorkspacePage
@@ -90,9 +103,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       viewTestId='admin-overview-view'
     >
       {view === 'scoreboard' ? (
-        <Suspense fallback={<AdminScoreboardSectionSkeleton />}>
-          <AdminScoreboardSection />
-        </Suspense>
+        <div className='space-y-4'>
+          <Suspense fallback={<AdminProductFunnelSectionSkeleton />}>
+            <AdminProductFunnelSection timeRange={funnelRange} />
+          </Suspense>
+          <Suspense fallback={<AdminScoreboardSectionSkeleton />}>
+            <AdminScoreboardSection />
+          </Suspense>
+        </div>
       ) : (
         <div
           className='flex h-full flex-col gap-4'

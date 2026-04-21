@@ -27,6 +27,7 @@ import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatU
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
+import { trackProductFunnelEvent } from '@/lib/product-funnel/client';
 import { AuthShell } from './AuthShell';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
@@ -243,6 +244,14 @@ function AuthShellWrapperInner({
     },
     []
   );
+
+  useEffect(() => {
+    trackProductFunnelEvent({
+      eventType: 'app_session',
+      sourceSurface: 'app_shell',
+      sourceRoute: globalThis.location.pathname,
+    });
+  }, []);
 
   // Memoize context value to prevent unnecessary re-renders
   // setTableMeta is a stable useState setter, so we exclude it from deps

@@ -3,6 +3,8 @@
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ProductFunnelVisitBeacon } from '@/components/features/tracking/ProductFunnelVisitBeacon';
+import { APP_ROUTES } from '@/constants/routes';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 
 interface ClaimPageContentProps {
@@ -19,10 +21,11 @@ export function ClaimPageContent({
   avatarUrl,
 }: ClaimPageContentProps) {
   const encodedRedirect = encodeURIComponent(`/${username}`);
-  const signupUrl = `/signup?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
+  const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}&source=claim_page`;
 
   return (
     <>
+      <ProductFunnelVisitBeacon sourceSurface='claim_page' />
       <JoviePixel profileId={profileId} />
       <div className='flex min-h-dvh flex-col items-center justify-center bg-base px-4'>
         <div className='w-full max-w-sm text-center'>

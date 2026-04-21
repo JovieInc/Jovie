@@ -10,6 +10,7 @@
 
 import { syncEmailFromClerkByClerkId } from '@/lib/auth/clerk-sync';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { recordProductFunnelEventForClerkUser } from '@/lib/product-funnel/events';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -23,6 +24,7 @@ async function handleUserUpdated(
 ): Promise<ClerkHandlerResult> {
   const { event } = context;
   const user = event.data;
+  const isSynthetic = user.public_metadata?.jovieSyntheticMonitor === true;
 
   try {
     // NOTE: Username sync is intentionally removed.
@@ -50,6 +52,21 @@ async function handleUserUpdated(
           error: 'Failed to sync email from Clerk',
           message,
         };
+      }
+
+      try {
+        await recordProductFunnelEventForClerkUser({
+          clerkUserId: user.id,
+          eventType: 'email_verified',
+          idempotencyKey: `email_verified:${user.id}`,
+          isSynthetic,
+          metadata: {
+            source: 'clerk_webhook',
+            hasVerifiedEmail: true,
+          },
+        });
+      } catch (error) {
+        logger.warn('[user-updated] Failed to record email_verified', error);
       }
     }
 

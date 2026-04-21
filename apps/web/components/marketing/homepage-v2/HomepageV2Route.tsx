@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { ProductScreenshot } from '@/components/features/home/ProductScreenshot';
+import { ProductFunnelVisitBeacon } from '@/components/features/tracking/ProductFunnelVisitBeacon';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
@@ -29,6 +30,7 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 export function HomepageV2Route() {
   return (
     <MarketingPageShell>
+      <ProductFunnelVisitBeacon sourceSurface='homepage_primary_cta' />
       <HomepageV2Hero />
       <HomeTrustSection />
       <div aria-hidden='true' className='section-gradient-divider' />
@@ -92,7 +94,7 @@ function HomepageV2Hero() {
 
             <div className='mt-7 flex flex-wrap items-center gap-3'>
               <Link
-                href={APP_ROUTES.SIGNUP}
+                href={`${APP_ROUTES.SIGNUP}?source=homepage_primary_cta`}
                 data-testid='homepage-v2-hero-primary-cta'
                 className='public-action-primary'
               >
@@ -477,7 +479,7 @@ function HomepageV2Pricing() {
         <div className='mt-8 grid gap-4 md:grid-cols-2'>
           <PricingCard
             body={ENTITLEMENT_REGISTRY.free.marketing.tagline}
-            ctaHref={`${APP_ROUTES.SIGNUP}?plan=free`}
+            ctaHref={`${APP_ROUTES.SIGNUP}?plan=free&source=pricing_cta`}
             ctaLabel='Start Free'
             price='$0'
             testId='homepage-v2-pricing-free'
@@ -485,7 +487,7 @@ function HomepageV2Pricing() {
           />
           <PricingCard
             body={ENTITLEMENT_REGISTRY.pro.marketing.tagline}
-            ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
+            ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro&source=pricing_cta`}
             ctaLabel='Start Pro Trial'
             featured
             price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}/mo`}
@@ -534,7 +536,10 @@ function HomepageV2FinalCta() {
             {HOMEPAGE_V2_COPY.finalCta.body}
           </p>
           <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
-            <Link href={APP_ROUTES.SIGNUP} className='public-action-primary'>
+            <Link
+              href={`${APP_ROUTES.SIGNUP}?source=homepage_primary_cta`}
+              className='public-action-primary'
+            >
               {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
             </Link>
             <Link href={APP_ROUTES.PRICING} className='public-action-secondary'>

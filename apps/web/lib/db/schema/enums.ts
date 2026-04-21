@@ -242,6 +242,32 @@ export const releaseNotificationStatusEnum = pgEnum(
   ['pending', 'scheduled', 'sending', 'sent', 'failed', 'cancelled']
 );
 
+// Product funnel enums
+export const productFunnelEventTypeEnum = pgEnum('product_funnel_event_type', [
+  'visit',
+  'signup_started',
+  'signup_completed',
+  'email_verified',
+  'onboarding_started',
+  'onboarding_completed',
+  'activated',
+  'checkout_started',
+  'payment_succeeded',
+  'retained_day_1',
+  'retained_day_7',
+  'app_session',
+]);
+
+export const productFunnelAlertStatusEnum = pgEnum(
+  'product_funnel_alert_status',
+  ['ok', 'alerting']
+);
+
+export const productSyntheticRunStatusEnum = pgEnum(
+  'product_synthetic_run_status',
+  ['running', 'success', 'failure', 'skipped']
+);
+
 export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
   'pending',
   'accepted',

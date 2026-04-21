@@ -13,6 +13,7 @@ const inter = localFont({
   variable: '--font-inter',
   display: 'swap',
   weight: '100 900',
+  preload: false,
 });
 
 export const metadata: Metadata = {

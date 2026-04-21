@@ -18,6 +18,7 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
+import { trackProductFunnelEvent } from '@/lib/product-funnel/client';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -177,12 +178,34 @@ function SignUpPageContent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+  const sourceSurface = searchParams.get('source');
 
   useNormalizeClerkHomeLink(containerRef);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    const sourceRoute = globalThis.location.pathname;
+    const plan = searchParams.get('plan');
+
+    if (!sourceSurface) {
+      trackProductFunnelEvent({
+        eventType: 'visit',
+        sourceSurface: 'signup_page',
+        sourceRoute,
+        metadata: plan ? { plan } : undefined,
+      });
+    }
+
+    trackProductFunnelEvent({
+      eventType: 'signup_started',
+      sourceSurface: sourceSurface ?? 'signup_page',
+      sourceRoute,
+      metadata: plan ? { plan } : undefined,
+    });
+  }, [searchParams, sourceSurface]);
 
   if (!isMounted) {
     return <AuthFormSkeleton />;

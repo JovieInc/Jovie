@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie-v1/guangzhou/.claude/skills/gstack/design-consultation/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie-v1/dublin/.claude/skills/gstack/design-consultation/SKILL.md

@@ -50,7 +50,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      '/signup'
+      '/signup?source=homepage_primary_cta'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })
@@ -81,5 +81,6 @@ describe('NewLandingPage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Real artists. Real workflows.' })
     ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 });

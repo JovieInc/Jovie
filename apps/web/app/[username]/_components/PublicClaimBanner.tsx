@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { ProductFunnelVisitBeacon } from '@/components/features/tracking/ProductFunnelVisitBeacon';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import type { ProfileVisitorState } from '@/lib/claim/types';
 import { resolveClaimBannerState } from '../_lib/claim-banner-state';
@@ -108,21 +109,30 @@ export function PublicClaimBanner({
       isClaimed,
     }
   );
+  const shouldTrackClaimPageVisit =
+    shouldShowClaimBanner &&
+    claimBannerVariant !== null &&
+    claimBannerVariant !== 'organic';
 
   if (!shouldShowClaimBanner) {
     return null;
   }
 
   return (
-    <ClaimBanner
-      profileHandle={profileHandle}
-      displayName={displayName}
-      variant={claimBannerVariant ?? undefined}
-      ctaHref={
-        claimBannerVariant === 'unsupported'
-          ? undefined
-          : `/${encodeURIComponent(profileHandle)}/claim?next=auth`
-      }
-    />
+    <>
+      {shouldTrackClaimPageVisit ? (
+        <ProductFunnelVisitBeacon sourceSurface='claim_page' />
+      ) : null}
+      <ClaimBanner
+        profileHandle={profileHandle}
+        displayName={displayName}
+        variant={claimBannerVariant ?? undefined}
+        ctaHref={
+          claimBannerVariant === 'unsupported'
+            ? undefined
+            : `/${encodeURIComponent(profileHandle)}/claim?next=auth`
+        }
+      />
+    </>
   );
 }

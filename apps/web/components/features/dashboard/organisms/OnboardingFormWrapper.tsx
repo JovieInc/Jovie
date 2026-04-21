@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
+import { trackProductFunnelEvent } from '@/lib/product-funnel/client';
 import { OnboardingHandleOnlyForm } from './OnboardingHandleOnlyForm';
 
 const SIDEBAR_STEP_KEYS = [
@@ -111,6 +112,21 @@ export function OnboardingFormWrapper({
       setIsHydrated(true);
     }
   }, [isHydrated]);
+
+  useEffect(() => {
+    const sourceRoute = globalThis.location.pathname;
+
+    trackProductFunnelEvent({
+      eventType: 'visit',
+      sourceSurface: 'onboarding_landing',
+      sourceRoute,
+    });
+    trackProductFunnelEvent({
+      eventType: 'onboarding_started',
+      sourceSurface: 'onboarding_landing',
+      sourceRoute,
+    });
+  }, []);
 
   const resolvedHandle = initialHandle;
   const formKey = resolvedHandle || '__empty__';

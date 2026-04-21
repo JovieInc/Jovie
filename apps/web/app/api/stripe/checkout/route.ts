@@ -5,10 +5,12 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
+import { recordProductFunnelEventForClerkUser } from '@/lib/product-funnel/events';
 import {
   MAX_REFERRAL_CODE_LENGTH,
   MIN_REFERRAL_CODE_LENGTH,
@@ -226,6 +228,31 @@ export async function POST(request: NextRequest) {
       customerId,
       url: session.url,
     });
+
+    try {
+      const dayKey = new Date().toISOString().slice(0, 10);
+      await recordProductFunnelEventForClerkUser({
+        clerkUserId: userId,
+        eventType: 'checkout_started',
+        idempotencyKey: `checkout_started:${userId}:${dayKey}`,
+        sourceSurface:
+          checkoutSource === 'onboarding'
+            ? 'onboarding_checkout'
+            : 'billing_checkout',
+        sourceRoute:
+          checkoutSource === 'onboarding'
+            ? APP_ROUTES.ONBOARDING_CHECKOUT
+            : '/api/stripe/checkout',
+        metadata: {
+          priceId,
+          sessionId: session.id,
+          source: checkoutSource ?? 'default',
+          referralCode: referralCode ?? null,
+        },
+      });
+    } catch (error) {
+      logger.warn('[stripe/checkout] Failed to record checkout_started', error);
+    }
 
     return NextResponse.json(
       { sessionId: session.id, url: session.url },

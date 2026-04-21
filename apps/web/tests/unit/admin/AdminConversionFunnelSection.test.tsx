@@ -74,7 +74,7 @@ describe('AdminConversionFunnelSection', () => {
     expect(screen.getByText('Paid')).toBeDefined();
   });
 
-  it('shows "User conversion funnel" title', async () => {
+  it('shows "Outbound Funnel" title', async () => {
     mockGetConversionFunnelData.mockResolvedValue(makeFunnelData());
 
     const { AdminConversionFunnelSection } = await import(
@@ -84,7 +84,7 @@ describe('AdminConversionFunnelSection', () => {
     const result = await AdminConversionFunnelSection();
     render(result);
 
-    expect(screen.getByText('User conversion funnel')).toBeDefined();
+    expect(screen.getByText('Outbound Funnel')).toBeDefined();
   });
 
   it('shows error message when funnel has errors', async () => {

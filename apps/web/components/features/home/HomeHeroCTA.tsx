@@ -16,8 +16,13 @@ export function HomeHeroCTA() {
       section: 'hero',
       handle: trimmed || undefined,
     });
-    const params = trimmed ? `?handle=${encodeURIComponent(trimmed)}` : '';
-    router.push(`${APP_ROUTES.SIGNUP}${params}`);
+    const params = new URLSearchParams({
+      source: 'homepage_primary_cta',
+    });
+    if (trimmed) {
+      params.set('handle', trimmed);
+    }
+    router.push(`${APP_ROUTES.SIGNUP}?${params.toString()}`);
   }
 
   return (

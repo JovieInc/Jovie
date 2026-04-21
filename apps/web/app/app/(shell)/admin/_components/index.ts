@@ -19,6 +19,10 @@ export {
   AdminPlatformStatsSectionSkeleton,
 } from './AdminPlatformStatsSection';
 export {
+  AdminProductFunnelSection,
+  AdminProductFunnelSectionSkeleton,
+} from './AdminProductFunnelSection';
+export {
   AdminScoreboardSection,
   AdminScoreboardSectionSkeleton,
 } from './AdminScoreboardSection';

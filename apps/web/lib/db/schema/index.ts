@@ -522,6 +522,27 @@ export {
   type PreSaveToken,
   preSaveTokens,
 } from './pre-save';
+// Product funnel (internal product analytics + alerts)
+export {
+  insertProductFunnelAlertStateSchema,
+  insertProductFunnelEventSchema,
+  insertProductSyntheticRunSchema,
+  type NewProductFunnelAlertState,
+  type NewProductFunnelEvent,
+  type NewProductSyntheticRun,
+  type ProductFunnelAlertPayload,
+  type ProductFunnelAlertState,
+  type ProductFunnelEvent,
+  type ProductFunnelEventMetadata,
+  type ProductSyntheticRun,
+  type ProductSyntheticRunDetails,
+  productFunnelAlertStates,
+  productFunnelEvents,
+  productSyntheticRuns,
+  selectProductFunnelAlertStateSchema,
+  selectProductFunnelEventSchema,
+  selectProductSyntheticRunSchema,
+} from './product-funnel';
 // Product Update Subscribers
 export {
   insertProductUpdateSubscriberSchema,

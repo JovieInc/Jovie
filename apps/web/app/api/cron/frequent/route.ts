@@ -18,6 +18,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { safeEvaluateProductFunnelAlerts } from '@/lib/admin/product-funnel-alerts';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import {
@@ -39,7 +40,12 @@ import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
 import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
+import { runSyntheticSignupMonitor } from '@/lib/monitors/synthetic-signup';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import {
+  backfillProductFunnelHistory,
+  materializeRetentionEvents,
+} from '@/lib/product-funnel/events';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
@@ -95,7 +101,9 @@ export async function GET(request: Request) {
   });
   if (authError) return authError;
 
-  const minute = new Date().getMinutes();
+  const now = new Date();
+  const minute = now.getMinutes();
+  const hour = now.getHours();
   const results: Record<string, SubJobResult> = {};
 
   // 1. DB warm ping — keeps Neon compute from auto-suspending
@@ -136,7 +144,39 @@ export async function GET(request: Request) {
     return notifResult as unknown as Record<string, unknown>;
   });
 
-  // 6. Lead discovery + qualification + auto-approve — every invocation (15 min)
+  // 6. Product funnel backfill — every 6 hours
+  results.productFunnelBackfill =
+    hour % 6 === 0 && minute < 15
+      ? await runSubJob('productFunnelBackfill', async () => {
+          return await backfillProductFunnelHistory();
+        })
+      : { success: true, skipped: true };
+
+  // 7. Product funnel retention materialization — every invocation (15 min)
+  results.productFunnelRetention = await runSubJob(
+    'productFunnelRetention',
+    async () => {
+      return await materializeRetentionEvents();
+    }
+  );
+
+  // 8. Synthetic signup monitor — hourly
+  results.productFunnelSynthetic =
+    minute < 15
+      ? await runSubJob('productFunnelSynthetic', async () => {
+          return await runSyntheticSignupMonitor();
+        })
+      : { success: true, skipped: true };
+
+  // 9. Product funnel alerts — every invocation (15 min)
+  results.productFunnelAlerts = await runSubJob(
+    'productFunnelAlerts',
+    async () => {
+      return await safeEvaluateProductFunnelAlerts();
+    }
+  );
+
+  // 10. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
     // Fetch settings (upsert default if missing)
     let [settings] = await db
@@ -213,7 +253,7 @@ export async function GET(request: Request) {
     } as unknown as Record<string, unknown>;
   });
 
-  // 6.5 Outreach — send a batch of pending emails after auto-approve
+  // 10.5 Outreach — send a batch of pending emails after auto-approve
   results.outreach = await runSubJob('outreach', async () => {
     const [settings] = await db
       .select()
@@ -234,8 +274,7 @@ export async function GET(request: Request) {
     return outreachResult as unknown as Record<string, unknown>;
   });
 
-  // 7. Warm Spotify alphabet cache — every 6 hours
-  const hour = new Date().getHours();
+  // 11. Warm Spotify alphabet cache — every 6 hours
   if (hour % 6 === 0 && minute < 15) {
     try {
       const warmResult = await warmAlphabetCache();
@@ -260,7 +299,7 @@ export async function GET(request: Request) {
     results.alphabetCache = { success: true, skipped: true };
   }
 
-  // 8. Fallback ingestion job processing — drains up to 2 jobs if the
+  // 12. Fallback ingestion job processing — drains up to 2 jobs if the
   //    dedicated cron hasn't picked them up. Runs last to stay within budget.
   const elapsed = Date.now() - startTime;
   if (elapsed < 50_000) {

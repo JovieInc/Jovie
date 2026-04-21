@@ -30,6 +30,16 @@ export type {
 // platform-stats
 export type { AdminPlatformStats } from './platform-stats';
 
+// product-funnel
+export type {
+  AdminProductFunnelAlert,
+  AdminProductFunnelDashboard,
+  AdminProductFunnelExternalEngagementMetrics,
+  AdminProductFunnelStage,
+  ProductFunnelTimeRange,
+  SyntheticMonitorStatus,
+} from './product-funnel';
+
 // releases
 export type { AdminReleaseRow, AdminReleasesSort } from './releases';
 

@@ -79,6 +79,7 @@ function buildAuthStartPath(params: {
   const signUpParams = new URLSearchParams({
     handle: params.username,
     redirect_url: `${APP_ROUTES.ONBOARDING}?${onboardingParams.toString()}`,
+    source: 'claim_page',
   });
 
   if (params.spotifyUrl) {

@@ -159,6 +159,10 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             )}
           </p>
         )}
+
+        <p className='pt-1 text-[11px] text-tertiary-token'>
+          10-minute production error-rate alerting is managed in Sentry.
+        </p>
       </div>
     </ContentSurfaceCard>
   );

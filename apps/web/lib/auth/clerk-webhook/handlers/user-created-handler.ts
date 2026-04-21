@@ -21,6 +21,7 @@ import {
   formatFounderSender,
   getSenderPolicy,
 } from '@/lib/notifications/sender-policy';
+import { recordProductFunnelEventForClerkUser } from '@/lib/product-funnel/events';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -34,6 +35,7 @@ async function handleUserCreated(
 ): Promise<ClerkHandlerResult> {
   const { event } = context;
   const user = event.data;
+  const isSynthetic = user.public_metadata?.jovieSyntheticMonitor === true;
 
   try {
     // Create full name from first + last name (for display purposes)
@@ -72,37 +74,53 @@ async function handleUserCreated(
 
     logger.info(`Post-signup processing completed for user ${user.id}`);
 
+    try {
+      await recordProductFunnelEventForClerkUser({
+        clerkUserId: user.id,
+        eventType: 'signup_completed',
+        idempotencyKey: `signup_completed:${user.id}`,
+        isSynthetic,
+        metadata: {
+          source: 'clerk_webhook',
+        },
+      });
+    } catch (error) {
+      logger.warn('[user-created] Failed to record signup_completed', error);
+    }
+
     const displayName = fullName || user.username || 'A new user';
     const primaryEmail = user.email_addresses?.[0]?.email_address;
 
-    // Cancel outbound sales/prospecting sequences for the new user's email
-    // (fire-and-forget — failure should not block the signup response)
-    if (primaryEmail) {
-      stopEnrollmentsForEmail(primaryEmail, 'claimed').catch(err => {
-        logger.warn('[user-created] Failed to stop outbound sequences', err);
-      });
+    if (!isSynthetic) {
+      // Cancel outbound sales/prospecting sequences for the new user's email
+      // (fire-and-forget — failure should not block the signup response)
+      if (primaryEmail) {
+        stopEnrollmentsForEmail(primaryEmail, 'claimed').catch(err => {
+          logger.warn('[user-created] Failed to stop outbound sequences', err);
+        });
 
-      // Send personal founder welcome email
-      const welcomeEmail = getFounderWelcomeEmail({
-        firstName: user.first_name ?? null,
-      });
-      const founderSender = getSenderPolicy('founder');
-      sendEmail({
-        to: primaryEmail,
-        from: formatFounderSender(),
-        replyTo: founderSender.replyToEmail,
-        subject: welcomeEmail.subject,
-        text: welcomeEmail.text,
-        html: welcomeEmail.html,
-      }).catch(err => {
-        logger.warn('[user-created] Founder welcome email failed', err);
+        // Send personal founder welcome email
+        const welcomeEmail = getFounderWelcomeEmail({
+          firstName: user.first_name ?? null,
+        });
+        const founderSender = getSenderPolicy('founder');
+        sendEmail({
+          to: primaryEmail,
+          from: formatFounderSender(),
+          replyTo: founderSender.replyToEmail,
+          subject: welcomeEmail.subject,
+          text: welcomeEmail.text,
+          html: welcomeEmail.html,
+        }).catch(err => {
+          logger.warn('[user-created] Founder welcome email failed', err);
+        });
+      }
+
+      // Send Slack notification for new signup (fire-and-forget)
+      notifySlackSignup(displayName, primaryEmail).catch(err => {
+        logger.warn('[user-created] Slack notification failed', err);
       });
     }
-
-    // Send Slack notification for new signup (fire-and-forget)
-    notifySlackSignup(displayName, primaryEmail).catch(err => {
-      logger.warn('[user-created] Slack notification failed', err);
-    });
 
     return {
       success: true,

@@ -34,6 +34,7 @@ import {
 import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { recordProductFunnelEventForClerkUser } from '@/lib/product-funnel/events';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
@@ -415,6 +416,34 @@ export async function completeOnboarding({
         () => invalidateProfileCache(completion.username),
         {
           username: completion.username,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'record_onboarding_completed_event',
+        () =>
+          recordProductFunnelEventForClerkUser({
+            clerkUserId: userId,
+            eventType: 'onboarding_completed',
+            creatorProfileId: completion.profileId ?? null,
+            idempotencyKey: `onboarding_completed:${completion.profileId ?? userId}`,
+          }).then(() => {}),
+        {
+          userId,
+          profileId: completion.profileId ?? null,
+        }
+      ),
+      runBoundedPostOnboardingSideEffect(
+        'record_activated_event',
+        () =>
+          recordProductFunnelEventForClerkUser({
+            clerkUserId: userId,
+            eventType: 'activated',
+            creatorProfileId: completion.profileId ?? null,
+            idempotencyKey: `activated:${completion.profileId ?? userId}`,
+          }).then(() => {}),
+        {
+          userId,
+          profileId: completion.profileId ?? null,
         }
       ),
     ]);

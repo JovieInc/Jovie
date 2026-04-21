@@ -85,6 +85,7 @@ export function HeroSpotifySearch() {
       setIsNavigating(true);
       const params = new URLSearchParams();
       params.set('spotify_url', spotifyUrl);
+      params.set('source', 'homepage_primary_cta');
       if (artistName) {
         params.set('artist_name', artistName);
       }

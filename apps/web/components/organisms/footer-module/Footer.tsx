@@ -196,7 +196,7 @@ export function Footer({
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
                   className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  style={{ color: 'var(--linear-text-secondary)' }}
                 >
                   Privacy
                 </Link>
@@ -204,16 +204,16 @@ export function Footer({
                   href={APP_ROUTES.LEGAL_TERMS}
                   prefetch={false}
                   className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  style={{ color: 'var(--linear-text-secondary)' }}
                 >
                   Terms
                 </Link>
               </div>
               <Copyright
                 variant='light'
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
                 style={{
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--linear-text-secondary)',
                 }}
               />
             </div>

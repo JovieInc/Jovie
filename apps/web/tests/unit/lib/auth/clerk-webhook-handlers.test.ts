@@ -26,6 +26,9 @@ const mockStopEnrollmentsForEmail = vi.hoisted(() =>
 const mockSendEmail = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ success: true, messageId: 'msg_123' })
 );
+const mockRecordProductFunnelEventForClerkUser = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(true)
+);
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: mockClerkClient,
@@ -51,6 +54,11 @@ vi.mock('@/lib/email/campaigns/enrollment', () => ({
 
 vi.mock('@/lib/email/send', () => ({
   sendEmail: mockSendEmail,
+}));
+
+vi.mock('@/lib/product-funnel/events', () => ({
+  recordProductFunnelEventForClerkUser:
+    mockRecordProductFunnelEventForClerkUser,
 }));
 
 vi.mock('@/lib/notifications/sender-policy', () => ({
@@ -198,6 +206,38 @@ describe('user-created-handler', () => {
         to: 'riley@example.com',
         from: 'Tim White <tim@send.jov.ie>',
         replyTo: 'tim@jov.ie',
+      })
+    );
+  });
+
+  it('skips founder-facing side effects for synthetic signups', async () => {
+    const context = makeContext('user.created', {
+      id: 'user_synthetic',
+      first_name: 'Synthetic',
+      last_name: 'Monitor',
+      public_metadata: {
+        jovieSyntheticMonitor: true,
+      },
+      email_addresses: [
+        {
+          id: 'email_1',
+          email_address: 'synthetic@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+
+    const result = await userCreatedHandler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(mockNotifySlackSignup).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockStopEnrollmentsForEmail).not.toHaveBeenCalled();
+    expect(mockRecordProductFunnelEventForClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_synthetic',
+        eventType: 'signup_completed',
+        isSynthetic: true,
       })
     );
   });

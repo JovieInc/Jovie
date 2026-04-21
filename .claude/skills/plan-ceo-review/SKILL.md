@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie-v1/guangzhou/.claude/skills/gstack/plan-ceo-review/SKILL.md
+/Users/timwhite/conductor/workspaces/jovie-v1/dublin/.claude/skills/gstack/plan-ceo-review/SKILL.md

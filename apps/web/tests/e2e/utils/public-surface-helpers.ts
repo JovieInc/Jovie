@@ -36,6 +36,9 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/audience/visit', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/funnel/track', route =>
+    route.fulfill({ status: 200, body: '{"inserted":true,"success":true}' })
+  );
   await page.route('**/api/track', route =>
     route.fulfill({ status: 200, body: '{}' })
   );

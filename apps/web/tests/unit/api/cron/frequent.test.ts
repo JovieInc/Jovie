@@ -18,6 +18,10 @@ const {
   mockHandleIngestionJobFailure,
   mockWithSystemIngestionSession,
   mockProcessOutreachBatch,
+  mockBackfillProductFunnelHistory,
+  mockMaterializeRetentionEvents,
+  mockRunSyntheticSignupMonitor,
+  mockSafeEvaluateProductFunnelAlerts,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -36,6 +40,10 @@ const {
   mockHandleIngestionJobFailure: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
   mockProcessOutreachBatch: vi.fn(),
+  mockBackfillProductFunnelHistory: vi.fn(),
+  mockMaterializeRetentionEvents: vi.fn(),
+  mockRunSyntheticSignupMonitor: vi.fn(),
+  mockSafeEvaluateProductFunnelAlerts: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -103,6 +111,19 @@ vi.mock('@/lib/leads/process-batch', () => ({
 
 vi.mock('@/lib/notifications/suppression', () => ({
   cleanupExpiredSuppressions: mockCleanupExpiredSuppressions,
+}));
+
+vi.mock('@/lib/product-funnel/events', () => ({
+  backfillProductFunnelHistory: mockBackfillProductFunnelHistory,
+  materializeRetentionEvents: mockMaterializeRetentionEvents,
+}));
+
+vi.mock('@/lib/monitors/synthetic-signup', () => ({
+  runSyntheticSignupMonitor: mockRunSyntheticSignupMonitor,
+}));
+
+vi.mock('@/lib/admin/product-funnel-alerts', () => ({
+  safeEvaluateProductFunnelAlerts: mockSafeEvaluateProductFunnelAlerts,
 }));
 
 vi.mock('@/lib/spotify/alphabet-cache', () => ({
@@ -177,6 +198,13 @@ describe('GET /api/cron/frequent', () => {
     });
     mockResetBudgetIfNeeded.mockImplementation(async settings => settings);
     mockWarmAlphabetCache.mockResolvedValue({ warmed: false });
+    mockBackfillProductFunnelHistory.mockResolvedValue({ inserted: 0 });
+    mockMaterializeRetentionEvents.mockResolvedValue({ inserted: 0 });
+    mockRunSyntheticSignupMonitor.mockResolvedValue({ status: 'success' });
+    mockSafeEvaluateProductFunnelAlerts.mockResolvedValue({
+      triggered: [],
+      recovered: [],
+    });
     mockClaimPendingJobs.mockResolvedValue([]);
     mockProcessJob.mockResolvedValue(undefined);
     mockSucceedJob.mockResolvedValue(undefined);
@@ -217,6 +245,12 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
+    expect(data.results.productFunnelRetention.success).toBe(true);
+    expect(data.results.productFunnelSynthetic).toEqual({
+      success: true,
+      skipped: true,
+    });
+    expect(data.results.productFunnelAlerts.success).toBe(true);
   });
 
   it('returns 207 when notification scheduling fails', async () => {

@@ -11,6 +11,7 @@ const satoshi = localFont({
   variable: '--font-satoshi',
   display: 'swap',
   weight: '300 900',
+  preload: false,
 });
 
 const dmSans = localFont({
@@ -18,6 +19,7 @@ const dmSans = localFont({
   variable: '--font-dm-sans',
   display: 'swap',
   weight: '400 700',
+  preload: false,
 });
 
 export default async function MarketingLayout({

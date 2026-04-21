@@ -17,6 +17,13 @@ const standaloneOutputRoot = path.join(appRoot, '.next', 'standalone');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
 const standaloneNextRoot = path.join(standaloneRoot, '.next');
 
+if (process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'preview') {
+  console.log(
+    'Skipping standalone asset sync on Vercel preview deploys; Vercel packages the build output directly.'
+  );
+  process.exit(0);
+}
+
 const copyTargets = [
   {
     label: 'standalone public assets',

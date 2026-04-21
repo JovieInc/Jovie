@@ -21,7 +21,7 @@ export async function AdminConversionFunnelSection() {
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
       <ContentSectionHeader
-        title='User conversion funnel'
+        title='Outbound Funnel'
         subtitle='All-time: signup → profile → complete → subscribers → paid'
         className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />

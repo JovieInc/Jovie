@@ -72,8 +72,18 @@ describe('signup page', () => {
     clearSignupClaimValueMock.mockReset();
     clerkSignUpMock.mockReset();
     fetchMock.mockReset();
-    fetchMock.mockResolvedValue({
-      json: async () => ({ available: true }),
+    fetchMock.mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/handle/check')) {
+        return {
+          json: async () => ({ available: true }),
+        } as Response;
+      }
+
+      return {
+        json: async () => ({ success: true, inserted: true }),
+      } as Response;
     });
     persistSignupClaimValueMock.mockReset();
     routerPrefetchMock.mockReset();
@@ -225,8 +235,18 @@ describe('signup page', () => {
 
   it('renders the taken-handle state when the requested handle is unavailable', async () => {
     searchParamsState.value = 'handle=TakenHandle';
-    fetchMock.mockResolvedValueOnce({
-      json: async () => ({ available: false }),
+    fetchMock.mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/handle/check')) {
+        return {
+          json: async () => ({ available: false }),
+        } as Response;
+      }
+
+      return {
+        json: async () => ({ success: true, inserted: true }),
+      } as Response;
     });
 
     render(<SignUpPage />);
@@ -240,7 +260,17 @@ describe('signup page', () => {
 
   it('renders the fallback state when handle availability lookup fails', async () => {
     searchParamsState.value = 'handle=BrokenHandle';
-    fetchMock.mockRejectedValueOnce(new Error('network down'));
+    fetchMock.mockImplementation(async input => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/handle/check')) {
+        throw new Error('network down');
+      }
+
+      return {
+        json: async () => ({ success: true, inserted: true }),
+      } as Response;
+    });
 
     render(<SignUpPage />);
 
