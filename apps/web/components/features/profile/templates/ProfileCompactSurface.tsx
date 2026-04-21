@@ -62,7 +62,16 @@ const ProfileInlineNotificationsCTA = dynamic(
     ).then(mod => ({
       default: mod.ProfileInlineNotificationsCTA,
     })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        data-testid='profile-inline-cta-placeholder'
+        className='min-h-[116px]'
+        aria-hidden='true'
+      />
+    ),
+  }
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
