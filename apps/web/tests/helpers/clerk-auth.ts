@@ -758,11 +758,19 @@ function buildSeededTestUserProfile(email: string): {
   lastName: string;
 } {
   const localPart = email.split('@')[0] ?? 'e2e';
-  const baseUsername = localPart
-    .replaceAll(/[^a-z0-9]+/gi, '-')
-    .replaceAll(/^-+/g, '')
-    .replaceAll(/-+$/g, '')
-    .slice(0, 48);
+  const normalizedUsername = localPart.replaceAll(/[^a-z0-9]+/gi, '-');
+  let start = 0;
+  let end = normalizedUsername.length;
+
+  while (start < end && normalizedUsername.charCodeAt(start) === 45) {
+    start += 1;
+  }
+
+  while (end > start && normalizedUsername.charCodeAt(end - 1) === 45) {
+    end -= 1;
+  }
+
+  const baseUsername = normalizedUsername.slice(start, end).slice(0, 48);
 
   if (localPart.startsWith('browse')) {
     return {
