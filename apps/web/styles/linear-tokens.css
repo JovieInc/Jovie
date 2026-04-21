@@ -43,9 +43,9 @@
      TEXT COLORS — LIGHT MODE
      ============================================ */
   --linear-text-primary: oklch(12% 0.005 282);
-  --linear-text-secondary: oklch(45% 0.012 282);
-  --linear-text-tertiary: oklch(55% 0.01 282);
-  --linear-text-quaternary: oklch(70% 0.008 282);
+  --linear-text-secondary: oklch(42% 0.012 282);
+  --linear-text-tertiary: oklch(45% 0.01 282);
+  --linear-text-quaternary: oklch(55% 0.008 282);
   --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
