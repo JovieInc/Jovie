@@ -18,6 +18,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Windows setup must use Git Bash, not the WSL launcher
+
+**Mistake:** In a Windows PowerShell automation shell, `bash ./scripts/setup.sh` resolved to `C:\Windows\System32\bash.exe`, the WSL launcher. WSL was denied in the sandbox, so setup looked broken even though Git for Windows Bash was installed and worked.
+
+**Rule:** On Windows PowerShell, run `.\scripts\setup.ps1`. The wrapper locates Git for Windows Bash directly and avoids the WSL launcher. Setup should also verify `gh auth status` so PR automation failures are caught before `/train` tries to update branches.
+
 ### Staging auth must never fall back to production Clerk keys
 
 **Mistake:** Staging auth routes were allowed to resolve production Clerk keys when `CLERK_PUBLISHABLE_KEY_STAGING` / `CLERK_SECRET_KEY_STAGING` were missing at runtime. That produced `500`s on `staging.jov.ie/signin` and `staging.jov.ie/signup` while `main` kept passing earlier checks.
