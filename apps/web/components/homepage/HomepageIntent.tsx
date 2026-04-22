@@ -1,6 +1,13 @@
 'use client';
 
-import { ArrowRight } from 'lucide-react';
+import {
+  ArrowRight,
+  Calendar,
+  FileText,
+  type LucideIcon,
+  Send,
+  Sparkles,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
@@ -11,10 +18,18 @@ import {
   HOMEPAGE_INTENT_VARIANT_ID,
   type HomepageIntent,
   type HomepagePill,
+  type HomepagePillId,
   PILLS,
 } from './intent';
 
 const INPUT_ID = 'homepage-intent-input';
+
+const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
+  create_release_page: FileText,
+  generate_album_art: Sparkles,
+  generate_playlist_pitch: Send,
+  plan_a_release: Calendar,
+};
 
 function persistIntent(intent: HomepageIntent) {
   if (globalThis.window === undefined) return;
@@ -124,19 +139,22 @@ export function HomepageIntent() {
 
   return (
     <div
-      className='homepage-intent flex w-full min-w-0 max-w-[720px] flex-col items-stretch'
+      className='homepage-intent flex w-full min-w-0 max-w-[640px] flex-col items-stretch'
       style={{
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <label
-        htmlFor={INPUT_ID}
-        className='mb-3 text-center text-[12px] font-normal tracking-[0] text-quaternary-token'
-      >
-        What do you want to create?
-      </label>
+      <h1 className='text-center text-[32px] font-semibold tracking-[-0.02em] text-primary-token sm:text-[38px]'>
+        How can I help you today?
+      </h1>
+      <p className='mt-3 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token'>
+        Jovie helps artists &amp; labels release music faster.
+      </p>
 
-      <div className='relative flex w-full items-center'>
+      <label htmlFor={INPUT_ID} className='sr-only'>
+        Message Jovie
+      </label>
+      <div className='relative mt-7 flex w-full items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -145,7 +163,7 @@ export function HomepageIntent() {
           value={value}
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder='Tell Jovie what you want to create...'
+          placeholder='Message...'
           className='h-[52px] w-full rounded-full border border-white/[0.09] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.14] focus-visible:border-white/[0.32] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
         />
         <button
@@ -165,7 +183,7 @@ export function HomepageIntent() {
       </div>
 
       <div
-        className='mt-5 flex w-full min-w-0 items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='mt-4 flex w-full min-w-0 items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         style={{
           WebkitMaskImage:
             'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',
@@ -173,16 +191,24 @@ export function HomepageIntent() {
             'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',
         }}
       >
-        {PILLS.map(pill => (
-          <button
-            key={pill.id}
-            type='button'
-            onClick={() => handlePillClick(pill)}
-            className='group inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-white/[0.07] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
-          >
-            {pill.label}
-          </button>
-        ))}
+        {PILLS.map(pill => {
+          const Icon = PILL_ICONS[pill.id];
+          return (
+            <button
+              key={pill.id}
+              type='button'
+              onClick={() => handlePillClick(pill)}
+              className='group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.07] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
+            >
+              <Icon
+                className='h-[14px] w-[14px] text-quaternary-token transition-colors duration-150 group-hover:text-secondary-token'
+                strokeWidth={1.75}
+                aria-hidden='true'
+              />
+              {pill.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

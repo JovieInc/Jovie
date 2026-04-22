@@ -16,9 +16,7 @@ import { HomepageIntent } from '@/components/homepage/HomepageIntent';
 import { HOMEPAGE_INTENT_KEY } from '@/components/homepage/intent';
 
 function getInput() {
-  return screen.getByPlaceholderText(
-    'Tell Jovie what you want to create...'
-  ) as HTMLInputElement;
+  return screen.getByPlaceholderText('Message...') as HTMLInputElement;
 }
 
 function getSubmit() {
@@ -32,9 +30,14 @@ describe('HomepageIntent', () => {
     globalThis.localStorage?.clear();
   });
 
-  it('1. renders label, input placeholder, and all 4 pills with correct labels', () => {
+  it('1. renders headline, subhead, input, and all 4 pills with correct labels', () => {
     render(<HomepageIntent />);
-    expect(screen.getByText('What do you want to create?')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'How can I help you today?' })
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Jovie helps artists & labels release music faster.')
+    ).toBeTruthy();
     expect(getInput()).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Create release page' })

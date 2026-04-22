@@ -8,9 +8,7 @@ test.describe('Homepage chat intake', () => {
   }) => {
     await page.goto('/');
 
-    const input = page.getByPlaceholder(
-      'Tell Jovie what you want to create...'
-    );
+    const input = page.getByPlaceholder('Message...');
     await expect(input).toBeVisible();
 
     await page.getByRole('button', { name: 'Create release page' }).click();
@@ -35,9 +33,7 @@ test.describe('Homepage chat intake', () => {
 
   test('free-form submit stores intent with pillId=null', async ({ page }) => {
     await page.goto('/');
-    const input = page.getByPlaceholder(
-      'Tell Jovie what you want to create...'
-    );
+    const input = page.getByPlaceholder('Message...');
     await input.pressSequentially('something completely custom');
     await input.press('Enter');
 
