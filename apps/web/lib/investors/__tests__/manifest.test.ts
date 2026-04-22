@@ -99,7 +99,7 @@ describe('getInvestorManifest', () => {
     await getInvestorManifest();
 
     expect(mockReadFile).toHaveBeenCalledWith(
-      expect.stringContaining('content/investors/manifest.json'),
+      expect.stringMatching(/content[\\/]+investors[\\/]+manifest\.json$/),
       'utf-8'
     );
   });
@@ -122,5 +122,22 @@ describe('getInvestorManifest', () => {
     await getInvestorManifest();
 
     expect(mockReadFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns an empty manifest when manifest.json is missing', async () => {
+    mockReadFile.mockRejectedValueOnce(
+      Object.assign(new Error('Missing file'), { code: 'ENOENT' })
+    );
+
+    const { getInvestorManifest } = await import('../manifest');
+    const manifest = await getInvestorManifest();
+
+    expect(manifest).toEqual({
+      pages: [],
+      deck: {
+        slides: [],
+        downloadFilename: 'Jovie-Pitch-Deck.pdf',
+      },
+    });
   });
 });
