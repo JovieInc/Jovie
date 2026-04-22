@@ -4,7 +4,10 @@ import { SignUp } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
-import { readHomepageIntent } from '@/components/homepage/intent-store';
+import {
+  HOMEPAGE_PROMPT_HINT_TRUNCATE,
+  readHomepageIntent,
+} from '@/components/homepage/intent-store';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -34,7 +37,20 @@ function SignupModalBody() {
   // Hydrate the intent hint from localStorage (text only — the load-bearing
   // restoration happens on /onboarding after the OAuth round-trip).
   useEffect(() => {
-    const intentId = searchParams.get('intent_id');
+    // `intent_id` travels inside the encoded `redirect_url` (so it survives
+    // Clerk's OAuth round-trip), not as a sibling query param on /signup.
+    // Parse it out of redirect_url's own query string.
+    const redirectUrlRaw = searchParams.get('redirect_url');
+    if (!redirectUrlRaw) return;
+    let intentId: string | null = null;
+    try {
+      intentId = new URL(
+        redirectUrlRaw,
+        globalThis.window?.location.origin ?? 'http://localhost'
+      ).searchParams.get('intent_id');
+    } catch {
+      return;
+    }
     if (!intentId) return;
     const intent = readHomepageIntent(intentId);
     if (intent) setPromptHint(intent.finalPrompt);
@@ -50,7 +66,9 @@ function SignupModalBody() {
       title={promptHint}
     >
       Continuing with &ldquo;
-      {promptHint.length > 48 ? `${promptHint.slice(0, 48)}…` : promptHint}
+      {promptHint.length > HOMEPAGE_PROMPT_HINT_TRUNCATE
+        ? `${promptHint.slice(0, HOMEPAGE_PROMPT_HINT_TRUNCATE)}…`
+        : promptHint}
       &rdquo;
     </p>
   ) : null;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   consumeHomepageIntent,
+  HOMEPAGE_PROMPT_HINT_TRUNCATE,
   readHomepageIntent,
   sanitizeHomepagePrompt,
 } from '@/components/homepage/intent-store';
@@ -45,7 +46,10 @@ export function IntentRestorer({ intentId }: IntentRestorerProps) {
 
   if (!prompt) return null;
 
-  const truncated = prompt.length > 72 ? `${prompt.slice(0, 72)}…` : prompt;
+  const truncated =
+    prompt.length > HOMEPAGE_PROMPT_HINT_TRUNCATE
+      ? `${prompt.slice(0, HOMEPAGE_PROMPT_HINT_TRUNCATE)}…`
+      : prompt;
 
   return (
     <p
