@@ -70,7 +70,7 @@ function PlatformSection({
     <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <h4 className='text-[13px] font-[510] text-primary-token'>
+          <h4 className='text-[13px] font-caption text-primary-token'>
             {platform}
           </h4>
           <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
@@ -90,7 +90,7 @@ function PlatformSection({
         href={helpUrl}
         target='_blank'
         rel='noopener noreferrer'
-        className='inline-flex items-center gap-1.5 text-[12.5px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+        className='inline-flex items-center gap-1.5 text-[12.5px] font-caption text-secondary-token transition-colors hover:text-primary-token'
       >
         {helpText}
         <ExternalLink className='h-3.5 w-3.5' />
@@ -100,7 +100,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-caption uppercase tracking-[0.06em] text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -118,7 +118,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-caption uppercase tracking-[0.06em] text-tertiary-token'
           >
             {tokenLabel}
           </label>
@@ -181,7 +181,7 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-[510] ${color}`}
+      className={`inline-flex items-center gap-1 text-[11px] font-caption ${color}`}
     >
       <span aria-hidden='true'>{dot}</span>
       {label}
@@ -240,12 +240,12 @@ function TestEventButton({
         {status === 'loading' ? 'Testing...' : 'Test'}
       </Button>
       {status === 'success' && (
-        <span className='text-[11px] font-[510] text-green-500'>
+        <span className='text-[11px] font-caption text-green-500'>
           Event received
         </span>
       )}
       {status === 'error' && errorMessage && (
-        <span className='text-[11px] font-[510] text-red-500'>
+        <span className='text-[11px] font-caption text-red-500'>
           {errorMessage}
         </span>
       )}
@@ -457,7 +457,7 @@ export function SettingsAdPixelsSection({
         description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
         actions={
           <div className='flex items-center gap-2'>
-            <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+            <span className='text-[13px] font-caption tracking-normal text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}
             </span>
             <Switch
@@ -477,7 +477,7 @@ export function SettingsAdPixelsSection({
 
           {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
             <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-              <p className='text-[13px] font-[510] leading-[18px] text-primary-token'>
+              <p className='text-[13px] font-caption leading-[18px] text-primary-token'>
                 {healthData.aggregate.totalEventsThisWeek.toLocaleString()}{' '}
                 events forwarded this week &middot;{' '}
                 {healthData.aggregate.overallSuccessRate}% success rate
