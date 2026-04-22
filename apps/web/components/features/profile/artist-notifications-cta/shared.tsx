@@ -362,11 +362,11 @@ export function SubscriptionOtpResendAction({
  */
 export function SubscriptionFormSkeleton() {
   return (
-    <output className='block space-y-3' aria-busy='true'>
+    <output className='flex h-[72px] flex-col justify-between' aria-busy='true'>
       <span className='sr-only'>Loading subscription form</span>
-      <Skeleton className='h-14 w-full rounded-[2rem]' />
+      <Skeleton className='h-12 w-full rounded-[2rem]' />
       {/* Disclaimer area skeleton - fixed height to prevent layout shift */}
-      <div className='h-4' />
+      <div className='h-5' />
     </output>
   );
 }

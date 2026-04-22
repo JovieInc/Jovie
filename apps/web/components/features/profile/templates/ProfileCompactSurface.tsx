@@ -67,7 +67,7 @@ const ProfileInlineNotificationsCTA = dynamic(
     loading: () => (
       <div
         data-testid='profile-inline-cta-placeholder'
-        className='min-h-[116px]'
+        className='h-[72px]'
         aria-hidden='true'
       />
     ),
@@ -404,7 +404,14 @@ export function ProfileCompactSurface({
               alt={artist.name}
               fill
               priority
-              sizes='(max-width: 767px) 100vw, 430px'
+              decoding={renderMode === 'preview' ? 'sync' : 'async'}
+              fetchPriority='high'
+              quality={renderMode === 'preview' ? 50 : undefined}
+              sizes={
+                renderMode === 'preview'
+                  ? '254px'
+                  : '(max-width: 767px) 100vw, 430px'
+              }
               className='object-cover object-center'
               fallbackVariant='avatar'
               fallbackClassName='bg-surface-2'
