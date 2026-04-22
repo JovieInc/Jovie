@@ -687,15 +687,29 @@ jobs:
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
-          APPROVER=$(gh api user --jq '.login')
           echo "permission_denied=false" >> "$GITHUB_OUTPUT"
 
-          if [[ "$PR_AUTHOR" == "$APPROVER" ]]; then
+          APPROVER_ERROR_LOG=$(mktemp)
+          if ! APPROVER=$(gh api user --jq '.login' 2>"$APPROVER_ERROR_LOG"); then
+            if rg -q "Resource not accessible by integration" "$APPROVER_ERROR_LOG"; then
+              APPROVER=""
+              echo "Could not resolve approver identity from GitHub App token; continuing to direct approval attempt."
+            else
+              cat "$APPROVER_ERROR_LOG"
+              exit 1
+            fi
+          fi
+
+          if [[ -n "$APPROVER" && "$PR_AUTHOR" == "$APPROVER" ]]; then
             echo "Skipping auto-approval for PR #$PR_NUMBER because approver '$APPROVER' matches PR author."
             exit 0
           fi
 
-          echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
+          if [[ -n "$APPROVER" ]]; then
+            echo "All gates passed. Auto-approving PR #$PR_NUMBER as '$APPROVER'"
+          else
+            echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+          fi
 
           # Submit approval review
           APPROVAL_ERROR_LOG=$(mktemp)
