@@ -217,7 +217,7 @@ function TaskStageInline({
         className={cn('h-3.5 w-3.5', task.status === 'done' && 'fill-current')}
         style={{ color: accent.solid }}
       />
-      <span className='font-[560] text-secondary-token'>{stage.label}</span>
+      <span className='font-semibold text-secondary-token'>{stage.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -241,7 +241,7 @@ function TaskPriorityInline({
       title={`Priority ${visual.label}`}
     >
       <PriorityBars bars={visual.bars} accentColor={accent.solid} />
-      <span className='font-[560] text-secondary-token'>{visual.label}</span>
+      <span className='font-semibold text-secondary-token'>{visual.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -275,7 +275,7 @@ function TaskAssigneeInline({
       >
         <UserAvatar name={meta.avatarName} size='xs' />
       </span>
-      <span className='font-[560] text-secondary-token'>{meta.label}</span>
+      <span className='font-semibold text-secondary-token'>{meta.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -369,7 +369,7 @@ function TaskMetaMenuNumber({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <TaskMetaTrigger ariaLabel='Open task controls'>
-          <span className='inline-flex items-center gap-1 text-[11px] font-[600] text-tertiary-token'>
+          <span className='inline-flex items-center gap-1 text-[11px] font-semibold text-tertiary-token'>
             <span className='shrink-0'>J-{task.taskNumber}</span>
             <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
           </span>
@@ -524,7 +524,7 @@ function TaskDocumentPanel({
           <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
             <FileText className='h-5 w-5' />
           </div>
-          <h2 className='mt-5 text-[21px] font-[590] tracking-[-0.03em] text-primary-token'>
+          <h2 className='mt-5 text-[21px] font-semibold tracking-[-0.03em] text-primary-token'>
             Select a task
           </h2>
         </div>
@@ -663,7 +663,7 @@ function TaskDocumentPanel({
                   className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
                 >
                   <Disc3 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-                  <span className='truncate font-[560]'>
+                  <span className='truncate font-semibold'>
                     {task.releaseTitle}
                   </span>
                 </button>
@@ -730,7 +730,7 @@ function TaskTitleEditor({
         aria-label='Task title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task'
-        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.55rem,1.9vw,2.15rem)] font-[620] leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
+        className='w-full resize-none border-0 bg-transparent px-0 py-0 text-[clamp(1.55rem,1.9vw,2.15rem)] font-semibold leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -764,7 +764,7 @@ function TaskEmptyState({
   return (
     <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
       <div className='space-y-1'>
-        <h2 className='text-[18px] font-[580] tracking-[-0.025em] text-primary-token'>
+        <h2 className='text-[18px] font-semibold tracking-[-0.025em] text-primary-token'>
           {hasFilters
             ? 'No tasks match your filters'
             : 'Your task list is empty'}
@@ -829,7 +829,7 @@ function MobileTaskScopeTabs({
               onClick={() => onChange(value)}
               aria-pressed={isActive}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-[560] transition-[background-color,color] duration-150',
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-[background-color,color] duration-150',
                 isActive
                   ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
                   : 'text-secondary-token hover:text-primary-token'
@@ -869,7 +869,9 @@ function MobileTaskSection({
   return (
     <section className='px-3 pb-4'>
       <div className='mb-2 flex items-center justify-between px-1'>
-        <h2 className='text-[11px] font-[560] text-tertiary-token'>{title}</h2>
+        <h2 className='text-[11px] font-semibold text-tertiary-token'>
+          {title}
+        </h2>
         <span className='text-[10px] text-tertiary-token'>{tasks.length}</span>
       </div>
       <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
@@ -933,7 +935,7 @@ function MobileTaskListItem({
       </span>
 
       <span className='min-w-0 flex-1'>
-        <span className='block truncate text-[14px] font-[560] leading-[1.25] text-primary-token'>
+        <span className='block truncate text-[14px] font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
         <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
@@ -965,7 +967,7 @@ function MobileTaskListItem({
           />
         ) : null}
         {task.releaseTitle ? (
-          <span className='text-[10px] font-[560] text-tertiary-token'>
+          <span className='text-[10px] font-semibold text-tertiary-token'>
             Release
           </span>
         ) : null}
@@ -1620,7 +1622,7 @@ export function TasksPageClient() {
         {isError ? (
           <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
             <div className='space-y-1'>
-              <h2 className='text-[15px] font-[560] text-primary-token'>
+              <h2 className='text-[15px] font-semibold text-primary-token'>
                 Couldn&apos;t Load Tasks
               </h2>
               <p className='text-[13px] text-secondary-token'>
