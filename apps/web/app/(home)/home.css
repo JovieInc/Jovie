@@ -95,13 +95,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-headline {
-  font-size: clamp(56px, 8vw, 96px);
+  font-size: clamp(32px, 7vw, 68px);
   font-weight: 680;
   line-height: 1.02;
   letter-spacing: -0.04em;
-  text-wrap: balance;
+  white-space: nowrap;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
-  max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
 }
