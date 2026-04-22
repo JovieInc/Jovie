@@ -10,7 +10,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -44,7 +44,7 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { userId: clerkId } = await getCachedAuth();
+    const { userId: clerkId } = await getOptionalAuth();
     if (!clerkId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
