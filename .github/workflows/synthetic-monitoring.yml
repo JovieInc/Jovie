@@ -64,6 +64,15 @@ jobs:
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results
         continue-on-error: true
 
+      - name: Cleanup Synthetic E2E Users
+        if: always()
+        continue-on-error: true
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          cd apps/web
+          doppler run -- pnpm tsx scripts/cleanup-e2e-users.ts --force
+
       - name: Parse test results
         id: test-results
         run: |
