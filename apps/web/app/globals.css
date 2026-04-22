@@ -37,13 +37,15 @@ body {
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
-html:has(.linear-marketing) {
+html:has(.linear-marketing),
+html:has(.home-surface) {
   height: auto;
   min-height: 100%;
   overflow-y: auto;
   overscroll-behavior: auto;
 }
-body:has(.linear-marketing) {
+body:has(.linear-marketing),
+body:has(.home-surface) {
   height: auto;
   min-height: 100%;
   overflow: visible;
