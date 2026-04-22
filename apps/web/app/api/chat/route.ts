@@ -23,6 +23,7 @@ import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -74,6 +75,17 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
+
+/**
+ * Statsig gate keys for the chat kill switch. Declared as const so typos fail
+ * at compile time rather than silently defaulting to `false` (never firing).
+ * Kept local to the chat route — once other routes need runtime kill switches
+ * these should graduate into the typed APP_FLAG_* registry.
+ */
+const CHAT_KILL_SWITCH_GATES = {
+  DISABLED: 'ai_chat_disabled',
+  FORCE_LIGHT: 'ai_chat_force_light',
+} as const;
 
 /**
  * Zod schema for validating client-provided artist context.
@@ -1692,6 +1704,15 @@ export async function POST(req: Request) {
     'POST, OPTIONS'
   );
 
+  // Tag every Sentry event captured during this request as chat-surface. The
+  // error path already tags `feature: 'ai-chat'`, but breadcrumbs, performance
+  // events, and any intermediate captureException elsewhere in the handler
+  // would otherwise go untagged. One call here covers all of them.
+  // `request_id` is stored as extra (not tag) — it is unique per request and
+  // would blow out Sentry's tag cardinality budget.
+  Sentry.getCurrentScope().setTag('feature', 'ai-chat');
+  Sentry.getCurrentScope().setExtra('request_id', requestId);
+
   // Auth check - ensure user is authenticated
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -1701,9 +1722,41 @@ export async function POST(req: Request) {
     );
   }
 
-  // Fetch user plan for rate limiting and tool gating
+  // Fetch billing/plan before the kill switch so 503 responses are still
+  // tagged by tier — lets us answer "how many paid users did this incident
+  // block" from Sentry without a second data source.
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
+  Sentry.getCurrentScope().setTag('plan_tier', userPlan);
+
+  // Kill switch: Statsig-backed, no deploy required. When a provider incident
+  // happens, flip `ai_chat_disabled` to 503 all chat traffic with a friendly
+  // message, or `ai_chat_force_light` to force-route to the cheaper/faster
+  // light model without a code change. Defaults (both false) = normal behavior.
+  // Keys are const-declared so a typo fails at compile time rather than
+  // silently falling back to the default.
+  const chatDisabled = await checkGateForUser(
+    userId,
+    CHAT_KILL_SWITCH_GATES.DISABLED,
+    false
+  );
+  if (chatDisabled) {
+    return NextResponse.json(
+      {
+        error: 'Chat is temporarily unavailable',
+        message:
+          'Jovie chat is paused while we address an upstream issue. Please try again in a few minutes.',
+        errorCode: 'CHAT_DISABLED',
+        requestId,
+      },
+      { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
+  const forceLightModel = await checkGateForUser(
+    userId,
+    CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
+    false
+  );
   const planLimits = getEntitlements(userPlan);
   const currentUserEntitlements = await getCurrentUserEntitlements().catch(
     () => null
@@ -1846,12 +1899,31 @@ export async function POST(req: Request) {
         }
       : freeTools;
 
-    const selectedModel = canUseLightModel(
-      uiMessages,
-      planLimits.booleans.aiCanUseTools
-    )
-      ? CHAT_MODEL_LIGHT
-      : CHAT_MODEL;
+    // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
+    // that degrades the entire chat surface to the light model during a
+    // provider incident, overriding the per-request heuristic. Intermediate
+    // variable keeps the precedence explicit (|| binds tighter than ?:).
+    const shouldUseLightModel =
+      forceLightModel ||
+      canUseLightModel(uiMessages, planLimits.booleans.aiCanUseTools);
+    const selectedModel = shouldUseLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+
+    // Tag the request scope with chat-specific dimensions so all Sentry events
+    // for this request (errors, perf, breadcrumbs) are filterable together.
+    // `chat_conversation_id` goes in `extra` (high cardinality per Sentry
+    // guidance); `chat_has_tools` reflects the real plan capability boundary
+    // rather than a count of always-on freeTools.
+    Sentry.getCurrentScope().setTags({
+      chat_model: selectedModel,
+      chat_force_light: String(forceLightModel),
+      chat_has_tools: String(planLimits.booleans.aiCanUseTools),
+    });
+    if (resolvedConversationId) {
+      Sentry.getCurrentScope().setExtra(
+        'chat_conversation_id',
+        resolvedConversationId.slice(0, 120)
+      );
+    }
 
     const result = streamText({
       model: gateway(selectedModel),
@@ -1861,10 +1933,12 @@ export async function POST(req: Request) {
       abortSignal: req.signal,
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
-        recordOutputs: true,
+        // PII: do not capture prompts/outputs in AI SDK spans. Tokens, model,
+        // latency, and tool-call structure are still captured.
+        recordInputs: false,
+        recordOutputs: false,
         functionId: 'jovie-chat',
-        metadata: { model: selectedModel },
+        metadata: { model: selectedModel, plan: userPlan },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;
