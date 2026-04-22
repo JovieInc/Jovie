@@ -8,12 +8,11 @@
  * (parent of commit fc2f6723d).
  */
 
-.home-root,
-.home-root * {
+.home-root {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.home-root *::-webkit-scrollbar {
+.home-root::-webkit-scrollbar {
   display: none;
 }
 

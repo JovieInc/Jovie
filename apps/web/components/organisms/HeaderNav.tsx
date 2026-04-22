@@ -24,7 +24,9 @@ export interface HeaderNavProps {
   readonly minimalAuth?: boolean;
 }
 
-function PublicAuthActions({ minimal = false }: { minimal?: boolean } = {}) {
+type PublicAuthActionsProps = Readonly<{ minimal?: boolean }>;
+
+function PublicAuthActions({ minimal = false }: PublicAuthActionsProps = {}) {
   if (minimal) {
     return (
       <Link

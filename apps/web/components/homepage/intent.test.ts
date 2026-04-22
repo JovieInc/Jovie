@@ -33,6 +33,14 @@ describe('homepage intent constants', () => {
       'Build artist profile',
       'Set up fan notifications',
     ]);
+    expect(PILLS.map(p => p.insertedPrompt)).toEqual([
+      'Create a release page for ',
+      'Generate album art for ',
+      'Generate a playlist pitch for ',
+      'Plan a release for ',
+      'Build an artist profile for ',
+      'Set up fan notifications for ',
+    ]);
     expect(PILLS.every(p => p.insertedPrompt.endsWith(' '))).toBe(true);
   });
 });
