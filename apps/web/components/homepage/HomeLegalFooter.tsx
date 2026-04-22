@@ -8,19 +8,19 @@ export function HomeLegalFooter() {
       <nav aria-label='Legal' className='flex items-center gap-4'>
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='transition-colors duration-150 hover:text-secondary-token'
+          className='focus-ring-themed rounded transition-colors duration-150 hover:text-secondary-token focus-visible:text-secondary-token'
         >
           Terms
         </Link>
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='transition-colors duration-150 hover:text-secondary-token'
+          className='focus-ring-themed rounded transition-colors duration-150 hover:text-secondary-token focus-visible:text-secondary-token'
         >
           Privacy
         </Link>
         <a
           href='https://status.jov.ie'
-          className='transition-colors duration-150 hover:text-secondary-token'
+          className='focus-ring-themed rounded transition-colors duration-150 hover:text-secondary-token focus-visible:text-secondary-token'
         >
           Status
         </a>
