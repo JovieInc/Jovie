@@ -12,6 +12,24 @@ const mockUseBreakpointDown = vi.fn<
 const mockUseAdminUsersInfiniteQuery = vi.fn();
 const mockUseRowSelection = vi.fn();
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/admin/users'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
+
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') =>
     mockUseBreakpointDown(breakpoint),

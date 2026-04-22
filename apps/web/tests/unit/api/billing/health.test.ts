@@ -28,6 +28,10 @@ vi.mock('@/lib/stripe/config', () => ({
   getActivePriceIds: vi.fn(() => ['price_test_monthly', 'price_test_yearly']),
 }));
 
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: () => Promise<unknown>) => fn,
+}));
+
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -41,16 +45,38 @@ describe('GET /api/billing/health', () => {
   });
 
   it('returns healthy status when all checks pass', async () => {
-    // Mock database queries
-    const fromMock = vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        orderBy: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ createdAt: new Date() }]),
-        }),
-      }),
-    });
+    const lastReconciliationAt = new Date();
+    const lastBillingEventAt = new Date();
+    const queryResults = [
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt }],
+    ];
+    let queryIndex = 0;
 
-    mockDbSelect.mockReturnValue({ from: fromMock });
+    mockDbSelect.mockImplementation(() => {
+      const result = queryResults[queryIndex] ?? [];
+      queryIndex += 1;
+      const resolved = Promise.resolve(result);
+
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue(result),
+            }),
+            then: resolved.then.bind(resolved),
+            catch: resolved.catch.bind(resolved),
+            finally: resolved.finally.bind(resolved),
+          }),
+          then: resolved.then.bind(resolved),
+          catch: resolved.catch.bind(resolved),
+          finally: resolved.finally.bind(resolved),
+        }),
+      };
+    });
 
     // Mock Stripe subscription list
     mockStripeSubscriptionsList.mockResolvedValue({

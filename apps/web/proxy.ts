@@ -16,7 +16,7 @@ import {
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
-import { BASE_URL, HOSTNAME, STAGING_HOSTNAMES } from '@/constants/domains';
+import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
@@ -36,6 +36,12 @@ import {
   isCookieBannerRequired,
 } from '@/lib/cookies/consent-regions';
 import { captureError } from '@/lib/error-tracking';
+import {
+  analyzeHost,
+  categorizePath,
+  DASHBOARD_URL,
+  type PathCategory,
+} from '@/lib/routing/proxy-routing';
 import {
   buildContentSecurityPolicy,
   buildContentSecurityPolicyReportOnly,
@@ -67,134 +73,6 @@ const META_BOT_REGEX =
 function detectMetaBot(userAgent: string): boolean {
   return META_BOT_REGEX.test(userAgent);
 }
-
-// ============================================================================
-// Path Categorization (computed once per request)
-// ============================================================================
-
-interface PathCategory {
-  needsNonce: boolean;
-  isProtectedPath: boolean;
-  isAuthPath: boolean;
-  isAuthCallbackPath: boolean;
-  isSensitiveAPI: boolean;
-}
-
-/** Check if pathname matches a route (exact or prefix) */
-function matchesRoute(pathname: string, route: string): boolean {
-  return pathname === route || pathname.startsWith(`${route}/`);
-}
-
-// Legacy subdomain set — kept for redirect to /investor-portal
-const INVESTOR_HOSTNAMES = new Set([
-  `investors.${HOSTNAME}`,
-  'investors.localhost',
-  'investors.jov.ie',
-]);
-
-/**
- * Categorize a pathname once for all routing decisions.
- * Eliminates redundant path matching throughout the middleware.
- */
-function categorizePath(pathname: string): PathCategory {
-  // Auth paths
-  const isAuthPath =
-    pathname === '/signin' ||
-    pathname === '/sign-in' ||
-    pathname === '/signup' ||
-    pathname === '/sign-up';
-
-  const isAuthCallbackPath =
-    pathname === '/sso-callback' ||
-    pathname === '/signup/sso-callback' ||
-    pathname === '/signin/sso-callback' ||
-    pathname === '/sign-up/sso-callback' ||
-    pathname === '/sign-in/sso-callback';
-
-  const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
-  const isAccountPath = matchesRoute(pathname, '/account');
-  const isBillingPath = matchesRoute(pathname, '/billing');
-
-  // Onboarding/waitlist paths
-  const isOnboardingPath = matchesRoute(pathname, '/onboarding');
-  const isWaitlistPath = matchesRoute(pathname, '/waitlist');
-
-  // Protected paths (require auth)
-  const isProtectedPath =
-    isAppShellPath ||
-    isAccountPath ||
-    isBillingPath ||
-    isWaitlistPath ||
-    isOnboardingPath;
-
-  // Paths that need CSP nonce (app/protected routes, not marketing)
-  const needsNonce =
-    pathname.startsWith('/api/') ||
-    isAppShellPath ||
-    isAccountPath ||
-    isBillingPath ||
-    isOnboardingPath ||
-    isWaitlistPath;
-
-  // Sensitive API paths for bot blocking
-  const isSensitiveAPI = pathname.startsWith('/api/link/');
-
-  return {
-    needsNonce,
-    isProtectedPath,
-    isAuthPath,
-    isAuthCallbackPath,
-    isSensitiveAPI,
-  };
-}
-
-// ============================================================================
-// Host Detection (cached per request)
-// ============================================================================
-
-interface HostInfo {
-  isMainHost: boolean;
-  isDevOrPreview: boolean;
-  isMeetJovie: boolean;
-  isSupportHost: boolean;
-  isInvestorPortal: boolean;
-}
-
-/**
- * Analyze hostname once for all routing decisions.
- * Single domain architecture: everything on jov.ie.
- * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
- */
-function analyzeHost(hostname: string): HostInfo {
-  const isDevOrPreview =
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.includes('vercel.app') ||
-    STAGING_HOSTNAMES.has(hostname);
-
-  const isMainHost =
-    hostname === HOSTNAME ||
-    hostname === `www.${HOSTNAME}` ||
-    STAGING_HOSTNAMES.has(hostname) ||
-    isDevOrPreview;
-
-  const isMeetJovie =
-    hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
-  const isSupportHost = hostname === `support.${HOSTNAME}`;
-
-  const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
-
-  return {
-    isMainHost,
-    isDevOrPreview,
-    isMeetJovie,
-    isSupportHost,
-    isInvestorPortal,
-  };
-}
-
-/** Dashboard is always at /app in single-domain architecture */
-const DASHBOARD_URL = '/app';
 
 // ============================================================================
 // Public Profile Audience Block Check

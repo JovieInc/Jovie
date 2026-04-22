@@ -88,13 +88,12 @@ describe('PreSaveActions', () => {
   it('renders countdown timer', () => {
     render(<PreSaveActions {...defaultProps} />);
     const countdown = screen.getByTestId('release-countdown');
-    expect(countdown).toBeDefined();
-    expect(countdown.getAttribute('data-compact')).toBe('true');
+    expect(countdown).toHaveAttribute('data-compact', 'true');
   });
 
   it('renders notification signup CTA', () => {
     render(<PreSaveActions {...defaultProps} />);
-    expect(screen.getByTestId('notification-cta')).toBeDefined();
+    expect(screen.getByTestId('notification-cta')).toBeInTheDocument();
   });
 
   it('hides platform presave buttons when enablePlatformPresaves is false', () => {
@@ -105,8 +104,8 @@ describe('PreSaveActions', () => {
 
   it('renders without crashing when trackId is null', () => {
     render(<PreSaveActions {...defaultProps} trackId={null} />);
-    expect(screen.getByTestId('release-countdown')).toBeDefined();
-    expect(screen.getByTestId('notification-cta')).toBeDefined();
+    expect(screen.getByTestId('release-countdown')).toBeInTheDocument();
+    expect(screen.getByTestId('notification-cta')).toBeInTheDocument();
   });
 
   it('spotify href includes correct query params', () => {

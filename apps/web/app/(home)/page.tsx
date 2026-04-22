@@ -142,7 +142,7 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <div className='flex min-w-0 flex-1 items-center justify-center px-4 pb-[8vh]'>
+      <div className='flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
         <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
           <HomepageIntent />
         </div>

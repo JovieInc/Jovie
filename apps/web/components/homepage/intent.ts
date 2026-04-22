@@ -7,7 +7,9 @@ export type HomepagePillId =
   | 'create_release_page'
   | 'generate_album_art'
   | 'generate_playlist_pitch'
-  | 'plan_a_release';
+  | 'plan_a_release'
+  | 'build_artist_profile'
+  | 'setup_fan_notifications';
 
 export interface HomepagePill {
   readonly id: HomepagePillId;
@@ -35,6 +37,16 @@ export const PILLS: readonly HomepagePill[] = [
     id: 'plan_a_release',
     label: 'Plan a release',
     insertedPrompt: 'Plan a release for ',
+  },
+  {
+    id: 'build_artist_profile',
+    label: 'Build artist profile',
+    insertedPrompt: 'Build an artist profile for ',
+  },
+  {
+    id: 'setup_fan_notifications',
+    label: 'Set up fan notifications',
+    insertedPrompt: 'Set up fan notifications for ',
   },
 ] as const;
 

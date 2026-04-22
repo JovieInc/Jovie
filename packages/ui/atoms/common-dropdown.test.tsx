@@ -962,6 +962,176 @@ describe('CommonDropdown', () => {
       });
     });
 
+    it('keeps only one sibling submenu open at a time', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          items: [
+            {
+              type: 'action',
+              id: 'copy-link',
+              label: 'Copy Link',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+        {
+          type: 'submenu',
+          id: 'metadata',
+          label: 'Copy Metadata',
+          items: [
+            {
+              type: 'action',
+              id: 'copy-isrc',
+              label: 'Copy ISRC',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} />);
+
+      await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copy Link')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('menuitem', { name: 'Copy Metadata' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copy ISRC')).toBeInTheDocument();
+        expect(screen.queryByText('Copy Link')).not.toBeInTheDocument();
+      });
+    });
+
+    it('keeps only one context-menu sibling submenu open at a time', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          items: [
+            {
+              type: 'action',
+              id: 'copy-link',
+              label: 'Copy Link',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+        {
+          type: 'submenu',
+          id: 'metadata',
+          label: 'Copy Metadata',
+          items: [
+            {
+              type: 'action',
+              id: 'copy-isrc',
+              label: 'Copy ISRC',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(
+        <CommonDropdown items={items} variant='context'>
+          <div data-testid='context-target'>Target</div>
+        </CommonDropdown>
+      );
+
+      fireEvent.contextMenu(screen.getByTestId('context-target'));
+
+      await user.click(screen.getByRole('menuitem', { name: 'Share' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copy Link')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('menuitem', { name: 'Copy Metadata' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copy ISRC')).toBeInTheDocument();
+        expect(screen.queryByText('Copy Link')).not.toBeInTheDocument();
+      });
+    });
+
+    it('keeps only one nested sibling submenu open at a time', async () => {
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'submenu',
+          id: 'share',
+          label: 'Share',
+          items: [
+            {
+              type: 'submenu',
+              id: 'tracked-links',
+              label: 'Tracked Links',
+              items: [
+                {
+                  type: 'submenu',
+                  id: 'facebook',
+                  label: 'Facebook',
+                  items: [
+                    {
+                      type: 'action',
+                      id: 'facebook-post',
+                      label: 'Facebook Post',
+                      onClick: vi.fn(),
+                    },
+                  ],
+                },
+                {
+                  type: 'submenu',
+                  id: 'reddit',
+                  label: 'Reddit',
+                  items: [
+                    {
+                      type: 'action',
+                      id: 'reddit-post',
+                      label: 'Reddit Post',
+                      onClick: vi.fn(),
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={items} open={true} />);
+
+      screen.getByRole('menuitem', { name: 'Share' }).focus();
+      await user.keyboard('{ArrowRight}');
+      await waitFor(() => {
+        expect(screen.getByText('Tracked Links')).toBeInTheDocument();
+      });
+      screen.getByRole('menuitem', { name: 'Tracked Links' }).focus();
+      await user.keyboard('{ArrowRight}');
+      await waitFor(() => {
+        expect(screen.getByText('Facebook')).toBeInTheDocument();
+      });
+      screen.getByRole('menuitem', { name: 'Facebook' }).focus();
+      await user.keyboard('{ArrowRight}');
+
+      await waitFor(() => {
+        expect(screen.getByText('Facebook Post')).toBeInTheDocument();
+      });
+
+      screen.getByRole('menuitem', { name: 'Reddit' }).focus();
+      await user.keyboard('{ArrowRight}');
+
+      await waitFor(() => {
+        expect(screen.getByText('Reddit Post')).toBeInTheDocument();
+        expect(screen.queryByText('Facebook Post')).not.toBeInTheDocument();
+      });
+    });
+
     it('inherits submenu min-width from the trigger row when no override is provided', async () => {
       const items: CommonDropdownItem[] = [
         {

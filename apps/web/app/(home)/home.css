@@ -8,6 +8,14 @@
  * (parent of commit fc2f6723d).
  */
 
+.home-viewport {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.home-viewport::-webkit-scrollbar {
+  display: none;
+}
+
 /* Entrance animation for the chat intake island */
 @keyframes homepageFadeIn {
   from {

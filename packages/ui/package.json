@@ -1,6 +1,6 @@
 {
   "name": "@jovie/ui",
-  "version": "26.4.159",
+  "version": "26.4.161",
   "private": true,
   "sideEffects": [
     "*.css"
@@ -55,9 +55,9 @@
     "@types/react-dom": "^19.2.3",
     "vite": "8.0.9",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/coverage-v8": "4.1.4",
     "jsdom": "29.0.2",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "vitest": "4.1.4"
   }
 }

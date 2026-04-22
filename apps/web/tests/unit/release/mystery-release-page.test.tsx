@@ -65,7 +65,7 @@ const defaultProps = {
 describe('MysteryReleasePage', () => {
   it('renders "Upcoming release" text', () => {
     render(<MysteryReleasePage {...defaultProps} />);
-    expect(screen.getByText('Upcoming release')).toBeDefined();
+    expect(screen.getByText('Upcoming release')).toBeInTheDocument();
   });
 
   it('renders artist name as link to /${handle}', () => {
@@ -76,17 +76,17 @@ describe('MysteryReleasePage', () => {
 
   it('shows countdown when minimal is false (default)', () => {
     render(<MysteryReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('release-countdown')).toBeDefined();
+    expect(screen.getByTestId('release-countdown')).toBeInTheDocument();
   });
 
   it('shows notification CTA when minimal is false', () => {
     render(<MysteryReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('profile-inline-cta')).toBeDefined();
+    expect(screen.getByTestId('profile-inline-cta')).toBeInTheDocument();
   });
 
   it('shows "Something new coming soon" when minimal is true', () => {
     render(<MysteryReleasePage {...defaultProps} minimal />);
-    expect(screen.getByText('Something new coming soon')).toBeDefined();
+    expect(screen.getByText('Something new coming soon')).toBeInTheDocument();
   });
 
   it('hides countdown and CTA when minimal is true', () => {
@@ -97,6 +97,6 @@ describe('MysteryReleasePage', () => {
 
   it('wraps content in ReleaseNotificationsProvider', () => {
     render(<MysteryReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('notifications-provider')).toBeDefined();
+    expect(screen.getByTestId('notifications-provider')).toBeInTheDocument();
   });
 });

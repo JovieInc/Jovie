@@ -31,6 +31,23 @@ vi.mock('@/lib/nuqs/hooks', () => ({
   ],
 }));
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+  return {
+    ...actual,
+    usePathname: () => '/demo/releases',
+    useSearchParams: () => new URLSearchParams(),
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+    }),
+  };
+});
+
 const runDemoAction = vi.fn(() => Promise.resolve());
 
 vi.mock('@/features/demo/demo-actions', () => ({
