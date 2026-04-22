@@ -45,7 +45,7 @@ export const PILLS: readonly HomepagePill[] = [
   },
   {
     id: 'setup_fan_notifications',
-    label: 'Setup fan notifications',
+    label: 'Set up fan notifications',
     insertedPrompt: 'Set up fan notifications for ',
   },
 ] as const;

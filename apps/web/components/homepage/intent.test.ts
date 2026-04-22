@@ -31,7 +31,7 @@ describe('homepage intent constants', () => {
       'Generate playlist pitch',
       'Plan a release',
       'Build artist profile',
-      'Setup fan notifications',
+      'Set up fan notifications',
     ]);
     expect(PILLS.every(p => p.insertedPrompt.endsWith(' '))).toBe(true);
   });
