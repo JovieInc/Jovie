@@ -605,7 +605,9 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
 | `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
 | `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
-| `apps/web/components/features/home/*` | Homepage implementation layer |
+| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
+| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
+| `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
 
 ---
 
