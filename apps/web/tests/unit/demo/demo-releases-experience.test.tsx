@@ -246,7 +246,8 @@ describe('DemoReleasesExperience', () => {
     renderDemo();
 
     await openReleaseDrawer('96 Months', { requireSidebar: true });
-    fireEvent.click(await screen.findByTestId('drawer-tab-tracks'));
+    const tracksCard = await screen.findByTestId('release-tracks-card');
+    fireEvent.click(within(tracksCard).getByRole('button', { name: 'Tracks' }));
 
     const tracklist = await screen.findByTestId('tracklist');
     const trackButtons = within(tracklist)
