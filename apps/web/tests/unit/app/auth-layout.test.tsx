@@ -39,6 +39,10 @@ async function renderAuthRouteLayout({
       .mockResolvedValue(resolvedPublishableKey),
   }));
 
+  vi.doMock('next/headers', () => ({
+    headers: vi.fn().mockResolvedValue(new Headers()),
+  }));
+
   vi.doMock('@/components/providers/AuthClientProviders', () => ({
     AuthClientProviders: ({ children }: { children: ReactNode }) => (
       <div data-testid='auth-client-providers'>{children}</div>

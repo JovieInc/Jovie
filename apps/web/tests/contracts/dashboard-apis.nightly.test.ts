@@ -26,6 +26,7 @@ const mockClerkClient = vi.fn();
 const mockSyncCanonicalUsername = vi.fn();
 const mockVerifyProfileOwnership = vi.fn();
 const mockGetAuthenticatedProfile = vi.fn();
+const mockGetUserByClerkId = vi.fn();
 const mockGetSocialLinksVerificationColumnSupport = vi.fn();
 const mockBuildSocialLinksVerificationSelect = vi.fn();
 const mockApplyRateLimiting = vi.fn();
@@ -109,6 +110,7 @@ vi.mock('@/lib/db/queries/shared', () => ({
     mockVerifyProfileOwnership(...args),
   getAuthenticatedProfile: (...args: any[]) =>
     mockGetAuthenticatedProfile(...args),
+  getUserByClerkId: (...args: any[]) => mockGetUserByClerkId(...args),
 }));
 
 vi.mock('@/lib/db/cache', () => ({
@@ -251,6 +253,15 @@ beforeEach(() => {
     avatarUrl: null,
     avatarLockedByUser: false,
     userId: 'user_internal',
+  });
+  mockGetUserByClerkId.mockResolvedValue({
+    id: 'user_internal',
+    clerkId: TEST_USER_ID,
+    email: 'artist@example.com',
+    isAdmin: false,
+    isPro: false,
+    userStatus: 'active',
+    deletedAt: null,
   });
   mockGetSocialLinksVerificationColumnSupport.mockResolvedValue(false);
   mockBuildSocialLinksVerificationSelect.mockReturnValue({
