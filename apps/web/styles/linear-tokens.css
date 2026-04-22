@@ -391,10 +391,12 @@
   --linear-bg-footer: #08090a;
   --linear-border-footer: #2a2a2e;
   --linear-bg-hover: rgba(255, 255, 255, 0.06);
-  /* Borders — extracted 2026-03-17 */
-  --linear-border-subtle: rgba(255, 255, 255, 0.04);
-  --linear-border-default: rgba(255, 255, 255, 0.07);
-  --linear-border-strong: rgba(255, 255, 255, 0.12);
+  /* Borders — JOV-1780: dark-mode contrast bump (prev 0.04/0.07/0.12 blended
+     into surface-1 `#17171a` and page `#08090a`, making cards/panels/inputs
+     edge-less in dark mode). */
+  --linear-border-subtle: rgba(255, 255, 255, 0.07);
+  --linear-border-default: rgba(255, 255, 255, 0.11);
+  --linear-border-strong: rgba(255, 255, 255, 0.18);
   --linear-border-focus: oklch(60% 0.12 282);
   /* Buttons — white primary on dark bg, matching Linear.app */
   --linear-btn-primary-bg: #ffffff;
@@ -425,16 +427,20 @@
   --linear-hero-gradient-to: #8a8f98;
   --linear-separator-from: rgba(255, 255, 255, 0.06);
   --linear-separator-via: rgba(255, 255, 255, 0.03);
-  /* Shadows — deeper on dark */
+  /* Shadows — deeper on dark. JOV-1780: ring bumped from 0.06 → 0.12 so
+     popovers/dropdowns/menus have a clearly visible rim against the app
+     shell in dark mode. */
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
-    0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
+    0 0 0 1px rgba(255, 255, 255, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
   --linear-app-content-surface: var(--linear-bg-surface-0);
   /* primary framed main-pane surface */
   --linear-app-card-shadow: none;
-  --linear-app-shell-border: rgba(255, 255, 255, 0.03);
-  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.055);
-  --linear-app-frame-seam: rgba(255, 255, 255, 0.035);
+  /* JOV-1780: panel/frame seams bumped so card & panel boundaries are
+     visible in dark mode (prev 0.03 / 0.035 read as no edge at all). */
+  --linear-app-shell-border: rgba(255, 255, 255, 0.06);
+  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.08);
+  --linear-app-frame-seam: rgba(255, 255, 255, 0.07);
   --linear-app-shell-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.025), 0 14px 36px rgba(0, 0, 0, 0.18);
   --linear-app-sidebar-shadow:
