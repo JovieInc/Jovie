@@ -1,7 +1,9 @@
 'use client';
 
 import { ClerkProvider, SignIn } from '@clerk/nextjs';
-import { useEffect, useState } from 'react';
+import { ui } from '@clerk/ui';
+import { X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -39,6 +41,7 @@ export function MarketingSignInModal({
   onClose,
 }: Readonly<MarketingSignInModalProps>) {
   const [mounted, setMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -54,13 +57,46 @@ export function MarketingSignInModal({
     };
   }, [onClose]);
 
+  // Move focus into the modal once Clerk mounts its form. Clerk renders
+  // async (bundles + network), so watch the container with a
+  // MutationObserver and focus the first input as soon as it appears.
+  useEffect(() => {
+    if (!mounted) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const focusFirstInput = () => {
+      const input = container.querySelector<HTMLInputElement>(
+        'input[type="email"], input[name="identifier"], input[type="text"]'
+      );
+      if (input) {
+        input.focus();
+        return true;
+      }
+      return false;
+    };
+
+    if (focusFirstInput()) return;
+
+    const observer = new MutationObserver(() => {
+      if (focusFirstInput()) observer.disconnect();
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    // Safety: stop watching after 5s even if Clerk never rendered.
+    const timeout = window.setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timeout);
+    };
+  }, [mounted]);
+
   if (!mounted) return null;
 
   // Portal to <body> so the modal escapes the marketing header's
   // backdrop-filter containing block (which would otherwise shrink
   // a `position: fixed` descendant to the header's bounds).
   return createPortal(
-    <ClerkProvider appearance={clerkDarkCompact}>
+    <ClerkProvider appearance={clerkDarkCompact} ui={ui}>
       <div
         role='dialog'
         aria-modal='true'
@@ -74,7 +110,18 @@ export function MarketingSignInModal({
           className='absolute inset-0 bg-black/70 backdrop-blur-sm'
         />
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center p-4'>
-          <div className='pointer-events-auto w-full max-w-[400px]'>
+          <div
+            ref={containerRef}
+            className='pointer-events-auto relative w-full max-w-[400px]'
+          >
+            <button
+              type='button'
+              aria-label='Close'
+              onClick={onClose}
+              className='absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
+            >
+              <X className='h-4 w-4' strokeWidth={2} />
+            </button>
             <SignIn
               appearance={clerkDarkCompact}
               routing='hash'
