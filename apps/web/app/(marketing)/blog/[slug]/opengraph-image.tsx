@@ -3,7 +3,7 @@ import { getBlogPost } from '@/lib/blog/getBlogPosts';
 import { loadSatoshiFont, OG_SIZE, THEME } from '@/lib/share/image-utils';
 
 export const runtime = 'nodejs';
-export const revalidate = 900;
+export const revalidate = false;
 
 export const alt = 'Jovie blog post';
 export const size = OG_SIZE;

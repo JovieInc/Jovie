@@ -4,6 +4,8 @@ import {
   MarketingRenderSurface,
 } from '@/features/home/MarketingRenderSurface';
 
+export const revalidate = false;
+
 function getSearchParam(
   value: string | string[] | undefined
 ): string | undefined {
