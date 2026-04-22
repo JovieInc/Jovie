@@ -71,7 +71,7 @@ export function TasksWorkspaceUpgradeInterstitial() {
     <PageShell data-testid='tasks-upgrade-interstitial'>
       <section className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
         <TasksUpgradeContent
-          heading='Upgrade To Access Tasks'
+          heading='Upgrade to access Tasks'
           description='Upgrade to turn releases into step-by-step plans and manage all of your work in one task workspace.'
           secondaryHref={APP_ROUTES.DASHBOARD_RELEASES}
           secondaryLabel='Back to Releases'
