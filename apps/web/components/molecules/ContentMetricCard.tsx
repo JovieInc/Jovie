@@ -66,7 +66,7 @@ export function ContentMetricCard({
         </div>
         <p
           className={cn(
-            'text-[26px] font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+            'text-[26px] font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums',
             valueClassName
           )}
         >
