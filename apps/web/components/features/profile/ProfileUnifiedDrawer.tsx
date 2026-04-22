@@ -306,7 +306,7 @@ function ReleasesDrawerContent({
             ) : null}
             <a
               href={`/${artistHandle}/${release.slug}`}
-              className='flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150 ease-out hover:bg-white/[0.05] focus-visible:bg-white/[0.06] focus-visible:outline-none active:bg-white/[0.08]'
+              className='flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150 ease-out hover:bg-white/[0.05] focus-visible:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset active:bg-white/[0.08]'
               aria-label={ariaLabel}
             >
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>

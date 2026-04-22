@@ -75,11 +75,18 @@ export function contrastRatio(hex1: string, hex2: string): number {
 /**
  * Lighten a hex color by mixing toward white. amount=0.35 mixes 35% white in.
  * Used for readable text on low-alpha brand fills over dark surfaces.
+ * Amount is clamped to [0, 1] so callers passing out-of-range values don't
+ * produce negative channels or values above 255. Returns a hex string so
+ * the function composes with other hex-expecting helpers in this module.
  */
 export function lightenHex(hex: string, amount: number): string {
   const { r, g, b } = hexToRgb(hex);
-  const mix = (c: number) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+  const t = Math.max(0, Math.min(1, amount));
+  const mix = (c: number) => Math.round(c + (255 - c) * t);
+  const nr = mix(r);
+  const ng = mix(g);
+  const nb = mix(b);
+  return `#${((1 << 24) | (nr << 16) | (ng << 8) | nb).toString(16).slice(1)}`;
 }
 
 /**
