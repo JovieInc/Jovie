@@ -45,7 +45,6 @@ import {
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ProviderKey } from '@/lib/discography/types';
 import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -102,6 +101,7 @@ interface ReleaseEntityHeaderProps {
   readonly headerLabel: string;
   readonly release: Release;
   readonly artistName: string | null | undefined;
+  readonly onArtistClick?: (artistName: string) => void;
   readonly canUploadArtwork: boolean;
   readonly canRevertArtwork: boolean;
   readonly onArtworkUpload: ((file: File) => Promise<string>) | undefined;
@@ -114,10 +114,62 @@ interface ReleaseEntityHeaderProps {
   readonly footer?: ReactNode;
 }
 
+const releaseArtistListFormatter = new Intl.ListFormat('en', {
+  style: 'long',
+  type: 'conjunction',
+});
+
+function renderArtistLine(
+  artistNames: string[] | undefined,
+  fallbackArtistName: string | null | undefined,
+  onArtistClick: ((artistName: string) => void) | undefined
+): ReactNode {
+  const normalizedNames = (artistNames ?? [])
+    .map(name => name.trim())
+    .filter(Boolean);
+
+  if (normalizedNames.length === 0) {
+    const fallback = fallbackArtistName?.trim();
+    if (!fallback) return null;
+    if (!onArtistClick) return fallback;
+    return (
+      <button
+        type='button'
+        onClick={() => onArtistClick(fallback)}
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+      >
+        {fallback}
+      </button>
+    );
+  }
+
+  if (!onArtistClick) {
+    return releaseArtistListFormatter.format(normalizedNames);
+  }
+
+  return releaseArtistListFormatter
+    .formatToParts(normalizedNames)
+    .map((part, index) =>
+      part.type === 'element' ? (
+        <button
+          key={`artist-${index}`}
+          type='button'
+          onClick={() => onArtistClick(part.value)}
+          className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+        >
+          {part.value}
+        </button>
+      ) : (
+        <span key={`sep-${index}`}>{part.value}</span>
+      )
+    );
+}
+
 function ReleaseEntityHeader({
   headerLabel,
   release,
   artistName,
+  onArtistClick,
   canUploadArtwork,
   canRevertArtwork,
   onArtworkUpload,
@@ -132,7 +184,11 @@ function ReleaseEntityHeader({
   const artworkAlt = release.title
     ? `${release.title} artwork`
     : 'Release artwork';
-  const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
+  const artistLine = renderArtistLine(
+    release.artistNames,
+    artistName,
+    onArtistClick
+  );
   const hasActionBar = Boolean(actionBar);
 
   return (
@@ -274,6 +330,7 @@ export function ReleaseSidebar({
   width,
   providerConfig,
   artistName,
+  onArtistClick,
   canGenerateAlbumArt,
   onGenerateAlbumArt,
   onClose,
@@ -631,6 +688,7 @@ export function ReleaseSidebar({
             headerLabel={headerLabel}
             release={release}
             artistName={artistName}
+            onArtistClick={onArtistClick}
             canUploadArtwork={canUploadArtwork}
             canRevertArtwork={canRevertArtwork}
             onArtworkUpload={handleArtworkUpload}
