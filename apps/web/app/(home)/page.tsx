@@ -170,7 +170,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_TRUST ? <HomeTrustSection /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_TRUST ? (
+        <HomeTrustSection label='Accelerating release cycles for artists on' />
+      ) : null}
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
         <HomepageV2SystemOverview />
       ) : null}
