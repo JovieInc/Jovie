@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.163] - 2026-04-22
+
+> Codex now boots Jovie worktrees through the canonical setup path and performs safe stop-time cleanup automatically when lifecycle hooks are available.
+
+### Added
+
+- Added tracked Codex lifecycle config that runs the canonical setup wrapper on session start and the cleanup wrapper on stop.
+- Added a safe Codex cleanup wrapper that prunes stale worktree metadata, clears Turbopack cache, and keeps heavier E2E/archive cleanup behind explicit environment flags.
+
+### Changed
+
+- Simplified the Codex setup wrapper to delegate to `scripts/setup.sh`, including hook-safe JSON stdout handling for Codex lifecycle events.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.163`.
+
 ## [26.4.162] - 2026-04-22
 
 > The homepage now opens with a Linear-premium hero: a muted, slow-pulsing neon glow behind a "Your AI Artist Manager." one-line headline that fits from 375px up, a "Built for artists." eyebrow pill, and a Clerk modal sign-in that lazy-mounts only when the header link is clicked. The rest of the `/new` composition is available behind individual feature flags, all off in production.
