@@ -16,6 +16,50 @@
   display: none;
 }
 
+/*
+ * A2 · Lovable — Saturated Flood hero background.
+ * Two radial-gradient layers behind the hero content. Kept in CSS to
+ * keep the large gradient strings out of JSX.
+ */
+.homepage-hero-flood {
+  background: #08090a;
+}
+.homepage-hero-flood__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.homepage-hero-flood__base {
+  background: radial-gradient(
+    1200px 800px at 50% 60%,
+    #ff2e88 0%,
+    #ff6a00 35%,
+    #8e00ff 70%,
+    #0a0812 100%
+  );
+}
+.homepage-hero-flood__glow {
+  background: radial-gradient(
+    900px 500px at 50% 100%,
+    #ffdd88 0%,
+    transparent 60%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.6;
+}
+
+.homepage-hero-headline {
+  font-size: clamp(56px, 8vw, 96px);
+  font-weight: 680;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Entrance animation for the chat intake island */
 @keyframes homepageFadeIn {
   from {

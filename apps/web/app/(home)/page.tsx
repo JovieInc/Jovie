@@ -135,14 +135,23 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 export default function HomePage() {
   return (
-    <div className='relative flex flex-1 flex-col bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='homepage-hero-flood relative flex flex-1 flex-col overflow-hidden text-primary-token'>
+      <div
+        aria-hidden='true'
+        className='homepage-hero-flood__layer homepage-hero-flood__base'
+      />
+      <div
+        aria-hidden='true'
+        className='homepage-hero-flood__layer homepage-hero-flood__glow'
+      />
+
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <div className='flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
+      <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
         <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
           <HomepageIntent />
         </div>

@@ -16,6 +16,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import {
+  HERO_COPY,
   HOMEPAGE_INTENT_EXPERIMENT_ID,
   HOMEPAGE_INTENT_KEY,
   HOMEPAGE_INTENT_VARIANT_ID,
@@ -167,11 +168,25 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1 className='text-center text-[32px] font-semibold tracking-[-0.02em] text-primary-token sm:text-[38px]'>
-        How can I help you today?
+      <span
+        hidden
+        className='homepage-hero-eyebrow mx-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.12] py-1 pl-1 pr-3 text-[11.5px] font-medium text-white backdrop-blur-xl'
+      >
+        <span className='rounded-full bg-white px-2 py-[3px] text-[10px] font-bold text-[#ff2e88]'>
+          {HERO_COPY.eyebrow.badge}
+        </span>
+        {HERO_COPY.eyebrow.text}
+        <ArrowRight
+          aria-hidden='true'
+          className='h-[11px] w-[11px] text-white'
+          strokeWidth={2.25}
+        />
+      </span>
+      <h1 className='homepage-hero-headline mt-7 text-center font-semibold text-white sm:mt-8'>
+        {HERO_COPY.headline}
       </h1>
-      <p className='mt-3 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token'>
-        Jovie helps artists &amp; labels release music faster.
+      <p className='homepage-hero-subhead mx-auto mt-5 max-w-[620px] text-center text-[18px] leading-[1.45] tracking-[-0.01em] text-white/85'>
+        {HERO_COPY.subhead}
       </p>
 
       <label htmlFor={INPUT_ID} className='sr-only'>
