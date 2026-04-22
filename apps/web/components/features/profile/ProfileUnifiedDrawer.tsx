@@ -306,7 +306,7 @@ function ReleasesDrawerContent({
             ) : null}
             <a
               href={`/${artistHandle}/${release.slug}`}
-              className='flex items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 transition-colors duration-normal active:bg-white/[0.06]'
+              className='flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150 ease-out hover:bg-white/[0.05] focus-visible:bg-white/[0.06] focus-visible:outline-none active:bg-white/[0.08]'
               aria-label={ariaLabel}
             >
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -499,10 +499,10 @@ export function ProfileUnifiedDrawer({
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
           key={renderedView}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15, ease: [0.32, 0, 0.67, 1] }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12, ease: 'linear' }}
         >
           {renderedView === 'menu' && (
             <div className='flex flex-col gap-0.5' role='menu'>

@@ -439,7 +439,7 @@ export function ProfileCompactSurface({
             )}
           </div>
 
-          <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+          <div className='absolute inset-x-0 bottom-5 z-10 flex flex-col items-stretch gap-3 px-5'>
             <IdentityHeading className='min-w-0'>
               <Link
                 data-testid='profile-identity-link'
@@ -459,15 +459,28 @@ export function ProfileCompactSurface({
                 ) : null}
               </Link>
             </IdentityHeading>
-            {mergedDSPs.length > 0 ? (
-              <button
-                type='button'
-                onClick={onPlayClick}
-                className='mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-transform duration-150 hover:scale-[1.06] active:scale-95'
-                aria-label={`Play ${artist.name}`}
-              >
-                <Play className='ml-0.5 h-3.5 w-3.5 fill-current text-black/85' />
-              </button>
+
+            {renderMode === 'interactive' ? (
+              <div className='flex items-start gap-2'>
+                <div className='min-w-0 flex-1'>
+                  <ProfileInlineNotificationsCTA
+                    artist={artist}
+                    onManageNotifications={onManageNotifications}
+                    onRegisterReveal={onRegisterReveal}
+                    variant='hero'
+                  />
+                </div>
+                {mergedDSPs.length > 0 ? (
+                  <button
+                    type='button'
+                    onClick={onPlayClick}
+                    className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.28),inset_0_0_0_1px_rgba(255,255,255,0.4)] transition-transform duration-150 hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                    aria-label={`Play ${artist.name}`}
+                  >
+                    <Play className='ml-0.5 h-[15px] w-[15px] fill-current' />
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </header>
@@ -493,17 +506,11 @@ export function ProfileCompactSurface({
             />
           </div>
 
-          {renderMode === 'interactive' ? (
-            <ProfileInlineNotificationsCTA
-              artist={artist}
-              onManageNotifications={onManageNotifications}
-              onRegisterReveal={onRegisterReveal}
-            />
-          ) : (
+          {renderMode === 'preview' ? (
             <PreviewInlineNotifications
               notifications={previewNotificationsState}
             />
-          )}
+          ) : null}
 
           {visibleSocialLinks.length > 0 ? (
             <nav

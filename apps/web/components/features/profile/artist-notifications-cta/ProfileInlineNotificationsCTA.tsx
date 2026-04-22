@@ -21,6 +21,7 @@ import type { Artist } from '@/types/db';
 import {
   clearOtpConfirmTimeout,
   noFontSynthesisStyle,
+  profileHeroMorphPillClassName,
   requestOtpResendConfirmation,
   SubscriptionDesktopErrorIndicator,
   SubscriptionFeedbackRail,
@@ -28,6 +29,9 @@ import {
   SubscriptionOtpResendAction,
   SubscriptionPearlComposer,
   subscriptionComposerFocusClassName,
+  subscriptionHeroComposerFocusClassName,
+  subscriptionHeroInputClassName,
+  subscriptionHeroSubmitClassName,
   subscriptionInputClassName,
   subscriptionPrimaryActionClassName,
   subscriptionSuccessTextClassName,
@@ -40,6 +44,15 @@ type RevealVisualState = 'collapsed' | 'expanded' | 'submitting' | 'error';
 
 const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
 const inlineComposerWrapperClassName = 'h-[72px]';
+const heroComposerWrapperClassName = 'h-[64px]';
+
+/** How long we wait after tapping "Notify me" before we'll consider the reveal
+ * shell truly blurred. Must exceed the focus delay below, otherwise the blur
+ * that fires between click and input-mount collapses the step back to 'cta'
+ * and causes visible flicker. */
+const REVEAL_SHELL_BLUR_GUARD_MS = 250;
+const EMAIL_INPUT_FOCUS_DELAY_MS = 180;
+const EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS = 0;
 
 function getRevealVisualState(
   step: Step,
@@ -56,17 +69,21 @@ function CircularSubmitButton({
   onClick,
   disabled,
   submitting = false,
+  tone = 'default',
 }: {
   readonly onClick: () => void;
   readonly disabled: boolean;
   readonly submitting?: boolean;
+  readonly tone?: 'default' | 'hero';
 }) {
+  const base =
+    tone === 'hero' ? subscriptionHeroSubmitClassName : circularButtonClassName;
   return (
     <button
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className={`${circularButtonClassName} relative`}
+      className={`${base} relative`}
       aria-label={submitting ? 'Submitting' : 'Submit'}
     >
       <span
@@ -102,6 +119,7 @@ interface BirthdayInputProps {
   readonly autoFocus?: boolean;
   readonly disabled?: boolean;
   readonly error?: boolean;
+  readonly tone?: 'default' | 'hero';
 }
 
 function formatBirthdayInput(value: string): string {
@@ -123,6 +141,7 @@ function BirthdayInput({
   autoFocus = true,
   disabled = false,
   error = false,
+  tone = 'default',
 }: Readonly<BirthdayInputProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const formattedValue = formatBirthdayInput(value);
@@ -131,6 +150,11 @@ function BirthdayInput({
     if (!autoFocus) return;
     inputRef.current?.focus();
   }, [autoFocus]);
+
+  const isHero = tone === 'hero';
+  const className = isHero
+    ? `${subscriptionHeroInputClassName} text-left px-3`
+    : 'h-12 w-full rounded-full bg-transparent px-3 text-left text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0';
 
   return (
     <input
@@ -158,7 +182,7 @@ function BirthdayInput({
         }
       }}
       autoComplete='bday'
-      className='h-12 w-full rounded-full bg-transparent px-3 text-left text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0'
+      className={className}
     />
   );
 }
@@ -184,6 +208,7 @@ interface InlineInputStepProps {
   readonly maxLength?: number;
   readonly ariaInvalid?: boolean;
   readonly composerTestId?: string;
+  readonly tone?: 'default' | 'hero';
 }
 
 function InlineInputStep({
@@ -207,16 +232,26 @@ function InlineInputStep({
   maxLength,
   ariaInvalid,
   composerTestId,
+  tone = 'default',
 }: InlineInputStepProps) {
+  const isHero = tone === 'hero';
+  const focusClass = isHero
+    ? subscriptionHeroComposerFocusClassName
+    : subscriptionComposerFocusClassName;
+  const inputClass = isHero
+    ? subscriptionHeroInputClassName
+    : subscriptionInputClassName;
   return (
     <SubscriptionPearlComposer
+      tone={tone}
       dataTestId={composerTestId ?? `${testId}-composer`}
-      className={isFocused ? subscriptionComposerFocusClassName : ''}
+      className={isFocused ? focusClass : ''}
       action={
         <CircularSubmitButton
           onClick={onSubmit}
           disabled={disabled}
           submitting={submitting}
+          tone={tone}
         />
       }
     >
@@ -232,7 +267,7 @@ function InlineInputStep({
           data-testid={testId}
           type={type}
           inputMode={inputMode}
-          className={subscriptionInputClassName}
+          className={inputClass}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
@@ -294,13 +329,23 @@ interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
   readonly onManageNotifications?: () => void;
   readonly onRegisterReveal?: (reveal: () => void) => void;
+  /** 'hero' renders the Pearl-Notify glassy dark pill over the hero image. */
+  readonly variant?: 'default' | 'hero';
 }
 
 export function ProfileInlineNotificationsCTA({
   artist,
   onManageNotifications,
   onRegisterReveal,
+  variant = 'default',
 }: ProfileInlineNotificationsCTAProps) {
+  const isHero = variant === 'hero';
+  const collapsedPillClassName = isHero
+    ? `${profileHeroMorphPillClassName} w-full gap-2 px-5`
+    : `${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`;
+  const donePillClassName = isHero
+    ? `${profileHeroMorphPillClassName} w-full gap-2 px-5`
+    : `${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`;
   const {
     emailInput,
     error,
@@ -345,6 +390,7 @@ export function ProfileInlineNotificationsCTA({
   const prefersReducedMotion = useReducedMotion();
   const lastInteractionWasKeyboardRef = useRef(false);
   const suppressNextFocusOpenRef = useRef(false);
+  const emailInputFocusedRef = useRef(false);
 
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -394,7 +440,9 @@ export function ProfileInlineNotificationsCTA({
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const focusDelay = prefersReducedMotion ? 0 : 180;
+    const focusDelay = prefersReducedMotion
+      ? EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS
+      : EMAIL_INPUT_FOCUS_DELAY_MS;
 
     if (step === 'email') {
       timeoutId = globalThis.setTimeout(() => {
@@ -461,6 +509,9 @@ export function ProfileInlineNotificationsCTA({
   useEffect(() => {
     if (step !== 'otp') {
       lastAutoVerifiedCodeRef.current = null;
+    }
+    if (step !== 'email') {
+      emailInputFocusedRef.current = false;
     }
   }, [step]);
 
@@ -563,6 +614,8 @@ export function ProfileInlineNotificationsCTA({
   );
 
   const handleRevealShellBlurCapture = useCallback(() => {
+    // Defer past the autofocus window so the reveal transition isn't
+    // interrupted by the click-blur that precedes input mount/focus.
     globalThis.setTimeout(() => {
       if (step !== 'email') return;
 
@@ -571,10 +624,14 @@ export function ProfileInlineNotificationsCTA({
         return;
       }
 
+      // Only collapse if the input actually received focus at least once.
+      // Prevents flicker when blur fires before the input has mounted.
+      if (!emailInputFocusedRef.current) return;
+
       if (!emailInput.trim() && !isSubmitting) {
         setStep('cta');
       }
-    }, 0);
+    }, REVEAL_SHELL_BLUR_GUARD_MS);
   }, [step, emailInput, isSubmitting]);
 
   const handleManageButtonFocus = useCallback(() => {
@@ -633,7 +690,10 @@ export function ProfileInlineNotificationsCTA({
     <div
       data-testid='profile-inline-cta'
       data-ui='step-stack'
-      className={inlineComposerWrapperClassName}
+      data-tone={isHero ? 'hero' : 'default'}
+      className={
+        isHero ? heroComposerWrapperClassName : inlineComposerWrapperClassName
+      }
     >
       <div className='step-stack-track h-full'>
         <StepLayout
@@ -662,11 +722,13 @@ export function ProfileInlineNotificationsCTA({
                   <button
                     type='button'
                     onClick={handleReveal}
-                    className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+                    className={collapsedPillClassName}
                     style={noFontSynthesisStyle}
                   >
                     <Bell className='h-4 w-4' />
-                    Turn on notifications
+                    {isHero
+                      ? 'Notify me about new releases'
+                      : 'Turn on notifications'}
                   </button>
                 </div>
 
@@ -684,7 +746,10 @@ export function ProfileInlineNotificationsCTA({
                     onChange={e => handleEmailChange(e.target.value)}
                     onSubmit={handleEmailSubmit}
                     onKeyDown={handleKeyDown}
-                    onFocus={() => setIsInputFocused(true)}
+                    onFocus={() => {
+                      setIsInputFocused(true);
+                      emailInputFocusedRef.current = true;
+                    }}
                     onBlur={() => {
                       setIsInputFocused(false);
                       handleFieldBlur();
@@ -695,6 +760,7 @@ export function ProfileInlineNotificationsCTA({
                     ariaInvalid={error ? true : undefined}
                     autoComplete='email'
                     maxLength={254}
+                    tone={isHero ? 'hero' : 'default'}
                   />
                 </div>
               </div>
@@ -724,6 +790,7 @@ export function ProfileInlineNotificationsCTA({
           shell={
             <div ref={otpStepRef}>
               <SubscriptionPearlComposer
+                tone={isHero ? 'hero' : 'default'}
                 dataTestId='inline-otp-composer'
                 action={
                   <CircularSubmitButton
@@ -736,6 +803,7 @@ export function ProfileInlineNotificationsCTA({
                     }}
                     disabled={otpCode.length !== 6 || isSubmitting}
                     submitting={isSubmitting}
+                    tone={isHero ? 'hero' : 'default'}
                   />
                 }
               >
@@ -751,7 +819,7 @@ export function ProfileInlineNotificationsCTA({
                     aria-label='Enter 6-digit verification code'
                     disabled={isSubmitting}
                     error={Boolean(error)}
-                    size='compact'
+                    size={isHero ? 'hero' : 'compact'}
                     showProgressDots={false}
                   />
                 </div>
@@ -820,6 +888,7 @@ export function ProfileInlineNotificationsCTA({
               isFocused={isInputFocused}
               autoComplete='given-name'
               maxLength={100}
+              tone={isHero ? 'hero' : 'default'}
             />
           }
         />
@@ -830,6 +899,7 @@ export function ProfileInlineNotificationsCTA({
           shell={
             <div ref={birthdayStepRef}>
               <SubscriptionPearlComposer
+                tone={isHero ? 'hero' : 'default'}
                 dataTestId='inline-birthday-composer'
                 action={
                   <CircularSubmitButton
@@ -842,6 +912,7 @@ export function ProfileInlineNotificationsCTA({
                     }}
                     disabled={birthdayMutation.isPending}
                     submitting={birthdayMutation.isPending}
+                    tone={isHero ? 'hero' : 'default'}
                   />
                 }
               >
@@ -871,6 +942,7 @@ export function ProfileInlineNotificationsCTA({
                     }}
                     autoFocus={step === 'birthday'}
                     disabled={birthdayMutation.isPending}
+                    tone={isHero ? 'hero' : 'default'}
                   />
                 </div>
               </SubscriptionPearlComposer>
@@ -900,7 +972,7 @@ export function ProfileInlineNotificationsCTA({
               onFocus={handleManageButtonFocus}
               onBlur={handleManageButtonBlur}
               onKeyDown={handleManageButtonKeyDown}
-              className={`${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`}
+              className={donePillClassName}
               style={noFontSynthesisStyle}
               aria-label='Manage notifications'
               aria-haspopup='dialog'
@@ -910,7 +982,7 @@ export function ProfileInlineNotificationsCTA({
                 aria-hidden='true'
               />
               <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
-                Notifications on
+                {isHero ? "You're on the list" : 'Notifications on'}
               </span>
             </button>
           }
