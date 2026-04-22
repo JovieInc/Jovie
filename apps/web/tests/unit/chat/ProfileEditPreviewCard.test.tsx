@@ -52,8 +52,8 @@ describe('ProfileEditPreviewCard', () => {
   it('renders current and new values', () => {
     renderCard();
 
-    expect(screen.getByText('Old Name')).toBeDefined();
-    expect(screen.getByText('New Name')).toBeDefined();
+    expect(screen.getByText('Old Name')).toBeInTheDocument();
+    expect(screen.getByText('New Name')).toBeInTheDocument();
   });
 
   it('renders field label in the header', () => {
@@ -61,13 +61,13 @@ describe('ProfileEditPreviewCard', () => {
 
     expect(
       screen.getByText('Update Display name shown on your profile')
-    ).toBeDefined();
+    ).toBeInTheDocument();
   });
 
   it('renders reason text when provided', () => {
     renderCard();
 
-    expect(screen.getByText('Better branding')).toBeDefined();
+    expect(screen.getByText('Better branding')).toBeInTheDocument();
   });
 
   it('shows "Not set" for null current value', () => {
@@ -77,7 +77,7 @@ describe('ProfileEditPreviewCard', () => {
     };
     renderCard(preview);
 
-    expect(screen.getByText('Not set')).toBeDefined();
+    expect(screen.getByText('Not set')).toBeInTheDocument();
   });
 
   it('calls mutate with correct args when Apply is clicked', () => {
@@ -108,7 +108,7 @@ describe('ProfileEditPreviewCard', () => {
     fireEvent.click(applyButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/updated/i)).toBeDefined();
+      expect(screen.getByText(/updated/i)).toBeInTheDocument();
     });
 
     // Apply and Cancel buttons should no longer be present
@@ -121,7 +121,7 @@ describe('ProfileEditPreviewCard', () => {
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     fireEvent.click(cancelButton);
 
-    expect(screen.getByText('Edit cancelled')).toBeDefined();
+    expect(screen.getByText('Edit cancelled')).toBeInTheDocument();
 
     // Apply button should no longer be present
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
@@ -137,9 +137,11 @@ describe('ProfileEditPreviewCard', () => {
 
     renderCard(bioPreview);
 
-    expect(screen.getByText('Old bio')).toBeDefined();
-    expect(screen.getByText('New bio about the artist')).toBeDefined();
-    expect(screen.getByText('Update Artist bio/description')).toBeDefined();
+    expect(screen.getByText('Old bio')).toBeInTheDocument();
+    expect(screen.getByText('New bio about the artist')).toBeInTheDocument();
+    expect(
+      screen.getByText('Update Artist bio/description')
+    ).toBeInTheDocument();
   });
 
   it('fires onApply callback after successful mutation', () => {

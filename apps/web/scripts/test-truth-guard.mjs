@@ -38,6 +38,12 @@ function walk(dir) {
           );
         }
       }
+
+      if (/loader\(\)\.then/.test(line)) {
+        violations.push(
+          `${path.relative(appRoot, fullPath)}:${index + 1} starts a real async import from a dynamic() mock: ${line.trim()}`
+        );
+      }
     });
   }
 }

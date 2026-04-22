@@ -67,11 +67,11 @@ describe('AdminConversionFunnelSection', () => {
     const result = await AdminConversionFunnelSection();
     render(result);
 
-    expect(screen.getByText('Total Users')).toBeDefined();
-    expect(screen.getByText('With Profiles')).toBeDefined();
-    expect(screen.getByText('Profile Complete')).toBeDefined();
-    expect(screen.getByText('Has Subscribers')).toBeDefined();
-    expect(screen.getByText('Paid')).toBeDefined();
+    expect(screen.getByText('Total Users')).toBeInTheDocument();
+    expect(screen.getByText('With Profiles')).toBeInTheDocument();
+    expect(screen.getByText('Profile Complete')).toBeInTheDocument();
+    expect(screen.getByText('Has Subscribers')).toBeInTheDocument();
+    expect(screen.getByText('Paid')).toBeInTheDocument();
   });
 
   it('shows "User conversion funnel" title', async () => {
@@ -84,7 +84,7 @@ describe('AdminConversionFunnelSection', () => {
     const result = await AdminConversionFunnelSection();
     render(result);
 
-    expect(screen.getByText('User conversion funnel')).toBeDefined();
+    expect(screen.getByText('User conversion funnel')).toBeInTheDocument();
   });
 
   it('shows error message when funnel has errors', async () => {
@@ -99,6 +99,8 @@ describe('AdminConversionFunnelSection', () => {
     const result = await AdminConversionFunnelSection();
     render(result);
 
-    expect(screen.getByText('Funnel query: connection refused')).toBeDefined();
+    expect(
+      screen.getByText('Funnel query: connection refused')
+    ).toBeInTheDocument();
   });
 });

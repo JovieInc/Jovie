@@ -23,7 +23,7 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       APP_ROUTES.DASHBOARD_RELEASES
@@ -40,7 +40,7 @@ describe('DashboardNav interactions', () => {
       overrides: { isAdmin: true },
     });
 
-    expect(screen.getByRole('button', { name: 'Admin' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Growth' })).toHaveAttribute(
       'href',
       APP_ROUTES.ADMIN_GROWTH

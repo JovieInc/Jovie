@@ -14,19 +14,17 @@ const mockProfile = {
 };
 
 vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<{ default: unknown }>) => {
-    let Component: React.ComponentType<Record<string, unknown>> | null = null;
-    const promise = loader().then(mod => {
-      Component = (mod.default ?? mod) as React.ComponentType<
-        Record<string, unknown>
-      >;
-    });
-    // Block-free: vitest hoists mocks, so the promise resolves before render
-    return (props: Record<string, unknown>) => {
-      if (!Component) throw promise;
-      return <Component {...props} />;
-    };
-  },
+  default: () =>
+    function DynamicReleasesExperience(props: Record<string, unknown>) {
+      return (
+        <div
+          data-testid='releases-experience'
+          data-count={String((props.releases as unknown[])?.length ?? 0)}
+        >
+          Releases
+        </div>
+      );
+    },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -42,17 +40,6 @@ const mockQueryResult = {
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => mockQueryResult,
-}));
-
-vi.mock('@/features/dashboard/organisms/release-provider-matrix', () => ({
-  ReleasesExperience: (props: Record<string, unknown>) => (
-    <div
-      data-testid='releases-experience'
-      data-count={String((props.releases as unknown[])?.length ?? 0)}
-    >
-      Releases
-    </div>
-  ),
 }));
 
 vi.mock('@/features/feedback/PageErrorState', () => ({
@@ -81,7 +68,9 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.isError = false;
 
     render(<ReleasesPageClient />);
-    expect(screen.getByTestId('release-skeleton')).toBeDefined();
+    expect(screen.getByTestId('release-skeleton')).toHaveTextContent(
+      'Loading...'
+    );
 
     // Reset
     mockQueryResult.data = [];
@@ -94,10 +83,12 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.isError = true;
 
     render(<ReleasesPageClient />);
-    expect(screen.getByTestId('page-error')).toBeDefined();
+    expect(screen.getByTestId('page-error')).toHaveTextContent(
+      'Failed to load releases data. Please refresh the page.'
+    );
     expect(
       screen.getByText('Failed to load releases data. Please refresh the page.')
-    ).toBeDefined();
+    ).toBeInTheDocument();
 
     // Reset
     mockQueryResult.isError = false;
@@ -111,7 +102,7 @@ describe('@critical ReleasesPageClient', () => {
 
     render(<ReleasesPageClient />);
     const exp = await waitFor(() => screen.getByTestId('releases-experience'));
-    expect(exp).toBeDefined();
+    expect(exp).toHaveTextContent('Releases');
     expect(exp.getAttribute('data-count')).toBe('2');
 
     // Reset
@@ -133,6 +124,9 @@ describe('@critical ReleasesPageClient', () => {
     // This is verified by the component passing it to ReleasesExperience
     mockQueryResult.data = [];
     render(<ReleasesPageClient />);
-    expect(screen.getByTestId('releases-experience')).toBeDefined();
+    expect(screen.getByTestId('releases-experience')).toHaveAttribute(
+      'data-count',
+      '0'
+    );
   });
 });

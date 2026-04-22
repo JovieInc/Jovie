@@ -13,16 +13,13 @@ const { mockUseRegisterRightPanel } = vi.hoisted(() => ({
 let mockPreviewPanelOpen = false;
 
 vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType }>) => {
-    let Component: React.ComponentType | null = null;
-    loader().then(mod => {
-      Component = mod.default;
-    });
-    return function DynamicWrapper(props: Record<string, unknown>) {
-      if (Component) return React.createElement(Component, props);
-      return null;
-    };
-  },
+  default: () =>
+    function DynamicWrapper(props: Record<string, unknown>) {
+      return React.createElement('div', {
+        'data-testid': 'dynamic-import-stub',
+        ...props,
+      });
+    },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
