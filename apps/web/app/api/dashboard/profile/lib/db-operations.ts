@@ -69,18 +69,18 @@ export async function updateProfileRecords({
     .where(eq(creatorProfiles.userId, user.id))
     .returning();
 
-  if (displayNameForUserUpdate) {
-    await db
-      .update(users)
-      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
-  }
-
   if (!updatedProfile) {
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
+  }
+
+  if (displayNameForUserUpdate) {
+    await db
+      .update(users)
+      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
   }
 
   return {
@@ -90,13 +90,17 @@ export async function updateProfileRecords({
 }
 
 export async function getProfileByClerkId(clerkUserId: string) {
+  const user = await getUserByClerkId(db, clerkUserId);
+  if (!user) {
+    return null;
+  }
+
   const [userProfile] = await db
     .select({
       profile: creatorProfiles,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(creatorProfiles.userId, user.id))
     .limit(1);
 
   return userProfile ?? null;

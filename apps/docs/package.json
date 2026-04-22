@@ -1,6 +1,6 @@
 {
   "name": "@jovie/docs",
-  "version": "26.4.157",
+  "version": "26.4.159",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "16.2.3",
+    "next": "16.2.4",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "react": "19.2.4",

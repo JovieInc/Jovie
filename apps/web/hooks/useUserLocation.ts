@@ -13,6 +13,10 @@ interface UseUserLocationResult {
   error: string | null;
 }
 
+interface UseUserLocationOptions {
+  readonly enabled?: boolean;
+}
+
 const LOCATION_CACHE_KEY = 'jovie_user_location';
 const LOCATION_CACHE_EXPIRY_KEY = 'jovie_user_location_expiry';
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
@@ -23,12 +27,24 @@ const GEOLOCATION_TIMEOUT_MS = 5000; // 5 second timeout for fast UX
  * Uses session storage to avoid repeated permission prompts.
  * Times out quickly to ensure the page remains responsive.
  */
-export function useUserLocation(): UseUserLocationResult {
+export function useUserLocation({
+  enabled = true,
+}: UseUserLocationOptions = {}): UseUserLocationResult {
   const [location, setLocation] = useState<UserLocation | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setLocation(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
     // Check for cached location first
     const cachedLocation = getCachedLocation();
     if (cachedLocation) {
@@ -86,7 +102,7 @@ export function useUserLocation(): UseUserLocationResult {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [enabled]);
 
   return { location, isLoading, error };
 }

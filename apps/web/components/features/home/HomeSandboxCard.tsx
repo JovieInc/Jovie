@@ -6,21 +6,21 @@ import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 const STATES = [
   {
     label: 'Tour date',
-    url: 'jov.ie/timwhite',
+    url: 'jov.ie/tim',
     status: 'live',
     detail: 'The Novo, Los Angeles \u00B7 May 17',
     output: '\u2192 Show nearest date, ticket link, full run',
   },
   {
     label: 'New release',
-    url: 'jov.ie/timwhite',
+    url: 'jov.ie/tim',
     status: 'live',
     detail: 'Take Me Over \u00B7 Out now',
     output: '\u2192 Feature release, streaming links, presave converts',
   },
   {
     label: 'Countdown',
-    url: 'jov.ie/timwhite',
+    url: 'jov.ie/tim',
     status: 'scheduled',
     detail: 'The Deep End \u00B7 May 1',
     output: '\u2192 Countdown page, presave capture, auto-notify on drop',

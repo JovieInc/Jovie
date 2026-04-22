@@ -9,7 +9,7 @@ import { APP_NAME } from '@/constants/app';
 import { escapeHtml } from '../utils';
 
 export interface FounderWelcomeTemplateData {
-  /** New user's first name (optional — falls back to a generic greeting) */
+  /** New user's first name (optional - falls back to a generic greeting) */
   firstName?: string | null;
 }
 
@@ -17,7 +17,7 @@ export interface FounderWelcomeTemplateData {
  * Generate the email subject line
  */
 export function getFounderWelcomeSubject(): string {
-  return `Welcome to ${APP_NAME} — any questions?`;
+  return `Welcome to ${APP_NAME} - any questions?`;
 }
 
 /**
@@ -32,11 +32,11 @@ export function getFounderWelcomeText(
 
 Welcome to ${APP_NAME}! I'm Tim, one of the founders.
 
-I wanted to personally reach out — did you run into any issues during signup or onboarding? Even small friction points are super useful for us to hear about.
+I wanted to personally reach out - did you run into any issues during signup or onboarding? Even small friction points are super useful for us to hear about.
 
 Just hit reply if anything felt off. I read every response.
 
-– Tim
+- Tim
 ${APP_NAME}`;
 }
 
@@ -66,9 +66,9 @@ export function getFounderWelcomeHtml(
             <td style="font-size: 15px; line-height: 1.7; color: #333;">
               <p style="margin: 0 0 16px;">${greeting}</p>
               <p style="margin: 0 0 16px;">Welcome to ${APP_NAME}! I'm Tim, one of the founders.</p>
-              <p style="margin: 0 0 16px;">I wanted to personally reach out — did you run into any issues during signup or onboarding? Even small friction points are super useful for us to hear about.</p>
+              <p style="margin: 0 0 16px;">I wanted to personally reach out - did you run into any issues during signup or onboarding? Even small friction points are super useful for us to hear about.</p>
               <p style="margin: 0 0 16px;">Just hit reply if anything felt off. I read every response.</p>
-              <p style="margin: 0;">– Tim<br>${APP_NAME}</p>
+              <p style="margin: 0;">- Tim<br>${APP_NAME}</p>
             </td>
           </tr>
         </table>

@@ -214,6 +214,13 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       publicExportPath: 'tim-white-profile-tour-phone.png',
     },
     {
+      id: 'tim-white-profile-tour-nearby-mobile',
+      title: 'Tim White Profile — Nearby Tour',
+      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+    },
+    {
       id: 'tim-white-profile-pay-mobile',
       title: 'Tim White Profile — Pay',
       route: '/demo/showcase/tim-white-profile?mode=pay',
@@ -270,6 +277,20 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
       publicExportPath: 'tim-white-profile-listen-phone.png',
     },
+    {
+      id: 'tim-white-profile-playlist-fallback-mobile',
+      title: 'Tim White Profile — Playlist Fallback',
+      route: '/demo/showcase/tim-white-profile?state=playlist-fallback',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+    },
+    {
+      id: 'tim-white-profile-listen-fallback-mobile',
+      title: 'Tim White Profile — Listen Fallback',
+      route: '/demo/showcase/tim-white-profile?state=listen-fallback',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+    },
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {
@@ -301,10 +322,10 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'dashboard-release-sidebar-platforms-desktop',
       title: 'Release Sidebar Platforms',
       route: '/demo',
-      waitFor: '[data-testid="release-platforms-card"]',
+      waitFor: '[data-testid="release-tabbed-card"]',
       captureTarget: 'locator',
-      captureSelector: '[data-testid="release-platforms-card"]',
-      interaction: 'open-first-release',
+      captureSelector: '[data-testid="release-tabbed-card"]',
+      interaction: 'open-first-release-dsps',
       publicExportPath: 'release-sidebar-platforms.png',
     },
     {

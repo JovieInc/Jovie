@@ -1,5 +1,5 @@
 export interface ArtistProfileMode {
-  readonly id: 'listen' | 'pay' | 'tour';
+  readonly id: 'listen' | 'pay' | 'tour' | 'contact';
   readonly label: string;
   readonly headline: string;
   readonly description: string;
@@ -34,13 +34,14 @@ export interface ArtistProfileOutcomeCard {
 export interface ArtistProfileOutcomeProof {
   readonly visualProofs: {
     readonly driveStreams: {
-      readonly screenshotSrc: string;
-      readonly screenshotAlt: string;
-      readonly floatingCardLabel: string;
-      readonly floatingCardTitle: string;
+      readonly liveScreenshotSrc: string;
+      readonly liveScreenshotAlt: string;
+      readonly presaveScreenshotSrc: string;
+      readonly presaveScreenshotAlt: string;
+      readonly title: string;
       readonly artistName: string;
-      readonly floatingCardMeta: string;
-      readonly primaryCtaLabel: string;
+      readonly liveLabel: string;
+      readonly presaveLabel: string;
     };
     readonly sellOut: {
       readonly screenshotSrc: string;
@@ -262,6 +263,30 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly body: string;
     readonly steps: readonly ArtistProfileHowItWorksStep[];
+    readonly claim: {
+      readonly searchValue: string;
+      readonly resultName: string;
+      readonly resultSubtitle: string;
+      readonly profilePath: string;
+      readonly ctaLabel: string;
+    };
+    readonly sync: {
+      readonly artistName: string;
+      readonly startProgress: number;
+      readonly endProgress: number;
+      readonly otherProvidersLabel: string;
+      readonly providers: readonly {
+        readonly provider: 'spotify' | 'apple_music' | 'deezer';
+        readonly status: 'Matched' | 'Ingesting';
+      }[];
+    };
+    readonly share: {
+      readonly url: string;
+      readonly displayValue: string;
+      readonly qrLabel: string;
+      readonly deepLinksLabel: string;
+      readonly deepLinks: readonly [string, string, string, string];
+    };
   };
   readonly socialProof: {
     readonly headline: string;
@@ -319,9 +344,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       'Intent-aware',
     ],
     restingScreenshotAlt:
-      'Jovie artist profile showing the default profile view before a mode is opened.',
+      "Jovie artist profile showing Tim White's live profile view.",
     restingScreenshotSrc:
-      '/product-screenshots/tim-white-profile-listen-phone.png',
+      '/product-screenshots/tim-white-profile-live-phone.png',
     modes: [
       {
         id: 'listen',
@@ -445,11 +470,55 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
+      {
+        id: 'contact',
+        label: 'Contact',
+        headline: 'Keep booking, management, and press one tap away.',
+        description: 'Keep booking, management, and press one tap away.',
+        pathLabel: 'jov.ie/you/contact',
+        drawer: {
+          title: 'Contact',
+          subtitle: 'Booking, management, and press in one place.',
+          ctaLabel: 'Email team',
+          items: [
+            {
+              id: 'booking',
+              label: 'Booking',
+              detail: 'North America + Europe',
+              action: 'Email',
+            },
+            {
+              id: 'management',
+              label: 'Management',
+              detail: 'Worldwide',
+              action: 'Email',
+            },
+            {
+              id: 'press',
+              label: 'Press',
+              detail: 'US + UK',
+              action: 'Email',
+            },
+            {
+              id: 'brands',
+              label: 'Brands',
+              detail: 'Partnerships',
+              action: 'Email',
+            },
+          ],
+        },
+        screenshotSrc:
+          '/product-screenshots/tim-white-profile-contact-phone.png',
+        screenshotAlt:
+          'Jovie artist profile showing contact access for booking and press.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
+      },
     ],
   },
   outcomes: {
     headline: 'Built for Artists.',
-    body: 'Every state is tuned to move the next tap forward.',
+    body: 'Every detail is tuned to move the next tap forward.',
     cards: [
       {
         id: 'drive-streams',
@@ -478,15 +547,18 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     syntheticProofs: {
       visualProofs: {
         driveStreams: {
-          screenshotSrc:
-            '/product-screenshots/tim-white-profile-presave-phone.png',
-          screenshotAlt:
-            'Jovie profile showing the latest release and a pre-save state.',
-          floatingCardLabel: 'Latest release',
-          floatingCardTitle: 'The Deep End',
-          artistName: 'Tim White',
-          floatingCardMeta: 'Pre-save live',
-          primaryCtaLabel: 'Turn on notifications',
+          liveScreenshotSrc:
+            '/product-screenshots/tim-white-profile-live-phone.png',
+          liveScreenshotAlt:
+            'Jovie artist profile showing Tim White with the latest release live.',
+          presaveScreenshotSrc:
+            '/product-screenshots/release-deep-end-phone.png',
+          presaveScreenshotAlt:
+            'Jovie release page showing The Deep End countdown card.',
+          title: 'The Deep End',
+          artistName: 'Cosmic Gate & Tim White',
+          liveLabel: 'Out now',
+          presaveLabel: 'Countdown live',
         },
         sellOut: {
           screenshotSrc:
@@ -559,7 +631,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     subhead: 'Turn a $5 busking tip into a lifelong customer.',
     irlPaymentsCard: {
       textAnchor: 'top',
-      title: 'Accept IRL payments',
+      title: 'Accept payments',
       body: 'A sidewalk scan should feel instant, native, and ready to close the tip.',
       visualSide: 'right',
       contextLabel: 'Busking QR',
@@ -587,19 +659,20 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       body: 'A cashless street payment should become a reachable fan, not a dead-end receipt.',
       fanName: 'Jessica',
       fanLocation: 'Los Angeles',
-      fanAmount: '$5',
-      fanIntent: 'Wants the next song',
+      fanAmount: '$10',
+      fanIntent: 'Sidewalk QR tip',
       visualSide: 'left',
     },
     thanksCard: {
       textAnchor: 'top',
       title: 'Say thanks',
       body: 'One clean thank-you can feel personal and send the fan straight back to the music.',
-      appName: 'Mail',
-      sender: 'Tim White',
+      appName: 'Jovie',
+      sender: 'Jovie for Tim White',
       visualSide: 'right',
-      notificationTitle: "Thanks. Here's the new song.",
-      notificationPreview: 'Thanks for the tip. Here is the new song.',
+      notificationTitle: "Thanks for the payment. Here's the new song.",
+      notificationPreview:
+        'A quick thank-you with the latest release, sent right after the tip.',
     },
     reengageCard: {
       textAnchor: 'bottom',
@@ -646,66 +719,66 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         {
           id: 'spotify-jason-la',
           icon: 'spotify',
-          sentence: 'Jason in LA clicked through to Spotify.',
+          sentence: 'Ava L. in London saved O2 Arena.',
         },
         {
           id: 'email-brian',
           icon: 'email',
-          sentence: 'Brian M subscribed by email.',
+          sentence: 'Marcus T. in Chicago opened the LA show.',
         },
         {
           id: 'shows-london-o2',
           icon: 'shows',
-          sentence: 'Ava in London saved O2 Arena.',
+          sentence: 'Mika B. in Berlin scanned the New York show flyer.',
         },
         {
           id: 'qr-berlin-flyer',
           icon: 'qr',
-          sentence: 'Mika in Berlin scanned the flyer.',
+          sentence: 'Nina P. turned on new music notifications.',
         },
       ],
       [
         {
           id: 'apple-tokyo',
           icon: 'apple',
-          sentence: 'Kenji in Tokyo opened the release page.',
+          sentence: 'Jason R. in Toronto opened the release page.',
         },
         {
           id: 'youtube-sao-paulo',
           icon: 'youtube',
-          sentence: 'Luana in Sao Paulo watched on YouTube.',
+          sentence: 'Luana P. in Sao Paulo watched on YouTube.',
         },
         {
           id: 'subscribe-maya-notifications',
           icon: 'subscribe',
-          sentence: 'Maya enabled notifications.',
+          sentence: 'Maya S. turned on release notifications.',
         },
         {
           id: 'spotify-amelia-london',
           icon: 'spotify',
-          sentence: 'Amelia in London checked out your Spotify.',
+          sentence: 'Amelia D. in London opened Spotify.',
         },
       ],
       [
         {
           id: 'shows-chicago',
           icon: 'shows',
-          sentence: 'Marcus in Chicago saved the show.',
+          sentence: 'Diego F. in Austin saved the show.',
         },
         {
           id: 'qr-miami-sticker',
           icon: 'qr',
-          sentence: 'Sofia in Miami scanned the sticker.',
+          sentence: 'Sofia K. in Miami scanned the sticker.',
         },
         {
           id: 'email-nina',
           icon: 'email',
-          sentence: 'Nina P confirmed the email opt-in.',
+          sentence: 'Nina P. confirmed the email opt-in.',
         },
         {
           id: 'pay-diego-support',
           icon: 'pay',
-          sentence: 'Diego paid with Apple Pay.',
+          sentence: 'Diego F. paid from the sidewalk QR.',
         },
       ],
     ],
@@ -713,66 +786,45 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   reactivation: {
     headline: 'Notify them automatically.',
     subhead:
-      'Once a fan opts in, new music, local shows, and thank-yous go out without rebuilding the moment.',
+      'When new music drops or a nearby show is coming up, Jovie brings the right fans back.',
     workflow: {
       columns: ['Trigger', 'Audience', 'Message', 'Destination'],
       rows: [
         {
           id: 'release',
-          trigger: 'New Release',
-          audience: 'Subscribers',
-          message: 'Hear It First',
-          destination: '/music',
-        },
-        {
-          id: 'tour',
-          trigger: 'Tour Announced',
-          audience: 'Nearby Fans',
-          message: 'Date Just Added',
-          destination: '/shows',
-        },
-        {
-          id: 'video',
-          trigger: 'Video Live',
-          audience: 'Recent Listeners',
-          message: 'Watch Now',
-          destination: '/music',
-        },
-        {
-          id: 'support-follow-up',
-          trigger: 'Support Received',
-          audience: 'Supporter',
-          message: 'Thanks for Being Here',
-          destination: '/music',
+          trigger: 'New music',
+          audience: 'Fans who asked for music',
+          message: 'New release alert',
+          destination: 'Latest release page',
         },
       ],
     },
     outputs: [
       {
         id: 'release-alerts',
-        label: 'New music',
+        label: 'Drive streams',
         title: 'Subscribers hear it first.',
         detail: 'New release live now',
-        destination: 'Email -> /music',
+        destination: 'Email -> release page',
       },
       {
         id: 'nearby-show-alerts',
-        label: 'Nearby shows',
+        label: 'Move ticket intent',
         title: 'The right city gets the date.',
         detail: 'Los Angeles added · The Novo',
-        destination: 'Alert -> /shows',
+        destination: 'Alert -> ticket page',
       },
       {
         id: 'thank-you',
-        label: 'Follow-up',
+        label: 'Bring fans back',
         title: 'Support turns into the next listen.',
         detail: 'Thanks for the support tonight',
-        destination: 'Message -> /music',
+        destination: 'Message -> release page',
       },
     ],
   },
   specWall: {
-    headline: 'Details that pull their weight.',
+    headline: 'Details that matter.',
     subhead:
       'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.',
   },
@@ -796,6 +848,45 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         description: 'Use the same link everywhere.',
       },
     ],
+    claim: {
+      searchValue: 'Tim White',
+      resultName: 'Tim White',
+      resultSubtitle: 'Spotify artist',
+      profilePath: 'jov.ie/tim',
+      ctaLabel: 'Claim',
+    },
+    sync: {
+      artistName: 'Tim White',
+      startProgress: 0,
+      endProgress: 86,
+      otherProvidersLabel: 'And 24 others.',
+      providers: [
+        {
+          provider: 'spotify',
+          status: 'Matched',
+        },
+        {
+          provider: 'apple_music',
+          status: 'Matched',
+        },
+        {
+          provider: 'deezer',
+          status: 'Ingesting',
+        },
+      ],
+    },
+    share: {
+      url: 'https://jov.ie/tim',
+      displayValue: 'jov.ie/tim',
+      qrLabel: 'QR code',
+      deepLinksLabel: 'Deep links',
+      deepLinks: [
+        'jov.ie/tim',
+        'jov.ie/tim/pay',
+        'jov.ie/tim/listen',
+        'jov.ie/tim/contact',
+      ],
+    },
   },
   socialProof: {
     headline: 'Real Artists. Real Workflows.',
@@ -837,7 +928,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   finalCta: {
-    headline: 'Ready to Amplify?',
+    headline: "Don't lose your next fan.",
     subhead: 'Turn every visit into a stream, save, signup, or support.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',

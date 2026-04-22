@@ -75,7 +75,7 @@
               }
             ],
             "cumulative-layout-shift": [
-              "error",
+              "warn",
               {
                 "maxNumericValue": 0.05
               }

@@ -107,18 +107,15 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
 
   if (!result.success) {
     return (
-      <div
-        role='status'
-        className='rounded-xl border border-subtle bg-surface-1 p-3 text-[13px] text-primary-token'
-      >
-        <div className='font-medium'>Album Art Failed</div>
-        <div className='mt-1 text-secondary-token'>{result.error}</div>
+      <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-[13px] text-primary-token'>
+        <span className='block font-medium'>Album Art Failed</span>
+        <span className='mt-1 block text-secondary-token'>{result.error}</span>
         {result.retryable ? (
-          <div className='mt-2 text-[12px] text-tertiary-token'>
+          <span className='mt-2 block text-[12px] text-tertiary-token'>
             Retry from chat when the provider is available.
-          </div>
+          </span>
         ) : null}
-      </div>
+      </output>
     );
   }
 
@@ -217,11 +214,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         >
           {hasAppliedSelectedCandidate
             ? 'Applied'
-            : !result.releaseId
-              ? 'Create Release With Art'
-              : result.hasExistingArtwork
+            : result.releaseId
+              ? result.hasExistingArtwork
                 ? 'Replace Artwork'
-                : 'Use This Art'}
+                : 'Use This Art'
+              : 'Create Release With Art'}
         </Button>
         <Button
           type='button'
@@ -243,9 +240,9 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         </Button>
       </div>
       {applyMutation.isError || createMutation.isError ? (
-        <div role='status' className='mt-2 text-[12px] text-red-500'>
+        <output className='mt-2 block text-[12px] text-red-500'>
           Could not apply artwork. Try again.
-        </div>
+        </output>
       ) : null}
     </div>
   );

@@ -1,17 +1,19 @@
-import { HomeHero } from '@/components/features/home/HomeAdaptiveProfileStory';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { MarketingContainer } from '@/components/marketing';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
+import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 
 interface ArtistProfileHeroAdaptiveIntroProps {
+  readonly hero: ArtistProfileLandingCopy['hero'];
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
   readonly phoneCaption: string;
   readonly phoneSubcaption: string;
 }
 
 export function ArtistProfileHeroAdaptiveIntro({
+  hero,
   adaptive,
   phoneCaption,
   phoneSubcaption,
@@ -19,12 +21,12 @@ export function ArtistProfileHeroAdaptiveIntro({
   return (
     <div className='relative overflow-x-clip bg-black'>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-        <HomeHero showPhoneComposition={false} variant='artist-profile' />
+        <ArtistProfileHero hero={hero} />
       </div>
 
       <div
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}
-        className='relative -mt-16 bg-black pb-16 sm:-mt-20 sm:pb-10 lg:-mt-24 lg:pb-12'
+        className='relative bg-black pb-16 pt-2 sm:pb-10 sm:pt-4 lg:pb-12 lg:pt-6'
       >
         <MarketingContainer
           width='page'
@@ -44,8 +46,14 @@ export function ArtistProfileHeroAdaptiveIntro({
         </MarketingContainer>
       </div>
 
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}>
-        <HomeTrustSection variant='compact' />
+      <div
+        data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}
+        className='relative z-30 lg:-mt-28 xl:-mt-32'
+      >
+        <HomeTrustSection
+          variant='compact'
+          className='border-y border-white/[0.04] bg-[#030507]'
+        />
       </div>
 
       <style>{`
@@ -74,7 +82,7 @@ export function ArtistProfileHeroAdaptiveIntro({
 
         @media (min-width: 1024px) and (min-height: 821px) {
           .artist-profile-intro-stage {
-            min-height: calc(100svh + 17rem);
+            min-height: calc(100svh + 24rem);
           }
 
           .artist-profile-intro-rail {

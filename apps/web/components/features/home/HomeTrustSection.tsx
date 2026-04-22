@@ -12,17 +12,20 @@ const LOGO_CLASS = 'select-none text-white';
 
 interface HomeTrustSectionProps {
   readonly variant?: 'default' | 'compact';
+  readonly className?: string;
 }
 
 export function HomeTrustSection({
   variant = 'default',
+  className,
 }: Readonly<HomeTrustSectionProps>) {
   return (
     <section
       data-testid='homepage-trust'
       className={cn(
         'homepage-trust-strip',
-        variant === 'compact' && 'homepage-trust-strip--compact'
+        variant === 'compact' && 'homepage-trust-strip--compact',
+        className
       )}
       aria-label='Trusted by artists on major labels'
     >

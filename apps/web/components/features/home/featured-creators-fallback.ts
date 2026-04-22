@@ -5,7 +5,7 @@ const FALLBACK_CREATOR_DATA = [
   {
     handle: TIM_WHITE_PROFILE.handle,
     name: TIM_WHITE_PROFILE.name,
-    tagline: 'Afterglow (Deluxe)',
+    tagline: 'The Deep End',
     src: TIM_WHITE_PROFILE.avatarSrc,
   },
   {

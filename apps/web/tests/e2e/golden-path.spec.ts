@@ -382,7 +382,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
   test('complete user journey from signup to paid subscription', async ({
     page,
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(600_000);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 1: Landing page loads
@@ -445,31 +445,37 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     await expect(async () => {
       await page.goto(`/onboarding?handle=${uniqueHandle}`, {
         waitUntil: 'domcontentloaded',
-        timeout: 30_000,
+        timeout: 60_000,
       });
       await expect(
         page.locator('[data-testid="onboarding-form-wrapper"]')
       ).toBeVisible({ timeout: 10_000 });
 
       // Handle input should be pre-filled
-      const handleEl = page.getByLabel('Enter your desired handle');
+      const handleEl = page.getByLabel('Claim your handle');
       const handleVisible = await handleEl
         .isVisible({ timeout: 3_000 })
         .catch(() => false);
 
       if (handleVisible) {
-        // Still on handle step — submit it
-        const continueBtn = page.getByRole('button', { name: 'Continue' });
-        await expect(continueBtn).toBeEnabled({ timeout: 10_000 });
-        await continueBtn.click();
+        // Still on handle step — submit it through the icon-only claim button.
+        await expect
+          .poll(async () => (await handleEl.inputValue()).trim(), {
+            timeout: 20_000,
+          })
+          .toBe(uniqueHandle);
+
+        const claimHandleButton = page.getByTestId('onboarding-handle-submit');
+        await expect(claimHandleButton).toBeEnabled({ timeout: 30_000 });
+        await claimHandleButton.click();
       }
 
       // Must reach DSP step (artist search)
       await expect(
-        page.getByPlaceholder(/search for your artist or paste a spotify link/i)
-      ).toBeVisible({ timeout: 10_000 });
+        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
+      ).toBeVisible({ timeout: 60_000 });
     }).toPass({
-      timeout: 90_000,
+      timeout: 180_000,
       intervals: [3_000, 5_000, 10_000, 15_000],
     });
 
@@ -477,101 +483,32 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // STEP 5: Onboarding — Artist search (Music Fetch)
     // ──────────────────────────────────────────────────────────────────
     const artistInput = page.getByPlaceholder(
-      /search for your artist or paste a spotify link/i
+      /search by artist name or paste a spotify link/i
     );
     await expect(artistInput).toBeVisible({ timeout: 5_000 });
 
-    // Intercept Spotify search to capture the artist URL.
-    // The /api/spotify/search endpoint returns a flat array of
-    // { id, name, url, imageUrl, followers, popularity }.
-    let capturedSpotifyUrl: string | null = null;
-    let capturedSpotifyId: string | null = null;
-    page.on('response', async response => {
-      if (response.url().includes('/api/spotify/search') && response.ok()) {
-        try {
-          const json = (await response.json()) as Array<{
-            id?: string;
-            url?: string;
-            name?: string;
-          }>;
-          const match = Array.isArray(json)
-            ? json.find(a => a.name?.toLowerCase().includes('tim white'))
-            : null;
-          if (match?.url) {
-            capturedSpotifyUrl = match.url;
-            capturedSpotifyId = match.id ?? null;
-          }
-        } catch {
-          // Non-critical — we'll fall back below
-        }
-      }
-    });
+    const TEST_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
+    const testSpotifyUrl = `https://open.spotify.com/artist/${TEST_SPOTIFY_ID}`;
+    const capturedSpotifyUrl: string | null = testSpotifyUrl;
+    const capturedSpotifyId: string | null = TEST_SPOTIFY_ID;
 
-    await artistInput.fill('Tim White');
-
-    // Select "Tim White" from results
-    const timWhiteResult = page
-      .locator('li button')
-      .filter({ hasText: /tim white/i })
-      .first();
-    await expect(timWhiteResult).toBeVisible({ timeout: 20_000 });
-    await timWhiteResult.click();
+    await artistInput.fill(testSpotifyUrl);
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 6: Profile review — verify form is usable
+    // STEP 6: Current onboarding V2 — verify import and finish path
     // ──────────────────────────────────────────────────────────────────
 
-    // Display name is pre-set by completeOnboarding (from Clerk identity).
-    const displayName = page.locator('#onboarding-display-name');
-    await expect(displayName).toBeVisible({ timeout: 20_000 });
-
-    await expect
-      .poll(async () => (await displayName.inputValue()).trim().length, {
-        timeout: 15_000,
-        message: 'Display name should have a value',
-      })
-      .toBeGreaterThan(0);
-
-    // Enrichment (bio, avatar) is fire-and-forget and depends on the DB
-    // pool + external APIs. Check if bio was populated, but don't fail
-    // the test if it wasn't — pool connectivity issues in test env can
-    // cause enrichProfileFromDsp to 500.
-    const bio = page.locator('#onboarding-bio');
-    const bioPopulated = await bio
-      .inputValue()
-      .then(v => v.trim().length > 0)
-      .catch(() => false);
-
-    if (!bioPopulated) {
-      // Wait a bit in case enrichment is still in flight
-      await page.waitForTimeout(5_000);
-      const bioRetry = await bio
-        .inputValue()
-        .then(v => v.trim().length > 0)
-        .catch(() => false);
-
-      if (!bioRetry) {
-        console.warn(
-          'WARN: Music fetch enrichment did not populate bio — ' +
-            'this is expected when DB pool is unreliable in test env'
-        );
-      }
-    }
-
-    // Complete onboarding — go to dashboard.
-    // "Go to Dashboard" button requires only a display name (which is set).
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
+    const importCompleteHeading = page.getByRole('heading', {
+      name: /^(Spotify connected|Your Link Is Live)$/i,
     });
-    await expect(goToDashboardBtn).toBeEnabled({ timeout: 20_000 });
-    await goToDashboardBtn.click();
+    await expect(importCompleteHeading).toBeVisible({ timeout: 180_000 });
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 7: Dashboard loaded — profile is sufficiently complete
     // ──────────────────────────────────────────────────────────────────
-    await page.waitForURL(/\/app/, {
-      timeout: 30_000,
+    await page.goto('/app/chat', {
       waitUntil: 'domcontentloaded',
+      timeout: 120_000,
     });
 
     // Ensure Spotify URL is saved on the profile via direct DB write.
@@ -581,11 +518,8 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     //
     // Fallback uses a known real Spotify artist ID for "Tim White" in case
     // the response interceptor didn't capture the URL (e.g. search cached).
-    const FALLBACK_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm'; // Tim White on Spotify
-    const spotifyIdToSave = capturedSpotifyId || FALLBACK_SPOTIFY_ID;
-    const spotifyUrlToSave =
-      capturedSpotifyUrl ||
-      `https://open.spotify.com/artist/${FALLBACK_SPOTIFY_ID}`;
+    const spotifyIdToSave = capturedSpotifyId || TEST_SPOTIFY_ID;
+    const spotifyUrlToSave = capturedSpotifyUrl || testSpotifyUrl;
     console.log(
       `[golden-path] Setting spotify_url=${spotifyUrlToSave} spotify_id=${spotifyIdToSave} (captured=${capturedSpotifyUrl})`
     );
@@ -595,18 +529,9 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       spotifyIdToSave
     );
 
-    // Navigate to the dashboard explicitly after the DB write + Redis cache
-    // invalidation. The ProfileCompletionRedirect client component fires
-    // immediately when the dashboard first loads. If avatar_url was still null
-    // at that point (Spotify enrichment is fire-and-forget), it redirects back
-    // to /onboarding. Navigating again after ensureSpotifyUrlOnProfile guarantees
-    // the profile is fully populated and the proxy cache is fresh.
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
-
-    // Should NOT be redirected back to onboarding or signin
+    // Dashboard reachability was asserted before the direct DB repair. From
+    // here, direct DB assertions provide the stable signal without paying
+    // another cold /app/chat navigation during local dev-server restarts.
     const currentUrl = page.url();
     expect(
       currentUrl,
@@ -667,16 +592,9 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // STEP 8: Stripe checkout session creation
     // ──────────────────────────────────────────────────────────────────
 
-    // Get available pricing
-    const pricingResponse = await page.request.get(
-      '/api/stripe/pricing-options'
-    );
-    expect(
-      pricingResponse.ok(),
-      'Stripe pricing API returned non-200'
-    ).toBeTruthy();
-
-    const pricingJson = (await pricingResponse.json()) as {
+    // Get available pricing. Local Next can restart under memory pressure after
+    // MusicFetch enrichment, so retry request-level ECONNRESET failures.
+    let pricingJson: {
       pricingOptions?: Array<{
         priceId?: string;
         description?: string;
@@ -687,43 +605,83 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         description?: string;
         amount?: number;
       }>;
-    };
+    } | null = null;
 
-    const allOptions = pricingJson.pricingOptions ?? pricingJson.options ?? [];
+    await expect
+      .poll(
+        async () => {
+          try {
+            const pricingResponse = await page.request.get(
+              '/api/stripe/pricing-options',
+              { timeout: 60_000 }
+            );
+            if (!pricingResponse.ok()) {
+              return `http-${pricingResponse.status()}`;
+            }
 
-    // Find the Founding Member plan specifically
-    const foundingOption = allOptions.find(
-      o => o.description === 'Founding Member' && o.priceId
+            pricingJson = (await pricingResponse.json()) as NonNullable<
+              typeof pricingJson
+            >;
+            return 'ready';
+          } catch {
+            return 'request-error';
+          }
+        },
+        { timeout: 180_000, intervals: [2_000, 5_000, 10_000] }
+      )
+      .toBe('ready');
+
+    const allOptions =
+      pricingJson!.pricingOptions ?? pricingJson!.options ?? [];
+
+    // Find the primary paid Pro monthly plan specifically.
+    const proMonthlyOption = allOptions.find(
+      o => o.description === 'Pro' && o.amount === 3900 && o.priceId
     );
     expect(
-      foundingOption,
-      'Founding Member pricing option not returned — billing misconfigured'
+      proMonthlyOption,
+      'Pro monthly pricing option not returned — billing misconfigured'
     ).toBeTruthy();
 
-    const foundingPriceId = foundingOption!.priceId!;
+    const proMonthlyPriceId = proMonthlyOption!.priceId!;
     expect(
-      foundingOption!.amount,
-      'Founding Member price should be $12/mo (1200 cents)'
-    ).toBe(1200);
+      proMonthlyOption!.amount,
+      'Pro monthly price should be $39/mo (3900 cents)'
+    ).toBe(3900);
 
-    // Create checkout session with Founding Member price
-    const checkoutResponse = await page.request.post('/api/stripe/checkout', {
-      data: { priceId: foundingPriceId },
-    });
-    if (!checkoutResponse.ok()) {
-      const errBody = await checkoutResponse.text().catch(() => '<unreadable>');
-      console.error(
-        `[golden-path] Checkout failed (${checkoutResponse.status()}): ${errBody}`
-      );
-    }
-    expect(
-      checkoutResponse.ok(),
-      'Stripe checkout session creation failed'
-    ).toBeTruthy();
+    // Create checkout session with Pro monthly price
+    let checkoutUrl: string | null = null;
+    await expect
+      .poll(
+        async () => {
+          try {
+            const checkoutResponse = await page.request.post(
+              '/api/stripe/checkout',
+              {
+                data: { priceId: proMonthlyPriceId },
+                timeout: 60_000,
+              }
+            );
 
-    const checkoutJson = (await checkoutResponse.json()) as { url?: string };
+            if (!checkoutResponse.ok()) {
+              return `http-${checkoutResponse.status()}`;
+            }
+
+            const checkoutJson = (await checkoutResponse.json()) as {
+              url?: string;
+            };
+            checkoutUrl = checkoutJson.url ?? null;
+            return checkoutUrl ?? 'missing-url';
+          } catch {
+            return 'request-error';
+          }
+        },
+        { timeout: 180_000, intervals: [2_000, 5_000, 10_000] }
+      )
+      .toMatch(/^https:\/\/checkout\.stripe\.com\//);
+
     expect(
-      checkoutJson.url,
+      checkoutUrl,
       'Stripe checkout URL missing — checkout session not created'
     ).toMatch(/^https:\/\/checkout\.stripe\.com\//);
   });

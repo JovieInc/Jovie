@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockAcquirePlaylistGenerationLease,
+  mockGetAppFlagValue,
   mockGeneratePlaylist,
   mockGetPlaylistEngineSettings,
   mockGetPlaylistSpotifyStatus,
@@ -10,6 +11,7 @@ const {
   mockVerifyCronRequest,
 } = vi.hoisted(() => ({
   mockAcquirePlaylistGenerationLease: vi.fn(),
+  mockGetAppFlagValue: vi.fn(),
   mockGeneratePlaylist: vi.fn(),
   mockGetPlaylistEngineSettings: vi.fn(),
   mockGetPlaylistSpotifyStatus: vi.fn(),
@@ -32,6 +34,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagValue: mockGetAppFlagValue,
+}));
+
 vi.mock('@/lib/playlists/pipeline', () => ({
   generatePlaylist: mockGeneratePlaylist,
 }));
@@ -45,6 +51,7 @@ describe('GET /api/cron/generate-playlist', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mockVerifyCronRequest.mockReturnValue(null);
+    mockGetAppFlagValue.mockResolvedValue(true);
     mockGetPlaylistEngineSettings.mockResolvedValue({
       enabled: true,
       intervalValue: 3,

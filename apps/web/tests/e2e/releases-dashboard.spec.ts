@@ -261,10 +261,10 @@ test.describe('Releases dashboard', () => {
     await installClipboardSpy(page);
 
     const sidebar = await openFirstReleaseSidebar(page);
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
     await expect(sidebar.getByTestId('drawer-tab-tasks')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toHaveAttribute(
+    await sidebar.getByTestId('drawer-tab-dsps').click();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toHaveAttribute(
       'aria-selected',
       'true'
     );
@@ -282,11 +282,14 @@ test.describe('Releases dashboard', () => {
       .toBe(copiedUrl);
 
     await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
+    await sidebar.getByTestId('release-tasks-toggle').click();
+    await expect(
+      sidebar.locator(
+        '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
+      )
+    ).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
 
     const smartLinkPage = await page.context().newPage();
     try {
@@ -316,6 +319,8 @@ test.describe('Releases dashboard', () => {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
     });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
 
     const { surface } = await ensureReleasesVisible(page);
 
@@ -364,15 +369,19 @@ test.describe('Releases dashboard', () => {
     });
 
     const sidebar = await openFirstReleaseSidebar(page);
+    await expect(sidebar.getByTestId('release-properties-card')).toBeVisible();
     await expect(sidebar.getByTestId('release-tabbed-card')).toBeVisible();
-    await expect(sidebar.getByTestId('drawer-tab-links')).toBeVisible();
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await expect(sidebar.getByTestId('drawer-tab-dsps')).toBeVisible();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-tasks').click();
-    await expect(sidebar.getByTestId('drawer-tab-tasks')).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
+    await sidebar.getByTestId('release-tasks-toggle').click();
+    await expect(
+      sidebar.locator(
+        '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
+      )
+    ).toBeVisible();
   });
 
   test('smart link URLs contain the correct artist handle @nightly', async ({
@@ -398,7 +407,7 @@ test.describe('Releases dashboard', () => {
     const smartLinkHandle = extractSmartLinkHandle(copiedUrl);
     expect(smartLinkHandle).toBeTruthy();
 
-    await sidebar.getByTestId('drawer-tab-links').click();
+    await sidebar.getByTestId('drawer-tab-dsps').click();
     const smartLinkTokens = sidebar.locator(
       '[title^="http://"], [title^="https://"]'
     );
@@ -450,5 +459,80 @@ test.describe('Releases dashboard', () => {
     await expect(
       page.getByRole('button', { name: 'Toggle release preview' })
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+  });
+
+  test('opens the add-release calendar and keeps expanded tracks bounded between release rows @nightly', async ({
+    page,
+  }) => {
+    test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.goto('/app/dashboard/releases', {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.NAVIGATION,
+    });
+
+    const { surface } = await ensureReleasesVisible(page);
+    expect(surface).toBe('desktop');
+
+    const expandButton = page
+      .getByRole('button', { name: 'Expand tracks' })
+      .first();
+    await expect(expandButton).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    await expandButton.click();
+
+    const trackStack = page
+      .locator('[data-testid^="release-track-stack-"]')
+      .first();
+    await expect(trackStack).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+
+    const releaseOpenButtons = page.locator('[data-testid^="release-open-"]');
+    await expect
+      .poll(() => releaseOpenButtons.count(), {
+        timeout: TIMEOUTS.ELEMENT_CHECK,
+      })
+      .toBeGreaterThan(1);
+
+    const trackStackBox = await trackStack.boundingBox();
+    const secondReleaseBox = await releaseOpenButtons.nth(1).boundingBox();
+
+    expect(trackStackBox).not.toBeNull();
+    expect(secondReleaseBox).not.toBeNull();
+    expect(secondReleaseBox!.y).toBeGreaterThan(
+      trackStackBox!.y + trackStackBox!.height - 2
+    );
+
+    const addReleaseButton = page.getByRole('button', {
+      name: 'Create a new release',
+    });
+    await expect(addReleaseButton).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
+    await addReleaseButton.click();
+
+    const addReleaseSidebar = page.getByTestId('add-release-sidebar');
+    await expect(addReleaseSidebar).toBeVisible({
+      timeout: TIMEOUTS.SIDEBAR_OPEN,
+    });
+    await expect(
+      addReleaseSidebar.getByTestId('add-release-details-card')
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+
+    await addReleaseSidebar
+      .getByRole('button', { name: /Pick a date/i })
+      .first()
+      .click();
+    await expect(
+      addReleaseSidebar.locator('[role="grid"]').first()
+    ).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_CHECK,
+    });
   });
 });

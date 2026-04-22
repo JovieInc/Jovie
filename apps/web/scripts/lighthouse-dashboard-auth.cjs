@@ -10,6 +10,21 @@ const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 
+// Mirrors DevTestAuthPersona in apps/web/lib/auth/dev-test-auth-types.ts.
+const ALLOWED_PERSONAS = new Set(['creator', 'creator-ready', 'admin']);
+const DEFAULT_PERSONA = 'creator-ready';
+
+function resolveTestPersona() {
+  const configured = process.env.LIGHTHOUSE_TEST_PERSONA?.trim();
+  if (!configured) return DEFAULT_PERSONA;
+  if (!ALLOWED_PERSONAS.has(configured)) {
+    throw new Error(
+      `LIGHTHOUSE_TEST_PERSONA must be one of ${[...ALLOWED_PERSONAS].join(', ')}; got "${configured}"`
+    );
+  }
+  return configured;
+}
+
 const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '..', '..');
 const defaultBaseUrl = process.env.BASE_URL || 'http://localhost:3000';
@@ -277,7 +292,7 @@ async function seedDashboardAuth(browser, { url }) {
       },
       {
         name: TEST_PERSONA_COOKIE,
-        value: 'creator-ready',
+        value: resolveTestPersona(),
         url: origin,
         sameSite: 'Lax',
       },

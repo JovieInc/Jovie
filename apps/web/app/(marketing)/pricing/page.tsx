@@ -45,6 +45,11 @@ export const metadata: Metadata = {
 };
 
 const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
+const pricingSchemaValidUntil = new Date(
+  Date.UTC(new Date().getUTCFullYear() + 1, 11, 31)
+)
+  .toISOString()
+  .slice(0, 10);
 
 const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
@@ -73,7 +78,7 @@ const PRICING_SCHEMA = {
               price: String(price),
               priceCurrency: 'USD',
               ...(price > 0 && {
-                priceValidUntil: '2026-12-31',
+                priceValidUntil: pricingSchemaValidUntil,
                 billingIncrement: 'P1M',
               }),
               availability: 'https://schema.org/InStock',
@@ -528,6 +533,7 @@ function PricingTableRow({ label, children }: Readonly<PricingTableRowProps>) {
   return (
     <tr>
       <th
+        scope='row'
         className='px-6 py-6 text-left align-top text-[12px] font-semibold tracking-[0.08em] text-tertiary-token'
         style={{ borderTop: '1px solid var(--linear-border-subtle)' }}
       >

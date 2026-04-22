@@ -96,12 +96,13 @@ function MobileFeatureRow({
       className='border-b'
       style={{ borderColor: 'var(--linear-border-subtle)' }}
     >
-      <td
+      <th
+        scope='row'
         className='px-5 py-3.5 pr-4 text-[13px]'
         style={{ color: 'var(--linear-text-secondary)' }}
       >
         {feature.name}
-      </td>
+      </th>
       <td
         className='px-5 py-3.5 text-center'
         style={
@@ -129,12 +130,13 @@ function DesktopFeatureRow({
       className='border-b'
       style={{ borderColor: 'var(--linear-border-subtle)' }}
     >
-      <td
+      <th
+        scope='row'
         className='px-5 py-3.5 pr-4 text-[13px]'
         style={{ color: 'var(--linear-text-secondary)' }}
       >
         {feature.name}
-      </td>
+      </th>
       <td className='px-5 py-3.5 text-center'>
         <CellValue
           value={feature.free}

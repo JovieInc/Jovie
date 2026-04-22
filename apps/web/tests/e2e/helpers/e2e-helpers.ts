@@ -931,6 +931,19 @@ async function clearCachedUserState(clerkUserId: string) {
   }
 }
 
+export interface SeedOnboardedCreatorProfileOptions {
+  readonly clerkUserId: string;
+  readonly handle: string;
+  readonly displayName: string;
+  readonly spotifyId: string;
+  readonly spotifyUrl: string;
+  readonly careerHighlights?: string | null;
+}
+
+interface SeededCreatorProfileRow {
+  id: string;
+}
+
 /**
  * Pre-create a DB user row via direct Neon HTTP query.
  *
@@ -1043,6 +1056,127 @@ export async function ensureDbUser(
   `;
 
   await clearCachedUserState(clerkUserId);
+}
+
+export async function seedOnboardedCreatorProfile({
+  clerkUserId,
+  handle,
+  displayName,
+  spotifyId,
+  spotifyUrl,
+  careerHighlights = null,
+}: SeedOnboardedCreatorProfileOptions): Promise<string> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for creator profile seeding');
+  }
+
+  const sql = neon(dbUrl);
+  const normalizedHandle = handle.toLowerCase();
+  const [user] = (await sql`
+    SELECT id
+    FROM users
+    WHERE clerk_id = ${clerkUserId}
+    LIMIT 1
+  `) as EnsuredUserRow[];
+
+  if (!user?.id) {
+    throw new Error(`No DB user found for Clerk user ${clerkUserId}`);
+  }
+
+  await sql`
+    UPDATE creator_profiles
+    SET spotify_id = NULL, spotify_url = NULL, updated_at = NOW()
+    WHERE spotify_id = ${spotifyId}
+      AND (user_id IS NULL OR user_id <> ${user.id})
+  `;
+
+  const [profile] = (await sql`
+    INSERT INTO creator_profiles (
+      user_id,
+      creator_type,
+      username,
+      username_normalized,
+      display_name,
+      spotify_id,
+      spotify_url,
+      avatar_url,
+      career_highlights,
+      is_public,
+      is_claimed,
+      claimed_at,
+      onboarding_completed_at,
+      settings,
+      theme,
+      ingestion_status,
+      updated_at
+    )
+    VALUES (
+      ${user.id},
+      'artist',
+      ${normalizedHandle},
+      ${normalizedHandle},
+      ${displayName},
+      ${spotifyId},
+      ${spotifyUrl},
+      'https://images.unsplash.com/placeholder',
+      ${careerHighlights},
+      true,
+      true,
+      NOW(),
+      NOW(),
+      '{"spotifyImportStatus":"complete"}'::jsonb,
+      '{}'::jsonb,
+      'idle',
+      NOW()
+    )
+    ON CONFLICT (username_normalized) WHERE username_normalized IS NOT NULL DO UPDATE SET
+      user_id = ${user.id},
+      display_name = ${displayName},
+      spotify_id = ${spotifyId},
+      spotify_url = ${spotifyUrl},
+      avatar_url = COALESCE(creator_profiles.avatar_url, 'https://images.unsplash.com/placeholder'),
+      career_highlights = ${careerHighlights},
+      is_public = true,
+      is_claimed = true,
+      claimed_at = COALESCE(creator_profiles.claimed_at, NOW()),
+      onboarding_completed_at = COALESCE(creator_profiles.onboarding_completed_at, NOW()),
+      settings = creator_profiles.settings || '{"spotifyImportStatus":"complete"}'::jsonb,
+      ingestion_status = 'idle',
+      updated_at = NOW()
+    RETURNING id
+  `) as SeededCreatorProfileRow[];
+
+  if (!profile?.id) {
+    throw new Error(`Failed to seed creator profile for ${clerkUserId}`);
+  }
+
+  await sql`
+    DELETE FROM user_profile_claims
+    WHERE creator_profile_id = ${profile.id}
+  `;
+
+  await sql`
+    INSERT INTO user_profile_claims (
+      user_id,
+      creator_profile_id,
+      role,
+      claimed_at
+    )
+    VALUES (${user.id}, ${profile.id}, 'owner', NOW())
+  `;
+
+  await sql`
+    UPDATE users
+    SET
+      active_profile_id = ${profile.id},
+      user_status = 'active',
+      updated_at = NOW()
+    WHERE id = ${user.id}
+  `;
+
+  await clearCachedUserState(clerkUserId);
+  return profile.id;
 }
 
 /* ------------------------------------------------------------------ */

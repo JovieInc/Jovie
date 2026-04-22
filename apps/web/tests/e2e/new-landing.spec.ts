@@ -6,7 +6,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function gotoLanding(page: import('@playwright/test').Page) {
   await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(2000);
+  await page.getByTestId('homepage-v2-hero').waitFor({ state: 'visible' });
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -140,7 +140,6 @@ test.describe('/new landing page', () => {
   });
 
   test('keeps the hero and pricing visible on mobile', async ({ page }) => {
-    await blockAnalytics(page);
     await page.setViewportSize({ width: 375, height: 812 });
     await gotoLanding(page);
 

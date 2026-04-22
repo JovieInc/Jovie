@@ -42,6 +42,15 @@ function isLegacyProps<TData = unknown>(
   return 'checked' in props && 'onChange' in props;
 }
 
+function resolveCheckboxState(
+  checked: boolean,
+  indeterminate: boolean
+): boolean | 'indeterminate' {
+  if (checked) return true;
+  if (indeterminate) return 'indeterminate';
+  return false;
+}
+
 // Normalize header checkbox state to string format
 function normalizeHeaderState(
   headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' | boolean
@@ -64,8 +73,8 @@ function TanStackHeaderCheckbox({
 
   return (
     <div
-      className='relative flex h-5 w-5 items-center justify-center'
       role='presentation'
+      className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
@@ -96,8 +105,8 @@ function TanStackRowCheckbox({
 }) {
   return (
     <div
-      className='relative flex h-5 w-5 items-center justify-center'
       role='presentation'
+      className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
@@ -169,7 +178,7 @@ function LegacyCheckboxCell({
           )}
         >
           <Checkbox
-            checked={checked ? true : indeterminate ? 'indeterminate' : false}
+            checked={resolveCheckboxState(checked, indeterminate)}
             onCheckedChange={(value: boolean | 'indeterminate') =>
               onChange(value === true)
             }

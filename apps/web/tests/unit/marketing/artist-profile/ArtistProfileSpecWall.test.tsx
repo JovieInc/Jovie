@@ -15,7 +15,7 @@ describe('ArtistProfileSpecWall', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Details that pull their weight.',
+        name: 'Details that matter.',
       })
     ).toBeInTheDocument();
     expect(
@@ -48,6 +48,20 @@ describe('ArtistProfileSpecWall', () => {
       }
 
       expect(within(card).getByRole('img')).toBeInTheDocument();
+    }
+
+    const richAnalyticsCard = screen
+      .getByRole('heading', { name: 'Rich Analytics' })
+      .closest('article');
+
+    expect(richAnalyticsCard).not.toBeNull();
+
+    if (richAnalyticsCard) {
+      expect(
+        within(richAnalyticsCard).getByRole('img', {
+          name: ARTIST_PROFILE_SPEC_TILES[0].screenshotAlt,
+        })
+      ).toBeInTheDocument();
     }
 
     expect(screen.queryByText('Power features')).not.toBeInTheDocument();

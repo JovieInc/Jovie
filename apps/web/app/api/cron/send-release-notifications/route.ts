@@ -442,24 +442,34 @@ async function sendEmailNotification(
   return success ? 'sent' : 'failed';
 }
 
-async function processNotificationWithBatchedData(
-  notification: PendingNotification,
-  now: Date,
-  releasesMap: Map<string, BatchRelease>,
-  creatorsMap: Map<string, BatchCreator>,
-  subscribersMap: Map<string, BatchSubscriber>,
-  linksMap: Map<string, Array<{ providerId: string; url: string }>>,
+async function processNotificationWithBatchedData(ctx: {
+  notification: PendingNotification;
+  now: Date;
+  releasesMap: Map<string, BatchRelease>;
+  creatorsMap: Map<string, BatchCreator>;
+  subscribersMap: Map<string, BatchSubscriber>;
+  linksMap: Map<string, Array<{ providerId: string; url: string }>>;
   entitlementsMap: NonNullable<
     Awaited<ReturnType<typeof getCreatorEntitlementsMap>>
-  >,
+  >;
   creatorTrialCounts: Map<
     string,
     {
       isTrialing: boolean;
       trialNotificationsSent: number;
     }
-  >
-): Promise<ProcessResult> {
+  >;
+}): Promise<ProcessResult> {
+  const {
+    notification,
+    now,
+    releasesMap,
+    creatorsMap,
+    subscribersMap,
+    linksMap,
+    entitlementsMap,
+    creatorTrialCounts,
+  } = ctx;
   try {
     const release = releasesMap.get(notification.releaseId);
     if (!release) {
@@ -693,7 +703,7 @@ async function processNotificationBatches(
   >();
 
   for (const notification of pendingNotifications) {
-    const result = await processNotificationWithBatchedData(
+    const result = await processNotificationWithBatchedData({
       notification,
       now,
       releasesMap,
@@ -701,8 +711,8 @@ async function processNotificationBatches(
       subscribersMap,
       linksMap,
       entitlementsMap,
-      creatorTrialCounts
-    );
+      creatorTrialCounts,
+    });
 
     if (result === 'sent') {
       totalSent += 1;

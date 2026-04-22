@@ -70,12 +70,21 @@ export function useSegmentedInput({
   const [isComplete, setIsComplete] = useState(false);
   const haptic = useHapticFeedback();
   const lastLengthRef = useRef(0);
+  const lastCompletedValueRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
       inputRefs.current[0].focus();
     }
   }, [autoFocus]);
+
+  useEffect(() => {
+    const sanitized = currentValue.replaceAll(/\D/g, '').slice(0, length);
+    lastLengthRef.current = sanitized.length;
+    setIsComplete(sanitized.length === length);
+    lastCompletedValueRef.current =
+      sanitized.length === length ? sanitized : null;
+  }, [currentValue, length]);
 
   const updateValue = useCallback(
     (newValue: string, shouldBlurOnComplete = false) => {
@@ -92,6 +101,7 @@ export function useSegmentedInput({
 
       if (sanitized.length < length) {
         setIsComplete(false);
+        lastCompletedValueRef.current = null;
       }
 
       lastLengthRef.current = sanitized.length;
@@ -101,7 +111,11 @@ export function useSegmentedInput({
       }
       onChange?.(sanitized);
 
-      if (sanitized.length === length) {
+      if (
+        sanitized.length === length &&
+        sanitized !== lastCompletedValueRef.current
+      ) {
+        lastCompletedValueRef.current = sanitized;
         onComplete?.(sanitized);
         if (shouldBlurOnComplete) {
           setTimeout(() => {
@@ -125,34 +139,74 @@ export function useSegmentedInput({
     [updateValue, haptic, length]
   );
 
+  const handleMultiDigitInsertion = useCallback(
+    (index: number, digits: string) => {
+      const chars = Array.from(
+        { length },
+        (_, charIndex) => currentValue[charIndex] ?? ''
+      );
+
+      for (const [offset, digit] of digits
+        .slice(0, length - index)
+        .split('')
+        .entries()) {
+        chars[index + offset] = digit;
+      }
+
+      const nextValue = chars.join('');
+      const complete = nextValue.length >= length;
+      updateValue(nextValue, complete);
+
+      if (!complete) {
+        inputRefs.current[Math.min(index + digits.length, length - 1)]?.focus();
+        haptic.medium();
+      }
+    },
+    [currentValue, updateValue, haptic, length]
+  );
+
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
       const digits = inputValue.replaceAll(/\D/g, '');
 
-      if (digits.length > 1) {
-        handleMultiDigitInput(digits);
+      if (!digits) {
         return;
       }
 
-      const digit = digits.slice(-1);
+      const effectiveIndex =
+        index < currentValue.length || currentValue.length >= length
+          ? index
+          : Math.min(index, currentValue.length);
 
-      if (digit) {
-        // If typing into a position beyond the current value length,
-        // append the digit at the next available position instead of
-        // creating a sparse value (e.g., clicking box 5 when empty).
-        const effectiveIndex = Math.min(index, currentValue.length);
-        const chars = currentValue.split('');
-        chars[effectiveIndex] = digit;
-        const newValue = chars.join('');
-        updateValue(newValue);
+      if (digits.length > 1) {
+        if (digits.length >= length || currentValue.length === 0) {
+          handleMultiDigitInput(digits);
+          return;
+        }
 
-        const nextIndex = effectiveIndex + 1;
-        if (nextIndex < length) {
-          inputRefs.current[nextIndex]?.focus();
+        if (currentValue.length < length) {
+          handleMultiDigitInsertion(effectiveIndex, digits);
+          return;
         }
       }
+
+      const digit = digits.slice(-1);
+      const chars = currentValue.split('');
+      chars[effectiveIndex] = digit;
+      updateValue(chars.join(''));
+
+      const nextIndex = effectiveIndex + 1;
+      if (nextIndex < length) {
+        inputRefs.current[nextIndex]?.focus();
+      }
     },
-    [currentValue, updateValue, handleMultiDigitInput, length]
+    [
+      currentValue,
+      updateValue,
+      handleMultiDigitInput,
+      handleMultiDigitInsertion,
+      length,
+    ]
   );
 
   const handleKeyDown = useCallback(

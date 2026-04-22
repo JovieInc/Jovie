@@ -82,7 +82,7 @@ describe('ArtistProfilesPage', () => {
 
   it('renders the artist profile landing scaffold with subtraction-first copy', {
     timeout: 20_000,
-  }, () => {
+  }, async () => {
     render(<ArtistProfilesPage />);
 
     expectArtistProfileSectionOrder({
@@ -129,17 +129,14 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
 
-    fireEvent.click(adaptiveSequence.getByRole('button', { name: 'Get Paid' }));
+    expect(
+      adaptiveSequence.getByRole('tab', { name: 'Contact' })
+    ).toBeInTheDocument();
+    expect(
+      ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
+        ?.screenshotAlt
+    ).toContain('contact');
 
-    expect(
-      adaptiveSequence.getByText('Make support one tap away.')
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('img', {
-        name: ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'pay')
-          ?.screenshotAlt,
-      })
-    ).toBeInTheDocument();
     expect(screen.queryByText('/listen')).not.toBeInTheDocument();
     expect(screen.queryByText('/tour')).not.toBeInTheDocument();
     expect(screen.queryByText('/pay')).not.toBeInTheDocument();
@@ -155,7 +152,10 @@ describe('ArtistProfilesPage', () => {
       captureSection.getByText('Notifications Enabled')
     ).toBeInTheDocument();
     expect(
-      captureSection.getAllByText('Jason in LA clicked through to Spotify.')
+      captureSection.getAllByText('Ava L. in London saved O2 Arena.').length
+    ).toBeGreaterThan(0);
+    expect(
+      captureSection.getAllByText('Nina P. turned on new music notifications.')
         .length
     ).toBeGreaterThan(0);
     expect(
@@ -174,11 +174,11 @@ describe('ArtistProfilesPage', () => {
       reactivationSection.getByText('Subscribers hear it first.')
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('The right city gets the date.')
+      reactivationSection.getByText('New release live now')
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('Support turns into the next listen.')
-    ).toBeInTheDocument();
+      reactivationSection.queryByText('Nearby show alert')
+    ).not.toBeInTheDocument();
 
     const monetizationSection = within(
       screen.getByTestId('artist-profile-section-monetization')
@@ -197,7 +197,7 @@ describe('ArtistProfilesPage', () => {
       monetizationSection.getAllByTestId('artist-profile-monetization-card')
     ).toHaveLength(4);
     for (const title of [
-      'Accept IRL payments',
+      'Accept payments',
       'Capture the fan',
       'Say thanks',
       'Re-engage every release',
@@ -209,13 +209,20 @@ describe('ArtistProfilesPage', () => {
     expect(monetizationSection.getByText('Jessica')).toBeInTheDocument();
     expect(monetizationSection.getByText('Los Angeles')).toBeInTheDocument();
     expect(
-      monetizationSection.getByText('Wants the next song')
+      monetizationSection.getByText('Sidewalk QR tip')
     ).toBeInTheDocument();
     expect(
-      monetizationSection.getByText("Thanks. Here's the new song.")
+      monetizationSection.getByText('New music notifications enabled')
     ).toBeInTheDocument();
     expect(
-      monetizationSection.getByText('Thanks for the tip. Here is the new song.')
+      monetizationSection.getByText(
+        "Thanks for the payment. Here's the new song."
+      )
+    ).toBeInTheDocument();
+    expect(
+      monetizationSection.getByText(
+        'A quick thank-you with the latest release, sent right after the tip.'
+      )
     ).toBeInTheDocument();
     expect(
       monetizationSection.getByText('Jessica paid you $5')
@@ -237,16 +244,35 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
     expect(
       within(
-        outcomesSection.getByTestId('artist-profile-outcomes-scroller')
+        outcomesSection.getByTestId('artist-profile-outcomes-grid')
       ).getAllByTestId('artist-profile-outcome-card')
     ).toHaveLength(4);
+    expect(
+      outcomesSection.getByTestId('artist-profile-outcomes-grid')
+    ).toBeInTheDocument();
+    expect(outcomesSection.getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(
+      outcomesSection.getAllByText('w/ Cosmic Gate').length
+    ).toBeGreaterThan(0);
+    expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
+    ).toBeInTheDocument();
+    expect(
+      outcomesSection.queryByText('Wired to my latest release')
+    ).not.toBeInTheDocument();
 
     const specWallSection = within(
       screen.getByTestId('artist-profile-section-spec-wall')
     );
     expect(
       specWallSection.getByRole('heading', {
-        name: 'Details that pull their weight.',
+        name: 'Details that matter.',
       })
     ).toBeInTheDocument();
     expect(
@@ -284,10 +310,19 @@ describe('ArtistProfilesPage', () => {
     expect(
       howItWorksSection.getByText('Use the same link everywhere.')
     ).toBeInTheDocument();
+    expect(howItWorksSection.getByText('And 24 others.')).toBeInTheDocument();
+    expect(howItWorksSection.getAllByText('jov.ie/tim').length).toBeGreaterThan(
+      0
+    );
 
     expect(
       screen.getByRole('heading', { name: 'Real Artists. Real Workflows.' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/We built Jovie because we were tired of stitching/)
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(screen.getByText('Founder, Jovie')).toBeInTheDocument();
     expect(
       screen.getAllByRole('link', { name: 'Claim your profile' }).length
     ).toBeGreaterThan(0);
@@ -300,7 +335,7 @@ describe('ArtistProfilesPage', () => {
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'Ready to Amplify?'
+      "Don't lose your next fan."
     );
     expect(
       screen.getByText(
@@ -362,7 +397,7 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Stay Booked' })
+      screen.queryByRole('button', { name: 'Contact' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Get paid. Again and again.' })

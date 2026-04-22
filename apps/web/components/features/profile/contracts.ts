@@ -55,10 +55,19 @@ export type ProfileShowcaseStateId =
   | 'streams-presave'
   | 'streams-release-day'
   | 'streams-video'
+  | 'tour-nearby'
+  | 'playlist-fallback'
+  | 'listen-fallback'
   | 'fans-opt-in'
   | 'fans-confirmed'
   | 'fans-song-alert'
   | 'fans-show-alert'
+  | 'subscribe-email'
+  | 'subscribe-otp'
+  | 'subscribe-otp-error'
+  | 'subscribe-name'
+  | 'subscribe-birthday'
+  | 'subscribe-done'
   | 'tips-open'
   | 'tips-apple-pay'
   | 'tips-thank-you'
@@ -76,8 +85,8 @@ export type ProfileShowcaseDrawerView =
   | null;
 
 export interface ProfilePreviewNotificationsState {
-  readonly kind?: 'button' | 'input' | 'status';
-  readonly tone: 'quiet' | 'compose' | 'success';
+  readonly kind?: 'button' | 'input' | 'status' | 'otp' | 'name' | 'birthday';
+  readonly tone: 'quiet' | 'compose' | 'success' | 'error';
   readonly label: string;
   readonly helper?: string;
   readonly value?: string;

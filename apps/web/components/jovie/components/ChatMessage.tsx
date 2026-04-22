@@ -5,164 +5,17 @@ import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import React, { useMemo } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-import {
-  type ChatInsightsToolResult,
-  isChatAlbumArtToolResult,
-  isToolInvocationPart,
-  type MessagePart,
-  type SocialLinkRemovalToolResult,
-  type SocialLinkToolResult,
-  type ToolInvocationPart,
-} from '../types';
+import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
+import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-import { ChatAlbumArtCard } from './ChatAlbumArtCard';
-import { ChatAnalyticsCard } from './ChatAnalyticsCard';
-import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
-import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
-import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
-import { ChatPitchCard } from './ChatPitchCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
-
-function isInsightsResult(result: unknown): result is ChatInsightsToolResult {
-  return typeof result === 'object' && result !== null && 'success' in result;
-}
-
-function isSocialLinkResult(result: unknown): result is SocialLinkToolResult {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'platform' in result &&
-    'normalizedUrl' in result &&
-    'originalUrl' in result
-  );
-}
-
-function isSocialLinkRemovalResult(
-  result: unknown
-): result is SocialLinkRemovalToolResult {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'linkId' in result &&
-    'platform' in result &&
-    'url' in result
-  );
-}
-
-function renderPitchResultCard(
-  toolInvocation: ToolInvocationPart
-): React.ReactNode {
-  const result = toolInvocation.result as {
-    success: boolean;
-    releaseTitle?: string;
-    pitches?: {
-      spotify: string;
-      appleMusic: string;
-      amazon: string;
-      generic: string;
-    };
-    error?: string;
-  };
-
-  return (
-    <ChatPitchCard
-      state={result.success ? 'success' : 'error'}
-      releaseTitle={result.releaseTitle}
-      pitches={result.pitches}
-      error={result.error}
-    />
-  );
-}
-
-function renderToolCard(
-  toolInvocation: ToolInvocationPart,
-  profileId?: string
-): React.ReactNode {
-  if (
-    toolInvocation.toolName === 'proposeAvatarUpload' &&
-    toolInvocation.state === 'result' &&
-    toolInvocation.result?.success
-  ) {
-    return <ChatAvatarUploadCard />;
-  }
-
-  if (
-    toolInvocation.toolName === 'showTopInsights' &&
-    toolInvocation.state === 'result' &&
-    isInsightsResult(toolInvocation.result)
-  ) {
-    return <ChatAnalyticsCard result={toolInvocation.result} />;
-  }
-
-  if (
-    toolInvocation.toolName === 'proposeSocialLink' &&
-    toolInvocation.state === 'result' &&
-    isSocialLinkResult(toolInvocation.result) &&
-    profileId
-  ) {
-    const result = toolInvocation.result;
-    return (
-      <ChatLinkConfirmationCard
-        profileId={profileId}
-        platform={result.platform}
-        normalizedUrl={result.normalizedUrl}
-        originalUrl={result.originalUrl}
-      />
-    );
-  }
-
-  if (
-    toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
-    toolInvocation.state === 'result' &&
-    isSocialLinkRemovalResult(toolInvocation.result) &&
-    profileId
-  ) {
-    const result = toolInvocation.result;
-    return (
-      <ChatLinkRemovalCard
-        profileId={profileId}
-        linkId={result.linkId}
-        platform={result.platform}
-        url={result.url}
-      />
-    );
-  }
-
-  if (
-    toolInvocation.toolName === 'generateAlbumArt' &&
-    toolInvocation.state === 'result' &&
-    isChatAlbumArtToolResult(toolInvocation.result) &&
-    profileId
-  ) {
-    return (
-      <ChatAlbumArtCard result={toolInvocation.result} profileId={profileId} />
-    );
-  }
-
-  if (
-    toolInvocation.toolName === 'generateReleasePitch' &&
-    toolInvocation.state === 'call'
-  ) {
-    return <ChatPitchCard state='loading' />;
-  }
-
-  if (
-    toolInvocation.toolName === 'generateReleasePitch' &&
-    toolInvocation.state === 'result'
-  ) {
-    return renderPitchResultCard(toolInvocation);
-  }
-
-  return null;
-}
 
 interface ChatMessageProps {
   readonly id: string;
@@ -194,6 +47,7 @@ export function ChatMessage({
   const { copy, isSuccess } = useClipboard();
   const messageText = getMessageText(parts);
   const shouldReduceMotion = useReducedMotion();
+  const toolEvents = getRenderableToolEvents(parts);
   const fileParts = parts.filter(
     (p): p is MessagePart & { url: string; mediaType: string } =>
       p.type === 'file' &&
@@ -201,11 +55,7 @@ export function ChatMessage({
       typeof p.mediaType === 'string' &&
       p.mediaType.startsWith('image/')
   );
-
-  const toolInvocations = useMemo(
-    () => parts.filter(isToolInvocationPart),
-    [parts]
-  );
+  const hasAssistantContent = Boolean(messageText) || toolEvents.length > 0;
 
   return (
     <motion.div
@@ -294,7 +144,7 @@ export function ChatMessage({
             </div>
           )}
 
-          {!isThinking && messageText && (
+          {!isThinking && hasAssistantContent && (
             <div className='space-y-1.5'>
               <div className='flex items-center gap-2 pl-0.5'>
                 <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
@@ -307,33 +157,26 @@ export function ChatMessage({
                   {isStreaming ? 'Writing reply…' : 'Reply'}
                 </span>
               </div>
-              <div
-                data-testid='chat-message-reply-bubble'
-                className='rounded-[18px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-surface))] px-4 py-3.5 text-primary-token shadow-none'
-              >
-                <ChatMarkdown
-                  content={messageText}
-                  isStreaming={Boolean(isStreaming)}
-                />
-              </div>
+              {messageText ? (
+                <div
+                  data-testid='chat-message-reply-bubble'
+                  className='rounded-[18px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-surface))] px-4 py-3.5 text-primary-token shadow-none'
+                >
+                  <ChatMarkdown
+                    content={messageText}
+                    isStreaming={Boolean(isStreaming)}
+                  />
+                </div>
+              ) : null}
             </div>
           )}
 
-          {/* Interactive tool cards */}
-          {toolInvocations.map(toolInvocation => {
-            const card = renderToolCard(toolInvocation, profileId);
-            if (!card) {
-              return null;
-            }
-            return (
-              <div
-                key={toolInvocation.toolInvocationId}
-                className={cn(messageText && 'mt-3')}
-              >
-                {card}
-              </div>
-            );
-          })}
+          <ToolPartsRenderer
+            parts={parts}
+            profileId={profileId}
+            variant='chat'
+            hasMessageText={Boolean(messageText)}
+          />
 
           {!isStreaming && messageText && (
             <div className='mt-1.5 flex items-center justify-end pr-0.5'>

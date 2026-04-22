@@ -42,7 +42,6 @@ vi.mock('next/navigation', async importOriginal => {
     useSearchParams: vi.fn(() => new URLSearchParams()),
   };
 });
-
 vi.mock('@/lib/feature-flags/shared', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/feature-flags/shared')>();
