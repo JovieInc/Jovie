@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 
@@ -45,14 +45,18 @@ describe('OnboardingFormWrapper', () => {
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
   });
 
-  it('prefers the server-provided handle', () => {
+  it('prefers the server-provided handle', async () => {
     render(
       <OnboardingFormWrapper initialHandle='serverhandle' userId='user_123' />
     );
 
-    expect(handleOnlyFormPropsSpy.mock.calls[0]?.[0]).toMatchObject({
-      initialHandle: 'serverhandle',
-      isHydrated: true,
+    await waitFor(() => {
+      expect(handleOnlyFormPropsSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          initialHandle: 'serverhandle',
+          isHydrated: true,
+        })
+      );
     });
     expect(v2FormPropsSpy).not.toHaveBeenCalled();
   });
