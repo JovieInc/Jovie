@@ -2,6 +2,7 @@
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
 import Image from 'next/image';
+import { hexToRgba, lightenHex } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
@@ -11,6 +12,19 @@ interface AboutSectionProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
 }
+
+// Geist accent palette for genre badge rotation — tuned for dark surfaces
+// via low-alpha fill + lightened text. Matches the design system's rotation.
+const GENRE_ACCENTS = [
+  '#8b5cf6', // purple
+  '#22c1fc', // cyan
+  '#0cce6b', // green
+  '#f5a623', // amber
+  '#0070f3', // blue
+  '#ff0080', // pink
+  '#00bcd4', // teal
+  '#f7d600', // yellow
+] as const;
 
 function sanitizeFilename(value: string): string {
   const sanitized = value
@@ -115,14 +129,22 @@ export function AboutSection({
 
       {hasGenres && (
         <div className='flex flex-wrap gap-2'>
-          {genres.map(genre => (
-            <span
-              key={genre}
-              className='rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-[510] capitalize text-white/60'
-            >
-              {genre}
-            </span>
-          ))}
+          {genres.map((genre, i) => {
+            const accent = GENRE_ACCENTS[i % GENRE_ACCENTS.length];
+            return (
+              <span
+                key={genre}
+                className='rounded-full border px-3 py-1 text-[11px] font-[510] capitalize'
+                style={{
+                  backgroundColor: hexToRgba(accent, 0.14),
+                  color: lightenHex(accent, 0.35),
+                  borderColor: hexToRgba(accent, 0.28),
+                }}
+              >
+                {genre}
+              </span>
+            );
+          })}
         </div>
       )}
 
