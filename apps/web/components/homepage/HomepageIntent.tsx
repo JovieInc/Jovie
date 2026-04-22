@@ -124,7 +124,7 @@ export function HomepageIntent() {
 
   return (
     <div
-      className='homepage-intent flex w-full max-w-[720px] flex-col items-stretch'
+      className='homepage-intent flex w-full min-w-0 max-w-[720px] flex-col items-stretch'
       style={{
         fontFeatureSettings: '"cv01", "ss03"',
       }}
@@ -165,7 +165,7 @@ export function HomepageIntent() {
       </div>
 
       <div
-        className='mt-5 flex w-full items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='mt-5 flex w-full min-w-0 items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         style={{
           WebkitMaskImage:
             'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',
