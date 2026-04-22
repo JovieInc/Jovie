@@ -1,7 +1,8 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import { HOMEPAGE_INTENTS_KEY } from '@/components/homepage/intent-store';
 import { expect, test } from './setup';
 
-const INTENTS_KEY = 'jovie_homepage_intents';
+const INTENTS_KEY = HOMEPAGE_INTENTS_KEY;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -143,7 +144,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await page.goto('/');
     // Seed an intent with an HTML-looking prompt via localStorage so we can
     // test the RENDER path on /onboarding without needing real auth.
-    await page.evaluate(() => {
+    await page.evaluate(key => {
       const id = '11111111-1111-4111-8111-111111111111';
       const intent = {
         id,
@@ -157,11 +158,8 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
         createdAt: new Date().toISOString(),
         expiresAt: Date.now() + 30 * 60 * 1000,
       };
-      window.localStorage.setItem(
-        'jovie_homepage_intents',
-        JSON.stringify({ [id]: intent })
-      );
-    });
+      window.localStorage.setItem(key, JSON.stringify({ [id]: intent }));
+    }, INTENTS_KEY);
 
     // No real auth — we are only checking React's escaping. The body
     // should contain the literal text, never a live <script>.
