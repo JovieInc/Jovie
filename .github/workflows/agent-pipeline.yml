@@ -691,7 +691,7 @@ jobs:
 
           APPROVER_ERROR_LOG=$(mktemp)
           if ! APPROVER=$(gh api user --jq '.login' 2>"$APPROVER_ERROR_LOG"); then
-            if rg -q "Resource not accessible by integration" "$APPROVER_ERROR_LOG"; then
+            if grep -q "Resource not accessible by integration" "$APPROVER_ERROR_LOG"; then
               APPROVER=""
               echo "Could not resolve approver identity from GitHub App token; continuing to direct approval attempt."
             else
@@ -729,7 +729,7 @@ jobs:
 
           > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
             >"$APPROVAL_ERROR_LOG" 2>&1; then
-            if rg -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
+            if grep -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
               echo "permission_denied=true" >> "$GITHUB_OUTPUT"
               echo "Skipping auto-approval for PR #$PR_NUMBER because the GitHub App token lacks review permission."
               exit 0
