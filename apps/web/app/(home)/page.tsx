@@ -1,7 +1,15 @@
 import type { Metadata } from 'next';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
-import { HomepageV2BelowHero } from '@/components/marketing/homepage-v2/HomepageV2Route';
+import {
+  HomepageV2CaptureReactivate,
+  HomepageV2FinalCta,
+  HomepageV2FooterLinks,
+  HomepageV2PowerGrid,
+  HomepageV2Pricing,
+  HomepageV2Spotlight,
+  HomepageV2SystemOverview,
+} from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -162,10 +170,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      <HomeTrustSection />
-
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_BELOW_HERO ? (
-        <HomepageV2BelowHero />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_TRUST ? <HomeTrustSection /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
+        <HomepageV2SystemOverview />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SPOTLIGHT ? (
+        <HomepageV2Spotlight />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE ? (
+        <HomepageV2CaptureReactivate />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
+        <HomepageV2PowerGrid />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? <HomepageV2FinalCta /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FOOTER_LINKS ? (
+        <HomepageV2FooterLinks />
       ) : null}
     </>
   );
