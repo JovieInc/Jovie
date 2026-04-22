@@ -261,8 +261,7 @@ export function AudienceRail({
       className='artist-profile-audience-mask overflow-hidden py-1'
       aria-hidden='true'
     >
-      <ul
-        role='presentation'
+      <div
         className={cn(
           'artist-profile-audience-rail flex w-max gap-3',
           direction === 'right' && 'artist-profile-audience-rail-reverse'
@@ -275,7 +274,7 @@ export function AudienceRail({
             pill={pill}
           />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

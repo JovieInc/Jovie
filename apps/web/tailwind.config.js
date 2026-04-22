@@ -32,9 +32,9 @@ module.exports = {
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
         caption: 'var(--linear-caption-weight)', // 510 — compact app controls
         medium: 'var(--font-weight-medium)', // 500
-        semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
-        bold: 'var(--font-weight-bold)', // 590 — Linear-specific
-        heavy: 'var(--font-weight-heavy)', // 700
+        semibold: 'var(--font-weight-semibold)', // 590 — Linear-specific (extracted 2026-03-16)
+        bold: 'var(--font-weight-bold)', // 680 — Linear-specific (extracted 2026-03-16)
+        heavy: 'var(--font-weight-heavy)', // 680 — matches bold today; reserve for future step
         // Legacy linear-prefixed aliases
         'linear-normal': 'var(--linear-font-weight-normal)',
         'linear-medium': 'var(--linear-font-weight-medium)',

@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui/atoms/popover';
-import { format, isValid, parse, startOfToday, subDays } from 'date-fns';
+import { format, isValid, max, parse, startOfToday, subDays } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -102,7 +102,7 @@ export function AddReleaseSidebar({
 
     const today = startOfToday();
     const suggestedRevealDate = subDays(parsedReleaseDate, 30);
-    const effective = suggestedRevealDate > today ? suggestedRevealDate : today;
+    const effective = max([suggestedRevealDate, today]);
 
     return format(effective, 'yyyy-MM-dd');
   }, [releaseDate, isFutureRelease]);

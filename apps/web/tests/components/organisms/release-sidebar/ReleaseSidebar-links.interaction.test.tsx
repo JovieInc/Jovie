@@ -517,11 +517,15 @@ describe('ReleaseSidebar inspector cards', () => {
     );
   });
 
-  it('renders the release drawer with collapsed secondary sections', () => {
+  it('renders the release drawer with four primary tabs and overview content', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-overview')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-dsps')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-tasks')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-pitch')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('metadata')).toHaveAttribute(
       'data-variant',
@@ -532,28 +536,26 @@ describe('ReleaseSidebar inspector cards', () => {
       'flat'
     );
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
-    expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
-    expect(screen.getByTestId('release-extras-card')).toBeInTheDocument();
     expect(screen.getByText('Lyrics')).toBeInTheDocument();
-    expect(screen.getByText('Extras')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('async-toggle')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pitch-section')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('target-playlists-section')
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
+    expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
-  it('shows the compact upgrade card when task access is locked', () => {
+  it('shows the compact upgrade card when task access is locked', async () => {
     mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: false,
     });
+    const user = userEvent.setup();
 
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
 
     expect(
       screen.getByTestId('compact-release-plan-upgrade-card')
@@ -561,13 +563,15 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 
-  it('shows a loading state instead of the lock card while task access is resolving', () => {
+  it('shows a loading state instead of the lock card while task access is resolving', async () => {
     mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: true,
     });
+    const user = userEvent.setup();
 
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
 
     expect(
       screen.getByTestId('release-tasks-loading-state')
@@ -675,7 +679,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
-  it('renders the release drawer as header, analytics, primary tabs, and collapsed secondary sections', () => {
+  it('renders the release drawer as header, analytics, and four primary tabs', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
@@ -685,17 +689,17 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
-    expect(screen.getByTestId('release-extras-card')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
     expect(
       screen.queryByTestId('release-credits-card-stack')
     ).not.toBeInTheDocument();
   });
 
-  it('switches between Details, DSPs, and Tracks tabs', async () => {
+  it('switches between Overview, Links, Tasks, and Pitch tabs', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
@@ -705,20 +709,28 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('drawer-tab-tracks'));
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
+    expect(screen.getByTestId('release-tasks-card')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-pitch'));
+    expect(screen.getByTestId('release-pitch-tab')).toBeInTheDocument();
+    expect(screen.queryByTestId('release-tasks-card')).not.toBeInTheDocument();
   });
 
-  it('omits the Tracks tab when the release has no tracks', () => {
-    render(
+  it('renders the Tracks collapsible only when the release has tracks', () => {
+    const { rerender } = render(
+      <ReleaseSidebar release={mockRelease} {...defaultProps} />
+    );
+    expect(screen.getByTestId('release-tracks-card')).toBeInTheDocument();
+
+    rerender(
       <ReleaseSidebar
         release={{ ...mockRelease, totalTracks: 0 }}
         {...defaultProps}
       />
     );
-
-    expect(screen.queryByTestId('drawer-tab-tracks')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('release-tracks-card')).not.toBeInTheDocument();
   });
 
   it('renders the properties panel with flat metadata and credits content', () => {

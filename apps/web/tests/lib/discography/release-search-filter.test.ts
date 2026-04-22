@@ -116,6 +116,37 @@ describe('filterReleases — text search', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
   });
+
+  it('matches by artist name (case-insensitive)', () => {
+    const releases = [
+      makeRelease({ id: 'a', title: 'Song A', artistNames: ['Deadmau5'] }),
+      makeRelease({ id: 'b', title: 'Song B', artistNames: ['Kaskade'] }),
+      makeRelease({
+        id: 'c',
+        title: 'Song C',
+        artistNames: ['Deadmau5', 'Kaskade'],
+      }),
+    ];
+    const result = filterReleases(releases, EMPTY_FILTERS, 'deadmau5');
+    expect(result.map(r => r.id).sort()).toEqual(['a', 'c']);
+  });
+
+  it('matches artist name even when title does not contain the query', () => {
+    const releases = [
+      makeRelease({ id: 'x', title: 'Unrelated', artistNames: ['Avicii'] }),
+    ];
+    const result = filterReleases(releases, EMPTY_FILTERS, 'Avicii');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('x');
+  });
+
+  it('does not match when neither title nor artist names contain the query', () => {
+    const releases = [
+      makeRelease({ id: 'y', title: 'Foo', artistNames: ['Bar'] }),
+    ];
+    const result = filterReleases(releases, EMPTY_FILTERS, 'baz');
+    expect(result).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

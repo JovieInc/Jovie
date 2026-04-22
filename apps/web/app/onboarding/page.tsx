@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { IntentRestorer } from '@/components/onboarding/IntentRestorer';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
@@ -23,6 +24,7 @@ interface OnboardingPageProps {
     readonly handle?: string;
     readonly username?: string;
     readonly resume?: string;
+    readonly intent_id?: string;
   }>;
 }
 
@@ -192,22 +194,25 @@ export default async function OnboardingPage({
     !existingProfile?.username;
 
   return (
-    <OnboardingFormWrapper
-      assumeInitialHandleAvailable={assumeInitialHandleAvailable}
-      initialDisplayName={initialDisplayName}
-      initialHandle={initialHandle}
-      isReservedHandle={isReservedHandle}
-      userEmail={userEmail}
-      userId={userId}
-      shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-      initialProfileId={
-        existingProfile?.id ?? targetProfileId ?? authResult.profileId
-      }
-      initialResumeStep={resolvedSearchParams?.resume ?? null}
-      existingAvatarUrl={existingProfile?.avatarUrl ?? null}
-      existingBio={existingProfile?.bio ?? null}
-      existingGenres={existingProfile?.genres ?? null}
-    />
+    <>
+      <IntentRestorer intentId={resolvedSearchParams?.intent_id} />
+      <OnboardingFormWrapper
+        assumeInitialHandleAvailable={assumeInitialHandleAvailable}
+        initialDisplayName={initialDisplayName}
+        initialHandle={initialHandle}
+        isReservedHandle={isReservedHandle}
+        userEmail={userEmail}
+        userId={userId}
+        shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+        initialProfileId={
+          existingProfile?.id ?? targetProfileId ?? authResult.profileId
+        }
+        initialResumeStep={resolvedSearchParams?.resume ?? null}
+        existingAvatarUrl={existingProfile?.avatarUrl ?? null}
+        existingBio={existingProfile?.bio ?? null}
+        existingGenres={existingProfile?.genres ?? null}
+      />
+    </>
   );
 }
 
