@@ -1,20 +1,31 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DSP_CONFIGS } from '@/lib/dsp';
-import { RELEASES } from './mock-data';
+import { toast } from 'sonner';
+import {
+  DEMO_PROVIDER_CONFIG,
+  DEMO_RELEASE_VIEW_MODELS,
+} from '@/components/features/demo/mock-release-data';
+import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
-const PROVIDER_KEYS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'deezer',
-] as const;
+async function copyDemoLink(path: string, label: string): Promise<string> {
+  const origin = globalThis.location?.origin ?? 'https://jov.ie';
+  const absoluteUrl = new URL(path, `${origin}/`).toString();
+  try {
+    await navigator.clipboard.writeText(absoluteUrl);
+    toast.success(`${label} copied (demo)`);
+  } catch {
+    toast.error('Unable to copy link in demo mode');
+  }
+  return absoluteUrl;
+}
+
+function noop() {}
 
 /**
- * Releases management demo showing a discography table.
- * Uses real SocialIcon provider dots matching the ReleaseTable pattern.
+ * Marketing hero: renders the real ReleaseTable with demo data so every UX
+ * change to the live dashboard flows through here automatically.
  */
 export function DashboardReleasesDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,94 +45,21 @@ export function DashboardReleasesDemo() {
   }, []);
 
   return (
-    <div ref={containerRef}>
-      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-0'>
-        {/* Header */}
-        <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-3'>
-          <p className='text-xs font-medium text-secondary-token'>
-            {RELEASES.length} releases
-          </p>
-          <div className='rounded-md bg-btn-primary px-2.5 py-1 text-[11px] font-medium text-btn-primary-foreground'>
-            + Add release
-          </div>
-        </div>
-
-        {/* Release rows */}
-        <div>
-          {RELEASES.map((release, i) => (
-            <div
-              key={release.id}
-              className='flex items-center gap-3 px-4 py-3'
-              style={{
-                borderBottom:
-                  i < RELEASES.length - 1
-                    ? '1px solid var(--linear-border-subtle)'
-                    : undefined,
-                opacity: visible ? 1 : 0,
-                transform: visible ? 'translateY(0)' : 'translateY(8px)',
-                transition: `opacity 0.4s ease ${i * 60}ms, transform 0.4s ease ${i * 60}ms`,
-              }}
-            >
-              {/* Artwork */}
-              <div
-                className='h-10 w-10 shrink-0 rounded-md'
-                style={{ background: release.gradient }}
-              />
-
-              {/* Info */}
-              <div className='min-w-0 flex-1'>
-                <div className='flex items-center gap-2'>
-                  <p className='truncate text-sm font-medium text-primary-token'>
-                    {release.title}
-                  </p>
-                  <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token'>
-                    {release.type}
-                  </span>
-                </div>
-                <p className='mt-0.5 text-[11px] text-tertiary-token'>
-                  {release.date} · {release.trackCount}{' '}
-                  {release.trackCount === 1 ? 'track' : 'tracks'}
-                </p>
-              </div>
-
-              {/* Provider dots — matches real ReleaseTable */}
-              <div className='max-sm:hidden sm:flex items-center gap-1'>
-                {PROVIDER_KEYS.map(key => {
-                  const config = DSP_CONFIGS[key];
-                  const isAvailable = release.platforms.some(
-                    p =>
-                      p.toLowerCase().replaceAll(/\s+/g, '_') === key ||
-                      p.toLowerCase().replaceAll(/\s+/g, '') ===
-                        key.replaceAll('_', '')
-                  );
-                  return (
-                    <span
-                      key={key}
-                      className='inline-flex h-5 w-5 items-center justify-center rounded-full'
-                      style={{
-                        backgroundColor: isAvailable
-                          ? `${config?.color ?? '#888'}20`
-                          : 'var(--color-bg-surface-2)',
-                        color: isAvailable
-                          ? config?.color
-                          : 'var(--color-text-tertiary-token)',
-                        opacity: isAvailable ? 1 : 0.3,
-                      }}
-                      title={config?.name}
-                    >
-                      <SocialIcon
-                        platform={key}
-                        className='h-3 w-3'
-                        aria-hidden
-                      />
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+    <div
+      ref={containerRef}
+      className='overflow-hidden rounded-lg border border-subtle bg-surface-0 transition-[opacity,transform] duration-500'
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(8px)',
+      }}
+    >
+      <ReleaseTable
+        releases={DEMO_RELEASE_VIEW_MODELS}
+        providerConfig={DEMO_PROVIDER_CONFIG}
+        artistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
+        onCopy={copyDemoLink}
+        onEdit={noop}
+      />
     </div>
   );
 }
