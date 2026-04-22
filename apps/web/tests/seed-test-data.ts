@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { eq } from 'drizzle-orm';
+import { and, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import {
@@ -49,6 +49,54 @@ interface TestProfile {
 
 interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
+}
+
+function isConflictingCreatorProfileMatchError(
+  error: unknown,
+  usernameNormalized: string,
+  userId: string
+): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.includes(
+    `Conflicting creator profile matches for ${usernameNormalized} and user ${userId}`
+  );
+}
+
+async function reclaimCanonicalE2EProfile(
+  db: ReturnType<typeof drizzle>,
+  userId: string,
+  usernameNormalized: string
+): Promise<boolean> {
+  const [profileByUsername] = await db
+    .select({ id: schema.creatorProfiles.id })
+    .from(schema.creatorProfiles)
+    .where(eq(schema.creatorProfiles.usernameNormalized, usernameNormalized))
+    .limit(1);
+
+  if (!profileByUsername) {
+    return false;
+  }
+
+  await db
+    .update(schema.creatorProfiles)
+    .set({ isClaimed: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.creatorProfiles.userId, userId),
+        eq(schema.creatorProfiles.isClaimed, true),
+        not(eq(schema.creatorProfiles.id, profileByUsername.id))
+      )
+    );
+
+  await db
+    .update(schema.creatorProfiles)
+    .set({ userId, isClaimed: true, updatedAt: new Date() })
+    .where(eq(schema.creatorProfiles.id, profileByUsername.id));
+
+  return true;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1096,7 +1144,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               );
             }
 
-            const profileId = await ensureCreatorProfile(db, {
+            const e2eProfileValues = {
               userId,
               username: E2E_USERNAME,
               usernameNormalized: E2E_USERNAME.toLowerCase(),
@@ -1116,8 +1164,40 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               isClaimed: true,
               ingestionStatus: 'idle',
               onboardingCompletedAt: new Date(),
-            });
+            } as const;
 
+            let profileId: string;
+            try {
+              profileId = await ensureCreatorProfile(db, e2eProfileValues);
+            } catch (error) {
+              if (
+                !isConflictingCreatorProfileMatchError(
+                  error,
+                  e2eProfileValues.usernameNormalized,
+                  userId
+                )
+              ) {
+                throw error;
+              }
+
+              console.warn(
+                '    ⚠ Detected conflicting E2E profile ownership; reclaiming canonical profile'
+              );
+
+              const reclaimed = await reclaimCanonicalE2EProfile(
+                db,
+                userId,
+                e2eProfileValues.usernameNormalized
+              );
+
+              if (!reclaimed) {
+                throw error;
+              }
+
+              profileId = await ensureCreatorProfile(db, e2eProfileValues);
+            }
+
+            await ensureUserProfileClaim(db, userId, profileId);
             await setActiveProfile(db, userId, profileId);
 
             console.log(
