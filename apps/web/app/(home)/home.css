@@ -38,41 +38,40 @@ body:has(.home-viewport)::-webkit-scrollbar {
   inset: 0;
   pointer-events: none;
 }
-/* Low-pass room tone: a very wide, very soft blue-violet wash seeping up from
- * the floor. No high-frequency detail, no hard edges. This is the "muffled
- * bass" layer — felt more than seen. */
+/* Low-pass room tone: almost imperceptible cool wash seeping up from the
+ * floor. Desaturated toward neutral so it reads as "lighting in the room,"
+ * not "blue page." */
 .homepage-hero-flood__base {
   background: radial-gradient(
     1200px 720px at 50% 110%,
-    rgba(92, 108, 190, 0.14) 0%,
-    rgba(72, 64, 150, 0.08) 35%,
-    rgba(20, 18, 36, 0) 72%
+    rgba(120, 125, 150, 0.07) 0%,
+    rgba(90, 90, 120, 0.04) 40%,
+    rgba(20, 18, 28, 0) 76%
   );
 }
-/* Electric pulse: tight cyan-violet point at the floor that slowly breathes,
- * like bass hitting through the floorboards. Screen-blended so it reads as
- * light, not paint. Amplitude is tiny on purpose. */
+/* Slow pulse point: a very faint glow that breathes at the floor. The color
+ * is almost neutral with only a hint of cool. Amplitude is a whisper. */
 .homepage-hero-flood__glow {
   background: radial-gradient(
-    520px 340px at 50% 96%,
-    rgba(120, 170, 235, 0.22) 0%,
-    rgba(90, 120, 215, 0.12) 40%,
-    transparent 74%
+    480px 300px at 50% 98%,
+    rgba(170, 175, 200, 0.1) 0%,
+    rgba(130, 135, 170, 0.05) 42%,
+    transparent 76%
   );
   mix-blend-mode: screen;
-  opacity: 0.55;
-  animation: homepage-hero-pulse 6.5s ease-in-out infinite;
+  opacity: 0.5;
+  animation: homepage-hero-pulse 7s ease-in-out infinite;
   will-change: opacity, transform;
 }
 @keyframes homepage-hero-pulse {
   0%,
   100% {
-    opacity: 0.42;
+    opacity: 0.32;
     transform: scale(1);
   }
   50% {
-    opacity: 0.68;
-    transform: scale(1.05);
+    opacity: 0.48;
+    transform: scale(1.03);
   }
 }
 @media (prefers-reduced-motion: reduce) {
