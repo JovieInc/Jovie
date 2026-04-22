@@ -419,8 +419,8 @@ export function SettingsAdPixelsSection({
         <div className='px-4 py-4 sm:px-5'>
           <SettingsToggleRow
             gated
-            title='Pixel tracking'
-            description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+            title='Enable pixel tracking'
+            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.'
             gateFeatureContext='Pixel tracking'
           />
         </div>
