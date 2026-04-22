@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.164] - 2026-04-22
+
+> Sign-in modal now proxies Clerk traffic through the app's `/__clerk` middleware like the rest of the app (fixing a would-be production break on `pk_live_` keys), and restores URL and focus state cleanly when dismissed. Hero headline picks up its intended Linear-bold weight from CSS instead of a conflicting Tailwind utility.
+
+### Fixed
+
+- [a11y] Restored focus to the trigger element when the sign-in modal closes, so keyboard and screen-reader users return to where they were.
+- Fixed Clerk requests from the sign-in modal bypassing the `/__clerk` proxy in production. The scoped provider now passes `proxyUrl={getClerkProxyUrl(...)}` like the rest of the app.
+- Fixed stale `#/sign-in/...` hash fragments persisting on the homepage after the modal was dismissed mid-flow. The original hash is restored on unmount.
+- Fixed homepage hero headline rendering at Tailwind `font-semibold` (600) instead of the intended Linear-bold `680` weight. The `font-semibold` utility was removed so the `.homepage-hero-headline` class wins cleanly.
+
+### Changed
+
+- [internal] Synced the homepage performance manifest's `readySelectors` to the live hero (`#home-hero-heading` + `input#homepage-intent-input`) so `pnpm perf:loop --route-id home` can measure the real DOM instead of hanging on elements from the retired hero.
+- [internal] Removed the unused `HERO_COPY.eyebrow.badge` field (dead code since the "NEW" chip was dropped from the pill).
+- [internal] Synced the canonical VERSION file and workspace `package.json` entries to `26.4.164`.
+
 ## [26.4.163] - 2026-04-22
 
 > Sign-in modal polish: portaled to `<body>` so it escapes the header's `backdrop-filter` containing block, restyled to a compact 400px dark card close to stock Clerk, and hardened for accessibility with a visible close X, focus-in-modal on open, and a Tab focus trap that keeps keyboard users inside the dialog.
