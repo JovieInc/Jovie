@@ -9,10 +9,10 @@ export default function HomeLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='home-root dark flex h-[100dvh] flex-col overflow-hidden bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='home-root dark flex min-h-[100dvh] flex-col bg-[var(--color-bg-base)] text-primary-token'>
       <SkipToContent />
       <MarketingHeader logoSize='xs' variant='minimal' />
-      <main id='main-content' className='flex flex-1 flex-col min-h-0'>
+      <main id='main-content' className='flex flex-1 flex-col'>
         {children}
       </main>
       <HomeLegalFooter />

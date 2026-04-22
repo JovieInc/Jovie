@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { HomepageV2BelowHero } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -8,6 +9,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
@@ -135,27 +137,33 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 export default function HomePage() {
   return (
-    <div className='homepage-hero-flood relative flex flex-1 flex-col overflow-hidden text-primary-token'>
-      <div
-        aria-hidden='true'
-        className='homepage-hero-flood__layer homepage-hero-flood__base'
-      />
-      <div
-        aria-hidden='true'
-        className='homepage-hero-flood__layer homepage-hero-flood__glow'
-      />
-
+    <>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
-        <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
-          <HomepageIntent />
+      <section className='homepage-hero-flood relative flex min-h-[100svh] flex-col overflow-hidden text-primary-token'>
+        <div
+          aria-hidden='true'
+          className='homepage-hero-flood__layer homepage-hero-flood__base'
+        />
+        <div
+          aria-hidden='true'
+          className='homepage-hero-flood__layer homepage-hero-flood__glow'
+        />
+
+        <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
+          <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
+            <HomepageIntent />
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
+
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_BELOW_HERO ? (
+        <HomepageV2BelowHero />
+      ) : null}
+    </>
   );
 }

@@ -30,6 +30,14 @@ export function HomepageV2Route() {
   return (
     <MarketingPageShell>
       <HomepageV2Hero />
+      <HomepageV2BelowHero />
+    </MarketingPageShell>
+  );
+}
+
+export function HomepageV2BelowHero() {
+  return (
+    <>
       <HomeTrustSection />
       <div aria-hidden='true' className='section-gradient-divider' />
       <HomepageV2SystemOverview />
@@ -42,7 +50,7 @@ export function HomepageV2Route() {
       <HomepageV2Pricing />
       <HomepageV2FinalCta />
       <HomepageV2FooterLinks />
-    </MarketingPageShell>
+    </>
   );
 }
 

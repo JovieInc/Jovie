@@ -17,6 +17,24 @@
 }
 
 /*
+ * Opt the homepage into document-level scrolling. globals.css locks html/body
+ * overflow for the app-shell; marketing pages use `.linear-marketing` to opt
+ * out. The homepage uses its own root class so it needs its own opt-out.
+ */
+html:has(.home-root) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+body:has(.home-root) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+/*
  * A2 · Lovable — Saturated Flood hero background.
  * Two radial-gradient layers behind the hero content. Kept in CSS to
  * keep the large gradient strings out of JSX.
