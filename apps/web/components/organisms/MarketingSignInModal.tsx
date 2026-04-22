@@ -5,6 +5,7 @@ import { ui } from '@clerk/ui';
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getClerkProxyUrl } from '@/components/providers/clerkAvailability';
 import { APP_ROUTES } from '@/constants/routes';
 
 interface MarketingSignInModalProps {
@@ -42,9 +43,15 @@ export function MarketingSignInModal({
 }: Readonly<MarketingSignInModalProps>) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Remember the element that opened the modal so focus can return on
+    // close. Typically the marketing-header "Sign in" button.
+    previouslyFocusedRef.current =
+      (document.activeElement as HTMLElement | null) ?? null;
+
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
@@ -79,9 +86,22 @@ export function MarketingSignInModal({
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Snapshot the current URL hash so we can restore it if Clerk's
+    // `routing='hash'` writes step fragments (e.g. `#/sign-in/factor-one`)
+    // that would otherwise stick around when the modal is dismissed.
+    const previousHash = window.location.hash;
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
+      if (window.location.hash !== previousHash) {
+        const url = `${window.location.pathname}${window.location.search}${previousHash}`;
+        window.history.replaceState(null, '', url);
+      }
+      // Restore focus to whatever triggered the modal.
+      const prev = previouslyFocusedRef.current;
+      if (prev && typeof prev.focus === 'function') {
+        prev.focus();
+      }
     };
   }, [onClose]);
 
@@ -123,8 +143,20 @@ export function MarketingSignInModal({
   // Portal to <body> so the modal escapes the marketing header's
   // backdrop-filter containing block (which would otherwise shrink
   // a `position: fixed` descendant to the header's bounds).
+  //
+  // proxyUrl routes Clerk traffic through the /__clerk middleware proxy
+  // exactly like ClientProviders + AuthClientProviders. Without it, prod
+  // (pk_live_) sign-ins bypass the proxy and break the FAPI host contract
+  // documented in CLAUDE.md.
   return createPortal(
-    <ClerkProvider appearance={clerkDarkCompact} ui={ui}>
+    <ClerkProvider
+      appearance={clerkDarkCompact}
+      ui={ui}
+      proxyUrl={getClerkProxyUrl(globalThis.location)}
+      signInUrl={APP_ROUTES.SIGNIN}
+      signUpUrl={APP_ROUTES.SIGNUP}
+      signInFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+    >
       <div
         role='dialog'
         aria-modal='true'

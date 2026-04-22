@@ -211,8 +211,11 @@ const HOME_ROUTE = {
   warmupStrategy: 'public-route',
   measureMode: 'interactive-shell',
   readySelectors: {
+    // The primary CTA is now the chat-intake composer (not a /signup link).
+    // Sign-in is behind a modal triggered from the header. The input id is
+    // stable from HomepageIntent (`INPUT_ID = 'homepage-intent-input'`).
     shell: ['#home-hero-heading'],
-    content: ['#home-hero-heading', 'a[href="/signup"]'],
+    content: ['#home-hero-heading', 'input#homepage-intent-input'],
   },
   timings: [
     { metric: 'first-contentful-paint', budget: 2000 },
