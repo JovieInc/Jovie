@@ -43,45 +43,107 @@ jobs:
       - name: Install Playwright Browsers (chromium only)
         run: pnpm --filter=@jovie/web exec playwright install --with-deps chromium
 
+      - name: Install Doppler CLI
+        run: |
+          sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+          curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+          sudo apt-get update && sudo apt-get install -y doppler
+          doppler --version
+
       - name: Run Golden Path Test
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           BASE_URL: https://jov.ie
           PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          # Use production Clerk for synthetic tests
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_PROD }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PROD }}
-          # Enable synthetic monitoring mode
+          E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
         run: |
-          # Run only the golden path test
-          pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --reporter=json --output=test-results
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results
         continue-on-error: true
 
       - name: Parse test results
         id: test-results
         run: |
-          RESULTS_DIR="test-results"
-          if [ -f "$RESULTS_DIR/results.json" ]; then
-            FAILED_TESTS=$(jq -r '[.suites[].specs[] | select(.outcome == "unexpected") | .title] | join("\n")' "$RESULTS_DIR/results.json")
-            TOTAL_TESTS=$(jq -r '[.suites[].specs[]] | length' "$RESULTS_DIR/results.json")
-            PASSED_TESTS=$(jq -r '[.suites[].specs[] | select(.outcome == "expected")] | length' "$RESULTS_DIR/results.json")
+          node <<'NODE'
+          const fs = require('node:fs');
 
-            echo "total_tests=$TOTAL_TESTS" >> "$GITHUB_OUTPUT"
-            echo "passed_tests=$PASSED_TESTS" >> "$GITHUB_OUTPUT"
-            echo "failed_tests<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$FAILED_TESTS" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+          const resultsFile = 'apps/web/test-results/results.json';
+          const outputFile = process.env.GITHUB_OUTPUT;
 
-            if [ "$PASSED_TESTS" -lt "$TOTAL_TESTS" ]; then
-              echo "test_status=failed" >> "$GITHUB_OUTPUT"
-            else
-              echo "test_status=passed" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "test_status=error" >> "$GITHUB_OUTPUT"
-            echo "failed_tests=Test results file not found" >> "$GITHUB_OUTPUT"
-          fi
+          function emit(line) {
+            if (outputFile) {
+              fs.appendFileSync(outputFile, `${line}\n`);
+            } else {
+              console.log(line);
+            }
+          }
+
+          function emitMultiline(name, lines) {
+            emit(`${name}<<EOF`);
+            for (const line of lines) emit(line);
+            emit('EOF');
+          }
+
+          if (!fs.existsSync(resultsFile)) {
+            emit('test_status=error');
+            emitMultiline('failed_tests', ['Test results file not found']);
+            process.exit(0);
+          }
+
+          const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+          const specs = [];
+
+          function collectSpecs(suites = []) {
+            for (const suite of suites) {
+              specs.push(...(suite.specs ?? []));
+              collectSpecs(suite.suites ?? []);
+            }
+          }
+
+          collectSpecs(results.suites ?? []);
+
+          const tests = specs.flatMap(spec =>
+            (spec.tests ?? []).map(testCase => ({ spec, testCase }))
+          );
+          const skipped = tests.filter(({ testCase }) =>
+            (testCase.results ?? []).some(result => result.status === 'skipped')
+          );
+          const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
+          const failed = tests.filter(
+            ({ testCase }) => testCase.status === 'unexpected'
+          );
+          const passed = tests.filter(
+            ({ testCase }) =>
+              ['expected', 'flaky'].includes(testCase.status) &&
+              !(testCase.results ?? []).some(result => result.status === 'skipped')
+          );
+
+          emit(`total_tests=${tests.length}`);
+          emit(`passed_tests=${passed.length}`);
+          emit(`flaky_tests=${flaky.length}`);
+          emit(`skipped_tests=${skipped.length}`);
+
+          const details = [
+            ...failed.map(({ spec }) => spec.title),
+            ...(skipped.length > 0
+              ? ['Skipped tests:', ...skipped.map(({ spec }) => spec.title)]
+              : []),
+          ];
+          emitMultiline('failed_tests', details);
+
+          if (tests.length === 0) {
+            emit('test_status=error');
+          } else if (failed.length > 0 || skipped.length > 0) {
+            emit('test_status=failed');
+          } else if (passed.length === tests.length) {
+            emit('test_status=passed');
+          } else {
+            emit('test_status=error');
+          }
+          NODE
 
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -89,14 +151,14 @@ jobs:
         with:
           name: synthetic-test-results
           path: |
-            test-results/
-            playwright-report/
+            apps/web/test-results/
+            apps/web/playwright-report/
           retention-days: 30
 
       - name: Fail job if tests failed
-        if: steps.test-results.outputs.test_status == 'failed'
+        if: steps.test-results.outputs.test_status != 'passed'
         run: |
-          echo "Marking job as failed due to test failures"
+          echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
           exit 1
 
       - name: Send Slack Alert on Failure

@@ -225,7 +225,7 @@ export function ReleasePitchSection({
             <Sparkles className='h-3.5 w-3.5 text-tertiary-token' />
           )}
           <span className='text-[11px] font-medium text-secondary-token'>
-            Playlist Pitches
+            Pitch Builder
           </span>
         </div>
         {pitches && activeText && !isTyping && (
@@ -270,8 +270,7 @@ export function ReleasePitchSection({
 
         {!isPending && !pitches && (
           <p className='py-2 text-center text-[11px] text-tertiary-token'>
-            Generate AI-powered playlist pitches formatted for each streaming
-            platform.
+            Generate AI-powered pitches formatted for each streaming platform.
           </p>
         )}
 

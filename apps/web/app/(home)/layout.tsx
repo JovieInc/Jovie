@@ -1,6 +1,5 @@
 import './home.css';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
 export default function HomeLayout({
@@ -9,13 +8,12 @@ export default function HomeLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-black text-primary-token'>
+    <div className='dark flex min-h-screen flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
       <SkipToContent />
-      <MarketingHeader logoSize='xs' />
+      <MarketingHeader logoSize='xs' variant='minimal' />
       <main id='main-content' className='flex flex-1 flex-col'>
         {children}
       </main>
-      <MarketingFooter variant='minimal' />
     </div>
   );
 }

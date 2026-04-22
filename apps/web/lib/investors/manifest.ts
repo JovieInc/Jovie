@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { captureError } from '@/lib/error-tracking';
 import { resolveAppContentPath } from '@/lib/filesystem-paths';
 
 export interface InvestorPage {
@@ -19,6 +20,21 @@ export interface InvestorManifest {
 }
 
 let cachedManifest: InvestorManifest | null = null;
+const EMPTY_MANIFEST: InvestorManifest = {
+  pages: [],
+  deck: {
+    slides: [],
+    downloadFilename: 'Jovie-Pitch-Deck.pdf',
+  },
+};
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
+}
 
 /**
  * Load the investor content manifest.
@@ -30,7 +46,23 @@ export async function getInvestorManifest(): Promise<InvestorManifest> {
   }
 
   const manifestPath = resolveAppContentPath('investors/manifest.json');
-  const raw = await fs.readFile(manifestPath, 'utf-8');
-  cachedManifest = JSON.parse(raw) as InvestorManifest;
-  return cachedManifest;
+  try {
+    const raw = await fs.readFile(manifestPath, 'utf-8');
+    cachedManifest = JSON.parse(raw) as InvestorManifest;
+    return cachedManifest;
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+
+    captureError(
+      'Investor manifest missing, falling back to empty manifest',
+      error,
+      {
+        manifestPath,
+      }
+    );
+    cachedManifest = EMPTY_MANIFEST;
+    return EMPTY_MANIFEST;
+  }
 }

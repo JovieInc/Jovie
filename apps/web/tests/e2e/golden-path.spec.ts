@@ -1,6 +1,13 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  ensureSignedInUser,
+  getAdminCredentials,
+  hasAdminCredentials,
+  waitForClerkSignInApi,
+} from '../helpers/clerk-auth';
 
 /**
  * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Stripe
@@ -141,7 +148,7 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     UPDATE creator_profiles
     SET spotify_id = NULL, spotify_url = NULL
     WHERE user_id IN (
-      SELECT id FROM users WHERE email LIKE '%+clerk_test@test.jovie.com'
+      SELECT id FROM users WHERE email LIKE 'gp-%+clerk_test@test.jovie.com'
     ) AND spotify_id IS NOT NULL
   `;
 
@@ -281,7 +288,7 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
  * For +clerk_test emails, Clerk requires completing email verification
  * with the magic code 424242 before a session is created.
  */
-async function createFreshUser(page: import('@playwright/test').Page) {
+async function createFreshUserOnce(page: import('@playwright/test').Page) {
   await setupClerkTestingToken({ page });
 
   await page.goto('/signin', {
@@ -289,17 +296,10 @@ async function createFreshUser(page: import('@playwright/test').Page) {
     timeout: 60_000,
   });
 
-  // Wait for Clerk JS to load
-  const loaded = await page
-    .waitForFunction(
-      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-      { timeout: 60_000 }
-    )
-    .then(() => true)
-    .catch(() => false);
+  const loaded = await waitForClerkSignInApi(page);
 
   if (!loaded) {
-    throw new Error('Clerk JS failed to load — cannot create test user');
+    throw new Error('Clerk sign-in API never became ready on /signin');
   }
 
   const email = `gp-${Date.now().toString(36)}+clerk_test@test.jovie.com`;
@@ -354,6 +354,40 @@ async function createFreshUser(page: import('@playwright/test').Page) {
   return { email, clerkUserId };
 }
 
+async function createFreshUser(page: import('@playwright/test').Page) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      return await createFreshUserOnce(page);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const lowerMessage = message.toLowerCase();
+      const isRetryable =
+        lowerMessage.includes('captcha') ||
+        lowerMessage.includes('statement timeout') ||
+        lowerMessage.includes('canceling statement');
+      if (!isRetryable || attempt === 6) {
+        throw error;
+      }
+
+      await page.context().clearCookies();
+      await page
+        .evaluate(() => {
+          localStorage.clear();
+          sessionStorage.clear();
+        })
+        .catch(() => {});
+      await page.waitForTimeout(2000 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to create Clerk test user');
+}
+
 /* ------------------------------------------------------------------ */
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
@@ -381,6 +415,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
   test('complete user journey from signup to paid subscription', async ({
     page,
+    browser,
   }) => {
     test.setTimeout(600_000);
 
@@ -585,6 +620,50 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
       console.log(
         `[golden-path] DSP check passed: spotify_url=${p.spotify_url}, spotify_id=${p.spotify_id}, is_public=${p.is_public}`
+      );
+    }
+
+    // Verify the newly created user is visible in the admin dashboard.
+    if (hasAdminCredentials()) {
+      const adminContext = await browser.newContext();
+      const adminPage = await adminContext.newPage();
+
+      try {
+        await setupClerkTestingToken({ page: adminPage });
+        await ensureSignedInUser(adminPage, getAdminCredentials());
+
+        await adminPage.goto(APP_ROUTES.ADMIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: 30_000,
+        });
+        await expect(
+          adminPage.locator('[data-testid="admin-overview-page"]')
+        ).toBeVisible({ timeout: 30_000 });
+        await expect(adminPage.getByText(/scoreboard/i).first()).toBeVisible({
+          timeout: 30_000,
+        });
+
+        const usersParams = new URLSearchParams({
+          view: 'users',
+          q: uniqueHandle,
+        });
+        await adminPage.goto(
+          `${APP_ROUTES.ADMIN_USERS}?${usersParams.toString()}`,
+          {
+            waitUntil: 'domcontentloaded',
+            timeout: 30_000,
+          }
+        );
+
+        await expect(
+          adminPage.getByText(`@${uniqueHandle}`).first()
+        ).toBeVisible({ timeout: 30_000 });
+      } finally {
+        await adminContext.close().catch(() => undefined);
+      }
+    } else {
+      console.warn(
+        '[golden-path] Skipping admin dashboard verification — no admin credentials configured'
       );
     }
 

@@ -51,7 +51,7 @@ describe('ReleasePitchSection', () => {
 
     expect(
       screen.getByText(
-        'Generate AI-powered playlist pitches formatted for each streaming platform.'
+        'Generate AI-powered pitches formatted for each streaming platform.'
       )
     ).toBeInTheDocument();
     expect(screen.getByText('Generate Pitch')).toBeInTheDocument();

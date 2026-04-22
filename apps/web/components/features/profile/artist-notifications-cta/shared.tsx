@@ -42,6 +42,10 @@ export const subscriptionDisclaimerClassName =
 export const profilePrimaryPillClassName =
   'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
+/** Pearl-Notify hero morph-bar CTA pill — glassy dark, sits over the hero image. */
+export const profileHeroMorphPillClassName =
+  'inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-5 text-[13.5px] font-[560] tracking-[-0.01em] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-[background-color,color,opacity,box-shadow] duration-200 ease-out hover:bg-white/14 active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+
 export const profileSecondaryPillClassName =
   'inline-flex h-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-[15px] font-[580] tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--profile-pearl-bg-hover)] hover:border-[color:var(--profile-pearl-border)] hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
@@ -54,8 +58,24 @@ export const subscriptionComposerSurfaceClassName =
 export const subscriptionComposerFocusClassName =
   'border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-hover)] shadow-[0_14px_30px_rgba(15,17,24,0.12)] dark:bg-[var(--profile-pearl-bg-hover)] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]';
 
+/** Hero morph-bar surface — matches the glassy-dark collapsed pill so every
+ * step (email/OTP/name/birthday/done) shares the exact same shell. */
+export const subscriptionHeroComposerSurfaceClassName =
+  'rounded-full border border-white/14 bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-[background-color,border-color,box-shadow] duration-200 ease-out';
+
+export const subscriptionHeroComposerFocusClassName =
+  'border-white/22 bg-white/14 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_8px_22px_rgba(0,0,0,0.28)]';
+
 export const subscriptionInputClassName =
   'h-12 w-full bg-transparent px-2 text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
+
+export const subscriptionHeroInputClassName =
+  'h-11 w-full bg-transparent px-2 text-[13.5px] font-[560] tracking-[-0.01em] text-white placeholder:text-white/45 focus-visible:outline-none focus-visible:ring-0';
+
+/** Hero morph-bar circular submit button — 36×36 inverted-white to match the
+ * white Play button beside the pill, while staying inside the 44px shell. */
+export const subscriptionHeroSubmitClassName =
+  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_4px_12px_rgba(0,0,0,0.22)] transition-[transform,opacity] duration-150 hover:scale-[1.04] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white';
 
 export const subscriptionPrimaryActionClassName = `${profilePrimaryPillClassName} shrink-0`;
 
@@ -93,6 +113,8 @@ interface SubscriptionPearlComposerProps {
   readonly layout?: 'inline' | 'stacked';
   readonly className?: string;
   readonly dataTestId?: string;
+  /** 'hero' renders the glassy-dark morph-bar surface used in the hero CTA. */
+  readonly tone?: 'default' | 'hero';
 }
 
 interface SubscriptionFeedbackRailProps {
@@ -148,17 +170,32 @@ export function SubscriptionPearlComposer({
   layout = 'inline',
   className,
   dataTestId,
+  tone = 'default',
 }: SubscriptionPearlComposerProps) {
   const stacked = layout === 'stacked';
+  if (process.env.NODE_ENV !== 'production' && tone === 'hero' && stacked) {
+    console.warn(
+      '[SubscriptionPearlComposer] tone="hero" is only supported with inline layout. ' +
+        'The stacked layout will render without the 44px hero shell.'
+    );
+  }
+  const surfaceClass =
+    tone === 'hero'
+      ? subscriptionHeroComposerSurfaceClassName
+      : subscriptionComposerSurfaceClassName;
+
+  const heroInline = tone === 'hero' && !stacked;
 
   return (
     <div
       className={cn(
-        subscriptionComposerSurfaceClassName,
+        surfaceClass,
         stacked ? 'rounded-[2rem] p-3' : 'px-1',
+        heroInline ? 'h-11' : '',
         className
       )}
       data-testid={dataTestId}
+      data-tone={tone}
     >
       <div
         className={cn(

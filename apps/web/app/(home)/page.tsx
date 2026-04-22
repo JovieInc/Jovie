@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
+import { HomepageIntent } from '@/components/homepage/HomepageIntent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { HomePageNarrative } from '@/features/home/HomePageNarrative';
-import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
@@ -136,20 +134,19 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 export default function HomePage() {
-  const showLiveProof = FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION;
-
   return (
-    <div className='relative min-h-screen'>
+    <div className='relative flex flex-1 flex-col bg-[var(--color-bg-base)] text-primary-token'>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HomePageNarrative
-        proofAvailability={showLiveProof ? 'visible' : 'hidden'}
-        proofSection={showLiveProof ? <SeeItInActionSafe enabled /> : null}
-      />
+      <div className='flex min-w-0 flex-1 items-center justify-center px-4 pb-[8vh]'>
+        <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
+          <HomepageIntent />
+        </div>
+      </div>
     </div>
   );
 }

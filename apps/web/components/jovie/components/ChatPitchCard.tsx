@@ -179,7 +179,7 @@ export function ChatPitchCard({
       <div className='mb-3 flex items-center gap-2'>
         <Sparkles className='h-4 w-4 text-accent-token' />
         <span className='text-[13px] font-medium text-secondary-token'>
-          Playlist Pitches{releaseTitle ? ` — ${releaseTitle}` : ''}
+          Pitch Builder{releaseTitle ? ` — ${releaseTitle}` : ''}
         </span>
       </div>
       <div className='space-y-2'>

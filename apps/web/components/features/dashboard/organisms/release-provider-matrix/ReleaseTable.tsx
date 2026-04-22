@@ -108,7 +108,7 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
       } else {
         baseClassName =
           'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';

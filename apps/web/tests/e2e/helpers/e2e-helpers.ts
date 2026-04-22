@@ -16,6 +16,7 @@ import {
 import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
+  waitForClerkSignInApi,
 } from '@/tests/helpers/clerk-auth';
 
 /* ------------------------------------------------------------------ */
@@ -1222,38 +1223,15 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
 
   await setupClerkTestingToken({ page });
 
-  const loadClerk = async () => {
-    await smokeNavigateWithRetry(page, '/signin', {
-      timeout: 120_000,
-      retries: 2,
-    });
+  await smokeNavigateWithRetry(page, '/signin', {
+    timeout: 120_000,
+    retries: 2,
+  });
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const loaded = await page
-        .waitForFunction(
-          () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-          { timeout: 20_000 }
-        )
-        .then(() => true)
-        .catch(() => false);
-
-      if (loaded) return true;
-
-      const retryButton = page.getByRole('button', { name: 'Retry now' });
-      if (await retryButton.isVisible().catch(() => false)) {
-        await retryButton.click();
-      } else {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
-      }
-    }
-
-    return false;
-  };
-
-  const loaded = await loadClerk();
+  const loaded = await waitForClerkSignInApi(page);
 
   if (!loaded) {
-    throw new Error('Clerk JS failed to load — cannot create test user');
+    throw new Error('Clerk sign-in API never became ready on /signin');
   }
 
   const clerkUserId = await page.evaluate(async (targetEmail: string) => {
