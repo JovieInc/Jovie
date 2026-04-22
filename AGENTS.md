@@ -4,6 +4,15 @@
 
 ---
 
+## Workspace Topology
+
+This repo is the main code workspace.
+
+- Default coding profile: `coder`
+- Ops / FounderOS workspace: `/Users/timwhite/conductor/workspaces/ops/raleigh`
+- Treat that ops repo as the source of truth for `company_state.md`, daily briefings, and task routing
+- Keep code changes in this repo; keep orchestration and company-state updates in the ops repo
+
 ## Environment Setup (Run First)
 
 Before running ANY command in this repo, run:

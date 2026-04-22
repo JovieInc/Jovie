@@ -445,6 +445,7 @@ export function PublicProfileTemplateV2({
         <div
           className='relative flex h-full flex-col overflow-hidden'
           data-test='public-profile-root'
+          data-testid='public-profile-root'
         >
           <ProfileScrollBody
             artist={artist}
