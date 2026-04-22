@@ -13,7 +13,9 @@ if (-not (Test-Path -LiteralPath $SetupSh)) {
 $candidates = @()
 
 if ($env:GIT_BASH) {
-  $candidates += $env:GIT_BASH
+  if ($env:GIT_BASH -notlike "*\Windows\System32\bash.exe") {
+    $candidates += $env:GIT_BASH
+  }
 }
 
 $programFiles = [Environment]::GetFolderPath("ProgramFiles")

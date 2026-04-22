@@ -383,7 +383,9 @@ else
       if GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" gh auth status -h github.com &>/dev/null 2>&1; then
         GH_AUTH_OK=true
       fi
-    elif command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" sh -c 'test -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}"' &>/dev/null 2>&1; then
+    fi
+
+    if [[ "$GH_AUTH_OK" != "true" ]] && command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" sh -c 'test -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}"' &>/dev/null 2>&1; then
       if "${DOPPLER_LOCAL_RUN[@]}" gh auth status -h github.com &>/dev/null 2>&1; then
         GH_AUTH_OK=true
       fi
