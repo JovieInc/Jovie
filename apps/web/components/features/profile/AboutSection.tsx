@@ -131,9 +131,14 @@ export function AboutSection({
         <div className='flex flex-wrap gap-2'>
           {genres.map((genre, i) => {
             const accent = GENRE_ACCENTS[i % GENRE_ACCENTS.length];
+            // Dedupe duplicate genre labels deterministically: track how
+            // many times each label has appeared so the key is stable
+            // across renders but still unique. Avoids array index in key.
+            const dupIndex = genres.slice(0, i).filter(g => g === genre).length;
+            const key = dupIndex === 0 ? genre : `${genre}-${dupIndex}`;
             return (
               <span
-                key={genre}
+                key={key}
                 className='rounded-full border px-3 py-1 text-[11px] font-[510] capitalize'
                 style={{
                   backgroundColor: hexToRgba(accent, 0.14),

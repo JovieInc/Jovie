@@ -396,6 +396,11 @@ export function ProfileInlineNotificationsCTA({
   const lastInteractionWasKeyboardRef = useRef(false);
   const suppressNextFocusOpenRef = useRef(false);
   const emailInputFocusedRef = useRef(false);
+  // Mirror `step` into a ref so the blur guard can read the latest value
+  // after its 250 ms timeout fires. Without this, the setTimeout closes
+  // over whichever step was active when the blur started, which under
+  // Concurrent Mode scheduling could be stale.
+  const stepRef = useRef<Step>('cta');
 
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -512,6 +517,7 @@ export function ProfileInlineNotificationsCTA({
   }, []);
 
   useEffect(() => {
+    stepRef.current = step;
     if (step !== 'otp') {
       lastAutoVerifiedCodeRef.current = null;
     }
@@ -621,8 +627,11 @@ export function ProfileInlineNotificationsCTA({
   const handleRevealShellBlurCapture = useCallback(() => {
     // Defer past the autofocus window so the reveal transition isn't
     // interrupted by the click-blur that precedes input mount/focus.
+    // Read step via ref so the timeout sees the latest value even if
+    // Concurrent Mode defers the effect that would otherwise invalidate
+    // this closure.
     globalThis.setTimeout(() => {
-      if (step !== 'email') return;
+      if (stepRef.current !== 'email') return;
 
       const activeElement = document.activeElement;
       if (revealShellRef.current?.contains(activeElement)) {
@@ -637,7 +646,7 @@ export function ProfileInlineNotificationsCTA({
         setStep('cta');
       }
     }, REVEAL_SHELL_BLUR_GUARD_MS);
-  }, [step, emailInput, isSubmitting]);
+  }, [emailInput, isSubmitting]);
 
   const handleManageButtonFocus = useCallback(() => {
     if (!lastInteractionWasKeyboardRef.current) return;

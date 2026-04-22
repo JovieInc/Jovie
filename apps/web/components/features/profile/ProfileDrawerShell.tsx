@@ -51,7 +51,7 @@ export function ProfileDrawerShell({
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
   const contentClasses = `relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
-  const bodyClasses = `relative z-10 min-h-[calc(var(--profile-drawer-height-max)-var(--profile-drawer-header))] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  const bodyClasses = `relative z-10 min-h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
