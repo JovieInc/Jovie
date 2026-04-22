@@ -31,30 +31,67 @@ body:has(.home-viewport)::-webkit-scrollbar {
  * keep the large gradient strings out of JSX.
  */
 .homepage-hero-flood {
-  background: #08090a;
+  background: #06070b;
 }
 .homepage-hero-flood__layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
+/* Low-pass room tone: a very wide, very soft blue-violet wash seeping up from
+ * the floor. No high-frequency detail, no hard edges. This is the "muffled
+ * bass" layer — felt more than seen. */
 .homepage-hero-flood__base {
   background: radial-gradient(
-    1200px 800px at 50% 60%,
-    #ff2e88 0%,
-    #ff6a00 35%,
-    #8e00ff 70%,
-    #0a0812 100%
+    1200px 720px at 50% 110%,
+    rgba(92, 108, 190, 0.14) 0%,
+    rgba(72, 64, 150, 0.08) 35%,
+    rgba(20, 18, 36, 0) 72%
   );
 }
+/* Electric pulse: tight cyan-violet point at the floor that slowly breathes,
+ * like bass hitting through the floorboards. Screen-blended so it reads as
+ * light, not paint. Amplitude is tiny on purpose. */
 .homepage-hero-flood__glow {
   background: radial-gradient(
-    900px 500px at 50% 100%,
-    #ffdd88 0%,
-    transparent 60%
+    520px 340px at 50% 96%,
+    rgba(120, 170, 235, 0.22) 0%,
+    rgba(90, 120, 215, 0.12) 40%,
+    transparent 74%
   );
   mix-blend-mode: screen;
-  opacity: 0.6;
+  opacity: 0.55;
+  animation: homepage-hero-pulse 6.5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+@keyframes homepage-hero-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.68;
+    transform: scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-flood__glow {
+    animation: none;
+  }
+}
+/* Edge vignette — pulls the corners hard to black. Premium framing. */
+.homepage-hero-flood::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    1200px 820px at 50% 60%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  z-index: 1;
 }
 
 .homepage-hero-headline {
