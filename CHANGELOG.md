@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.162] - 2026-04-22
+
+> The homepage now opens with a Linear-premium hero: a muted, slow-pulsing neon glow behind a "Your AI Artist Manager." one-line headline that fits from 375px up, a "Built for artists." eyebrow pill, and a Clerk modal sign-in that lazy-mounts only when the header link is clicked. The rest of the `/new` composition is available behind individual feature flags, all off in production.
+
+### Added
+
+- Added saturated-flood-turned-Linear-premium hero to the homepage with a slow-pulsing blue-violet glow, centered headline that fits on one line across breakpoints, "Built for artists." eyebrow pill, and one-click Clerk sign-in modal that preserves the static home build.
+- Added a configurable `label` prop to `HomeTrustSection` so the homepage can read "Accelerating release cycles for artists on" while artist-profile and release-notification surfaces keep "Trusted by artists on".
+- Added individual feature flags for every `/new` section on the homepage (`SHOW_HOMEPAGE_V2_TRUST`, `_SYSTEM_OVERVIEW`, `_SPOTLIGHT`, `_CAPTURE_REACTIVATE`, `_POWER_GRID`, `_PRICING`, `_FINAL_CTA`, `_FOOTER_LINKS`), all default false, so sections can be rolled on one at a time.
+
+### Changed
+
+- The `(home)` layout now uses `.home-viewport` + `min-h-[100svh]` on both the shell and `<main>` so the hero fills the viewport and the footer sits below the fold, revealed on scroll.
+- [internal] Synced the canonical VERSION file and workspace `package.json` entries to `26.4.162`.
+
 ## [26.4.161] - 2026-04-22
 
 > Dropdown flyouts now behave like one focused menu stack, so release actions no longer leave multiple sibling submenus hanging open at the same time.

@@ -16,6 +16,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import {
+  HERO_COPY,
   HOMEPAGE_INTENT_EXPERIMENT_ID,
   HOMEPAGE_INTENT_VARIANT_ID,
   type HomepagePill,
@@ -173,22 +174,25 @@ export function HomepageIntent() {
 
   return (
     <div
-      className='homepage-intent flex w-full min-w-0 max-w-[640px] flex-col items-stretch'
+      className='homepage-intent flex w-full min-w-0 flex-col items-center'
       style={{
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1 className='text-center text-[40px] font-bold leading-[1.05] tracking-[-0.025em] text-primary-token sm:text-[48px] md:text-[56px]'>
-        How can I help you today?
+      <span className='homepage-hero-eyebrow inline-flex items-center gap-2 self-center rounded-full border border-white/15 bg-white/[0.08] py-1 pl-3 pr-3 text-[11.5px] font-medium text-white/85 backdrop-blur-xl'>
+        {HERO_COPY.eyebrow.text}
+      </span>
+      <h1 className='homepage-hero-headline mt-7 self-center text-center font-semibold text-white sm:mt-8'>
+        {HERO_COPY.headline}
       </h1>
-      <p className='mt-4 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token sm:text-[17px]'>
-        Jovie helps artists &amp; labels release music faster.
+      <p className='homepage-hero-subhead mt-5 max-w-[620px] self-center text-center text-[18px] leading-[1.45] tracking-[-0.01em] text-white/85'>
+        {HERO_COPY.subhead}
       </p>
 
       <label htmlFor={INPUT_ID} className='sr-only'>
         Message Jovie
       </label>
-      <div className='relative mt-7 flex w-full items-center'>
+      <div className='relative mt-7 flex w-full max-w-[640px] items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -217,7 +221,7 @@ export function HomepageIntent() {
       </div>
 
       <div
-        className='mt-4 flex w-full min-w-0 items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='mt-4 flex w-full min-w-0 max-w-[640px] items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         style={{
           WebkitMaskImage:
             'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',

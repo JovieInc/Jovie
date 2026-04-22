@@ -50,6 +50,16 @@ export const PILLS: readonly HomepagePill[] = [
   },
 ] as const;
 
+export const HERO_COPY = {
+  headline: 'Your AI Artist Manager.',
+  subhead:
+    'Drop more music. Learn what hits. Build momentum before you burn out.',
+  eyebrow: {
+    badge: 'NEW',
+    text: 'Built for artists.',
+  },
+} as const;
+
 export interface HomepageIntent {
   readonly source: 'homepage';
   readonly finalPrompt: string;

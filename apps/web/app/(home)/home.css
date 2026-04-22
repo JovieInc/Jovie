@@ -25,6 +25,85 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: none;
 }
 
+/*
+ * A2 · Lovable — Saturated Flood hero background.
+ * Two radial-gradient layers behind the hero content. Kept in CSS to
+ * keep the large gradient strings out of JSX.
+ */
+.homepage-hero-flood {
+  background: #06070b;
+}
+.homepage-hero-flood__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Low-pass room tone: almost imperceptible cool wash seeping up from the
+ * floor. Desaturated toward neutral so it reads as "lighting in the room,"
+ * not "blue page." */
+.homepage-hero-flood__base {
+  background: radial-gradient(
+    1200px 720px at 50% 110%,
+    rgba(120, 125, 150, 0.07) 0%,
+    rgba(90, 90, 120, 0.04) 40%,
+    rgba(20, 18, 28, 0) 76%
+  );
+}
+/* Slow pulse point: a very faint glow that breathes at the floor. The color
+ * is almost neutral with only a hint of cool. Amplitude is a whisper. */
+.homepage-hero-flood__glow {
+  background: radial-gradient(
+    480px 300px at 50% 98%,
+    rgba(170, 175, 200, 0.1) 0%,
+    rgba(130, 135, 170, 0.05) 42%,
+    transparent 76%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  animation: homepage-hero-pulse 7s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+@keyframes homepage-hero-pulse {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.48;
+    transform: scale(1.03);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-flood__glow {
+    animation: none;
+  }
+}
+/* Edge vignette — pulls the corners hard to black. Premium framing. */
+.homepage-hero-flood::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    1200px 820px at 50% 60%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  z-index: 1;
+}
+
+.homepage-hero-headline {
+  font-size: clamp(32px, 7vw, 68px);
+  font-weight: 680;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Entrance animation for the chat intake island */
 @keyframes homepageFadeIn {
   from {

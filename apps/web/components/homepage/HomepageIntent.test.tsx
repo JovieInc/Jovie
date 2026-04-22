@@ -48,10 +48,12 @@ describe('HomepageIntent', () => {
   it('1. renders headline, subhead, input, and all 4 pills with correct labels', () => {
     render(<HomepageIntent />);
     expect(
-      screen.getByRole('heading', { name: 'How can I help you today?' })
+      screen.getByRole('heading', { name: 'Your AI Artist Manager.' })
     ).toBeTruthy();
     expect(
-      screen.getByText('Jovie helps artists & labels release music faster.')
+      screen.getByText(
+        'Drop more music. Learn what hits. Build momentum before you burn out.'
+      )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
     expect(
