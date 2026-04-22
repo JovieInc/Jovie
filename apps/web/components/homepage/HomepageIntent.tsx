@@ -163,10 +163,10 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1 className='text-center text-[32px] font-semibold tracking-[-0.02em] text-primary-token sm:text-[38px]'>
+      <h1 className='text-center text-[40px] font-bold leading-[1.05] tracking-[-0.025em] text-primary-token sm:text-[48px] md:text-[56px]'>
         How can I help you today?
       </h1>
-      <p className='mt-3 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token'>
+      <p className='mt-4 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token sm:text-[17px]'>
         Jovie helps artists &amp; labels release music faster.
       </p>
 

@@ -13,13 +13,16 @@ Jovie uses two related but distinct design systems based on surface purpose:
 
 | Surface | System | Mood | Routes |
 |---------|--------|------|--------|
-| Marketing / homepage | System A | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
+| Homepage / chat-intake | System B | Product surface, utility-first, inevitable | `(home)/*` |
+| Marketing (editorial) | System A | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
 | Product app shell | System B | Compact, operational, tool-like | `app/*`, settings, admin, dashboard |
 | Auth / onboarding / waitlist | System B | Funnel-focused, product family | `(auth)/*`, `onboarding/*`, `waitlist/*` |
 | Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
 | Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
 
-**Decision tree:** Selling/explaining → System A. Operating/using → System B. Public artifact → System B.
+**Decision tree:** Selling/explaining (blog, pricing, legal) → System A. Everything else (homepage, auth, app, profiles) → System B.
+
+Note: the homepage migrated from System A to System B on 2026-04-22. The chat-intake surface is product, not marketing. The restraint is the brand. Full System A retirement is TBD after 3 months of shipping.
 
 See the [Surface Classification](#canonical-surface-split) section below for full route mapping.
 
@@ -622,6 +625,8 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | 2026-03-25 | BrandLogo: `next/image` with dark/light variants | Reverted from inline SVG — `next/image` handles theme-aware loading with proper optimization |
 | 2026-04-11 | Marketing typography: Satoshi (display) + DM Sans (body) | Inter is too generic for a music/DJ product. Satoshi 800 provides hierarchy without being flashy. DM Sans is clean body text. |
 | 2026-04-11 | No brand color (Apple approach) | White-on-black CTAs. Accent colors are supporting cast for feature differentiation only. Restraint is the brand. |
+| 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
+| 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 590 (Linear bold) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. |
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
