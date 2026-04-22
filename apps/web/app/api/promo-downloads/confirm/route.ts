@@ -30,19 +30,24 @@ const confirmSchema = z.object({
 });
 
 function slugify(title: string): string {
+  const normalized = title.toLowerCase();
   let slug = '';
+  let previousWasHyphen = false;
 
-  for (const character of title.toLowerCase()) {
-    const isLowercaseLetter = character >= 'a' && character <= 'z';
-    const isDigit = character >= '0' && character <= '9';
+  for (const character of normalized) {
+    const code = character.charCodeAt(0);
+    const isAsciiLowercase = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
 
-    if (isLowercaseLetter || isDigit) {
+    if (isAsciiLowercase || isDigit) {
       slug += character;
+      previousWasHyphen = false;
       continue;
     }
 
-    if (slug.length > 0 && !slug.endsWith('-')) {
+    if (!previousWasHyphen && slug.length > 0) {
       slug += '-';
+      previousWasHyphen = true;
     }
   }
 
@@ -50,11 +55,9 @@ function slugify(title: string): string {
     slug = slug.slice(0, -1);
   }
 
-  if (slug.length > 80) {
-    slug = slug.slice(0, 80);
-    while (slug.endsWith('-')) {
-      slug = slug.slice(0, -1);
-    }
+  slug = slug.slice(0, 80);
+  while (slug.endsWith('-')) {
+    slug = slug.slice(0, -1);
   }
 
   return slug;

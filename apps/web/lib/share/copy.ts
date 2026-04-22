@@ -113,20 +113,24 @@ export function buildMailtoHref(params: {
 }
 
 export function slugifyShareValue(input: string): string {
+  const trimmed = input.trim().toLowerCase();
   let slug = '';
-  const normalized = input.trim().toLowerCase();
+  let previousWasHyphen = false;
 
-  for (const character of normalized) {
-    const isLowercaseLetter = character >= 'a' && character <= 'z';
-    const isDigit = character >= '0' && character <= '9';
+  for (const character of trimmed) {
+    const code = character.charCodeAt(0);
+    const isAsciiLowercase = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
 
-    if (isLowercaseLetter || isDigit) {
+    if (isAsciiLowercase || isDigit) {
       slug += character;
+      previousWasHyphen = false;
       continue;
     }
 
-    if (slug.length > 0 && !slug.endsWith('-')) {
+    if (!previousWasHyphen && slug.length > 0) {
       slug += '-';
+      previousWasHyphen = true;
     }
   }
 
