@@ -589,6 +589,34 @@ export const taskAgentStatusEnum = pgEnum('task_agent_status', [
   'failed',
 ]);
 
+// Release Task Catalog (Phase 1) — canonical catalog, clusters, child releases, custom-task telemetry
+export const releaseSkillClusterStatusEnum = pgEnum(
+  'release_skill_cluster_status',
+  ['planned', 'shipping', 'shipped']
+);
+
+export const releaseTaskAiSkillStatusEnum = pgEnum(
+  'release_task_ai_skill_status',
+  ['none', 'planned', 'in_progress', 'shipped']
+);
+
+export const releaseChildTypeEnum = pgEnum('release_child_type', [
+  'spedup',
+  'slowed',
+  'clean',
+  'radio_edit',
+  'extended',
+  'instrumental',
+  'lyric_video',
+]);
+
+export const customTaskTriageStatusEnum = pgEnum('custom_task_triage_status', [
+  'auto_clustered',
+  'pending_review',
+  'merged_to_catalog',
+  'rejected',
+]);
+
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [
   'pending', // Referred user signed up but not yet subscribed

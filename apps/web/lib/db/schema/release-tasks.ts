@@ -5,6 +5,8 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -13,6 +15,9 @@ import {
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { discogReleases } from './content';
 import {
+  customTaskTriageStatusEnum,
+  releaseSkillClusterStatusEnum,
+  releaseTaskAiSkillStatusEnum,
   releaseTaskAssigneeTypeEnum,
   releaseTaskPriorityEnum,
   releaseTaskStatusEnum,
@@ -135,6 +140,135 @@ export const releaseTasks = pgTable(
   })
 );
 
+// ─── Release Skill Clusters (Phase 1) ──────────────────────────────
+// User-visible filter groupings + roadmap tracking for AI-skill work.
+
+export const releaseSkillClusters = pgTable('release_skill_clusters', {
+  id: serial('id').primaryKey(),
+  slug: text('slug').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  status: releaseSkillClusterStatusEnum('status').notNull().default('planned'),
+  demandScore: integer('demand_score').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Release Task Catalog (Phase 1) ────────────────────────────────
+// Canonical atomic release-task definitions. Selector reads from here;
+// per-release work is materialized into release_task_snapshots.
+
+export const releaseTaskCatalog = pgTable(
+  'release_task_catalog',
+  {
+    slug: text('slug').primaryKey(),
+    name: text('name').notNull(),
+    category: text('category').notNull(),
+    clusterId: integer('cluster_id').references(() => releaseSkillClusters.id, {
+      onDelete: 'set null',
+    }),
+    shortDescription: text('short_description'),
+    priority: releaseTaskPriorityEnum('priority').notNull().default('medium'),
+    // flowStage expressed as day offset from release (e.g. -28, 0, 7)
+    flowStageDaysOffset: integer('flow_stage_days_offset'),
+    dependencies: text('dependencies').array(),
+    applicabilityRules: jsonb('applicability_rules').$type<unknown>().notNull(),
+    applicabilityRulesVersion: integer('applicability_rules_version')
+      .notNull()
+      .default(1),
+    platforms: jsonb('platforms').$type<Record<string, unknown>>().default({}),
+    sourceLinks: jsonb('source_links')
+      .$type<Record<string, string>>()
+      .default({}),
+    assigneeType: releaseTaskAssigneeTypeEnum('assignee_type')
+      .notNull()
+      .default('human'),
+    aiSkillStatus: releaseTaskAiSkillStatusEnum('ai_skill_status')
+      .notNull()
+      .default('none'),
+    aiSkillId: text('ai_skill_id'),
+    catalogVersion: integer('catalog_version').notNull().default(1),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    clusterIdIndex: index('release_task_catalog_cluster_id_idx').on(
+      table.clusterId
+    ),
+  })
+);
+
+// ─── Release Task Snapshots (Phase 1) ──────────────────────────────
+// Denormalized copy of a catalog row at release-instantiation time.
+// In-flight releases render from here so catalog edits do not retro-rewrite.
+
+export const releaseTaskSnapshots = pgTable(
+  'release_task_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    catalogSlug: text('catalog_slug').notNull(),
+    catalogVersion: integer('catalog_version').notNull(),
+    name: text('name').notNull(),
+    category: text('category').notNull(),
+    clusterId: integer('cluster_id'),
+    shortDescription: text('short_description'),
+    priority: releaseTaskPriorityEnum('priority').notNull().default('medium'),
+    flowStageDaysOffset: integer('flow_stage_days_offset'),
+    assigneeType: releaseTaskAssigneeTypeEnum('assignee_type')
+      .notNull()
+      .default('human'),
+    aiSkillId: text('ai_skill_id'),
+    aiSkillStatus: releaseTaskAiSkillStatusEnum('ai_skill_status')
+      .notNull()
+      .default('none'),
+    reasons: text('reasons').array(),
+    score: real('score'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    releaseIdIndex: index('release_task_snapshots_release_id_idx').on(
+      table.releaseId
+    ),
+  })
+);
+
+// ─── Custom Task Telemetry (Phase 1) ───────────────────────────────
+// Free-form user-added tasks. Classifier routes to cluster or admin triage.
+
+export const customTaskTelemetry = pgTable(
+  'custom_task_telemetry',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id').references(() => discogReleases.id, {
+      onDelete: 'set null',
+    }),
+    creatorProfileId: uuid('creator_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'set null' }
+    ),
+    userText: text('user_text').notNull(),
+    normalizedText: text('normalized_text').notNull(),
+    suggestedClusterSlug: text('suggested_cluster_slug'),
+    classifierConfidence: real('classifier_confidence'),
+    triageStatus: customTaskTriageStatusEnum('triage_status')
+      .notNull()
+      .default('pending_review'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    triageStatusIndex: index('custom_task_telemetry_triage_status_idx').on(
+      table.triageStatus
+    ),
+    normalizedTextIndex: index('custom_task_telemetry_normalized_text_idx').on(
+      table.normalizedText
+    ),
+  })
+);
+
 // ─── Zod Schemas & Types ────────────────────────────────────────────
 
 export const insertReleaseTaskTemplateSchema =
@@ -159,3 +293,31 @@ export const insertReleaseTaskSchema = createInsertSchema(releaseTasks);
 export const selectReleaseTaskSchema = createSelectSchema(releaseTasks);
 export type ReleaseTask = typeof releaseTasks.$inferSelect;
 export type NewReleaseTask = typeof releaseTasks.$inferInsert;
+
+export const insertReleaseSkillClusterSchema =
+  createInsertSchema(releaseSkillClusters);
+export const selectReleaseSkillClusterSchema =
+  createSelectSchema(releaseSkillClusters);
+export type ReleaseSkillCluster = typeof releaseSkillClusters.$inferSelect;
+export type NewReleaseSkillCluster = typeof releaseSkillClusters.$inferInsert;
+
+export const insertReleaseTaskCatalogSchema =
+  createInsertSchema(releaseTaskCatalog);
+export const selectReleaseTaskCatalogSchema =
+  createSelectSchema(releaseTaskCatalog);
+export type ReleaseTaskCatalog = typeof releaseTaskCatalog.$inferSelect;
+export type NewReleaseTaskCatalog = typeof releaseTaskCatalog.$inferInsert;
+
+export const insertReleaseTaskSnapshotSchema =
+  createInsertSchema(releaseTaskSnapshots);
+export const selectReleaseTaskSnapshotSchema =
+  createSelectSchema(releaseTaskSnapshots);
+export type ReleaseTaskSnapshot = typeof releaseTaskSnapshots.$inferSelect;
+export type NewReleaseTaskSnapshot = typeof releaseTaskSnapshots.$inferInsert;
+
+export const insertCustomTaskTelemetrySchema =
+  createInsertSchema(customTaskTelemetry);
+export const selectCustomTaskTelemetrySchema =
+  createSelectSchema(customTaskTelemetry);
+export type CustomTaskTelemetry = typeof customTaskTelemetry.$inferSelect;
+export type NewCustomTaskTelemetry = typeof customTaskTelemetry.$inferInsert;
