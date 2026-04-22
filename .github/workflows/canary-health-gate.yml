@@ -406,7 +406,7 @@ jobs:
           # and is deferred (see chat instrumentation plan, 30-day review).
           echo "Checking /api/chat is reachable and auth-gated..."
           chat_url="${deployment_url%/}/api/chat"
-          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || echo "\n000")
+          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
           chat_code="${chat_response##*$'\n'}"
 
           # 401 = expected (auth-gated). 400 = acceptable (validation ran, route alive).
