@@ -1,4 +1,5 @@
 import './auth-utilities.css';
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { isMockPublishableKey } from '@/components/providers/clerkAvailability';
@@ -12,6 +13,12 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
+
+// Auth routes must never be indexed — duplicate signup/signin pages hurt SEO
+// and the flows carry state that search crawlers shouldn't surface.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AuthLayout({
   children,

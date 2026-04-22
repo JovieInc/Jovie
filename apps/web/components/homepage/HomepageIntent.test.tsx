@@ -13,7 +13,11 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
-import { HOMEPAGE_INTENT_KEY } from '@/components/homepage/intent';
+import {
+  HOMEPAGE_ACTIVE_INTENT_KEY,
+  HOMEPAGE_INTENTS_KEY,
+  type StoredHomepageIntent,
+} from '@/components/homepage/intent-store';
 
 function getInput() {
   return screen.getByPlaceholderText('Message...') as HTMLInputElement;
@@ -28,6 +32,17 @@ describe('HomepageIntent', () => {
     mockPush.mockClear();
     mockTrack.mockClear();
     globalThis.localStorage?.clear();
+    globalThis.sessionStorage?.clear();
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   it('1. renders headline, subhead, input, and all 4 pills with correct labels', () => {
@@ -75,7 +90,7 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     fireEvent.click(getSubmit());
     expect(mockPush).not.toHaveBeenCalled();
-    expect(globalThis.localStorage?.getItem(HOMEPAGE_INTENT_KEY)).toBeNull();
+    expect(globalThis.localStorage?.getItem(HOMEPAGE_INTENTS_KEY)).toBeNull();
     expect(
       mockTrack.mock.calls.find(c => c[0] === 'homepage_prompt_submitted')
     ).toBeUndefined();
@@ -87,9 +102,17 @@ describe('HomepageIntent', () => {
     fireEvent.change(input, { target: { value: 'my new EP' } });
     fireEvent.click(getSubmit());
 
-    const raw = globalThis.localStorage?.getItem(HOMEPAGE_INTENT_KEY);
+    const raw = globalThis.localStorage?.getItem(HOMEPAGE_INTENTS_KEY);
     expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw as string);
+    const parsedMap = JSON.parse(raw as string) as Record<
+      string,
+      StoredHomepageIntent
+    >;
+    const [parsed] = Object.values(parsedMap);
+    expect(parsed).toBeTruthy();
+    expect(globalThis.sessionStorage?.getItem(HOMEPAGE_ACTIVE_INTENT_KEY)).toBe(
+      parsed.id
+    );
     expect(parsed.source).toBe('homepage');
     expect(parsed.finalPrompt).toBe('my new EP');
     expect(parsed.pillId).toBeNull();
@@ -97,6 +120,8 @@ describe('HomepageIntent', () => {
     expect(parsed.insertedPrompt).toBeNull();
     expect(parsed.experimentId).toBe('homepage_intent_pills_v1');
     expect(parsed.variantId).toBe('release_assets_v1');
+    expect(typeof parsed.id).toBe('string');
+    expect(typeof parsed.expiresAt).toBe('number');
     expect(typeof parsed.createdAt).toBe('string');
     expect(() => new Date(parsed.createdAt).toISOString()).not.toThrow();
   });
@@ -122,14 +147,14 @@ describe('HomepageIntent', () => {
     expect(props.promptLength).toBe('Create a release page for my EP'.length);
   });
 
-  it('6. submit calls router.push with /signin?redirect_url=/onboarding', () => {
+  it('6. submit calls router.push with /signup?redirect_url=/onboarding', () => {
     render(<HomepageIntent />);
     fireEvent.change(getInput(), { target: { value: 'anything' } });
     fireEvent.click(getSubmit());
     expect(mockPush).toHaveBeenCalledTimes(1);
     const target = mockPush.mock.calls[0][0] as string;
-    expect(target).toContain('/signin');
-    expect(target).toContain('redirect_url=%2Fonboarding');
+    expect(target).toContain('/signup');
+    expect(target).toContain('redirect_url=%2Fonboarding%3Fintent_id%3D');
   });
 
   it('7. homepage_viewed fires exactly once on mount', () => {

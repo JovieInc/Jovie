@@ -74,11 +74,15 @@ Sentry.init({
     /Daily query budget exhausted/,
   ],
 
-  // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)
+  // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage).
+  // recordInputs/recordOutputs are intentionally `false` — user prompts and
+  // model replies can contain PII (DM drafts, fan messages, DSAR-relevant
+  // content). Re-enable per-environment only after a data-classification
+  // review with whoever owns privacy. Tokens/model/latency/cost still captured.
   integrations: [
     Sentry.vercelAIIntegration({
-      recordInputs: true,
-      recordOutputs: true,
+      recordInputs: false,
+      recordOutputs: false,
     }),
   ],
 });

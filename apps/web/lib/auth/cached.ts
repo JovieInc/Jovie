@@ -6,6 +6,7 @@ import {
   buildDevTestAuthCurrentUser,
   getCachedDevTestAuthSession,
 } from '@/lib/auth/dev-test-auth.server';
+import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
 type CachedCurrentUser = Awaited<ReturnType<typeof currentUser>>;
 
@@ -40,14 +41,18 @@ function isMissingAuthRequestContext(error: unknown): boolean {
 async function resolveCachedAuth() {
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
-    return {
+    const result = {
       userId: bypassSession.clerkUserId,
       sessionId: 'sess_test_bypass',
       orgId: undefined,
     };
+    await attachSentryContext(result.userId);
+    return result;
   }
 
-  return auth();
+  const result = await auth();
+  await attachSentryContext(result.userId);
+  return result;
 }
 
 /**
