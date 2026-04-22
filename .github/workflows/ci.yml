@@ -3201,7 +3201,7 @@ jobs:
             exit 0
           fi
 
-          if printf '%s' "$promote_output" | rg -q "already the current production deployment"; then
+          if printf '%s' "$promote_output" | grep -q "already the current production deployment"; then
             echo "Staging deployment is already in production; continuing."
             exit 0
           fi
