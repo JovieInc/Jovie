@@ -211,7 +211,7 @@ export function Footer({
               </div>
               <Copyright
                 variant='light'
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
                 style={{
                   color: 'var(--linear-text-tertiary)',
                 }}

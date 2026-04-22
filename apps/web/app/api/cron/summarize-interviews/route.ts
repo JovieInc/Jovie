@@ -83,6 +83,7 @@ export async function GET(request: Request) {
               summary_structured: structured,
               summary_error: null,
             },
+            claimedAt: null,
             updatedAt: new Date(),
           })
           .where(eq(userInterviews.id, row.id));
@@ -116,11 +117,21 @@ export async function GET(request: Request) {
     }
 
     // Sweep: any 'summarizing' rows older than 10 minutes without updates
-    // are almost certainly from a crashed run. Kick them back to pending.
+    // are almost certainly from a crashed run. Count the failed attempt so a
+    // permanently crashing row eventually reaches the terminal failed state.
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     await db
       .update(userInterviews)
-      .set({ status: 'pending', claimedAt: null, updatedAt: new Date() })
+      .set({
+        status: drizzleSql`CASE
+          WHEN ${userInterviews.summaryAttempts} + 1 >= ${MAX_ATTEMPTS}
+          THEN 'failed'
+          ELSE 'pending'
+        END`,
+        summaryAttempts: drizzleSql`${userInterviews.summaryAttempts} + 1`,
+        claimedAt: null,
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(userInterviews.status, 'summarizing'),

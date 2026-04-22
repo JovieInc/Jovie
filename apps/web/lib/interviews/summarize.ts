@@ -18,8 +18,16 @@ const SUMMARY_SCHEMA = z.object({
 });
 
 function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced?.[1]) return fenced[1].trim();
+  const fenceStart = text.indexOf('```');
+  if (fenceStart >= 0) {
+    const contentStart = text.indexOf('\n', fenceStart + 3);
+    const fenceEnd =
+      contentStart >= 0 ? text.indexOf('```', contentStart + 1) : -1;
+    if (contentStart >= 0 && fenceEnd > contentStart) {
+      return text.slice(contentStart + 1, fenceEnd).trim();
+    }
+  }
+
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
   if (firstBrace >= 0 && lastBrace > firstBrace) {
