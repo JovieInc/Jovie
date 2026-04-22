@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -136,23 +135,14 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 export default function HomePage() {
   return (
-    <main className='relative min-h-dvh bg-[var(--color-bg-base)] text-primary-token'>
+    <main className='relative flex flex-1 flex-col bg-[var(--color-bg-base)] text-primary-token'>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <header className='absolute left-5 top-4 md:left-6 md:top-5'>
-        <Link
-          href='/'
-          className='text-[13px] font-medium tracking-tight text-primary-token'
-        >
-          jovie
-        </Link>
-      </header>
-
-      <div className='flex min-h-dvh items-center justify-center px-4'>
+      <div className='flex flex-1 items-center justify-center px-4'>
         <HomepageIntent />
       </div>
     </main>
