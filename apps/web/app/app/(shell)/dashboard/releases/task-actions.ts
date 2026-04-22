@@ -290,6 +290,48 @@ export async function addReleaseTask(
     dueAt: data.dueDate ?? null,
   });
 
+  // Fire-and-forget cluster-classification telemetry. Must not surface
+  // failures to the user; custom task telemetry is a roadmap signal, not a
+  // critical path.
+  void (async () => {
+    try {
+      const { classifyTaskCluster, CLASSIFIER_AUTO_CLUSTER_THRESHOLD } =
+        await import('@/lib/release-tasks/classify-task-cluster');
+      const { normalizeTaskText } = await import(
+        '@/lib/release-tasks/normalize-task-text'
+      );
+      const { customTaskTelemetry, releaseSkillClusters } = await import(
+        '@/lib/db/schema/release-tasks'
+      );
+      const clusters = await db
+        .select({
+          slug: releaseSkillClusters.slug,
+          displayName: releaseSkillClusters.displayName,
+        })
+        .from(releaseSkillClusters);
+      const userText = data.description
+        ? `${data.title} | ${data.description}`
+        : data.title;
+      const result = await classifyTaskCluster(userText, clusters);
+      const triageStatus =
+        result.clusterSlug !== null &&
+        result.confidence >= CLASSIFIER_AUTO_CLUSTER_THRESHOLD
+          ? ('auto_clustered' as const)
+          : ('pending_review' as const);
+      await db.insert(customTaskTelemetry).values({
+        releaseId,
+        creatorProfileId: profileId,
+        userText,
+        normalizedText: normalizeTaskText(userText),
+        suggestedClusterSlug: result.clusterSlug,
+        classifierConfidence: result.confidence,
+        triageStatus,
+      });
+    } catch {
+      // swallow — telemetry must not block or surface errors
+    }
+  })();
+
   return mapTaskToReleaseTaskView(task);
 }
 

@@ -260,3 +260,163 @@ export async function listReleaseSkillClusters() {
     .orderBy(releaseSkillClusters.displayOrder);
   return rows;
 }
+
+/**
+ * Read-only: list catalog rows for the task-builder browser.
+ * Ordered by cluster, then priority weight, then name.
+ */
+export async function listReleaseTaskCatalog() {
+  await requireTasksWorkspaceAccess();
+  const priorityCase = drizzleSql<number>`CASE ${releaseTaskCatalog.priority}
+    WHEN 'urgent' THEN 1
+    WHEN 'high' THEN 2
+    WHEN 'medium' THEN 3
+    WHEN 'low' THEN 4
+    WHEN 'none' THEN 5
+    ELSE 6 END`;
+  const rows = await db
+    .select({
+      slug: releaseTaskCatalog.slug,
+      name: releaseTaskCatalog.name,
+      shortDescription: releaseTaskCatalog.shortDescription,
+      clusterId: releaseTaskCatalog.clusterId,
+      category: releaseTaskCatalog.category,
+      priority: releaseTaskCatalog.priority,
+      flowStageDaysOffset: releaseTaskCatalog.flowStageDaysOffset,
+    })
+    .from(releaseTaskCatalog)
+    .orderBy(
+      releaseTaskCatalog.clusterId,
+      priorityCase,
+      releaseTaskCatalog.name
+    );
+  return rows;
+}
+
+/**
+ * Add a single catalog task to a release. Idempotent against
+ * release_task_snapshots — if a snapshot already exists for this releaseId +
+ * catalogSlug, returns the existing task list without inserting a duplicate.
+ */
+export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  await requireReleaseAccess(releaseId, profileId);
+
+  const [existingSnapshot] = await db
+    .select({ id: releaseTaskSnapshots.id })
+    .from(releaseTaskSnapshots)
+    .where(
+      and(
+        eq(releaseTaskSnapshots.releaseId, releaseId),
+        eq(releaseTaskSnapshots.catalogSlug, slug)
+      )
+    )
+    .limit(1);
+  if (existingSnapshot) return getReleaseTasks(releaseId);
+
+  const [row] = await db
+    .select({
+      slug: releaseTaskCatalog.slug,
+      name: releaseTaskCatalog.name,
+      category: releaseTaskCatalog.category,
+      clusterId: releaseTaskCatalog.clusterId,
+      shortDescription: releaseTaskCatalog.shortDescription,
+      priority: releaseTaskCatalog.priority,
+      flowStageDaysOffset: releaseTaskCatalog.flowStageDaysOffset,
+      assigneeType: releaseTaskCatalog.assigneeType,
+      aiSkillId: releaseTaskCatalog.aiSkillId,
+      aiSkillStatus: releaseTaskCatalog.aiSkillStatus,
+      catalogVersion: releaseTaskCatalog.catalogVersion,
+    })
+    .from(releaseTaskCatalog)
+    .where(eq(releaseTaskCatalog.slug, slug))
+    .limit(1);
+  if (!row) throw new Error(`Unknown catalog slug: ${slug}`);
+
+  const [release, positionRow, counterRow] = await Promise.all([
+    db
+      .select({ releaseDate: discogReleases.releaseDate })
+      .from(discogReleases)
+      .where(eq(discogReleases.id, releaseId))
+      .limit(1)
+      .then(rows => rows[0]),
+    db
+      .select({ maxPosition: max(tasks.position) })
+      .from(tasks)
+      .where(
+        and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt))
+      )
+      .then(rows => rows[0]),
+    db
+      .update(creatorProfiles)
+      .set({
+        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profileId))
+      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber })
+      .then(rows => rows[0]),
+  ]);
+
+  const taskNumber = (counterRow?.nextTaskNumber ?? 1) - 1;
+  const position = (positionRow?.maxPosition ?? -1) + 1;
+  const releaseDate = release?.releaseDate ?? null;
+
+  await db.transaction(async tx => {
+    await tx.insert(tasks).values({
+      taskNumber,
+      creatorProfileId: profileId,
+      title: row.name,
+      description: row.shortDescription ?? null,
+      status: 'todo' as const,
+      priority: row.priority,
+      assigneeKind:
+        row.assigneeType === 'ai_workflow'
+          ? ('jovie' as const)
+          : ('human' as const),
+      agentType: row.aiSkillId ?? null,
+      agentStatus: 'idle' as const,
+      releaseId,
+      category: row.category,
+      dueAt:
+        releaseDate === null || row.flowStageDaysOffset === null
+          ? null
+          : (() => {
+              const d = new Date(releaseDate);
+              d.setDate(d.getDate() + row.flowStageDaysOffset);
+              return d;
+            })(),
+      position,
+      sourceTemplateId: null,
+      metadata: {
+        dueDaysOffset: row.flowStageDaysOffset,
+        catalogSlug: row.slug,
+        catalogVersion: row.catalogVersion,
+        selectionScore: null,
+        selectionReasons: ['manual_add'],
+      },
+    });
+    await tx.insert(releaseTaskSnapshots).values({
+      releaseId,
+      catalogSlug: row.slug,
+      catalogVersion: row.catalogVersion,
+      name: row.name,
+      category: row.category,
+      clusterId: row.clusterId,
+      shortDescription: row.shortDescription,
+      priority: row.priority,
+      flowStageDaysOffset: row.flowStageDaysOffset,
+      assigneeType: row.assigneeType,
+      aiSkillId: row.aiSkillId,
+      aiSkillStatus: row.aiSkillStatus,
+      reasons: ['manual_add'],
+      score: null,
+    });
+  });
+
+  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+  revalidatePath(APP_ROUTES.TASKS);
+
+  return getReleaseTasks(releaseId);
+}
