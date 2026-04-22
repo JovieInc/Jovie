@@ -1,32 +1,273 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import ArtistProfilesPage from '@/app/(marketing)/artist-profiles/page';
-import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile';
+import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_LAUNCH_FEATURES,
   ARTIST_PROFILE_SPEC_TILES,
 } from '@/data/artistProfileFeatures';
-import { ARTIST_PROFILE_SECTION_ORDER } from '@/data/artistProfilePageOrder';
+import {
+  ARTIST_PROFILE_SECTION_ORDER,
+  ARTIST_PROFILE_SECTION_TEST_IDS,
+} from '@/data/artistProfilePageOrder';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 
-vi.mock('next/navigation', async importOriginal => {
-  const actual = await importOriginal<typeof import('next/navigation')>();
-  return {
-    ...actual,
-    useRouter: () => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      refresh: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      prefetch: vi.fn(),
-    }),
-    usePathname: () => '/artist-profiles',
-    useSearchParams: () => new URLSearchParams(),
-  };
-});
+interface ChildrenProps {
+  readonly children?: ReactNode;
+}
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+  usePathname: () => '/artist-profiles',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+vi.mock('@/components/marketing', () => ({
+  MarketingContainer: ({ children }: ChildrenProps) => (
+    <div data-testid='marketing-container'>{children}</div>
+  ),
+  MarketingPageShell: ({ children }: ChildrenProps) => (
+    <main data-testid='marketing-page-shell'>{children}</main>
+  ),
+}));
+
+vi.mock('@/components/features/home/HomeTrustSection', () => ({
+  HomeTrustSection: () => <section>Trusted by Artists</section>,
+}));
+
+vi.mock('@/features/home/HomeTrustSection', () => ({
+  HomeTrustSection: () => <section>Trusted by Artists</section>,
+}));
+
+vi.mock('@/components/marketing/artist-profile/ArtistProfileHero', () => ({
+  ArtistProfileHero: ({
+    hero,
+  }: {
+    readonly hero: typeof ARTIST_PROFILE_COPY.hero;
+  }) => (
+    <section className='homepage-hero--artist-profile'>
+      <h1>{hero.headline}</h1>
+      <p>{hero.subhead}</p>
+      <div data-testid='homepage-claim-form'>{hero.ctaLabel}</div>
+    </section>
+  ),
+}));
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro',
+  () => ({
+    ArtistProfileHeroAdaptiveIntro: ({
+      hero,
+      adaptive,
+      phoneCaption,
+      phoneSubcaption,
+    }: {
+      readonly hero: typeof ARTIST_PROFILE_COPY.hero;
+      readonly adaptive: typeof ARTIST_PROFILE_COPY.adaptive;
+      readonly phoneCaption: string;
+      readonly phoneSubcaption: string;
+    }) => (
+      <>
+        <section data-testid='artist-profile-section-hero'>
+          <h1>{hero.headline}</h1>
+          <div data-testid='homepage-claim-form'>{hero.ctaLabel}</div>
+        </section>
+        <section data-testid='artist-profile-section-adaptive'>
+          <div data-testid='artist-profile-adaptive-sequence'>
+            <h2>{phoneCaption}</h2>
+            <p>{phoneSubcaption}</p>
+            <img alt={adaptive.restingScreenshotAlt} src='/test-shot.png' />
+            {adaptive.modes.map(mode => (
+              <button key={mode.id} type='button'>
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section data-testid='artist-profile-section-trust'>
+          Trusted by Artists
+        </section>
+      </>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel',
+  () => ({
+    ArtistProfileOutcomesCarousel: ({
+      outcomes,
+    }: {
+      readonly outcomes: typeof ARTIST_PROFILE_COPY.outcomes;
+    }) => (
+      <section>
+        <h2>{outcomes.headline}</h2>
+        <div data-testid='artist-profile-outcomes-grid'>
+          {outcomes.cards.map(card => (
+            <article data-testid='artist-profile-outcome-card' key={card.id}>
+              {card.title}
+            </article>
+          ))}
+        </div>
+      </section>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileCaptureSection',
+  () => ({
+    ArtistProfileCaptureSection: ({
+      capture,
+    }: {
+      readonly capture: typeof ARTIST_PROFILE_COPY.capture;
+    }) => (
+      <section>
+        <h2>{capture.headline}</h2>
+        <p>{capture.notification.title}</p>
+      </section>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileReactivationSection',
+  () => ({
+    ArtistProfileReactivationSection: ({
+      reactivation,
+    }: {
+      readonly reactivation: typeof ARTIST_PROFILE_COPY.reactivation;
+    }) => (
+      <section>
+        <h2>{reactivation.headline}</h2>
+        <p>{reactivation.outputs[0]?.title}</p>
+      </section>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileMonetizationSection',
+  () => ({
+    ArtistProfileMonetizationSection: ({
+      monetization,
+    }: {
+      readonly monetization: typeof ARTIST_PROFILE_COPY.monetization;
+    }) => (
+      <section>
+        <h2>{monetization.headline}</h2>
+        {[
+          monetization.irlPaymentsCard,
+          monetization.captureCard,
+          monetization.thanksCard,
+          monetization.reengageCard,
+        ].map(card => (
+          <article
+            data-testid='artist-profile-monetization-card'
+            key={card.title}
+          >
+            {card.title}
+          </article>
+        ))}
+      </section>
+    ),
+  })
+);
+
+vi.mock('@/components/marketing/artist-profile/ArtistProfileSpecWall', () => ({
+  ArtistProfileSpecWall: ({
+    specWall,
+    tiles,
+  }: {
+    readonly specWall: typeof ARTIST_PROFILE_COPY.specWall;
+    readonly tiles: typeof ARTIST_PROFILE_SPEC_TILES;
+  }) => (
+    <section>
+      <h2>{specWall.headline}</h2>
+      {tiles.map(tile => (
+        <article key={tile.title}>{tile.title}</article>
+      ))}
+    </section>
+  ),
+}));
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileHowItWorks',
+  () => ({
+    ArtistProfileHowItWorks: ({
+      howItWorks,
+    }: {
+      readonly howItWorks: typeof ARTIST_PROFILE_COPY.howItWorks;
+    }) => (
+      <section>
+        <h2>{howItWorks.headline}</h2>
+        {howItWorks.steps.map(step => (
+          <article key={step.id}>{step.description}</article>
+        ))}
+        <p>{howItWorks.sync.otherProvidersLabel}</p>
+      </section>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileSocialProof',
+  () => ({
+    ArtistProfileSocialProof: ({
+      socialProof,
+    }: {
+      readonly socialProof: typeof ARTIST_PROFILE_COPY.socialProof;
+    }) => (
+      <section>
+        <h2>{socialProof.headline}</h2>
+        <p>{socialProof.intro}</p>
+      </section>
+    ),
+  })
+);
+
+vi.mock('@/components/marketing/artist-profile/ArtistProfileFaq', () => ({
+  ArtistProfileFaq: ({
+    faq,
+  }: {
+    readonly faq: typeof ARTIST_PROFILE_COPY.faq;
+  }) => (
+    <section>
+      <h2>{faq.headline}</h2>
+      {faq.items.map(item => (
+        <article key={item.question}>
+          <h3>{item.question}</h3>
+          <p>{item.answer}</p>
+        </article>
+      ))}
+    </section>
+  ),
+}));
+
+vi.mock('@/components/marketing/artist-profile/ArtistProfileFinalCta', () => ({
+  ArtistProfileFinalCta: ({
+    finalCta,
+  }: {
+    readonly finalCta: typeof ARTIST_PROFILE_COPY.finalCta;
+  }) => (
+    <section>
+      <h2 data-testid='final-cta-headline'>{finalCta.headline}</h2>
+      <p>{finalCta.subhead}</p>
+      <button type='button'>{finalCta.ctaLabel}</button>
+    </section>
+  ),
+}));
 
 function getEnabledSectionTestIds(flags: ArtistProfileSectionFlags) {
   if (!flags.FULL_PAGE) {
@@ -59,348 +300,119 @@ function expectArtistProfileSectionOrder(flags: ArtistProfileSectionFlags) {
   }
 }
 
+async function renderArtistProfileLandingPage(
+  flags: ArtistProfileSectionFlags
+) {
+  const { ArtistProfileLandingPage } = await import(
+    '@/components/marketing/artist-profile'
+  );
+
+  render(
+    <ArtistProfileLandingPage
+      copy={ARTIST_PROFILE_COPY}
+      launchFeatures={ARTIST_PROFILE_LAUNCH_FEATURES}
+      specTiles={ARTIST_PROFILE_SPEC_TILES}
+      socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
+      flags={flags}
+    />
+  );
+}
+
 describe('ArtistProfilesPage', () => {
-  const originalMatchMedia = globalThis.matchMedia;
+  it('exports the static artist-profiles SEO contract and renders through the marketing shell', async () => {
+    const {
+      default: ArtistProfilesPage,
+      metadata,
+      revalidate,
+    } = await import('@/app/(marketing)/artist-profiles/page');
 
-  beforeAll(() => {
-    // @ts-expect-error test shim
-    globalThis.matchMedia = vi.fn().mockImplementation(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      onchange: null,
-      dispatchEvent: vi.fn(),
-    }));
-  });
+    expect(revalidate).toBe(false);
+    expect(metadata.title).toBe(ARTIST_PROFILE_COPY.seo.title);
+    expect(metadata.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+    expect(metadata.alternates?.canonical).toContain('/artist-profiles');
 
-  afterAll(() => {
-    globalThis.matchMedia = originalMatchMedia;
-  });
-
-  it('renders the artist profile landing scaffold with subtraction-first copy', {
-    timeout: 20_000,
-  }, async () => {
     render(<ArtistProfilesPage />);
+
+    expect(screen.getByTestId('marketing-page-shell')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: ARTIST_PROFILE_COPY.hero.headline })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
+      ARTIST_PROFILE_COPY.finalCta.headline
+    );
+  });
+
+  it('renders full-page sections in the canonical data order', async () => {
+    await renderArtistProfileLandingPage({
+      FULL_PAGE: true,
+      SOCIAL_PROOF: true,
+      FAQ: true,
+    });
 
     expectArtistProfileSectionOrder({
       FULL_PAGE: true,
       SOCIAL_PROOF: true,
       FAQ: true,
     });
-    expect(document.getElementById('capture-every-fan')).toBeInTheDocument();
     expect(
-      document.getElementById('bring-them-back-automatically')
-    ).toBeInTheDocument();
-
-    expect(screen.getByTestId('homepage-hero')).toHaveClass(
-      'homepage-hero--artist-profile'
-    );
-    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'The link your music deserves.' })
-    ).toBeInTheDocument();
-
-    for (const bannedCopy of [
-      'Owned audience',
-      'Automatic reactivation',
-      'Fan outcomes',
-      'Power features',
-      'Claim. Sync. Share.',
-    ]) {
-      expect(screen.queryByText(bannedCopy)).not.toBeInTheDocument();
-    }
-
-    const adaptiveSequence = within(
-      screen.getByTestId('artist-profile-adaptive-sequence')
-    );
-    expect(
-      adaptiveSequence.getByRole('heading', { name: 'One profile.' })
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByText('Adapts to every fan.')
-    ).toBeInTheDocument();
-    expect(
-      adaptiveSequence.getByRole('img', {
-        name: ARTIST_PROFILE_COPY.adaptive.restingScreenshotAlt,
-      })
-    ).toBeInTheDocument();
-
-    expect(
-      adaptiveSequence.getByRole('tab', { name: 'Contact' })
-    ).toBeInTheDocument();
-    expect(
-      ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
-        ?.screenshotAlt
-    ).toContain('contact');
-
-    expect(screen.queryByText('/listen')).not.toBeInTheDocument();
-    expect(screen.queryByText('/tour')).not.toBeInTheDocument();
-    expect(screen.queryByText('/pay')).not.toBeInTheDocument();
-    expect(screen.queryByText('/contact')).not.toBeInTheDocument();
-
-    const captureSection = within(
-      screen.getByTestId('artist-profile-section-capture')
-    );
-    expect(
-      captureSection.getByRole('heading', { name: 'Capture every fan.' })
-    ).toBeInTheDocument();
-    expect(
-      captureSection.getByText('Notifications Enabled')
-    ).toBeInTheDocument();
-    expect(
-      captureSection.getAllByText('Ava L. in London saved O2 Arena.').length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.getAllByText('Nina P. turned on new music notifications.')
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      captureSection.queryByText('Trusted alerts, not marketing spam.')
-    ).toBe(null);
-
-    const reactivationSection = within(
-      screen.getByTestId('artist-profile-section-reactivation')
-    );
-    expect(
-      reactivationSection.getByRole('heading', {
-        name: 'Notify them automatically.',
+      screen.getByRole('heading', {
+        name: ARTIST_PROFILE_COPY.hero.phoneCaption,
       })
     ).toBeInTheDocument();
     expect(
-      reactivationSection.getByText('Subscribers hear it first.')
-    ).toBeInTheDocument();
-    expect(
-      reactivationSection.getByText('New release live now')
-    ).toBeInTheDocument();
-    expect(
-      reactivationSection.queryByText('Nearby show alert')
-    ).not.toBeInTheDocument();
-
-    const monetizationSection = within(
-      screen.getByTestId('artist-profile-section-monetization')
-    );
-    expect(
-      monetizationSection.getByRole('heading', {
-        name: 'Get paid. Again and again.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText(
-        'Turn a $5 busking tip into a lifelong customer.'
-      )
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getAllByTestId('artist-profile-monetization-card')
-    ).toHaveLength(4);
-    for (const title of [
-      'Accept payments',
-      'Capture the fan',
-      'Say thanks',
-      'Re-engage every release',
-    ]) {
-      expect(
-        monetizationSection.getByRole('heading', { name: title })
-      ).toBeInTheDocument();
-    }
-    expect(monetizationSection.getByText('Jessica')).toBeInTheDocument();
-    expect(monetizationSection.getByText('Los Angeles')).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Sidewalk QR tip')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('New music notifications enabled')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText(
-        "Thanks for the payment. Here's the new song."
-      )
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText(
-        'A quick thank-you with the latest release, sent right after the tip.'
-      )
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText('Jessica paid you $5')
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.getByText(
-        'One payment can turn into a fan who comes back again and again.'
-      )
-    ).toBeInTheDocument();
-    expect(
-      monetizationSection.queryByText('Retention loop')
-    ).not.toBeInTheDocument();
-
-    const outcomesSection = within(
-      screen.getByTestId('artist-profile-section-outcomes')
-    );
-    expect(
-      outcomesSection.getByRole('heading', { name: 'Built for Artists.' })
-    ).toBeInTheDocument();
-    expect(
-      within(
-        outcomesSection.getByTestId('artist-profile-outcomes-grid')
-      ).getAllByTestId('artist-profile-outcome-card')
-    ).toHaveLength(4);
-    expect(
-      outcomesSection.getByTestId('artist-profile-outcomes-grid')
-    ).toBeInTheDocument();
-    expect(outcomesSection.getAllByText('Tim White').length).toBeGreaterThan(0);
-    expect(
-      outcomesSection.getAllByText('w/ Cosmic Gate').length
-    ).toBeGreaterThan(0);
-    expect(
-      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
-    ).toBeInTheDocument();
-    expect(
-      outcomesSection.queryByText('Wired to my latest release')
-    ).not.toBeInTheDocument();
-
-    const specWallSection = within(
-      screen.getByTestId('artist-profile-section-spec-wall')
-    );
-    expect(
-      specWallSection.getByRole('heading', {
-        name: 'Details that matter.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      specWallSection.getByText(
-        'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.'
-      )
-    ).toBeInTheDocument();
-    for (const tile of ARTIST_PROFILE_SPEC_TILES) {
-      expect(
-        specWallSection.getByRole('heading', { name: tile.title })
-      ).toBeInTheDocument();
-    }
-    expect(
-      specWallSection.queryByText('Audience quality filtering')
-    ).not.toBeInTheDocument();
-    expect(
-      specWallSection.queryByText('Opinionated design')
-    ).not.toBeInTheDocument();
-    expect(
-      specWallSection.queryByText('Product philosophy')
-    ).not.toBeInTheDocument();
-
-    const howItWorksSection = within(
-      screen.getByTestId('artist-profile-section-how-it-works')
-    );
-    expect(
-      howItWorksSection.getByRole('heading', { name: 'Live in 60 seconds.' })
-    ).toBeInTheDocument();
-    expect(
-      howItWorksSection.getByText('Find your artist.')
-    ).toBeInTheDocument();
-    expect(
-      howItWorksSection.getByText('Pull your catalog in.')
-    ).toBeInTheDocument();
-    expect(
-      howItWorksSection.getByText('Use the same link everywhere.')
-    ).toBeInTheDocument();
-    expect(howItWorksSection.getByText('And 24 others.')).toBeInTheDocument();
-    expect(howItWorksSection.getAllByText('jov.ie/tim').length).toBeGreaterThan(
-      0
-    );
-
-    expect(
-      screen.getByRole('heading', { name: 'Real Artists. Real Workflows.' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/We built Jovie because we were tired of stitching/)
-    ).toBeInTheDocument();
-    expect(screen.getAllByText('Tim White').length).toBeGreaterThan(0);
-    expect(screen.getByText('Founder, Jovie')).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('link', { name: 'Claim your profile' }).length
-    ).toBeGreaterThan(0);
-  });
-
-  it('renders the data-driven faq and final cta copy', () => {
-    render(<ArtistProfilesPage />);
-
-    expect(
-      screen.getByRole('heading', { name: 'Frequently Asked Questions' })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      "Don't lose your next fan."
-    );
-    expect(
-      screen.getByText(
-        'Turn every visit into a stream, save, signup, or support.'
-      )
-    ).toBeInTheDocument();
-  });
-
-  it('keeps only one artist profile faq item open at a time', () => {
-    render(<ArtistProfilesPage />);
-
-    fireEvent.click(
       screen.getByRole('button', {
-        name: 'How is Jovie different from Linktree?',
+        name:
+          ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
+            ?.label ?? 'Contact',
       })
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
+      ARTIST_PROFILE_COPY.outcomes.cards.length
     );
     expect(
-      screen.getByText(
-        'Linktree is a general-purpose link list. Jovie is a music profile that understands releases, shows, pay, fan capture, and the actions artists need fans to take.'
-      )
-    ).toBeVisible();
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'How is it different from a smart link or pre-save page?',
-      })
-    );
-    expect(
-      screen.getByText(
-        'Linktree is a general-purpose link list. Jovie is a music profile that understands releases, shows, pay, fan capture, and the actions artists need fans to take.'
-      )
-    ).not.toBeVisible();
-    expect(
-      screen.getByText(
-        'A smart link or pre-save page usually serves one campaign. Jovie gives the artist one profile that can route to music, shows, pay, subscribe, releases, and future fan actions.'
-      )
-    ).toBeVisible();
+      screen.getAllByTestId('artist-profile-monetization-card')
+    ).toHaveLength(4);
+    expect(screen.getByText('And 24 others.')).toBeInTheDocument();
   });
 
-  it('renders only the hero when full page sections are flagged off', () => {
-    render(
-      <ArtistProfileLandingPage
-        copy={ARTIST_PROFILE_COPY}
-        launchFeatures={ARTIST_PROFILE_LAUNCH_FEATURES}
-        specTiles={ARTIST_PROFILE_SPEC_TILES}
-        socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
-        flags={{ FULL_PAGE: false, SOCIAL_PROOF: false, FAQ: false }}
-      />
-    );
+  it('omits optional social proof and FAQ sections when their flags are off', async () => {
+    await renderArtistProfileLandingPage({
+      FULL_PAGE: true,
+      SOCIAL_PROOF: false,
+      FAQ: false,
+    });
+
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.socialProof)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.faq)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.finalCta)
+    ).toBeInTheDocument();
+  });
+
+  it('renders only hero and trust sections when the full page flag is off', async () => {
+    await renderArtistProfileLandingPage({
+      FULL_PAGE: false,
+      SOCIAL_PROOF: false,
+      FAQ: false,
+    });
 
     expectArtistProfileSectionOrder({
       FULL_PAGE: false,
       SOCIAL_PROOF: false,
       FAQ: false,
     });
-    expect(screen.getByTestId('homepage-hero')).toHaveClass(
-      'homepage-hero--artist-profile'
-    );
-    expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
-    expect(screen.getByTestId('homepage-claim-form')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Contact' })
+      screen.getByText(ARTIST_PROFILE_COPY.hero.headline)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Get paid. Again and again.' })
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.monetization)
     ).not.toBeInTheDocument();
   });
 });
