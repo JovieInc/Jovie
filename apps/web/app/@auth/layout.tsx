@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { isMockPublishableKey } from '@/components/providers/clerkAvailability';
 import { AuthUnavailableCard } from '@/features/auth';
@@ -32,7 +33,14 @@ export default async function AuthSlotLayout({
     isMockPublishableKey(publishableKey);
 
   if (isClerkUnavailable) {
-    return <AuthUnavailableCard />;
+    // Wrap the fallback card in the same modal shell the real flow uses, so
+    // dev (Clerk mock) and prod both show a modal. Without this, the card
+    // rendered in flow below the homepage and looked like a layout bug.
+    return (
+      <AuthModalShell ariaLabel='Authentication unavailable'>
+        <AuthUnavailableCard />
+      </AuthModalShell>
+    );
   }
 
   return (
