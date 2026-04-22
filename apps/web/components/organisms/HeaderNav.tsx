@@ -21,9 +21,22 @@ export interface HeaderNavProps {
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly authMode?: 'client' | 'public-static';
+  readonly minimalAuth?: boolean;
 }
 
-function PublicAuthActions() {
+type PublicAuthActionsProps = Readonly<{ minimal?: boolean }>;
+
+function PublicAuthActions({ minimal = false }: PublicAuthActionsProps = {}) {
+  if (minimal) {
+    return (
+      <Link
+        href='/signin'
+        className='focus-ring-themed text-[13px] text-white/60 transition-colors duration-150 hover:text-white/90'
+      >
+        Sign in
+      </Link>
+    );
+  }
   return (
     <div className='flex items-center gap-1'>
       <Link href='/signin' className='btn-linear-login focus-ring-themed'>
@@ -49,6 +62,7 @@ export function HeaderNav({
   containerSize: _containerSize = 'lg',
   navLinks,
   authMode = 'client',
+  minimalAuth = false,
 }: HeaderNavProps = {}) {
   const navLinkClass = 'nav-link-linear focus-ring-themed';
   const hasNavLinks = !hideNav && !!navLinks?.length;
@@ -132,7 +146,7 @@ export function HeaderNav({
           {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
           <div className='flex items-center gap-1'>
             {authMode === 'public-static' ? (
-              <PublicAuthActions />
+              <PublicAuthActions minimal={minimalAuth} />
             ) : (
               <AuthActions />
             )}

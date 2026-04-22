@@ -2,11 +2,13 @@
 
 import {
   ArrowRight,
+  Bell,
   Calendar,
   FileText,
   type LucideIcon,
   Send,
   Sparkles,
+  UserCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,6 +32,8 @@ const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
   generate_album_art: Sparkles,
   generate_playlist_pitch: Send,
   plan_a_release: Calendar,
+  build_artist_profile: UserCircle,
+  setup_fan_notifications: Bell,
 };
 
 /**
@@ -183,7 +187,7 @@ export function HomepageIntent() {
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder='Message...'
-          className='h-[52px] w-full rounded-full border border-white/[0.09] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.14] focus-visible:border-white/[0.32] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
+          className='h-[52px] w-full rounded-full border border-white/[0.06] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.18] focus-visible:border-white/[0.32] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
         />
         <button
           type='button'
@@ -217,7 +221,7 @@ export function HomepageIntent() {
               key={pill.id}
               type='button'
               onClick={() => handlePillClick(pill)}
-              className='group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.07] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
+              className='group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.05] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.18] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
             >
               <Icon
                 className='h-[14px] w-[14px] text-quaternary-token transition-colors duration-150 group-hover:text-secondary-token'

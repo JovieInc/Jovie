@@ -45,6 +45,7 @@ export function MarketingHeader({
       logoSize={logoSize}
       authMode='public-static'
       hideNav={variant === 'minimal'}
+      minimalAuth={variant === 'minimal'}
       containerSize='homepage'
       navLinks={resolvedNavLinks}
     />

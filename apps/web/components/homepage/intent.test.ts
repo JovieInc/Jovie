@@ -16,18 +16,30 @@ describe('homepage intent constants', () => {
     expect(HOMEPAGE_INTENT_VARIANT_ID).toBe('release_assets_v1');
   });
 
-  it('PILLS exposes the four release-adjacent pills in order', () => {
+  it('PILLS exposes the intake pills in order', () => {
     expect(PILLS.map(p => p.id)).toEqual([
       'create_release_page',
       'generate_album_art',
       'generate_playlist_pitch',
       'plan_a_release',
+      'build_artist_profile',
+      'setup_fan_notifications',
     ]);
     expect(PILLS.map(p => p.label)).toEqual([
       'Create release page',
       'Generate album art',
       'Generate playlist pitch',
       'Plan a release',
+      'Build artist profile',
+      'Set up fan notifications',
+    ]);
+    expect(PILLS.map(p => p.insertedPrompt)).toEqual([
+      'Create a release page for ',
+      'Generate album art for ',
+      'Generate a playlist pitch for ',
+      'Plan a release for ',
+      'Build an artist profile for ',
+      'Set up fan notifications for ',
     ]);
     expect(PILLS.every(p => p.insertedPrompt.endsWith(' '))).toBe(true);
   });
