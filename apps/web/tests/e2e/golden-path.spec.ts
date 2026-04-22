@@ -141,7 +141,7 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     UPDATE creator_profiles
     SET spotify_id = NULL, spotify_url = NULL
     WHERE user_id IN (
-      SELECT id FROM users WHERE email LIKE '%+clerk_test@test.jovie.com'
+      SELECT id FROM users WHERE email LIKE 'gp-%+clerk_test@test.jovie.com'
     ) AND spotify_id IS NOT NULL
   `;
 
@@ -281,7 +281,7 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
  * For +clerk_test emails, Clerk requires completing email verification
  * with the magic code 424242 before a session is created.
  */
-async function createFreshUser(page: import('@playwright/test').Page) {
+async function createFreshUserOnce(page: import('@playwright/test').Page) {
   await setupClerkTestingToken({ page });
 
   await page.goto('/signin', {
@@ -352,6 +352,40 @@ async function createFreshUser(page: import('@playwright/test').Page) {
   await ensureDbUser(clerkUserId, email);
 
   return { email, clerkUserId };
+}
+
+async function createFreshUser(page: import('@playwright/test').Page) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      return await createFreshUserOnce(page);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const lowerMessage = message.toLowerCase();
+      const isRetryable =
+        lowerMessage.includes('captcha') ||
+        lowerMessage.includes('statement timeout') ||
+        lowerMessage.includes('canceling statement');
+      if (!isRetryable || attempt === 6) {
+        throw error;
+      }
+
+      await page.context().clearCookies();
+      await page
+        .evaluate(() => {
+          localStorage.clear();
+          sessionStorage.clear();
+        })
+        .catch(() => {});
+      await page.waitForTimeout(2000 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to create Clerk test user');
 }
 
 /* ------------------------------------------------------------------ */
