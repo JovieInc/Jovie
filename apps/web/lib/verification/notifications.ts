@@ -48,13 +48,27 @@ interface VerificationApprovedPayload {
   firstName: string;
 }
 
+function getSafeGreetingName(firstName: string): string | null {
+  const trimmed = firstName.trim();
+  if (trimmed.length < 2 || trimmed.length > 40) {
+    return null;
+  }
+
+  if (!/^[A-Za-z][A-Za-z' -]*[A-Za-z]$/.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
+
 export async function sendVerificationApprovedEmail(
   payload: VerificationApprovedPayload
 ): Promise<void> {
   const founderSender = getSenderPolicy('founder');
-  const safeFirstName = escapeHtml(payload.firstName);
+  const greetingName = getSafeGreetingName(payload.firstName) ?? 'Hey there';
+  const safeGreetingName = escapeHtml(greetingName);
   const message =
-    `${payload.firstName},\n\n` +
+    `${greetingName},\n\n` +
     'Hey, just saw you requested verification - pushed it through for you. Really excited to have you on the product. Let me know if you have any questions or feedback.\n\n' +
     '- Tim';
   const html = `<!DOCTYPE html>
@@ -71,7 +85,7 @@ export async function sendVerificationApprovedEmail(
         <table role="presentation" style="max-width: 520px; margin: 0 auto;">
           <tr>
             <td style="font-size: 15px; line-height: 1.7; color: #333;">
-              <p style="margin: 0 0 16px;">${safeFirstName},</p>
+              <p style="margin: 0 0 16px;">${safeGreetingName},</p>
               <p style="margin: 0 0 16px;">Hey, just saw you requested verification - pushed it through for you. Really excited to have you on the product. Let me know if you have any questions or feedback.</p>
               <p style="margin: 0;">- Tim</p>
             </td>

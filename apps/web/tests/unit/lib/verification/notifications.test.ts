@@ -108,4 +108,23 @@ describe('verification notifications', () => {
       html: expectedHtml,
     });
   });
+
+  it('uses a generic verification approval greeting for non-name input', async () => {
+    await sendVerificationApprovedEmail({
+      to: 'pro@example.com',
+      firstName: '@bad_handle',
+    });
+
+    const emailPayload = mockSendEmail.mock.calls[0][0] as {
+      html: string;
+      text: string;
+    };
+
+    expect(emailPayload.text).toMatch(/^Hey there,\n\n/);
+    expect(emailPayload.html).toContain(
+      '<p style="margin: 0 0 16px;">Hey there,</p>'
+    );
+    expect(emailPayload.text).not.toContain('@bad_handle');
+    expect(emailPayload.html).not.toContain('@bad_handle');
+  });
 });
