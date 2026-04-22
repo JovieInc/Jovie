@@ -23,6 +23,7 @@ import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { checkGateForUser } from '@/lib/flags/statsig';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -1692,6 +1693,13 @@ export async function POST(req: Request) {
     'POST, OPTIONS'
   );
 
+  // Tag every Sentry event captured during this request as chat-surface. The
+  // error path already tags `feature: 'ai-chat'`, but breadcrumbs, performance
+  // events, and any intermediate captureException elsewhere in the handler
+  // would otherwise go untagged. One call here covers all of them.
+  Sentry.getCurrentScope().setTag('feature', 'ai-chat');
+  Sentry.getCurrentScope().setTag('request_id', requestId);
+
   // Auth check - ensure user is authenticated
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -1701,9 +1709,38 @@ export async function POST(req: Request) {
     );
   }
 
+  // Kill switch: Statsig-backed, no deploy required. When a provider incident
+  // happens, flip `ai_chat_disabled` to 503 all chat traffic with a friendly
+  // message, or `ai_chat_force_light` to force-route to the cheaper/faster
+  // light model without a code change. Defaults (both false) = normal behavior.
+  const chatDisabled = await checkGateForUser(
+    userId,
+    'ai_chat_disabled',
+    false
+  );
+  if (chatDisabled) {
+    return NextResponse.json(
+      {
+        error: 'Chat is temporarily unavailable',
+        message:
+          'Jovie chat is paused while we address an upstream issue. Please try again in a few minutes.',
+        errorCode: 'CHAT_DISABLED',
+        requestId,
+      },
+      { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
+  const forceLightModel = await checkGateForUser(
+    userId,
+    'ai_chat_force_light',
+    false
+  );
+
   // Fetch user plan for rate limiting and tool gating
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
+  // Tag plan on the request scope so every Sentry event is queryable by tier.
+  Sentry.getCurrentScope().setTag('plan_tier', userPlan);
   const planLimits = getEntitlements(userPlan);
   const currentUserEntitlements = await getCurrentUserEntitlements().catch(
     () => null
@@ -1846,12 +1883,23 @@ export async function POST(req: Request) {
         }
       : freeTools;
 
-    const selectedModel = canUseLightModel(
-      uiMessages,
-      planLimits.booleans.aiCanUseTools
-    )
-      ? CHAT_MODEL_LIGHT
-      : CHAT_MODEL;
+    // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
+    // that degrades the entire chat surface to the light model during a
+    // provider incident, overriding the per-request heuristic.
+    const selectedModel =
+      forceLightModel ||
+      canUseLightModel(uiMessages, planLimits.booleans.aiCanUseTools)
+        ? CHAT_MODEL_LIGHT
+        : CHAT_MODEL;
+
+    // Tag the request scope with chat-specific dimensions so all Sentry events
+    // for this request (errors, perf, breadcrumbs) are filterable together.
+    Sentry.getCurrentScope().setTags({
+      chat_model: selectedModel,
+      chat_force_light: String(forceLightModel),
+      chat_has_tools: String(Object.keys(tools).length > 0),
+      chat_conversation_id: resolvedConversationId ?? 'none',
+    });
 
     const result = streamText({
       model: gateway(selectedModel),
@@ -1861,10 +1909,12 @@ export async function POST(req: Request) {
       abortSignal: req.signal,
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
-        recordOutputs: true,
+        // PII: do not capture prompts/outputs in AI SDK spans. Tokens, model,
+        // latency, and tool-call structure are still captured.
+        recordInputs: false,
+        recordOutputs: false,
         functionId: 'jovie-chat',
-        metadata: { model: selectedModel },
+        metadata: { model: selectedModel, plan: userPlan },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;

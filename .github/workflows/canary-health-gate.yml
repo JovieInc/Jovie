@@ -399,6 +399,32 @@ jobs:
 
           echo "✅ Signin renders correctly"
 
+          # Verify /api/chat is reachable and auth-gated. We send an unauthenticated
+          # POST and expect HTTP 401 — that proves the route exists, the auth wall
+          # is intact, and the handler is not 5xxing on boot (bad Sentry config,
+          # missing env, broken import). A full streaming smoke would require auth
+          # and is deferred (see chat instrumentation plan, 30-day review).
+          echo "Checking /api/chat is reachable and auth-gated..."
+          chat_url="${deployment_url%/}/api/chat"
+          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || echo "\n000")
+          chat_code="${chat_response##*$'\n'}"
+
+          # 401 = expected (auth-gated). 400 = acceptable (validation ran, route alive).
+          # Anything 5xx or 404 = regression.
+          if [ "$chat_code" = "401" ] || [ "$chat_code" = "400" ]; then
+            echo "✅ /api/chat reachable and auth-gated (HTTP $chat_code)"
+          elif [ "$chat_code" = "404" ]; then
+            echo "❌ Canary failed: /api/chat returned HTTP 404 — route missing or broken build"
+            echo "canary_status=failed_chat_route" >> "$GITHUB_OUTPUT"
+            exit 1
+          elif [ "$chat_code" -ge 500 ] 2>/dev/null; then
+            echo "❌ Canary failed: /api/chat returned HTTP $chat_code — handler crashing on boot"
+            echo "canary_status=failed_chat_route" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "⚠️ /api/chat returned unexpected HTTP $chat_code — investigate (non-blocking)"
+          fi
+
           # Verify the public profile route renders without a server error.
           # "Profile not found" with HTTP 200 is a valid app response (data issue,
           # not a code regression), so only block on 5xx or actual error pages.
