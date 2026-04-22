@@ -23,6 +23,14 @@ export const HOMEPAGE_ACTIVE_INTENT_KEY = 'jovie_active_homepage_intent_id';
 export const HOMEPAGE_INTENT_TTL_MS = 30 * 60 * 1000;
 export const HOMEPAGE_INTENT_MAX_CHARS = 140;
 
+/**
+ * Shared truncation length for rendering the prompt hint back to the user
+ * (modal status row + onboarding restorer). Keep both surfaces in lockstep
+ * so the visible copy doesn't change mid-flow when the user moves from
+ * signup → onboarding.
+ */
+export const HOMEPAGE_PROMPT_HINT_TRUNCATE = 60;
+
 export interface StoredHomepageIntent extends HomepageIntent {
   readonly id: string;
   readonly expiresAt: number;

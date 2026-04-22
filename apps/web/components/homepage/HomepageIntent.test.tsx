@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPush = vi.fn();
 const mockTrack = vi.fn();
+const mockLocationAssign = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, prefetch: vi.fn() }),
@@ -13,7 +14,10 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
-import { HOMEPAGE_INTENT_KEY } from '@/components/homepage/intent';
+import {
+  HOMEPAGE_ACTIVE_INTENT_KEY,
+  HOMEPAGE_INTENTS_KEY,
+} from '@/components/homepage/intent-store';
 
 function getInput() {
   return screen.getByPlaceholderText('Message...') as HTMLInputElement;
@@ -23,11 +27,56 @@ function getSubmit() {
   return screen.getByRole('button', { name: 'Submit prompt' });
 }
 
+// The submit handler branches on a desktop viewport check that uses
+// matchMedia. jsdom returns false by default — stub it to desktop=true so
+// the router.push path runs. Individual mobile tests can override.
+function mockMatchMediaDesktop(matches: boolean) {
+  window.matchMedia = vi.fn().mockImplementation(query => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
 describe('HomepageIntent', () => {
+  const originalMatchMedia = window.matchMedia;
+  const originalLocation = window.location;
+
   beforeEach(() => {
     mockPush.mockClear();
     mockTrack.mockClear();
+    mockLocationAssign.mockClear();
     globalThis.localStorage?.clear();
+    globalThis.sessionStorage?.clear();
+    mockMatchMediaDesktop(true);
+    // Replace window.location wholesale — jsdom's Location.assign is
+    // non-configurable, so mutating one property in place throws. Using
+    // Object.defineProperty on window itself lets us swap the whole
+    // object out and restore it cleanly in afterEach.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: {
+        ...originalLocation,
+        assign: mockLocationAssign,
+        origin: 'http://localhost',
+        pathname: '/',
+      },
+    });
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: originalLocation,
+    });
   });
 
   it('1. renders headline, subhead, input, and all 4 pills with correct labels', () => {
@@ -73,7 +122,10 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     fireEvent.click(getSubmit());
     expect(mockPush).not.toHaveBeenCalled();
-    expect(globalThis.localStorage?.getItem(HOMEPAGE_INTENT_KEY)).toBeNull();
+    expect(globalThis.localStorage?.getItem(HOMEPAGE_INTENTS_KEY)).toBeNull();
+    expect(
+      globalThis.sessionStorage?.getItem(HOMEPAGE_ACTIVE_INTENT_KEY)
+    ).toBeNull();
     expect(
       mockTrack.mock.calls.find(c => c[0] === 'homepage_prompt_submitted')
     ).toBeUndefined();
@@ -85,18 +137,34 @@ describe('HomepageIntent', () => {
     fireEvent.change(input, { target: { value: 'my new EP' } });
     fireEvent.click(getSubmit());
 
-    const raw = globalThis.localStorage?.getItem(HOMEPAGE_INTENT_KEY);
+    const raw = globalThis.localStorage?.getItem(HOMEPAGE_INTENTS_KEY);
     expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw as string);
-    expect(parsed.source).toBe('homepage');
-    expect(parsed.finalPrompt).toBe('my new EP');
-    expect(parsed.pillId).toBeNull();
-    expect(parsed.pillLabel).toBeNull();
-    expect(parsed.insertedPrompt).toBeNull();
-    expect(parsed.experimentId).toBe('homepage_intent_pills_v1');
-    expect(parsed.variantId).toBe('release_assets_v1');
-    expect(typeof parsed.createdAt).toBe('string');
-    expect(() => new Date(parsed.createdAt).toISOString()).not.toThrow();
+    const parsedMap = JSON.parse(raw as string) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    // Look up the entry via the active-intent sentinel rather than
+    // Object.values()[0] — that way a future refactor that persists
+    // multiple intents still validates the "active" one.
+    const activeIntentId = globalThis.sessionStorage?.getItem(
+      HOMEPAGE_ACTIVE_INTENT_KEY
+    );
+    expect(activeIntentId).toBeTruthy();
+    const parsed = activeIntentId ? parsedMap[activeIntentId] : undefined;
+    expect(parsed).toBeTruthy();
+    expect(parsed?.source).toBe('homepage');
+    expect(parsed?.finalPrompt).toBe('my new EP');
+    expect(parsed?.pillId).toBeNull();
+    expect(parsed?.pillLabel).toBeNull();
+    expect(parsed?.insertedPrompt).toBeNull();
+    expect(parsed?.experimentId).toBe('homepage_intent_pills_v1');
+    expect(parsed?.variantId).toBe('release_assets_v1');
+    expect(typeof parsed?.createdAt).toBe('string');
+    expect(typeof parsed?.id).toBe('string');
+    expect(typeof parsed?.expiresAt).toBe('number');
+    expect(() =>
+      new Date(parsed?.createdAt as string).toISOString()
+    ).not.toThrow();
   });
 
   it('5. submit fires homepage_prompt_submitted with expected shape', () => {
@@ -120,14 +188,31 @@ describe('HomepageIntent', () => {
     expect(props.promptLength).toBe('Create a release page for my EP'.length);
   });
 
-  it('6. submit calls router.push with /signin?redirect_url=/onboarding', () => {
+  it('6. desktop submit calls router.push with /signup and intent_id inside redirect_url', () => {
     render(<HomepageIntent />);
     fireEvent.change(getInput(), { target: { value: 'anything' } });
     fireEvent.click(getSubmit());
     expect(mockPush).toHaveBeenCalledTimes(1);
     const target = mockPush.mock.calls[0][0] as string;
-    expect(target).toContain('/signin');
-    expect(target).toContain('redirect_url=%2Fonboarding');
+    expect(target).toContain('/signup');
+    // intent_id MUST be encoded inside redirect_url (not a sibling param)
+    // so Clerk's OAuth round-trip preserves it. Assert the URL shape.
+    expect(target).toMatch(
+      /\/signup\?redirect_url=%2Fonboarding%3Fintent_id%3D[0-9a-f-]+/i
+    );
+    expect(mockLocationAssign).not.toHaveBeenCalled();
+  });
+
+  it('6b. mobile submit hard-navigates via window.location.assign, not router.push', () => {
+    mockMatchMediaDesktop(false);
+    render(<HomepageIntent />);
+    fireEvent.change(getInput(), { target: { value: 'from phone' } });
+    fireEvent.click(getSubmit());
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockLocationAssign).toHaveBeenCalledTimes(1);
+    const target = mockLocationAssign.mock.calls[0][0] as string;
+    expect(target).toContain('/signup');
+    expect(target).toMatch(/intent_id%3D[0-9a-f-]+/i);
   });
 
   it('7. homepage_viewed fires exactly once on mount', () => {
