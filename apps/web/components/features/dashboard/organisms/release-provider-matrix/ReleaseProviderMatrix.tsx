@@ -32,7 +32,6 @@ import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -42,6 +41,7 @@ import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
+import { NewReleaseHeaderAction } from './NewReleaseHeaderAction';
 import { ReleaseTable } from './ReleaseTable';
 import {
   DEFAULT_RELEASE_FILTERS,
@@ -654,18 +654,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const { setHeaderActions } = useSetHeaderActions();
 
+  const syncAction = experienceAdapter?.onSync ?? handleSync;
+
   const headerActions = useMemo(
-    () =>
-      canCreateManualReleases ? (
-        <DashboardHeaderActionButton
-          ariaLabel='Create a new release'
-          onClick={handleNewRelease}
-          icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
-          iconOnly
-          tooltipLabel='New Release'
-        />
-      ) : null,
-    [canCreateManualReleases, handleNewRelease]
+    () => (
+      <NewReleaseHeaderAction
+        canCreateManualReleases={canCreateManualReleases}
+        isSyncing={isSyncing}
+        onSyncSpotify={syncAction}
+        onCreateManual={handleNewRelease}
+      />
+    ),
+    [canCreateManualReleases, handleNewRelease, isSyncing, syncAction]
   );
 
   useEffect(() => {

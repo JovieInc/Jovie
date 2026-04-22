@@ -1,6 +1,13 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  ensureSignedInUser,
+  getAdminCredentials,
+  hasAdminCredentials,
+  waitForClerkSignInApi,
+} from '../helpers/clerk-auth';
 
 /**
  * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Stripe
@@ -141,7 +148,9 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     UPDATE creator_profiles
     SET spotify_id = NULL, spotify_url = NULL
     WHERE user_id IN (
-      SELECT id FROM users WHERE email LIKE '%+clerk_test@test.jovie.com'
+      SELECT id
+      FROM users
+      WHERE email LIKE ${'gp-%+clerk\\_test@test.jovie.com'} ESCAPE ${'\\'}
     ) AND spotify_id IS NOT NULL
   `;
 
@@ -264,7 +273,7 @@ async function ensureSpotifyUrlOnProfile(
 /* ------------------------------------------------------------------ */
 
 /** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
-async function interceptTrackingCalls(page: import('@playwright/test').Page) {
+async function interceptTrackingCalls(page: Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
   );
@@ -274,6 +283,80 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
+interface CheckoutAttempt {
+  readonly status: number;
+  readonly url: string | null;
+  readonly body: string;
+}
+
+async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
+  await setupClerkTestingToken({ page }).catch(() => {});
+  await page.goto('/app/chat', {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+
+  if (/\/sign-?in/.test(page.url())) {
+    return false;
+  }
+
+  return page
+    .evaluate(async () => {
+      const clerk = (window as any).Clerk;
+      if (!clerk) return true;
+      if (!clerk.loaded) {
+        await new Promise<void>(resolve => {
+          const startedAt = Date.now();
+          const tick = () => {
+            if (clerk.loaded || Date.now() - startedAt > 15_000) {
+              resolve();
+              return;
+            }
+            window.setTimeout(tick, 100);
+          };
+          tick();
+        });
+      }
+
+      if (!clerk.user?.id || !clerk.session) return false;
+      await clerk.session.getToken({ skipCache: true }).catch(() => null);
+      return true;
+    })
+    .catch(() => false);
+}
+
+async function createCheckoutSessionFromBrowser(
+  page: Page,
+  priceId: string
+): Promise<CheckoutAttempt> {
+  return page.evaluate(async targetPriceId => {
+    const clerk = (window as any).Clerk;
+    const token = await clerk?.session
+      ?.getToken({ skipCache: true })
+      .catch(() => null);
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ priceId: targetPriceId }),
+    });
+    const body = await response.text();
+    if (!response.ok) {
+      return { status: response.status, url: null, body };
+    }
+
+    const json = JSON.parse(body) as { url?: string };
+    return { status: response.status, url: json.url ?? null, body };
+  }, priceId);
+}
+
 /**
  * Create a brand-new Clerk test user session.
  * Uses `+clerk_test` email suffix which auto-verifies in Clerk test mode.
@@ -281,7 +364,7 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
  * For +clerk_test emails, Clerk requires completing email verification
  * with the magic code 424242 before a session is created.
  */
-async function createFreshUser(page: import('@playwright/test').Page) {
+async function createFreshUserOnce(page: import('@playwright/test').Page) {
   await setupClerkTestingToken({ page });
 
   await page.goto('/signin', {
@@ -289,17 +372,10 @@ async function createFreshUser(page: import('@playwright/test').Page) {
     timeout: 60_000,
   });
 
-  // Wait for Clerk JS to load
-  const loaded = await page
-    .waitForFunction(
-      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-      { timeout: 60_000 }
-    )
-    .then(() => true)
-    .catch(() => false);
+  const loaded = await waitForClerkSignInApi(page);
 
   if (!loaded) {
-    throw new Error('Clerk JS failed to load — cannot create test user');
+    throw new Error('Clerk sign-in API never became ready on /signin');
   }
 
   const email = `gp-${Date.now().toString(36)}+clerk_test@test.jovie.com`;
@@ -354,6 +430,40 @@ async function createFreshUser(page: import('@playwright/test').Page) {
   return { email, clerkUserId };
 }
 
+async function createFreshUser(page: import('@playwright/test').Page) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      return await createFreshUserOnce(page);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const lowerMessage = message.toLowerCase();
+      const isRetryable =
+        lowerMessage.includes('captcha') ||
+        lowerMessage.includes('statement timeout') ||
+        lowerMessage.includes('canceling statement');
+      if (!isRetryable || attempt === 6) {
+        throw error;
+      }
+
+      await page.context().clearCookies();
+      await page
+        .evaluate(() => {
+          localStorage.clear();
+          sessionStorage.clear();
+        })
+        .catch(() => {});
+      await page.waitForTimeout(2000 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to create Clerk test user');
+}
+
 /* ------------------------------------------------------------------ */
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
@@ -381,6 +491,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
   test('complete user journey from signup to paid subscription', async ({
     page,
+    browser,
   }) => {
     test.setTimeout(600_000);
 
@@ -503,14 +614,6 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     });
     await expect(importCompleteHeading).toBeVisible({ timeout: 180_000 });
 
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 7: Dashboard loaded — profile is sufficiently complete
-    // ──────────────────────────────────────────────────────────────────
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 120_000,
-    });
-
     // Ensure Spotify URL is saved on the profile via direct DB write.
     // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
     // and often fails silently in test envs. This guarantees the URL is persisted
@@ -529,9 +632,26 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       spotifyIdToSave
     );
 
-    // Dashboard reachability was asserted before the direct DB repair. From
-    // here, direct DB assertions provide the stable signal without paying
-    // another cold /app/chat navigation during local dev-server restarts.
+    // ──────────────────────────────────────────────────────────────────
+    // STEP 7: Dashboard loaded — profile is sufficiently complete
+    // ──────────────────────────────────────────────────────────────────
+    await expect(async () => {
+      const response = await page.goto('/app/chat', {
+        waitUntil: 'commit',
+        timeout: 90_000,
+      });
+
+      expect(
+        response?.status() ?? 0,
+        'Dashboard route should respond after profile completion'
+      ).toBeLessThan(400);
+    }).toPass({
+      timeout: 240_000,
+      intervals: [5_000, 10_000, 20_000],
+    });
+
+    // Direct DB repair runs before the dashboard check, so a redirect here
+    // means auth or profile completion regressed rather than slow enrichment.
     const currentUrl = page.url();
     expect(
       currentUrl,
@@ -585,6 +705,50 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
       console.log(
         `[golden-path] DSP check passed: spotify_url=${p.spotify_url}, spotify_id=${p.spotify_id}, is_public=${p.is_public}`
+      );
+    }
+
+    // Verify the newly created user is visible in the admin dashboard.
+    if (hasAdminCredentials()) {
+      const adminContext = await browser.newContext();
+      const adminPage = await adminContext.newPage();
+
+      try {
+        await setupClerkTestingToken({ page: adminPage });
+        await ensureSignedInUser(adminPage, getAdminCredentials());
+
+        await adminPage.goto(APP_ROUTES.ADMIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: 30_000,
+        });
+        await expect(
+          adminPage.locator('[data-testid="admin-overview-page"]')
+        ).toBeVisible({ timeout: 30_000 });
+        await expect(adminPage.getByText(/scoreboard/i).first()).toBeVisible({
+          timeout: 30_000,
+        });
+
+        const usersParams = new URLSearchParams({
+          view: 'users',
+          q: uniqueHandle,
+        });
+        await adminPage.goto(
+          `${APP_ROUTES.ADMIN_USERS}?${usersParams.toString()}`,
+          {
+            waitUntil: 'domcontentloaded',
+            timeout: 30_000,
+          }
+        );
+
+        await expect(
+          adminPage.getByText(`@${uniqueHandle}`).first()
+        ).toBeVisible({ timeout: 30_000 });
+      } finally {
+        await adminContext.close().catch(() => undefined);
+      }
+    } else {
+      console.warn(
+        '[golden-path] Skipping admin dashboard verification — no admin credentials configured'
       );
     }
 
@@ -655,22 +819,25 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       .poll(
         async () => {
           try {
-            const checkoutResponse = await page.request.post(
-              '/api/stripe/checkout',
-              {
-                data: { priceId: proMonthlyPriceId },
-                timeout: 60_000,
-              }
+            let checkoutAttempt = await createCheckoutSessionFromBrowser(
+              page,
+              proMonthlyPriceId
             );
 
-            if (!checkoutResponse.ok()) {
-              return `http-${checkoutResponse.status()}`;
+            if (checkoutAttempt.status === 401) {
+              const refreshed = await refreshClerkSessionForApi(page);
+              if (!refreshed) return 'http-401';
+              checkoutAttempt = await createCheckoutSessionFromBrowser(
+                page,
+                proMonthlyPriceId
+              );
             }
 
-            const checkoutJson = (await checkoutResponse.json()) as {
-              url?: string;
-            };
-            checkoutUrl = checkoutJson.url ?? null;
+            if (checkoutAttempt.status < 200 || checkoutAttempt.status >= 300) {
+              return `http-${checkoutAttempt.status}`;
+            }
+
+            checkoutUrl = checkoutAttempt.url;
             return checkoutUrl ?? 'missing-url';
           } catch {
             return 'request-error';

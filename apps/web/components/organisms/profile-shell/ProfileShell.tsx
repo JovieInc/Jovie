@@ -184,7 +184,11 @@ export function ProfileShell({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div id='main-content' data-test='public-profile-root'>
+      <div
+        id='main-content'
+        data-test='public-profile-root'
+        data-testid='public-profile-root'
+      >
         <PublicSurfaceShell
           backgroundPattern={backgroundPattern}
           showGradientBlurs={showGradientBlurs}

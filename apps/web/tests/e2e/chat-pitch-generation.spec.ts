@@ -113,9 +113,7 @@ test.describe
 
       // Wait for the actual pitch tool UI, not just "some assistant activity".
       // The tool can surface either the loading title or the completed card.
-      const pitchToolUi = page.getByText(
-        /Generating pitches|Playlist Pitches/i
-      );
+      const pitchToolUi = page.getByText(/Generating pitches|Pitch Builder/i);
       await expect(pitchToolUi.first()).toBeVisible({ timeout: 30_000 });
     });
 

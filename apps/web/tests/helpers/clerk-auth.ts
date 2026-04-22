@@ -505,7 +505,7 @@ async function navigateToClerkSignIn(page: Page): Promise<void> {
     .catch(() => {});
 }
 
-async function waitForClerkSignInApi(page: Page): Promise<boolean> {
+export async function waitForClerkSignInApi(page: Page): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const ready = await page
       .waitForFunction(

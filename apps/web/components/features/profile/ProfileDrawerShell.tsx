@@ -41,8 +41,17 @@ export function ProfileDrawerShell({
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const showBackButton = navigationLevel === 'secondary' && Boolean(onBack);
-  const contentClasses = `flex max-h-[86dvh] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] ${contentClassName ?? ''}`;
-  const bodyClasses = `relative z-10 min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  // Shell height is a single `min(fixed, viewport%)` envelope so the body's
+  // min-height can never exceed the shell's max-height on short viewports.
+  // --profile-drawer-height-max caps the sheet; the body's min-height is a
+  // derived `calc()` that subtracts the header so the layout stays stable
+  // across view swaps without clipping tall views.
+  const drawerHeightStyle = {
+    ['--profile-drawer-height-max' as string]: 'min(86dvh, 720px)',
+    ['--profile-drawer-header' as string]: '72px',
+  } as React.CSSProperties;
+  const contentClasses = `relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
+  const bodyClasses = `relative z-10 min-h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
@@ -50,7 +59,7 @@ export function ProfileDrawerShell({
 
       <div className='relative z-10 shrink-0 px-5 pb-2.5 pt-3'>
         <div className='absolute inset-x-0 top-3 flex justify-center'>
-          <div className='h-[5px] w-9 rounded-full bg-white/[0.16]' />
+          <div className='h-[5px] w-10 rounded-full bg-white/[0.22]' />
         </div>
 
         <div className='grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2.5 pt-5'>
@@ -133,9 +142,10 @@ export function ProfileDrawerShell({
           role='dialog'
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
+          style={drawerHeightStyle}
         >
           <div
-            className={`relative flex max-h-[78%] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl ${contentClassName ?? ''}`}
+            className={`relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
           >
             <span id={accessibleDescriptionId} className='sr-only'>
               {accessibleDescription}
@@ -155,6 +165,7 @@ export function ProfileDrawerShell({
         <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
           <Drawer.Content
             className={contentClasses}
+            style={drawerHeightStyle}
             data-testid={dataTestId}
             aria-labelledby={titleId}
             aria-describedby={accessibleDescriptionId}

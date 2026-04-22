@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
@@ -38,20 +39,22 @@ describe('ProviderCell actions', () => {
     const openSpy = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
 
     render(
-      <table>
-        <tbody>
-          <tr onClick={parentClick}>
-            <td>
-              <ProviderCell
-                release={release}
-                provider={'spotify' as ProviderKey}
-                config={{ label: 'Spotify', accent: '#22c55e' }}
-                onCopy={onCopy}
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <TooltipProvider>
+        <table>
+          <tbody>
+            <tr onClick={parentClick}>
+              <td>
+                <ProviderCell
+                  release={release}
+                  provider={'spotify' as ProviderKey}
+                  config={{ label: 'Spotify', accent: '#22c55e' }}
+                  onCopy={onCopy}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </TooltipProvider>
     );
 
     const [openButton, copyButton] = screen.getAllByRole('button');
