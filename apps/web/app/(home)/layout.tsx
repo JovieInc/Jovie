@@ -8,11 +8,15 @@ export default function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Dual min-h-[100svh] is intentional (Lovable-style hero shell): the outer
+  // container is at least viewport height, AND main holds the hero at full
+  // viewport height on its own. Header sits in flow above, footer below the
+  // fold. Scrolling reveals the footer; the hero is the first paint.
   return (
-    <div className='home-root dark flex h-[100dvh] flex-col overflow-hidden bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='home-viewport dark flex min-h-[100svh] flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
       <SkipToContent />
       <MarketingHeader logoSize='xs' variant='minimal' />
-      <main id='main-content' className='flex flex-1 flex-col min-h-0'>
+      <main id='main-content' className='flex min-h-[100svh] flex-1 flex-col'>
         {children}
       </main>
       <HomeLegalFooter />

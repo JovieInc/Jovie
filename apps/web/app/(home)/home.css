@@ -8,11 +8,20 @@
  * (parent of commit fc2f6723d).
  */
 
-.home-root {
+/* Hide the scrollbar on the actual scroll container. `.home-viewport` is
+ * applied to the homepage layout's inner wrapper, but globals.css routes
+ * overflow-y to the html/body via `html:has(.home-viewport)`, so the
+ * scrollbar paints on html. The prior rules targeted `.home-viewport`
+ * directly and had no effect (caught by Sentry code-review bot). Keep
+ * this scoped to the homepage only; other routes intentionally show a
+ * thin scrollbar. */
+html:has(.home-viewport),
+body:has(.home-viewport) {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.home-root::-webkit-scrollbar {
+html:has(.home-viewport)::-webkit-scrollbar,
+body:has(.home-viewport)::-webkit-scrollbar {
   display: none;
 }
 
