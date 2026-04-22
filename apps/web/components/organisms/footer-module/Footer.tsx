@@ -214,6 +214,7 @@ export function Footer({
                 className='text-[11px] leading-[16px] font-normal tracking-[-0.01em]'
                 style={{
                   color: 'var(--linear-text-tertiary)',
+                  opacity: 1,
                 }}
               />
             </div>
@@ -290,6 +291,7 @@ export function Footer({
               className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
               style={{
                 color: 'var(--linear-text-tertiary)',
+                opacity: 1,
               }}
             />
           </>
