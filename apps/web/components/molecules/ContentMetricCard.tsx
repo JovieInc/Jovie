@@ -53,7 +53,7 @@ export function ContentMetricCard({
             ) : null}
             <p
               className={cn(
-                'truncate text-[11px] font-[560] tracking-normal text-tertiary-token',
+                'truncate text-[11px] font-semibold tracking-normal text-tertiary-token',
                 labelClassName
               )}
             >
@@ -66,7 +66,7 @@ export function ContentMetricCard({
         </div>
         <p
           className={cn(
-            'text-[26px] font-[610] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+            'text-[26px] font-semibold leading-none tracking-[-0.03em] text-primary-token tabular-nums',
             valueClassName
           )}
         >
