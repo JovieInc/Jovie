@@ -276,7 +276,7 @@ export function TableContextMenu({
   const [resolvedItems, setResolvedItems] = useState<ContextMenuItemType[]>(
     items ?? []
   );
-  const [, setResolveGeneration] = useState(0);
+  const [_resolveGeneration, setResolveGeneration] = useState(0);
 
   useEffect(() => {
     if (!getItems) {

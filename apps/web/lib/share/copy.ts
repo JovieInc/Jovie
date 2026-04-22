@@ -118,7 +118,7 @@ export function slugifyShareValue(input: string): string {
   let previousWasHyphen = false;
 
   for (const character of trimmed) {
-    const code = character.charCodeAt(0);
+    const code = character.codePointAt(0) ?? 0;
     const isAsciiLowercase = code >= 97 && code <= 122;
     const isDigit = code >= 48 && code <= 57;
 

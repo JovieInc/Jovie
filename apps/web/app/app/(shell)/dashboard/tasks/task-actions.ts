@@ -11,6 +11,7 @@ import {
   isNull,
   max,
   or,
+  type SQL,
 } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
@@ -39,7 +40,7 @@ function clampLimit(limit?: number): number {
 }
 
 function getTaskListWhereClause(profileId: string, filters?: TaskFilters) {
-  const conditions = [
+  const conditions: (SQL<unknown> | undefined)[] = [
     eq(tasks.creatorProfileId, profileId),
     isNull(tasks.deletedAt),
   ];
@@ -76,7 +77,7 @@ function getTaskListWhereClause(profileId: string, filters?: TaskFilters) {
           eq(tasks.position, cursor.position),
           drizzleSql`${tasks.id} > ${cursor.id}`
         )
-      )!
+      )
     );
   }
 

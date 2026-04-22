@@ -789,6 +789,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           width={RELEASE_DETAIL_PANEL_WIDTH}
           providerConfig={providerConfig}
           artistName={artistName}
+          onArtistClick={name => setSearchQuery(name)}
           canGenerateAlbumArt={showGenerateAlbumArtAction}
           onGenerateAlbumArt={handleGenerateAlbumArt}
           onClose={closeEditor}

@@ -19,10 +19,14 @@ export function filterReleases(
   searchQuery: string
 ): ReleaseViewModel[] {
   return releases.filter(release => {
-    // Text search filter
+    // Text search filter — matches title or any artist name (case-insensitive)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      if (!release.title.toLowerCase().includes(query)) return false;
+      const titleMatches = release.title.toLowerCase().includes(query);
+      const artistMatches =
+        release.artistNames?.some(name => name.toLowerCase().includes(query)) ??
+        false;
+      if (!titleMatches && !artistMatches) return false;
     }
 
     // Filter by release type
