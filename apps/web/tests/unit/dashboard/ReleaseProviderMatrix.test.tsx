@@ -161,7 +161,45 @@ vi.mock('@/features/dashboard/atoms/DashboardHeaderActionButton', () => ({
       {label}
     </button>
   ),
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS: '',
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS: '',
+  DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS: '',
+  DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS: '',
 }));
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction',
+  () => ({
+    NewReleaseHeaderAction: ({
+      canCreateManualReleases,
+      onCreateManual,
+      onSyncSpotify,
+    }: {
+      canCreateManualReleases: boolean;
+      onCreateManual: () => void;
+      onSyncSpotify: () => void;
+    }) => (
+      <div>
+        {canCreateManualReleases ? (
+          <button
+            type='button'
+            aria-label='Create a new release'
+            onClick={onCreateManual}
+          >
+            Create a new release
+          </button>
+        ) : null}
+        <button
+          type='button'
+          aria-label='Sync releases from Spotify'
+          onClick={onSyncSpotify}
+        >
+          Sync from Spotify
+        </button>
+      </div>
+    ),
+  })
+);
 
 vi.mock('@/features/dashboard/atoms/DashboardHeaderActionGroup', () => ({
   DashboardHeaderActionGroup: ({ children }: { children: React.ReactNode }) => (
