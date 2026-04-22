@@ -102,6 +102,8 @@ export function StaticArtistPage({
     profileSettings,
     featuredPlaylistFallback,
   });
+  const resolvedRenderMode: ProfileRenderMode =
+    presentation === 'compact-preview' ? 'preview' : renderMode;
 
   // Live public profiles and compact preview callers intentionally share the
   // same Apple-native compact shell. Homepage preview uses ProfileCompactSurface
@@ -109,6 +111,7 @@ export function StaticArtistPage({
   return (
     <ProfileCompactTemplate
       key={`${presentation}-${viewModel.artist.id}`}
+      renderMode={resolvedRenderMode}
       mode={viewModel.mode}
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}
@@ -132,7 +135,6 @@ export function StaticArtistPage({
       releases={releases}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
-      renderMode={renderMode}
     />
   );
 }

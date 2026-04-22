@@ -36,6 +36,7 @@ import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 
 interface ProfileCompactTemplateProps {
+  readonly renderMode?: ProfileRenderMode;
   readonly mode: ProfileMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
@@ -66,7 +67,6 @@ interface ProfileCompactTemplateProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly renderMode?: ProfileRenderMode;
 }
 
 function resolveDrawerView(
@@ -145,6 +145,7 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
 }
 
 export function ProfileCompactTemplate({
+  renderMode = 'interactive',
   mode,
   artist,
   socialLinks,
@@ -166,7 +167,6 @@ export function ProfileCompactTemplate({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
-  renderMode = 'interactive',
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
