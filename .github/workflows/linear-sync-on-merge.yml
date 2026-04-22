@@ -18,10 +18,11 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Extract Linear issue marker from PR body
+      - name: Extract Linear issue marker from PR body or branch
         id: extract
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           BODY_FILE="$RUNNER_TEMP/pr_body.txt"
           printf '%s' "$PR_BODY" > "$BODY_FILE"
@@ -29,8 +30,20 @@ jobs:
           LINEAR_ISSUE_ID=$(sed -n 's/.*linear-issue-id:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
           LINEAR_ISSUE_IDENTIFIER=$(sed -n 's/.*linear-issue-identifier:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
 
-          if [[ -z "$LINEAR_ISSUE_ID" ]]; then
-            echo "No linear-issue-id marker found; skipping"
+          # Fallback: infer identifier (e.g. JOV-1433) from the head branch
+          # (Cursor + this repo's convention: "<user>/jov-NNNN-…" or "itstimwhite/jov-NNNN-…").
+          # The Linear API accepts an issue identifier in place of the UUID in most places,
+          # but `issueUpdate` requires the UUID, so we also resolve it via an `issue()` query.
+          if [[ -z "$LINEAR_ISSUE_IDENTIFIER" ]]; then
+            BRANCH_IDENT=$(printf '%s' "$HEAD_REF" | grep -ioE 'jov-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]')
+            if [[ -n "$BRANCH_IDENT" ]]; then
+              echo "Inferred identifier from branch: $BRANCH_IDENT"
+              LINEAR_ISSUE_IDENTIFIER="$BRANCH_IDENT"
+            fi
+          fi
+
+          if [[ -z "$LINEAR_ISSUE_ID" && -z "$LINEAR_ISSUE_IDENTIFIER" ]]; then
+            echo "No linear issue marker or branch identifier found; skipping"
             echo "has_linear_marker=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -53,13 +66,31 @@ jobs:
             exit 0
           fi
 
+          # `issue(id: ...)` accepts both UUID and identifier (e.g. JOV-1433), so
+          # prefer the UUID marker when present and fall back to the identifier
+          # inferred from the branch name.
+          LOOKUP_ID="${ISSUE_ID:-$ISSUE_IDENTIFIER}"
+
           ISSUE_DATA=$(curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
-            -d "$(jq -cn --arg issueId "$ISSUE_ID" '{
-              query: "query IssueDoneState($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }",
+            -d "$(jq -cn --arg issueId "$LOOKUP_ID" '{
+              query: "query IssueDoneState($issueId: String!) { issue(id: $issueId) { id identifier team { states { nodes { id name type } } } } }",
               variables: { issueId: $issueId }
             }')")
+
+          # Resolve the canonical UUID + identifier so the downstream mutation
+          # works regardless of which form we were given.
+          RESOLVED_UUID=$(echo "$ISSUE_DATA" | jq -r '.data.issue.id // empty')
+          RESOLVED_IDENTIFIER=$(echo "$ISSUE_DATA" | jq -r '.data.issue.identifier // empty')
+
+          if [[ -z "$RESOLVED_UUID" ]]; then
+            echo "Could not resolve Linear issue for lookup '$LOOKUP_ID'; skipping"
+            exit 0
+          fi
+
+          ISSUE_ID="$RESOLVED_UUID"
+          ISSUE_IDENTIFIER="${RESOLVED_IDENTIFIER:-$ISSUE_IDENTIFIER}"
 
           DONE_STATE_ID=$(echo "$ISSUE_DATA" | jq -r '
             .data.issue.team.states.nodes

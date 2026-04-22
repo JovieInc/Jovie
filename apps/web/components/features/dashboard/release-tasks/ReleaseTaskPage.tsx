@@ -22,8 +22,8 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
   );
 
   // Sort by due date (nearest first), then by position (template order)
-  return incomplete
-    .toSorted((a, b) => {
+  return [...incomplete]
+    .sort((a, b) => {
       // Tasks with due dates come first
       if (a.dueDate && !b.dueDate) return -1;
       if (!a.dueDate && b.dueDate) return 1;

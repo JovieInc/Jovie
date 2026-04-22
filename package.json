@@ -48,7 +48,11 @@
       "qs": "6.15.0",
       "@vercel/microfrontends": "2.3.2",
       "follow-redirects": "1.16.0",
-      "@clerk/ui>@floating-ui/react": "0.27.19"
+      "@clerk/ui>@floating-ui/react": "0.27.19",
+      "tar": "7.5.13",
+      "@tootallnate/once": "3.0.1",
+      "smol-toml": "1.6.1",
+      "srvx": "0.11.13"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
@@ -109,7 +113,7 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.6",
     "typescript": "^6.0.2",
-    "vercel": "51.8.0",
+    "vercel": "52.0.0",
     "vitest": "4.1.4"
   },
   "lint-staged": {
