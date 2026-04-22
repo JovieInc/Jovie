@@ -9,10 +9,7 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   UnifiedTable,
 } from '@/components/organisms/table';
-import {
-  AdminTableHeader,
-  AdminTableSubheader,
-} from '@/features/admin/table/AdminTableHeader';
+import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
@@ -127,10 +124,6 @@ export function ActivityTableUnified({
       className='h-full border-0 bg-(--linear-app-content-surface)'
       data-testid='admin-activity-content'
     >
-      <AdminTableHeader
-        title='Activity'
-        subtitle='Monitor operational actions and recent system outcomes.'
-      />
       <AdminTableSubheader
         start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
       />
