@@ -56,6 +56,36 @@ interface SearchableContentProps {
   readonly inputRef?: React.Ref<HTMLInputElement>;
 }
 
+interface SubmenuGroupContextValue {
+  readonly activeSubmenuId: string | null;
+  readonly setActiveSubmenuId: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
+}
+
+const SubmenuGroupContext =
+  React.createContext<SubmenuGroupContextValue | null>(null);
+
+function SubmenuGroupProvider({
+  children,
+}: {
+  readonly children: React.ReactNode;
+}) {
+  const [activeSubmenuId, setActiveSubmenuId] = React.useState<string | null>(
+    null
+  );
+  const value = React.useMemo(
+    () => ({ activeSubmenuId, setActiveSubmenuId }),
+    [activeSubmenuId]
+  );
+
+  return (
+    <SubmenuGroupContext.Provider value={value}>
+      {children}
+    </SubmenuGroupContext.Provider>
+  );
+}
+
 function focusSiblingMenuItem(
   input: HTMLInputElement | null,
   placement: 'first' | 'last'
@@ -196,7 +226,7 @@ export function renderRootBody({
     return <EmptyState message={emptyMessage} />;
   }
 
-  return renderItems(items);
+  return <SubmenuGroupProvider>{renderItems(items)}</SubmenuGroupProvider>;
 }
 
 export function renderItem(
@@ -247,7 +277,8 @@ function CommonDropdownSubmenuRenderer({
   readonly item: CommonDropdownSubmenu;
   readonly context: MenuRenderContext;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const submenuGroup = React.useContext(SubmenuGroupContext);
+  const [localOpen, setLocalOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [measuredMinWidth, setMeasuredMinWidth] = React.useState<
     string | undefined
@@ -275,6 +306,9 @@ function CommonDropdownSubmenuRenderer({
     context.kind === 'context'
       ? CONTEXT_TRANSFORM_ORIGIN
       : DROPDOWN_TRANSFORM_ORIGIN;
+  const open = submenuGroup
+    ? submenuGroup.activeSubmenuId === item.id
+    : localOpen;
   const filteredItems = React.useMemo(
     () => filterItems(item.items, query, 'recursive', item.filterItem),
     [item.filterItem, item.items, query]
@@ -301,6 +335,12 @@ function CommonDropdownSubmenuRenderer({
   const clearQuery = React.useCallback(() => {
     handleQueryChange('');
   }, [handleQueryChange]);
+
+  React.useEffect(() => {
+    if (!open && query) {
+      clearQuery();
+    }
+  }, [clearQuery, open, query]);
 
   const measureTriggerWidth = React.useCallback(() => {
     if (item.minWidth !== undefined || !triggerRef.current) {
@@ -363,7 +403,17 @@ function CommonDropdownSubmenuRenderer({
         if (nextOpen) {
           measureTriggerWidth();
         }
-        setOpen(nextOpen);
+        if (submenuGroup) {
+          submenuGroup.setActiveSubmenuId(currentId => {
+            if (nextOpen) {
+              return item.id;
+            }
+
+            return currentId === item.id ? null : currentId;
+          });
+        } else {
+          setLocalOpen(nextOpen);
+        }
         if (!nextOpen && query) {
           clearQuery();
         }
