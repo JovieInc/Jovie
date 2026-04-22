@@ -9,14 +9,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 > Codex now boots Jovie worktrees through the canonical setup path and performs safe stop-time cleanup automatically when lifecycle hooks are available.
 
+> Sign-in modal polish: portaled to `<body>` so it escapes the header's `backdrop-filter` containing block, restyled to a compact 400px dark card close to stock Clerk, and hardened for accessibility with a visible close X, focus-in-modal on open, and a Tab focus trap that keeps keyboard users inside the dialog.
+
 ### Added
 
 - Added tracked Codex lifecycle config that runs the canonical setup wrapper on session start and the cleanup wrapper on stop.
 - Added a safe Codex cleanup wrapper that prunes stale worktree metadata, clears Turbopack cache, and keeps heavier E2E/archive cleanup behind explicit environment flags.
 
+### Fixed
+
+- [a11y] Trapped Tab focus inside the sign-in modal so keyboard users no longer escape to the page behind the backdrop after Clerk's internal focus cycle ends.
+- [a11y] Grew the close X touch target from 32×32 to 44×44 (WCAG 2.1 AAA) while keeping the 16px icon visually identical.
+- Fixed the sign-in modal mounting inside the marketing header's `backdrop-filter` containing block, which shrank the dialog to 72px and top-clipped the Clerk card. Now portaled to `document.body`.
+
 ### Changed
 
 - Simplified the Codex setup wrapper to delegate to `scripts/setup.sh`, including hook-safe JSON stdout handling for Codex lifecycle events.
+- Restyled the sign-in modal to a compact dark Clerk appearance (400px card, stock Clerk `Sign in to Jovie` + "Welcome back" + social buttons + "Secured by Clerk" footer) instead of the heavy marketing theme.
+- Added `ui={ui}` from `@clerk/ui` to the scoped ClerkProvider so Clerk pins its internal DOM structure for forward compatibility.
+- Added a visible close X in the top-right of the modal card for users who don't know Escape + backdrop-click.
+- Moved focus to the first input when the modal opens, via a `MutationObserver` that watches Clerk's async mount.
 - [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.163`.
 
 ## [26.4.162] - 2026-04-22
