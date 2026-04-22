@@ -184,7 +184,7 @@ export function HomepageIntent() {
       </span>
       <h1
         id='home-hero-heading'
-        className='homepage-hero-headline mt-7 self-center text-center font-semibold text-white sm:mt-8'
+        className='homepage-hero-headline mt-7 self-center text-center text-white sm:mt-8'
       >
         {HERO_COPY.headline}
       </h1>
