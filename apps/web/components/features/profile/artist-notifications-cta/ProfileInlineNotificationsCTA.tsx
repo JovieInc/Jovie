@@ -42,17 +42,22 @@ import { useSubscriptionForm } from './useSubscriptionForm';
 type Step = 'cta' | 'email' | 'otp' | 'name' | 'birthday' | 'done';
 type RevealVisualState = 'collapsed' | 'expanded' | 'submitting' | 'error';
 
-const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
-const inlineComposerWrapperClassName = 'h-[72px]';
-const heroComposerWrapperClassName = 'h-[64px]';
+// ─── Composer shell geometry ──────────────────────────────────────────
+// The wrapper's fixed height is what makes the step-stack "morph" rather
+// than "resize". Every step panel renders absolutely inside this wrapper.
+const inlineComposerWrapperClassName = 'h-[72px]'; // default: 48px shell + 20px rail + gap
+const heroComposerWrapperClassName = 'h-[64px]'; // hero:    44px shell + 20px rail
 
-/** How long we wait after tapping "Notify me" before we'll consider the reveal
- * shell truly blurred. Must exceed the focus delay below, otherwise the blur
- * that fires between click and input-mount collapses the step back to 'cta'
- * and causes visible flicker. */
-const REVEAL_SHELL_BLUR_GUARD_MS = 250;
+// ─── Buttons ──────────────────────────────────────────────────────────
+const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-10 !px-0 !py-0`;
+
+// ─── Focus & blur timing ──────────────────────────────────────────────
+// The reveal shell's onBlurCapture used to race the input mount/focus
+// and collapse the step back to 'cta' before the user ever saw the
+// email field. The guard MUST exceed EMAIL_INPUT_FOCUS_DELAY_MS.
 const EMAIL_INPUT_FOCUS_DELAY_MS = 180;
 const EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS = 0;
+const REVEAL_SHELL_BLUR_GUARD_MS = EMAIL_INPUT_FOCUS_DELAY_MS + 70;
 
 function getRevealVisualState(
   step: Step,
