@@ -168,19 +168,8 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <span
-        hidden
-        className='homepage-hero-eyebrow inline-flex items-center gap-2 self-center rounded-full border border-white/20 bg-white/[0.12] py-1 pl-1 pr-3 text-[11.5px] font-medium text-white backdrop-blur-xl'
-      >
-        <span className='rounded-full bg-white px-2 py-[3px] text-[10px] font-bold text-[#ff2e88]'>
-          {HERO_COPY.eyebrow.badge}
-        </span>
+      <span className='homepage-hero-eyebrow inline-flex items-center gap-2 self-center rounded-full border border-white/15 bg-white/[0.08] py-1 pl-3 pr-3 text-[11.5px] font-medium text-white/85 backdrop-blur-xl'>
         {HERO_COPY.eyebrow.text}
-        <ArrowRight
-          aria-hidden='true'
-          className='h-[11px] w-[11px] text-white'
-          strokeWidth={2.25}
-        />
       </span>
       <h1 className='homepage-hero-headline mt-7 self-center text-center font-semibold text-white sm:mt-8'>
         {HERO_COPY.headline}
