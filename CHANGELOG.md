@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.161] - 2026-04-22
+
+> Dropdown flyouts now behave like one focused menu stack, so release actions no longer leave multiple sibling submenus hanging open at the same time.
+
+### Fixed
+
+- Fixed shared dropdown submenu coordination so opening a sibling submenu closes the previously open flyout across dropdown and context-menu surfaces.
+- Added regression coverage for root, context-menu, and nested submenu siblings so tracked-link style menus keep only one child flyout open per level.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.161`.
+
 ## [26.4.160] - 2026-04-21
 
 > Windows agents can bootstrap the repo from PowerShell without hitting the WSL launcher, and PR automation now verifies GitHub auth before trying to move branches.
