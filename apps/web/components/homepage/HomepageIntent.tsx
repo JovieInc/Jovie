@@ -137,15 +137,6 @@ export function HomepageIntent() {
       </label>
 
       <div className='relative flex w-full items-center'>
-        {/* Ambient glow behind input — pure decoration, no layout impact */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-[-20%] top-1/2 -z-10 h-[140px] -translate-y-1/2 rounded-full opacity-70 blur-3xl'
-          style={{
-            background:
-              'radial-gradient(ellipse at center, rgba(94,106,210,0.18) 0%, rgba(94,106,210,0) 60%)',
-          }}
-        />
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -155,7 +146,7 @@ export function HomepageIntent() {
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder='Tell Jovie what you want to create...'
-          className='h-[52px] w-full rounded-full border border-white/[0.09] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.14] focus-visible:border-[var(--linear-border-focus)] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(94,106,210,0.18),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
+          className='h-[52px] w-full rounded-full border border-white/[0.09] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.14] focus-visible:border-white/[0.32] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
         />
         <button
           type='button'
@@ -165,7 +156,7 @@ export function HomepageIntent() {
           className={[
             'absolute right-[6px] inline-flex h-10 w-10 items-center justify-center rounded-full transition-all duration-150',
             canSubmit
-              ? 'bg-[var(--linear-border-focus)] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3),0_0_0_1px_rgba(94,106,210,0.4)] hover:brightness-110 active:scale-95'
+              ? 'bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.4)] hover:bg-white/95 active:scale-95'
               : 'bg-white/[0.04] text-quaternary-token pointer-events-none opacity-60',
           ].join(' ')}
         >
@@ -187,7 +178,7 @@ export function HomepageIntent() {
             key={pill.id}
             type='button'
             onClick={() => handlePillClick(pill)}
-            className='group inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-white/[0.07] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-[var(--linear-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-border-focus)]/20 active:translate-y-0'
+            className='group inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-white/[0.07] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
           >
             {pill.label}
           </button>
