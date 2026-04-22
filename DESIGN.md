@@ -567,7 +567,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 | Surface | Routes / entrypoints | Layout / shell | Design system |
 |---------|---------------------|----------------|---------------|
-| Homepage storytelling | `(marketing)/page.tsx`, `components/features/home/*` | `(marketing)/layout.tsx` with `MarketingHeader` + `MarketingFooter` | System A |
+| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | System B |
 | Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | System A (calmer) |
 | Legal / informational | `(dynamic)/legal/*` | Legal layout | System A (informational) |
 | Product app shell | `app/(shell)/*` | Authenticated app shell | System B |
