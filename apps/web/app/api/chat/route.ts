@@ -473,6 +473,14 @@ function sanitizeRetryAfterSeconds(value: unknown): number | null {
   return Math.min(normalized, 3600);
 }
 
+function safeSetSentryContext(callback: () => void): void {
+  try {
+    callback();
+  } catch {
+    // Observability must never break the chat request path.
+  }
+}
+
 /**
  * Creates the proposeAvatarUpload tool that signals the client to render
  * an inline photo upload widget in the chat conversation.
@@ -1710,8 +1718,10 @@ export async function POST(req: Request) {
   // would otherwise go untagged. One call here covers all of them.
   // `request_id` is stored as extra (not tag) — it is unique per request and
   // would blow out Sentry's tag cardinality budget.
-  Sentry.getCurrentScope().setTag('feature', 'ai-chat');
-  Sentry.getCurrentScope().setExtra('request_id', requestId);
+  safeSetSentryContext(() => {
+    Sentry.setTag('feature', 'ai-chat');
+    Sentry.setExtra('request_id', requestId);
+  });
 
   // Auth check - ensure user is authenticated
   const { userId } = await getOptionalAuth();
@@ -1727,7 +1737,9 @@ export async function POST(req: Request) {
   // block" from Sentry without a second data source.
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
-  Sentry.getCurrentScope().setTag('plan_tier', userPlan);
+  safeSetSentryContext(() => {
+    Sentry.setTag('plan_tier', userPlan);
+  });
 
   // Kill switch: Statsig-backed, no deploy required. When a provider incident
   // happens, flip `ai_chat_disabled` to 503 all chat traffic with a friendly
@@ -1913,16 +1925,20 @@ export async function POST(req: Request) {
     // `chat_conversation_id` goes in `extra` (high cardinality per Sentry
     // guidance); `chat_has_tools` reflects the real plan capability boundary
     // rather than a count of always-on freeTools.
-    Sentry.getCurrentScope().setTags({
-      chat_model: selectedModel,
-      chat_force_light: String(forceLightModel),
-      chat_has_tools: String(planLimits.booleans.aiCanUseTools),
+    safeSetSentryContext(() => {
+      Sentry.setTags({
+        chat_model: selectedModel,
+        chat_force_light: String(forceLightModel),
+        chat_has_tools: String(planLimits.booleans.aiCanUseTools),
+      });
     });
     if (resolvedConversationId) {
-      Sentry.getCurrentScope().setExtra(
-        'chat_conversation_id',
-        resolvedConversationId.slice(0, 120)
-      );
+      safeSetSentryContext(() => {
+        Sentry.setExtra(
+          'chat_conversation_id',
+          resolvedConversationId.slice(0, 120)
+        );
+      });
     }
 
     const result = streamText({
