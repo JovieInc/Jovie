@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.163] - 2026-04-22
+
+> Sign-in modal polish: portaled to `<body>` so it escapes the header's `backdrop-filter` containing block, restyled to a compact 400px dark card close to stock Clerk, and hardened for accessibility with a visible close X, focus-in-modal on open, and a Tab focus trap that keeps keyboard users inside the dialog.
+
+### Fixed
+
+- [a11y] Trapped Tab focus inside the sign-in modal so keyboard users no longer escape to the page behind the backdrop after Clerk's internal focus cycle ends.
+- [a11y] Grew the close X touch target from 32×32 to 44×44 (WCAG 2.1 AAA) while keeping the 16px icon visually identical.
+- Fixed the sign-in modal mounting inside the marketing header's `backdrop-filter` containing block, which shrank the dialog to 72px and top-clipped the Clerk card. Now portaled to `document.body`.
+
+### Changed
+
+- Restyled the sign-in modal to a compact dark Clerk appearance (400px card, stock Clerk `Sign in to Jovie` + "Welcome back" + social buttons + "Secured by Clerk" footer) instead of the heavy marketing theme.
+- Added `ui={ui}` from `@clerk/ui` to the scoped ClerkProvider so Clerk pins its internal DOM structure for forward compatibility.
+- Added a visible close X in the top-right of the modal card for users who don't know Escape + backdrop-click.
+- Moved focus to the first input when the modal opens, via a `MutationObserver` that watches Clerk's async mount.
+- [internal] Synced the canonical VERSION file and workspace `package.json` entries to `26.4.163`.
+
 ## [26.4.162] - 2026-04-22
 
 > The homepage now opens with a Linear-premium hero: a muted, slow-pulsing neon glow behind a "Your AI Artist Manager." one-line headline that fits from 375px up, a "Built for artists." eyebrow pill, and a Clerk modal sign-in that lazy-mounts only when the header link is clicked. The rest of the `/new` composition is available behind individual feature flags, all off in production.
