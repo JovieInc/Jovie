@@ -1,15 +1,14 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { HomepageIntent } from '@/components/homepage/HomepageIntent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { HomePageNarrative } from '@/features/home/HomePageNarrative';
-import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
@@ -136,20 +135,26 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 export default function HomePage() {
-  const showLiveProof = FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION;
-
   return (
-    <div className='relative min-h-screen'>
+    <main className='relative min-h-dvh bg-[var(--color-bg-base)] text-primary-token'>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HomePageNarrative
-        proofAvailability={showLiveProof ? 'visible' : 'hidden'}
-        proofSection={showLiveProof ? <SeeItInActionSafe enabled /> : null}
-      />
-    </div>
+      <header className='absolute left-5 top-4 md:left-6 md:top-5'>
+        <Link
+          href='/'
+          className='text-[13px] font-medium tracking-tight text-primary-token'
+        >
+          jovie
+        </Link>
+      </header>
+
+      <div className='flex min-h-dvh items-center justify-center px-4'>
+        <HomepageIntent />
+      </div>
+    </main>
   );
 }
