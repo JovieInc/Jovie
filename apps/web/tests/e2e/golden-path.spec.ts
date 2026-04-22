@@ -273,7 +273,7 @@ async function ensureSpotifyUrlOnProfile(
 /* ------------------------------------------------------------------ */
 
 /** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
-async function interceptTrackingCalls(page: import('@playwright/test').Page) {
+async function interceptTrackingCalls(page: Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
   );
@@ -281,6 +281,80 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
     r.fulfill({ status: 200, body: '{}' })
   );
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+}
+
+interface CheckoutAttempt {
+  readonly status: number;
+  readonly url: string | null;
+  readonly body: string;
+}
+
+async function refreshClerkSessionForApi(page: Page): Promise<boolean> {
+  await setupClerkTestingToken({ page }).catch(() => {});
+  await page.goto('/app/chat', {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
+
+  if (/\/sign-?in/.test(page.url())) {
+    return false;
+  }
+
+  return page
+    .evaluate(async () => {
+      const clerk = (window as any).Clerk;
+      if (!clerk) return true;
+      if (!clerk.loaded) {
+        await new Promise<void>(resolve => {
+          const startedAt = Date.now();
+          const tick = () => {
+            if (clerk.loaded || Date.now() - startedAt > 15_000) {
+              resolve();
+              return;
+            }
+            window.setTimeout(tick, 100);
+          };
+          tick();
+        });
+      }
+
+      if (!clerk.user?.id || !clerk.session) return false;
+      await clerk.session.getToken({ skipCache: true }).catch(() => null);
+      return true;
+    })
+    .catch(() => false);
+}
+
+async function createCheckoutSessionFromBrowser(
+  page: Page,
+  priceId: string
+): Promise<CheckoutAttempt> {
+  return page.evaluate(async targetPriceId => {
+    const clerk = (window as any).Clerk;
+    const token = await clerk?.session
+      ?.getToken({ skipCache: true })
+      .catch(() => null);
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ priceId: targetPriceId }),
+    });
+    const body = await response.text();
+    if (!response.ok) {
+      return { status: response.status, url: null, body };
+    }
+
+    const json = JSON.parse(body) as { url?: string };
+    return { status: response.status, url: json.url ?? null, body };
+  }, priceId);
 }
 
 /**
@@ -540,14 +614,6 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     });
     await expect(importCompleteHeading).toBeVisible({ timeout: 180_000 });
 
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 7: Dashboard loaded — profile is sufficiently complete
-    // ──────────────────────────────────────────────────────────────────
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 120_000,
-    });
-
     // Ensure Spotify URL is saved on the profile via direct DB write.
     // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
     // and often fails silently in test envs. This guarantees the URL is persisted
@@ -566,9 +632,26 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       spotifyIdToSave
     );
 
-    // Dashboard reachability was asserted before the direct DB repair. From
-    // here, direct DB assertions provide the stable signal without paying
-    // another cold /app/chat navigation during local dev-server restarts.
+    // ──────────────────────────────────────────────────────────────────
+    // STEP 7: Dashboard loaded — profile is sufficiently complete
+    // ──────────────────────────────────────────────────────────────────
+    await expect(async () => {
+      const response = await page.goto('/app/chat', {
+        waitUntil: 'commit',
+        timeout: 90_000,
+      });
+
+      expect(
+        response?.status() ?? 0,
+        'Dashboard route should respond after profile completion'
+      ).toBeLessThan(400);
+    }).toPass({
+      timeout: 240_000,
+      intervals: [5_000, 10_000, 20_000],
+    });
+
+    // Direct DB repair runs before the dashboard check, so a redirect here
+    // means auth or profile completion regressed rather than slow enrichment.
     const currentUrl = page.url();
     expect(
       currentUrl,
@@ -736,22 +819,25 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       .poll(
         async () => {
           try {
-            const checkoutResponse = await page.request.post(
-              '/api/stripe/checkout',
-              {
-                data: { priceId: proMonthlyPriceId },
-                timeout: 60_000,
-              }
+            let checkoutAttempt = await createCheckoutSessionFromBrowser(
+              page,
+              proMonthlyPriceId
             );
 
-            if (!checkoutResponse.ok()) {
-              return `http-${checkoutResponse.status()}`;
+            if (checkoutAttempt.status === 401) {
+              const refreshed = await refreshClerkSessionForApi(page);
+              if (!refreshed) return 'http-401';
+              checkoutAttempt = await createCheckoutSessionFromBrowser(
+                page,
+                proMonthlyPriceId
+              );
             }
 
-            const checkoutJson = (await checkoutResponse.json()) as {
-              url?: string;
-            };
-            checkoutUrl = checkoutJson.url ?? null;
+            if (checkoutAttempt.status < 200 || checkoutAttempt.status >= 300) {
+              return `http-${checkoutAttempt.status}`;
+            }
+
+            checkoutUrl = checkoutAttempt.url;
             return checkoutUrl ?? 'missing-url';
           } catch {
             return 'request-error';
