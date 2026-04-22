@@ -1910,12 +1910,20 @@ export async function POST(req: Request) {
 
     // Tag the request scope with chat-specific dimensions so all Sentry events
     // for this request (errors, perf, breadcrumbs) are filterable together.
+    // `chat_conversation_id` goes in `extra` (high cardinality per Sentry
+    // guidance); `chat_has_tools` reflects the real plan capability boundary
+    // rather than a count of always-on freeTools.
     Sentry.getCurrentScope().setTags({
       chat_model: selectedModel,
       chat_force_light: String(forceLightModel),
-      chat_has_tools: String(Object.keys(tools).length > 0),
-      chat_conversation_id: resolvedConversationId ?? 'none',
+      chat_has_tools: String(planLimits.booleans.aiCanUseTools),
     });
+    if (resolvedConversationId) {
+      Sentry.getCurrentScope().setExtra(
+        'chat_conversation_id',
+        resolvedConversationId.slice(0, 120)
+      );
+    }
 
     const result = streamText({
       model: gateway(selectedModel),

@@ -409,10 +409,11 @@ jobs:
           chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
           chat_code="${chat_response##*$'\n'}"
 
-          # 401 = expected (auth-gated). 400 = acceptable (validation ran, route alive).
-          # Anything 5xx or 404 = regression.
-          if [ "$chat_code" = "401" ] || [ "$chat_code" = "400" ]; then
-            echo "✅ /api/chat reachable and auth-gated (HTTP $chat_code)"
+          # The chat route checks auth BEFORE body parsing, so an unauthenticated
+          # probe must return exactly 401. Any other code means routing/auth
+          # behavior changed (broken build, middleware rewrite, auth bypass).
+          if [ "$chat_code" = "401" ]; then
+            echo "✅ /api/chat reachable and auth-gated (HTTP 401)"
           elif [ "$chat_code" = "404" ]; then
             echo "❌ Canary failed: /api/chat returned HTTP 404 — route missing or broken build"
             echo "canary_status=failed_chat_route" >> "$GITHUB_OUTPUT"
@@ -422,7 +423,9 @@ jobs:
             echo "canary_status=failed_chat_route" >> "$GITHUB_OUTPUT"
             exit 1
           else
-            echo "⚠️ /api/chat returned unexpected HTTP $chat_code — investigate (non-blocking)"
+            echo "❌ Canary failed: /api/chat returned unexpected HTTP $chat_code — expected 401"
+            echo "canary_status=failed_chat_route" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
           # Verify the public profile route renders without a server error.
