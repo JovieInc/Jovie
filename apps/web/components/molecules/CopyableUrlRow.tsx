@@ -17,6 +17,7 @@ interface CopyableUrlRowProps {
   readonly openButtonTitle?: string;
   readonly testId?: string;
   readonly surface?: 'boxed' | 'flat';
+  readonly actionsVisibility?: 'always' | 'hover';
 }
 
 export function CopyableUrlRow({
@@ -31,6 +32,7 @@ export function CopyableUrlRow({
   openButtonTitle = 'Open link',
   testId,
   surface = 'boxed',
+  actionsVisibility = 'always',
 }: CopyableUrlRowProps) {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,10 +107,12 @@ export function CopyableUrlRow({
         className
       )}
     >
-      <Link2
-        className={cn(styles.icon, 'shrink-0 text-tertiary-token')}
-        aria-hidden='true'
-      />
+      {surface !== 'flat' && (
+        <Link2
+          className={cn(styles.icon, 'shrink-0 text-tertiary-token')}
+          aria-hidden='true'
+        />
+      )}
       <span
         className={cn(
           'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
@@ -123,26 +127,34 @@ export function CopyableUrlRow({
       >
         {displayValue ?? url.replace(/^https?:\/\//, '')}
       </span>
-      <DrawerInlineIconButton
-        onClick={handleCopy}
-        title={isCopied ? 'Copied!' : copyButtonTitle}
+      <span
         className={cn(
-          'shrink-0 text-tertiary-token',
-          styles.button,
-          isCopied && 'text-success'
+          'inline-flex shrink-0 items-center gap-1 transition-opacity duration-150',
+          actionsVisibility === 'hover' &&
+            'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
         )}
       >
-        <Copy className={styles.glyph} />
-        <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </DrawerInlineIconButton>
-      <DrawerInlineIconButton
-        onClick={handleOpen}
-        title={openButtonTitle}
-        className={cn('shrink-0 text-tertiary-token', styles.button)}
-      >
-        <ExternalLink className={styles.glyph} />
-        <span className='sr-only'>Open</span>
-      </DrawerInlineIconButton>
+        <DrawerInlineIconButton
+          onClick={handleCopy}
+          title={isCopied ? 'Copied!' : copyButtonTitle}
+          className={cn(
+            'shrink-0 text-tertiary-token',
+            styles.button,
+            isCopied && 'text-success'
+          )}
+        >
+          <Copy className={styles.glyph} />
+          <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
+        </DrawerInlineIconButton>
+        <DrawerInlineIconButton
+          onClick={handleOpen}
+          title={openButtonTitle}
+          className={cn('shrink-0 text-tertiary-token', styles.button)}
+        >
+          <ExternalLink className={styles.glyph} />
+          <span className='sr-only'>Open</span>
+        </DrawerInlineIconButton>
+      </span>
     </div>
   );
 }
