@@ -1,3 +1,4 @@
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -6,6 +7,7 @@ test.describe('Homepage chat intake', () => {
   test('happy path: pill prefill + edit + Enter persists intent and redirects to /signin', async ({
     page,
   }) => {
+    await setupClerkTestingToken({ page });
     await page.goto('/');
 
     const input = page.getByPlaceholder('Message...');
@@ -32,6 +34,7 @@ test.describe('Homepage chat intake', () => {
   });
 
   test('free-form submit stores intent with pillId=null', async ({ page }) => {
+    await setupClerkTestingToken({ page });
     await page.goto('/');
     const input = page.getByPlaceholder('Message...');
     await input.pressSequentially('something completely custom');

@@ -135,7 +135,7 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 export default function HomePage() {
   return (
-    <main className='relative flex flex-1 flex-col bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='relative flex flex-1 flex-col bg-[var(--color-bg-base)] text-primary-token'>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
@@ -147,6 +147,6 @@ export default function HomePage() {
           <HomepageIntent />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

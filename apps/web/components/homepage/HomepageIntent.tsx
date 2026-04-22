@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import {
@@ -31,22 +32,28 @@ const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
   plan_a_release: Calendar,
 };
 
-function persistIntent(intent: HomepageIntent) {
-  if (globalThis.window === undefined) return;
-  try {
-    globalThis.localStorage?.setItem(
-      HOMEPAGE_INTENT_KEY,
-      JSON.stringify(intent)
-    );
-  } catch {
-    // Private mode / disabled storage — intent capture is best-effort; redirect proceeds.
+/**
+ * Writes the homepage intent to localStorage so onboarding can pick it up
+ * post-auth. Throws on any failure (quota exceeded, private-mode disabled
+ * storage, serialization error). Callers are responsible for handling the
+ * failure mode — per repo convention, persistence helpers surface errors
+ * rather than swallow them.
+ */
+function persistIntent(intent: HomepageIntent): void {
+  if (globalThis.window === undefined) {
+    throw new Error('persistIntent: localStorage is not available (SSR)');
   }
+  const storage = globalThis.localStorage;
+  if (!storage) {
+    throw new Error('persistIntent: localStorage is not available');
+  }
+  storage.setItem(HOMEPAGE_INTENT_KEY, JSON.stringify(intent));
 }
 
 function buildSigninUrl(): string {
   return buildAuthRouteUrl(
-    '/signin',
-    new URLSearchParams({ redirect_url: '/onboarding' })
+    APP_ROUTES.SIGNIN,
+    new URLSearchParams({ redirect_url: APP_ROUTES.ONBOARDING })
   );
 }
 
@@ -110,12 +117,24 @@ export function HomepageIntent() {
       createdAt: new Date().toISOString(),
     };
 
-    persistIntent(intent);
+    // Intent capture is best-effort: if storage fails (private mode, quota,
+    // disabled), we still redirect so the user isn't stranded — but we
+    // surface the failure via analytics so we can see it in prod.
+    let persisted = true;
+    try {
+      persistIntent(intent);
+    } catch (error) {
+      persisted = false;
+      track('homepage_intent_persist_failed', {
+        reason: error instanceof Error ? error.message : 'unknown',
+      });
+    }
 
     track('homepage_prompt_submitted', {
       pillId: intent.pillId,
       pillUsed: intent.pillId !== null,
       promptLength: trimmed.length,
+      persisted,
     });
 
     router.push(buildSigninUrl());
