@@ -253,6 +253,20 @@
       "when": 1776300243139,
       "tag": "0035_tranquil_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1776896216004,
+      "tag": "0036_long_wendigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1776896300000,
+      "tag": "0037_release_task_catalog_seed",
+      "breakpoints": true
     }
   ]
 }
