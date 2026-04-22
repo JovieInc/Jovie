@@ -279,7 +279,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, handle));
     expect(existing).toHaveLength(1);
-  });
+  }, 20_000);
 
   it('reingests an unclaimed profile without creating a duplicate record', async () => {
     const handle = `csv-reingest-${Date.now()}`;

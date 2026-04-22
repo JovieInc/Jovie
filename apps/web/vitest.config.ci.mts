@@ -6,6 +6,11 @@ import { defineConfig } from 'vitest/config';
 // Load environment variables from .env.test if it exists
 dotenv.config({ path: '.env.test' });
 
+const isCI = process.env.CI === 'true';
+const configuredMaxForks = process.env.VITEST_MAX_FORKS
+  ? parseInt(process.env.VITEST_MAX_FORKS)
+  : 8;
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -19,21 +24,15 @@ export default defineConfig({
       'node_modules/**',
       '.next/**',
     ],
-    // Use forks pool to prevent JS heap OOM in worker threads (Vitest 4 style)
-    // CI runners have 7GB RAM - safe to use more workers for parallelization
+    // Use forks pool to prevent JS heap OOM in worker threads (Vitest 4 style).
+    // Local coverage runs are more stable when reusing one long-lived fork instead
+    // of spawning a fresh worker late in a multi-thousand-test pass.
     pool: 'forks',
     minWorkers: 1,
-    // Use available CPUs in CI (up to 8 for faster execution), single fork locally for stability
-    maxWorkers: process.env.CI
-      ? Math.max(
-          2,
-          Math.floor(
-            process.env.VITEST_MAX_FORKS
-              ? parseInt(process.env.VITEST_MAX_FORKS)
-              : 8
-          )
-        )
-      : 1,
+    singleFork: !isCI,
+    fileParallelism: isCI,
+    // Use available CPUs in CI (up to 8 for faster execution), single fork locally for stability.
+    maxWorkers: isCI ? Math.max(2, Math.floor(configuredMaxForks)) : 1,
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
     isolate: true,
     // Coverage optimization
@@ -63,10 +62,11 @@ export default defineConfig({
     // Test timeout - 5s safety net (tests target <200ms)
     testTimeout: 5000,
     hookTimeout: 5000,
+    teardownTimeout: isCI ? 5000 : 12000,
     globals: true,
-    // Allow concurrent tests within each worker for better throughput
-    // CI can handle more concurrency; local stays conservative
-    maxConcurrency: process.env.CI ? 5 : 1,
+    // Allow concurrent tests within each worker for better throughput.
+    // CI can handle more concurrency; local coverage runs stay conservative.
+    maxConcurrency: isCI ? 5 : 1,
   },
   server: {
     fs: {
