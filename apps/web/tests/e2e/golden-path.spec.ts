@@ -148,7 +148,9 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     UPDATE creator_profiles
     SET spotify_id = NULL, spotify_url = NULL
     WHERE user_id IN (
-      SELECT id FROM users WHERE email LIKE 'gp-%+clerk_test@test.jovie.com'
+      SELECT id
+      FROM users
+      WHERE email LIKE ${'gp-%+clerk\\_test@test.jovie.com'} ESCAPE ${'\\'}
     ) AND spotify_id IS NOT NULL
   `;
 
