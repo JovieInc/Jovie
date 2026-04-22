@@ -15,11 +15,7 @@ export function ContactsContent() {
   }
 
   return (
-    <SettingsSection
-      id='contacts'
-      title='Contacts'
-      description='Manage bookings, management, and press contacts.'
-    >
+    <SettingsSection id='contacts' title='Contacts'>
       <SettingsContactsSection artist={artist} />
     </SettingsSection>
   );

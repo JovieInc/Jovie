@@ -202,7 +202,9 @@ function SpotifyTabContent({
               'Not set'}
           </p>
           <p className='mt-1 text-[12px] text-tertiary-token'>
-            Updated {formatDate(spotifyStatus.updatedAt)}
+            {spotifyStatus.updatedAt
+              ? `Updated ${formatDate(spotifyStatus.updatedAt)}`
+              : 'Never updated'}
           </p>
         </div>
         <div>

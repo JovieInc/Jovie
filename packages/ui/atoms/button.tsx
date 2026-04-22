@@ -22,7 +22,7 @@ const buttonVariants = cva(
           'border border-default bg-transparent hover:bg-surface-hover active:bg-interactive-active',
         // Destructive variant
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+          'bg-[var(--color-error)] text-[var(--color-error-foreground)] hover:opacity-90',
         // Link variant
         link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
         // Frosted glass variants (glassmorphism) - using design tokens
