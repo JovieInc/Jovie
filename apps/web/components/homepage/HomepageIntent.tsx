@@ -182,7 +182,10 @@ export function HomepageIntent() {
       <span className='homepage-hero-eyebrow inline-flex items-center gap-2 self-center rounded-full border border-white/15 bg-white/[0.08] py-1 pl-3 pr-3 text-[11.5px] font-medium text-white/85 backdrop-blur-xl'>
         {HERO_COPY.eyebrow.text}
       </span>
-      <h1 className='homepage-hero-headline mt-7 self-center text-center font-semibold text-white sm:mt-8'>
+      <h1
+        id='home-hero-heading'
+        className='homepage-hero-headline mt-7 self-center text-center font-semibold text-white sm:mt-8'
+      >
         {HERO_COPY.headline}
       </h1>
       <p className='homepage-hero-subhead mt-5 max-w-[620px] self-center text-center text-[18px] leading-[1.45] tracking-[-0.01em] text-white/85'>
