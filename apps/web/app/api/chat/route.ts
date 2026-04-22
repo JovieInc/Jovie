@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
@@ -1714,7 +1714,7 @@ export async function POST(req: Request) {
   Sentry.getCurrentScope().setExtra('request_id', requestId);
 
   // Auth check - ensure user is authenticated
-  const { userId } = await getCachedAuth();
+  const { userId } = await getOptionalAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },
