@@ -102,9 +102,9 @@ export function OnboardingFormWrapper({
   existingBio = null,
   existingGenres = null,
 }: OnboardingFormWrapperProps) {
-  // Server-seeded handles are already stable at render time, so they do not
-  // need to wait for the client-only pendingClaim reconciliation pass.
-  const [isHydrated, setIsHydrated] = useState(() => Boolean(initialHandle));
+  // Keep the form disabled until React has attached submit handlers. Otherwise
+  // a fast click on a server-seeded handle can trigger a native GET submit.
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     if (!isHydrated) {
