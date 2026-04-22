@@ -16,8 +16,10 @@ import {
   TEST_USER_ID_COOKIE,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
+import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { env } from '@/lib/env-client';
 import { buildTrackedShareDropdownItems } from '@/lib/share/tracked-sources';
+import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
@@ -273,27 +275,38 @@ export function ReleaseSmartLinkAnalytics({
 
   const totalClicks = data?.totalClicks ?? 0;
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
+  const lastClickAt = data?.lastClickAt ?? null;
+  const topProvider = data?.providerClicks?.[0] ?? null;
+  const topProviderLabel = topProvider
+    ? (PROVIDER_LABELS[topProvider.provider] ?? topProvider.provider)
+    : null;
 
   const state = getReleaseAnalyticsState({ isLoading, hasError, data });
+  const hasClicks = totalClicks > 0;
 
-  return (
-    <DrawerAnalyticsSummaryCard
-      metrics={[
+  const metrics = hasClicks
+    ? [
         {
           id: 'total-clicks',
           label: 'Total clicks',
           value: numberFormatter.format(totalClicks),
-          hint: 'All time',
+          hint: topProviderLabel ? `Top: ${topProviderLabel}` : 'All time',
         },
         {
-          id: 'last-7-days-clicks',
-          label: 'Last 7 days',
-          value: numberFormatter.format(last7DaysClicks),
-          hint: 'Recent',
+          id: 'last-click',
+          label: 'Last click',
+          value: lastClickAt ? formatTimeAgo(lastClickAt) : '—',
+          hint: `${numberFormatter.format(last7DaysClicks)} in last 7 days`,
         },
-      ]}
+      ]
+    : [];
+
+  return (
+    <DrawerAnalyticsSummaryCard
+      metrics={metrics}
       state={state}
       dimmed={isSwitching}
+      emptyMessage='No clicks yet. Share your smart link to start tracking where fans listen.'
       errorMessage='Analytics unavailable'
       testId='release-smart-link-analytics'
       variant={variant}

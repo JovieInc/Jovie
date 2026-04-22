@@ -38,6 +38,7 @@ export type ReleaseSidebarTrack = Pick<
 export interface ReleaseSidebarAnalytics {
   totalClicks: number;
   last7DaysClicks: number;
+  lastClickAt: string | null;
   providerClicks: Array<{ provider: string; clicks: number }>;
 }
 

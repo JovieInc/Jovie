@@ -151,9 +151,15 @@ function makeDemoAnalytics(
     clicks: Math.max(24, Math.round(totalClicks / (i + 2.4))),
   }));
 
+  const lastClickHoursAgo = 2 + index * 3;
+  const lastClickAt = new Date(
+    Date.now() - lastClickHoursAgo * 60 * 60 * 1000
+  ).toISOString();
+
   return {
     totalClicks,
     last7DaysClicks: Math.max(32, Math.round(totalClicks * 0.18)),
+    lastClickAt,
     providerClicks,
   };
 }
