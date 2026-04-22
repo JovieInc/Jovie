@@ -4,6 +4,24 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/testartist'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
+
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpoint: () => true,
   useBreakpointDown: () => false,

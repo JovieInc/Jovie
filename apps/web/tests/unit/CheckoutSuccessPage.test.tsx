@@ -33,6 +33,24 @@ vi.mock('next/link', () => ({
   }) => <a href={href}>{children}</a>,
 }));
 
+vi.mock('next/navigation', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+    })),
+    usePathname: vi.fn(() => '/billing/success'),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+  };
+});
+
 // Use relative import to avoid @/app/ alias which resolves to app/app/
 import CheckoutSuccessPage from '../../app/billing/success/page';
 

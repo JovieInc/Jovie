@@ -35,6 +35,7 @@
     "test": "NODE_OPTIONS=--max-old-space-size=8192 node scripts/vitest-wrapper.mjs",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
+    "test:truth": "node scripts/test-truth-guard.mjs",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
@@ -249,9 +250,9 @@
     "@typescript-eslint/parser": "^8.57.2",
     "vite": "8.0.9",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/browser": "^4.1.2",
-    "@vitest/browser-playwright": "^4.1.2",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/browser": "4.1.4",
+    "@vitest/browser-playwright": "4.1.4",
+    "@vitest/coverage-v8": "4.1.4",
     "autoprefixer": "^10.4.27",
     "axe-core": "^4.11.1",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
@@ -272,6 +273,6 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "vitest": "4.1.4"
   }
 }

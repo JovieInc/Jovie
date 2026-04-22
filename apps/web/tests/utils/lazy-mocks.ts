@@ -1,89 +1,122 @@
 /**
- * Lazy Mock Loading System
+ * Shared lightweight mocks for fast component tests.
  *
- * Provides on-demand loading of mocks to reduce setup time.
- * Only loads mocks when they're actually needed by tests.
+ * Vitest hoists every `vi.mock()` call, so defining them inside helper
+ * functions creates warnings and makes execution order misleading. Keep the
+ * module-level mocks here, then expose no-op loaders so existing helpers keep
+ * working without changing call sites.
  */
 
 import React from 'react';
 import { vi } from 'vitest';
 
-// Track which mocks have been loaded to avoid duplicate initialization
-const loadedMocks = new Set<string>();
+const clerkState = {
+  useUser: () => ({
+    isSignedIn: false,
+    user: null,
+    isLoaded: true,
+  }),
+  useAuth: () => ({
+    has: vi.fn(() => false),
+    isLoaded: true,
+    isSignedIn: false,
+    userId: null,
+  }),
+  useSession: () => ({
+    session: null,
+    isLoaded: true,
+  }),
+  useClerk: () => ({
+    signOut: vi.fn(),
+    openUserProfile: vi.fn(),
+    setActive: vi.fn(),
+  }),
+};
 
-/**
- * Lazy load Clerk mocks only when needed
- */
-export function loadClerkMocks() {
-  if (loadedMocks.has('clerk')) return;
+const headlessPassthrough = (name: string) => {
+  const MockComponent = React.forwardRef<
+    HTMLDivElement,
+    Record<string, unknown>
+  >(({ children, ...props }, ref) =>
+    React.createElement(
+      'div',
+      { ...props, ref, 'data-headlessui': name },
+      children as React.ReactNode
+    )
+  );
 
-  vi.mock('@clerk/nextjs', () => ({
-    useUser: () => ({
-      isSignedIn: false,
-      user: null,
-      isLoaded: true,
-    }),
-    useAuth: () => ({
-      has: vi.fn(() => false),
-    }),
-    useSession: () => ({
-      session: null,
-      isLoaded: true,
-    }),
-    ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
-    SignIn: ({ children }: { children: React.ReactNode }) => children,
-    SignUp: ({ children }: { children: React.ReactNode }) => children,
-    SignInButton: ({ children }: { children: React.ReactNode }) => children,
-    SignUpButton: ({ children }: { children: React.ReactNode }) => children,
-    UserButton: () =>
-      React.createElement(
-        'div',
-        { 'data-testid': 'user-button' },
-        'User Button'
-      ),
-  }));
+  MockComponent.displayName = `HeadlessUiMock(${name})`;
+  return MockComponent;
+};
 
-  loadedMocks.add('clerk');
-}
+vi.mock('@clerk/nextjs', () => ({
+  useUser: clerkState.useUser,
+  useAuth: clerkState.useAuth,
+  useSession: clerkState.useSession,
+  useClerk: clerkState.useClerk,
+  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  SignIn: ({ children }: { children: React.ReactNode }) => children,
+  SignUp: ({ children }: { children: React.ReactNode }) => children,
+  SignInButton: ({ children }: { children: React.ReactNode }) => children,
+  SignUpButton: ({ children }: { children: React.ReactNode }) => children,
+  UserButton: () =>
+    React.createElement('div', { 'data-testid': 'user-button' }, 'User Button'),
+}));
 
-/**
- * Lazy load Next.js mocks only when needed
- */
-export function loadNextJsMocks() {
-  if (loadedMocks.has('nextjs')) return;
-
-  // Mock Next.js Image component
-  vi.mock('next/image', () => ({
-    default: ({
+vi.mock('next/image', () => ({
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+    className,
+    ...props
+  }: React.ComponentProps<'img'>) =>
+    React.createElement('img', {
       src,
       alt,
       width,
       height,
       className,
-      ...props
-    }: React.ComponentProps<'img'>) => {
-      return React.createElement('img', {
-        src,
-        alt,
-        width,
-        height,
-        className,
-        'data-testid': 'next-image',
-        ...props,
-      });
-    },
-  }));
+      'data-testid': 'next-image',
+      ...props,
+    }),
+}));
 
-  loadedMocks.add('nextjs');
-}
+vi.mock('@headlessui/react', () => ({
+  Dialog: headlessPassthrough('dialog'),
+  DialogPanel: headlessPassthrough('dialog-panel'),
+  DialogTitle: headlessPassthrough('dialog-title'),
+  Menu: headlessPassthrough('menu'),
+  MenuButton: headlessPassthrough('menu-button'),
+  MenuItems: headlessPassthrough('menu-items'),
+  MenuItem: headlessPassthrough('menu-item'),
+  Listbox: headlessPassthrough('listbox'),
+  ListboxButton: headlessPassthrough('listbox-button'),
+  ListboxOptions: headlessPassthrough('listbox-options'),
+  ListboxOption: headlessPassthrough('listbox-option'),
+  Combobox: headlessPassthrough('combobox'),
+  ComboboxInput: headlessPassthrough('combobox-input'),
+  ComboboxButton: headlessPassthrough('combobox-button'),
+  ComboboxOptions: headlessPassthrough('combobox-options'),
+  ComboboxOption: headlessPassthrough('combobox-option'),
+  Popover: headlessPassthrough('popover'),
+  PopoverButton: headlessPassthrough('popover-button'),
+  PopoverPanel: headlessPassthrough('popover-panel'),
+  Switch: headlessPassthrough('switch'),
+  TabGroup: headlessPassthrough('tab-group'),
+  TabList: headlessPassthrough('tab-list'),
+  Tab: headlessPassthrough('tab'),
+  TabPanels: headlessPassthrough('tab-panels'),
+  TabPanel: headlessPassthrough('tab-panel'),
+  Transition: headlessPassthrough('transition'),
+  TransitionChild: headlessPassthrough('transition-child'),
+  Input: headlessPassthrough('input'),
+}));
 
-/**
- * Lazy load browser API mocks only when needed
- */
-export function loadBrowserApiMocks() {
-  if (loadedMocks.has('browser-apis')) return;
+vi.mock('server-only', () => ({}));
 
-  // Mock ResizeObserver
+function ensureBrowserApis() {
   if (typeof global.ResizeObserver === 'undefined') {
     global.ResizeObserver = vi.fn().mockImplementation(function (this: any) {
       this.observe = vi.fn();
@@ -92,7 +125,6 @@ export function loadBrowserApiMocks() {
     });
   }
 
-  // Mock IntersectionObserver
   if (typeof global.IntersectionObserver === 'undefined') {
     global.IntersectionObserver = vi.fn().mockImplementation(function (
       this: any
@@ -103,7 +135,6 @@ export function loadBrowserApiMocks() {
     });
   }
 
-  // Mock matchMedia
   if (typeof window !== 'undefined' && !window.matchMedia) {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -120,95 +151,32 @@ export function loadBrowserApiMocks() {
     });
   }
 
-  // Mock window.scrollTo
   if (typeof window !== 'undefined' && !window.scrollTo) {
     Object.defineProperty(window, 'scrollTo', {
       writable: true,
       value: vi.fn(),
     });
   }
-
-  loadedMocks.add('browser-apis');
 }
 
-// Define mocked components outside the function to avoid hoisting issues
-const MockedHeadlessUiComponents = {
-  // Dialog components
-  Dialog: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
-    (props, ref) => {
-      return React.createElement('div', { ...props, ref, role: 'dialog' });
-    }
-  ),
-  DialogPanel: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
-    (props, ref) => {
-      return React.createElement('div', { ...props, ref });
-    }
-  ),
-  DialogTitle: React.forwardRef<HTMLHeadingElement, React.ComponentProps<'h2'>>(
-    (props, ref) => {
-      return React.createElement('h2', { ...props, ref });
-    }
-  ),
-  // Add other components as needed...
-  Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
-    (props, ref) => {
-      return React.createElement('input', { ...props, ref });
-    }
-  ),
-};
+export function loadClerkMocks() {}
 
-// Add display names
-MockedHeadlessUiComponents.Dialog.displayName = 'MockedDialog';
-MockedHeadlessUiComponents.DialogPanel.displayName = 'MockedDialogPanel';
-MockedHeadlessUiComponents.DialogTitle.displayName = 'MockedDialogTitle';
-MockedHeadlessUiComponents.Input.displayName = 'MockedInput';
+export function loadNextJsMocks() {}
 
-/**
- * Lazy load Headless UI mocks only when needed
- */
-export function loadHeadlessUiMocks() {
-  if (loadedMocks.has('headless-ui')) return;
+export function loadHeadlessUiMocks() {}
 
-  vi.mock('@headlessui/react', () => MockedHeadlessUiComponents);
-
-  loadedMocks.add('headless-ui');
+export function loadBrowserApiMocks() {
+  ensureBrowserApis();
 }
 
-/**
- * Load only the essential mocks needed for most tests
- */
 export function loadEssentialMocks() {
-  loadBrowserApiMocks();
-  loadNextJsMocks(); // Add Next.js mocks to essential mocks
-  loadClerkMocks(); // Add Clerk mocks to essential mocks
-
-  // Mock server-only modules
-  vi.mock('server-only', () => ({
-    default: vi.fn(),
-  }));
-
-  // Mock console methods to reduce noise
-  global.console = {
-    ...console,
-    warn: vi.fn(),
-    error: vi.fn(),
-  };
+  ensureBrowserApis();
 }
 
-/**
- * Load all mocks (for compatibility with existing tests)
- */
 export function loadAllMocks() {
-  loadEssentialMocks();
-  loadClerkMocks();
-  loadNextJsMocks();
-  loadHeadlessUiMocks();
+  ensureBrowserApis();
 }
 
-/**
- * Reset all loaded mocks (useful for test isolation)
- */
 export function resetMocks() {
-  loadedMocks.clear();
   vi.clearAllMocks();
 }

@@ -1,187 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import {
+  analyzeHost,
+  categorizePath,
+  DASHBOARD_URL,
+} from '@/lib/routing/proxy-routing';
 
-/**
- * Unit tests for proxy.ts URL mapping logic
- *
- * Single Domain Architecture:
- * - All traffic is served from jov.ie (no subdomains)
- * - Dashboard is always at /app/* on all environments
- * - meetjovie.com redirects to jov.ie (handled by middleware)
- *
- * The functions are recreated here since they're private in proxy.ts.
- * If the logic in proxy.ts changes, these tests should fail and
- * alert us to potential routing issues.
- *
- * @see apps/web/proxy.ts
- */
-
-// Recreate proxy.ts helper functions for testing
-function isDevOrPreview(hostname: string): boolean {
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.includes('vercel.app') ||
-    hostname === 'staging.jov.ie' ||
-    hostname === 'main.jov.ie'
-  );
-}
-
-function isMainHost(hostname: string): boolean {
-  return (
-    hostname === 'jov.ie' ||
-    hostname === 'www.jov.ie' ||
-    hostname === 'staging.jov.ie' ||
-    hostname === 'main.jov.ie' ||
-    isDevOrPreview(hostname)
-  );
-}
-
-// Single domain: dashboard is always at /app
-const DASHBOARD_URL = '/app';
-
-function isAuthCallbackPath(pathname: string): boolean {
-  return (
-    pathname === '/sso-callback' ||
-    pathname === '/signup/sso-callback' ||
-    pathname === '/signin/sso-callback' ||
-    pathname === '/sign-up/sso-callback' ||
-    pathname === '/sign-in/sso-callback'
-  );
-}
-
-function matchesRoute(pathname: string, route: string): boolean {
-  return pathname === route || pathname.startsWith(`${route}/`);
-}
-
-function isProtectedPath(pathname: string): boolean {
-  return (
-    matchesRoute(pathname, '/app') ||
-    matchesRoute(pathname, '/waitlist') ||
-    matchesRoute(pathname, '/onboarding')
-  );
-}
-
-describe('Proxy URL Mapping', () => {
-  describe('isDevOrPreview', () => {
-    it('returns true for localhost', () => {
-      expect(isDevOrPreview('localhost')).toBe(true);
-    });
-
-    it('returns true for 127.0.0.1', () => {
-      expect(isDevOrPreview('127.0.0.1')).toBe(true);
-    });
-
-    it('returns true for vercel preview URLs', () => {
-      expect(isDevOrPreview('jovie-abc123.vercel.app')).toBe(true);
-      expect(isDevOrPreview('my-branch-jovie.vercel.app')).toBe(true);
-    });
-
-    it('returns true for staging.jov.ie', () => {
-      expect(isDevOrPreview('staging.jov.ie')).toBe(true);
-    });
-
-    it('returns true for legacy main.jov.ie (staging)', () => {
-      expect(isDevOrPreview('main.jov.ie')).toBe(true);
-    });
-
-    it('returns false for production domain', () => {
-      expect(isDevOrPreview('jov.ie')).toBe(false);
-      expect(isDevOrPreview('www.jov.ie')).toBe(false);
-    });
-  });
-
-  describe('isMainHost', () => {
-    it('returns true for jov.ie (production)', () => {
-      expect(isMainHost('jov.ie')).toBe(true);
-    });
-
-    it('returns true for www.jov.ie', () => {
-      expect(isMainHost('www.jov.ie')).toBe(true);
-    });
-
-    it('returns true for staging.jov.ie', () => {
-      expect(isMainHost('staging.jov.ie')).toBe(true);
-    });
-
-    it('returns true for legacy main.jov.ie (staging)', () => {
-      expect(isMainHost('main.jov.ie')).toBe(true);
-    });
-
-    it('returns true for localhost', () => {
-      expect(isMainHost('localhost')).toBe(true);
-    });
-
-    it('returns true for vercel preview URLs', () => {
-      expect(isMainHost('jovie-abc123.vercel.app')).toBe(true);
-    });
-
-    it('returns false for meetjovie.com (legacy redirect domain)', () => {
-      expect(isMainHost('meetjovie.com')).toBe(false);
-    });
-  });
-
-  describe('auth callback paths', () => {
-    it('includes canonical auth callback paths', () => {
-      expect(isAuthCallbackPath('/sso-callback')).toBe(true);
-      expect(isAuthCallbackPath('/signup/sso-callback')).toBe(true);
-      expect(isAuthCallbackPath('/signin/sso-callback')).toBe(true);
-    });
-
-    it('includes legacy sign-in/sign-up callback aliases', () => {
-      expect(isAuthCallbackPath('/sign-in/sso-callback')).toBe(true);
-      expect(isAuthCallbackPath('/sign-up/sso-callback')).toBe(true);
-    });
-
-    it('does not treat non-callback routes as auth callbacks', () => {
-      expect(isAuthCallbackPath('/signin')).toBe(false);
-      expect(isAuthCallbackPath('/signup')).toBe(false);
-      expect(isAuthCallbackPath('/app')).toBe(false);
-    });
-  });
-
-  describe('DASHBOARD_URL', () => {
-    it('dashboard is always at /app in single domain architecture', () => {
-      expect(DASHBOARD_URL).toBe('/app');
-    });
-  });
-
-  describe('protected route classification', () => {
-    it('treats the authenticated shell root as protected', () => {
-      expect(isProtectedPath('/app')).toBe(true);
-    });
-
-    it('treats nested dashboard and settings routes as protected', () => {
-      expect(isProtectedPath('/app/dashboard/earnings')).toBe(true);
-      expect(isProtectedPath('/app/settings/artist-profile')).toBe(true);
-      expect(isProtectedPath('/app/admin/users')).toBe(true);
-    });
-
-    it('does not classify public marketing routes as protected', () => {
-      expect(isProtectedPath('/')).toBe(false);
-      expect(isProtectedPath('/pricing')).toBe(false);
-      expect(isProtectedPath('/tim')).toBe(false);
-    });
-  });
-
-  describe('URL consistency between environments', () => {
-    /**
-     * Single domain architecture means dashboard is at /app everywhere:
-     * - localhost:3100/app/* (local development)
-     * - *.vercel.app/app/* (preview deployments)
-     * - staging.jov.ie/app/* (staging)
-     * - main.jov.ie/app/* (legacy staging)
-     * - jov.ie/app/* (production)
-     */
-    it('dashboard path is consistent across all environments', () => {
-      // In single domain architecture, all environments use /app
-      const dashboardPath = DASHBOARD_URL;
-
-      expect(dashboardPath).toBe('/app');
-    });
-
-    it('all valid hosts resolve to same dashboard path', () => {
-      // These are all valid hosts that should serve the app
-      const validHosts = [
+describe('proxy routing helpers', () => {
+  describe('analyzeHost', () => {
+    it('treats local, preview, staging, and production app hosts as main hosts', () => {
+      const hosts = [
         'localhost',
         '127.0.0.1',
         'jovie-abc123.vercel.app',
@@ -191,12 +18,72 @@ describe('Proxy URL Mapping', () => {
         'www.jov.ie',
       ];
 
-      validHosts.forEach(host => {
-        expect(isMainHost(host)).toBe(true);
+      hosts.forEach(host => {
+        expect(analyzeHost(host).isMainHost).toBe(true);
       });
-
-      // Dashboard is always at /app
-      expect(DASHBOARD_URL).toBe('/app');
     });
+
+    it('marks preview-style hosts as dev or preview', () => {
+      expect(analyzeHost('localhost').isDevOrPreview).toBe(true);
+      expect(analyzeHost('127.0.0.1').isDevOrPreview).toBe(true);
+      expect(analyzeHost('feature-branch.vercel.app').isDevOrPreview).toBe(
+        true
+      );
+      expect(analyzeHost('staging.jov.ie').isDevOrPreview).toBe(true);
+      expect(analyzeHost('jov.ie').isDevOrPreview).toBe(false);
+    });
+
+    it('keeps redirect-only hosts out of the main host classification', () => {
+      const meetJovie = analyzeHost('meetjovie.com');
+      expect(meetJovie.isMainHost).toBe(false);
+      expect(meetJovie.isMeetJovie).toBe(true);
+      expect(analyzeHost('support.jov.ie').isSupportHost).toBe(true);
+      expect(analyzeHost('investors.jov.ie').isInvestorPortal).toBe(true);
+    });
+  });
+
+  describe('categorizePath', () => {
+    it('classifies protected shell and onboarding routes correctly', () => {
+      expect(categorizePath('/app').isProtectedPath).toBe(true);
+      expect(categorizePath('/app/dashboard/earnings').isProtectedPath).toBe(
+        true
+      );
+      expect(categorizePath('/billing').isProtectedPath).toBe(true);
+      expect(categorizePath('/waitlist').isProtectedPath).toBe(true);
+      expect(categorizePath('/onboarding/profile').isProtectedPath).toBe(true);
+    });
+
+    it('keeps public routes public', () => {
+      expect(categorizePath('/').isProtectedPath).toBe(false);
+      expect(categorizePath('/pricing').isProtectedPath).toBe(false);
+      expect(categorizePath('/tim').isProtectedPath).toBe(false);
+    });
+
+    it('recognizes auth entrypoints and callback aliases', () => {
+      expect(categorizePath('/signin').isAuthPath).toBe(true);
+      expect(categorizePath('/signup').isAuthPath).toBe(true);
+      expect(categorizePath('/signin/sso-callback').isAuthCallbackPath).toBe(
+        true
+      );
+      expect(categorizePath('/sign-up/sso-callback').isAuthCallbackPath).toBe(
+        true
+      );
+      expect(categorizePath('/pricing').isAuthCallbackPath).toBe(false);
+    });
+
+    it('only adds nonce requirements to app and api surfaces', () => {
+      expect(categorizePath('/api/stripe/checkout').needsNonce).toBe(true);
+      expect(categorizePath('/app/dashboard').needsNonce).toBe(true);
+      expect(categorizePath('/pricing').needsNonce).toBe(false);
+    });
+
+    it('flags only the sensitive link APIs for bot protections', () => {
+      expect(categorizePath('/api/link/abc').isSensitiveAPI).toBe(true);
+      expect(categorizePath('/api/stripe/checkout').isSensitiveAPI).toBe(false);
+    });
+  });
+
+  it('keeps the dashboard path stable across environments', () => {
+    expect(DASHBOARD_URL).toBe('/app');
   });
 });

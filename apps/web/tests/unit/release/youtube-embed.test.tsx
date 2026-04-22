@@ -7,8 +7,8 @@ describe('YouTubeEmbed', () => {
     render(<YouTubeEmbed videoId='dQw4w9WgXcQ' title='Test Video' />);
 
     const iframe = screen.getByTitle('Test Video');
-    expect(iframe).toBeDefined();
-    expect(iframe.getAttribute('src')).toBe(
+    expect(iframe).toHaveAttribute(
+      'src',
       'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
     );
   });
@@ -19,7 +19,7 @@ describe('YouTubeEmbed', () => {
     );
 
     const iframe = screen.getByTitle('Music video: Song by Artist');
-    expect(iframe).toBeDefined();
+    expect(iframe).toBeInTheDocument();
   });
 
   it('renders loading skeleton initially', () => {

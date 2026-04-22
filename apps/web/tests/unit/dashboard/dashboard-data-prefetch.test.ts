@@ -70,15 +70,24 @@ vi.mock('react', async () => {
   };
 });
 
-vi.mock('@sentry/nextjs', () => ({
-  getClient: vi.fn(() => undefined),
-  captureException: vi.fn(),
-  logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-  },
-  startSpan: startSpanMock,
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+
+  return {
+    ...actual,
+    getClient: vi.fn(() => undefined),
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(),
+    logger: {
+      error: vi.fn(),
+      warn: vi.fn(),
+    },
+    startSpan: startSpanMock,
+  };
+});
 
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: checkAdminRoleMock,

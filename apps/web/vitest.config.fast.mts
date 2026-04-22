@@ -86,12 +86,8 @@ export default defineConfig({
     // Performance optimizations
     // Use forks for better memory isolation (Vitest 4 style)
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        isolate: true,
-        singleFork: isChangedRun,
-      },
-    },
+    isolate: true,
+    singleFork: isChangedRun,
     // CI stability: reduce memory pressure
     maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,
@@ -121,10 +117,6 @@ export default defineConfig({
         'dist/**',
       ],
     },
-
-    // Enable isolation to prevent mock conflicts between tests
-    // Component tests need isolation for proper mock scoping
-    isolate: true,
 
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
     // JUnit reporter in CI for Codecov Test Analytics ingestion
