@@ -5,8 +5,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Command } from 'cmdk';
 import { Keyboard, MessageSquare, Search, SquarePen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useDashboardDataSafe } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
   adminSettingsNavigation,
@@ -31,12 +31,12 @@ function NavItemIcon({ item }: { readonly item: NavItem }) {
 }
 
 export function CommandPalette() {
-  const dashboardData = useDashboardDataSafe();
-
-  // The palette is only useful inside authenticated shells where the
+  // Read the context directly so we don't hit the throwing useDashboardData
+  // hook. The palette is only useful inside authenticated shells where the
   // DashboardDataProvider and QueryClient are mounted. On pre-auth routes
   // (e.g., when AuthShellWrapper renders without its inner providers) it
-  // should be a no-op instead of throwing.
+  // should be a no-op instead of crashing.
+  const dashboardData = useContext(DashboardDataContext);
   if (!dashboardData) {
     return null;
   }

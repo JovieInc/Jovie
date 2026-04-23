@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo } from 'react';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import type { DashboardData } from './actions';
 
-const DashboardDataContext = createContext<DashboardData | null>(null);
+export const DashboardDataContext = createContext<DashboardData | null>(null);
 
 const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
   percentage: 0,
@@ -49,11 +49,4 @@ export function useDashboardData(): DashboardData {
     );
   }
   return context;
-}
-
-// Use when the consumer can render outside a DashboardDataProvider (e.g.,
-// components mounted in shared shells like AuthShellWrapper that can appear
-// on pre-auth routes). Returns null when no provider is above in the tree.
-export function useDashboardDataSafe(): DashboardData | null {
-  return useContext(DashboardDataContext);
 }

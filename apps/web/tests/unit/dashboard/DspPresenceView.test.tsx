@@ -36,6 +36,7 @@ vi.mock('@tanstack/react-query', async () => {
 });
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
   useDashboardData: mockUseDashboardData,
 }));
 

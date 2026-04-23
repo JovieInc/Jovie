@@ -142,6 +142,7 @@ vi.mock('@/types', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
   DashboardDataProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='dashboard-data-provider'>{children}</div>
   ),

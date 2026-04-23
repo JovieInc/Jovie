@@ -28,6 +28,7 @@ vi.mock('next/dynamic', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
   useDashboardData: () => ({ selectedProfile: mockProfile }),
 }));
 

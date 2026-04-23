@@ -3,6 +3,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
   useDashboardData: () => ({
     profileCompletion: {
       percentage: 100,

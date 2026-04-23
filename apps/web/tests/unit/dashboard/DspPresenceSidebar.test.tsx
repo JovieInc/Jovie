@@ -30,6 +30,7 @@ vi.mock('@jovie/ui', async () => {
 vi.mock('next/navigation', () => ({}));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
   useDashboardData: mockUseDashboardData,
 }));
 
