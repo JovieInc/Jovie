@@ -34,12 +34,24 @@ const {
   const mockUpdateWhere = vi.fn(() => ({ returning: mockUpdateReturning }));
   const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
   const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
+  // Advisory-lock execute() inside the claim transaction must resolve truthy
+  // so processOutreachBatch proceeds. Default to locked=true.
+  const mockTxExecute = vi.fn().mockResolvedValue({ rows: [{ locked: true }] });
+  const mockTransaction = vi.fn(async (cb: (tx: unknown) => unknown) =>
+    cb({
+      select: mockSelect,
+      update: mockUpdate,
+      execute: mockTxExecute,
+      insert: mockInsert,
+    })
+  );
   return {
     mockDb: {
       select: mockSelect,
       update: mockUpdate,
       execute: mockExecute,
       insert: mockInsert,
+      transaction: mockTransaction,
     },
     mockExecute,
     mockInsert,
@@ -72,6 +84,10 @@ vi.mock('@/constants/domains', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: mockDb,
+}));
+
+vi.mock('@/lib/notifications/suppression', () => ({
+  isEmailSuppressed: vi.fn().mockResolvedValue({ suppressed: false }),
 }));
 
 vi.mock('@/lib/db/schema/leads', () => ({

@@ -321,7 +321,7 @@ const TipLinkSection = memo(function TipLinkSection({
     <div>
       <div className='mb-3 flex items-center gap-2'>
         <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-subtle bg-surface-1'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'
           aria-hidden='true'
         >
           <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />

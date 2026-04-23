@@ -67,7 +67,7 @@ export function ProfilePreview({
   return (
     <div
       className={cn(
-        'h-full w-full overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam)',
+        'h-full w-full overflow-hidden rounded-3xl border border-(--linear-app-frame-seam)',
         className
       )}
     >

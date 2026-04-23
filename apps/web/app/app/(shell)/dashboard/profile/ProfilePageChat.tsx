@@ -15,7 +15,7 @@ function ProfilePageChatFallback() {
     <ChatWorkspaceSurface>
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-subtle bg-surface-0'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0'>
             <AlertCircle className='h-5 w-5 text-tertiary-token' />
           </div>
           <p className='text-sm text-secondary-token'>
@@ -45,7 +45,7 @@ function ProfilePageChatInner() {
         <ChatWorkspaceSurface>
           <div className='flex h-full items-center justify-center p-6'>
             <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-              <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-subtle bg-surface-0'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0'>
                 <AlertCircle className='h-5 w-5 text-tertiary-token' />
               </div>
               <p className='text-sm text-secondary-token'>
@@ -74,7 +74,7 @@ function ProfilePageChatInner() {
           </div>
           <div className='shrink-0 px-4 py-4'>
             <ContentSurfaceCard className='mx-auto max-w-2xl p-3'>
-              <div className='h-10 rounded-[16px] skeleton' />
+              <div className='h-10 rounded-2xl skeleton' />
             </ContentSurfaceCard>
           </div>
         </div>
@@ -106,7 +106,7 @@ function ProfilePageChatSkeleton() {
         </div>
         <div className='shrink-0 px-4 py-4'>
           <ContentSurfaceCard className='mx-auto max-w-2xl p-3'>
-            <div className='h-10 rounded-[16px] skeleton' />
+            <div className='h-10 rounded-2xl skeleton' />
           </ContentSurfaceCard>
         </div>
       </div>

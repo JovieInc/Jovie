@@ -239,7 +239,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
               <button
                 type='button'
                 aria-label={`Accept ${suggestion.platform.name} suggestion`}
-                className='rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                className='rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
                 onClick={() => handleAccept(suggestion)}
               >
                 <PlatformPill
@@ -256,7 +256,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
               <AppIconButton
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={event => handleDismiss(suggestion, event)}
               >
                 <X className='h-3.5 w-3.5' aria-hidden />

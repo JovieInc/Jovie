@@ -31,7 +31,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   if (compact) {
     return (
       <div
-        className='inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-xs text-primary-token'
+        className='inline-flex h-7.5 items-center gap-2 rounded-md border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-xs text-primary-token'
         aria-live='polite'
       >
         <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />

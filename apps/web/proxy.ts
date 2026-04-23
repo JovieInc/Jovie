@@ -5,10 +5,7 @@ import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
-import {
-  getRequestLocationFromHeaders,
-  shouldBypassClerk,
-} from '@/components/providers/clerkAvailability';
+import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -21,6 +18,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
   type ClerkBypassPathInfo,
+  isClerkRequiredPath,
   shouldBypassClerkForRequest,
 } from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -1182,8 +1180,11 @@ export default async function middleware(
   // This can happen during Vercel cold starts when env vars are temporarily unavailable
   if (clerkConfigMissing) {
     // For public routes (non-protected), proceed without auth
-    // This allows the homepage, marketing pages, and public profiles to load
-    if (!pathInfo.isProtectedPath) {
+    // This allows the homepage, marketing pages, and public profiles to load.
+    // Authenticated API routes (e.g. /api/chat) must NOT fall through here —
+    // their route handlers call auth() and would throw "Clerk can't detect
+    // usage of clerkMiddleware()" (JOV-1795) if Clerk context wasn't set up.
+    if (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) {
       return handleRequest(req, null);
     }
 
@@ -1210,7 +1211,7 @@ export default async function middleware(
   const shouldForceBypassClerk = shouldBypassClerk(
     resolvedClerkPublishableKey,
     process.env.NEXT_PUBLIC_CLERK_MOCK,
-    getRequestLocationFromHeaders(req.headers) ?? req.nextUrl
+    req.nextUrl
   );
   const allowAuthRouteClerkBypass =
     shouldForceBypassClerk ||
@@ -1236,7 +1237,7 @@ export default async function middleware(
     : clerkProductionMiddleware;
 
   if (!selectedMiddleware) {
-    if (!pathInfo.isProtectedPath) {
+    if (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) {
       return handleRequest(req, null);
     }
 
