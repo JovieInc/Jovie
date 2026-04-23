@@ -5,10 +5,7 @@ import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
-import {
-  getRequestLocationFromHeaders,
-  shouldBypassClerk,
-} from '@/components/providers/clerkAvailability';
+import { shouldBypassClerk } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -1301,7 +1298,7 @@ export default async function middleware(
   const shouldForceBypassClerk = shouldBypassClerk(
     resolvedClerkPublishableKey,
     process.env.NEXT_PUBLIC_CLERK_MOCK,
-    getRequestLocationFromHeaders(req.headers) ?? req.nextUrl
+    req.nextUrl
   );
   const allowAuthRouteClerkBypass =
     shouldForceBypassClerk ||
