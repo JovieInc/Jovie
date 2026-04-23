@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
     status: 'ok',
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
+  isClerkRequiredPath: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
@@ -87,6 +88,7 @@ vi.mock('@/lib/auth/staging-clerk-keys', () => ({
   isStagingHost: mocks.isStagingHost,
 }));
 vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
+  isClerkRequiredPath: mocks.isClerkRequiredPath,
   shouldBypassClerkForRequest: mocks.shouldBypassClerkForRequest,
 }));
 vi.mock('@/lib/auth/test-mode', () => ({
