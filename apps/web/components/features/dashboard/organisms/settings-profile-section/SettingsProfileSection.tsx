@@ -16,7 +16,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
+  'block w-full rounded-[10px] border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-focus focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20';
 const PROFILE_LABEL_COLUMN_WIDTH = '168px';
 const PROFILE_ROW_CLASS =
   'grid gap-2 py-3 sm:grid-cols-[var(--profile-label-column-width)_minmax(0,1fr)] sm:items-start sm:gap-x-5';
@@ -88,7 +88,7 @@ export function SettingsProfileSection({
     >
       <div className='space-y-0 px-4 py-4 sm:px-5' style={PROFILE_LAYOUT_VARS}>
         <div className={PROFILE_ROW_CLASS}>
-          <span className='pt-1 text-[13px] text-primary-token'>
+          <span className='pt-1 text-app text-primary-token'>
             Profile picture
           </span>
           <div className='flex justify-start sm:pt-0.5'>
@@ -109,7 +109,7 @@ export function SettingsProfileSection({
         </div>
         {avatarQuality?.status === 'low' ? (
           <div className='pb-2 sm:pl-[calc(var(--profile-label-column-width)+1.25rem)]'>
-            <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-secondary-token'>
+            <div className='flex items-start gap-3 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-secondary-token'>
               <AlertCircle
                 className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
                 aria-hidden='true'
@@ -126,7 +126,7 @@ export function SettingsProfileSection({
         <div className={PROFILE_ROW_CLASS}>
           <label
             htmlFor='displayName'
-            className='pt-2 text-[13px] text-primary-token'
+            className='pt-2 text-app text-primary-token'
           >
             Display name
           </label>
@@ -144,18 +144,15 @@ export function SettingsProfileSection({
 
         <div className={PROFILE_ROW_CLASS}>
           <div>
-            <label
-              htmlFor='username'
-              className='text-[13px] text-primary-token'
-            >
+            <label htmlFor='username' className='text-app text-primary-token'>
               Username
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-app text-secondary-token'>
               Used in your profile URL
             </p>
           </div>
           <div className={`flex rounded-md ${PROFILE_FIELD_COLUMN_CLASS}`}>
-            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-subtle bg-surface-0 px-3 text-[13px] text-secondary-token'>
+            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-subtle bg-surface-0 px-3 text-app text-secondary-token'>
               {profileDomain}/
             </span>
             <Input
@@ -175,13 +172,10 @@ export function SettingsProfileSection({
 
         <div className={PROFILE_ROW_CLASS}>
           <div>
-            <label
-              htmlFor='location'
-              className='text-[13px] text-primary-token'
-            >
+            <label htmlFor='location' className='text-app text-primary-token'>
               Current location
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-app text-secondary-token'>
               Where you are based now
             </p>
           </div>
@@ -199,13 +193,10 @@ export function SettingsProfileSection({
 
         <div className={PROFILE_ROW_CLASS}>
           <div>
-            <label
-              htmlFor='hometown'
-              className='text-[13px] text-primary-token'
-            >
+            <label htmlFor='hometown' className='text-app text-primary-token'>
               Hometown
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-app text-secondary-token'>
               Where you are from if it differs from where you live now
             </p>
           </div>
@@ -225,11 +216,11 @@ export function SettingsProfileSection({
           <div>
             <label
               htmlFor='careerHighlights'
-              className='text-[13px] text-primary-token'
+              className='text-app text-primary-token'
             >
               Career highlights
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-app text-secondary-token'>
               Share your streaming milestones, press coverage, radio play,
               playlist history, and anything that makes your story unique. This
               helps Jovie write better pitches and recommendations.
@@ -249,7 +240,7 @@ export function SettingsProfileSection({
               maxLength={2000}
               className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}
             />
-            <span className='absolute bottom-2 right-3 text-[11px] text-tertiary-token'>
+            <span className='absolute bottom-2 right-3 text-2xs text-tertiary-token'>
               {formData.careerHighlights.length}/2000
             </span>
           </div>
@@ -259,11 +250,11 @@ export function SettingsProfileSection({
           <div>
             <label
               htmlFor='targetPlaylists'
-              className='text-[13px] text-primary-token'
+              className='text-app text-primary-token'
             >
               Default target playlists
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-app text-secondary-token'>
               Default playlists for pitch generation. Override per-release in
               the release sidebar.
             </p>
