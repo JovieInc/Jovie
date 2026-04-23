@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.167] - 2026-04-22
+
+> Clicking "Generate album art" on a release no longer ships a raw JSON blob as your chat message. Release references render as a pill chip in the transcript, readable at a glance. The chip format is the groundwork for the upcoming `/` command menu — any release, artist, or skill will compose into the input as a chip instead of free text.
+
+### Added
+
+- `apps/web/lib/chat/tokens.ts` — wire-format serializer/parser for `@release:id[label]`, `@artist:id[label]`, `@track:id[label]` entity mentions, and `/skill:id` skill invocations. Pure, server-safe, 17 unit tests covering parse/serialize/roundtrip/extractors.
+- `apps/web/lib/commands/registry.ts` — shared Command registry seeded from `tool-schemas.ts` with 5 skills (generateAlbumArt, proposeAvatarUpload, proposeSocialLink, proposeSocialLinkRemoval, submitFeedback). Single source of truth for the upcoming chat `/` menu and cmd+k palette.
+- `apps/web/lib/commands/entities.ts` — `EntityProvider` type + lazy registration API for per-kind search hooks (release, artist, track).
+- `apps/web/components/jovie/components/EntityChip.tsx` — pill component with `input` and `transcript` variants, accessible (`role="img"` + `aria-label` reading "Release: Midnight Drive").
+- `apps/web/components/jovie/components/TokenizedText.tsx` — parses tokens in user-authored messages and renders chips inline.
+
+### Changed
+
+- `ChatAlbumArtCard` no longer embeds `JSON.stringify({releaseId, releaseTitle, ...})` inside user messages. Button clicks now emit `/skill:generateAlbumArt @release:<id>[<title>] — show three options.`, which renders as a pill chip in the transcript.
+- `ChatMessage` renders user messages through `TokenizedText` instead of plain `whitespace-pre-wrap`, so chips display inline.
+- System prompt has a new "Entity & Skill Tokens" section teaching the model to interpret `@kind:id[label]` and `/skill:id` tokens directly (pass id as the tool's releaseId; don't echo tokens in replies).
+
+### Developer Notes
+
+- `AGENTS.md`: added rule to always open a Linear issue for deferred follow-ups and link dependencies with `blockedBy`.
+- Slash command menu, contenteditable chip input, and concrete EntityProviders are tracked in JOV-1793.
+- Global cmd+k palette that consumes this registry is tracked in JOV-1792.
+
 ## [26.4.166] - 2026-04-22
 
 > Killed the "Built for artists." hero eyebrow pill so the headline owns first attention. Fixed the sign-in modal's small-then-layoutshift flash when Clerk loads cold: the modal now reserves its final size and paints a Clerk-shaped skeleton while the bundle is in flight, and the "Sign in" header link prefetches the modal chunk on hover/focus so the skeleton almost never appears. Hardened hero paint isolation so the pulsing glow can't invalidate below-the-fold layout.
