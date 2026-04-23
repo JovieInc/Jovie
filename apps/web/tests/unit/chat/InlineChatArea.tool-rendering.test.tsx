@@ -316,7 +316,7 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     const statusRow = screen.getByTestId('tool-status-row');
     expect(statusRow.getAttribute('data-tool-name')).toBe('summarizeAudience');
-    expect(screen.getByText('Summarize Audience')).toBeDefined();
+    expect(screen.getByText('Summarize audience done')).toBeDefined();
     expect(screen.getByText('Audience summary complete.')).toBeDefined();
   });
 });
