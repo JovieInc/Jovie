@@ -293,7 +293,7 @@ export function PreviewPanel() {
         Live preview
       </p>
       <div className='flex min-w-0 items-center gap-1.5'>
-        <span className='truncate text-[12px] font-semibold tracking-[-0.01em] text-primary-token'>
+        <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
           {displayName || username || 'Profile'}
         </span>
         {username && displayName !== username && (
@@ -383,7 +383,7 @@ export function PreviewPanel() {
               <Button
                 asChild
                 variant='primary'
-                className='h-9 w-full rounded-[10px] text-[12px] font-caption tracking-[-0.01em]'
+                className='h-9 w-full rounded-[10px] text-xs font-caption tracking-[-0.01em]'
               >
                 <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
                   <ExternalLink
@@ -496,7 +496,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {visibleLinkCount}
                   </p>
                 </div>
@@ -504,7 +504,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {hiddenLinkCount}
                   </p>
                 </div>
@@ -512,7 +512,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {connectedDspCount}
                   </p>
                 </div>

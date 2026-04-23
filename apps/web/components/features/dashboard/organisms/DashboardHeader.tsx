@@ -71,7 +71,7 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.012em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-xs font-[560] tracking-[-0.01em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
@@ -81,11 +81,11 @@ export function DashboardHeader({
               </span>
               <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
               {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-[12px] tracking-[-0.01em] text-secondary-token'>
+                <div className='min-w-0 truncate text-xs tracking-[-0.01em] text-secondary-token'>
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+                <span className='truncate text-xs font-[560] tracking-[-0.01em] text-primary-token'>
                   {currentLabel}
                 </span>
               )}

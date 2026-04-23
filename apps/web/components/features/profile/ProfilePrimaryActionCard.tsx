@@ -401,7 +401,7 @@ export function ProfilePrimaryActionCard({
     ? 'h-14 w-14 rounded-[14px]'
     : 'h-11 w-11 rounded-xl';
   const titleClassName = isShowcase
-    ? 'text-[16px] font-[630] tracking-[-0.03em] text-white'
+    ? 'text-base font-[630] tracking-[-0.03em] text-white'
     : 'text-[13px] font-[590] leading-[1.1] text-white/92';
   const metaClassName = isShowcase
     ? 'text-[11.5px] text-white/56'
@@ -501,7 +501,7 @@ export function ProfilePrimaryActionCard({
           <span className='text-[9px] font-[620] uppercase tracking-[0.14em] text-white/48'>
             {getMonthLabel(state.tourDate.startDate)}
           </span>
-          <span className='mt-1 text-[20px] font-[700] tracking-[-0.06em]'>
+          <span className='mt-1 text-xl font-[700] tracking-[-0.06em]'>
             {getDayLabel(state.tourDate.startDate)}
           </span>
         </div>

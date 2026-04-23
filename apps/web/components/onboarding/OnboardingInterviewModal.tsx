@@ -66,8 +66,8 @@ export function OnboardingInterviewModal({
     if (!isRequested) return;
 
     const alreadySubmitted =
-      typeof window !== 'undefined' &&
-      window.sessionStorage.getItem(SESSION_KEY) === '1';
+      typeof globalThis.window !== 'undefined' &&
+      globalThis.sessionStorage.getItem(SESSION_KEY) === '1';
 
     if (alreadySubmitted) {
       router.replace(pathname);
@@ -101,11 +101,11 @@ export function OnboardingInterviewModal({
           transcript,
           metadata: {
             locale:
-              typeof navigator !== 'undefined' ? navigator.language : null,
+              typeof navigator === 'undefined' ? null : navigator.language,
             userAgent:
-              typeof navigator !== 'undefined'
-                ? navigator.userAgent.slice(0, 512)
-                : null,
+              typeof navigator === 'undefined'
+                ? null
+                : navigator.userAgent.slice(0, 512),
           },
         }),
       });
@@ -113,8 +113,8 @@ export function OnboardingInterviewModal({
       // Silent failure — this is a research feature, not a paywall.
       // Loss of one transcript is acceptable.
     } finally {
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(SESSION_KEY, '1');
+      if (typeof globalThis.window !== 'undefined') {
+        globalThis.sessionStorage.setItem(SESSION_KEY, '1');
       }
       setSubmitting(false);
       setOpen(false);
@@ -130,12 +130,11 @@ export function OnboardingInterviewModal({
             : entry
         );
 
-        const isLast = current === prev.length - 1;
-        if (isLast) {
+        if (current === prev.length - 1) {
           void submit(next);
-          return next;
+        } else {
+          setCurrent(current + 1);
         }
-        setCurrent(current + 1);
         return next;
       });
     },

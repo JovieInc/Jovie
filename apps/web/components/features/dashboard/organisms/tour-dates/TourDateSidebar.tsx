@@ -59,9 +59,7 @@ function MiniRankedList({
   readonly emptyMessage: string;
 }) {
   if (items.length === 0) {
-    return (
-      <p className='py-2 text-[12px] text-tertiary-token'>{emptyMessage}</p>
-    );
+    return <p className='py-2 text-xs text-tertiary-token'>{emptyMessage}</p>;
   }
 
   return (
@@ -76,11 +74,11 @@ function MiniRankedList({
               {index + 1}
             </span>
             <IconComponent className='h-3 w-3 text-tertiary-token' />
-            <span className='truncate text-[12px] text-secondary-token'>
+            <span className='truncate text-xs text-secondary-token'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[12px] font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-xs font-[510] text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>
@@ -274,7 +272,7 @@ export function TourDateSidebar({
                 }
                 meta={
                   tourDate.provider === 'bandsintown' ? (
-                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-[12px] text-[var(--color-success)]'>
+                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-xs text-[var(--color-success)]'>
                       <Icon name='Link' className='h-3.5 w-3.5' />
                       <span>Synced from Bandsintown</span>
                     </div>
@@ -486,7 +484,7 @@ export function TourDateSidebar({
                         }
                         disabled={isPending}
                         className={cn(
-                          'flex-1 rounded-full border px-3 py-2 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
+                          'flex-1 rounded-full border px-3 py-2 text-xs font-[510] transition-[background-color,border-color,color] duration-150',
                           formData.ticketStatus === status
                             ? 'border-accent/35 bg-accent/10 text-accent'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -512,7 +510,7 @@ export function TourDateSidebar({
                 </DrawerSurfaceCard>
               )}
               {!analyticsLoading && analyticsError && (
-                <p className='text-[12px] text-tertiary-token'>
+                <p className='text-xs text-tertiary-token'>
                   Unable to load analytics data.
                 </p>
               )}
@@ -560,7 +558,7 @@ export function TourDateSidebar({
                   )}
 
                   {(analyticsData?.ticketClicks ?? 0) === 0 && (
-                    <p className='text-[12px] text-tertiary-token'>
+                    <p className='text-xs text-tertiary-token'>
                       No ticket click data yet. Analytics will appear once fans
                       click ticket links for this show.
                     </p>

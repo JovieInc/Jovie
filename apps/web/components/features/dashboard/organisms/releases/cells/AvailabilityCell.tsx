@@ -208,7 +208,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-[12px] font-normal tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
+          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
         >
           <CompactLinkRail
             items={compactProviders.map(providerKey => ({
@@ -247,7 +247,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-          <p className='text-[12px] font-caption tracking-[-0.01em] text-primary-token'>
+          <p className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
             Platform Availability
           </p>
           <p className='text-[11px] text-secondary-token'>
@@ -299,7 +299,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     className='h-4 w-4'
                     aria-label={config.label}
                   />
-                  <span className='truncate text-[12px] font-normal text-primary-token'>
+                  <span className='truncate text-xs font-normal text-primary-token'>
                     {config.label}
                   </span>
                 </div>
@@ -365,7 +365,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-8 w-[150px] rounded-full border-subtle bg-surface-1 text-[12px]'
+                          className='h-8 w-[150px] rounded-full border-subtle bg-surface-1 text-xs'
                           autoFocus
                         />
                         <DrawerButton

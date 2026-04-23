@@ -56,7 +56,7 @@ export function ArtistProfileContent() {
               href={`/${artist.handle}`}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px] font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-xs font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               View as Visitor
               <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />

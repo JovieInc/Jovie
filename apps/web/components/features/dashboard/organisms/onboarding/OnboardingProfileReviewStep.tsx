@@ -409,7 +409,7 @@ export function OnboardingProfileReviewStep({
                           maxLength={50}
                           className={cn(
                             AUTH_SURFACE.fieldInput,
-                            'text-center text-[15px] font-semibold'
+                            'text-center text-mid font-semibold'
                           )}
                           aria-label='Edit display name'
                         />
