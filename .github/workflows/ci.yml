@@ -3071,11 +3071,12 @@ jobs:
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Deploy concurrency: if multiple main pushes stack up (e.g., merge queue burst),
-    # cancel the in-progress deploy and deploy only the latest commit.
+    # Deploy concurrency: serialize main deploys instead of cancelling them.
+    # Cancelling in-progress main deploys during merge bursts can starve
+    # production promotion and leave main without a completed deploy run.
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
@@ -3158,7 +3159,7 @@ jobs:
     if: ${{ always() && needs.deploy-staging.result == 'success' }}
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: https://staging.jov.ie
@@ -3178,7 +3179,7 @@ jobs:
     timeout-minutes: 10
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     environment:
       name: Production – jovie
       url: https://jov.ie

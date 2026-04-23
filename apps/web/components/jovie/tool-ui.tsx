@@ -72,11 +72,11 @@ function getToolStatusTitle(event: PersistedToolEvent): string {
     case 'failed':
       return config.errorTitle ?? `${config.label} Failed`;
     case 'denied':
-      return `${config.label} Denied`;
+      return `${config.label} denied`;
     case 'needs-approval':
-      return `${config.label} Needs Approval`;
+      return `${config.label} needs your OK`;
     case 'succeeded':
-      return config.label;
+      return config.successTitle ?? config.label;
   }
 }
 
@@ -142,6 +142,7 @@ function ToolStatusRow({
         </span>
         <div className='min-w-0'>
           <div
+            title={getToolStatusTitle(event)}
             className={cn(
               'truncate font-[560] tracking-[-0.01em]',
               isInline ? 'text-[12px]' : 'text-[13px]'

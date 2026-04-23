@@ -15,10 +15,14 @@ const DEMO_ONBOARDING_STEPS = ['handle', 'dsp', 'profile-review'] as const;
 
 export type DemoOnboardingStepId = (typeof DEMO_ONBOARDING_STEPS)[number];
 
+// Labels mirror the canonical sidebar labels used by OnboardingV2Form
+// (Handle / Spotify / Finish). The demo exposes a condensed 3-step slice,
+// but the labels should match the real flow so the demo reads as a faithful
+// preview of real onboarding.
 const STEP_LABELS: Record<DemoOnboardingStepId, string> = {
   handle: 'Handle',
-  dsp: 'Music',
-  'profile-review': 'Profile',
+  dsp: 'Spotify',
+  'profile-review': 'Finish',
 };
 
 function getStepIndicatorClassName(index: number, currentIndex: number) {
@@ -55,7 +59,7 @@ function StepSwitcher({
           type='button'
           onClick={() => onStepChange(step)}
           className={cn(
-            'shrink-0 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors',
+            'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
             currentStep === step
               ? 'bg-accent-token text-white'
               : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -111,8 +115,8 @@ export function OnboardingDemoContent({
       case 'handle':
         return (
           <OnboardingHandleStep
-            title='Choose your handle'
-            prompt='This is how fans will find and remember you.'
+            title='Claim your link'
+            prompt='This is the only link you need to share your music. Make it yours.'
             handleInput={handleInput}
             isHydrated
             handleValidation={DEMO_HANDLE_VALIDATION}
@@ -129,8 +133,8 @@ export function OnboardingDemoContent({
       case 'dsp':
         return (
           <OnboardingDspStep
-            title='Connect your music'
-            prompt='Import your releases from Spotify so fans can find your music.'
+            title='Are you on Spotify?'
+            prompt='Connect Spotify so we can pull in your releases, artwork, and DSP links automatically.'
             onConnected={() => onStepChange('profile-review')}
             onSkip={() => onStepChange('profile-review')}
             isTransitioning={false}
@@ -139,8 +143,8 @@ export function OnboardingDemoContent({
       case 'profile-review':
         return (
           <OnboardingProfileReviewStep
-            title='Your profile'
-            prompt='Review your profile before going live.'
+            title='Your link is live'
+            prompt='Review your profile. You can polish anything later from the dashboard.'
             enrichedProfile={DEMO_ENRICHED_PROFILE}
             handle={handleInput}
             onGoToDashboard={onFinish}

@@ -130,7 +130,7 @@ export function AppleMusicSyncBanner({
       return (
         <div
           className={cn(
-            'inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#FA243C]/18 bg-[#FA243C]/6 px-2.5 text-[12px] text-secondary-token',
+            'inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#FA243C]/18 bg-[#FA243C]/6 px-2.5 text-xs text-secondary-token',
             className
           )}
         >
@@ -145,7 +145,7 @@ export function AppleMusicSyncBanner({
     return (
       <div
         className={cn(
-          'inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#FA243C]/18 bg-[#FA243C]/6 px-2 text-[12px] text-primary-token',
+          'inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#FA243C]/18 bg-[#FA243C]/6 px-2 text-xs text-primary-token',
           className
         )}
       >
@@ -159,7 +159,7 @@ export function AppleMusicSyncBanner({
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-7 rounded-[6px] px-2 text-[11px]'
+          className='h-7 rounded-[6px] px-2 text-2xs'
         >
           Dismiss
         </DrawerButton>
@@ -169,7 +169,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-7 rounded-[6px] border-[#FA243C] bg-[#FA243C] px-2 text-[11px] hover:border-[#FA243C] hover:bg-[#FA243C]/90'
+          className='h-7 rounded-[6px] border-[#FA243C] bg-[#FA243C] px-2 text-2xs hover:border-[#FA243C] hover:bg-[#FA243C]/90'
         >
           Confirm
         </DrawerButton>
@@ -191,10 +191,10 @@ export function AppleMusicSyncBanner({
           <DspProviderIcon provider='apple_music' size='md' />
         </div>
         <div className='min-w-0 flex-1'>
-          <p className='text-[13px] font-[510] text-primary-token'>
+          <p className='text-app font-[510] text-primary-token'>
             No Apple Music match found
           </p>
-          <p className='mt-0.5 text-[11px] text-secondary-token'>
+          <p className='mt-0.5 text-2xs text-secondary-token'>
             We couldn&apos;t confidently match your artist yet.
           </p>
         </div>
@@ -220,7 +220,7 @@ export function AppleMusicSyncBanner({
 
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-[13px] font-[510] text-primary-token'>
+          <span className='min-w-0 truncate text-app font-[510] text-primary-token'>
             {match.externalArtistName}
           </span>
           {externalArtistUrl && (
@@ -240,7 +240,7 @@ export function AppleMusicSyncBanner({
             </DrawerInlineIconButton>
           )}
         </div>
-        <p className='mt-0.5 text-[11px] text-secondary-token'>
+        <p className='mt-0.5 text-2xs text-secondary-token'>
           Confirm to link your Apple Music releases.
         </p>
       </div>
@@ -252,7 +252,7 @@ export function AppleMusicSyncBanner({
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-7 rounded-[8px] px-2.5 text-[12px]'
+          className='h-7 rounded-[8px] px-2.5 text-xs'
         >
           {rejectMutation.isPending &&
           rejectMutation.variables?.matchId === match.id
@@ -265,7 +265,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-7 rounded-[8px] border-[#FA243C] bg-[#FA243C] px-2.5 text-[12px] hover:border-[#FA243C] hover:bg-[#FA243C]/90'
+          className='h-7 rounded-[8px] border-[#FA243C] bg-[#FA243C] px-2.5 text-xs hover:border-[#FA243C] hover:bg-[#FA243C]/90'
         >
           {confirmMutation.isPending &&
           confirmMutation.variables?.matchId === match.id ? (

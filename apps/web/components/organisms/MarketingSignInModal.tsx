@@ -38,10 +38,44 @@ const clerkDarkCompact = {
   },
 } as const;
 
+/**
+ * Reserved-size loading placeholder that mirrors the final Clerk compact
+ * card layout (header, OAuth row, divider, input, primary button, footer
+ * link). Absolutely positioned so Clerk's real card mounts on top without
+ * reflow — eliminates the small-then-layoutshift flash on cold loads.
+ */
+function SignInSkeleton() {
+  return (
+    <div
+      aria-hidden='true'
+      data-testid='marketing-signin-skeleton'
+      className='absolute inset-0 flex flex-col gap-4 rounded-[0.75rem] border border-white/10 bg-[#0a0a0c] p-8 shadow-2xl'
+    >
+      <div className='mx-auto h-6 w-40 animate-pulse rounded bg-white/10' />
+      <div className='mx-auto mt-1 h-3 w-56 animate-pulse rounded bg-white/5' />
+      <div className='mt-5 grid grid-cols-3 gap-2'>
+        <div className='h-10 animate-pulse rounded-md bg-white/5' />
+        <div className='h-10 animate-pulse rounded-md bg-white/5' />
+        <div className='h-10 animate-pulse rounded-md bg-white/5' />
+      </div>
+      <div className='my-1 flex items-center gap-3'>
+        <div className='h-px flex-1 bg-white/10' />
+        <div className='h-2 w-6 rounded bg-white/5' />
+        <div className='h-px flex-1 bg-white/10' />
+      </div>
+      <div className='h-3 w-20 animate-pulse rounded bg-white/10' />
+      <div className='h-10 animate-pulse rounded-md bg-white/[0.04]' />
+      <div className='mt-1 h-10 animate-pulse rounded-md bg-white/15' />
+      <div className='mx-auto mt-auto h-3 w-44 animate-pulse rounded bg-white/5' />
+    </div>
+  );
+}
+
 export function MarketingSignInModal({
   onClose,
 }: Readonly<MarketingSignInModalProps>) {
   const [mounted, setMounted] = useState(false);
+  const [clerkReady, setClerkReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
@@ -119,6 +153,7 @@ export function MarketingSignInModal({
       );
       if (input) {
         input.focus();
+        setClerkReady(true);
         return true;
       }
       return false;
@@ -173,15 +208,17 @@ export function MarketingSignInModal({
           <div
             ref={containerRef}
             className='pointer-events-auto relative w-full max-w-[400px]'
+            style={{ minHeight: 520 }}
           >
             <button
               type='button'
               aria-label='Close'
               onClick={onClose}
-              className='absolute right-2 top-2 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
+              className='absolute right-2 top-2 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
             >
               <X className='h-4 w-4' strokeWidth={2} />
             </button>
+            {!clerkReady ? <SignInSkeleton /> : null}
             <SignIn
               appearance={clerkDarkCompact}
               routing='hash'

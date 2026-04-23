@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.166] - 2026-04-22
+
+> Killed the "Built for artists." hero eyebrow pill so the headline owns first attention. Fixed the sign-in modal's small-then-layoutshift flash when Clerk loads cold: the modal now reserves its final size and paints a Clerk-shaped skeleton while the bundle is in flight, and the "Sign in" header link prefetches the modal chunk on hover/focus so the skeleton almost never appears. Hardened hero paint isolation so the pulsing glow can't invalidate below-the-fold layout.
+
+### Added
+
+- New `MarketingSignInModal` skeleton (`data-testid="marketing-signin-skeleton"`) that mirrors the Clerk compact card layout (header, OAuth row, divider, input, primary button, footer) and is swapped out the moment Clerk's first input appears. Card wrapper reserves `min-height: 520px` so the box never resizes.
+- `MarketingSignInLink` prefetches `./MarketingSignInModal` on first `mouseenter` / `focus` / `touchstart` so the Clerk bundle is already loading by the time the visitor clicks.
+- New Vitest coverage for both components: `tests/components/organisms/MarketingSignInModal.test.tsx` (skeleton render, reserved min-height, Escape close, backdrop close, dialog role) and `tests/components/organisms/MarketingSignInLink.test.tsx` (no modal until click, open+close cycle, prefetch handlers wired).
+
+### Changed
+
+- Removed the `homepage-hero-eyebrow` "Built for artists." pill and its `HERO_COPY.eyebrow` entry. Dropped the now-redundant `mt-7 sm:mt-8` on the h1 since it's the first flex child.
+- [perf] Added `contain: layout paint` to `.homepage-hero-flood` so the pulsing glow can no longer invalidate below-fold content, and `transform: translateZ(0); backface-visibility: hidden` on the decorative gradient layers to pin them to the compositor (animation runs off the main thread).
+
+### Infrastructure
+
+- [internal] Bumped version to `26.4.166` across `VERSION` and `package.json`.
+
+## [26.4.165] - 2026-04-22
+
+> Sign-in no longer gets stuck on a black spinner when Clerk cookies or env keys drift between dev/staging/prod. The `/signin` page now surfaces a "Reset session" escape after 6 seconds, and a new public `/api/auth/reset` endpoint clears Clerk cookies on both the host and `.jov.ie` parent scope so stale cookies from one environment can't poison another. Staging deployments that accidentally inherit production Clerk keys show a visible error card instead of a blank page, and every silent-failure path now fires a Sentry event so the next occurrence can't go unnoticed.
+
+### Added
+
+- New `POST/GET /api/auth/reset` public endpoint that clears Clerk cookies (`__clerk*`, `__session*`, `__client*`, `__refresh*`) on both the current host and the parent `.jov.ie` domain scope, then redirects to `/signin?reset=1` with a confirmation toast.
+- New `SignInTimeoutEscape` component renders a "Reset session and retry" link after 6 seconds if Clerk's sign-in form fails to mount, fires a `clerk_signin_skeleton_timeout` Sentry event, and links to `/api/auth/reset`.
+- New `scripts/detect-clerk-id-drift.ts` audit script scans the DB for users whose `clerk_id` no longer matches any Clerk user for their email, reports mismatches, and emits a `clerk_id_drift_detected` Sentry event per row. Exits non-zero on drift so it can run on a schedule.
+- `AuthUnavailableCard` gains a `showResetAction` mode that replaces the "Go to Homepage" link with a "Reset session and retry" form pointing at `/api/auth/reset`, used whenever auth is unavailable on a public host.
+- Auth layout now fires a `clerk_bypass_on_public_host` Sentry event (error level) whenever the fallback unavailable card renders on a public https host, tagged with `hostname` and `key_status`.
+
+### Changed
+
+- `resolveClerkKeys()` now returns a structured `{ publishableKey, secretKey, status }` shape with `'ok' | 'staging_missing' | 'staging_inherits_prod' | 'no_publishable_key'` so downstream UI can distinguish missing-keys from inherits-prod misconfig.
+- Middleware always sets an `x-clerk-key-status` request header alongside the existing `x-clerk-publishable-key`, giving the auth layout a deterministic signal for what to render.
+- `AuthClientProviders` fires `clerk_bypass_on_public_host` from the client when `shouldBypassClerk` triggers on a public host, matching the server-side detection.
+- Extracted Clerk cookie name prefixes into `@/lib/auth/clerk-cookie-names` and the dev Sync-Clerk core into `@/lib/auth/sync-clerk-id`. Both are now reused between dev-only routes and new public/recovery surfaces.
+
+### Infrastructure
+
+- [internal] Added `isPublicAuthHost()` helper to `components/providers/clerkAvailability.ts` for gating public-host-specific behavior (https + non-private hostname).
+- [internal] Bumped version to `26.4.165` across `VERSION` and `package.json`.
+
 ## [26.4.164] - 2026-04-22
 
 > Sign-in modal now proxies Clerk traffic through the app's `/__clerk` middleware like the rest of the app (fixing a would-be production break on `pk_live_` keys), and restores URL and focus state cleanly when dismissed. Hero headline picks up its intended Linear-bold weight from CSS instead of a conflicting Tailwind utility.

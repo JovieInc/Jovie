@@ -1,0 +1,482 @@
+name: Main Autofix
+
+# Auto-triage red main. Dispatched after the health monitor's one-shot rerun fails
+# (or is skipped). Fetches the failing run's logs + diff since last green, invokes
+# Claude Code to propose a fix, opens a PR with auto-merge enabled.
+#
+# Guardrails (enforced in eval-main-health composite action):
+#  - Canary/Sentry gate failures do NOT trigger autofix (rollback path owns those).
+#  - Newer commit already in progress → skip.
+#  - ≥2 distinct SHAs needed autofix within 60 min → escalate to needs-human.
+#
+# Per-SHA limits (enforced here):
+#  - Dedup: no new PR if an open autofix PR for the SHA already exists.
+#  - Attempt cap: 3 autofix PRs per SHA (open+closed), then needs-human.
+#  - SHA drift guard: if main HEAD moved past the failing SHA, exit without opening a PR.
+
+on:
+  workflow_run:
+    workflows: ['Main CI health monitor']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      failing_run_id:
+        description: 'CI run ID to autofix (overrides evaluation).'
+        required: false
+
+permissions: {}
+
+concurrency:
+  # Serialize per repo so we don't race ourselves.
+  group: main-autofix
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Evaluate eligibility
+    # Monitor exits 1 (conclusion=failure) only when main CI is unhealthy.
+    # Skip evaluate on healthy monitor runs to avoid 96 no-op workflow runs/day.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      needs_autofix: ${{ steps.decide.outputs.needs_autofix }}
+      failing_run_id: ${{ steps.decide.outputs.failing_run_id }}
+      failing_sha: ${{ steps.decide.outputs.failing_sha }}
+      failing_short_sha: ${{ steps.decide.outputs.failing_short_sha }}
+      last_green_sha: ${{ steps.decide.outputs.last_green_sha }}
+      failed_job_names: ${{ steps.decide.outputs.failed_job_names }}
+      systemic: ${{ steps.decide.outputs.systemic }}
+      autofix_skip_reason: ${{ steps.decide.outputs.autofix_skip_reason }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Re-evaluate main CI health
+        id: evaluate
+        uses: ./.github/actions/eval-main-health
+
+      - name: Decide eligibility
+        id: decide
+        env:
+          DISPATCH_RUN_ID: ${{ inputs.failing_run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVAL_NEEDS_AUTOFIX: ${{ steps.evaluate.outputs.needs_autofix }}
+          EVAL_FAILING_RUN_ID: ${{ steps.evaluate.outputs.failing_run_id }}
+          EVAL_FAILING_SHA: ${{ steps.evaluate.outputs.failing_sha }}
+          EVAL_FAILING_SHORT_SHA: ${{ steps.evaluate.outputs.failing_short_sha }}
+          EVAL_LAST_GREEN_SHA: ${{ steps.evaluate.outputs.last_green_sha }}
+          EVAL_FAILED_JOB_NAMES: ${{ steps.evaluate.outputs.failed_job_names }}
+          EVAL_SYSTEMIC: ${{ steps.evaluate.outputs.systemic }}
+          EVAL_SKIP_REASON: ${{ steps.evaluate.outputs.autofix_skip_reason }}
+        run: |
+          # workflow_dispatch with explicit run ID overrides evaluation (for smoke testing).
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$DISPATCH_RUN_ID" ]; then
+            echo "Manual dispatch override: forcing autofix for run $DISPATCH_RUN_ID"
+            echo "needs_autofix=true" >> "$GITHUB_OUTPUT"
+            echo "failing_run_id=$DISPATCH_RUN_ID" >> "$GITHUB_OUTPUT"
+            # Rest of fields still come from evaluation (most recent failure context).
+            echo "failing_sha=$EVAL_FAILING_SHA" >> "$GITHUB_OUTPUT"
+            echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA" >> "$GITHUB_OUTPUT"
+            echo "last_green_sha=$EVAL_LAST_GREEN_SHA" >> "$GITHUB_OUTPUT"
+            echo "failed_job_names=$EVAL_FAILED_JOB_NAMES" >> "$GITHUB_OUTPUT"
+            echo "systemic=false" >> "$GITHUB_OUTPUT"
+            echo "autofix_skip_reason=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "needs_autofix=$EVAL_NEEDS_AUTOFIX" >> "$GITHUB_OUTPUT"
+          echo "failing_run_id=$EVAL_FAILING_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "failing_sha=$EVAL_FAILING_SHA" >> "$GITHUB_OUTPUT"
+          echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "last_green_sha=$EVAL_LAST_GREEN_SHA" >> "$GITHUB_OUTPUT"
+          echo "failed_job_names=$EVAL_FAILED_JOB_NAMES" >> "$GITHUB_OUTPUT"
+          echo "systemic=$EVAL_SYSTEMIC" >> "$GITHUB_OUTPUT"
+          echo "autofix_skip_reason=$EVAL_SKIP_REASON" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVAL_SYSTEMIC" = "true" ]; then
+            echo "::warning::Systemic failure detected across multiple SHAs — autofix will NOT dispatch. Human triage required."
+          elif [ "$EVAL_NEEDS_AUTOFIX" != "true" ] && [ -n "$EVAL_FAILING_RUN_ID" ]; then
+            echo "Skipping autofix: $EVAL_SKIP_REASON"
+          fi
+
+      - name: Escalate systemic failure to Slack
+        if: ${{ steps.decide.outputs.systemic == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          FAILING_SHORT_SHA: ${{ steps.decide.outputs.failing_short_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.decide.outputs.failing_run_id }}
+        run: |
+          PAYLOAD=$(jq -n --arg sha "$FAILING_SHORT_SHA" --arg url "$RUN_URL" '{
+            text: "🚨 Main CI systemic failure — multiple SHAs failing, autofix suspended",
+            attachments: [{
+              color: "danger",
+              fields: [
+                { title: "Failing SHA", value: $sha, short: true },
+                { title: "Reason", value: "≥2 distinct SHAs triggered autofix within 60 min — likely not a code bug (rotated secret, upstream outage, infra). Human triage required.", short: false },
+                { title: "Run", value: ("<" + $url + "|View failing run>"), short: false }
+              ]
+            }]
+          }')
+          curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+
+  autofix:
+    name: Dispatch Claude Code fix
+    needs: evaluate
+    if: needs.evaluate.outputs.needs_autofix == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: SHA drift guard
+        id: drift
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          CURRENT_HEAD=$(gh api "repos/$GH_REPO/commits/main" --jq '.sha')
+          echo "Current main HEAD: $CURRENT_HEAD"
+          echo "Failing SHA:       $FAILING_SHA"
+          if [ "$CURRENT_HEAD" != "$FAILING_SHA" ]; then
+            echo "::warning::main HEAD has moved past failing SHA — superseded, exiting."
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dedup and attempt cap
+        id: dedup
+        if: steps.drift.outputs.drifted != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+        run: |
+          # Count existing autofix PRs for this SHA using label filter + client-side title match.
+          # We avoid --search (GitHub Search has a 10-60s indexing delay that would cause
+          # duplicate PRs when two monitor cycles race on the same just-opened PR).
+          PR_COUNT=$(gh pr list --repo "$GH_REPO" --label autofix --state all --limit 200 --json number,title --jq "[.[] | select(.title | contains(\"$SHORT_SHA\"))] | length")
+          OPEN_COUNT=$(gh pr list --repo "$GH_REPO" --label autofix --state open --limit 200 --json number,title --jq "[.[] | select(.title | contains(\"$SHORT_SHA\"))] | length")
+          echo "Existing autofix PRs for $SHORT_SHA: $PR_COUNT total, $OPEN_COUNT open"
+          echo "total=$PR_COUNT" >> "$GITHUB_OUTPUT"
+          echo "open=$OPEN_COUNT" >> "$GITHUB_OUTPUT"
+          ATTEMPT=$((PR_COUNT + 1))
+          echo "attempt=$ATTEMPT" >> "$GITHUB_OUTPUT"
+          if [ "$OPEN_COUNT" -gt 0 ]; then
+            echo "skip_reason=open_pr_exists" >> "$GITHUB_OUTPUT"
+          elif [ "$PR_COUNT" -ge 3 ]; then
+            echo "skip_reason=attempt_cap_reached" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_reason=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Escalate — attempt cap reached
+        if: steps.dedup.outputs.skip_reason == 'attempt_cap_reached'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Label the most recent autofix PR for this SHA as needs-human so it's visible in review queue.
+          LATEST_PR=$(gh pr list --repo "$GH_REPO" --label autofix --state all --limit 200 --json number,title --jq "[.[] | select(.title | contains(\"$SHORT_SHA\"))][0].number" || echo "")
+          if [ -n "$LATEST_PR" ]; then
+            gh pr edit --repo "$GH_REPO" "$LATEST_PR" --add-label "needs-human" || true
+          fi
+
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            PAYLOAD=$(jq -n --arg sha "$SHORT_SHA" '{
+              text: "🚨 Main autofix attempt cap reached",
+              attachments: [{
+                color: "danger",
+                fields: [
+                  { title: "Failing SHA", value: $sha, short: true },
+                  { title: "Reason", value: "3 autofix attempts exhausted for this SHA. Human review required.", short: false }
+                ]
+              }]
+            }')
+            curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+          fi
+
+      - name: Checkout failing SHA
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.evaluate.outputs.failing_sha }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Create fix branch
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        env:
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          ATTEMPT: ${{ steps.dedup.outputs.attempt }}
+        run: |
+          git checkout -b "autofix/main-${SHORT_SHA}-${ATTEMPT}"
+
+      - name: Setup Node.js and pnpm
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Assemble context bundle
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        id: context
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          FAILING_RUN_ID: ${{ needs.evaluate.outputs.failing_run_id }}
+          FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
+          LAST_GREEN_SHA: ${{ needs.evaluate.outputs.last_green_sha }}
+          FAILED_JOB_NAMES: ${{ needs.evaluate.outputs.failed_job_names }}
+        run: |
+          mkdir -p /tmp/autofix-context
+
+          echo "Fetching failed logs for run $FAILING_RUN_ID..."
+          # --log-failed truncates cleanly; cap at 400KB so prompt stays manageable.
+          gh run view "$FAILING_RUN_ID" --repo "$GH_REPO" --log-failed 2>/dev/null | head -c 400000 > /tmp/autofix-context/failed-logs.txt || echo "(failed to fetch logs)" > /tmp/autofix-context/failed-logs.txt
+
+          echo "Computing diff since last green ($LAST_GREEN_SHA → $FAILING_SHA)..."
+          if [ -n "$LAST_GREEN_SHA" ]; then
+            git log --stat "${LAST_GREEN_SHA}..${FAILING_SHA}" > /tmp/autofix-context/commits-since-green.txt 2>/dev/null || echo "(no diff available)" > /tmp/autofix-context/commits-since-green.txt
+            git diff "${LAST_GREEN_SHA}..${FAILING_SHA}" | head -c 200000 > /tmp/autofix-context/diff-since-green.patch 2>/dev/null || true
+            git diff --name-only "${LAST_GREEN_SHA}..${FAILING_SHA}" > /tmp/autofix-context/suspect-files.txt 2>/dev/null || true
+          else
+            echo "(no prior green SHA available)" > /tmp/autofix-context/commits-since-green.txt
+            echo "" > /tmp/autofix-context/suspect-files.txt
+          fi
+
+          echo "Failed job names: $FAILED_JOB_NAMES" > /tmp/autofix-context/failed-jobs.txt
+          echo "Context bundle:"
+          ls -la /tmp/autofix-context/
+          wc -l /tmp/autofix-context/*.txt /tmp/autofix-context/*.patch 2>/dev/null || true
+
+      - name: Run Claude Code to fix CI failure
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        id: claude
+        uses: anthropics/claude-code-action@39431830520a7ae6c0c572f11a7707e7043325e3 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Main branch CI is red. Your job is to diagnose and fix the root cause.
+
+            **Failing run:** https://github.com/${{ github.repository }}/actions/runs/${{ needs.evaluate.outputs.failing_run_id }}
+            **Failing SHA:** ${{ needs.evaluate.outputs.failing_sha }}
+            **Last green SHA:** ${{ needs.evaluate.outputs.last_green_sha }}
+            **Failed jobs:** ${{ needs.evaluate.outputs.failed_job_names }}
+
+            ## Context bundle (read these first)
+
+            1. `/tmp/autofix-context/failed-logs.txt` — failed job output from CI
+            2. `/tmp/autofix-context/commits-since-green.txt` — commits merged since last green
+            3. `/tmp/autofix-context/diff-since-green.patch` — full diff since last green
+            4. `/tmp/autofix-context/suspect-files.txt` — files touched since last green (most likely cause)
+
+            ## Rules (from /drain Phase 1)
+
+            - Fix the **root cause**, not the symptom. Do not add try/catches to hide errors. Do not comment out failing tests.
+            - Do not skip tests. Do not add `[skip ci]`. Do not use `--no-verify`.
+            - Keep changes minimal — fix only what broke CI. Do not refactor.
+            - Skip security-sensitive paths unless the failure is IN them: auth, billing, drizzle/migrations, .github/ (other than this workflow).
+            - If the failure is an env/secret issue (not a code bug), STOP. Write a file `/tmp/autofix-context/ABORT.txt` explaining why and exit. Do not guess at secrets.
+
+            ## Required steps
+
+            1. Read the failed logs and identify the failing job's root cause.
+            2. Cross-reference the suspect files — the bug is almost certainly in one of them.
+            3. Make the minimal fix.
+            4. Run `pnpm biome check . --write` to auto-fix formatting.
+            5. Run `pnpm turbo typecheck --filter=@jovie/web` to verify types pass.
+            6. If the failure was a test, run the relevant test to confirm it now passes.
+            7. If validation fails, iterate up to 2 more times. After that, stop.
+
+            Keep the diff small and targeted. This will be auto-merged, so be conservative.
+
+      - name: Check for Claude ABORT signal
+        id: abort-check
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          FAILING_RUN_ID: ${{ needs.evaluate.outputs.failing_run_id }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ -f /tmp/autofix-context/ABORT.txt ]; then
+            REASON=$(cat /tmp/autofix-context/ABORT.txt)
+            echo "aborted=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Claude aborted — not a code bug."
+            echo "$REASON"
+
+            if [ -n "$SLACK_WEBHOOK_URL" ]; then
+              PAYLOAD=$(jq -n --arg sha "$SHORT_SHA" --arg reason "$REASON" --arg url "https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}" '{
+                text: "🚨 Main autofix declined to open a PR — human triage required",
+                attachments: [{
+                  color: "danger",
+                  fields: [
+                    { title: "Failing SHA", value: $sha, short: true },
+                    { title: "Reason (from Claude)", value: $reason, short: false },
+                    { title: "Failing run", value: ("<" + $url + "|View>"), short: false }
+                  ]
+                }]
+              }')
+              curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+            fi
+          else
+            echo "aborted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run automation verify bundle
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.abort-check.outputs.aborted != 'true'
+        run: |
+          bash scripts/automation-verify.sh affected
+
+      - name: Ensure autofix label exists
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.abort-check.outputs.aborted != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Idempotent — gh label create fails if the label exists, which we ignore.
+          gh label create autofix \
+            --repo "$GH_REPO" \
+            --description "Auto-generated fix PR from main-autofix workflow" \
+            --color "fbca04" 2>/dev/null || true
+
+      - name: Push branch and create PR
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.abort-check.outputs.aborted != 'true'
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
+          FAILING_RUN_ID: ${{ needs.evaluate.outputs.failing_run_id }}
+          FAILED_JOB_NAMES: ${{ needs.evaluate.outputs.failed_job_names }}
+          ATTEMPT: ${{ steps.dedup.outputs.attempt }}
+        run: |
+          BRANCH="autofix/main-${SHORT_SHA}-${ATTEMPT}"
+
+          if [ -f /tmp/autofix-context/ABORT.txt ]; then
+            echo "Claude reported it cannot fix this (not a code bug). Skipping PR."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            cat /tmp/autofix-context/ABORT.txt
+            exit 0
+          fi
+
+          if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "No changes made — Claude could not fix this."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "$(cat <<EOF
+          fix(ci): auto-triage main failure ${SHORT_SHA}
+
+          Automated fix for red main. Failing run:
+          https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}
+
+          Failed jobs: ${FAILED_JOB_NAMES}
+
+          Co-authored-by: Claude <claude@anthropic.com>
+          EOF
+          )"
+
+          git push origin "HEAD:${BRANCH}"
+
+          PR_URL=$(gh pr create \
+            --repo "$GH_REPO" \
+            --base main \
+            --head "$BRANCH" \
+            --title "fix(ci): auto-triage main failure ${SHORT_SHA}" \
+            --label autofix \
+            --body "$(cat <<EOF
+          ## Summary
+
+          Automated fix for red \`main\`. The health monitor detected an unresolved CI failure; the one-shot rerun did not resolve it, so this PR was opened.
+
+          - **Failing SHA:** \`${FAILING_SHA}\`
+          - **Failing run:** https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}
+          - **Failed jobs:** \`${FAILED_JOB_NAMES}\`
+          - **Attempt:** ${ATTEMPT} of 3
+
+          ## Test plan
+
+          - [ ] CI passes (Biome + TypeScript + tests)
+          - [ ] Review the diff — this was auto-generated and will auto-merge on green CI
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code) via Main Autofix
+          EOF
+          )")
+
+          echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_URL: ${{ steps.create-pr.outputs.pr_url }}
+        run: |
+          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge not available (branch protection may not be configured)"
+
+      - name: Slack — PR opened
+        if: steps.create-pr.outputs.has_changes == 'true' && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_URL: ${{ steps.create-pr.outputs.pr_url }}
+          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          ATTEMPT: ${{ steps.dedup.outputs.attempt }}
+        run: |
+          PAYLOAD=$(jq -n --arg url "$PR_URL" --arg sha "$SHORT_SHA" --arg attempt "$ATTEMPT" '{
+            text: "🤖 Main autofix PR opened",
+            attachments: [{
+              color: "warning",
+              fields: [
+                { title: "Failing SHA", value: $sha, short: true },
+                { title: "Attempt", value: ($attempt + " of 3"), short: true },
+                { title: "PR", value: ("<" + $url + "|View PR>"), short: false },
+                { title: "Action", value: "Auto-merge enabled on green CI. No action needed unless diff looks wrong.", short: false }
+              ]
+            }]
+          }')
+          curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+
+      - name: Fallback — mark PR as needs-human if validation failed
+        if: failure() && steps.create-pr.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR to update."
+            exit 0
+          fi
+          gh pr ready --repo "$GH_REPO" "$PR_NUMBER" --undo 2>/dev/null || true
+          gh pr edit --repo "$GH_REPO" "$PR_NUMBER" --add-label "needs-human" 2>/dev/null || true
+          gh pr comment --repo "$GH_REPO" "$PR_NUMBER" --body "## ⚠️ Autofix validation failed
+
+          The automated fix did not pass verify. A human developer needs to review and complete the fix.
+
+          The \`needs-human\` label has been added and auto-merge is disabled (PR converted to draft)." 2>/dev/null || true

@@ -45,7 +45,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-[12px] font-[510] text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-xs font-caption text-tertiary-token'>
         Past
       </span>
     );
@@ -54,19 +54,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-[12px] font-[510] text-amber-600 dark:text-amber-300'>
+        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-xs font-caption text-amber-600 dark:text-amber-300'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-[12px] font-[510] text-red-600 dark:text-red-400'>
+        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-xs font-caption text-red-600 dark:text-red-400'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-[12px] font-[510] text-emerald-600 dark:text-emerald-400'>
+        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-xs font-caption text-emerald-600 dark:text-emerald-400'>
           On Sale
         </span>
       );
@@ -82,11 +82,11 @@ const DateCell = memo(function DateCell({
 }) {
   return (
     <div className='flex flex-col'>
-      <span className='font-[510] text-primary-token'>
+      <span className='font-caption text-primary-token'>
         {formatShortDate(startDate)}
       </span>
       {startTime && (
-        <span className='text-[13px] text-tertiary-token'>{startTime}</span>
+        <span className='text-app text-tertiary-token'>{startTime}</span>
       )}
     </div>
   );
@@ -142,7 +142,7 @@ const TicketsCell = memo(function TicketsCell({
       aria-label='Buy tickets (opens in new tab)'
     >
       <Icon name='Ticket' className='h-4 w-4' aria-hidden='true' />
-      <span className='text-[13px]'>Buy</span>
+      <span className='text-app'>Buy</span>
     </a>
   );
 });
@@ -170,7 +170,7 @@ const SourceCell = memo(function SourceCell({
   const config = PROVIDER_CONFIG[provider];
 
   return (
-    <span className={cn('text-[13px]', config.className)}>{config.label}</span>
+    <span className={cn('text-app', config.className)}>{config.label}</span>
   );
 });
 
@@ -192,7 +192,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-md px-2.5 text-[13px] text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-8 gap-1 rounded-md px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'
@@ -347,14 +347,16 @@ export function TourDatesTable({
       }}
       enableVirtualization={tourDates.length >= 20}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
-      className='text-[13px]'
+      className='text-app'
       emptyState={
         <div className='px-4 py-8'>
-          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-3 py-6 text-center text-[13px] text-secondary-token'>
+          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-3 py-6 text-center text-app text-secondary-token'>
             <Icon name='Calendar' className='h-6 w-6 text-tertiary-token' />
             <div>
-              <div className='font-[510] text-primary-token'>No tour dates</div>
-              <div className='text-[13px]'>
+              <div className='font-caption text-primary-token'>
+                No tour dates
+              </div>
+              <div className='text-app'>
                 Add your first tour date to get started.
               </div>
             </div>
