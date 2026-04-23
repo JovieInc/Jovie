@@ -836,7 +836,7 @@ function MobileTaskScopeTabs({
               )}
             >
               <span>{label}</span>
-              <span className='text-[10px] text-tertiary-token'>
+              <span className='text-3xs text-tertiary-token'>
                 {counts[value]}
               </span>
             </button>
@@ -872,7 +872,7 @@ function MobileTaskSection({
         <h2 className='text-[11px] font-semibold text-tertiary-token'>
           {title}
         </h2>
-        <span className='text-[10px] text-tertiary-token'>{tasks.length}</span>
+        <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
       <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
@@ -967,7 +967,7 @@ function MobileTaskListItem({
           />
         ) : null}
         {task.releaseTitle ? (
-          <span className='text-[10px] font-semibold text-tertiary-token'>
+          <span className='text-3xs font-semibold text-tertiary-token'>
             Release
           </span>
         ) : null}

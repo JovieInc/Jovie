@@ -278,7 +278,7 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='rounded-full border border-transparent px-2 py-0.5 text-[10px] text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
+                  className='rounded-full border border-transparent px-2 py-0.5 text-3xs text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
                 >
                   Copy
                 </button>

@@ -32,7 +32,7 @@ export function ReleaseTaskCategoryGroup({
       >
         <span className='flex items-center gap-1.5'>
           {category}{' '}
-          <span className='text-[10px] text-tertiary-token font-normal'>
+          <span className='text-3xs text-tertiary-token font-normal'>
             ({done}/{total})
           </span>
           {allDone && (

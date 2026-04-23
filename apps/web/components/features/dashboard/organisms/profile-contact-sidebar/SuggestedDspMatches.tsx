@@ -131,7 +131,7 @@ function SectionHeading({ count }: { readonly count: number }) {
         Suggested
       </span>
       {count > 0 && (
-        <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-[10px] font-caption text-tertiary-token'>
+        <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
           {count}
         </span>
       )}

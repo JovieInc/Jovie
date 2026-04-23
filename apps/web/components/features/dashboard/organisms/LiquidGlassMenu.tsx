@@ -368,7 +368,7 @@ export function LiquidGlassMenu({
                 </div>
                 <span
                   className={cn(
-                    'text-[10px] leading-tight',
+                    'text-3xs leading-tight',
                     active ? 'font-semibold' : 'font-caption'
                   )}
                 >
@@ -399,7 +399,7 @@ export function LiquidGlassMenu({
             <MoreHorizontal className='h-5 w-5' aria-hidden='true' />
             <span
               className={cn(
-                'text-[10px] leading-tight',
+                'text-3xs leading-tight',
                 isExpanded ? 'font-semibold' : 'font-caption'
               )}
             >
@@ -416,7 +416,7 @@ export function LiquidGlassMenu({
               className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-[8px] py-1.5 text-tertiary-token transition-all duration-150 hover:text-secondary-token active:scale-95'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
-              <span className='text-[10px] leading-tight font-caption'>
+              <span className='text-3xs leading-tight font-caption'>
                 Search
               </span>
             </button>
