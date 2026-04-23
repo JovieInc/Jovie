@@ -47,7 +47,7 @@ export default async function AdminScreenshotsPage() {
   } catch (err) {
     catalogError =
       err instanceof Error ? err.message : 'Unknown error loading catalog';
-    captureError('Admin screenshots page failed to load catalog', err, {
+    await captureError('Admin screenshots page failed to load catalog', err, {
       route: APP_ROUTES.ADMIN_SCREENSHOTS,
     });
   }
@@ -58,7 +58,7 @@ export default async function AdminScreenshotsPage() {
   const supportingCaptureCount = screenshots.length - canonicalCaptureCount;
 
   const description = catalogError
-    ? `Screenshot catalog is unavailable in this environment (${catalogError}). Check the deploy logs and ensure the catalog directory is bundled.`
+    ? 'Screenshot catalog is unavailable in this environment. Check the deploy logs and ensure the catalog directory is bundled.'
     : `Review ${CANONICAL_SURFACES.length} canonical surfaces across ${canonicalCaptureCount} canonical captures, plus ${supportingCaptureCount} supporting captures from the latest screenshot catalog.`;
 
   return (
