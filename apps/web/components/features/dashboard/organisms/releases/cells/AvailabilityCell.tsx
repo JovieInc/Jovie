@@ -244,7 +244,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
+        className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-[12px] font-caption tracking-[-0.01em] text-primary-token'>
