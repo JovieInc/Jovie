@@ -332,7 +332,7 @@ export function AddReleaseSidebar({
     >
       <DrawerSurfaceCard variant='card' className='overflow-hidden'>
         <div className='space-y-3.5 p-3' data-testid='add-release-details-card'>
-          <p className='text-[11px] font-[560] leading-none tracking-[-0.01em] text-tertiary-token'>
+          <p className='text-2xs font-[560] leading-none tracking-[-0.01em] text-tertiary-token'>
             Details
           </p>
 
@@ -343,7 +343,7 @@ export function AddReleaseSidebar({
               onChange={event => setTitle(event.target.value)}
               placeholder='My New Release'
               autoFocus
-              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-xs'
             />
           </DrawerFormField>
 
@@ -354,7 +354,7 @@ export function AddReleaseSidebar({
             >
               <SelectTrigger
                 id='release-type'
-                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-xs'
               >
                 <SelectValue>{releaseTypeLabel}</SelectValue>
               </SelectTrigger>
@@ -376,7 +376,7 @@ export function AddReleaseSidebar({
                   type='button'
                   variant='outline'
                   className={cn(
-                    'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-[12px] font-normal',
+                    'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-xs font-normal',
                     !releaseDate && 'text-tertiary-token'
                   )}
                 >
@@ -408,7 +408,7 @@ export function AddReleaseSidebar({
                     type='button'
                     variant='outline'
                     className={cn(
-                      'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-[12px] font-normal',
+                      'h-[32px] w-full justify-start gap-2 rounded-[8px] border-subtle bg-surface-0 px-3 text-xs font-normal',
                       !revealDate && 'text-tertiary-token'
                     )}
                   >
@@ -429,7 +429,7 @@ export function AddReleaseSidebar({
                   />
                 </PopoverContent>
               </Popover>
-              <p className='mt-1 text-[11px] text-tertiary-token'>
+              <p className='mt-1 text-2xs text-tertiary-token'>
                 Details hidden until this date (mystery page)
               </p>
             </DrawerFormField>
@@ -442,14 +442,14 @@ export function AddReleaseSidebar({
               trigger={
                 <button
                   type='button'
-                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-[8px] border border-subtle bg-surface-0 px-3 py-1.5 text-left text-[12px] text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
+                  className='flex min-h-[32px] w-full items-center justify-between gap-2 rounded-[8px] border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-150 hover:border-default hover:bg-surface-1'
                 >
                   <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
                     {genres.length > 0 ? (
                       genres.map(genre => (
                         <span
                           key={genre}
-                          className='rounded-full bg-surface-1 px-2 py-0.5 text-[11px] capitalize text-secondary-token'
+                          className='rounded-full bg-surface-1 px-2 py-0.5 text-2xs capitalize text-secondary-token'
                         >
                           {genre}
                         </span>
