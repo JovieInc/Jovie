@@ -1,9 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { syncClerkIdForEmail } from '@/lib/auth/sync-clerk-id';
 
 export const runtime = 'nodejs';
 
@@ -44,14 +42,9 @@ export async function POST() {
     );
   }
 
-  // Check if a DB row exists with this email but a different clerk_id
-  const [existing] = await db
-    .select({ id: users.id, clerkId: users.clerkId })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const outcome = await syncClerkIdForEmail(email, clerkUserId);
 
-  if (!existing) {
+  if (outcome.kind === 'no_db_row') {
     return NextResponse.json(
       {
         success: true,
@@ -61,26 +54,20 @@ export async function POST() {
     );
   }
 
-  if (existing.clerkId === clerkUserId) {
+  if (outcome.kind === 'in_sync') {
     return NextResponse.json(
       { success: true, message: 'Clerk ID already matches', synced: false },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   }
 
-  // Update the DB row to use the current Clerk user ID
-  await db
-    .update(users)
-    .set({ clerkId: clerkUserId, updatedAt: new Date() })
-    .where(eq(users.email, email));
-
   return NextResponse.json(
     {
       success: true,
       message: `Synced clerk_id for ${email}`,
       synced: true,
-      oldClerkId: existing.clerkId,
-      newClerkId: clerkUserId,
+      oldClerkId: outcome.oldClerkId,
+      newClerkId: outcome.newClerkId,
     },
     { status: 200, headers: NO_STORE_HEADERS }
   );
