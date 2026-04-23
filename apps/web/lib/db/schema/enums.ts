@@ -606,3 +606,11 @@ export const referralCommissionStatusEnum = pgEnum(
     'cancelled', // Commission cancelled (e.g., refund/chargeback)
   ]
 );
+
+// Phase 2: viral reel generator
+export const reelJobStatusEnum = pgEnum('reel_job_status', [
+  'queued',
+  'rendering',
+  'succeeded',
+  'failed',
+]);

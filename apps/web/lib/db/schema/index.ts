@@ -596,6 +596,15 @@ export {
   selectPromoDownloadEventSchema,
   selectPromoDownloadSchema,
 } from './promo-downloads';
+// Reel Jobs (Phase 2: viral reel generator)
+export {
+  insertReelJobSchema,
+  type NewReelJob,
+  type ReelJob,
+  type ReelTemplateInputs,
+  reelJobs,
+  selectReelJobSchema,
+} from './reel-jobs';
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,
