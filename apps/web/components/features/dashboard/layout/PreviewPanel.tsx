@@ -496,7 +496,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {visibleLinkCount}
                   </p>
                 </div>
@@ -504,7 +504,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {hiddenLinkCount}
                   </p>
                 </div>
@@ -512,7 +512,7 @@ export function PreviewPanel() {
                   <p className='text-[10.5px] font-medium leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
-                  <p className='tabular-nums text-[18px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+                  <p className='tabular-nums text-lg font-semibold leading-none tracking-[-0.02em] text-primary-token'>
                     {connectedDspCount}
                   </p>
                 </div>

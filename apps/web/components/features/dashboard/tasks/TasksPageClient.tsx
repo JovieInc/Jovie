@@ -764,7 +764,7 @@ function TaskEmptyState({
   return (
     <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
       <div className='space-y-1'>
-        <h2 className='text-[18px] font-semibold tracking-[-0.025em] text-primary-token'>
+        <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
           {hasFilters
             ? 'No tasks match your filters'
             : 'Your task list is empty'}
