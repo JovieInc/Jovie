@@ -47,8 +47,8 @@ export const RESERVED_USERNAMES = [
   'artist-profiles',
 
   // Legal/company pages
-  'about',
-  'contact',
+  'about', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS
+  'contact', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS
   'privacy',
   'terms',
   'legal',
@@ -146,8 +146,8 @@ export const RESERVED_USERNAMES = [
   'jovie',
   'tip',
   'tips',
-  'listen',
-  'share',
+  'listen', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS
+  'share', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS
   'link',
   'links',
   'bio',
