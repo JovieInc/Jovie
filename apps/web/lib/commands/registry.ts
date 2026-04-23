@@ -58,53 +58,60 @@ export type Command = SkillCommand | NavCommand;
  *
  * Scope for JOV-1791: chat-slash only. Nav and cmdk entries arrive with JOV-1792.
  */
+
+const CHAT_SLASH: readonly CommandSurface[] = ['chat-slash'];
+
+function skill(
+  id: ToolSchemaKey,
+  label: string,
+  description: string,
+  iconName: string,
+  entitySlots: readonly EntitySlot[] = []
+): SkillCommand {
+  return {
+    kind: 'skill',
+    id,
+    label,
+    description,
+    iconName,
+    surfaces: CHAT_SLASH,
+    entitySlots,
+  };
+}
+
 export const COMMANDS: readonly Command[] = [
-  {
-    kind: 'skill',
-    id: 'generateAlbumArt',
-    label: 'Generate album art',
-    description: 'Generate three album art options for a release.',
-    iconName: 'Image',
-    surfaces: ['chat-slash'],
-    entitySlots: [{ kind: 'release', required: true }],
-  },
-  {
-    kind: 'skill',
-    id: 'proposeAvatarUpload',
-    label: 'Change profile photo',
-    description: 'Open the profile photo upload widget in chat.',
-    iconName: 'UserCircle',
-    surfaces: ['chat-slash'],
-    entitySlots: [],
-  },
-  {
-    kind: 'skill',
-    id: 'proposeSocialLink',
-    label: 'Add social link',
-    description: 'Add a social profile URL to your artist profile.',
-    iconName: 'Link',
-    surfaces: ['chat-slash'],
-    entitySlots: [],
-  },
-  {
-    kind: 'skill',
-    id: 'proposeSocialLinkRemoval',
-    label: 'Remove social link',
-    description: 'Remove a social link from your artist profile.',
-    iconName: 'Link2Off',
-    surfaces: ['chat-slash'],
-    entitySlots: [],
-  },
-  {
-    kind: 'skill',
-    id: 'submitFeedback',
-    label: 'Send feedback',
-    description: 'Share feedback, report a bug, or request a feature.',
-    iconName: 'MessageSquare',
-    surfaces: ['chat-slash'],
-    entitySlots: [],
-  },
-] as const;
+  skill(
+    'generateAlbumArt',
+    'Generate album art',
+    'Generate three album art options for a release.',
+    'Image',
+    [{ kind: 'release', required: true }]
+  ),
+  skill(
+    'proposeAvatarUpload',
+    'Change profile photo',
+    'Open the profile photo upload widget in chat.',
+    'UserCircle'
+  ),
+  skill(
+    'proposeSocialLink',
+    'Add social link',
+    'Add a social profile URL to your artist profile.',
+    'Link'
+  ),
+  skill(
+    'proposeSocialLinkRemoval',
+    'Remove social link',
+    'Remove a social link from your artist profile.',
+    'Link2Off'
+  ),
+  skill(
+    'submitFeedback',
+    'Send feedback',
+    'Share feedback, report a bug, or request a feature.',
+    'MessageSquare'
+  ),
+];
 
 export function commandsForSurface(surface: CommandSurface): Command[] {
   return COMMANDS.filter(c => c.surfaces.includes(surface));
