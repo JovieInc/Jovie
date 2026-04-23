@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetSessionContext = vi.fn();
@@ -113,6 +113,10 @@ describe('dashboard metadata generation', () => {
     const homePage = await import('@/app/app/(shell)/page');
 
     const result = await homePage.default();
-    expect(result.props.children.type).toBe(DeferredChatPageClient);
+    const children = Children.toArray(result.props.children);
+
+    expect(children.some(child => child.type === DeferredChatPageClient)).toBe(
+      true
+    );
   });
 });
