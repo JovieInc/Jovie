@@ -30,7 +30,7 @@ concurrency:
         && github.sha
         || github.ref
     }}
-  cancel-in-progress: ${{ fromJSON(github.ref != 'refs/heads/main') }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
