@@ -20,6 +20,7 @@
 
 import type { ReactNode } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
+import { logger } from '@/lib/utils/logger';
 
 export interface EntityRef {
   readonly kind: EntityKind;
@@ -57,9 +58,9 @@ const PROVIDERS: Partial<Record<EntityKind, EntityProvider>> = {};
 
 export function registerEntityProvider(provider: EntityProvider): void {
   if (PROVIDERS[provider.kind] && PROVIDERS[provider.kind] !== provider) {
-    console.warn(
+    logger.warn(
       `[commands] Overwriting existing EntityProvider for kind="${provider.kind}". ` +
-        `Double registration suggests a wiring mistake — only one provider per kind should register.`
+        'Double registration suggests a wiring mistake — only one provider per kind should register.'
     );
   }
   PROVIDERS[provider.kind] = provider;
