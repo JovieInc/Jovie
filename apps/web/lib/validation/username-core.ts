@@ -156,7 +156,34 @@ export const RESERVED_USERNAMES = [
   'invites',
   'referral',
   'refer',
+
+  // Public profile mode routes (app/[username]/[mode]/page.tsx).
+  // A creator whose handle matches any of these would be unreachable.
+  'subscribe',
+  'pay',
+  'tour',
+  'releases',
+  'menu',
 ] as const;
+
+/**
+ * Public profile mode tokens that become routed pages at /[username]/[mode].
+ * Must all be present in RESERVED_USERNAMES; enforced by a unit test.
+ */
+export const PROFILE_MODE_RESERVED_TOKENS = [
+  'listen',
+  'subscribe',
+  'pay',
+  'contact',
+  'about',
+  'tour',
+  'releases',
+  'share',
+  'menu',
+] as const;
+
+export type ProfileModeReservedToken =
+  (typeof PROFILE_MODE_RESERVED_TOKENS)[number];
 
 // Set for O(1) lookups
 const RESERVED_SET = new Set(RESERVED_USERNAMES.map(u => u.toLowerCase()));
