@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useTaskToggleMutation } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { GenerateReelButton } from './GenerateReelButton';
 import { MetadataAgentPanel } from './MetadataAgentPanel';
 import { ReleaseTaskChecklist } from './ReleaseTaskChecklist';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
@@ -83,6 +84,8 @@ export function ReleaseTaskPage({
           releaseTitle={releaseTitle}
         />
       ) : null}
+
+      <GenerateReelButton releaseId={releaseId} className='px-4 py-2' />
 
       {/* Up Next section (only when tasks exist and not all done) */}
       {upNextTasks.length > 0 && !allDone && (
