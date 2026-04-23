@@ -642,3 +642,11 @@ export const reelJobStatusEnum = pgEnum('reel_job_status', [
   'succeeded',
   'failed',
 ]);
+
+// Phase 3: content pack (bulk reel generation)
+export const reelPackStatusEnum = pgEnum('reel_pack_status', [
+  'pending',
+  'partial',
+  'complete',
+  'failed',
+]);
