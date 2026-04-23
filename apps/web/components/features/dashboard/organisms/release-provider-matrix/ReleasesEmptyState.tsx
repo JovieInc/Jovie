@@ -63,7 +63,7 @@ export function ReleasesEmptyState({
           <DrawerButton
             tone='secondary'
             onClick={onRetryEnrichment}
-            className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+            className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
           >
             Try again
           </DrawerButton>
@@ -94,7 +94,7 @@ export function ReleasesEmptyState({
           <DrawerButton
             tone='primary'
             onClick={onRetryEnrichment}
-            className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+            className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
           >
             Try again
           </DrawerButton>
@@ -122,7 +122,7 @@ export function ReleasesEmptyState({
       <DrawerButton
         tone='primary'
         onClick={onConnectSpotify}
-        className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+        className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
       >
         Connect Spotify
       </DrawerButton>

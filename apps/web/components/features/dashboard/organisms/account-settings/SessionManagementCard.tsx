@@ -173,7 +173,7 @@ export function SessionManagementCard({
                   size='sm'
                   disabled={endingSessionId === session.id}
                   onClick={() => setSessionToEnd(session)}
-                  className='h-7 shrink-0 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                  className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                 >
                   {endingSessionId === session.id ? 'Ending…' : 'End session'}
                 </Button>

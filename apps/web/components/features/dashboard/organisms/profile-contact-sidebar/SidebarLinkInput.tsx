@@ -179,7 +179,7 @@ export function SidebarLinkInput({
         autoCapitalize='none'
         autoCorrect='off'
         autoComplete='off'
-        className='h-9 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-[13px]'
+        className='h-9 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 text-[13px]'
         aria-label='Add link'
         autoFocus
       />
@@ -210,7 +210,7 @@ export function SidebarLinkInput({
         <button
           type='button'
           onClick={handleAdd}
-          className='mt-2 flex w-full items-center gap-2 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-[13px] transition-colors hover:bg-surface-1'
+          className='mt-2 flex w-full items-center gap-2 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-[13px] transition-colors hover:bg-surface-1'
         >
           <SocialIcon
             platform={detectedLink.platform.icon}

@@ -399,7 +399,7 @@ export function ProfilePrimaryActionCard({
   );
   const artClassName = isShowcase
     ? 'h-14 w-14 rounded-[14px]'
-    : 'h-11 w-11 rounded-[12px]';
+    : 'h-11 w-11 rounded-xl';
   const titleClassName = isShowcase
     ? 'text-[16px] font-[630] tracking-[-0.03em] text-white'
     : 'text-[13px] font-[590] leading-[1.1] text-white/92';

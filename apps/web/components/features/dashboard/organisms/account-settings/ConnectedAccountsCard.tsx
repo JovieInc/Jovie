@@ -111,7 +111,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
               className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
                   <Link2 className='h-4 w-4 text-secondary-token' aria-hidden />
                 </div>
                 <div className='min-w-0'>
@@ -137,7 +137,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 size='sm'
                 disabled={disconnectingId === account.id}
                 onClick={() => setAccountToDisconnect(account)}
-                className='h-7 shrink-0 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
               >
                 <Link2Off className='mr-1.5 h-4 w-4' aria-hidden />
                 {disconnectingId === account.id

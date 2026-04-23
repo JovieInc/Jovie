@@ -81,7 +81,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           )}
           <div
             className={cn(
-              'max-w-[85%] rounded-[12px] px-3 py-2',
+              'max-w-[85%] rounded-xl px-3 py-2',
               message.role === 'user'
                 ? 'bg-accent text-accent-foreground'
                 : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
@@ -302,7 +302,7 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 rounded-[8px] text-[11px] font-[510] tracking-[-0.01em]'
+                      className='mt-2 h-7 gap-1.5 rounded-lg text-[11px] font-[510] tracking-[-0.01em]'
                     >
                       <RefreshCw className='h-3 w-3' />
                       Try again

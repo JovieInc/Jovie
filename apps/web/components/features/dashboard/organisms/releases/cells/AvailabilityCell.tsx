@@ -46,7 +46,7 @@ interface AvailabilityCellProps {
 function AvailabilityEmptyAction() {
   return (
     <div className='flex min-w-[140px] justify-end'>
-      <div className='h-7 w-[76px] rounded-[8px] border border-dashed border-subtle bg-surface-1' />
+      <div className='h-7 w-[76px] rounded-lg border border-dashed border-subtle bg-surface-1' />
     </div>
   );
 }
@@ -244,7 +244,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
+        className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-[12px] font-caption tracking-[-0.01em] text-primary-token'>

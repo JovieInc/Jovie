@@ -125,7 +125,7 @@ export function DspMatchCard({
                   href={externalArtistUrl}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   title={`View on ${PROVIDER_LABELS[providerId]}`}
                 >
                   <Icon name='ExternalLink' className='h-3.5 w-3.5' />
@@ -154,7 +154,7 @@ export function DspMatchCard({
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex h-7 w-full items-center justify-between rounded-[8px] border border-transparent px-2 text-[12px] text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-[12px] text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           >
             <span>Confidence breakdown</span>
             <Icon
@@ -183,7 +183,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[11px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+              className='h-7 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[11px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>
@@ -194,7 +194,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onConfirm(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
+              className='h-7 rounded-lg px-2.5 text-[11px] font-[510]'
             >
               {isConfirming ? 'Confirming...' : 'Confirm Match'}
             </Button>

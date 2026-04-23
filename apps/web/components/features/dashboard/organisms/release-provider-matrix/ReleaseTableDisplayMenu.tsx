@@ -133,7 +133,7 @@ export function ReleaseTableDisplayMenu({
       </TooltipShortcut>
       <PopoverContent
         align='end'
-        className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-popover'
+        className='w-[248px] rounded-xl border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-[13px] font-[510] text-primary-token'>

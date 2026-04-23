@@ -134,7 +134,7 @@ export function UniversalLinkInputUrlMode({
           'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
           isDropdownOpen
             ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
-            : 'rounded-[12px] border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+            : 'rounded-xl border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           disabled && 'opacity-50'
         )}
       >
@@ -240,7 +240,7 @@ export function UniversalLinkInputUrlMode({
         )}
         aria-live='polite'
       >
-        <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2'>
+        <div className='rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2'>
           {dictationState === 'listening' ? (
             <div className='flex items-center gap-2'>
               <button

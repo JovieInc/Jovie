@@ -1724,7 +1724,7 @@ export function OnboardingV2Form({
             ) : null}
 
             <div className='relative'>
-              <div className='flex items-center gap-3 rounded-[22px] border border-subtle bg-surface-1 px-4 py-3'>
+              <div className='flex items-center gap-3 rounded-3xl border border-subtle bg-surface-1 px-4 py-3'>
                 <Music2 className='h-4 w-4 shrink-0 text-tertiary-token' />
                 <input
                   autoCapitalize='none'

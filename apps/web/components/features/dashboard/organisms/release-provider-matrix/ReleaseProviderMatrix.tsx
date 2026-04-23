@@ -1026,7 +1026,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   tone='primary'
                   disabled={isSyncing}
                   onClick={experienceAdapter?.onSync ?? handleSync}
-                  className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
+                  className='h-7 rounded-lg px-2.5 text-[11px] inline-flex items-center gap-2'
                   data-testid='sync-spotify-empty-state'
                 >
                   <Icon
@@ -1042,7 +1042,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 {canCreateManualReleases && (
                   <DrawerButton
                     onClick={handleNewRelease}
-                    className='h-7 rounded-[8px] px-2.5 text-[11px] inline-flex items-center gap-2'
+                    className='h-7 rounded-lg px-2.5 text-[11px] inline-flex items-center gap-2'
                     data-testid='create-release-empty-state'
                   >
                     <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />

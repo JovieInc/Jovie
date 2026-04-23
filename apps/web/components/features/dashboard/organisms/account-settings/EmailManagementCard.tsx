@@ -101,7 +101,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     size='sm'
                     disabled={syncingEmailId === email.id}
                     onClick={() => handleMakePrimary(email)}
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   >
                     {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
                   </Button>
@@ -110,7 +110,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                    className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                     disabled={syncingEmailId === email.id}
                     onClick={() => setEmailToRemove(email)}
                   >
@@ -178,7 +178,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 disabled={
                   emailStatus === 'sending' || emailStatus === 'verifying'
                 }
-                className='h-7 rounded-[8px] px-2.5 text-2xs font-caption'
+                className='h-7 rounded-lg px-2.5 text-2xs font-caption'
               >
                 {emailButtonLabel}
               </Button>
@@ -188,7 +188,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   variant='ghost'
                   size='sm'
                   onClick={resetEmailForm}
-                  className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                 >
                   Cancel
                 </Button>
