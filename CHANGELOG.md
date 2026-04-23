@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.168] - 2026-04-22
+
+> Profile edits through chat now actually show you the confirmation. "Update my bio to..." used to save the bio silently with no assistant reply, making it look like nothing happened. Every deterministic chat action (bio, name, add link, remove link, avatar upload, feedback) now streams back a visible assistant confirmation.
+
+### Fixed
+
+- `apps/web/app/api/chat/route.ts` — deterministic intent replies were returned as plain JSON, which the AI SDK `useChat` client (expecting `text/event-stream` UIMessage chunks) silently dropped. The reply now streams as a `text-delta` chunk via `createUIMessageStream` + `createUIMessageStreamResponse`, so the confirmation renders in the thread and persists to the conversation history.
+
+### Added
+
+- `apps/web/tests/unit/lib/chat/intent-response-sse-stream.test.ts` — regression test asserting deterministic intent responses use `text/event-stream` content type and contain the expected `text-delta` chunk, not plain JSON.
+
 ## [26.4.167] - 2026-04-22
 
 > Clicking "Generate album art" on a release no longer ships a raw JSON blob as your chat message. Release references render as a pill chip in the transcript, readable at a glance. The chip format is the groundwork for the upcoming `/` command menu — any release, artist, or skill will compose into the input as a chip instead of free text.

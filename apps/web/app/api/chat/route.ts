@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
 import * as Sentry from '@sentry/nextjs';
-import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+  tool,
+  type UIMessage,
+} from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -1671,7 +1678,7 @@ async function tryRouteViaIntent(
   userId: string,
   corsHeaders: Record<string, string>,
   requestId: string
-): Promise<NextResponse | null> {
+): Promise<Response | null> {
   const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
   if (!lastUserMsg) return null;
 
@@ -1694,8 +1701,31 @@ async function tryRouteViaIntent(
   });
   if (!result) return null;
 
-  return NextResponse.json(result, {
-    status: result.success ? 200 : 400,
+  // The chat client (AI SDK useChat) expects a UIMessage SSE stream, not plain
+  // JSON. Emit the deterministic reply as a text-only assistant message so the
+  // success/error confirmation renders in the thread.
+  const replyText =
+    typeof result.message === 'string' && result.message.length > 0
+      ? result.message
+      : result.success
+        ? 'Done.'
+        : 'Something went wrong. Please try again.';
+
+  const textId = randomUUID();
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({ type: 'start' });
+      writer.write({ type: 'start-step' });
+      writer.write({ type: 'text-start', id: textId });
+      writer.write({ type: 'text-delta', id: textId, delta: replyText });
+      writer.write({ type: 'text-end', id: textId });
+      writer.write({ type: 'finish-step' });
+      writer.write({ type: 'finish' });
+    },
+  });
+
+  return createUIMessageStreamResponse({
+    stream,
     headers: {
       ...corsHeaders,
       'x-request-id': requestId,
