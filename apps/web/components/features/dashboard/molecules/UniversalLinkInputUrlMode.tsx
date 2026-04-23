@@ -240,7 +240,7 @@ export function UniversalLinkInputUrlMode({
         )}
         aria-live='polite'
       >
-        <div className='rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2'>
+        <div className='rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'>
           {dictationState === 'listening' ? (
             <div className='flex items-center gap-2'>
               <button
