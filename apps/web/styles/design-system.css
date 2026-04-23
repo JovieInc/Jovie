@@ -872,6 +872,8 @@
 
   /* Type scale - based on 16px base
      KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
+  --text-3xs: 0.625rem;
+  /* 10px — micro labels, legal */
   --text-2xs: 0.6875rem;
   /* 11px — tiny labels, badges */
   --text-xs: 0.75rem;
