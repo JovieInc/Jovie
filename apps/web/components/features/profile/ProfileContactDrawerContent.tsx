@@ -35,7 +35,7 @@ function TerritoryPills({
         <PopoverTrigger asChild>
           <button
             type='button'
-            className='inline-flex h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-[11px] font-[560] text-white/58 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+            className='inline-flex h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-[11px] font-semibold text-white/58 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
             aria-label={`Show all territories for ${contact.roleLabel}`}
           >
             +{territories.length - 1}
@@ -46,14 +46,14 @@ function TerritoryPills({
           align='start'
           className='w-auto min-w-[180px] rounded-[18px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
         >
-          <p className='text-[11px] font-[560] tracking-[0.08em] text-white/42'>
+          <p className='text-[11px] font-semibold tracking-[0.08em] text-white/42'>
             Territories
           </p>
           <div className='mt-2 flex flex-wrap gap-1.5'>
             {territories.map(territory => (
               <span
                 key={territory}
-                className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] font-[520] text-white/72'
+                className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] font-caption text-white/72'
               >
                 {territory}
               </span>
@@ -101,13 +101,13 @@ export function ProfileContactDrawerContent({
           >
             <div className='flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left'>
               <div className='flex flex-wrap items-center gap-2'>
-                <span className='text-[14px] font-[500] text-white/90'>
+                <span className='text-[14px] font-medium text-white/90'>
                   {contact.roleLabel}
                 </span>
                 <TerritoryPills contact={contact} />
               </div>
               {metadata ? (
-                <span className='truncate text-[11px] font-[430] leading-[1.2] text-white/50'>
+                <span className='truncate text-[11px] font-book leading-[1.2] text-white/50'>
                   {metadata}
                 </span>
               ) : null}
