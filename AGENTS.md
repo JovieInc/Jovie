@@ -211,8 +211,9 @@ pnpm typecheck              # Type check all packages
 
 # Database (web app specific)
 pnpm --filter web drizzle:generate   # Generate migrations
-pnpm run db:web:migrate             # Apply migrations with pinned Doppler scope
+pnpm run db:web:migrate             # Apply migrations (auto-syncs dev clerk_ids after)
 pnpm run db:web:studio              # Open Drizzle Studio with pinned Doppler scope
+pnpm run db:web:sync-clerk          # Re-sync dev clerk_ids (run after a Neon branch reset from parent)
 ```
 
 ---
