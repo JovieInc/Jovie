@@ -17,8 +17,20 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # On main, scope the concurrency group per-commit so rapid merges cannot
+  # cancel each other's deploy pipelines. GitHub evaluates cancel-in-progress
+  # expressions as strings and treats "false" as truthy, which was cancelling
+  # every main CI run when the next merge landed and starving production
+  # promotion. Using github.sha in the group on main sidesteps the issue
+  # entirely. PRs and merge_group runs still share a group per ref so stale
+  # runs are superseded as usual.
+  group: >-
+    ci-${{ github.workflow }}-${{
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        && github.sha
+        || github.ref
+    }}
+  cancel-in-progress: ${{ fromJSON(github.ref != 'refs/heads/main') }}
 
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
