@@ -179,12 +179,9 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <span className='homepage-hero-eyebrow inline-flex items-center gap-2 self-center rounded-full border border-white/15 bg-white/[0.08] py-1 pl-3 pr-3 text-[11.5px] font-medium text-white/85 backdrop-blur-xl'>
-        {HERO_COPY.eyebrow.text}
-      </span>
       <h1
         id='home-hero-heading'
-        className='homepage-hero-headline mt-7 self-center text-center text-white sm:mt-8'
+        className='homepage-hero-headline self-center text-center text-white'
       >
         {HERO_COPY.headline}
       </h1>
