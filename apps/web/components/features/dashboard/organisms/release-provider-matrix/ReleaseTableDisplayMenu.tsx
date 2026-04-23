@@ -42,7 +42,7 @@ function ReleaseViewSegmentedControl({
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='min-h-[34px] px-3 py-1.5 text-[12px]'
+      triggerClassName='min-h-[34px] px-3 py-1.5 text-xs'
       aria-label='Choose releases view'
     />
   );
@@ -65,9 +65,7 @@ function ToggleSwitch({
       onClick={onToggle}
       className='flex w-full items-center justify-between gap-2 rounded-full px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
     >
-      <span className='text-[12px] font-[510] text-secondary-token'>
-        {label}
-      </span>
+      <span className='text-xs font-[510] text-secondary-token'>{label}</span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
@@ -136,7 +134,7 @@ export function ReleaseTableDisplayMenu({
         className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-[510] text-primary-token'>
+          <span className='text-app font-[510] text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close asChild>
@@ -161,7 +159,7 @@ export function ReleaseTableDisplayMenu({
 
         {onGroupByYearChange && (
           <div className='border-b border-subtle px-3 py-1.5'>
-            <p className='px-1 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
+            <p className='px-1 pb-1 text-app font-[510] tracking-normal text-secondary-token'>
               List options
             </p>
             <ToggleSwitch
