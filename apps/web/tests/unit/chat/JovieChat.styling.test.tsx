@@ -51,6 +51,15 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       setChatError: vi.fn(),
       isRateLimited: false,
       stop: vi.fn(),
+      chipTray: {
+        chips: [],
+        addSkill: vi.fn(),
+        addEntity: vi.fn(),
+        removeAt: vi.fn(),
+        removeLast: vi.fn(),
+        clear: vi.fn(),
+        serialized: '',
+      },
     }),
     useChatImageAttachments: () => ({
       pendingImages: [],
