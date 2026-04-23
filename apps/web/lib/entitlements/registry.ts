@@ -54,7 +54,10 @@ export type NumericEntitlement =
   | 'contactsLimit'
   | 'smartLinksLimit'
   | 'aiDailyMessageLimit'
-  | 'aiPitchGenPerRelease';
+  | 'aiPitchGenPerRelease'
+  | 'aiBudgetCents';
+
+export type AiBudgetPeriod = 'monthly' | 'trial_lifetime' | 'none';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -68,6 +71,12 @@ export interface PlanEntitlements {
     smartLinksLimit: number | null;
     aiDailyMessageLimit: number;
     aiPitchGenPerRelease: number | null;
+    /**
+     * Agent AI spend budget in cents. 0 = no agent access.
+     * Applied per the `aiBudgetPeriod` window.
+     */
+    aiBudgetCents: number;
+    aiBudgetPeriod: AiBudgetPeriod;
   };
   marketing: {
     displayName: string;
@@ -116,6 +125,8 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   smartLinksLimit: null,
   aiDailyMessageLimit: 100,
   aiPitchGenPerRelease: 5,
+  aiBudgetCents: 1000, // $10/month
+  aiBudgetPeriod: 'monthly',
 };
 
 const PRO_FEATURES: readonly string[] = [
@@ -180,6 +191,8 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 10,
       aiPitchGenPerRelease: 1,
+      aiBudgetCents: 0,
+      aiBudgetPeriod: 'none',
     },
     marketing: {
       displayName: 'Free',
@@ -258,6 +271,8 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
+      aiBudgetCents: 4000, // $40/month
+      aiBudgetPeriod: 'monthly',
     },
     marketing: {
       displayName: 'Max',
@@ -294,6 +309,8 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       smartLinksLimit: null,
       aiDailyMessageLimit: 25,
       aiPitchGenPerRelease: 3,
+      aiBudgetCents: 100, // $1 trial-lifetime — enough for a "whoa" moment
+      aiBudgetPeriod: 'trial_lifetime',
     },
     marketing: {
       displayName: 'Pro Trial',
@@ -593,4 +610,16 @@ export function getPlanDisplayName(plan: string | null | undefined): string {
 /** All valid plan IDs. */
 export function getAllPlanIds(): readonly PlanId[] {
   return PLAN_IDS;
+}
+
+/** AI agent spend budget for a plan, in cents. */
+export function getAiBudgetCents(plan: string | null | undefined): number {
+  return getEntitlements(plan).limits.aiBudgetCents;
+}
+
+/** Window over which the AI budget applies. */
+export function getAiBudgetPeriod(
+  plan: string | null | undefined
+): AiBudgetPeriod {
+  return getEntitlements(plan).limits.aiBudgetPeriod;
 }
