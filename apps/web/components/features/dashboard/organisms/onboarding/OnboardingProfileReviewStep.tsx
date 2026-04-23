@@ -409,7 +409,7 @@ export function OnboardingProfileReviewStep({
                           maxLength={50}
                           className={cn(
                             AUTH_SURFACE.fieldInput,
-                            'text-center text-[15px] font-[590]'
+                            'text-center text-[15px] font-semibold'
                           )}
                           aria-label='Edit display name'
                         />
@@ -426,7 +426,7 @@ export function OnboardingProfileReviewStep({
                         className='group cursor-pointer'
                         aria-label='Edit display name'
                       >
-                        <span className='text-[16px] font-[590] text-primary-token transition-colors group-hover:text-accent'>
+                        <span className='text-[16px] font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
                         </span>
                       </button>
