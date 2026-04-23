@@ -47,6 +47,7 @@ import {
 } from './profile-drawer-classes';
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
+import { PROFILE_VIEW_REGISTRY } from './views/registry';
 
 export type DrawerView =
   | 'menu'
@@ -59,51 +60,6 @@ export type DrawerView =
   | 'pay'
   | 'tour'
   | 'releases';
-
-interface DrawerMeta {
-  readonly title: string;
-  readonly subtitle?: string;
-}
-
-const VIEW_META: Record<DrawerView, DrawerMeta> = {
-  menu: { title: 'Menu' },
-  share: {
-    title: 'Share',
-    subtitle: 'Share this profile',
-  },
-  notifications: {
-    title: 'Notifications',
-    subtitle: 'Choose what you hear about.',
-  },
-  about: {
-    title: 'About',
-    subtitle: 'Profile details, genres, and press assets.',
-  },
-  listen: {
-    title: 'Listen',
-    subtitle: 'Stream or download on your favorite platform.',
-  },
-  subscribe: {
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
-  },
-  contact: {
-    title: 'Contact',
-    subtitle: 'Management, booking, press, and more.',
-  },
-  pay: {
-    title: 'Pay',
-    subtitle: 'Send support instantly with Venmo.',
-  },
-  tour: {
-    title: 'Tour Dates',
-    subtitle: 'Upcoming shows and ticket links.',
-  },
-  releases: {
-    title: 'Releases',
-    subtitle: 'Discography',
-  },
-};
 
 interface ProfileUnifiedDrawerProps {
   readonly open: boolean;
@@ -405,7 +361,7 @@ export function ProfileUnifiedDrawer({
   const meta =
     view === 'releases' && canOpenReleasesDrawer
       ? { title: 'Releases', subtitle: releasesSubtitle }
-      : VIEW_META[view === 'releases' ? 'menu' : view];
+      : PROFILE_VIEW_REGISTRY[view === 'releases' ? 'menu' : view];
   const renderedView =
     view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
 
