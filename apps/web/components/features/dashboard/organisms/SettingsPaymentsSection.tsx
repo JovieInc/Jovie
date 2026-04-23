@@ -153,7 +153,7 @@ export function SettingsPaymentsSection() {
         }
       />,
       error ? (
-        <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+        <p className='text-app leading-[18px] text-destructive'>{error}</p>
       ) : undefined
     );
   }
@@ -192,7 +192,7 @@ export function SettingsPaymentsSection() {
         }
       />,
       error ? (
-        <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+        <p className='text-app leading-[18px] text-destructive'>{error}</p>
       ) : undefined
     );
   }
@@ -223,7 +223,7 @@ export function SettingsPaymentsSection() {
       }
     />,
     error ? (
-      <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+      <p className='text-app leading-[18px] text-destructive'>{error}</p>
     ) : undefined
   );
 }
