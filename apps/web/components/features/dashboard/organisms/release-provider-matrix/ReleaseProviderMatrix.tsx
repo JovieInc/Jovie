@@ -1016,7 +1016,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <h3 className='text-[13px] font-[510] text-primary-token'>
                 No releases yet
               </h3>
-              <p className='mt-0.5 max-w-sm text-[12px] leading-[17px] text-secondary-token'>
+              <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
                 {canCreateManualReleases
                   ? 'Sync from Spotify or create one manually to start generating smart links.'
                   : 'Sync from Spotify to start generating smart links.'}

@@ -203,7 +203,7 @@ export function ReleaseTable({
     return (
       <Suspense
         fallback={
-          <div className='px-4 py-3 text-[12px] text-secondary-token'>
+          <div className='px-4 py-3 text-xs text-secondary-token'>
             Loading releases...
           </div>
         }

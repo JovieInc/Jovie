@@ -293,7 +293,7 @@ export function PreviewPanel() {
         Live preview
       </p>
       <div className='flex min-w-0 items-center gap-1.5'>
-        <span className='truncate text-[12px] font-semibold tracking-[-0.01em] text-primary-token'>
+        <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
           {displayName || username || 'Profile'}
         </span>
         {username && displayName !== username && (
@@ -383,7 +383,7 @@ export function PreviewPanel() {
               <Button
                 asChild
                 variant='primary'
-                className='h-9 w-full rounded-[10px] text-[12px] font-caption tracking-[-0.01em]'
+                className='h-9 w-full rounded-[10px] text-xs font-caption tracking-[-0.01em]'
               >
                 <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
                   <ExternalLink
