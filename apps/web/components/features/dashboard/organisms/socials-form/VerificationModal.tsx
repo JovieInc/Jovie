@@ -96,7 +96,7 @@ export function VerificationModal({
           >
             <CheckCircle2 className='h-5 w-5 text-success shrink-0' />
             <div>
-              <p className='text-[13px] font-[510] text-success'>
+              <p className='text-app font-[510] text-success'>
                 Domain verified!
               </p>
               <p className='mt-0.5 text-xs text-secondary-token'>
@@ -107,7 +107,7 @@ export function VerificationModal({
         ) : (
           <div className='space-y-5'>
             {/* Step-by-step instructions */}
-            <ol className='list-inside list-decimal space-y-3 text-[13px] text-secondary-token'>
+            <ol className='list-inside list-decimal space-y-3 text-app text-secondary-token'>
               <li>
                 Log in to your domain provider (DNS host) for{' '}
                 <strong className='text-primary-token'>{hostname}</strong>
@@ -129,7 +129,7 @@ export function VerificationModal({
 
             {/* Token display with copy */}
             <div className='space-y-2'>
-              <span className='text-[13px] font-[510] text-secondary-token'>
+              <span className='text-app font-[510] text-secondary-token'>
                 TXT Record Value
               </span>
               <div className='flex items-center gap-2'>
@@ -170,7 +170,7 @@ export function VerificationModal({
               <button
                 type='button'
                 onClick={() => setShowProviders(prev => !prev)}
-                className='flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                className='flex w-full items-center justify-between px-3 py-2.5 text-app font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 aria-expanded={showProviders}
                 data-testid='provider-tips-toggle'
               >
@@ -216,7 +216,7 @@ export function VerificationModal({
                 data-testid='verification-error'
               >
                 <AlertCircle className='h-4 w-4 text-error shrink-0 mt-0.5' />
-                <p className='text-[13px] text-error'>{displayError}</p>
+                <p className='text-app text-error'>{displayError}</p>
               </ContentSurfaceCard>
             )}
 
