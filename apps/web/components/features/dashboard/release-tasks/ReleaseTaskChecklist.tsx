@@ -1,7 +1,12 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useReleaseSkillClustersQuery,
+  useReleaseTaskCatalogQuery,
+} from '@/lib/queries/useReleaseCatalogQuery';
 import {
   useInstantiateTasksMutation,
   useTaskToggleMutation,
@@ -10,12 +15,26 @@ import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { cn } from '@/lib/utils';
 import { toDateOnlySafe } from '@/lib/utils/date';
+import { ClusterFilterChips } from './ClusterFilterChips';
 import { ReleaseTaskCategoryGroup } from './ReleaseTaskCategoryGroup';
 import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
 import { ReleaseTaskEmptyState } from './ReleaseTaskEmptyState';
 import { ReleaseTaskPastReleaseState } from './ReleaseTaskPastReleaseState';
 import { ReleaseTaskProgressBar } from './ReleaseTaskProgressBar';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
+
+const CatalogTaskBuilderDialog = lazy(() =>
+  import('./CatalogTaskBuilderDialog').then(m => ({
+    default: m.CatalogTaskBuilderDialog,
+  }))
+);
+
+function readTaskMetadataSlug(
+  metadata: Record<string, unknown> | null
+): string | null {
+  const v = metadata?.catalogSlug;
+  return typeof v === 'string' ? v : null;
+}
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -98,9 +117,55 @@ export function ReleaseTaskChecklist({
     }
   }, [tasks]);
 
+  const [selectedClusterSlugs, setSelectedClusterSlugs] = useState<
+    readonly string[]
+  >([]);
+  const [catalogDialogOpen, setCatalogDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: clustersData } = useReleaseSkillClustersQuery();
+  const { data: catalogData } = useReleaseTaskCatalogQuery();
+
+  const catalogSlugToClusterId = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const row of catalogData ?? []) m.set(row.slug, row.clusterId ?? null);
+    return m;
+  }, [catalogData]);
+
+  const clusterSlugToId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of clustersData ?? []) m.set(c.slug, c.id);
+    return m;
+  }, [clustersData]);
+
+  const filteredTasks = useMemo(() => {
+    if (!tasks) return tasks;
+    if (selectedClusterSlugs.length === 0) return tasks;
+    const wantedClusterIds = new Set(
+      selectedClusterSlugs
+        .map(s => clusterSlugToId.get(s))
+        .filter((v): v is number => typeof v === 'number')
+    );
+    return tasks.filter(task => {
+      const slug = readTaskMetadataSlug(task.metadata);
+      if (!slug) return true;
+      const cid = catalogSlugToClusterId.get(slug) ?? null;
+      return cid !== null && wantedClusterIds.has(cid);
+    });
+  }, [tasks, selectedClusterSlugs, clusterSlugToId, catalogSlugToClusterId]);
+
+  const alreadyAddedSlugs = useMemo(() => {
+    if (!tasks) return [] as string[];
+    const out: string[] = [];
+    for (const t of tasks) {
+      const s = readTaskMetadataSlug(t.metadata);
+      if (s) out.push(s);
+    }
+    return out;
+  }, [tasks]);
+
   const groups = useMemo(
-    () => (tasks ? groupByCategory(tasks) : new Map()),
-    [tasks]
+    () => (filteredTasks ? groupByCategory(filteredTasks) : new Map()),
+    [filteredTasks]
   );
 
   const totalDone = tasks?.filter(t => t.status === 'done').length ?? 0;
@@ -184,6 +249,16 @@ export function ReleaseTaskChecklist({
           overdueCount={overdueCount}
           className='flex-1'
         />
+        {!isCompact && (clustersData?.length ?? 0) > 0 && (
+          <button
+            type='button'
+            onClick={() => setCatalogDialogOpen(true)}
+            className='flex-shrink-0 text-xs text-muted-foreground hover:text-foreground'
+            data-testid='open-catalog-builder'
+          >
+            Add from catalog
+          </button>
+        )}
         {variant === 'compact' && onNavigateToFullPage && (
           <button
             type='button'
@@ -194,6 +269,32 @@ export function ReleaseTaskChecklist({
           </button>
         )}
       </motion.div>
+
+      {!isCompact && (clustersData?.length ?? 0) > 0 && (
+        <ClusterFilterChips
+          clusters={clustersData ?? []}
+          selectedSlugs={selectedClusterSlugs}
+          onChange={setSelectedClusterSlugs}
+        />
+      )}
+
+      {!isCompact && catalogDialogOpen && (
+        <Suspense fallback={null}>
+          <CatalogTaskBuilderDialog
+            open
+            releaseId={releaseId}
+            catalog={catalogData ?? []}
+            clusters={clustersData ?? []}
+            alreadyAddedSlugs={alreadyAddedSlugs}
+            onClose={() => setCatalogDialogOpen(false)}
+            onAdded={() =>
+              queryClient.invalidateQueries({
+                queryKey: ['release-tasks', releaseId],
+              })
+            }
+          />
+        </Suspense>
+      )}
 
       {/* Category groups */}
       <div

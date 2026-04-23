@@ -18,6 +18,7 @@ import {
   deleteRelease,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
+import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -38,6 +39,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
+import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
 import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
@@ -112,9 +114,9 @@ const SmartLinkGateBanner = lazy(() =>
   }))
 );
 
-const ReleasePlanPromptDialog = lazy(() =>
-  import('./ReleasePlanPromptDialog').then(m => ({
-    default: m.ReleasePlanPromptDialog,
+const ReleasePlanWizard = lazy(() =>
+  import('./ReleasePlanWizard').then(m => ({
+    default: m.ReleasePlanWizard,
   }))
 );
 
@@ -526,32 +528,41 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setPostCreateRelease(null);
   }, [isGeneratingReleasePlan]);
 
-  const handleGenerateReleasePlan = useCallback(async () => {
-    if (!postCreateRelease || isGeneratingReleasePlan) {
-      return;
-    }
+  const handleGenerateReleasePlan = useCallback(
+    async (ctx?: ReleaseContext) => {
+      if (!postCreateRelease || isGeneratingReleasePlan) {
+        return;
+      }
 
-    setIsGeneratingReleasePlan(true);
-    try {
-      await instantiateReleaseTasks(postCreateRelease.id);
-      const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-        '[releaseId]',
-        postCreateRelease.id
-      );
-      setIsPostCreatePlanModalOpen(false);
-      setPostCreateRelease(null);
-      router.push(releaseTasksPath);
-    } catch (error) {
-      captureError('Failed to generate release plan', error, {
-        context: 'release-provider-matrix',
-        releaseId: postCreateRelease.id,
-        action: 'generate-release-plan',
-      });
-      toast.error('Failed to generate the release plan. Try again.');
-    } finally {
-      setIsGeneratingReleasePlan(false);
-    }
-  }, [isGeneratingReleasePlan, postCreateRelease, router]);
+      setIsGeneratingReleasePlan(true);
+      try {
+        if (ctx) {
+          await instantiateReleaseTasksFromCatalog(postCreateRelease.id, ctx);
+        } else {
+          // Fallback: legacy default-template path (used only if the wizard
+          // is bypassed).
+          await instantiateReleaseTasks(postCreateRelease.id);
+        }
+        const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+          '[releaseId]',
+          postCreateRelease.id
+        );
+        setIsPostCreatePlanModalOpen(false);
+        setPostCreateRelease(null);
+        router.push(releaseTasksPath);
+      } catch (error) {
+        captureError('Failed to generate release plan', error, {
+          context: 'release-provider-matrix',
+          releaseId: postCreateRelease.id,
+          action: 'generate-release-plan',
+        });
+        toast.error('Failed to generate the release plan. Try again.');
+      } finally {
+        setIsGeneratingReleasePlan(false);
+      }
+    },
+    [isGeneratingReleasePlan, postCreateRelease, router]
+  );
 
   // Wrap openEditor to clear add-release state (prevents zombie drawer resurrection)
   const handleOpenEditor = useCallback(
@@ -1099,14 +1110,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         }
       >
         {isPostCreatePlanModalOpen && postCreateRelease !== null ? (
-          <ReleasePlanPromptDialog
+          <ReleasePlanWizard
             open
             releaseTitle={postCreateRelease.title}
             isGateLoading={isReleasePlanGateLoading}
             canGenerateReleasePlans={canGenerateReleasePlans}
             isGeneratingReleasePlan={isGeneratingReleasePlan}
             onClose={closePostCreatePlanModal}
-            onGenerateReleasePlan={handleGenerateReleasePlan}
+            onSubmit={handleGenerateReleasePlan}
           />
         ) : null}
       </Suspense>

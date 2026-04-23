@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,6 +6,11 @@ import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 
 vi.mock('@/lib/queries/useReleaseTasksQuery', () => ({
   useReleaseTasksQuery: vi.fn(),
+}));
+
+vi.mock('@/lib/queries/useReleaseCatalogQuery', () => ({
+  useReleaseTaskCatalogQuery: vi.fn(() => ({ data: [] })),
+  useReleaseSkillClustersQuery: vi.fn(() => ({ data: [] })),
 }));
 
 vi.mock('@/lib/queries/useReleaseTaskMutations', () => ({
@@ -16,6 +22,13 @@ vi.mock('@/lib/queries/useReleaseTaskMutations', () => ({
     mutate: vi.fn(),
   })),
 }));
+
+function withQueryClient(ui: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
 
 vi.mock(
   '@/components/features/dashboard/release-tasks/ReleaseTaskCategoryGroup',
@@ -124,9 +137,11 @@ describe('ReleaseTaskChecklist', () => {
     } as ReturnType<typeof useReleaseTasksQuery>);
 
     render(
-      <div className='h-80'>
-        <ReleaseTaskChecklist releaseId='release_1' variant='compact' />
-      </div>
+      withQueryClient(
+        <div className='h-80'>
+          <ReleaseTaskChecklist releaseId='release_1' variant='compact' />
+        </div>
+      )
     );
 
     const scrollRegion = screen.getByTestId(
@@ -145,7 +160,11 @@ describe('ReleaseTaskChecklist', () => {
       isLoading: false,
     } as ReturnType<typeof useReleaseTasksQuery>);
 
-    render(<ReleaseTaskChecklist releaseId='release_1' variant='full' />);
+    render(
+      withQueryClient(
+        <ReleaseTaskChecklist releaseId='release_1' variant='full' />
+      )
+    );
 
     expect(
       screen.queryByTestId('release-task-checklist-scroll-region')
