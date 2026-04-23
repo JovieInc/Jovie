@@ -186,7 +186,7 @@ function RankedList({
         {[1, 2, 3, 4, 5].map(i => (
           <li
             key={i}
-            className='flex h-9 items-center justify-between rounded-[8px] px-2.5'
+            className='flex h-9 items-center justify-between rounded-lg px-2.5'
           >
             <div className='flex items-center gap-2'>
               <LoadingSkeleton height='h-3' width='w-3' rounded='sm' />
@@ -213,7 +213,7 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-9 items-center justify-between rounded-[8px] px-2.5 transition-colors hover:bg-surface-1'
+          className='group flex h-9 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
             <span className='w-3 text-[11px] font-caption text-tertiary-token tabular-nums'>

@@ -3,8 +3,10 @@ import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { APP_ROUTES } from '@/constants/routes';
 import { getScreenshots } from '@/lib/admin/screenshots';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
+import { captureError } from '@/lib/error-tracking';
 
 const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
 
@@ -38,16 +40,31 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminScreenshotsPage() {
-  const screenshots = await getScreenshots();
+  let screenshots: Awaited<ReturnType<typeof getScreenshots>> = [];
+  let catalogError: string | undefined;
+  try {
+    screenshots = await getScreenshots();
+  } catch (err) {
+    catalogError =
+      err instanceof Error ? err.message : 'Unknown error loading catalog';
+    await captureError('Admin screenshots page failed to load catalog', err, {
+      route: APP_ROUTES.ADMIN_SCREENSHOTS,
+    });
+  }
+
   const canonicalCaptureCount = screenshots.filter(
     screenshot => screenshot.canonicalSurfaceId !== undefined
   ).length;
   const supportingCaptureCount = screenshots.length - canonicalCaptureCount;
 
+  const description = catalogError
+    ? 'Screenshot catalog is unavailable in this environment. Check the deploy logs and ensure the catalog directory is bundled.'
+    : `Review ${CANONICAL_SURFACES.length} canonical surfaces across ${canonicalCaptureCount} canonical captures, plus ${supportingCaptureCount} supporting captures from the latest screenshot catalog.`;
+
   return (
     <AdminToolPage
       title='Screenshots'
-      description={`Review ${CANONICAL_SURFACES.length} canonical surfaces across ${canonicalCaptureCount} canonical captures, plus ${supportingCaptureCount} supporting captures from the latest screenshot catalog.`}
+      description={description}
       testId='admin-screenshots-page'
     >
       <ScreenshotGallery screenshots={screenshots} />

@@ -33,7 +33,7 @@ const MetaHeaderCell = () => (
 
 function TrackRowsLoadingRow() {
   return (
-    <div className='rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-[11px] text-tertiary-token'>
+    <div className='rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-[11px] text-tertiary-token'>
       Loading tracks...
     </div>
   );

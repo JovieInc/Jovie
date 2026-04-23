@@ -2,6 +2,17 @@
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
+import {
+  CreditCard,
+  FileText,
+  HelpCircle,
+  Keyboard,
+  LogOut,
+  MessageSquare,
+  Settings,
+  Shield,
+  Sparkles,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback } from 'react';
 import { Badge } from '@/components/atoms/Badge';
@@ -114,6 +125,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'settings',
       label: 'Settings',
+      icon: Settings,
       onClick: handleSettings,
       shortcut: 'G S',
     },
@@ -127,6 +139,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
+      icon: Keyboard,
       onClick: handleOpenShortcuts,
       shortcut: `${GLYPH_CMD} /`,
     });
@@ -138,6 +151,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'privacy-policy',
       label: 'Privacy Policy',
+      icon: Shield,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_PRIVACY, '_blank', 'noopener,noreferrer'),
     },
@@ -145,6 +159,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms of Service',
+      icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
     },
@@ -152,6 +167,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
+      icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
     }
@@ -169,6 +185,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-settings',
       label: 'Cookie Settings',
+      icon: Settings,
       onClick: () =>
         globalThis.dispatchEvent(new CustomEvent('jv:cookie:open')),
     });
@@ -178,6 +195,7 @@ function buildDropdownItems({
     type: 'submenu',
     id: 'learn-more',
     label: 'Learn more',
+    icon: HelpCircle,
     items: learnMoreItems,
   };
   items.push(learnMoreSubmenu);
@@ -201,6 +219,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'manage-billing',
       label: loading.manageBilling ? 'Opening…' : 'Manage billing',
+      icon: CreditCard,
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -210,6 +229,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'upgrade',
       label: loading.upgrade ? 'Opening…' : upgradeLabel,
+      icon: Sparkles,
       onClick: handleUpgrade,
       disabled: loading.upgrade,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -222,6 +242,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'feedback',
       label: 'Send feedback',
+      icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
     },
     { type: 'separator', id: 'sep-2' },
@@ -229,6 +250,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'sign-out',
       label: loading.signOut ? 'Signing out…' : 'Sign out',
+      icon: LogOut,
       onClick: handleSignOut,
       disabled: loading.signOut,
       className: 'disabled:cursor-not-allowed disabled:opacity-60',

@@ -208,7 +208,7 @@ function evaluate(
       const inner = evaluate(predicate.rule, ctx);
       return {
         matched: !inner.matched,
-        reasons: !inner.matched ? ['not'] : [],
+        reasons: inner.matched ? [] : ['not'],
       };
     }
   }

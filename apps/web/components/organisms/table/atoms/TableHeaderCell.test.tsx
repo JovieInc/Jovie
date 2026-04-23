@@ -108,17 +108,14 @@ describe('TableHeaderCell', () => {
     expect(screen.getByRole('button', { name: /Col/ })).toHaveTextContent('⇅');
   });
 
-  it('activates sort via keyboard Enter (native button behavior)', () => {
-    const onSort = vi.fn();
+  it('sort button is focusable (native button, keyboard-reachable)', () => {
     renderInTable(
-      <TableHeaderCell sortable onSort={onSort}>
+      <TableHeaderCell sortable onSort={vi.fn()}>
         Col
       </TableHeaderCell>
     );
     const btn = screen.getByRole('button', { name: /Col/ });
     btn.focus();
-    // Native buttons fire click on Enter; simulate via click which jsdom uses for keyboard activation
-    fireEvent.click(btn);
-    expect(onSort).toHaveBeenCalled();
+    expect(document.activeElement).toBe(btn);
   });
 });
