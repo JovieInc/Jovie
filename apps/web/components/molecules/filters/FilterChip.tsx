@@ -21,8 +21,8 @@ export function FilterChip({
     <button
       type='button'
       onClick={onClick}
-      aria-pressed={pressed}
       {...rest}
+      aria-pressed={pressed}
       className={cn(
         'rounded-full border px-2.5 py-1 text-xs transition-colors',
         pressed
