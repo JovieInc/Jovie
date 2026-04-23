@@ -64,11 +64,11 @@ export function DspPresenceCard({
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-[13px] font-[510] text-primary-token'>
+                <span className='truncate text-app font-[510] text-primary-token'>
                   {item.externalArtistName ?? 'Unknown Artist'}
                 </span>
               </div>
-              <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
+              <div className='mt-0.5 flex items-center gap-1.5 text-xs text-tertiary-token'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
                 <span>{label}</span>
               </div>
@@ -80,7 +80,7 @@ export function DspPresenceCard({
           </div>
         </div>
 
-        <div className='flex min-h-5 items-center gap-2.5 text-[12px] text-tertiary-token'>
+        <div className='flex min-h-5 items-center gap-2.5 text-xs text-tertiary-token'>
           {isConfirmed && (
             <ConfidenceBadge score={item.confidenceScore ?? 0} size='sm' />
           )}
@@ -96,7 +96,7 @@ export function DspPresenceCard({
             href={item.externalArtistUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 text-xs text-tertiary-token transition-colors hover:text-primary-token'
           >
             <Icon name='ExternalLink' className='h-3.5 w-3.5' />
             <span>View on {label}</span>
