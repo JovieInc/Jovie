@@ -44,11 +44,7 @@ export function CommandPalette() {
   return <CommandPaletteInner isAdmin={dashboardData.isAdmin} />;
 }
 
-function CommandPaletteInner({
-  isAdmin,
-}: {
-  readonly isAdmin: boolean;
-}) {
+function CommandPaletteInner({ isAdmin }: { readonly isAdmin: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
