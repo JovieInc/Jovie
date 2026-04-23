@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import Image from 'next/image';
 import { useCallback, useMemo, useState } from 'react';
+import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
 import {
   useApplyGeneratedAlbumArtMutation,
   useCreateReleaseWithGeneratedAlbumArtMutation,
@@ -16,27 +17,21 @@ interface ChatAlbumArtCardProps {
 }
 
 function buildExistingReleasePrompt(title: string, releaseId: string): string {
-  return `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
-    {
-      releaseId,
-      releaseTitle: title,
-      instruction: 'Show three options.',
-    }
-  )}`;
+  const skill = serializeSkill('generateAlbumArt');
+  const mention = serializeEntity({
+    kind: 'release',
+    id: releaseId,
+    label: title,
+  });
+  return `${skill} ${mention} — show three options.`;
 }
 
 function buildCreateReleasePrompt(title: string | null): string {
+  const skill = serializeSkill('generateAlbumArt');
   if (!title?.trim()) {
-    return 'Help me create a new release and generate album art for it. Ask me for the release title first.';
+    return `${skill} — help me create a new release and generate album art for it. Ask me for the release title first.`;
   }
-
-  return `Generate album art for a new release and create the release after I pick one option.\n${JSON.stringify(
-    {
-      createRelease: true,
-      releaseTitle: title,
-      instruction: 'Show three options.',
-    }
-  )}`;
+  return `${skill} for a new release titled "${title}" — create the release after I pick one option. Show three options.`;
 }
 
 function submitChatPrompt(prompt: string): void {

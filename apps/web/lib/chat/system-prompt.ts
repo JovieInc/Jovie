@@ -85,6 +85,13 @@ ${buildDiscographySection(releases)}
 - **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
 ${buildKnowledgeSection(options?.knowledgeContext)}
+## Entity & Skill Tokens
+Messages may contain structured tokens the UI attached before sending:
+- \`@release:<id>[<title>]\` — reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
+- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\` — same pattern for artists/tracks.
+- \`/skill:<toolId>\` — the user picked this skill explicitly. Call the matching tool immediately. If the skill has required entity slots that aren't filled (no matching @entity token), ask for the missing entity before calling.
+Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
+
 ## Voice (CRITICAL)
 - Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
 - No emoji, no exclamation marks, no cheerleading, no filler, no repeating the user.
