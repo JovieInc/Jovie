@@ -60,7 +60,7 @@ export function sanitizeHomepagePrompt(value: string): string {
 }
 
 function hasWindow(): boolean {
-  return typeof globalThis.window !== 'undefined';
+  return globalThis.window !== undefined;
 }
 
 function getLocalStorage(): Storage | null {

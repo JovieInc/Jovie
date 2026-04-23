@@ -33,7 +33,7 @@ function SummaryCard({
       <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
         {value}
       </p>
-      <p className='text-[12px] font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
+      <p className='text-xs font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
         {label}
       </p>
       <p className='text-[13px] leading-5 text-secondary-token'>
@@ -99,10 +99,10 @@ function AttributionStatsCard() {
                 surface='nested'
                 className='px-3 py-2'
               >
-                <p className='text-[12px] font-[560] text-primary-token'>
+                <p className='text-xs font-[560] text-primary-token'>
                   {platform.label}
                 </p>
-                <p className='text-[12px] text-secondary-token'>
+                <p className='text-xs text-secondary-token'>
                   {stats.byPlatform[platform.key]}
                 </p>
               </ContentSurfaceCard>
@@ -231,9 +231,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           <p className='text-[13px] font-[560] text-primary-token'>
             {variant.label}
           </p>
-          <p className='text-[12px] text-tertiary-token'>
-            {variant.dimensions}
-          </p>
+          <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
         </div>
         <div className='flex items-center gap-2'>
           <Button

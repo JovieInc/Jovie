@@ -86,7 +86,7 @@ export function BirthdayInput({
           <div key={group.label} className='flex items-center gap-1'>
             {gIdx > 0 && (
               <span
-                className='px-0.5 text-[15px] text-secondary-token/40 select-none'
+                className='px-0.5 text-mid text-secondary-token/40 select-none'
                 aria-hidden='true'
               >
                 /

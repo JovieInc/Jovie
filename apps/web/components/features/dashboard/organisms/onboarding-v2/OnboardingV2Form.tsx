@@ -567,7 +567,7 @@ function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
           {title}
         </h1>
         {prompt ? (
-          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-[15px]'>
+          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-mid'>
             {prompt}
           </p>
         ) : null}

@@ -46,7 +46,7 @@ export function SettingsSection({
           description={description}
           className='border-b-0'
           titleClassName='text-[13px] font-[540]'
-          subtitleClassName='text-[12px] text-secondary-token'
+          subtitleClassName='text-xs text-secondary-token'
         />
         {headerAction}
       </div>

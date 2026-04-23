@@ -72,9 +72,7 @@ function ActivityItem({
       </span>
 
       <div className='min-w-0 flex-1 pt-px'>
-        <p className='truncate text-[12px] leading-4 text-primary-token'>
-          {label}
-        </p>
+        <p className='truncate text-xs leading-4 text-primary-token'>{label}</p>
         <div className='mt-0.5 flex items-center gap-1.5 text-[10.5px] text-tertiary-token'>
           {action.sourceLabel ? (
             <span className='max-w-[140px] truncate rounded bg-surface-0 px-1 text-secondary-token'>

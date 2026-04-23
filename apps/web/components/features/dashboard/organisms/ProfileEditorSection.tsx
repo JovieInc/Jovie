@@ -204,7 +204,7 @@ export function ProfileEditorSection({
                 onChange={e => onDisplayNameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'displayName')}
                 onBlur={onInputBlur}
-                className='min-h-[46px] rounded-md border-default bg-surface-0 text-center text-[15px] font-semibold tracking-[-0.02em] text-primary-token'
+                className='min-h-[46px] rounded-md border-default bg-surface-0 text-center text-mid font-semibold tracking-[-0.02em] text-primary-token'
               />
             }
           />
