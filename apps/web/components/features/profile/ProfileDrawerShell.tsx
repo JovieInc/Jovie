@@ -87,7 +87,7 @@ export function ProfileDrawerShell({
           >
             <h2
               id={titleId}
-              className='truncate text-[15px] font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'
+              className='truncate text-mid font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'
             >
               {title}
             </h2>
