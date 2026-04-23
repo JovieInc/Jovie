@@ -169,6 +169,8 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@remotion/bundler": "^4.0.451",
+    "@remotion/renderer": "^4.0.451",
     "@sentry/nextjs": "^10.46.0",
     "@tanstack/react-pacer": "^0.21.1",
     "@tanstack/react-query": "^5.95.2",
@@ -188,8 +190,8 @@
     "dompurify": "^3.4.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "0.45.2",
-    "flags": "^4.0.6",
     "exceljs": "4.4.0",
+    "flags": "^4.0.6",
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "3.6.0",
     "jose": "^6.2.2",
@@ -207,6 +209,7 @@
     "recharts": "3.8.1",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1",
+    "remotion": "^4.0.451",
     "resend": "^6.9.4",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
@@ -248,7 +251,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/parser": "^8.57.2",
-    "vite": "8.0.9",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "4.1.4",
     "@vitest/browser-playwright": "4.1.4",
@@ -273,6 +275,7 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
+    "vite": "8.0.9",
     "vitest": "4.1.4"
   }
 }
