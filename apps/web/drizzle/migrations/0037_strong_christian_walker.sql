@@ -1,3 +1,27 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'custom_task_triage_status') THEN
+    EXECUTE 'CREATE TYPE "public"."custom_task_triage_status" AS ' || 'ENUM(''auto_clustered'', ''pending_review'', ''merged_to_catalog'', ''rejected'')';
+  END IF;
+END $$;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_child_type') THEN
+    EXECUTE 'CREATE TYPE "public"."release_child_type" AS ' || 'ENUM(''spedup'', ''slowed'', ''clean'', ''radio_edit'', ''extended'', ''instrumental'', ''lyric_video'')';
+  END IF;
+END $$;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_skill_cluster_status') THEN
+    EXECUTE 'CREATE TYPE "public"."release_skill_cluster_status" AS ' || 'ENUM(''planned'', ''shipping'', ''shipped'')';
+  END IF;
+END $$;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_task_ai_skill_status') THEN
+    EXECUTE 'CREATE TYPE "public"."release_task_ai_skill_status" AS ' || 'ENUM(''none'', ''planned'', ''in_progress'', ''shipped'')';
+  END IF;
+END $$;--> statement-breakpoint
 CREATE TABLE "custom_task_telemetry" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"release_id" uuid,
