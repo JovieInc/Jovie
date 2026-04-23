@@ -72,11 +72,11 @@ function getToolStatusTitle(event: PersistedToolEvent): string {
     case 'failed':
       return config.errorTitle ?? `${config.label} Failed`;
     case 'denied':
-      return `${config.label} Denied`;
+      return `${config.label} denied`;
     case 'needs-approval':
-      return `${config.label} Needs Approval`;
+      return `${config.label} needs your OK`;
     case 'succeeded':
-      return config.label;
+      return config.successTitle ?? config.label;
   }
 }
 
