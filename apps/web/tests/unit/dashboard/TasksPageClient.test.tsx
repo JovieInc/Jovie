@@ -166,7 +166,11 @@ let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
-  DashboardDataContext: { Provider: ({ children }: { children: React.ReactNode }) => children, Consumer: () => null, displayName: 'DashboardDataContext' },
+  DashboardDataContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+    Consumer: () => null,
+    displayName: 'DashboardDataContext',
+  },
   useDashboardData: () => ({
     selectedProfile: {
       id: 'profile-1',
