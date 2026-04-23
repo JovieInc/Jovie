@@ -150,22 +150,19 @@ function startCaseFromCamelCase(value: string): string {
     .replaceAll(/\b\w/g, letter => letter.toUpperCase());
 }
 
-function sentenceCase(value: string): string {
-  const spaced = startCaseFromCamelCase(value).toLowerCase();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
 export function getToolUiConfig(toolName: string): ToolUiConfig {
   const existing = TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY];
   if (existing) return existing;
 
-  const pretty = sentenceCase(toolName);
+  const pretty = startCaseFromCamelCase(toolName);
+  const sentence = pretty.charAt(0) + pretty.slice(1).toLowerCase();
+  const lowered = sentence.toLowerCase();
   return {
     label: pretty,
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: `Working on ${pretty.toLowerCase()}…`,
-    successTitle: `${pretty} done`,
-    errorTitle: `Couldn't finish ${pretty.toLowerCase()}`,
+    loadingTitle: `Working on ${lowered}…`,
+    successTitle: `${sentence} done`,
+    errorTitle: `Couldn't finish ${lowered}`,
   };
 }

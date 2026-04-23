@@ -142,6 +142,7 @@ function ToolStatusRow({
         </span>
         <div className='min-w-0'>
           <div
+            title={getToolStatusTitle(event)}
             className={cn(
               'truncate font-[560] tracking-[-0.01em]',
               isInline ? 'text-[12px]' : 'text-[13px]'
