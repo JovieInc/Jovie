@@ -98,6 +98,30 @@ describe('ProfileDrawerShell', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  // Regression: tap targets on mode drawers must meet WCAG 2.5.5 (44×44 min).
+  // Found by /qa on 2026-04-23 against every mode drawer on mobile viewport.
+  it('sizes the header tap targets to at least 44×44', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Menu'
+        onBack={vi.fn()}
+        navigationLevel='secondary'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    const close = screen.getByTestId('profile-drawer-close-button');
+    const back = screen.getByTestId('profile-drawer-back-button');
+    // Tailwind: h-11 w-11 → 2.75rem → 44px.
+    expect(close.className).toMatch(/\bh-11\b/);
+    expect(close.className).toMatch(/\bw-11\b/);
+    expect(back.className).toMatch(/\bh-11\b/);
+    expect(back.className).toMatch(/\bw-11\b/);
+  });
+
   it('reserves the back-button slot for root-level drawers', () => {
     render(
       <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>
