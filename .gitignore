@@ -97,3 +97,4 @@ output/
 .audit/
 .gstack/
 .claude/skills/gstack/
+.claude/scheduled_tasks.lock
