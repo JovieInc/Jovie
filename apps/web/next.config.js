@@ -17,6 +17,20 @@ const nextConfig = {
   },
   // Transpile workspace packages for proper module resolution
   transpilePackages: ['@jovie/ui', '@clerk/ui'],
+  // Keep Remotion's native/renderer packages out of the Next bundler — they
+  // load platform-specific compositor binaries at runtime and only execute in
+  // the cron route (Node runtime).
+  serverExternalPackages: [
+    '@remotion/renderer',
+    '@remotion/bundler',
+    '@remotion/compositor-darwin-arm64',
+    '@remotion/compositor-darwin-x64',
+    '@remotion/compositor-linux-x64-gnu',
+    '@remotion/compositor-linux-x64-musl',
+    '@remotion/compositor-linux-arm64-gnu',
+    '@remotion/compositor-linux-arm64-musl',
+    '@remotion/compositor-win32-x64-msvc',
+  ],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
