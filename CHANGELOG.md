@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.166] - 2026-04-22
+
+> Killed the "Built for artists." hero eyebrow pill so the headline owns first attention. Fixed the sign-in modal's small-then-layoutshift flash when Clerk loads cold: the modal now reserves its final size and paints a Clerk-shaped skeleton while the bundle is in flight, and the "Sign in" header link prefetches the modal chunk on hover/focus so the skeleton almost never appears. Hardened hero paint isolation so the pulsing glow can't invalidate below-the-fold layout.
+
+### Added
+
+- New `MarketingSignInModal` skeleton (`data-testid="marketing-signin-skeleton"`) that mirrors the Clerk compact card layout (header, OAuth row, divider, input, primary button, footer) and is swapped out the moment Clerk's first input appears. Card wrapper reserves `min-height: 520px` so the box never resizes.
+- `MarketingSignInLink` prefetches `./MarketingSignInModal` on first `mouseenter` / `focus` / `touchstart` so the Clerk bundle is already loading by the time the visitor clicks.
+- New Vitest coverage for both components: `tests/components/organisms/MarketingSignInModal.test.tsx` (skeleton render, reserved min-height, Escape close, backdrop close, dialog role) and `tests/components/organisms/MarketingSignInLink.test.tsx` (no modal until click, open+close cycle, prefetch handlers wired).
+
+### Changed
+
+- Removed the `homepage-hero-eyebrow` "Built for artists." pill and its `HERO_COPY.eyebrow` entry. Dropped the now-redundant `mt-7 sm:mt-8` on the h1 since it's the first flex child.
+- [perf] Added `contain: layout paint` to `.homepage-hero-flood` so the pulsing glow can no longer invalidate below-fold content, and `transform: translateZ(0); backface-visibility: hidden` on the decorative gradient layers to pin them to the compositor (animation runs off the main thread).
+
+### Infrastructure
+
+- [internal] Bumped version to `26.4.166` across `VERSION` and `package.json`.
+
 ## [26.4.165] - 2026-04-22
 
 > Sign-in no longer gets stuck on a black spinner when Clerk cookies or env keys drift between dev/staging/prod. The `/signin` page now surfaces a "Reset session" escape after 6 seconds, and a new public `/api/auth/reset` endpoint clears Clerk cookies on both the host and `.jov.ie` parent scope so stale cookies from one environment can't poison another. Staging deployments that accidentally inherit production Clerk keys show a visible error card instead of a blank page, and every silent-failure path now fires a Sentry event so the next occurrence can't go unnoticed.
