@@ -39,11 +39,11 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
     return (
       <ContentSurfaceCard className='p-4 sm:p-5'>
         <div className='flex items-baseline justify-between'>
-          <h3 className='text-[13px] font-caption text-secondary-token'>
+          <h3 className='text-app font-caption text-secondary-token'>
             Link Clicks
           </h3>
         </div>
-        <p className='mt-4 text-center text-[13px] text-tertiary-token'>
+        <p className='mt-4 text-center text-app text-tertiary-token'>
           No link clicks yet. Share your profile to start tracking.
         </p>
       </ContentSurfaceCard>
@@ -54,14 +54,14 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
     <ContentSurfaceCard className='p-4 sm:p-5' data-testid='link-clicks-card'>
       <div className='flex items-baseline justify-between'>
         <div>
-          <h3 className='text-[13px] font-caption text-secondary-token'>
+          <h3 className='text-app font-caption text-secondary-token'>
             Link Clicks
           </h3>
-          <p className='mt-0.5 text-[11px] font-book text-tertiary-token'>
+          <p className='mt-0.5 text-2xs font-book text-tertiary-token'>
             Last 30 days
           </p>
         </div>
-        <p className='text-[24px] font-semibold tracking-[-0.04em] text-primary-token'>
+        <p className='text-2xl font-semibold tracking-[-0.04em] text-primary-token'>
           {total.toLocaleString()}
         </p>
       </div>
@@ -87,10 +87,10 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
                     aria-hidden
                   />
                 </div>
-                <span className='flex-1 text-[13px] font-book text-primary-token'>
+                <span className='flex-1 text-app font-book text-primary-token'>
                   {capitalizeFirst(stat.platform)}
                 </span>
-                <span className='text-[13px] font-caption tabular-nums text-primary-token'>
+                <span className='text-app font-caption tabular-nums text-primary-token'>
                   {formatCount(stat.clicks)}
                 </span>
               </div>
