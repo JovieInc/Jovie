@@ -42,6 +42,7 @@ export const APP_FLAG_DEFAULTS = {
   SHOW_RELEASE_TOOLBAR_EXTRAS: false,
   PLAYLIST_ENGINE: false,
   ALBUM_ART_GENERATION: true,
+  VIRAL_REEL_MVP: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -65,6 +66,7 @@ export const APP_FLAG_KEYS = {
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'show_release_toolbar_extras',
   PLAYLIST_ENGINE: 'playlist_engine',
   ALBUM_ART_GENERATION: 'album_art_generation',
+  VIRAL_REEL_MVP: 'viral_reel_mvp',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -85,6 +87,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
+  VIRAL_REEL_MVP: 'code:VIRAL_REEL_MVP',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -122,4 +125,6 @@ export const APP_FLAG_DESCRIPTIONS = {
   SHOW_RELEASE_TOOLBAR_EXTRAS: 'Extra releases toolbar controls',
   PLAYLIST_ENGINE: 'Playlist engine surfaces',
   ALBUM_ART_GENERATION: 'AI-generated release artwork via chat',
+  VIRAL_REEL_MVP:
+    'Phase 2 MVP: generate a silent 9:16 teaser reel for a release',
 } as const satisfies Record<AppFlagName, string>;
