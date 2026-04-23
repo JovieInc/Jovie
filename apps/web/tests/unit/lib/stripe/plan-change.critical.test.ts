@@ -29,6 +29,10 @@ const {
   mockStripeSubscriptionSchedules: {
     list: vi.fn(),
     cancel: vi.fn(),
+    release: vi.fn(),
+    create: vi.fn(),
+    retrieve: vi.fn(),
+    update: vi.fn(),
   },
   mockCaptureError: vi.fn(),
   mockGetActivePriceIds: vi.fn(),
@@ -398,14 +402,27 @@ describe('@critical plan-change.ts', () => {
       );
     });
 
-    it('executes a downgrade as a scheduled change', async () => {
+    it('executes a downgrade as a scheduled change via subscription schedule', async () => {
       const sub = makeSubscription({
         items: {
           data: [{ id: 'si_item_1', price: { id: PRICE_MAX_MONTHLY } }],
         },
       });
       mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
-      mockStripeSubscriptions.update.mockResolvedValue(sub);
+      mockStripeSubscriptionSchedules.create.mockResolvedValue({
+        id: 'sub_sched_new',
+      });
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_new',
+        phases: [
+          {
+            items: [{ price: PRICE_MAX_MONTHLY, quantity: 1 }],
+            start_date: sub.current_period_start,
+            end_date: sub.current_period_end,
+          },
+        ],
+      });
+      mockStripeSubscriptionSchedules.update.mockResolvedValue({});
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
@@ -415,11 +432,58 @@ describe('@critical plan-change.ts', () => {
       expect(result.success).toBe(true);
       // max -> pro is a downgrade, should be scheduled
       expect(result.isScheduledChange).toBe(true);
-      expect(mockStripeSubscriptions.update).toHaveBeenCalledWith(
-        'sub_123',
+      // Must NOT call subscriptions.update (that would apply immediately)
+      expect(mockStripeSubscriptions.update).not.toHaveBeenCalled();
+      // Schedule should be created from the existing subscription
+      expect(mockStripeSubscriptionSchedules.create).toHaveBeenCalledWith({
+        from_subscription: 'sub_123',
+      });
+      // Schedule should be updated with a second phase targeting the new price
+      expect(mockStripeSubscriptionSchedules.update).toHaveBeenCalledWith(
+        'sub_sched_new',
         expect.objectContaining({
-          proration_behavior: 'none',
+          end_behavior: 'release',
+          phases: expect.arrayContaining([
+            expect.objectContaining({
+              items: expect.arrayContaining([
+                expect.objectContaining({ price: PRICE_PRO_MONTHLY }),
+              ]),
+            }),
+          ]),
         })
+      );
+    });
+
+    it('reuses an existing subscription schedule when one already exists', async () => {
+      const sub = makeSubscription({
+        items: {
+          data: [{ id: 'si_item_1', price: { id: PRICE_MAX_MONTHLY } }],
+        },
+        schedule: 'sub_sched_existing',
+      });
+      mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_existing',
+        phases: [
+          {
+            items: [{ price: PRICE_MAX_MONTHLY, quantity: 1 }],
+            start_date: sub.current_period_start,
+            end_date: sub.current_period_end,
+          },
+        ],
+      });
+      mockStripeSubscriptionSchedules.update.mockResolvedValue({});
+
+      const result = await executePlanChange({
+        subscriptionId: 'sub_123',
+        newPriceId: PRICE_PRO_MONTHLY,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockStripeSubscriptionSchedules.create).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionSchedules.update).toHaveBeenCalledWith(
+        'sub_sched_existing',
+        expect.any(Object)
       );
     });
 
@@ -430,7 +494,20 @@ describe('@critical plan-change.ts', () => {
         },
       });
       mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
-      mockStripeSubscriptions.update.mockResolvedValue(sub);
+      mockStripeSubscriptionSchedules.create.mockResolvedValue({
+        id: 'sub_sched_iv',
+      });
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_iv',
+        phases: [
+          {
+            items: [{ price: PRICE_PRO_YEARLY, quantity: 1 }],
+            start_date: sub.current_period_start,
+            end_date: sub.current_period_end,
+          },
+        ],
+      });
+      mockStripeSubscriptionSchedules.update.mockResolvedValue({});
 
       const result = await executePlanChange({
         subscriptionId: 'sub_123',
@@ -439,6 +516,7 @@ describe('@critical plan-change.ts', () => {
 
       expect(result.success).toBe(true);
       expect(result.isScheduledChange).toBe(true);
+      expect(mockStripeSubscriptionSchedules.update).toHaveBeenCalled();
     });
 
     it('returns error for invalid price ID', async () => {
@@ -502,7 +580,20 @@ describe('@critical plan-change.ts', () => {
         },
       });
       mockStripeSubscriptions.retrieve.mockResolvedValue(sub);
-      mockStripeSubscriptions.update.mockResolvedValue(sub);
+      mockStripeSubscriptionSchedules.create.mockResolvedValue({
+        id: 'sub_sched_p',
+      });
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_p',
+        phases: [
+          {
+            items: [{ price: PRICE_MAX_MONTHLY, quantity: 1 }],
+            start_date: sub.current_period_start,
+            end_date: sub.current_period_end,
+          },
+        ],
+      });
+      mockStripeSubscriptionSchedules.update.mockResolvedValue({});
 
       await executePlanChange({
         subscriptionId: 'sub_123',
@@ -510,11 +601,13 @@ describe('@critical plan-change.ts', () => {
         prorate: true,
       });
 
-      expect(mockStripeSubscriptions.update).toHaveBeenCalledWith(
-        'sub_123',
-        expect.objectContaining({
-          proration_behavior: 'create_prorations',
-        })
+      // For scheduled downgrades, proration lives on the future phase.
+      const call = mockStripeSubscriptionSchedules.update.mock.calls[0];
+      const updatePayload = call[1] as {
+        phases: Array<{ proration_behavior?: string }>;
+      };
+      expect(updatePayload.phases[1].proration_behavior).toBe(
+        'create_prorations'
       );
     });
 
@@ -544,32 +637,40 @@ describe('@critical plan-change.ts', () => {
   // cancelScheduledPlanChange
   // -------------------------------------------------------
   describe('cancelScheduledPlanChange()', () => {
-    it('cancels a pending subscription schedule (string ID)', async () => {
+    it('releases a pending subscription schedule (string ID)', async () => {
       mockStripeSubscriptions.retrieve.mockResolvedValue({
         id: 'sub_123',
         schedule: 'sub_sched_abc',
       });
-      mockStripeSubscriptionSchedules.cancel.mockResolvedValue({});
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_abc',
+        status: 'active',
+      });
+      mockStripeSubscriptionSchedules.release.mockResolvedValue({});
 
       const result = await cancelScheduledPlanChange('sub_123');
 
       expect(result.success).toBe(true);
-      expect(mockStripeSubscriptionSchedules.cancel).toHaveBeenCalledWith(
+      expect(mockStripeSubscriptionSchedules.release).toHaveBeenCalledWith(
         'sub_sched_abc'
       );
     });
 
-    it('cancels a pending subscription schedule (expanded object)', async () => {
+    it('releases a pending subscription schedule (expanded object)', async () => {
       mockStripeSubscriptions.retrieve.mockResolvedValue({
         id: 'sub_123',
         schedule: { id: 'sub_sched_expanded' },
       });
-      mockStripeSubscriptionSchedules.cancel.mockResolvedValue({});
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_expanded',
+        status: 'active',
+      });
+      mockStripeSubscriptionSchedules.release.mockResolvedValue({});
 
       const result = await cancelScheduledPlanChange('sub_123');
 
       expect(result.success).toBe(true);
-      expect(mockStripeSubscriptionSchedules.cancel).toHaveBeenCalledWith(
+      expect(mockStripeSubscriptionSchedules.release).toHaveBeenCalledWith(
         'sub_sched_expanded'
       );
     });
@@ -584,7 +685,39 @@ describe('@critical plan-change.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('No scheduled change to cancel');
-      expect(mockStripeSubscriptionSchedules.cancel).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionSchedules.release).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent when the schedule has already been released', async () => {
+      mockStripeSubscriptions.retrieve.mockResolvedValue({
+        id: 'sub_123',
+        schedule: 'sub_sched_abc',
+      });
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_abc',
+        status: 'released',
+      });
+
+      const result = await cancelScheduledPlanChange('sub_123');
+
+      expect(result.success).toBe(true);
+      expect(mockStripeSubscriptionSchedules.release).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent when the schedule has already been canceled', async () => {
+      mockStripeSubscriptions.retrieve.mockResolvedValue({
+        id: 'sub_123',
+        schedule: 'sub_sched_abc',
+      });
+      mockStripeSubscriptionSchedules.retrieve.mockResolvedValue({
+        id: 'sub_sched_abc',
+        status: 'canceled',
+      });
+
+      const result = await cancelScheduledPlanChange('sub_123');
+
+      expect(result.success).toBe(true);
+      expect(mockStripeSubscriptionSchedules.release).not.toHaveBeenCalled();
     });
 
     it('captures error and returns failure on Stripe API error', async () => {

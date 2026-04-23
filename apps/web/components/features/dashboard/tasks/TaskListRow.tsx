@@ -122,7 +122,7 @@ export function TaskListRow({
       data-selected={isSelected ? 'true' : undefined}
       data-testid={`task-list-row-${task.id}`}
       className={cn(
-        'grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_4.75rem] items-center gap-3 rounded-[12px] border border-transparent px-2.5 py-2 transition-[background-color,border-color,box-shadow,opacity]',
+        'grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_4.75rem] items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 transition-[background-color,border-color,box-shadow,opacity]',
         'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]',
         'group-focus-visible/task-row:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] group-focus-visible/task-row:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         isSelected &&

@@ -401,11 +401,80 @@ export async function executePlanChange(
       shouldProrate,
     });
 
-    // For both upgrades and downgrades, use subscription update
-    // Stripe handles proration automatically
-    const updatedSubscription = await stripe.subscriptions.update(
-      subscriptionId,
-      {
+    const periodEndMs = subscription.current_period_end * 1000;
+    const effectiveDate = isScheduledChange
+      ? new Date(periodEndMs)
+      : new Date();
+
+    let updatedSubscription: Stripe.Subscription;
+
+    if (isScheduledChange) {
+      // For downgrades (plan-tier or interval), use a subscription schedule
+      // so the change applies at period end AND is cancellable via
+      // cancelScheduledPlanChange(). Direct subscription.update would take
+      // effect immediately and leave nothing for us to cancel.
+
+      // Create a schedule from the existing subscription if one doesn't
+      // already exist. Stripe's `from_subscription` seeds phase[0] from the
+      // current subscription; we append a new phase with the target price.
+      let scheduleId: string;
+      if (subscription.schedule) {
+        scheduleId =
+          typeof subscription.schedule === 'string'
+            ? subscription.schedule
+            : subscription.schedule.id;
+      } else {
+        const created = await stripe.subscriptionSchedules.create({
+          from_subscription: subscriptionId,
+        });
+        scheduleId = created.id;
+      }
+
+      // Re-read the schedule to get the seeded current phase, then append
+      // the downgrade phase. We copy the current phase's items verbatim so
+      // the user finishes their paid period on the current plan, and only
+      // flip to the new price in the next phase.
+      const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+      const currentPhase = schedule.phases[0];
+      if (!currentPhase) {
+        return {
+          success: false,
+          error: 'Schedule has no current phase',
+          isScheduledChange: false,
+          effectiveDate: new Date(),
+        };
+      }
+
+      await stripe.subscriptionSchedules.update(scheduleId, {
+        end_behavior: 'release',
+        phases: [
+          {
+            items: currentPhase.items.map(item => ({
+              price:
+                typeof item.price === 'string' ? item.price : item.price.id,
+              quantity: item.quantity,
+            })),
+            start_date: currentPhase.start_date,
+            end_date: currentPhase.end_date,
+            proration_behavior: 'none',
+          },
+          {
+            items: [{ price: newPriceId, quantity: 1 }],
+            proration_behavior: shouldProrate ? 'create_prorations' : 'none',
+          },
+        ],
+        metadata: {
+          previous_plan: currentPriceDetails.plan,
+          target_plan: newPriceDetails.plan,
+          scheduled_at: new Date().toISOString(),
+        },
+      });
+
+      // Return the underlying subscription (still on the current plan).
+      updatedSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+    } else {
+      // Immediate change (upgrade). Stripe handles proration automatically.
+      updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
         items: [
           {
             id: currentItem.id,
@@ -418,14 +487,8 @@ export async function executePlanChange(
           previous_plan: currentPriceDetails.plan,
           changed_at: new Date().toISOString(),
         },
-      }
-    );
-
-    // Calculate effective date
-    const periodEndMs = subscription.current_period_end * 1000;
-    const effectiveDate = isScheduledChange
-      ? new Date(periodEndMs)
-      : new Date();
+      });
+    }
 
     logger.info('Plan change executed successfully', {
       subscriptionId,
@@ -482,7 +545,22 @@ export async function cancelScheduledPlanChange(
         ? subscription.schedule
         : subscription.schedule.id;
 
-    await stripe.subscriptionSchedules.cancel(scheduleId);
+    // Idempotency: if the schedule is already released/canceled, treat this
+    // call as a no-op success. Prevents errors on double-clicks and retries.
+    const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+    if (schedule.status === 'released' || schedule.status === 'canceled') {
+      logger.info('Scheduled plan change already cleared', {
+        subscriptionId,
+        scheduleId,
+        status: schedule.status,
+      });
+      return { success: true };
+    }
+
+    // Release (not cancel): detaches the schedule from the subscription and
+    // leaves the subscription running on its current plan. `cancel` would
+    // end the subscription, which is not what "cancel downgrade" means.
+    await stripe.subscriptionSchedules.release(scheduleId);
 
     logger.info('Cancelled scheduled plan change', { subscriptionId });
 

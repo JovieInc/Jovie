@@ -56,11 +56,17 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     }
   }
 
-  // User not authenticated
+  // User not authenticated. This is routine traffic (unauth hits to admin
+  // routes) — not an actionable signal, so we record a breadcrumb for
+  // audit correlation but do not emit a Sentry event. The authenticated-
+  // but-not-admin case below remains a captureWarning since that IS worth
+  // surfacing.
   if (!userId) {
-    captureWarning(
-      '[admin/middleware] Unauthorized admin access attempt - no user ID'
-    );
+    Sentry.addBreadcrumb({
+      category: 'admin',
+      level: 'info',
+      message: 'admin/middleware: unauth hit (no user id)',
+    });
     return NextResponse.json(
       { error: 'Unauthorized. Please sign in.' },
       { status: 401 }

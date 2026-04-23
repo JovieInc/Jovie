@@ -7,6 +7,10 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*)
 
 Process ALL open pull requests to zero. Run once, walk away, come back to an empty queue.
 
+## Linear State — Hands Off
+
+Every PR here is owned by another agent whose Linear issue is already `In Progress` (see `AGENTS.md` → "Linear Ownership Contract"). Do not manually transition Linear state while orchestrating — `linear-ai-orchestrator.yml` moves issues to In Review on PR open, and `linear-sync-on-merge.yml` moves them to Done on merge. When merging or commenting here, preserve the PR body's `<!-- linear-issue-id:... -->` comment so the automations keep working.
+
 ## Current Repository Status
 
 Branch: !`git branch --show-current`

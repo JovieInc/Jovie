@@ -99,7 +99,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       {/* Profile URL and Actions */}
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
-          <code className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-1 text-[11px] text-secondary-token'>
+          <code className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-1 text-[11px] text-secondary-token'>
             {BASE_URL}/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton
