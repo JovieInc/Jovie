@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { useId } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
@@ -109,11 +109,15 @@ export function ProfileDrawerShell({
             </div>
           </div>
 
-          <span
-            aria-hidden='true'
-            className='block h-8 w-8 shrink-0'
-            data-testid='profile-drawer-right-placeholder'
-          />
+          <button
+            type='button'
+            onClick={() => onOpenChange(false)}
+            className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+            aria-label='Close'
+            data-testid='profile-drawer-close-button'
+          >
+            <X className='h-3.5 w-3.5' />
+          </button>
         </div>
       </div>
 

@@ -80,17 +80,22 @@ describe('ProfileDrawerShell', () => {
     expect(screen.getByText('Drawer body')).toBeInTheDocument();
   });
 
-  it('omits the close button and preserves the trailing header slot', () => {
+  it('renders an always-visible close button that invokes onOpenChange', () => {
+    const onOpenChange = vi.fn();
+
     render(
-      <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>
+      <ProfileDrawerShell open onOpenChange={onOpenChange} title='Menu'>
         <div>Drawer body</div>
       </ProfileDrawerShell>
     );
 
-    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
-    expect(
-      screen.getByTestId('profile-drawer-right-placeholder')
-    ).toBeVisible();
+    const close = screen.getByTestId('profile-drawer-close-button');
+    expect(close).toBeVisible();
+    expect(close).toHaveAttribute('aria-label', 'Close');
+
+    fireEvent.click(close);
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('reserves the back-button slot for root-level drawers', () => {
