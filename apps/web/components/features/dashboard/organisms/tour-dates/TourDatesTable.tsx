@@ -45,7 +45,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-[12px] font-[510] text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-[12px] font-caption text-tertiary-token'>
         Past
       </span>
     );
@@ -54,19 +54,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-[12px] font-[510] text-amber-600 dark:text-amber-300'>
+        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-[12px] font-caption text-amber-600 dark:text-amber-300'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-[12px] font-[510] text-red-600 dark:text-red-400'>
+        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-[12px] font-caption text-red-600 dark:text-red-400'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-[12px] font-[510] text-emerald-600 dark:text-emerald-400'>
+        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-[12px] font-caption text-emerald-600 dark:text-emerald-400'>
           On Sale
         </span>
       );
@@ -82,7 +82,7 @@ const DateCell = memo(function DateCell({
 }) {
   return (
     <div className='flex flex-col'>
-      <span className='font-[510] text-primary-token'>
+      <span className='font-caption text-primary-token'>
         {formatShortDate(startDate)}
       </span>
       {startTime && (
@@ -353,7 +353,9 @@ export function TourDatesTable({
           <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-3 py-6 text-center text-[13px] text-secondary-token'>
             <Icon name='Calendar' className='h-6 w-6 text-tertiary-token' />
             <div>
-              <div className='font-[510] text-primary-token'>No tour dates</div>
+              <div className='font-caption text-primary-token'>
+                No tour dates
+              </div>
               <div className='text-[13px]'>
                 Add your first tour date to get started.
               </div>

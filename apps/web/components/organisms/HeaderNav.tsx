@@ -4,6 +4,7 @@ import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
+import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -28,14 +29,7 @@ type PublicAuthActionsProps = Readonly<{ minimal?: boolean }>;
 
 function PublicAuthActions({ minimal = false }: PublicAuthActionsProps = {}) {
   if (minimal) {
-    return (
-      <Link
-        href='/signin'
-        className='focus-ring-themed text-[13px] text-white/60 transition-colors duration-150 hover:text-white/90'
-      >
-        Sign in
-      </Link>
-    );
+    return <MarketingSignInLink />;
   }
   return (
     <div className='flex items-center gap-1'>

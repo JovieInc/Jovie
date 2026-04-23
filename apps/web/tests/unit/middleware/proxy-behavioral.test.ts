@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => ({
   resolveClerkKeys: vi.fn().mockReturnValue({
     publishableKey: 'pk_test_real-key-123',
     secretKey: 'sk_test_real-key-456',
+    status: 'ok',
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
@@ -168,6 +169,7 @@ function resetMocks() {
   mocks.resolveClerkKeys.mockReturnValue({
     publishableKey: 'pk_test_real-key-123',
     secretKey: 'sk_test_real-key-456',
+    status: 'ok',
   });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
@@ -336,6 +338,7 @@ describe('proxy.ts middleware', () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: undefined,
         secretKey: undefined,
+        status: 'staging_missing',
       });
 
       const req = createUnauthenticatedRequest({
@@ -353,6 +356,7 @@ describe('proxy.ts middleware', () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: undefined,
         secretKey: undefined,
+        status: 'staging_missing',
       });
       const originalNodeEnv = process.env.NODE_ENV;
 
@@ -613,6 +617,7 @@ describe('proxy.ts middleware', () => {
         mocks.resolveClerkKeys.mockReturnValue({
           publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
           secretKey: 'sk_live_staging_example',
+          status: 'ok',
         });
 
         const req = createUnauthenticatedRequest({
@@ -653,6 +658,7 @@ describe('proxy.ts middleware', () => {
         mocks.resolveClerkKeys.mockReturnValue({
           publishableKey: undefined,
           secretKey: undefined,
+          status: 'staging_missing',
         });
 
         const req = createUnauthenticatedRequest({

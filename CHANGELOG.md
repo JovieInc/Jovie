@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.166] - 2026-04-22
+
+> Killed the "Built for artists." hero eyebrow pill so the headline owns first attention. Fixed the sign-in modal's small-then-layoutshift flash when Clerk loads cold: the modal now reserves its final size and paints a Clerk-shaped skeleton while the bundle is in flight, and the "Sign in" header link prefetches the modal chunk on hover/focus so the skeleton almost never appears. Hardened hero paint isolation so the pulsing glow can't invalidate below-the-fold layout.
+
+### Added
+
+- New `MarketingSignInModal` skeleton (`data-testid="marketing-signin-skeleton"`) that mirrors the Clerk compact card layout (header, OAuth row, divider, input, primary button, footer) and is swapped out the moment Clerk's first input appears. Card wrapper reserves `min-height: 520px` so the box never resizes.
+- `MarketingSignInLink` prefetches `./MarketingSignInModal` on first `mouseenter` / `focus` / `touchstart` so the Clerk bundle is already loading by the time the visitor clicks.
+- New Vitest coverage for both components: `tests/components/organisms/MarketingSignInModal.test.tsx` (skeleton render, reserved min-height, Escape close, backdrop close, dialog role) and `tests/components/organisms/MarketingSignInLink.test.tsx` (no modal until click, open+close cycle, prefetch handlers wired).
+
+### Changed
+
+- Removed the `homepage-hero-eyebrow` "Built for artists." pill and its `HERO_COPY.eyebrow` entry. Dropped the now-redundant `mt-7 sm:mt-8` on the h1 since it's the first flex child.
+- [perf] Added `contain: layout paint` to `.homepage-hero-flood` so the pulsing glow can no longer invalidate below-fold content, and `transform: translateZ(0); backface-visibility: hidden` on the decorative gradient layers to pin them to the compositor (animation runs off the main thread).
+
+### Infrastructure
+
+- [internal] Bumped version to `26.4.166` across `VERSION` and `package.json`.
+
+## [26.4.165] - 2026-04-22
+
+> Sign-in no longer gets stuck on a black spinner when Clerk cookies or env keys drift between dev/staging/prod. The `/signin` page now surfaces a "Reset session" escape after 6 seconds, and a new public `/api/auth/reset` endpoint clears Clerk cookies on both the host and `.jov.ie` parent scope so stale cookies from one environment can't poison another. Staging deployments that accidentally inherit production Clerk keys show a visible error card instead of a blank page, and every silent-failure path now fires a Sentry event so the next occurrence can't go unnoticed.
+
+### Added
+
+- New `POST/GET /api/auth/reset` public endpoint that clears Clerk cookies (`__clerk*`, `__session*`, `__client*`, `__refresh*`) on both the current host and the parent `.jov.ie` domain scope, then redirects to `/signin?reset=1` with a confirmation toast.
+- New `SignInTimeoutEscape` component renders a "Reset session and retry" link after 6 seconds if Clerk's sign-in form fails to mount, fires a `clerk_signin_skeleton_timeout` Sentry event, and links to `/api/auth/reset`.
+- New `scripts/detect-clerk-id-drift.ts` audit script scans the DB for users whose `clerk_id` no longer matches any Clerk user for their email, reports mismatches, and emits a `clerk_id_drift_detected` Sentry event per row. Exits non-zero on drift so it can run on a schedule.
+- `AuthUnavailableCard` gains a `showResetAction` mode that replaces the "Go to Homepage" link with a "Reset session and retry" form pointing at `/api/auth/reset`, used whenever auth is unavailable on a public host.
+- Auth layout now fires a `clerk_bypass_on_public_host` Sentry event (error level) whenever the fallback unavailable card renders on a public https host, tagged with `hostname` and `key_status`.
+
+### Changed
+
+- `resolveClerkKeys()` now returns a structured `{ publishableKey, secretKey, status }` shape with `'ok' | 'staging_missing' | 'staging_inherits_prod' | 'no_publishable_key'` so downstream UI can distinguish missing-keys from inherits-prod misconfig.
+- Middleware always sets an `x-clerk-key-status` request header alongside the existing `x-clerk-publishable-key`, giving the auth layout a deterministic signal for what to render.
+- `AuthClientProviders` fires `clerk_bypass_on_public_host` from the client when `shouldBypassClerk` triggers on a public host, matching the server-side detection.
+- Extracted Clerk cookie name prefixes into `@/lib/auth/clerk-cookie-names` and the dev Sync-Clerk core into `@/lib/auth/sync-clerk-id`. Both are now reused between dev-only routes and new public/recovery surfaces.
+
+### Infrastructure
+
+- [internal] Added `isPublicAuthHost()` helper to `components/providers/clerkAvailability.ts` for gating public-host-specific behavior (https + non-private hostname).
+- [internal] Bumped version to `26.4.165` across `VERSION` and `package.json`.
+
+## [26.4.164] - 2026-04-22
+
+> Sign-in modal now proxies Clerk traffic through the app's `/__clerk` middleware like the rest of the app (fixing a would-be production break on `pk_live_` keys), and restores URL and focus state cleanly when dismissed. Hero headline picks up its intended Linear-bold weight from CSS instead of a conflicting Tailwind utility.
+
+### Fixed
+
+- [a11y] Restored focus to the trigger element when the sign-in modal closes, so keyboard and screen-reader users return to where they were.
+- Fixed Clerk requests from the sign-in modal bypassing the `/__clerk` proxy in production. The scoped provider now passes `proxyUrl={getClerkProxyUrl(...)}` like the rest of the app.
+- Fixed stale `#/sign-in/...` hash fragments persisting on the homepage after the modal was dismissed mid-flow. The original hash is restored on unmount.
+- Fixed homepage hero headline rendering at Tailwind `font-semibold` (600) instead of the intended Linear-bold `680` weight. The `font-semibold` utility was removed so the `.homepage-hero-headline` class wins cleanly.
+
+### Changed
+
+- [internal] Synced the homepage performance manifest's `readySelectors` to the live hero (`#home-hero-heading` + `input#homepage-intent-input`) so `pnpm perf:loop --route-id home` can measure the real DOM instead of hanging on elements from the retired hero.
+- [internal] Removed the unused `HERO_COPY.eyebrow.badge` field (dead code since the "NEW" chip was dropped from the pill).
+- [internal] Synced the canonical VERSION file and workspace `package.json` entries to `26.4.164`.
+
+## [26.4.163] - 2026-04-22
+
+> Codex now boots Jovie worktrees through the canonical setup path and performs safe stop-time cleanup automatically when lifecycle hooks are available.
+
+> Sign-in modal polish: portaled to `<body>` so it escapes the header's `backdrop-filter` containing block, restyled to a compact 400px dark card close to stock Clerk, and hardened for accessibility with a visible close X, focus-in-modal on open, and a Tab focus trap that keeps keyboard users inside the dialog.
+
+### Added
+
+- Added tracked Codex lifecycle config that runs the canonical setup wrapper on session start and the cleanup wrapper on stop.
+- Added a safe Codex cleanup wrapper that prunes stale worktree metadata, clears Turbopack cache, and keeps heavier E2E/archive cleanup behind explicit environment flags.
+
+### Fixed
+
+- [a11y] Trapped Tab focus inside the sign-in modal so keyboard users no longer escape to the page behind the backdrop after Clerk's internal focus cycle ends.
+- [a11y] Grew the close X touch target from 32×32 to 44×44 (WCAG 2.1 AAA) while keeping the 16px icon visually identical.
+- Fixed the sign-in modal mounting inside the marketing header's `backdrop-filter` containing block, which shrank the dialog to 72px and top-clipped the Clerk card. Now portaled to `document.body`.
+
+### Changed
+
+- Simplified the Codex setup wrapper to delegate to `scripts/setup.sh`, including hook-safe JSON stdout handling for Codex lifecycle events.
+- Restyled the sign-in modal to a compact dark Clerk appearance (400px card, stock Clerk `Sign in to Jovie` + "Welcome back" + social buttons + "Secured by Clerk" footer) instead of the heavy marketing theme.
+- Added `ui={ui}` from `@clerk/ui` to the scoped ClerkProvider so Clerk pins its internal DOM structure for forward compatibility.
+- Added a visible close X in the top-right of the modal card for users who don't know Escape + backdrop-click.
+- Moved focus to the first input when the modal opens, via a `MutationObserver` that watches Clerk's async mount.
+- [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.163`.
+
+## [26.4.162] - 2026-04-22
+
+> The homepage now opens with a Linear-premium hero: a muted, slow-pulsing neon glow behind a "Your AI Artist Manager." one-line headline that fits from 375px up, a "Built for artists." eyebrow pill, and a Clerk modal sign-in that lazy-mounts only when the header link is clicked. The rest of the `/new` composition is available behind individual feature flags, all off in production.
+
+### Added
+
+- Added saturated-flood-turned-Linear-premium hero to the homepage with a slow-pulsing blue-violet glow, centered headline that fits on one line across breakpoints, "Built for artists." eyebrow pill, and one-click Clerk sign-in modal that preserves the static home build.
+- Added a configurable `label` prop to `HomeTrustSection` so the homepage can read "Accelerating release cycles for artists on" while artist-profile and release-notification surfaces keep "Trusted by artists on".
+- Added individual feature flags for every `/new` section on the homepage (`SHOW_HOMEPAGE_V2_TRUST`, `_SYSTEM_OVERVIEW`, `_SPOTLIGHT`, `_CAPTURE_REACTIVATE`, `_POWER_GRID`, `_PRICING`, `_FINAL_CTA`, `_FOOTER_LINKS`), all default false, so sections can be rolled on one at a time.
+
+### Changed
+
+- The `(home)` layout now uses `.home-viewport` + `min-h-[100svh]` on both the shell and `<main>` so the hero fills the viewport and the footer sits below the fold, revealed on scroll.
+- [internal] Synced the canonical VERSION file and workspace `package.json` entries to `26.4.162`.
+
 ## [26.4.161] - 2026-04-22
 
 > Dropdown flyouts now behave like one focused menu stack, so release actions no longer leave multiple sibling submenus hanging open at the same time.

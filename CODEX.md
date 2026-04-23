@@ -1,161 +1,85 @@
 # Codex Setup Guide for Jovie
 
-## Quick Start (Worktree Setup)
+This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `AGENTS.md`, `conductor.json`, or the scripts humans run locally.
 
-Run the setup script on every new worktree:
+## Automatic Local Setup
+
+Codex project config lives in `.codex/`:
+
+- `.codex/config.toml` enables Codex lifecycle hooks.
+- `.codex/hooks.json` runs `scripts/codex-setup.sh` on `SessionStart`.
+- `.codex/hooks.json` runs `scripts/codex-cleanup.sh` on `Stop`.
+- `.codex/local-env.toml` points Codex app worktree setup and common actions at the same wrappers.
+
+Codex hooks are currently a Codex lifecycle feature and may not run on every platform. If hooks are unavailable, run the same scripts manually.
+
+## Manual Setup
+
+Run this from the repository root on every fresh worktree:
 
 ```bash
 ./scripts/codex-setup.sh
 ```
 
-Or with a Doppler service token:
+On Windows PowerShell, use the Git Bash wrapper:
 
-```bash
-DOPPLER_TOKEN=dp.st.xxx ./scripts/codex-setup.sh
+```powershell
+.\scripts\setup.ps1
 ```
 
-## Critical Requirements
-
-| Tool | Required Version | Why |
-|------|------------------|-----|
-| **Node.js** | **24.x** | Runtime, build system, CI pipeline |
-| **pnpm** | **9.15.4** (exact) | Package manager, workspaces |
-| **Doppler** | Latest | Secrets management |
-
-## Manual Setup (if script fails)
-
-### 1. Node.js 24
+`scripts/codex-setup.sh` delegates to the canonical bootstrap:
 
 ```bash
-# Via nvm (recommended)
-nvm install 24
-nvm use 24
-
-# Or via fnm
-fnm install 24
-fnm use 24
-
-# Verify
-node --version  # Must be v24.x
+./scripts/setup.sh
 ```
 
-### 2. pnpm 9.15.4
+That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and syncs dev Clerk IDs when Doppler is available.
+
+## Cleanup
+
+Codex stop hooks run:
 
 ```bash
-corepack enable
-corepack prepare pnpm@9.15.4 --activate
-
-# Verify
-pnpm --version  # Must be 9.15.4
+./scripts/codex-cleanup.sh
 ```
 
-### 3. Doppler CLI
+By default this only performs safe, lightweight cleanup:
+
+- prune stale git worktree metadata
+- clear stale Turbopack cache entries
+
+Optional heavier cleanup is controlled by environment flags:
 
 ```bash
-# macOS
-brew install dopplerhq/cli/doppler
-
-# Ubuntu/Debian
-curl -sLf --retry 3 --tlsv1.2 --proto "=https" \
-  'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | \
-  sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | \
-  sudo tee /etc/apt/sources.list.d/doppler-cli.list
-sudo apt-get update && sudo apt-get install -y doppler
-
-# Configure (interactive)
-doppler login
-doppler setup --project jovie --config dev
-
-# Or with service token (non-interactive)
-export DOPPLER_TOKEN=dp.st.xxx
-doppler setup --project jovie --config dev --no-interactive
+CODEX_CLEANUP_E2E_USERS=1 ./scripts/codex-cleanup.sh
+CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
 ```
 
-### 4. Install Dependencies
+`CODEX_CLEANUP_E2E_USERS=1` runs the E2E Clerk cleanup through Doppler. `CODEX_ARCHIVE_ON_STOP=1` delegates to `scripts/archive.sh`, which removes build artifacts and dependencies for archived workspaces.
 
-```bash
-pnpm install
-```
+## Required Tooling
+
+| Tool | Required Version |
+|------|------------------|
+| Node.js | 22.x (22.13.0+) |
+| pnpm | 9.15.4 |
+| Doppler CLI | Required for secret-bound commands |
+| GitHub CLI | Required for PR and GitHub automation |
 
 ## Common Commands
 
+Always run commands from the repo root.
+
 ```bash
-# Development
-pnpm --filter web dev          # Start web dev server (uses Doppler)
-
-# Building
-pnpm turbo build               # Build all packages
-pnpm --filter web build        # Build web only
-
-# Testing
-pnpm turbo test                # Run all tests
-pnpm --filter web test         # Run web tests only
-
-# Linting & Type Checking
-pnpm turbo typecheck           # Type check all
-pnpm turbo lint                # Lint all
-
-# Database
-pnpm --filter web drizzle:generate   # Generate migrations
-pnpm --filter web drizzle:migrate    # Apply migrations
-pnpm --filter web drizzle:studio     # Open Drizzle Studio
+pnpm run dev:web:local
+pnpm run test:web
+pnpm run build
+pnpm run typecheck
+pnpm lint
 ```
 
-## Important Rules
-
-1. **Always run commands from repo root** - Never `cd` into packages
-2. **Use pnpm, not npm/yarn** - `pnpm install`, not `npm install`
-3. **Use filter for package-specific commands** - `pnpm --filter web dev`
-4. **Never edit migration files** - Create new migrations instead
-5. **No biome-ignore comments** - Fix the underlying issue
-
-## Environment Variables
-
-Secrets are managed via Doppler. The dev server automatically injects them:
+Commands that need secrets must use the repo wrappers or an explicit Doppler prefix:
 
 ```bash
-pnpm --filter web dev  # Runs: doppler run -- next dev
-```
-
-For scripts that need secrets directly:
-
-```bash
-doppler run -- your-command
-```
-
-## Troubleshooting
-
-### Wrong Node version
-
-```bash
-nvm use 24
-# or
-fnm use 24
-```
-
-### Wrong pnpm version
-
-```bash
-corepack prepare pnpm@9.15.4 --activate
-```
-
-### Doppler not configured
-
-```bash
-doppler login
-doppler setup --project jovie --config dev
-```
-
-### Dependencies out of sync
-
-```bash
-pnpm install
-```
-
-### Turbo cache issues
-
-```bash
-rm -rf .turbo
-pnpm turbo build
+doppler run --project jovie-web --config dev -- <command>
 ```

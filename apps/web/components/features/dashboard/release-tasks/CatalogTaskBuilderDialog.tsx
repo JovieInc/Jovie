@@ -51,10 +51,13 @@ export function CatalogTaskBuilderDialog({
 }: CatalogTaskBuilderDialogProps) {
   const [query, setQuery] = useState('');
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const [optimisticAddedSlugs, setOptimisticAddedSlugs] = useState<
+    readonly string[]
+  >([]);
   const [, startTransition] = useTransition();
   const addedSet = useMemo(
-    () => new Set(alreadyAddedSlugs),
-    [alreadyAddedSlugs]
+    () => new Set([...alreadyAddedSlugs, ...optimisticAddedSlugs]),
+    [alreadyAddedSlugs, optimisticAddedSlugs]
   );
 
   const clustersById = useMemo(() => {
@@ -97,6 +100,9 @@ export function CatalogTaskBuilderDialog({
       setPendingSlug(slug);
       try {
         await action(releaseId, slug);
+        setOptimisticAddedSlugs(prev =>
+          prev.includes(slug) ? prev : [...prev, slug]
+        );
         onAdded?.();
         toast.success('Task added from catalog.');
       } catch (error) {
@@ -127,6 +133,7 @@ export function CatalogTaskBuilderDialog({
             value={query}
             onChange={e => startTransition(() => setQuery(e.target.value))}
             placeholder='Search tasks'
+            aria-label='Search tasks'
             data-testid='catalog-search'
             className='w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm'
           />

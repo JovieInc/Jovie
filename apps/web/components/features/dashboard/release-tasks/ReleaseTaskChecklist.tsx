@@ -147,7 +147,7 @@ export function ReleaseTaskChecklist({
     );
     return tasks.filter(task => {
       const slug = readTaskMetadataSlug(task.metadata);
-      if (!slug) return false;
+      if (!slug) return true;
       const cid = catalogSlugToClusterId.get(slug) ?? null;
       return cid !== null && wantedClusterIds.has(cid);
     });

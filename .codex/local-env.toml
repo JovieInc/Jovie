@@ -1,0 +1,12 @@
+[setup]
+commands = ["bash scripts/codex-setup.sh"]
+
+[setup.windows]
+commands = ["powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\setup.ps1"]
+
+[actions]
+run = "pnpm run dev:web:local"
+test = "pnpm run test:web"
+typecheck = "pnpm run typecheck"
+cleanup = "bash scripts/codex-cleanup.sh"
+archive = "bash scripts/archive.sh"

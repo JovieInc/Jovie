@@ -1,5 +1,5 @@
 {
-  "id": "0a4e84b8-792a-4171-8c6a-2be65010b4de",
+  "id": "5e2f0c97-ccba-476a-849a-f1ddfa37f026",
   "prevId": "34d827e8-da3d-4343-b42e-ba23e4196ccc",
   "version": "7",
   "dialect": "postgresql",
@@ -5301,134 +5301,6 @@
           "columns": ["creator_profile_id"]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.custom_task_telemetry": {
-      "name": "custom_task_telemetry",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "release_id": {
-          "name": "release_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "creator_profile_id": {
-          "name": "creator_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_text": {
-          "name": "user_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "normalized_text": {
-          "name": "normalized_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "suggested_cluster_slug": {
-          "name": "suggested_cluster_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "classifier_confidence": {
-          "name": "classifier_confidence",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "triage_status": {
-          "name": "triage_status",
-          "type": "custom_task_triage_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending_review'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "custom_task_telemetry_triage_status_idx": {
-          "name": "custom_task_telemetry_triage_status_idx",
-          "columns": [
-            {
-              "expression": "triage_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "custom_task_telemetry_normalized_text_idx": {
-          "name": "custom_task_telemetry_normalized_text_idx",
-          "columns": [
-            {
-              "expression": "normalized_text",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "custom_task_telemetry_release_id_discog_releases_id_fk": {
-          "name": "custom_task_telemetry_release_id_discog_releases_id_fk",
-          "tableFrom": "custom_task_telemetry",
-          "tableTo": "discog_releases",
-          "columnsFrom": ["release_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "custom_task_telemetry_creator_profile_id_creator_profiles_id_fk": {
-          "name": "custom_task_telemetry_creator_profile_id_creator_profiles_id_fk",
-          "tableFrom": "custom_task_telemetry",
-          "tableTo": "creator_profiles",
-          "columnsFrom": ["creator_profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -13978,381 +13850,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.release_skill_clusters": {
-      "name": "release_skill_clusters",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "display_order": {
-          "name": "display_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "status": {
-          "name": "status",
-          "type": "release_skill_cluster_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'planned'"
-        },
-        "demand_score": {
-          "name": "demand_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "release_skill_clusters_slug_unique": {
-          "name": "release_skill_clusters_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": ["slug"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.release_task_catalog": {
-      "name": "release_task_catalog",
-      "schema": "",
-      "columns": {
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cluster_id": {
-          "name": "cluster_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "short_description": {
-          "name": "short_description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "release_task_priority",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'medium'"
-        },
-        "flow_stage_days_offset": {
-          "name": "flow_stage_days_offset",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dependencies": {
-          "name": "dependencies",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "applicability_rules": {
-          "name": "applicability_rules",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "applicability_rules_version": {
-          "name": "applicability_rules_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "platforms": {
-          "name": "platforms",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "source_links": {
-          "name": "source_links",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "assignee_type": {
-          "name": "assignee_type",
-          "type": "release_task_assignee_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'human'"
-        },
-        "ai_skill_status": {
-          "name": "ai_skill_status",
-          "type": "release_task_ai_skill_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "ai_skill_id": {
-          "name": "ai_skill_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "catalog_version": {
-          "name": "catalog_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "release_task_catalog_cluster_id_idx": {
-          "name": "release_task_catalog_cluster_id_idx",
-          "columns": [
-            {
-              "expression": "cluster_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "release_task_catalog_cluster_id_release_skill_clusters_id_fk": {
-          "name": "release_task_catalog_cluster_id_release_skill_clusters_id_fk",
-          "tableFrom": "release_task_catalog",
-          "tableTo": "release_skill_clusters",
-          "columnsFrom": ["cluster_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.release_task_snapshots": {
-      "name": "release_task_snapshots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "release_id": {
-          "name": "release_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "catalog_slug": {
-          "name": "catalog_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "catalog_version": {
-          "name": "catalog_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cluster_id": {
-          "name": "cluster_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "short_description": {
-          "name": "short_description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "release_task_priority",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'medium'"
-        },
-        "flow_stage_days_offset": {
-          "name": "flow_stage_days_offset",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "assignee_type": {
-          "name": "assignee_type",
-          "type": "release_task_assignee_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'human'"
-        },
-        "ai_skill_id": {
-          "name": "ai_skill_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ai_skill_status": {
-          "name": "ai_skill_status",
-          "type": "release_task_ai_skill_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "reasons": {
-          "name": "reasons",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "score": {
-          "name": "score",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "release_task_snapshots_release_id_idx": {
-          "name": "release_task_snapshots_release_id_idx",
-          "columns": [
-            {
-              "expression": "release_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "release_task_snapshots_release_id_discog_releases_id_fk": {
-          "name": "release_task_snapshots_release_id_discog_releases_id_fk",
-          "tableFrom": "release_task_snapshots",
-          "tableTo": "discog_releases",
-          "columnsFrom": ["release_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.release_task_template_items": {
       "name": "release_task_template_items",
       "schema": "",
@@ -17161,6 +16658,146 @@
           "columns": ["token_hash"]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_interviews": {
+      "name": "user_interviews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'onboarding'"
+        },
+        "transcript": {
+          "name": "transcript",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "summary_attempts": {
+          "name": "summary_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_interviews_user_source_unique": {
+          "name": "user_interviews_user_source_unique",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_interviews_status_idx": {
+          "name": "user_interviews_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_interviews_user_id_users_id_fk": {
+          "name": "user_interviews_user_id_users_id_fk",
+          "tableFrom": "user_interviews",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

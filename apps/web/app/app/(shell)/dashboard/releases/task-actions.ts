@@ -11,6 +11,7 @@ import {
   requireReleasePlanGenerationAccess,
   requireTasksWorkspaceAccess,
 } from '@/lib/entitlements/tasks-gate';
+import { captureError } from '@/lib/error-tracking';
 import {
   DEFAULT_RELEASE_TASK_TEMPLATE,
   type DefaultTemplateItem,
@@ -327,8 +328,13 @@ export async function addReleaseTask(
         classifierConfidence: result.confidence,
         triageStatus,
       });
-    } catch {
-      // swallow — telemetry must not block or surface errors
+    } catch (error) {
+      captureError('Failed to record custom task telemetry', error, {
+        context: 'release-task-classification-telemetry',
+        releaseId,
+        profileId,
+        taskId: task.id,
+      });
     }
   })();
 

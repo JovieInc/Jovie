@@ -16,14 +16,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import {
+  HERO_COPY,
   HOMEPAGE_INTENT_EXPERIMENT_ID,
-  HOMEPAGE_INTENT_KEY,
   HOMEPAGE_INTENT_VARIANT_ID,
-  type HomepageIntent,
   type HomepagePill,
   type HomepagePillId,
   PILLS,
 } from './intent';
+import { createHomepageIntent, persistHomepageIntent } from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
 
@@ -37,27 +37,27 @@ const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
 };
 
 /**
- * Writes the homepage intent to localStorage so onboarding can pick it up
- * post-auth. Throws on any failure (quota exceeded, private-mode disabled
- * storage, serialization error). Callers are responsible for handling the
- * failure mode — per repo convention, persistence helpers surface errors
- * rather than swallow them.
+ * Viewport gate: desktop (≥768px) gets an intercepted modal via `router.push`;
+ * mobile (<768px) gets a hard full-page navigation via `window.location.assign`.
+ *
+ * Fails closed to mobile until hydration so we never briefly open the modal on
+ * a touch device while the media query is still resolving.
  */
-function persistIntent(intent: HomepageIntent): void {
-  if (globalThis.window === undefined) {
-    throw new Error('persistIntent: localStorage is not available (SSR)');
-  }
-  const storage = globalThis.localStorage;
-  if (!storage) {
-    throw new Error('persistIntent: localStorage is not available');
-  }
-  storage.setItem(HOMEPAGE_INTENT_KEY, JSON.stringify(intent));
+function isDesktopViewport(): boolean {
+  if (typeof globalThis.window === 'undefined') return false;
+  const matcher = globalThis.window.matchMedia;
+  if (typeof matcher !== 'function') return false;
+  // Require both viewport width AND hover+fine pointer so laptops with touch
+  // still qualify but iPads in desktop mode don't get the modal.
+  return matcher('(min-width: 768px) and (hover: hover) and (pointer: fine)')
+    .matches;
 }
 
-function buildSigninUrl(): string {
+function buildAuthUrl(intentId: string): string {
+  const destination = `${APP_ROUTES.ONBOARDING}?intent_id=${encodeURIComponent(intentId)}`;
   return buildAuthRouteUrl(
-    APP_ROUTES.SIGNIN,
-    new URLSearchParams({ redirect_url: APP_ROUTES.ONBOARDING })
+    APP_ROUTES.SIGNUP,
+    new URLSearchParams({ redirect_url: destination })
   );
 }
 
@@ -110,23 +110,19 @@ export function HomepageIntent() {
     const trimmed = value.trim();
     if (!trimmed) return;
 
-    const intent: HomepageIntent = {
-      source: 'homepage',
+    const intent = createHomepageIntent({
       finalPrompt: trimmed,
       pillId: activePill?.id ?? null,
       pillLabel: activePill?.label ?? null,
       insertedPrompt: activePill?.insertedPrompt ?? null,
-      experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
-      variantId: HOMEPAGE_INTENT_VARIANT_ID,
-      createdAt: new Date().toISOString(),
-    };
+    });
 
     // Intent capture is best-effort: if storage fails (private mode, quota,
     // disabled), we still redirect so the user isn't stranded — but we
     // surface the failure via analytics so we can see it in prod.
     let persisted = true;
     try {
-      persistIntent(intent);
+      persistHomepageIntent(intent);
     } catch (error) {
       persisted = false;
       track('homepage_intent_persist_failed', {
@@ -134,14 +130,30 @@ export function HomepageIntent() {
       });
     }
 
+    const desktop = isDesktopViewport();
+    const surface: 'desktop_modal' | 'mobile_fullpage' = desktop
+      ? 'desktop_modal'
+      : 'mobile_fullpage';
+
     track('homepage_prompt_submitted', {
       pillId: intent.pillId,
       pillUsed: intent.pillId !== null,
-      promptLength: trimmed.length,
+      promptLength: intent.finalPrompt.length,
       persisted,
+      surface,
+      intentId: intent.id,
     });
 
-    router.push(buildSigninUrl());
+    const authUrl = buildAuthUrl(intent.id);
+    if (desktop) {
+      // Soft nav: the @auth parallel slot's intercepting route renders the
+      // modal over the homepage. Browser-back closes it.
+      router.push(authUrl);
+    } else {
+      // Hard nav: skips the intercept entirely and loads the full-page
+      // /signup route. iOS Safari + modal + OAuth popup is a known jank.
+      globalThis.window.location.assign(authUrl);
+    }
   }, [value, activePill, router]);
 
   const handleKeyDown = useCallback(
@@ -162,22 +174,25 @@ export function HomepageIntent() {
 
   return (
     <div
-      className='homepage-intent flex w-full min-w-0 max-w-[640px] flex-col items-stretch'
+      className='homepage-intent flex w-full min-w-0 flex-col items-center'
       style={{
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1 className='text-center text-[40px] font-bold leading-[1.05] tracking-[-0.025em] text-primary-token sm:text-[48px] md:text-[56px]'>
-        How can I help you today?
+      <h1
+        id='home-hero-heading'
+        className='homepage-hero-headline self-center text-center text-white'
+      >
+        {HERO_COPY.headline}
       </h1>
-      <p className='mt-4 text-center text-[15px] leading-[1.5] tracking-[-0.005em] text-tertiary-token sm:text-[17px]'>
-        Jovie helps artists &amp; labels release music faster.
+      <p className='homepage-hero-subhead mt-5 max-w-[620px] self-center text-center text-[18px] leading-[1.45] tracking-[-0.01em] text-white/85'>
+        {HERO_COPY.subhead}
       </p>
 
       <label htmlFor={INPUT_ID} className='sr-only'>
         Message Jovie
       </label>
-      <div className='relative mt-7 flex w-full items-center'>
+      <div className='relative mt-7 flex w-full max-w-[640px] items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -206,7 +221,7 @@ export function HomepageIntent() {
       </div>
 
       <div
-        className='mt-4 flex w-full min-w-0 items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='mt-4 flex w-full min-w-0 max-w-[640px] items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         style={{
           WebkitMaskImage:
             'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',

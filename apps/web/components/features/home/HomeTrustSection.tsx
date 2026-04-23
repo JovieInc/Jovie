@@ -13,11 +13,16 @@ const LOGO_CLASS = 'select-none text-white';
 interface HomeTrustSectionProps {
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
+  /** Label rendered above the logos. Artist-profile and release-notification
+   * surfaces use the default ("Trusted by artists on"); the homepage hero
+   * uses "Accelerating release cycles for artists on". */
+  readonly label?: string;
 }
 
 export function HomeTrustSection({
   variant = 'default',
   className,
+  label = 'Trusted by artists on',
 }: Readonly<HomeTrustSectionProps>) {
   return (
     <section
@@ -27,7 +32,7 @@ export function HomeTrustSection({
         variant === 'compact' && 'homepage-trust-strip--compact',
         className
       )}
-      aria-label='Trusted by artists on major labels'
+      aria-label={`${label} major labels`}
     >
       <p
         className={cn(
@@ -35,7 +40,7 @@ export function HomeTrustSection({
           variant === 'compact' ? 'mb-3 sm:mb-4' : 'mb-4 sm:mb-5'
         )}
       >
-        Trusted by artists on
+        {label}
       </p>
       <div
         className={cn(

@@ -30,6 +30,14 @@ export function HomepageV2Route() {
   return (
     <MarketingPageShell>
       <HomepageV2Hero />
+      <HomepageV2BelowHero />
+    </MarketingPageShell>
+  );
+}
+
+export function HomepageV2BelowHero() {
+  return (
+    <>
       <HomeTrustSection />
       <div aria-hidden='true' className='section-gradient-divider' />
       <HomepageV2SystemOverview />
@@ -42,7 +50,7 @@ export function HomepageV2Route() {
       <HomepageV2Pricing />
       <HomepageV2FinalCta />
       <HomepageV2FooterLinks />
-    </MarketingPageShell>
+    </>
   );
 }
 
@@ -223,7 +231,7 @@ function HomepageV2Hero() {
   );
 }
 
-function HomepageV2SystemOverview() {
+export function HomepageV2SystemOverview() {
   return (
     <section
       data-testid='homepage-v2-system-overview'
@@ -275,7 +283,7 @@ function HomepageV2SystemOverview() {
   );
 }
 
-function HomepageV2Spotlight() {
+export function HomepageV2Spotlight() {
   return (
     <section
       data-testid='homepage-v2-spotlight'
@@ -341,7 +349,7 @@ function HomepageV2Spotlight() {
   );
 }
 
-function HomepageV2CaptureReactivate() {
+export function HomepageV2CaptureReactivate() {
   return (
     <section
       data-testid='homepage-v2-capture-reactivate'
@@ -398,7 +406,7 @@ function HomepageV2CaptureReactivate() {
   );
 }
 
-function HomepageV2PowerGrid() {
+export function HomepageV2PowerGrid() {
   return (
     <div data-testid='homepage-v2-power-grid'>
       <ArtistProfileSpecWall
@@ -459,7 +467,7 @@ function HomepageV2SocialProof() {
   );
 }
 
-function HomepageV2Pricing() {
+export function HomepageV2Pricing() {
   return (
     <section
       data-testid='homepage-v2-pricing'
@@ -511,7 +519,7 @@ function HomepageV2Pricing() {
   );
 }
 
-function HomepageV2FinalCta() {
+export function HomepageV2FinalCta() {
   return (
     <section className='section-glow section-glow-cta relative overflow-hidden border-t border-white/8 py-20 sm:py-24 lg:py-28'>
       <div
@@ -547,7 +555,7 @@ function HomepageV2FinalCta() {
   );
 }
 
-function HomepageV2FooterLinks() {
+export function HomepageV2FooterLinks() {
   return (
     <section className='border-t border-white/8 py-10 sm:py-12'>
       <MarketingContainer width='page'>

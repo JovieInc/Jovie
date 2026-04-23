@@ -34,6 +34,13 @@ const PRIORITY_SCORE: Record<CatalogRow['priority'], number> = {
   none: 10,
 };
 
+function computeSelectionScore(row: CatalogRow, reasonsCount: number): number {
+  const baseScore = PRIORITY_SCORE[row.priority] ?? 0;
+  const reasonBonus = Math.min(reasonsCount, 5);
+  const shippedBonus = row.aiSkillStatus === 'shipped' ? 5 : 0;
+  return baseScore + reasonBonus + shippedBonus;
+}
+
 export function selectTasks(
   ctx: ReleaseContext,
   catalog: CatalogRow[]
@@ -51,13 +58,9 @@ export function selectTasks(
     const evaluation = compileRule(predicate)(ctx);
     if (!evaluation.matched) continue;
 
-    const baseScore = PRIORITY_SCORE[row.priority] ?? 0;
-    const reasonBonus = Math.min(evaluation.reasons.length, 5);
-    const shippedBonus = row.aiSkillStatus === 'shipped' ? 5 : 0;
-
     results.push({
       slug: row.slug,
-      score: baseScore + reasonBonus + shippedBonus,
+      score: computeSelectionScore(row, evaluation.reasons.length),
       reasons: evaluation.reasons,
     });
   }
@@ -98,9 +101,7 @@ export function explainSelection(
     const evaluation = compileRule(predicate)(ctx);
     const priorityScore = PRIORITY_SCORE[row.priority] ?? 0;
     const totalScore = evaluation.matched
-      ? priorityScore +
-        Math.min(evaluation.reasons.length, 5) +
-        (row.aiSkillStatus === 'shipped' ? 5 : 0)
+      ? computeSelectionScore(row, evaluation.reasons.length)
       : null;
     return {
       slug: row.slug,

@@ -152,7 +152,7 @@ export function createActionsHeaderRenderer(
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='h-7 gap-1 text-[13px]'
+            className='h-7 gap-1 text-app'
           >
             <Icon name='X' className='h-3.5 w-3.5' />
             Clear
@@ -299,7 +299,7 @@ export function createRightMetaCellRenderer(
         <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-[11px] font-[400] text-secondary-token'
+          className='inline-flex w-[64px] shrink-0 justify-end text-right tabular-nums text-2xs font-[400] text-secondary-token'
           title={yearTitle}
         >
           {dateLabel}
@@ -388,7 +388,7 @@ export function renderLabelCell({
   if (!label) return <EmptyCell />;
 
   return (
-    <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
+    <TruncatedText lines={1} className='text-2xs text-secondary-token'>
       {label}
     </TruncatedText>
   );
@@ -399,7 +399,7 @@ export function renderTotalTracksCell({
   getValue,
 }: CellContext<ReleaseViewModel, number>) {
   return (
-    <span className='text-[13px] tabular-nums text-secondary-token'>
+    <span className='text-app tabular-nums text-secondary-token'>
       {getValue()}
     </span>
   );
@@ -413,7 +413,7 @@ export function renderDurationCell({
   if (!durationMs) return <EmptyCell />;
 
   return (
-    <span className='text-[13px] tabular-nums text-secondary-token'>
+    <span className='text-app tabular-nums text-secondary-token'>
       {formatDuration(durationMs)}
     </span>
   );
@@ -435,13 +435,13 @@ export function renderGenresCell({
     <div className='flex items-center gap-1'>
       <TruncatedText
         lines={1}
-        className='min-w-0 flex-1 text-[13px] text-secondary-token'
+        className='min-w-0 flex-1 text-app text-secondary-token'
       >
         {firstGenre}
       </TruncatedText>
       {remainingCount > 0 && (
         <span
-          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 px-1.5 py-0.5 text-[11px] text-tertiary-token'
+          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 px-1.5 py-0.5 text-2xs text-tertiary-token'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
@@ -468,7 +468,7 @@ export function renderMetricsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-3 text-[13px] tabular-nums text-secondary-token'>
+    <div className='flex items-center gap-3 text-app tabular-nums text-secondary-token'>
       {/* Tracks count - fixed width */}
       <span className='w-8 text-right' title='Tracks'>
         {release.totalTracks}
@@ -511,14 +511,14 @@ export function renderStatsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-2 text-[13px] tabular-nums text-secondary-token'>
+    <div className='flex items-center gap-2 text-app tabular-nums text-secondary-token'>
       {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />
       </div>
 
       {/* Date - fixed width, right aligned */}
-      <span className='w-[60px] text-right text-[11px]'>{dateStr ?? '—'}</span>
+      <span className='w-[60px] text-right text-2xs'>{dateStr ?? '—'}</span>
     </div>
   );
 }

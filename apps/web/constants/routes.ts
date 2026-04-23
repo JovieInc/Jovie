@@ -61,6 +61,7 @@ export const APP_ROUTES = {
   ADMIN_WAITLIST: '/app/admin/waitlist',
   ADMIN_WAITLIST_SETTINGS: '/app/admin/waitlist/settings',
   ADMIN_FEEDBACK: '/app/admin/feedback',
+  ADMIN_INTERVIEWS: '/app/admin/interviews',
   ADMIN_CREATORS: '/app/admin/creators',
   ADMIN_CREATORS_BULK_REFRESH: '/app/admin/creators/bulk-refresh',
   ADMIN_CREATORS_DELETE: '/app/admin/creators/delete',

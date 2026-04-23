@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogActions,
@@ -9,6 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { APP_ROUTES } from '@/constants/routes';
 import type {
   DistributionModel,
   Genre,
@@ -19,6 +21,7 @@ import type {
 } from '@/lib/release-tasks/applicability';
 
 type StepKey =
+  | 'hasPublisher'
   | 'releaseFormat'
   | 'distribution'
   | 'genre'
@@ -28,14 +31,18 @@ type StepKey =
 const STEPS: StepKey[] = [
   'releaseFormat',
   'distribution',
+  'hasPublisher',
   'genre',
   'primaryGoal',
   'territory',
 ];
 
+type PublisherAnswer = 'yes' | 'no';
+
 type WizardAnswers = {
   releaseFormat: ReleaseFormat | null;
   distribution: DistributionModel | null;
+  hasPublisher: PublisherAnswer | null;
   genre: Genre | null;
   primaryGoal: Goal | null;
   territory: Territory | null;
@@ -44,6 +51,7 @@ type WizardAnswers = {
 const INITIAL: WizardAnswers = {
   releaseFormat: null,
   distribution: null,
+  hasPublisher: null,
   genre: null,
   primaryGoal: null,
   territory: null,
@@ -61,6 +69,11 @@ const DISTRIBUTION_CHOICES: Choice<DistributionModel>[] = [
   { value: 'diy', label: 'DIY' },
   { value: 'indie_label', label: 'Indie label' },
   { value: 'major_label', label: 'Major label' },
+];
+
+const PUBLISHER_CHOICES: Choice<PublisherAnswer>[] = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
 ];
 
 const GENRE_CHOICES: Choice<Genre>[] = [
@@ -104,6 +117,11 @@ const STEP_META: Record<StepKey, { title: string; description: string }> = {
     description:
       'DIY covers your own submissions. A label handles most rights paperwork for you.',
   },
+  hasPublisher: {
+    title: 'Do you control publishing?',
+    description:
+      'Publishing ownership changes which rights and royalty tasks belong in the plan.',
+  },
   genre: {
     title: "What's the genre?",
     description:
@@ -128,7 +146,7 @@ interface ReleasePlanWizardProps {
   readonly canGenerateReleasePlans: boolean;
   readonly isGeneratingReleasePlan: boolean;
   readonly onClose: () => void;
-  readonly onSubmit: (ctx: ReleaseContext) => void;
+  readonly onSubmit: (ctx: ReleaseContext) => void | Promise<void>;
 }
 
 export function ReleasePlanWizard({
@@ -140,8 +158,11 @@ export function ReleasePlanWizard({
   onClose,
   onSubmit,
 }: ReleasePlanWizardProps) {
+  const router = useRouter();
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<WizardAnswers>(INITIAL);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitInFlightRef = useRef(false);
 
   const currentStep = STEPS[stepIndex] ?? STEPS[0];
   const stepMeta = currentStep ? STEP_META[currentStep] : null;
@@ -174,11 +195,18 @@ export function ReleasePlanWizard({
     setStepIndex(idx => Math.min(STEPS.length - 1, idx + 1));
   }, [canAdvance]);
 
-  const handleSubmit = useCallback(() => {
+  const handleUpgrade = useCallback(() => {
+    handleClose();
+    router.push(APP_ROUTES.BILLING);
+  }, [handleClose, router]);
+
+  const handleSubmit = useCallback(async () => {
+    if (submitInFlightRef.current) return;
     if (
       !(
         answers.releaseFormat &&
         answers.distribution &&
+        answers.hasPublisher &&
         answers.genre &&
         answers.primaryGoal &&
         answers.territory
@@ -192,9 +220,16 @@ export function ReleasePlanWizard({
       genre: answers.genre,
       primaryGoal: answers.primaryGoal,
       territory: [answers.territory],
-      hasPublisher: answers.distribution !== 'diy',
+      hasPublisher: answers.hasPublisher === 'yes',
     };
-    onSubmit(ctx);
+    submitInFlightRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(ctx);
+    } finally {
+      submitInFlightRef.current = false;
+      setIsSubmitting(false);
+    }
   }, [answers, onSubmit]);
 
   const choices = useMemo(() => {
@@ -203,6 +238,8 @@ export function ReleasePlanWizard({
         return RELEASE_FORMAT_CHOICES;
       case 'distribution':
         return DISTRIBUTION_CHOICES;
+      case 'hasPublisher':
+        return PUBLISHER_CHOICES;
       case 'genre':
         return GENRE_CHOICES;
       case 'primaryGoal':
@@ -249,7 +286,7 @@ export function ReleasePlanWizard({
           >
             Maybe later
           </Button>
-          <Button type='button' size='sm' onClick={handleClose}>
+          <Button type='button' size='sm' onClick={handleUpgrade}>
             Upgrade
           </Button>
         </DialogActions>
@@ -261,7 +298,7 @@ export function ReleasePlanWizard({
     <Dialog open={open} onClose={handleClose} size='lg'>
       <DialogTitle>Plan for {releaseTitle ?? 'this release'}</DialogTitle>
       <DialogDescription>
-        Five quick questions. Jovie picks a task list tailored to your context.
+        Six quick questions. Jovie picks a task list tailored to your context.
       </DialogDescription>
       <DialogBody>
         <div className='space-y-4' data-testid='wizard-step'>
@@ -317,10 +354,12 @@ export function ReleasePlanWizard({
             type='button'
             size='sm'
             onClick={handleSubmit}
-            disabled={!canAdvance || isGeneratingReleasePlan}
+            disabled={!canAdvance || isGeneratingReleasePlan || isSubmitting}
             data-testid='wizard-submit'
           >
-            {isGeneratingReleasePlan ? 'Generating...' : 'Generate plan'}
+            {isGeneratingReleasePlan || isSubmitting
+              ? 'Generating...'
+              : 'Generate plan'}
           </Button>
         ) : (
           <Button

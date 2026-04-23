@@ -232,6 +232,9 @@ export const releaseTaskSnapshots = pgTable(
     releaseIdIndex: index('release_task_snapshots_release_id_idx').on(
       table.releaseId
     ),
+    releaseCatalogSlugUnique: uniqueIndex(
+      'release_task_snapshots_release_catalog_slug_unique'
+    ).on(table.releaseId, table.catalogSlug),
   })
 );
 
@@ -243,11 +246,11 @@ export const customTaskTelemetry = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     releaseId: uuid('release_id').references(() => discogReleases.id, {
-      onDelete: 'set null',
+      onDelete: 'cascade',
     }),
     creatorProfileId: uuid('creator_profile_id').references(
       () => creatorProfiles.id,
-      { onDelete: 'set null' }
+      { onDelete: 'cascade' }
     ),
     userText: text('user_text').notNull(),
     normalizedText: text('normalized_text').notNull(),

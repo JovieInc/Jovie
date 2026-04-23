@@ -257,15 +257,22 @@
     {
       "idx": 36,
       "version": "7",
-      "when": 1776896216004,
-      "tag": "0036_long_wendigo",
+      "when": 1776895603938,
+      "tag": "0036_striped_brother_voodoo",
       "breakpoints": true
     },
     {
       "idx": 37,
       "version": "7",
-      "when": 1776896300000,
-      "tag": "0037_release_task_catalog_seed",
+      "when": 1776912303862,
+      "tag": "0037_strong_christian_walker",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1776912303863,
+      "tag": "0038_release_task_catalog_seed",
       "breakpoints": true
     }
   ]

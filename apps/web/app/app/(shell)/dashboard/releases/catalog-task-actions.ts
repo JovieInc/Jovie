@@ -49,6 +49,13 @@ function computeDueDate(releaseDate: Date, offsetDays: number): Date {
 }
 
 async function loadCatalog(): Promise<CatalogRow[]> {
+  const priorityCase = drizzleSql<number>`CASE ${releaseTaskCatalog.priority}
+    WHEN 'urgent' THEN 1
+    WHEN 'high' THEN 2
+    WHEN 'medium' THEN 3
+    WHEN 'low' THEN 4
+    WHEN 'none' THEN 5
+    ELSE 6 END`;
   const rows = await db
     .select({
       slug: releaseTaskCatalog.slug,
@@ -64,7 +71,12 @@ async function loadCatalog(): Promise<CatalogRow[]> {
       assigneeType: releaseTaskCatalog.assigneeType,
       catalogVersion: releaseTaskCatalog.catalogVersion,
     })
-    .from(releaseTaskCatalog);
+    .from(releaseTaskCatalog)
+    .orderBy(
+      releaseTaskCatalog.catalogVersion,
+      priorityCase,
+      releaseTaskCatalog.slug
+    );
   return rows as CatalogRow[];
 }
 
@@ -101,7 +113,7 @@ export async function instantiateReleaseTasksFromCatalog(
 
   const catalogBySlug = new Map(catalog.map(r => [r.slug, r]));
 
-  const [release, positionRow, counterRow] = await Promise.all([
+  const [release, positionRow] = await Promise.all([
     db
       .select({
         releaseDate: discogReleases.releaseDate,
@@ -118,55 +130,45 @@ export async function instantiateReleaseTasksFromCatalog(
         and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt))
       )
       .then(rows => rows[0]),
-    db
-      .update(creatorProfiles)
-      .set({
-        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${selections.length}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profileId))
-      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber })
-      .then(rows => rows[0]),
   ]);
 
-  const firstTaskNumber =
-    (counterRow?.nextTaskNumber ?? selections.length + 1) - selections.length;
   const startPosition = (positionRow?.maxPosition ?? -1) + 1;
   const releaseDate = release?.releaseDate ?? null;
 
-  const taskRows = selections.map((sel, index) => {
-    const row = catalogBySlug.get(sel.slug);
-    if (!row) throw new Error(`Catalog row not found for slug: ${sel.slug}`);
-    return {
-      taskNumber: firstTaskNumber + index,
-      creatorProfileId: profileId,
-      title: row.name,
-      description: row.shortDescription ?? null,
-      status: 'todo' as const,
-      priority: row.priority,
-      assigneeKind:
-        row.assigneeType === 'ai_workflow'
-          ? ('jovie' as const)
-          : ('human' as const),
-      agentType: row.aiSkillId ?? null,
-      agentStatus: 'idle' as const,
-      releaseId,
-      category: row.category,
-      dueAt:
-        releaseDate === null || row.flowStageDaysOffset === null
-          ? null
-          : computeDueDate(releaseDate, row.flowStageDaysOffset),
-      position: startPosition + index,
-      sourceTemplateId: null,
-      metadata: {
-        dueDaysOffset: row.flowStageDaysOffset,
-        catalogSlug: row.slug,
-        catalogVersion: row.catalogVersion,
-        selectionScore: sel.score,
-        selectionReasons: sel.reasons,
-      },
-    };
-  });
+  const buildTaskRows = (firstTaskNumber: number) =>
+    selections.map((sel, index) => {
+      const row = catalogBySlug.get(sel.slug);
+      if (!row) throw new Error(`Catalog row not found for slug: ${sel.slug}`);
+      return {
+        taskNumber: firstTaskNumber + index,
+        creatorProfileId: profileId,
+        title: row.name,
+        description: row.shortDescription ?? null,
+        status: 'todo' as const,
+        priority: row.priority,
+        assigneeKind:
+          row.assigneeType === 'ai_workflow'
+            ? ('jovie' as const)
+            : ('human' as const),
+        agentType: row.aiSkillId ?? null,
+        agentStatus: 'idle' as const,
+        releaseId,
+        category: row.category,
+        dueAt:
+          releaseDate === null || row.flowStageDaysOffset === null
+            ? null
+            : computeDueDate(releaseDate, row.flowStageDaysOffset),
+        position: startPosition + index,
+        sourceTemplateId: null,
+        metadata: {
+          dueDaysOffset: row.flowStageDaysOffset,
+          catalogSlug: row.slug,
+          catalogVersion: row.catalogVersion,
+          selectionScore: sel.score,
+          selectionReasons: sel.reasons,
+        },
+      };
+    });
 
   const snapshotRows = selections.map(sel => {
     const row = catalogBySlug.get(sel.slug);
@@ -190,6 +192,30 @@ export async function instantiateReleaseTasksFromCatalog(
   });
 
   await db.transaction(async tx => {
+    const [freshExisting] = await tx
+      .select({ taskCount: count() })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.releaseId, releaseId),
+          eq(tasks.creatorProfileId, profileId),
+          isNull(tasks.deletedAt)
+        )
+      );
+    if (freshExisting && freshExisting.taskCount > 0) return;
+
+    const [counterRow] = await tx
+      .update(creatorProfiles)
+      .set({
+        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + ${selections.length}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profileId))
+      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
+    const firstTaskNumber =
+      (counterRow?.nextTaskNumber ?? selections.length + 1) - selections.length;
+    const taskRows = buildTaskRows(firstTaskNumber);
+
     await tx.insert(tasks).values(taskRows);
     await tx.insert(releaseTaskSnapshots).values(snapshotRows);
 
@@ -334,7 +360,7 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
     .limit(1);
   if (!row) throw new Error(`Unknown catalog slug: ${slug}`);
 
-  const [release, positionRow, counterRow] = await Promise.all([
+  const [release, positionRow] = await Promise.all([
     db
       .select({ releaseDate: discogReleases.releaseDate })
       .from(discogReleases)
@@ -348,22 +374,22 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
         and(eq(tasks.creatorProfileId, profileId), isNull(tasks.deletedAt))
       )
       .then(rows => rows[0]),
-    db
+  ]);
+
+  const position = (positionRow?.maxPosition ?? -1) + 1;
+  const releaseDate = release?.releaseDate ?? null;
+
+  await db.transaction(async tx => {
+    const [counterRow] = await tx
       .update(creatorProfiles)
       .set({
         nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profileId))
-      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber })
-      .then(rows => rows[0]),
-  ]);
+      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
+    const taskNumber = (counterRow?.nextTaskNumber ?? 1) - 1;
 
-  const taskNumber = (counterRow?.nextTaskNumber ?? 1) - 1;
-  const position = (positionRow?.maxPosition ?? -1) + 1;
-  const releaseDate = release?.releaseDate ?? null;
-
-  await db.transaction(async tx => {
     await tx.insert(tasks).values({
       taskNumber,
       creatorProfileId: profileId,
@@ -382,11 +408,7 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
       dueAt:
         releaseDate === null || row.flowStageDaysOffset === null
           ? null
-          : (() => {
-              const d = new Date(releaseDate);
-              d.setDate(d.getDate() + row.flowStageDaysOffset);
-              return d;
-            })(),
+          : computeDueDate(releaseDate, row.flowStageDaysOffset),
       position,
       sourceTemplateId: null,
       metadata: {

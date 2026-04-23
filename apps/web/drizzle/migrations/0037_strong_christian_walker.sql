@@ -1,28 +1,4 @@
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'custom_task_triage_status') THEN
-    CREATE TYPE "public"."custom_task_triage_status" AS ENUM('auto_clustered', 'pending_review', 'merged_to_catalog', 'rejected');
-  END IF;
-END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_child_type') THEN
-    CREATE TYPE "public"."release_child_type" AS ENUM('spedup', 'slowed', 'clean', 'radio_edit', 'extended', 'instrumental', 'lyric_video');
-  END IF;
-END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_skill_cluster_status') THEN
-    CREATE TYPE "public"."release_skill_cluster_status" AS ENUM('planned', 'shipping', 'shipped');
-  END IF;
-END $$;--> statement-breakpoint
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'release_task_ai_skill_status') THEN
-    CREATE TYPE "public"."release_task_ai_skill_status" AS ENUM('none', 'planned', 'in_progress', 'shipped');
-  END IF;
-END $$;--> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "custom_task_telemetry" (
+CREATE TABLE "custom_task_telemetry" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"release_id" uuid,
 	"creator_profile_id" uuid,
@@ -35,7 +11,7 @@ CREATE TABLE IF NOT EXISTS "custom_task_telemetry" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "release_skill_clusters" (
+CREATE TABLE "release_skill_clusters" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"display_name" text NOT NULL,
@@ -47,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "release_skill_clusters" (
 	CONSTRAINT "release_skill_clusters_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "release_task_catalog" (
+CREATE TABLE "release_task_catalog" (
 	"slug" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"category" text NOT NULL,
@@ -68,7 +44,7 @@ CREATE TABLE IF NOT EXISTS "release_task_catalog" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "release_task_snapshots" (
+CREATE TABLE "release_task_snapshots" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"release_id" uuid NOT NULL,
 	"catalog_slug" text NOT NULL,
@@ -87,19 +63,12 @@ CREATE TABLE IF NOT EXISTS "release_task_snapshots" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "custom_task_telemetry" ADD CONSTRAINT "custom_task_telemetry_release_id_discog_releases_id_fk" FOREIGN KEY ("release_id") REFERENCES "public"."discog_releases"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "custom_task_telemetry" ADD CONSTRAINT "custom_task_telemetry_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "release_task_catalog" ADD CONSTRAINT "release_task_catalog_cluster_id_release_skill_clusters_id_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."release_skill_clusters"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "release_task_snapshots" ADD CONSTRAINT "release_task_snapshots_release_id_discog_releases_id_fk" FOREIGN KEY ("release_id") REFERENCES "public"."discog_releases"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
+ALTER TABLE "custom_task_telemetry" ADD CONSTRAINT "custom_task_telemetry_release_id_discog_releases_id_fk" FOREIGN KEY ("release_id") REFERENCES "public"."discog_releases"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "custom_task_telemetry" ADD CONSTRAINT "custom_task_telemetry_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "release_task_catalog" ADD CONSTRAINT "release_task_catalog_cluster_id_release_skill_clusters_id_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."release_skill_clusters"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "release_task_snapshots" ADD CONSTRAINT "release_task_snapshots_release_id_discog_releases_id_fk" FOREIGN KEY ("release_id") REFERENCES "public"."discog_releases"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "custom_task_telemetry_triage_status_idx" ON "custom_task_telemetry" USING btree ("triage_status");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "custom_task_telemetry_normalized_text_idx" ON "custom_task_telemetry" USING btree ("normalized_text");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "release_task_catalog_cluster_id_idx" ON "release_task_catalog" USING btree ("cluster_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "release_task_snapshots_release_id_idx" ON "release_task_snapshots" USING btree ("release_id");
+CREATE INDEX IF NOT EXISTS "release_task_snapshots_release_id_idx" ON "release_task_snapshots" USING btree ("release_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "release_task_snapshots_release_catalog_slug_unique" ON "release_task_snapshots" USING btree ("release_id","catalog_slug");

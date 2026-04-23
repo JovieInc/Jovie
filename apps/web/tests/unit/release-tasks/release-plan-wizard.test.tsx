@@ -2,6 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleasePlanWizard } from '@/components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
 const baseProps = {
   open: true,
   releaseTitle: 'The Deep End',
@@ -19,7 +25,7 @@ describe('ReleasePlanWizard', () => {
 
   it('renders step 1 (release format) by default', () => {
     render(<ReleasePlanWizard {...baseProps} />);
-    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
     expect(screen.getByTestId('choice-single')).toBeInTheDocument();
     expect(screen.getByTestId('choice-ep')).toBeInTheDocument();
     expect(screen.getByTestId('choice-album')).toBeInTheDocument();
@@ -38,7 +44,7 @@ describe('ReleasePlanWizard', () => {
     expect(back).toBeDisabled();
     fireEvent.click(screen.getByTestId('choice-single'));
     fireEvent.click(screen.getByTestId('wizard-next'));
-    expect(screen.getByText('Step 2 of 5')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 6')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled();
   });
 
@@ -49,6 +55,8 @@ describe('ReleasePlanWizard', () => {
     fireEvent.click(screen.getByTestId('choice-single'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-diy'));
+    fireEvent.click(screen.getByTestId('wizard-next'));
+    fireEvent.click(screen.getByTestId('choice-no'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-electronic'));
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -74,6 +82,8 @@ describe('ReleasePlanWizard', () => {
     fireEvent.click(screen.getByTestId('choice-album'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-major_label'));
+    fireEvent.click(screen.getByTestId('wizard-next'));
+    fireEvent.click(screen.getByTestId('choice-yes'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-country'));
     fireEvent.click(screen.getByTestId('wizard-next'));
@@ -110,6 +120,8 @@ describe('ReleasePlanWizard', () => {
     fireEvent.click(screen.getByTestId('choice-single'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-diy'));
+    fireEvent.click(screen.getByTestId('wizard-next'));
+    fireEvent.click(screen.getByTestId('choice-no'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     fireEvent.click(screen.getByTestId('choice-pop'));
     fireEvent.click(screen.getByTestId('wizard-next'));

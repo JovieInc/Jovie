@@ -1,28 +1,15 @@
 import 'server-only';
-import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { captureWarning } from '@/lib/error-tracking';
 import { isAdmin } from './roles';
-
-/**
- * Mask user ID for logging to prevent PII exposure while maintaining correlation.
- * Format: first 4 chars + hash suffix for audit trail correlation
- */
-function maskUserIdForLog(userId: string): string {
-  const hash = crypto
-    .createHash('sha256')
-    .update(userId)
-    .digest('hex')
-    .substring(0, 8);
-  return `${userId.substring(0, 4)}...${hash}`;
-}
 
 /**
  * Admin route protection middleware

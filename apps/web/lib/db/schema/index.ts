@@ -729,6 +729,19 @@ export {
   tourDateProviderEnum,
   tourDates,
 } from './tour';
+// User Interviews (Mom Test interviews post-onboarding)
+export {
+  type InterviewMetadata,
+  type InterviewSummaryStructured,
+  type InterviewTranscriptEntry,
+  insertUserInterviewSchema,
+  type NewUserInterview,
+  selectUserInterviewSchema,
+  type UserInterview,
+  type UserInterviewStatus,
+  userInterviewStatusEnumValues,
+  userInterviews,
+} from './user-interviews';
 
 // Waitlist
 export {
