@@ -23,7 +23,7 @@ describe('DashboardNav interactions', () => {
   it('renders the full primary navigation config', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
       APP_ROUTES.DASHBOARD_RELEASES
@@ -40,7 +40,7 @@ describe('DashboardNav interactions', () => {
       overrides: { isAdmin: true },
     });
 
-    expect(screen.getByRole('button', { name: 'Admin' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Growth' })).toHaveAttribute(
       'href',
       APP_ROUTES.ADMIN_GROWTH
@@ -109,7 +109,10 @@ describe('DashboardNav interactions', () => {
 
     renderDashboardNav({ renderFn: render });
 
-    await user.click(screen.getByRole('link', { name: 'Releases' }));
+    const releasesLink = screen.getByRole('link', { name: 'Releases' });
+    releasesLink.addEventListener('click', event => event.preventDefault());
+
+    await user.click(releasesLink);
 
     expect(mockShowPendingShell).toHaveBeenCalledTimes(1);
     expect(mockShowPendingShell).toHaveBeenCalledWith('releases');
@@ -121,7 +124,10 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
     renderDashboardNav({ renderFn: render });
 
-    await user.click(screen.getByRole('link', { name: 'Releases' }));
+    const releasesLink = screen.getByRole('link', { name: 'Releases' });
+    releasesLink.addEventListener('click', event => event.preventDefault());
+
+    await user.click(releasesLink);
 
     expect(mockShowPendingShell).not.toHaveBeenCalled();
     expect(mockClearPendingShell).not.toHaveBeenCalled();
@@ -131,6 +137,7 @@ describe('DashboardNav interactions', () => {
     renderDashboardNav({ renderFn: render });
 
     const releasesLink = screen.getByRole('link', { name: 'Releases' });
+    releasesLink.addEventListener('click', event => event.preventDefault());
     fireEvent.pointerDown(releasesLink, {
       button: 0,
       metaKey: true,
@@ -162,6 +169,7 @@ describe('DashboardNav interactions', () => {
 
     const tasksLink = screen.getByRole('link', { name: 'Tasks' });
     expect(tasksLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD_TASKS);
+    tasksLink.addEventListener('click', event => event.preventDefault());
 
     await user.click(tasksLink);
 

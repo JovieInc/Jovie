@@ -72,6 +72,23 @@ These run on main branch and PRs with `testing` label:
 
 ## Adding New Tests
 
+### Test Truth Checklist
+
+Every new or updated test should satisfy these rules:
+
+- Test the real boundary: exported domain logic, rendered UI, request/response contracts, or observable side effects.
+- Do not duplicate private implementation logic inside the test. If a private helper deserves direct unit coverage, extract it into a production module first.
+- Prefer semantic assertions: roles, visible copy, response payloads, headers, redirects, invalidation, and persisted side effects.
+- Avoid assertion-light checks like `toBeDefined()` when the behavior can be asserted more directly.
+- Keep shared setup mocks top-level. Nested `vi.mock()` inside setup helpers is forbidden because Vitest hoists those calls anyway.
+- When fixing one bug or test smell, search for sibling suites with the same pattern and clean them up in the same pass.
+
+Run the lightweight guard before shipping test refactors:
+
+```bash
+pnpm --filter @jovie/web run test:truth
+```
+
 ### When to add to smoke
 
 Add to smoke **only if**:

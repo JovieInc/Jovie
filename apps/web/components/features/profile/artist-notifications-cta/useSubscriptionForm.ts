@@ -61,7 +61,7 @@ interface UseSubscriptionFormReturn {
   handleFieldBlur: () => void;
   handleOtpChange: (value: string) => void;
   handleSubscribe: () => Promise<void>;
-  handleVerifyOtp: () => Promise<void>;
+  handleVerifyOtp: (overrideCode?: string) => Promise<void>;
   handleResendOtp: () => Promise<boolean>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
@@ -355,52 +355,59 @@ export function useSubscriptionForm({
     [clearError, error]
   );
 
-  const handleVerifyOtp = useCallback(async () => {
-    if (isSubmitting) return;
-    if (otpCode.length !== 6) {
-      updateError('Enter the 6-digit code from your email', 'verify');
-      return;
-    }
+  const handleVerifyOtp = useCallback(
+    async (overrideCode?: string) => {
+      if (isSubmitting) return;
+      const verificationCode = (overrideCode ?? otpCode)
+        .replaceAll(/[^\d]/g, '')
+        .slice(0, 6);
 
-    setIsSubmitting(true);
-    clearError();
+      if (verificationCode.length !== 6) {
+        updateError('Enter the 6-digit code from your email', 'verify');
+        return;
+      }
 
-    try {
-      const normalizedEmail = normalizeSubscriptionEmail(emailInput);
-      if (!normalizedEmail)
-        throw new Error('Please enter a valid email address');
+      setIsSubmitting(true);
+      clearError();
 
-      await verifyEmailOtpMutation.mutateAsync({
-        artistId: artist.id,
-        email: normalizedEmail,
-        otpCode,
-      });
+      try {
+        const normalizedEmail = normalizeSubscriptionEmail(emailInput);
+        if (!normalizedEmail)
+          throw new Error('Please enter a valid email address');
 
-      setSubscribedChannels(prev => ({ ...prev, email: true }));
-      setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
-      setNotificationsState('success');
-      showSuccess("You're all set. We'll keep you in the loop.");
-    } catch (err) {
-      updateError(
-        resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic),
-        'verify'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    artist.id,
-    clearError,
-    emailInput,
-    isSubmitting,
-    otpCode,
-    setNotificationsState,
-    setSubscribedChannels,
-    setSubscriptionDetails,
-    showSuccess,
-    updateError,
-    verifyEmailOtpMutation,
-  ]);
+        await verifyEmailOtpMutation.mutateAsync({
+          artistId: artist.id,
+          email: normalizedEmail,
+          otpCode: verificationCode,
+        });
+
+        setSubscribedChannels(prev => ({ ...prev, email: true }));
+        setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
+        setNotificationsState('success');
+        showSuccess("You're all set. We'll keep you in the loop.");
+      } catch (err) {
+        updateError(
+          resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic),
+          'verify'
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [
+      artist.id,
+      clearError,
+      emailInput,
+      isSubmitting,
+      otpCode,
+      setNotificationsState,
+      setSubscribedChannels,
+      setSubscriptionDetails,
+      showSuccess,
+      updateError,
+      verifyEmailOtpMutation,
+    ]
+  );
 
   const handleResendOtp = useCallback(async () => {
     if (isResending || Date.now() < resendCooldownEnd) {

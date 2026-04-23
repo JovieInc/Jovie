@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -218,11 +212,40 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
+vi.mock('@/components/atoms/Calendar', () => ({
+  Calendar: ({ onSelect }: { onSelect?: (date: Date | undefined) => void }) => (
+    <button
+      type='button'
+      data-testid='calendar-select-date'
+      onClick={() => onSelect?.(new Date('2026-05-20T12:00:00.000Z'))}
+    >
+      Select May 20 2026
+    </button>
+  ),
+}));
+
 vi.mock('@/components/atoms/LoadingSpinner', () => ({
   LoadingSpinner: () => <span data-testid='loading-spinner' />,
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    onClick,
+    id,
+    type = 'button',
+    disabled,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    id?: string;
+    type?: 'button' | 'submit' | 'reset';
+    disabled?: boolean;
+  }) => (
+    <button type={type} id={id} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
   Input: ({
     value,
     onChange,
@@ -260,6 +283,14 @@ vi.mock('@jovie/ui', () => ({
   ),
   SelectValue: ({ children }: { children?: ReactNode }) => (
     <span>{children}</span>
+  ),
+}));
+
+vi.mock('@jovie/ui/atoms/popover', () => ({
+  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
   ),
 }));
 
@@ -338,15 +369,14 @@ describe('AddReleaseSidebar', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
     await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
-    fireEvent.change(screen.getByLabelText('Release Date'), {
-      target: { value: '2026-04-01' },
-    });
+    await user.click(screen.getByLabelText('Release Date'));
+    await user.click(screen.getByTestId('calendar-select-date'));
 
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
       'Midnight Sun'
     );
     expect(screen.getByTestId('release-fields')).toHaveTextContent(
-      'type:single|date:2026-04-01|tracks:1'
+      'type:single|date:2026-05-20|tracks:1'
     );
   });
 
@@ -356,6 +386,7 @@ describe('AddReleaseSidebar', () => {
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Release Type')).toBeInTheDocument();
     expect(screen.getByLabelText('Release Date')).toBeInTheDocument();
+    expect(screen.getByText('Pick a date')).toBeInTheDocument();
     expect(screen.getByLabelText('Explicit')).toBeInTheDocument();
     expect(screen.getByText('Choose Genre')).toBeInTheDocument();
     expect(
@@ -363,6 +394,18 @@ describe('AddReleaseSidebar', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Spotify')).not.toBeInTheDocument();
     expect(screen.queryByText('Platform Links')).not.toBeInTheDocument();
+  });
+
+  it('shows and updates the reveal date picker for future releases', async () => {
+    const user = userEvent.setup();
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.click(screen.getByLabelText('Release Date'));
+    await user.click(screen.getByTestId('calendar-select-date'));
+
+    const revealDatePicker = screen.getByLabelText('Reveal Date');
+    expect(revealDatePicker).toBeInTheDocument();
+    expect(revealDatePicker).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
   });
 
   it('keeps submit disabled until title exists', async () => {

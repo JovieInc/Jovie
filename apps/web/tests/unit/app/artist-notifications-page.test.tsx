@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import ArtistNotificationsPage from '@/app/(marketing)/artist-notifications/page';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_ORDER } from '@/data/artistNotificationsPageOrder';
 
@@ -64,8 +65,17 @@ describe('ArtistNotificationsPage', () => {
         name: 'Notify them automatically.',
       })
     ).toBeInTheDocument();
-    expect(reactivationSection.getByText('New music')).toBeInTheDocument();
-    expect(reactivationSection.getByText('Show near due')).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText('New music gets another listening moment.')
+    ).toBeInTheDocument();
+    expect(
+      reactivationSection.getByText(
+        'Subscribers go straight to the latest release.'
+      )
+    ).toBeInTheDocument();
+    for (const row of ARTIST_NOTIFICATIONS_COPY.reactivation.workflow.rows) {
+      expect(reactivationSection.getByText(row.trigger)).toBeInTheDocument();
+    }
     expect(
       reactivationSection.queryByText('Video Live')
     ).not.toBeInTheDocument();
@@ -125,7 +135,7 @@ describe('ArtistNotificationsPage', () => {
     ).toBeInTheDocument();
 
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'An email list that sends itself.'
+      'Ready to Amplify?'
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',

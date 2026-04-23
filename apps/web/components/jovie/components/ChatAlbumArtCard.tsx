@@ -15,33 +15,41 @@ interface ChatAlbumArtCardProps {
   readonly profileId: string;
 }
 
-function buildExistingReleasePrompt(title: string, releaseId: string): string {
-  return `Generate album art for this release and attach it to the provided release ID.\n${JSON.stringify(
-    {
-      releaseId,
-      releaseTitle: title,
-      instruction: 'Show three options.',
-    }
-  )}`;
-}
-
-function buildCreateReleasePrompt(title: string | null): string {
-  if (!title?.trim()) {
-    return 'Help me create a new release and generate album art for it. Ask me for the release title first.';
-  }
-
-  return `Generate album art for a new release and create the release after I pick one option.\n${JSON.stringify(
-    {
-      createRelease: true,
-      releaseTitle: title,
-      instruction: 'Show three options.',
-    }
-  )}`;
-}
-
-function submitChatPrompt(prompt: string): void {
+/**
+ * Dispatch chips into the chat input tray instead of auto-submitting a full
+ * prompt. The user sees the chips, can add context, and submits with Enter.
+ * `useJovieChat` listens for this event and appends to its chip tray.
+ */
+function insertReleaseChips(
+  release: { id: string; title: string },
+  { createRelease = false }: { readonly createRelease?: boolean } = {}
+): void {
+  // Skill chip first so the transcript reads "/skill:... @release:..."
   globalThis.dispatchEvent(
-    new CustomEvent('jovie-chat-submit-prompt', { detail: { prompt } })
+    new CustomEvent('jovie-chat-insert-mention', {
+      detail: { skillId: 'generateAlbumArt' },
+    })
+  );
+  if (createRelease) return;
+  globalThis.dispatchEvent(
+    new CustomEvent('jovie-chat-insert-mention', {
+      detail: {
+        mention: { kind: 'release', id: release.id, label: release.title },
+      },
+    })
+  );
+}
+
+/**
+ * For the "Create release with art" path we have no releaseId yet. Drop a
+ * skill chip into the tray; the model prompts for a title, user types it,
+ * tool creates the release.
+ */
+function insertCreateReleaseChip(): void {
+  globalThis.dispatchEvent(
+    new CustomEvent('jovie-chat-insert-mention', {
+      detail: { skillId: 'generateAlbumArt' },
+    })
   );
 }
 
@@ -133,9 +141,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
               variant='secondary'
               size='sm'
               onClick={() =>
-                submitChatPrompt(
-                  buildExistingReleasePrompt(release.title, release.id)
-                )
+                insertReleaseChips({ id: release.id, title: release.title })
               }
             >
               {release.title}
@@ -145,9 +151,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             type='button'
             variant='secondary'
             size='sm'
-            onClick={() =>
-              submitChatPrompt(buildCreateReleasePrompt(result.releaseTitle))
-            }
+            onClick={() => insertCreateReleaseChip()}
           >
             Create Release With Art
           </Button>
@@ -214,11 +218,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         >
           {hasAppliedSelectedCandidate
             ? 'Applied'
-            : !result.releaseId
-              ? 'Create Release With Art'
-              : result.hasExistingArtwork
+            : result.releaseId
+              ? result.hasExistingArtwork
                 ? 'Replace Artwork'
-                : 'Use This Art'}
+                : 'Use This Art'
+              : 'Create Release With Art'}
         </Button>
         <Button
           type='button'
@@ -226,14 +230,12 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
           variant='secondary'
           disabled={applyMutation.isPending || createMutation.isPending}
           onClick={() =>
-            submitChatPrompt(
-              result.releaseId
-                ? buildExistingReleasePrompt(
-                    result.releaseTitle,
-                    result.releaseId
-                  )
-                : buildCreateReleasePrompt(result.releaseTitle)
-            )
+            result.releaseId
+              ? insertReleaseChips({
+                  id: result.releaseId,
+                  title: result.releaseTitle,
+                })
+              : insertCreateReleaseChip()
           }
         >
           Regenerate

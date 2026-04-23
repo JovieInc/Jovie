@@ -76,7 +76,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
     return (
       <div className='mt-3 space-y-1.5'>
         <SectionHeading count={0} />
-        <p className='px-2 text-[12px] text-tertiary-token'>
+        <p className='px-2 text-xs text-tertiary-token'>
           Couldn&apos;t load suggestions.{' '}
           <button
             type='button'
@@ -95,7 +95,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   return (
     <div className='mt-3 space-y-1.5'>
       <SectionHeading count={sorted.length} />
-      <p className='px-2 text-[13px] font-[450] leading-[18px] text-secondary-token'>
+      <p className='px-2 text-app font-book leading-[18px] text-secondary-token'>
         We found profiles that may be you on other platforms. Confirm or dismiss
         each one.
       </p>
@@ -115,7 +115,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
         <button
           type='button'
           onClick={() => setExpanded(true)}
-          className='px-2 text-[12px] font-[450] text-accent hover:text-accent/80'
+          className='px-2 text-xs font-book text-accent hover:text-accent/80'
         >
           Show {hiddenCount} more
         </button>
@@ -127,11 +127,11 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
 function SectionHeading({ count }: { readonly count: number }) {
   return (
     <div className='flex items-center gap-2 px-2'>
-      <span className='text-[11px] font-[450] uppercase tracking-widest text-tertiary-token'>
+      <span className='text-2xs font-book uppercase tracking-widest text-tertiary-token'>
         Suggested
       </span>
       {count > 0 && (
-        <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-[10px] font-[510] text-tertiary-token'>
+        <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
           {count}
         </span>
       )}
@@ -190,7 +190,7 @@ function SuggestedMatchRow({
         <PopoverTrigger asChild>
           <span className='contents'>
             <DspProviderIcon provider={match.providerId} size='sm' />
-            <span className='min-w-0 flex-1 truncate text-[13px] font-[450] text-primary-token'>
+            <span className='min-w-0 flex-1 truncate text-app font-book text-primary-token'>
               {match.externalArtistName || label}
             </span>
             <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100'>
@@ -287,17 +287,17 @@ function MatchPopoverContent({
           </div>
         )}
         <div className='min-w-0 flex-1'>
-          <p className='truncate text-[14px] font-[590] text-primary-token'>
+          <p className='truncate text-sm font-semibold text-primary-token'>
             {match.externalArtistName || 'Unknown Artist'}
           </p>
-          <p className='text-[12px] font-[450] text-tertiary-token'>{label}</p>
+          <p className='text-xs font-book text-tertiary-token'>{label}</p>
         </div>
       </div>
 
       <div className='flex items-center gap-2'>
         <ConfidenceBadge score={match.confidenceScore} size='sm' />
         {match.matchingIsrcCount > 0 && (
-          <span className='text-[12px] text-tertiary-token'>
+          <span className='text-xs text-tertiary-token'>
             {match.matchingIsrcCount} tracks verified
           </span>
         )}
@@ -309,7 +309,7 @@ function MatchPopoverContent({
             asChild
             variant='ghost'
             size='sm'
-            className='h-7 flex-1 rounded-full text-[12px] font-[510]'
+            className='h-7 flex-1 rounded-full text-xs font-caption'
           >
             <a
               href={match.externalArtistUrl}
@@ -326,7 +326,7 @@ function MatchPopoverContent({
           size='sm'
           onClick={onReject}
           disabled={isLoading}
-          className='h-7 flex-1 rounded-full text-[12px] font-[510]'
+          className='h-7 flex-1 rounded-full text-xs font-caption'
         >
           {isRejecting ? 'Rejecting...' : 'Reject'}
         </Button>
@@ -335,7 +335,7 @@ function MatchPopoverContent({
           size='sm'
           onClick={onConfirm}
           disabled={isLoading}
-          className='h-7 flex-1 rounded-full text-[12px] font-[510]'
+          className='h-7 flex-1 rounded-full text-xs font-caption'
         >
           {isConfirming ? 'Confirming...' : 'Confirm'}
         </Button>

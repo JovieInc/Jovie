@@ -1,28 +1,15 @@
 import 'server-only';
-import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { captureWarning } from '@/lib/error-tracking';
 import { isAdmin } from './roles';
-
-/**
- * Mask user ID for logging to prevent PII exposure while maintaining correlation.
- * Format: first 4 chars + hash suffix for audit trail correlation
- */
-function maskUserIdForLog(userId: string): string {
-  const hash = crypto
-    .createHash('sha256')
-    .update(userId)
-    .digest('hex')
-    .substring(0, 8);
-  return `${userId.substring(0, 4)}...${hash}`;
-}
 
 /**
  * Admin route protection middleware
@@ -69,11 +56,17 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     }
   }
 
-  // User not authenticated
+  // User not authenticated. This is routine traffic (unauth hits to admin
+  // routes) — not an actionable signal, so we record a breadcrumb for
+  // audit correlation but do not emit a Sentry event. The authenticated-
+  // but-not-admin case below remains a captureWarning since that IS worth
+  // surfacing.
   if (!userId) {
-    captureWarning(
-      '[admin/middleware] Unauthorized admin access attempt - no user ID'
-    );
+    Sentry.addBreadcrumb({
+      category: 'admin',
+      level: 'info',
+      message: 'admin/middleware: unauth hit (no user id)',
+    });
     return NextResponse.json(
       { error: 'Unauthorized. Please sign in.' },
       { status: 401 }

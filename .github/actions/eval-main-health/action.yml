@@ -1,0 +1,294 @@
+name: Evaluate main CI health
+description: Shared truth source for main CI state. Used by the health monitor (alerting/one-shot rerun) and the autofix workflow (dispatching Claude Code fixes).
+
+inputs:
+  stuck-threshold-minutes:
+    description: How long an in-progress run must be stuck before alerting.
+    required: false
+    default: '45'
+  no-success-threshold-hours:
+    description: How long without a successful main run (while PRs are merging) before alerting.
+    required: false
+    default: '3'
+  autofix-cross-sha-window-minutes:
+    description: Window for detecting systemic failures across distinct SHAs.
+    required: false
+    default: '60'
+  autofix-cross-sha-limit:
+    description: If this many distinct SHAs triggered autofix within the window, escalate to human instead of dispatching.
+    required: false
+    default: '2'
+
+outputs:
+  should_alert:
+    description: Whether the monitor should post a Slack alert.
+    value: ${{ steps.evaluate.outputs.should_alert }}
+  summary:
+    description: One-line human summary.
+    value: ${{ steps.evaluate.outputs.summary }}
+  details:
+    description: Multi-line human details.
+    value: ${{ steps.evaluate.outputs.details }}
+  run_url:
+    description: URL to the most relevant run.
+    value: ${{ steps.evaluate.outputs.run_url }}
+  failed_run_id:
+    description: Run ID eligible for a safe one-shot rerun (monitor's self-heal). Empty if not safe to rerun.
+    value: ${{ steps.evaluate.outputs.failed_run_id }}
+  needs_autofix:
+    description: Whether the autofix workflow should dispatch a Claude Code fix agent.
+    value: ${{ steps.evaluate.outputs.needs_autofix }}
+  autofix_skip_reason:
+    description: If needs_autofix is false but a failure exists, why autofix was skipped (e.g. canary, systemic, stale).
+    value: ${{ steps.evaluate.outputs.autofix_skip_reason }}
+  failing_run_id:
+    description: Run ID of the unresolved failing run (for autofix to fetch logs).
+    value: ${{ steps.evaluate.outputs.failing_run_id }}
+  failing_sha:
+    description: Commit SHA of the failing main run.
+    value: ${{ steps.evaluate.outputs.failing_sha }}
+  failing_short_sha:
+    description: Short (7-char) SHA of the failing main run.
+    value: ${{ steps.evaluate.outputs.failing_short_sha }}
+  last_green_sha:
+    description: SHA of the most recent successful main run (for diff-since-green context).
+    value: ${{ steps.evaluate.outputs.last_green_sha }}
+  failed_job_names:
+    description: Comma-separated names of failed jobs in the failing run.
+    value: ${{ steps.evaluate.outputs.failed_job_names }}
+  systemic:
+    description: true if multiple distinct SHAs triggered autofix within the cross-SHA window.
+    value: ${{ steps.evaluate.outputs.systemic }}
+
+runs:
+  using: composite
+  steps:
+    - name: Evaluate
+      id: evaluate
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        STUCK_THRESHOLD_MINUTES: ${{ inputs.stuck-threshold-minutes }}
+        NO_SUCCESS_THRESHOLD_HOURS: ${{ inputs.no-success-threshold-hours }}
+        AUTOFIX_CROSS_SHA_WINDOW_MINUTES: ${{ inputs.autofix-cross-sha-window-minutes }}
+        AUTOFIX_CROSS_SHA_LIMIT: ${{ inputs.autofix-cross-sha-limit }}
+      with:
+        script: |
+          const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '30');
+          const noSuccessHours = Number(process.env.NO_SUCCESS_THRESHOLD_HOURS ?? '3');
+          const crossShaWindowMinutes = Number(process.env.AUTOFIX_CROSS_SHA_WINDOW_MINUTES ?? '60');
+          const crossShaLimit = Number(process.env.AUTOFIX_CROSS_SHA_LIMIT ?? '2');
+          const now = Date.now();
+
+          const runsResponse = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'ci.yml',
+            branch: 'main',
+            event: 'push',
+            per_page: 50,
+          });
+
+          const runs = runsResponse.data.workflow_runs ?? [];
+
+          const defaults = {
+            should_alert: 'false',
+            summary: 'Main CI is healthy.',
+            details: 'No stale, failed, or blocked main CI conditions were detected.',
+            run_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/ci.yml`,
+            failed_run_id: '',
+            needs_autofix: 'false',
+            autofix_skip_reason: '',
+            failing_run_id: '',
+            failing_sha: '',
+            failing_short_sha: '',
+            last_green_sha: '',
+            failed_job_names: '',
+            systemic: 'false',
+          };
+
+          const emit = (overrides) => {
+            const out = { ...defaults, ...overrides };
+            for (const [k, v] of Object.entries(out)) core.setOutput(k, v);
+          };
+
+          if (runs.length === 0) {
+            emit({ summary: 'No CI runs found on main.', details: 'The monitor did not find any `ci.yml` push runs on main.' });
+            return;
+          }
+
+          const staleRun = runs.find((run) => {
+            if (!(run.status === 'queued' || run.status === 'in_progress')) return false;
+            const startedAt = run.run_started_at ?? run.created_at;
+            if (!startedAt) return false;
+            return (now - Date.parse(startedAt)) / (1000 * 60) > thresholdMinutes;
+          });
+          const activeRun = runs.find((run) => run.status === 'queued' || run.status === 'in_progress');
+
+          const latestSuccess = runs.find((run) => run.status === 'completed' && run.conclusion === 'success');
+          const latestFailure = runs.find((run) =>
+            run.status === 'completed' &&
+            ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
+          );
+
+          const hasNewerActiveMainRun = (() => {
+            if (!activeRun || !latestFailure) return false;
+
+            const activeRunNumber = Number(activeRun.run_number ?? 0);
+            const failureRunNumber = Number(latestFailure.run_number ?? 0);
+            if (activeRunNumber > failureRunNumber) return true;
+
+            // Fallback for unexpected API payloads where run_number is missing:
+            // only treat it as newer if SHA changed and creation time is later.
+            if (!activeRun.head_sha || !latestFailure.head_sha) return false;
+            if (activeRun.head_sha === latestFailure.head_sha) return false;
+
+            const activeCreatedAt = activeRun.created_at ? Date.parse(activeRun.created_at) : Number.NaN;
+            const failureCreatedAt = latestFailure.created_at ? Date.parse(latestFailure.created_at) : Number.NaN;
+
+            if (Number.isNaN(activeCreatedAt) || Number.isNaN(failureCreatedAt)) return false;
+            return activeCreatedAt > failureCreatedAt;
+          })();
+
+          const failedForTooLong = (() => {
+            if (!latestFailure) return false;
+            // A newer CI run is already in progress for main. Let it finish before
+            // treating the previous failed run as unresolved.
+            if (hasNewerActiveMainRun && !staleRun) return false;
+            const failedAt = latestFailure.updated_at ?? latestFailure.created_at;
+            if (!failedAt) return false;
+            const failedAgeMinutes = (now - Date.parse(failedAt)) / (1000 * 60);
+            if (failedAgeMinutes <= thresholdMinutes) return false;
+            if (!latestSuccess) return true;
+            return Date.parse(latestSuccess.created_at) < Date.parse(latestFailure.created_at);
+          })();
+
+          const successCutoff = latestSuccess?.updated_at ?? latestSuccess?.created_at;
+          let mergedCount = 0;
+
+          const pulls = await github.paginate(github.rest.pulls.list, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'closed',
+            base: 'main',
+            sort: 'updated',
+            direction: 'desc',
+            per_page: 100,
+          });
+
+          for (const pull of pulls) {
+            if (!pull.merged_at) continue;
+            const mergedAt = Date.parse(pull.merged_at);
+            if (Number.isNaN(mergedAt)) continue;
+            if (successCutoff && mergedAt <= Date.parse(successCutoff)) continue;
+            const ageHours = (now - mergedAt) / (1000 * 60 * 60);
+            if (ageHours > noSuccessHours * 2) continue;
+            mergedCount += 1;
+          }
+
+          const noSuccessForTooLong = (() => {
+            if (activeRun && !staleRun) return false;
+            if (!successCutoff) return mergedCount > 0;
+            const successAgeHours = (now - Date.parse(successCutoff)) / (1000 * 60 * 60);
+            return successAgeHours > noSuccessHours && mergedCount > 0;
+          })();
+
+          const reasons = [];
+          if (staleRun) reasons.push(`CI run #${staleRun.run_number} has been ${staleRun.status} for more than ${thresholdMinutes} minutes.`);
+          if (failedForTooLong && latestFailure) reasons.push(`Latest main CI run #${latestFailure.run_number} is ${latestFailure.conclusion} and unresolved for more than ${thresholdMinutes} minutes.`);
+          if (noSuccessForTooLong) reasons.push(`No successful main CI in over ${noSuccessHours} hours while ${mergedCount} merged PR(s) are waiting.`);
+
+          const shouldAlert = reasons.length > 0;
+          const runUrl = staleRun?.html_url ?? latestFailure?.html_url ?? defaults.run_url;
+
+          const out = {
+            should_alert: shouldAlert ? 'true' : 'false',
+            summary: shouldAlert ? 'Main CI health issue detected.' : defaults.summary,
+            details: shouldAlert ? reasons.join('\n') : defaults.details,
+            run_url: runUrl,
+          };
+
+          // Monitor self-heal: only emit failed_run_id when it's safe to --rerun --failed.
+          // Rules: failure is unresolved, no staleRun racing a newer push, and the failed jobs
+          // are not canary/sentry gates (those own their own rollback path).
+          let canaryOrSentryFailed = false;
+          let failedJobNames = '';
+          if (latestFailure) {
+            try {
+              const jobsResp = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: latestFailure.id,
+                per_page: 100,
+              });
+              const failedNames = jobsResp
+                .filter((j) => j.conclusion === 'failure' || j.conclusion === 'timed_out')
+                .map((j) => j.name);
+              failedJobNames = failedNames.join(',');
+              canaryOrSentryFailed = failedNames.some((n) => /canary|sentry/i.test(n));
+            } catch (err) {
+              core.warning(`Could not fetch jobs for run ${latestFailure.id}: ${err.message}`);
+            }
+          }
+
+          const safeToRerun = failedForTooLong && !staleRun && latestFailure && !canaryOrSentryFailed;
+
+          // Autofix eligibility — separate from monitor's one-shot rerun.
+          // Dispatch autofix when: failure is unresolved, not canary/sentry, and either the
+          // one-shot rerun already happened (run_attempt >= 2) or the failure category was
+          // never rerun-eligible in the first place.
+          let needsAutofix = false;
+          let autofixSkipReason = '';
+          let systemic = false;
+
+          if (!failedForTooLong || !latestFailure) {
+            // No eligible failure — leave needs_autofix=false silently.
+          } else if (canaryOrSentryFailed) {
+            autofixSkipReason = 'canary_or_sentry_gate_failed';
+          } else if (staleRun) {
+            autofixSkipReason = 'newer_commit_in_progress';
+          } else {
+            // Check for systemic across distinct SHAs.
+            try {
+              const autofixRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'main-autofix.yml',
+                per_page: 50,
+              });
+              const windowCutoff = now - crossShaWindowMinutes * 60 * 1000;
+              const recentShas = new Set();
+              for (const r of autofixRuns) {
+                if (Date.parse(r.created_at) < windowCutoff) continue;
+                if (r.head_sha) recentShas.add(r.head_sha);
+              }
+              // Include the current failing SHA in the set. Escalate when the count
+              // (including this SHA) reaches the limit — so limit=2 means "the 2nd
+              // distinct SHA in the window is the one that triggers escalation".
+              const thisSha = latestFailure.head_sha;
+              recentShas.add(thisSha);
+              if (recentShas.size >= crossShaLimit) {
+                systemic = true;
+                autofixSkipReason = 'systemic_multiple_shas_failing';
+              }
+            } catch (err) {
+              core.warning(`Could not check cross-SHA autofix history: ${err.message}`);
+            }
+
+            if (!systemic) {
+              needsAutofix = true;
+            }
+          }
+
+          Object.assign(out, {
+            failed_run_id: safeToRerun ? String(latestFailure.id) : '',
+            needs_autofix: needsAutofix ? 'true' : 'false',
+            autofix_skip_reason: autofixSkipReason,
+            failing_run_id: latestFailure ? String(latestFailure.id) : '',
+            failing_sha: latestFailure?.head_sha ?? '',
+            failing_short_sha: latestFailure?.head_sha ? latestFailure.head_sha.slice(0, 7) : '',
+            last_green_sha: latestSuccess?.head_sha ?? '',
+            failed_job_names: failedJobNames,
+            systemic: systemic ? 'true' : 'false',
+          });
+
+          emit(out);

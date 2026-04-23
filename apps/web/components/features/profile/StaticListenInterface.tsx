@@ -166,6 +166,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
               DSP_LOGO_CONFIG[dsp.key as keyof typeof DSP_LOGO_CONFIG];
             const isSelected = selectedDSP === dsp.key;
 
+            let buttonClassName: string | undefined;
+            if (isPreview) buttonClassName = 'pointer-events-none opacity-88';
+            else if (isSelected || isLoading) buttonClassName = 'opacity-60';
+
             return (
               <SmartLinkProviderButton
                 key={dsp.key}
@@ -174,13 +178,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 iconPath={logoConfig?.iconPath}
-                className={
-                  isPreview
-                    ? 'pointer-events-none opacity-88'
-                    : isSelected || isLoading
-                      ? 'opacity-60'
-                      : undefined
-                }
+                className={buttonClassName}
               />
             );
           })

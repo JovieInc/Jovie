@@ -97,14 +97,13 @@ describe('SmartLinkShell', () => {
   it('renders artwork via Image when artworkUrl is provided', () => {
     render(<SmartLinkShell {...defaultProps} />);
     const img = screen.getByTestId('next-image');
-    expect(img).toBeDefined();
-    expect(img.getAttribute('src')).toBe('https://example.com/artwork.jpg');
-    expect(img.getAttribute('alt')).toBe('Test Artwork');
+    expect(img).toHaveAttribute('src', 'https://example.com/artwork.jpg');
+    expect(img).toHaveAttribute('alt', 'Test Artwork');
   });
 
   it('renders ArtworkFallback (Disc3 icon) when artworkUrl is null', () => {
     render(<SmartLinkShell {...defaultProps} artworkUrl={null} />);
-    expect(screen.getByTestId('icon-Disc3')).toBeDefined();
+    expect(screen.getByTestId('icon-Disc3')).toBeInTheDocument();
     expect(screen.queryByTestId('next-image')).toBeNull();
   });
 
@@ -115,7 +114,7 @@ describe('SmartLinkShell', () => {
         heroOverlay={<div data-testid='hero-overlay'>Overlay</div>}
       />
     );
-    expect(screen.getByTestId('hero-overlay')).toBeDefined();
+    expect(screen.getByTestId('hero-overlay')).toHaveTextContent('Overlay');
   });
 
   it('calls onMenuOpen when menu button is clicked', () => {
@@ -127,7 +126,7 @@ describe('SmartLinkShell', () => {
 
   it('renders children content', () => {
     render(<SmartLinkShell {...defaultProps} />);
-    expect(screen.getByTestId('children-content')).toBeDefined();
+    expect(screen.getByTestId('children-content')).toHaveTextContent('Content');
   });
 });
 

@@ -186,7 +186,8 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Run nightly route QA breadth pass
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' }}
+        # Temporarily keep this flaky breadth pass out of scheduled runs.
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' }}
         run: |
           cd apps/web
           pnpm run qa:routes

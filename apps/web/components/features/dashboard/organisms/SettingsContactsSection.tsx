@@ -62,7 +62,7 @@ export function SettingsContactsSection({
         <div className='px-4 py-4 sm:px-5'>
           <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
             <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
-            <p className='text-[13px] text-secondary-token'>
+            <p className='text-app text-secondary-token'>
               Failed to load contacts.
             </p>
             <Button variant='ghost' size='sm' onClick={() => refetch()}>
@@ -216,7 +216,7 @@ function ContactsListInner({
           {isEmpty ? (
             <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-10 text-center'>
               <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
-              <p className='text-[13px] text-secondary-token'>
+              <p className='text-app text-secondary-token'>
                 No contacts yet. Add your first contact to get started.
               </p>
             </ContentSurfaceCard>
@@ -286,18 +286,18 @@ function ContactRow({
     >
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[13px] font-[510] text-secondary-token tracking-normal'>
+          <span className='text-app font-[510] text-secondary-token tracking-normal'>
             {roleLabel}
           </span>
         </div>
         <div className='flex items-center gap-2 mt-0.5'>
           {contact.personName && (
-            <span className='text-[13px] text-primary-token truncate'>
+            <span className='text-app text-primary-token truncate'>
               {contact.personName}
             </span>
           )}
           {contact.email && (
-            <span className='text-[11px] text-secondary-token truncate'>
+            <span className='text-2xs text-secondary-token truncate'>
               {contact.email}
             </span>
           )}

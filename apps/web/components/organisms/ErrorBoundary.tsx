@@ -18,7 +18,7 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = 'Something went wrong. Try again?',
+  message = "We couldn't load this page. Give it another try, or head home.",
 }: ErrorBoundaryProps) {
   const router = useRouter();
 

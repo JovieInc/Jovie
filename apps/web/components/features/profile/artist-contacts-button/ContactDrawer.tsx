@@ -3,8 +3,8 @@
 import { useCallback, useEffect } from 'react';
 import { track } from '@/lib/analytics';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
-import { ProfileContactDrawerContent } from '../ProfileContactDrawerContent';
 import { ProfileDrawerShell } from '../ProfileDrawerShell';
+import { ContactView } from '../views/ContactView';
 
 interface ContactDrawerProps {
   readonly open: boolean;
@@ -49,7 +49,7 @@ export function ContactDrawer({
       subtitle='Booking, management, and press.'
       dataTestId='contact-drawer'
     >
-      <ProfileContactDrawerContent
+      <ContactView
         artistHandle={artistHandle}
         contacts={contacts}
         primaryChannel={primaryChannel}

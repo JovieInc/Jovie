@@ -25,6 +25,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/summarize-interviews",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/generate-playlist",
       "schedule": "0 6 * * *"
     }

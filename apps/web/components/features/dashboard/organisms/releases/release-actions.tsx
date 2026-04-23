@@ -49,13 +49,47 @@ export interface BuildReleaseActionsOptions {
   readonly onGenerateAlbumArt?: (release: ReleaseViewModel) => void;
 }
 
+function buildPrimaryCopySmartLinkItem(
+  opts: Pick<BuildReleaseActionsOptions, 'release' | 'onCopy'> & {
+    locked: boolean;
+    lockReason: 'scheduled' | 'cap' | null;
+  }
+): ContextMenuItemType {
+  const { release, onCopy, locked, lockReason } = opts;
+
+  if (locked) {
+    return {
+      id: 'copy-smart-link',
+      label:
+        lockReason === 'scheduled'
+          ? 'Scheduled smart link (Pro)'
+          : 'Smart link (Pro)',
+      icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
+      disabled: true,
+      onClick: () => {},
+    };
+  }
+
+  return {
+    id: 'copy-smart-link',
+    label: 'Copy smart link',
+    icon: menuIcon('Copy'),
+    onClick: () => {
+      void onCopy(
+        release.smartLinkPath,
+        `${release.title} smart link`,
+        `smart-link-copy-${release.id}`
+      );
+    },
+  };
+}
+
 function buildShareItems(
   opts: Pick<
     BuildReleaseActionsOptions,
     'release' | 'onCopy' | 'artistName' | 'onCopyQrCode' | 'qrCodeIcon'
   > & {
     locked: boolean;
-    lockReason: 'scheduled' | 'cap' | null;
     smartLinkUrl: string;
   }
 ): ContextMenuItemType[] {
@@ -66,39 +100,14 @@ function buildShareItems(
     onCopyQrCode,
     qrCodeIcon,
     locked,
-    lockReason,
     smartLinkUrl,
   } = opts;
 
   if (locked) {
-    return [
-      {
-        id: 'copy-smart-link',
-        label:
-          lockReason === 'scheduled'
-            ? 'Scheduled smart link (Pro)'
-            : 'Smart link (Pro)',
-        icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
-        disabled: true,
-        onClick: () => {},
-      },
-    ];
+    return [];
   }
 
-  const items: ContextMenuItemType[] = [
-    {
-      id: 'copy-smart-link',
-      label: 'Copy smart link',
-      icon: menuIcon('Copy'),
-      onClick: () => {
-        void onCopy(
-          release.smartLinkPath,
-          `${release.title} smart link`,
-          `smart-link-copy-${release.id}`
-        );
-      },
-    },
-  ];
+  const items: ContextMenuItemType[] = [];
 
   const trackedContext = buildUTMContext({
     smartLinkUrl,
@@ -134,15 +143,17 @@ function buildShareItems(
           } satisfies ContextMenuItemType;
         }
 
+        const sourceIcon = getTrackedShareIcon(sourceGroup.source);
         return {
           id: `tracked-group-${sourceGroup.source}`,
           label: sourceGroup.label,
-          icon: getTrackedShareIcon(sourceGroup.source),
+          icon: sourceIcon,
           items: sourceGroup.presets.map(
             preset =>
               ({
                 id: `tracked-${preset.id}`,
                 label: preset.label,
+                icon: sourceIcon,
                 onClick: () => {
                   const result = buildUTMUrl({
                     url: smartLinkUrl,
@@ -163,37 +174,31 @@ function buildShareItems(
   ];
 
   if (utmShareItems.length > 0) {
-    items.push({ type: 'separator' }, ...utmShareItems);
+    items.push(...utmShareItems);
   }
 
   if (release.hasVideoLinks) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'copy-sounds-link',
-        label: 'Copy Use Sound link',
-        icon: menuIcon('Music'),
-        onClick: () => {
-          void onCopy(
-            `${release.smartLinkPath}/sounds`,
-            `${release.title} sounds link`,
-            `sounds-link-copy-${release.id}`
-          );
-        },
-      }
-    );
+    items.push({
+      id: 'copy-sounds-link',
+      label: 'Copy Use Sound link',
+      icon: menuIcon('Music'),
+      onClick: () => {
+        void onCopy(
+          `${release.smartLinkPath}/sounds`,
+          `${release.title} sounds link`,
+          `sounds-link-copy-${release.id}`
+        );
+      },
+    });
   }
 
   if (onCopyQrCode) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'copy-qr-code',
-        label: 'Copy QR code',
-        icon: qrCodeIcon,
-        onClick: onCopyQrCode,
-      }
-    );
+    items.push({
+      id: 'copy-qr-code',
+      label: 'Copy QR code',
+      icon: qrCodeIcon,
+      onClick: onCopyQrCode,
+    });
   }
 
   return items;
@@ -223,6 +228,12 @@ export function buildReleaseActions({
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const copySmartLinkItem = buildPrimaryCopySmartLinkItem({
+    release,
+    onCopy,
+    locked,
+    lockReason,
+  });
   const shareItems = buildShareItems({
     release,
     onCopy,
@@ -230,7 +241,6 @@ export function buildReleaseActions({
     onCopyQrCode,
     qrCodeIcon,
     locked,
-    lockReason,
     smartLinkUrl,
   });
 
@@ -245,6 +255,7 @@ export function buildReleaseActions({
       : null,
   ]);
 
+  // ── Group 1: Primary edit/create actions ──
   const items: ContextMenuItemType[] = [
     {
       id: 'edit',
@@ -262,25 +273,28 @@ export function buildReleaseActions({
           } satisfies ContextMenuItemType,
         ]
       : []),
-    {
-      type: 'separator',
-    },
-    {
+    { type: 'separator' },
+    // ── Group 2: Share / copy / open ──
+    copySmartLinkItem,
+  ];
+
+  // Share submenu only when there are additional share options
+  // (tracked links, Use Sound, QR code) beyond the primary copy.
+  if (shareItems.length > 0) {
+    items.push({
       id: 'share-link',
       label: 'Share link',
       icon: menuIcon('Link2'),
       items: shareItems,
-    },
-    {
-      type: 'separator',
-    },
-    {
-      id: 'copy-metadata',
-      label: 'Copy metadata',
-      icon: menuIcon('Hash'),
-      items: metadataItems,
-    },
-  ];
+    });
+  }
+
+  items.push({
+    id: 'copy-metadata',
+    label: 'Copy metadata',
+    icon: menuIcon('Hash'),
+    items: metadataItems,
+  });
 
   // ── External provider links ──
   const supportedProviders = new Set<ProviderKey>([
@@ -300,26 +314,34 @@ export function buildReleaseActions({
     p => supportedProviders.has(p.key) && p.url
   );
 
-  if (externalProviders.length > 0) {
-    items.push(
-      { type: 'separator' },
-      {
-        id: 'open-release',
-        label: 'Open in',
+  if (externalProviders.length === 1) {
+    // Flatten a single-provider "Open in" submenu to a top-level action
+    const provider = externalProviders[0];
+    items.push({
+      id: 'open-release',
+      label: `Open in ${providerLabels[provider.key] || provider.key}`,
+      icon: menuIcon('ExternalLink'),
+      onClick: () => {
+        globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
+      },
+    });
+  } else if (externalProviders.length > 1) {
+    items.push({
+      id: 'open-release',
+      label: 'Open in',
+      icon: menuIcon('ExternalLink'),
+      items: externalProviders.map(provider => ({
+        id: `open-${provider.key}`,
+        label: `Open in ${providerLabels[provider.key] || provider.key}`,
         icon: menuIcon('ExternalLink'),
-        items: externalProviders.map(provider => ({
-          id: `open-${provider.key}`,
-          label: `Open in ${providerLabels[provider.key] || provider.key}`,
-          icon: menuIcon('ExternalLink'),
-          onClick: () => {
-            globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
-          },
-        })),
-      }
-    );
+        onClick: () => {
+          globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
+        },
+      })),
+    });
   }
 
-  // ── Destructive group ──
+  // ── Group 3: Destructive ──
   if (onDelete) {
     items.push(
       { type: 'separator' },

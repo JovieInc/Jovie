@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 
+export const revalidate = false;
+
 export const metadata: Metadata = {
   title: `${APP_NAME} Pricing`,
   description:

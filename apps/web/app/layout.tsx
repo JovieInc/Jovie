@@ -135,8 +135,10 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({
   children,
+  auth,
 }: Readonly<{
   children: React.ReactNode;
+  auth: React.ReactNode;
 }>) {
   const isE2EClientRuntime =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' ||
@@ -183,6 +185,7 @@ export default async function RootLayout({
   const content = (
     <>
       {children}
+      {auth}
       {devToolbar}
       {shouldRenderCookieBanner ? <CookieBannerMount /> : null}
       <InstantlyPixel />

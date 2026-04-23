@@ -30,11 +30,37 @@ const confirmSchema = z.object({
 });
 
 function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .slice(0, 80);
+  const normalized = title.toLowerCase();
+  let slug = '';
+  let previousWasHyphen = false;
+
+  for (const character of normalized) {
+    const code = character.codePointAt(0) ?? 0;
+    const isAsciiLowercase = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
+
+    if (isAsciiLowercase || isDigit) {
+      slug += character;
+      previousWasHyphen = false;
+      continue;
+    }
+
+    if (!previousWasHyphen && slug.length > 0) {
+      slug += '-';
+      previousWasHyphen = true;
+    }
+  }
+
+  while (slug.endsWith('-')) {
+    slug = slug.slice(0, -1);
+  }
+
+  slug = slug.slice(0, 80);
+  while (slug.endsWith('-')) {
+    slug = slug.slice(0, -1);
+  }
+
+  return slug;
 }
 
 export async function POST(request: NextRequest) {

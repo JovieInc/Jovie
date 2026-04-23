@@ -15,10 +15,10 @@ const DEFAULT_STAGED_HOMEPAGE_NAV_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
   { href: APP_ROUTES.SUPPORT, label: 'Support' },
 ] as const;
-const STAGED_NAV_PATHS: readonly string[] = [
+const STAGED_NAV_PATHS = new Set<string>([
   APP_ROUTES.LANDING_NEW,
   APP_ROUTES.PRICING,
-];
+]);
 
 export interface MarketingHeaderProps
   extends Readonly<{
@@ -36,8 +36,7 @@ export function MarketingHeader({
   variant = 'landing',
 }: MarketingHeaderProps) {
   const pathname = usePathname();
-  const showStagedNav =
-    pathname !== null && STAGED_NAV_PATHS.includes(pathname);
+  const showStagedNav = pathname !== null && STAGED_NAV_PATHS.has(pathname);
   const resolvedNavLinks =
     navLinks ?? (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : undefined);
 
@@ -46,6 +45,7 @@ export function MarketingHeader({
       logoSize={logoSize}
       authMode='public-static'
       hideNav={variant === 'minimal'}
+      minimalAuth={variant === 'minimal'}
       containerSize='homepage'
       navLinks={resolvedNavLinks}
     />

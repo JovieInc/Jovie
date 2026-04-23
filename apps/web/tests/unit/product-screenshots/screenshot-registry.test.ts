@@ -5,6 +5,7 @@ import { SCREENSHOT_SCENARIOS } from '../../../lib/screenshots/registry';
 
 const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-tour-mobile',
+  'tim-white-profile-tour-nearby-mobile',
   'tim-white-profile-pay-mobile',
   'tim-white-profile-presave-mobile',
   'tim-white-profile-live-mobile',
@@ -12,6 +13,8 @@ const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-subscribe-mobile',
   'tim-white-profile-contact-mobile',
   'tim-white-profile-listen-mobile',
+  'tim-white-profile-playlist-fallback-mobile',
+  'tim-white-profile-listen-fallback-mobile',
 ] as const;
 
 describe('screenshot registry', () => {
@@ -107,7 +110,7 @@ describe('screenshot registry', () => {
         currentScenario.id === 'artist-profile-power-features-section-desktop'
     );
 
-    expect(scenario?.title).toBe('Artist Profile Power Features Section');
+    expect(scenario?.title).toBe('Artist Profile Details That Matter Section');
     expect(scenario?.route).toBe('/artist-profiles');
     expect(scenario?.captureSelector).toBe(
       '[data-testid="artist-profile-section-spec-wall"]'

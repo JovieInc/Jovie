@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
+import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import {
+  HomepageV2CaptureReactivate,
+  HomepageV2FinalCta,
+  HomepageV2FooterLinks,
+  HomepageV2PowerGrid,
+  HomepageV2Pricing,
+  HomepageV2Spotlight,
+  HomepageV2SystemOverview,
+} from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { HomePageNarrative } from '@/features/home/HomePageNarrative';
-import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -136,20 +145,51 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 export default function HomePage() {
-  const showLiveProof = FEATURE_FLAGS.SHOW_SEE_IT_IN_ACTION;
-
   return (
-    <div className='relative min-h-screen'>
+    <>
       <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HomePageNarrative
-        proofAvailability={showLiveProof ? 'visible' : 'hidden'}
-        proofSection={showLiveProof ? <SeeItInActionSafe enabled /> : null}
-      />
-    </div>
+      <section className='homepage-hero-flood relative flex min-h-[100svh] flex-col overflow-hidden text-primary-token'>
+        <div
+          aria-hidden='true'
+          className='homepage-hero-flood__layer homepage-hero-flood__base'
+        />
+        <div
+          aria-hidden='true'
+          className='homepage-hero-flood__layer homepage-hero-flood__glow'
+        />
+
+        <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
+          <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
+            <HomepageIntent />
+          </div>
+        </div>
+      </section>
+
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_TRUST ? (
+        <HomeTrustSection label='Accelerating release cycles for artists on' />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
+        <HomepageV2SystemOverview />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SPOTLIGHT ? (
+        <HomepageV2Spotlight />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE ? (
+        <HomepageV2CaptureReactivate />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
+        <HomepageV2PowerGrid />
+      ) : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? <HomepageV2FinalCta /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FOOTER_LINKS ? (
+        <HomepageV2FooterLinks />
+      ) : null}
+    </>
   );
 }

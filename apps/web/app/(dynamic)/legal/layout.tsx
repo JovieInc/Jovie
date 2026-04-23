@@ -1,8 +1,7 @@
 import { MarketingContainer } from '@/components/marketing';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 
-// Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
-// Legal pages will still be dynamic by default
+export const revalidate = false;
 
 export default function LegalLayout({
   children,

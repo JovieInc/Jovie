@@ -21,7 +21,6 @@ const SPEC_TILE_ACCENTS: Record<MarketingFeatureTile['accent'], string> = {
 
 type AccentStyle = CSSProperties & {
   readonly '--tile-accent': string;
-  readonly '--tile-accent-secondary': string;
 };
 
 interface ArtistProfileSpecWallProps {
@@ -32,31 +31,55 @@ interface ArtistProfileSpecWallProps {
 function ScreenshotCrop({
   alt,
   className,
+  frameClassName,
   imageClassName,
   objectPosition,
+  screenshotHeight,
+  screenshotWidth,
   src,
 }: Readonly<{
   alt: string;
   className?: string;
+  frameClassName?: string;
   imageClassName?: string;
   objectPosition?: string;
+  screenshotHeight?: number;
+  screenshotWidth?: number;
   src: string;
 }>) {
+  const frameStyle =
+    screenshotWidth && screenshotHeight
+      ? {
+          aspectRatio: `${screenshotWidth} / ${screenshotHeight}`,
+        }
+      : {
+          aspectRatio: '4 / 5',
+        };
+
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[1rem] bg-[#0d1015]',
+        'flex h-full items-start overflow-hidden rounded-[1rem] bg-[#0d1015] p-2.5',
         className
       )}
     >
-      <Image
-        fill
-        alt={alt}
-        className={cn('object-cover', imageClassName)}
-        sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
-        src={src}
-        style={{ objectPosition }}
-      />
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-[0.95rem] bg-[#090d12]',
+          !frameClassName && 'aspect-[4/5]',
+          frameClassName
+        )}
+        style={frameClassName ? undefined : frameStyle}
+      >
+        <Image
+          fill
+          alt={alt}
+          className={cn('object-cover object-top', imageClassName)}
+          sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
+          src={src}
+          style={{ objectPosition }}
+        />
+      </div>
     </div>
   );
 }
@@ -111,88 +134,32 @@ function IconBadgeVisual({
   );
 }
 
-const ANALYTICS_FLOATER_STAGES = [
-  { label: 'Profile Views', value: '42.8K', width: '100%' },
-  { label: 'Unique Visitors', value: '28.2K', width: '66%' },
-  { label: 'Followers', value: '6.4K', width: '15%' },
-] as const;
-
-function AnalyticsFunnelHeroVisual() {
+function MockPopoverVisual({
+  popoverItems,
+  popoverLabel,
+}: Readonly<{
+  popoverItems: readonly string[];
+  popoverLabel: string;
+}>) {
   return (
     <div
       role='img'
-      aria-label='Rich analytics funnel preview'
-      className='relative flex h-full min-h-[12.75rem] items-end justify-center overflow-hidden rounded-[1.15rem] pt-2 sm:min-h-[14.5rem] sm:pt-4'
+      aria-label={`${popoverLabel} preview`}
+      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14] p-4'
     >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute left-[8%] top-[10%] h-28 w-28 rounded-full opacity-85 blur-3xl sm:h-36 sm:w-36'
-        style={{
-          background:
-            'radial-gradient(circle, color-mix(in srgb, var(--tile-accent) 34%, transparent) 0%, transparent 72%)',
-        }}
-      />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute bottom-[18%] right-[10%] h-24 w-24 rounded-full opacity-80 blur-3xl sm:h-32 sm:w-32'
-        style={{
-          background:
-            'radial-gradient(circle, color-mix(in srgb, var(--tile-accent-secondary) 34%, transparent) 0%, transparent 74%)',
-        }}
-      />
-      <div className='relative w-full max-w-[30rem] px-1 pb-1 sm:px-3 sm:pb-2'>
-        <div className='relative overflow-hidden rounded-[1.4rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(17,20,28,0.96),rgba(8,10,16,0.92))] px-4 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.42)] backdrop-blur-[18px] sm:px-5 sm:py-5'>
-          <div className='absolute inset-x-0 top-0 h-px bg-white/12' />
-          <div
-            aria-hidden='true'
-            className='pointer-events-none absolute inset-x-10 top-0 h-20 blur-2xl'
-            style={{
-              background:
-                'linear-gradient(90deg, color-mix(in srgb, var(--tile-accent) 20%, transparent), color-mix(in srgb, var(--tile-accent-secondary) 18%, transparent))',
-            }}
-          />
-          <div className='relative space-y-3 sm:space-y-3.5'>
-            {ANALYTICS_FLOATER_STAGES.map((stage, index) => (
-              <div key={stage.label} className='space-y-1.5 sm:space-y-2'>
-                <div className='flex items-center justify-between gap-3'>
-                  <div className='flex min-w-0 items-center gap-2'>
-                    <span className='truncate text-[11px] font-medium tracking-[-0.01em] text-secondary-token sm:text-[11.5px]'>
-                      {stage.label}
-                    </span>
-                    {index > 0 ? (
-                      <span className='inline-flex items-center rounded-full border border-white/6 bg-[color-mix(in_srgb,var(--tile-accent-secondary)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-[color:var(--tile-accent-secondary)] sm:text-[10px]'>
-                        {stage.width}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className='shrink-0 text-[15px] font-semibold tracking-[-0.03em] text-primary-token sm:text-[17px]'>
-                    {stage.value}
-                  </span>
-                </div>
-                <div className='h-2 rounded-full bg-white/[0.06] sm:h-2.5'>
-                  <div
-                    className='relative h-full rounded-full'
-                    style={{
-                      width: stage.width,
-                      background:
-                        'linear-gradient(90deg, color-mix(in srgb, var(--tile-accent) 96%, white 4%), color-mix(in srgb, var(--tile-accent-secondary) 88%, transparent))',
-                      boxShadow:
-                        '0 0 18px color-mix(in srgb, var(--tile-accent) 22%, transparent)',
-                    }}
-                  >
-                    <span
-                      aria-hidden='true'
-                      className='absolute inset-y-0 right-0 w-6 rounded-full blur-md'
-                      style={{
-                        background:
-                          'color-mix(in srgb, var(--tile-accent-secondary) 50%, transparent)',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className='w-full max-w-[15rem] rounded-[1rem] bg-[#121722] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]'>
+        <div className='inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black'>
+          {popoverLabel}
+        </div>
+        <div className='mt-3 space-y-2 rounded-[0.9rem] bg-[#0c1018] p-2.5'>
+          {popoverItems.map(item => (
+            <div
+              key={item}
+              className='rounded-[0.7rem] border border-white/6 bg-white/[0.03] px-3 py-2 text-[11px] font-medium text-primary-token'
+            >
+              {item}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -206,7 +173,10 @@ function ArtistProfilePowerFeatureTile({
 }>) {
   const style: AccentStyle = {
     '--tile-accent': SPEC_TILE_ACCENTS[tile.accent],
-    '--tile-accent-secondary': SPEC_TILE_ACCENTS.purple,
+  };
+  const chromeStyle: CSSProperties = {
+    boxShadow:
+      '0 0 0 1px color-mix(in srgb, var(--tile-accent) 26%, rgba(255,255,255,0.08)), 0 22px 64px rgba(0,0,0,0.28), 0 0 42px color-mix(in srgb, var(--tile-accent) 14%, transparent)',
   };
 
   return (
@@ -218,27 +188,35 @@ function ArtistProfilePowerFeatureTile({
       )}
       style={style}
     >
-      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015)),#07090d] p-4 shadow-[0_22px_64px_rgba(0,0,0,0.28)]'>
+      <div
+        className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-white/8 bg-[#07090d] p-4'
+        style={chromeStyle}
+      >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-24 opacity-75'
+          className='pointer-events-none absolute inset-0 rounded-[1.35rem] border'
           style={{
-            background:
-              'radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--tile-accent) 16%, transparent), transparent 55%)',
+            borderColor:
+              'color-mix(in srgb, var(--tile-accent) 38%, rgba(255,255,255,0.12))',
           }}
         />
-        <div className='relative z-10 max-w-[24rem]'>
-          <h3 className='max-w-[18ch] text-[1.08rem] font-semibold tracking-[-0.04em] text-primary-token sm:text-[1.16rem]'>
-            {tile.title}
-          </h3>
-          <p className='mt-3 max-w-[34ch] text-[13px] leading-[1.58] text-secondary-token'>
-            {tile.body}
-          </p>
-        </div>
-        <div className='relative z-10 mt-5 flex-1'>
-          {tile.visual === 'analytics-funnel-hero' ? (
-            <AnalyticsFunnelHeroVisual />
-          ) : null}
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-6 top-0 h-px'
+          style={{
+            background:
+              'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tile-accent) 72%, white), transparent)',
+          }}
+        />
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-8 top-5 h-10 rounded-full blur-2xl'
+          style={{
+            background:
+              'color-mix(in srgb, var(--tile-accent) 18%, transparent)',
+          }}
+        />
+        <div className='relative z-10 flex-1'>
           {tile.visual === 'button-chip' ? (
             <ButtonChipVisual
               chipIcon={tile.chipIcon}
@@ -251,12 +229,21 @@ function ArtistProfilePowerFeatureTile({
               badgeLabel={tile.badgeLabel}
             />
           ) : null}
+          {tile.visual === 'mock-popover' ? (
+            <MockPopoverVisual
+              popoverItems={tile.popoverItems}
+              popoverLabel={tile.popoverLabel}
+            />
+          ) : null}
           {tile.visual === 'share-menu-crop' ? (
             <ScreenshotCrop
               alt={tile.screenshotAlt}
               className='h-full min-h-[12rem]'
+              frameClassName={tile.frameClassName}
               imageClassName='object-top'
               objectPosition={tile.objectPosition}
+              screenshotHeight={tile.screenshotHeight}
+              screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
             />
           ) : null}
@@ -265,11 +252,22 @@ function ArtistProfilePowerFeatureTile({
             <ScreenshotCrop
               alt={tile.screenshotAlt}
               className='h-full min-h-[12rem]'
+              frameClassName={tile.frameClassName}
               imageClassName={tile.imageClassName}
               objectPosition={tile.objectPosition}
+              screenshotHeight={tile.screenshotHeight}
+              screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
             />
           ) : null}
+        </div>
+        <div className='relative z-10 mt-4 max-w-[24rem]'>
+          <h3 className='max-w-[18ch] text-[1.08rem] font-semibold tracking-[-0.04em] text-primary-token sm:text-[1.16rem]'>
+            {tile.title}
+          </h3>
+          <p className='mt-2.5 max-w-[34ch] text-[13px] leading-[1.58] text-secondary-token'>
+            {tile.body}
+          </p>
         </div>
       </div>
     </article>
@@ -281,11 +279,7 @@ export function ArtistProfileSpecWall({
   tiles,
 }: Readonly<ArtistProfileSpecWallProps>) {
   return (
-    <ArtistProfileSectionShell
-      width='page'
-      className='py-24 sm:py-28 lg:py-32'
-      containerClassName='max-w-none'
-    >
+    <ArtistProfileSectionShell width='page' containerClassName='max-w-none'>
       <div className='mx-auto max-w-[var(--linear-content-max)]'>
         <ArtistProfileSectionHeader
           align='left'

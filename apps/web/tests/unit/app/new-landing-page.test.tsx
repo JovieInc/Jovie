@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react';
+import Link from 'next/link';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+
+vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
+  HomepageV2Route: () => (
+    <main data-testid='homepage-v2-route'>
+      <h1>Make every release feel bigger.</h1>
+      <Link data-testid='homepage-v2-hero-primary-cta' href='/signup'>
+        Start free trial
+      </Link>
+      <Link href='/artist-profiles'>Explore artist profiles</Link>
+      <h2>One system for the whole release cycle.</h2>
+      <h2>Artist profiles built to convert.</h2>
+      <h2>Capture every fan. Send them every release automatically.</h2>
+      <h2>Pricing.</h2>
+      <div data-testid='homepage-v2-release-pages-preview'>Preview</div>
+    </main>
+  ),
+}));
 
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();

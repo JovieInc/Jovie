@@ -32,6 +32,7 @@ describe('SmartLinkProviderButton', () => {
     );
 
     const link = screen.getByRole('link', { name: /spotify/i });
+    link.addEventListener('click', event => event.preventDefault());
     fireEvent.click(link);
     expect(onClick).toHaveBeenCalledTimes(1);
   });

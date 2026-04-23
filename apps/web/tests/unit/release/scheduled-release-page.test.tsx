@@ -84,17 +84,17 @@ describe('ScheduledReleasePage', () => {
     expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThanOrEqual(
       1
     );
-    expect(screen.getByText('Tim White')).toBeDefined();
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
   });
 
   it('renders the countdown timer', () => {
     render(<ScheduledReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('release-countdown')).toBeDefined();
+    expect(screen.getByTestId('release-countdown')).toBeInTheDocument();
   });
 
   it('renders the notification signup CTA', () => {
     render(<ScheduledReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('profile-inline-cta')).toBeDefined();
+    expect(screen.getByTestId('profile-inline-cta')).toBeInTheDocument();
   });
 
   it('shares the scheduled release when the share button is clicked', () => {
@@ -112,6 +112,6 @@ describe('ScheduledReleasePage', () => {
 
   it('wraps content in ReleaseNotificationsProvider', () => {
     render(<ScheduledReleasePage {...defaultProps} />);
-    expect(screen.getByTestId('notifications-provider')).toBeDefined();
+    expect(screen.getByTestId('notifications-provider')).toBeInTheDocument();
   });
 });

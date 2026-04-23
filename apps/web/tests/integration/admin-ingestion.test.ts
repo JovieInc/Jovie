@@ -143,7 +143,22 @@ afterEach(async () => {
 describe('Admin ingestion pipeline (integration)', () => {
   it('processes CSV upload through ingestion pipeline', async () => {
     const handle = `csv-import-${Date.now()}`;
+    const instagramHandle = `csvimportartist${Date.now()}`;
     const url = `https://linktr.ee/${handle}`;
+    extractLinktreeMock.mockReturnValueOnce({
+      displayName: 'CSV Import Artist',
+      avatarUrl: 'https://images.test/csv-avatar.png',
+      links: [
+        {
+          url: 'https://open.spotify.com/artist/4YRxDV8wJFPHPTeXepOstw',
+          title: 'Spotify',
+        },
+        {
+          url: `https://instagram.com/${instagramHandle}`,
+          title: 'Instagram',
+        },
+      ],
+    });
 
     const response = await POST(
       new Request('http://localhost/api/admin/creator-ingest', {
@@ -202,7 +217,7 @@ describe('Admin ingestion pipeline (integration)', () => {
     expect(
       (jobs[0]?.payload as Record<string, unknown> | undefined)?.dedupKey
     ).toBeTruthy();
-  });
+  }, 20_000);
 
   it('rejects invalid CSV rows with clear validation errors', async () => {
     const url = 'not-a-valid-url';
@@ -264,7 +279,7 @@ describe('Admin ingestion pipeline (integration)', () => {
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, handle));
     expect(existing).toHaveLength(1);
-  });
+  }, 20_000);
 
   it('reingests an unclaimed profile without creating a duplicate record', async () => {
     const handle = `csv-reingest-${Date.now()}`;

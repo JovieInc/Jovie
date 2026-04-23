@@ -563,11 +563,11 @@ function StepFrame({ actions, children, prompt, title }: StepFrameProps) {
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
       <div className='space-y-3'>
-        <h1 className='text-3xl font-[620] tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
+        <h1 className='text-3xl font-semibold tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
           {title}
         </h1>
         {prompt ? (
-          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-[15px]'>
+          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-mid'>
             {prompt}
           </p>
         ) : null}
@@ -621,7 +621,7 @@ function EmptyState({
 }: Readonly<{ body: string; title: string }>) {
   return (
     <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] pb-5'>
-      <p className='text-sm font-[560] text-primary-token'>{title}</p>
+      <p className='text-sm font-semibold text-primary-token'>{title}</p>
       <p className='mt-1 text-sm leading-6 text-secondary-token'>{body}</p>
     </div>
   );
@@ -704,10 +704,10 @@ function OnboardingSidebar({
       ) : null}
       {/* Compact progress indicator for small screens */}
       <div className='flex items-center gap-3 sm:hidden'>
-        <span className='text-[13px] font-[560] text-primary-token'>
+        <span className='text-app font-semibold text-primary-token'>
           {currentLabel}
         </span>
-        <span className='text-[12px] text-tertiary-token'>
+        <span className='text-xs text-tertiary-token'>
           {currentIndex + 1}/{SIDEBAR_STEPS.length}
         </span>
         <div className='flex flex-1 gap-1'>
@@ -733,7 +733,7 @@ function OnboardingSidebar({
             <li key={step.id} aria-current={isCurrent ? 'step' : undefined}>
               <div
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-2 py-2 text-[13px] transition-colors',
+                  'flex items-center gap-3 rounded-xl px-2 py-2 text-app transition-colors',
                   isCurrent
                     ? 'bg-surface-1 text-primary-token'
                     : 'text-secondary-token'
@@ -744,7 +744,7 @@ function OnboardingSidebar({
                   color={state === 'pending' ? 'currentColor' : step.color}
                   state={state}
                 />
-                <span className='font-[560]'>{step.label}</span>
+                <span className='font-semibold'>{step.label}</span>
               </div>
             </li>
           );
@@ -1658,7 +1658,7 @@ export function OnboardingV2Form({
                 )}
 
                 <div className='min-w-0 flex-1'>
-                  <p className='truncate text-sm font-[560] text-primary-token'>
+                  <p className='truncate text-sm font-semibold text-primary-token'>
                     {artist.name}
                   </p>
                   <p className='text-xs text-secondary-token'>
@@ -1825,7 +1825,7 @@ export function OnboardingV2Form({
             }
           >
             <ContentSurfaceCard className='p-5'>
-              <p className='text-sm font-[560] text-primary-token'>
+              <p className='text-sm font-semibold text-primary-token'>
                 Discovery is already complete for this onboarding pass.
               </p>
               <p className='mt-2 text-sm leading-6 text-secondary-token'>
@@ -1857,10 +1857,10 @@ export function OnboardingV2Form({
                 <FlatPanel key={item.id}>
                   <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                     <div className='min-w-0'>
-                      <p className='text-[11px] font-[560] text-tertiary-token'>
+                      <p className='text-2xs font-semibold text-tertiary-token'>
                         {item.providerLabel}
                       </p>
-                      <p className='truncate text-base font-[580] text-primary-token'>
+                      <p className='truncate text-base font-semibold text-primary-token'>
                         {item.externalArtistName || 'Suggested artist'}
                       </p>
                       <p className='text-sm text-secondary-token'>
@@ -1946,10 +1946,10 @@ export function OnboardingV2Form({
                   <FlatPanel key={`${item.kind}:${item.id}`}>
                     <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                       <div className='min-w-0'>
-                        <p className='text-[11px] font-[560] text-tertiary-token'>
+                        <p className='text-2xs font-semibold text-tertiary-token'>
                           {item.platformLabel}
                         </p>
-                        <p className='truncate text-base font-[580] text-primary-token'>
+                        <p className='truncate text-base font-semibold text-primary-token'>
                           {item.username || item.url}
                         </p>
                         <p className='text-sm text-secondary-token'>
@@ -2044,7 +2044,7 @@ export function OnboardingV2Form({
                       </div>
                     )}
                     <div className='min-w-0'>
-                      <p className='truncate text-base font-[580] text-primary-token'>
+                      <p className='truncate text-base font-semibold text-primary-token'>
                         {release.title}
                       </p>
                       <p className='text-sm text-secondary-token'>
@@ -2082,10 +2082,10 @@ export function OnboardingV2Form({
           >
             {lateArrivals.map(item => (
               <FlatPanel key={item.id}>
-                <p className='text-[11px] font-[560] text-tertiary-token'>
+                <p className='text-2xs font-semibold text-tertiary-token'>
                   {item.subtitle}
                 </p>
-                <p className='mt-1 text-base font-[580] text-primary-token'>
+                <p className='mt-1 text-base font-semibold text-primary-token'>
                   {item.title}
                 </p>
               </FlatPanel>
@@ -2120,10 +2120,10 @@ export function OnboardingV2Form({
             <FlatPanel>
               <div className='space-y-4'>
                 <div>
-                  <p className='text-[11px] font-[560] text-tertiary-token'>
+                  <p className='text-2xs font-semibold text-tertiary-token'>
                     Your public link
                   </p>
-                  <p className='mt-1 text-base font-[580] text-primary-token'>
+                  <p className='mt-1 text-base font-semibold text-primary-token'>
                     {publicProfileUrl ?? 'Your Jovie link will appear here'}
                   </p>
                   <p className='mt-2 text-sm leading-6 text-secondary-token'>
@@ -2133,11 +2133,11 @@ export function OnboardingV2Form({
                 </div>
                 <ol className='space-y-3'>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       1
                     </span>
                     <div className='min-w-0'>
-                      <p className='text-sm font-[560] text-primary-token'>
+                      <p className='text-sm font-semibold text-primary-token'>
                         Copy your Instagram bio link
                       </p>
                       <p className='text-sm leading-6 text-secondary-token'>
@@ -2148,11 +2148,11 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       2
                     </span>
                     <div className='min-w-0'>
-                      <p className='text-sm font-[560] text-primary-token'>
+                      <p className='text-sm font-semibold text-primary-token'>
                         Open Instagram
                       </p>
                       <p className='text-sm leading-6 text-secondary-token'>
@@ -2163,11 +2163,11 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-[560] text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       3
                     </span>
                     <div className='min-w-0'>
-                      <p className='text-sm font-[560] text-primary-token'>
+                      <p className='text-sm font-semibold text-primary-token'>
                         Paste it into your bio
                       </p>
                       <p className='text-sm leading-6 text-secondary-token'>
@@ -2182,7 +2182,7 @@ export function OnboardingV2Form({
 
             <FlatPanel className='border-b-0 pb-0'>
               <label
-                className='text-sm font-[560] text-primary-token'
+                className='text-sm font-semibold text-primary-token'
                 htmlFor='onboarding-anything-else'
               >
                 Anything else I should know?

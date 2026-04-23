@@ -129,6 +129,7 @@ describe('TourModePanel', () => {
     const ticketLink = screen.getByRole('link', { name: 'Tickets' });
     expect(ticketLink).toHaveAttribute('href', londonDate.ticketUrl);
 
+    ticketLink.addEventListener('click', event => event.preventDefault());
     fireEvent.click(ticketLink);
     expect(ticketClickMock).toHaveBeenCalledTimes(1);
   });
@@ -211,7 +212,7 @@ describe('TourModePanel', () => {
     // Day is rendered (may vary by timezone, just check it's a number)
     const dayElement = screen
       .getAllByText(/^\d{1,2}$/)
-      .find(el => el.className.includes('font-[700]'));
+      .find(el => el.className.includes('font-bold'));
     expect(dayElement).toBeTruthy();
   });
 });

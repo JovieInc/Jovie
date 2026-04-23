@@ -33,7 +33,7 @@ const MetaHeaderCell = () => (
 
 function TrackRowsLoadingRow() {
   return (
-    <div className='px-4 py-2 text-[11px] text-tertiary-token'>
+    <div className='rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-[11px] text-tertiary-token'>
       Loading tracks...
     </div>
   );
@@ -110,7 +110,7 @@ export function ReleaseTableWithTracks({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_52%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_62%,transparent)]';
@@ -226,18 +226,26 @@ export function ReleaseTableWithTracks({
       if (!tracks) return null;
 
       return (
-        <Suspense fallback={<TrackRowsLoadingRow />}>
-          <TrackRowsContainer
-            tracks={tracks}
-            release={release}
-            providerConfig={providerConfig}
-            allProviders={allProviders}
-            columnCount={columnCount}
-            columnVisibility={tanstackColumnVisibility}
-            onTrackClick={onTrackClick}
-            selectedTrackId={selectedTrackId}
-          />
-        </Suspense>
+        <div
+          data-testid={`release-track-stack-${release.id}`}
+          className='px-4 pb-3 pt-1.5'
+        >
+          <div className='rounded-[14px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_74%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-bg-surface-0))] p-2.5 shadow-[inset_0_1px_0_color-mix(in_oklab,white_4%,transparent)]'>
+            <Suspense fallback={<TrackRowsLoadingRow />}>
+              <TrackRowsContainer
+                tracks={tracks}
+                release={release}
+                providerConfig={providerConfig}
+                allProviders={allProviders}
+                columnCount={columnCount}
+                columnVisibility={tanstackColumnVisibility}
+                onTrackClick={onTrackClick}
+                selectedTrackId={selectedTrackId}
+                renderMode='stack'
+              />
+            </Suspense>
+          </div>
+        </div>
       );
     },
     [

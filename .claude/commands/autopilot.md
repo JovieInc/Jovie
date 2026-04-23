@@ -51,6 +51,14 @@ When querying Linear, always apply both filters:
 - Exclude label: `human-review-required`
 - Exclude description containing: `This issue requires human review`
 
+## Linear Ownership Contract (mandatory)
+
+See `AGENTS.md` → "Linear Ownership Contract" for the full rules. Autopilot-specific responsibilities:
+
+- **Before dispatching a teammate:** confirm the Linear issue is in `In Progress` (set it if not). Dispatched teammates own subsequent state (In Review / Done are automated).
+- **Never dispatch two teammates to the same Linear issue.** If the issue is already `In Progress` and assigned to another agent, skip it or escalate — do not collide.
+- **Trust the automation:** `linear-ai-orchestrator.yml` handles In Review on PR open; `linear-sync-on-merge.yml` handles Done on merge. Do not manually transition those states.
+
 ## Orchestration Loop (run continuously)
 
 ### 0) Auto-open draft PRs for orphaned Codex branches

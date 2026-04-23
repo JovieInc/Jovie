@@ -12,14 +12,12 @@ export function MarketingFooter({
   variant = 'auto',
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
-  const resolvedVariant =
-    variant === 'auto'
-      ? pathname === APP_ROUTES.PRICING
-        ? 'regular'
-        : 'minimal'
-      : variant === 'expanded'
-        ? 'regular'
-        : 'minimal';
+  let resolvedVariant: 'regular' | 'minimal';
+  if (variant === 'auto') {
+    resolvedVariant = pathname === APP_ROUTES.PRICING ? 'regular' : 'minimal';
+  } else {
+    resolvedVariant = variant === 'expanded' ? 'regular' : 'minimal';
+  }
 
   return (
     <FooterOrganism

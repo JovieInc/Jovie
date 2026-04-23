@@ -399,6 +399,24 @@ jobs:
 
           echo "✅ Signin renders correctly"
 
+          # Verify /api/chat is reachable and auth-gated.
+          #
+          # NOTE: This probe has shown intermittent false positives on staging
+          # (transient 5xx responses while the deployment is still warming). Keep
+          # this check informational so canary does not block healthy deployments.
+          echo "Checking /api/chat is reachable and auth-gated (informational)..."
+          chat_url="${deployment_url%/}/api/chat"
+          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
+          chat_code="${chat_response##*$'\n'}"
+
+          # The chat route checks auth before body parsing, so unauthenticated
+          # probes should return 401 when healthy.
+          if [ "$chat_code" = "401" ]; then
+            echo "✅ /api/chat reachable and auth-gated (HTTP 401)"
+          else
+            echo "⚠️ /api/chat probe returned HTTP $chat_code (expected 401). Continuing because this check is currently flaky on staging."
+          fi
+
           # Verify the public profile route renders without a server error.
           # "Profile not found" with HTTP 200 is a valid app response (data issue,
           # not a code regression), so only block on 5xx or actual error pages.

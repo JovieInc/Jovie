@@ -614,21 +614,41 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
-// Release Tasks (Templates, Template Items, Tasks)
+// Release Tasks (Templates, Template Items, Tasks, Catalog, Clusters, Snapshots, Telemetry)
 export {
+  type CustomTaskTelemetry,
+  customTaskTelemetry,
+  insertCustomTaskTelemetrySchema,
+  insertReleaseSkillClusterSchema,
+  insertReleaseTaskCatalogSchema,
   insertReleaseTaskSchema,
+  insertReleaseTaskSnapshotSchema,
   insertReleaseTaskTemplateItemSchema,
   insertReleaseTaskTemplateSchema,
+  type NewCustomTaskTelemetry,
+  type NewReleaseSkillCluster,
   type NewReleaseTask,
+  type NewReleaseTaskCatalog,
+  type NewReleaseTaskSnapshot,
   type NewReleaseTaskTemplate,
   type NewReleaseTaskTemplateItem,
+  type ReleaseSkillCluster,
   type ReleaseTask,
+  type ReleaseTaskCatalog,
+  type ReleaseTaskSnapshot,
   type ReleaseTaskTemplate,
   type ReleaseTaskTemplateItem,
+  releaseSkillClusters,
+  releaseTaskCatalog,
+  releaseTaskSnapshots,
   releaseTasks,
   releaseTaskTemplateItems,
   releaseTaskTemplates,
+  selectCustomTaskTelemetrySchema,
+  selectReleaseSkillClusterSchema,
+  selectReleaseTaskCatalogSchema,
   selectReleaseTaskSchema,
+  selectReleaseTaskSnapshotSchema,
   selectReleaseTaskTemplateItemSchema,
   selectReleaseTaskTemplateSchema,
 } from './release-tasks';
@@ -709,6 +729,19 @@ export {
   tourDateProviderEnum,
   tourDates,
 } from './tour';
+// User Interviews (Mom Test interviews post-onboarding)
+export {
+  type InterviewMetadata,
+  type InterviewSummaryStructured,
+  type InterviewTranscriptEntry,
+  insertUserInterviewSchema,
+  type NewUserInterview,
+  selectUserInterviewSchema,
+  type UserInterview,
+  type UserInterviewStatus,
+  userInterviewStatusEnumValues,
+  userInterviews,
+} from './user-interviews';
 
 // Waitlist
 export {

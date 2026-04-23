@@ -162,7 +162,7 @@ describe('@critical SubscriptionHandler - Errors', () => {
   });
 
   describe('price validation errors', () => {
-    it('throws error when subscription price ID is unknown', async () => {
+    it('skips and captures a critical error when subscription price ID is unknown', async () => {
       mockGetPlanFromPriceId.mockReturnValue(null);
 
       const context: WebhookContext = {
@@ -184,8 +184,22 @@ describe('@critical SubscriptionHandler - Errors', () => {
         stripeEventTimestamp: new Date(),
       };
 
-      await expect(handler.handle(context)).rejects.toThrow(
-        'Unknown price ID: price_unknown'
+      await expect(handler.handle(context)).resolves.toMatchObject({
+        success: true,
+        skipped: true,
+        reason: 'unknown_price_id',
+      });
+
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Unknown price ID in subscription',
+        expect.any(Error),
+        expect.objectContaining({
+          customerId: 'cus_123',
+          priceId: 'price_unknown',
+          route: '/api/stripe/webhooks',
+          subscriptionId: 'sub_unknown_price',
+          userId: 'user_test',
+        })
       );
     });
 

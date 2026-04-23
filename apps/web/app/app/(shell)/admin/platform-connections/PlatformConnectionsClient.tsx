@@ -161,11 +161,9 @@ function SpotifyTabContent({
   }
 
   const isBusy = isPending || isConnecting;
-  const connectButtonLabel = isConnecting
-    ? 'Connecting'
-    : currentUser.hasSpotify
-      ? 'Reconnect Spotify'
-      : 'Connect Spotify';
+  let connectButtonLabel = 'Connect Spotify';
+  if (isConnecting) connectButtonLabel = 'Connecting';
+  else if (currentUser.hasSpotify) connectButtonLabel = 'Reconnect Spotify';
 
   return (
     <div className='divide-y divide-(--linear-app-frame-seam) rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1'>
@@ -204,7 +202,9 @@ function SpotifyTabContent({
               'Not set'}
           </p>
           <p className='mt-1 text-[12px] text-tertiary-token'>
-            Updated {formatDate(spotifyStatus.updatedAt)}
+            {spotifyStatus.updatedAt
+              ? `Updated ${formatDate(spotifyStatus.updatedAt)}`
+              : 'Never updated'}
           </p>
         </div>
         <div>

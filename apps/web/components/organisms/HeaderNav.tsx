@@ -1,8 +1,10 @@
+import { getLinearPillClassName } from '@jovie/ui';
 import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
+import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -20,15 +22,24 @@ export interface HeaderNavProps {
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly authMode?: 'client' | 'public-static';
+  readonly minimalAuth?: boolean;
 }
 
-function PublicAuthActions() {
+type PublicAuthActionsProps = Readonly<{ minimal?: boolean }>;
+
+function PublicAuthActions({ minimal = false }: PublicAuthActionsProps = {}) {
+  if (minimal) {
+    return <MarketingSignInLink />;
+  }
   return (
-    <div className='flex items-center gap-4'>
-      <Link href='/signin' className='nav-link-linear focus-ring-themed'>
+    <div className='flex items-center gap-1'>
+      <Link href='/signin' className='btn-linear-login focus-ring-themed'>
         Log in
       </Link>
-      <Link href='/signup' className='nav-link-linear focus-ring-themed'>
+      <Link
+        href='/signup'
+        className={getLinearPillClassName({ className: 'focus-ring-themed' })}
+      >
         Sign up
       </Link>
     </div>
@@ -45,6 +56,7 @@ export function HeaderNav({
   containerSize: _containerSize = 'lg',
   navLinks,
   authMode = 'client',
+  minimalAuth = false,
 }: HeaderNavProps = {}) {
   const navLinkClass = 'nav-link-linear focus-ring-themed';
   const hasNavLinks = !hideNav && !!navLinks?.length;
@@ -98,7 +110,7 @@ export function HeaderNav({
 
           {/* Nav links - desktop only, right-aligned */}
           {hasNavLinks && (
-            <div className='hidden items-center gap-1 md:flex lg:gap-1.5'>
+            <div className='max-md:hidden items-center gap-1 md:flex lg:gap-1.5'>
               {navLinks?.map(link =>
                 link.href.startsWith('/') && !link.href.startsWith('#') ? (
                   <Link
@@ -120,19 +132,15 @@ export function HeaderNav({
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks ? (
             <div
-              className='mx-1.5 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
+              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
               aria-hidden='true'
             />
           ) : null}
 
-          <div
-            className={cn(
-              'items-center gap-4',
-              hasNavLinks ? 'hidden md:flex' : 'flex'
-            )}
-          >
+          {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
+          <div className='flex items-center gap-1'>
             {authMode === 'public-static' ? (
-              <PublicAuthActions />
+              <PublicAuthActions minimal={minimalAuth} />
             ) : (
               <AuthActions />
             )}
@@ -140,7 +148,7 @@ export function HeaderNav({
 
           {/* Mobile hamburger menu - shown on small screens only */}
           {hasNavLinks && (
-            <div className='md:hidden'>
+            <div className='flex md:hidden items-center'>
               <MobileNav navLinks={navLinks} />
             </div>
           )}

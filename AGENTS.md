@@ -4,6 +4,15 @@
 
 ---
 
+## Workspace Topology
+
+This repo is the main code workspace.
+
+- Default coding profile: `coder`
+- Ops / FounderOS workspace: `/Users/timwhite/conductor/workspaces/ops/raleigh`
+- Treat that ops repo as the source of truth for `company_state.md`, daily briefings, and task routing
+- Keep code changes in this repo; keep orchestration and company-state updates in the ops repo
+
 ## Environment Setup (Run First)
 
 Before running ANY command in this repo, run:
@@ -12,7 +21,13 @@ Before running ANY command in this repo, run:
 ./scripts/setup.sh
 ```
 
-This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), and Doppler CLI, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
+On Windows PowerShell, run the wrapper instead so Git for Windows Bash is used instead of the WSL launcher:
+
+```powershell
+.\scripts\setup.ps1
+```
+
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), `ripgrep` (`rg`), Doppler CLI, and GitHub CLI auth, installs missing tools when supported, runs `pnpm install`, and verifies Doppler auth.
 
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
@@ -25,6 +40,7 @@ Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
 - verify/install required tools
 - install dependencies
 - verify Doppler auth/config
+- verify GitHub CLI auth when present, including `GH_TOKEN`/`GITHUB_TOKEN` supplied by the environment or Doppler
 - avoid creating remote infrastructure by default
 
 Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
@@ -155,7 +171,7 @@ pnpm turbo build --filter=@jovie/web
 
 **Creating a Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate. Pass as `DOPPLER_TOKEN` env var.
 
-**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection (macOS/Linux), Doppler installation, and `.env.local` generation automatically.
+**Alternative:** Run `./scripts/codex-setup.sh`, the Codex wrapper that delegates to the canonical `./scripts/setup.sh` bootstrap. Codex lifecycle config in `.codex/` also runs that wrapper automatically when supported.
 
 ### Common Mistakes to Avoid
 
@@ -546,6 +562,9 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 
 ## Linear Issue Gating
 
+See also: [Linear Ownership Contract](#linear-ownership-contract) below for the
+state-transition rules every agent must follow.
+
 Before working on any Linear issue, check for the `human-review-required` label.
 If present, SKIP the issue entirely. Do not attempt to work on it, close it,
 or add comments. These issues require human decision-making.
@@ -562,6 +581,78 @@ When scanning Linear for issues to work on, always filter with:
 - Architectural decisions requiring human judgment
 - Process or workflow changes
 - Issues filed by automated scanners that haven't been triaged
+
+### Always file a Linear issue for deferred follow-ups
+
+When you identify follow-up work in the course of a task — out-of-scope refactors,
+next-phase features, known gaps, TODOs — and **choose not to tackle it right away**,
+open a Linear issue for it before closing out the current work. Do not rely on
+inline `// TODO` comments, PR-body bullet lists, or chat memory to track it.
+
+- Create the issue on the relevant team (usually `Jovie`) with a clear title and
+  description of the deferred scope.
+- If the follow-up depends on the current work landing first, use `blockedBy` to
+  link it to the current issue so the dependency is explicit in Linear.
+- Reference the follow-up issue ID in the current PR description and in any
+  planning/design docs so future readers can navigate to it.
+- This applies equally to scope you deferred *to ship faster* (Approach C-style
+  decisions) and scope you noticed but chose not to do. If it's worth remembering,
+  it's worth a Linear issue.
+
+---
+
+## Linear Ownership Contract
+
+Every agent working a Linear-tracked task MUST follow this three-state contract.
+Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc sessions).
+Linear state is the shared signal other agents use to see what is in flight —
+if you do not mark your issue In Progress, you invite collisions where two agents
+edit the same files.
+
+### The contract
+
+1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading
+   code or editing files. If the issue is unassigned, assign it to yourself
+   (or the human owner) at the same time. This is the only manual transition.
+2. **On PR open —** behavior depends on how the work was started:
+   - **Orchestrator-dispatched work** (branches created by `linear-ai-orchestrator.yml`): no action required. The `sync_linear_in_review` job auto-transitions the issue to `In Review` when the PR opens.
+   - **Ad-hoc work** (direct agent sessions, manually opened PRs): manually transition the Linear issue to `In Review` when you open the PR. The orchestrator's `sync_linear_in_review` job does NOT run for branches it didn't dispatch.
+   In both cases, preserve the PR body's `<!-- linear-issue-id:... -->` comment and the `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the issue at merge time.
+3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions
+   the issue to `Done` and posts the merge SHA as a comment.
+
+Do NOT manually perform the In Review or Done transitions — you will race the
+workflows and produce confusing state.
+
+### Orchestrator-dispatched work
+
+When the Linear AI orchestrator dispatches work (`linear-ai-orchestrator.yml`
+`assign_to_codex` job), it sets `In Progress` at dispatch time. If your session
+was started by the orchestrator, the transition is already done — skip step 1.
+
+### How to transition
+
+With Linear MCP available (most Claude Code sessions):
+
+```
+# 1. Get the team's state IDs
+mcp__claude_ai_Linear__list_issue_statuses({ team: "<team-id-or-key>" })
+
+# 2. Set the issue to In Progress
+mcp__claude_ai_Linear__save_issue({ id: "<issue-id>", state: "<in-progress-state-id>" })
+```
+
+Without Linear MCP, use the GraphQL API directly (same pattern as
+`.github/workflows/linear-ai-orchestrator.yml` — look up the state where
+`name` matches `/in progress/i`, then call `issueUpdate`).
+
+### No Linear issue (ad-hoc work)
+
+If the user asks you to fix something without a Linear issue, either:
+
+1. Create a Linear issue for it and move it to In Progress, OR
+2. Explicitly state "no Linear issue — ad-hoc" in your first status message so
+   the human knows coordination is manual and other agents won't see this work.
 
 ---
 
@@ -589,6 +680,7 @@ The gstack skill pipeline handles verification. The standard agent workflow is:
 ### One PR = One Concern
 
 - Each PR addresses exactly one Linear issue or one bug fix
+- Mark the Linear issue `In Progress` before you start editing files (see [Linear Ownership Contract](#linear-ownership-contract))
 - No drive-by refactors, no "while I'm here" changes
 - If you find a related issue, create a separate Linear ticket
 

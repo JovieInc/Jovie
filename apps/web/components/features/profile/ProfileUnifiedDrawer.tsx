@@ -47,6 +47,7 @@ import {
 } from './profile-drawer-classes';
 import type { PublicRelease } from './releases/types';
 import { StaticListenInterface } from './StaticListenInterface';
+import { PROFILE_VIEW_REGISTRY } from './views/registry';
 
 export type DrawerView =
   | 'menu'
@@ -59,51 +60,6 @@ export type DrawerView =
   | 'pay'
   | 'tour'
   | 'releases';
-
-interface DrawerMeta {
-  readonly title: string;
-  readonly subtitle?: string;
-}
-
-const VIEW_META: Record<DrawerView, DrawerMeta> = {
-  menu: { title: 'Menu' },
-  share: {
-    title: 'Share',
-    subtitle: 'Share this profile',
-  },
-  notifications: {
-    title: 'Notifications',
-    subtitle: 'Choose what you hear about.',
-  },
-  about: {
-    title: 'About',
-    subtitle: 'Profile details, genres, and press assets.',
-  },
-  listen: {
-    title: 'Listen',
-    subtitle: 'Stream or download on your favorite platform.',
-  },
-  subscribe: {
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
-  },
-  contact: {
-    title: 'Contact',
-    subtitle: 'Management, booking, press, and more.',
-  },
-  pay: {
-    title: 'Pay',
-    subtitle: 'Send support instantly with Venmo.',
-  },
-  tour: {
-    title: 'Tour Dates',
-    subtitle: 'Upcoming shows and ticket links.',
-  },
-  releases: {
-    title: 'Releases',
-    subtitle: 'Discography',
-  },
-};
 
 interface ProfileUnifiedDrawerProps {
   readonly open: boolean;
@@ -306,7 +262,7 @@ function ReleasesDrawerContent({
             ) : null}
             <a
               href={`/${artistHandle}/${release.slug}`}
-              className='flex items-center gap-3 rounded-[var(--profile-action-radius)] px-4 py-3 transition-colors duration-normal active:bg-white/[0.06]'
+              className='flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150 ease-out hover:bg-white/[0.05] focus-visible:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset active:bg-white/[0.08]'
               aria-label={ariaLabel}
             >
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
@@ -326,7 +282,7 @@ function ReleasesDrawerContent({
                   {collabs ? `${collabs} \u00b7 ` : ''}
                   {metaParts.join(' \u00b7 ')}
                   {release.releaseType === 'music_video' ? (
-                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-[510] text-white/50'>
+                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-3xs font-[510] text-white/50'>
                       Video
                     </span>
                   ) : null}
@@ -405,7 +361,7 @@ export function ProfileUnifiedDrawer({
   const meta =
     view === 'releases' && canOpenReleasesDrawer
       ? { title: 'Releases', subtitle: releasesSubtitle }
-      : VIEW_META[view === 'releases' ? 'menu' : view];
+      : PROFILE_VIEW_REGISTRY[view === 'releases' ? 'menu' : view];
   const renderedView =
     view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
 
@@ -499,10 +455,10 @@ export function ProfileUnifiedDrawer({
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
           key={renderedView}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15, ease: [0.32, 0, 0.67, 1] }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12, ease: 'linear' }}
         >
           {renderedView === 'menu' && (
             <div className='flex flex-col gap-0.5' role='menu'>

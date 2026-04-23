@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-[11px] font-[510] text-tertiary-token'
+          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-[510] text-tertiary-token'
         >
           <Icon name='Plus' className='h-3.5 w-3.5' aria-hidden='true' />
           <span className='line-clamp-1'>Add</span>
@@ -108,7 +108,7 @@ export function AddProviderUrlPopover({
                 style={{ backgroundColor: accent }}
                 aria-hidden='true'
               />
-              <span className='text-[13px] font-[510] text-primary-token'>
+              <span className='text-app font-[510] text-primary-token'>
                 Add {providerLabel} link
               </span>
             </div>
@@ -133,14 +133,14 @@ export function AddProviderUrlPopover({
                 }}
                 disabled={isSaving}
                 autoComplete='off'
-                className='h-8 rounded-full border-subtle bg-surface-1 text-[12px]'
+                className='h-8 rounded-full border-subtle bg-surface-1 text-xs'
               />
             </DrawerFormField>
             <div className='flex justify-end gap-2'>
               <DrawerButton
                 type='button'
                 tone='ghost'
-                className='h-7 rounded-full px-2.5 text-[11px]'
+                className='h-7 rounded-full px-2.5 text-2xs'
                 onClick={() => {
                   setUrl('');
                   setOpen(false);
@@ -152,7 +152,7 @@ export function AddProviderUrlPopover({
                 type='submit'
                 tone='primary'
                 disabled={!url.trim() || isSaving}
-                className='h-7 min-w-[60px] rounded-full px-2.5 text-[11px]'
+                className='h-7 min-w-[60px] rounded-full px-2.5 text-2xs'
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </DrawerButton>

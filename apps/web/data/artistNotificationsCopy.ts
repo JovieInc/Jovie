@@ -173,14 +173,14 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       rows: [
         {
           id: 'release',
-          trigger: 'New music',
+          trigger: 'New release',
           audience: 'Fans who asked for music',
           message: 'New release alert',
           destination: 'Latest release page',
         },
         {
           id: 'tour',
-          trigger: 'Show near due',
+          trigger: 'Nearby show',
           audience: 'Fans near the venue',
           message: 'Nearby show alert',
           destination: 'Ticket page',
@@ -265,7 +265,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   finalCta: {
-    headline: 'An email list that sends itself.',
+    headline: 'Ready to Amplify?',
     subhead:
       'Capture demand on free. Turn on automatic artist notifications with Pro.',
     ctaLabel: 'Start Pro Trial',

@@ -231,6 +231,64 @@ describe('SegmentControl', () => {
       expect((root as HTMLElement).className).toContain('border-transparent');
       expect((root as HTMLElement).className).toContain('bg-transparent');
     });
+
+    it('renders the linear pill indicator', () => {
+      const { container } = render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={defaultOptions}
+          variant='linear-pill'
+          layout='hug'
+        />
+      );
+
+      const activeTab = screen.getByRole('tab', {
+        name: 'Links',
+        selected: true,
+      });
+      const indicator = screen
+        .getByRole('tablist')
+        .querySelector(':scope > [aria-hidden="true"]');
+
+      expect(activeTab).toHaveAttribute('data-state', 'active');
+      expect(indicator).toBeInTheDocument();
+      expect((container.firstChild as HTMLElement).className).toContain(
+        'bg-(--linear-bg-button)'
+      );
+    });
+  });
+
+  describe('Layout', () => {
+    it('uses fill layout by default', () => {
+      render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={defaultOptions}
+        />
+      );
+
+      expect(screen.getByRole('tab', { name: 'Links' }).className).toContain(
+        'flex-1'
+      );
+    });
+
+    it('uses hug layout without stretching tabs', () => {
+      render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={defaultOptions}
+          variant='linear-pill'
+          layout='hug'
+        />
+      );
+
+      expect(
+        screen.getByRole('tab', { name: 'Links' }).className
+      ).not.toContain('flex-1');
+    });
   });
 
   describe('Accessibility', () => {

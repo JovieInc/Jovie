@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { completeOnboarding } from '@/app/onboarding/actions/index';
 
 const hoisted = vi.hoisted(() => {
   const withRetryMock = vi.fn();
@@ -187,8 +188,6 @@ describe('completeOnboarding', () => {
       id: 'profile_123',
       usernameNormalized: 'freshhandle',
     });
-
-    const { completeOnboarding } = await import('@/app/onboarding/actions');
 
     await expect(
       completeOnboarding({

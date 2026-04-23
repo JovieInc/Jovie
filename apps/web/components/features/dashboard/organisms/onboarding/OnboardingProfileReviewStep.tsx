@@ -345,7 +345,7 @@ export function OnboardingProfileReviewStep({
                 <div className='h-full w-[40%] rounded-full bg-(--linear-accent) animate-[onboarding-indeterminate_1.5s_ease-in-out_infinite]' />
               </div>
             </div>
-            <p className='text-[13px] text-secondary-token animate-pulse'>
+            <p className='text-app text-secondary-token animate-pulse'>
               Setting up your profile...
             </p>
           </div>
@@ -369,12 +369,12 @@ export function OnboardingProfileReviewStep({
                     />
                   </div>
                   {!avatarUrl && (
-                    <p className='text-[12px] text-tertiary-token'>
+                    <p className='text-xs text-tertiary-token'>
                       Tap to add a profile photo
                     </p>
                   )}
                   {avatarQuality?.status === 'low' ? (
-                    <div className='mt-2 flex max-w-[320px] items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
+                    <div className='mt-2 flex max-w-[320px] items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-xs text-secondary-token'>
                       <AlertCircle
                         className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
                         aria-hidden='true'
@@ -409,13 +409,13 @@ export function OnboardingProfileReviewStep({
                           maxLength={50}
                           className={cn(
                             AUTH_SURFACE.fieldInput,
-                            'text-center text-[15px] font-[590]'
+                            'text-center text-mid font-semibold'
                           )}
                           aria-label='Edit display name'
                         />
                       </div>
                       {nameError && (
-                        <p className='text-[11px] text-red-500'>{nameError}</p>
+                        <p className='text-2xs text-red-500'>{nameError}</p>
                       )}
                     </div>
                   ) : (
@@ -426,7 +426,7 @@ export function OnboardingProfileReviewStep({
                         className='group cursor-pointer'
                         aria-label='Edit display name'
                       >
-                        <span className='text-[16px] font-[590] text-primary-token transition-colors group-hover:text-accent'>
+                        <span className='text-base font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
                         </span>
                       </button>
@@ -446,7 +446,7 @@ export function OnboardingProfileReviewStep({
 
                 {/* Bio */}
                 {bio && (
-                  <p className='text-[13px] text-secondary-token text-center max-w-sm line-clamp-3'>
+                  <p className='text-app text-secondary-token text-center max-w-sm line-clamp-3'>
                     {bio}
                   </p>
                 )}

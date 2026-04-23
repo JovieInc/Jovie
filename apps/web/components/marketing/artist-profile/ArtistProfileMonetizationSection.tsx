@@ -7,8 +7,8 @@ import {
   Mail,
   MapPin,
   Music2,
-  QrCode,
 } from 'lucide-react';
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
@@ -207,7 +207,7 @@ export function ArtistProfileMonetizationSection({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-[#050505] py-24 sm:py-28 lg:py-32'
+      className='bg-[#050505]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
@@ -225,61 +225,62 @@ export function ArtistProfileMonetizationSection({
         </div>
 
         <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
-            <button
-              type='button'
-              onClick={() => {
-                scrollByDirection('prev');
-              }}
-              disabled={activeCardIndex === 0}
-              className={cn(
-                'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                activeCardIndex === 0
-                  ? 'cursor-not-allowed opacity-35'
-                  : 'hover:bg-white hover:text-black'
-              )}
-              aria-label='Scroll monetization left'
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </button>
-            <button
-              type='button'
-              onClick={() => {
-                scrollByDirection('next');
-              }}
-              disabled={activeCardIndex === cards.length - 1}
-              className={cn(
-                'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                activeCardIndex === cards.length - 1
-                  ? 'cursor-not-allowed opacity-35'
-                  : 'hover:bg-white hover:text-black'
-              )}
-              aria-label='Scroll monetization right'
-            >
-              <ChevronRight className='h-4 w-4' />
-            </button>
-          </div>
-
-          <div
+          <section
             ref={scrollerRef}
             data-testid='artist-profile-monetization-scroller'
-            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] lg:pl-[max(0px,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] [&::-webkit-scrollbar]:hidden'
+            aria-label='Monetization card carousel'
+            className='relative flex gap-3.5 overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth snap-x snap-mandatory pb-2 pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] pr-[9vw] scroll-pl-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide sm:gap-4 sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [&::-webkit-scrollbar]:hidden'
           >
             <button
               type='button'
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-10 focus:rounded-full focus:bg-white focus:px-3 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-black'
+              className='sr-only focus:not-sr-only focus:absolute focus:left-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] focus:top-4 focus:z-30 focus:rounded-full focus:border focus:border-black/12 focus:bg-[#f3efe6] focus:px-4 focus:py-2 focus:text-[12px] focus:font-semibold focus:text-black focus:shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
             >
-              Scroll monetization
+              Browse monetization cards
             </button>
+            <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
+              <button
+                type='button'
+                onClick={() => {
+                  scrollByDirection('prev');
+                }}
+                disabled={activeCardIndex === 0}
+                className={cn(
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  activeCardIndex === 0
+                    ? 'cursor-not-allowed opacity-35'
+                    : 'hover:bg-white hover:text-black'
+                )}
+                aria-label='Scroll monetization left'
+              >
+                <ChevronLeft className='h-4 w-4' />
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  scrollByDirection('next');
+                }}
+                disabled={activeCardIndex === cards.length - 1}
+                className={cn(
+                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
+                  activeCardIndex === cards.length - 1
+                    ? 'cursor-not-allowed opacity-35'
+                    : 'hover:bg-white hover:text-black'
+                )}
+                aria-label='Scroll monetization right'
+              >
+                <ChevronRight className='h-4 w-4' />
+              </button>
+            </div>
             {cards.map((card, index) => (
               <MonetizationCard
                 key={card.id}
                 ref={node => {
                   cardRefs.current[index] = node;
                 }}
+                cardId={card.id}
                 body={card.body}
                 textAnchor={card.textAnchor}
                 title={card.title}
@@ -299,7 +300,7 @@ export function ArtistProfileMonetizationSection({
                 ) : null}
               </MonetizationCard>
             ))}
-          </div>
+          </section>
         </div>
       </div>
     </ArtistProfileSectionShell>
@@ -307,6 +308,7 @@ export function ArtistProfileMonetizationSection({
 }
 
 interface MonetizationCardProps {
+  readonly cardId: MonetizationCardId;
   readonly body: string;
   readonly children: ReactNode;
   readonly textAnchor: 'top' | 'bottom';
@@ -317,6 +319,7 @@ interface MonetizationCardProps {
 const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
   function MonetizationCard(
     {
+      cardId,
       body,
       children,
       textAnchor,
@@ -325,6 +328,9 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
     }: Readonly<MonetizationCardProps>,
     ref
   ) {
+    const isIrlPaymentsCard = cardId === 'irl-payments';
+    const isCaptureCard = cardId === 'capture';
+
     const textBlock = (
       <div
         className={cn(
@@ -347,7 +353,9 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
       <div
         className={cn(
           'relative z-10',
-          visualSide === 'right' ? 'self-end' : 'self-start'
+          visualSide === 'right' ? 'self-end' : 'self-start',
+          isIrlPaymentsCard &&
+            '-mb-5 -mr-5 sm:-mb-6 sm:-mr-6 lg:-mb-6.5 lg:-mr-6.5'
         )}
       >
         {children}
@@ -358,11 +366,16 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
       <article
         ref={ref}
         data-testid='artist-profile-monetization-card'
-        className='relative flex min-h-[29rem] w-[min(24rem,82vw)] shrink-0 snap-start flex-col rounded-[1.55rem] bg-[#f3efe6] p-5 text-black shadow-[0_22px_70px_rgba(0,0,0,0.28)] sm:min-h-[31rem] sm:w-[28rem] sm:p-6 lg:min-h-[32rem] lg:w-[30rem] lg:p-7'
+        className={cn(
+          'relative flex w-[min(22rem,82vw)] shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-[#f3efe6] p-5 text-black shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
+          isCaptureCard
+            ? 'min-h-[22.75rem] sm:min-h-[23.75rem] lg:min-h-[24.5rem]'
+            : 'min-h-[27rem] sm:min-h-[29rem] lg:min-h-[30rem]'
+        )}
       >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-[1.55rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.7),transparent)]'
+          className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-[1.45rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.7),transparent)]'
         />
         {textAnchor === 'top' ? textBlock : visualBlock}
         <div className='flex-1' />
@@ -372,42 +385,22 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
   }
 );
 
-function IrlPaymentsVisual({
-  card,
-}: Readonly<{
+function IrlPaymentsVisual({}: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['irlPaymentsCard'];
 }>) {
   return (
-    <div className='w-[16.75rem] sm:w-[18rem]'>
-      <div className='rounded-t-[1.45rem] rounded-b-none bg-[#111214] px-4 pb-5 pt-4 text-white shadow-[0_-18px_40px_rgba(0,0,0,0.18)] sm:px-5'>
-        <div className='mx-auto h-1 w-10 rounded-full bg-white/18' />
-        <div className='mt-4 flex items-center gap-2 text-[11px] font-medium tracking-[-0.02em] text-white/72'>
-          <QrCode className='h-3.5 w-3.5' strokeWidth={1.9} />
-          <span>{card.contextLabel}</span>
-          <span className='h-1 w-1 rounded-full bg-white/18' />
-          <span>{card.contextDetail}</span>
-        </div>
-        <p className='mt-4 text-[14px] font-semibold tracking-[-0.03em] text-white/92'>
-          {card.amountLabel}
-        </p>
-        <div className='mt-3 grid grid-cols-3 gap-2'>
-          {card.amounts.map(amount => (
-            <div
-              key={amount.id}
-              className={cn(
-                'rounded-[0.95rem] px-2 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-                'featured' in amount && amount.featured
-                  ? 'bg-white text-black'
-                  : 'bg-white/[0.08]'
-              )}
-            >
-              <p className='text-[16px] font-semibold leading-none tracking-[-0.05em]'>
-                {amount.amount}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className='relative h-[13.8rem] w-[18rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-[#0d1015] shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem]'>
+      <Image
+        alt='Pay drawer open inside an artist profile payment flow'
+        className='object-cover object-bottom'
+        fill
+        sizes='(max-width: 640px) 18rem, 19rem'
+        src='/product-screenshots/tim-white-profile-pay-phone.png'
+      />
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-0 top-0 h-12 bg-[linear-gradient(180deg,rgba(13,16,21,0.06),transparent)]'
+      />
     </div>
   );
 }
@@ -418,25 +411,28 @@ function CaptureFanVisual({
   card: ArtistProfileLandingCopy['monetization']['captureCard'];
 }>) {
   return (
-    <div className='w-[14.5rem] rounded-[1.15rem] bg-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.14)]'>
+    <div className='w-[14.75rem] rounded-[1.15rem] bg-[#0f131a] px-4 py-3.5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-[14px] font-semibold tracking-[-0.03em] text-black'>
+          <p className='text-[14px] font-semibold tracking-[-0.03em] text-white'>
             {card.fanName}
           </p>
-          <div className='mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-black/68'>
+          <div className='mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-white/72'>
             <MapPin className='h-3.5 w-3.5' strokeWidth={1.9} />
             {card.fanLocation}
           </div>
         </div>
-        <div className='rounded-full bg-[#eff4ff] px-2.5 py-1 text-[11px] font-semibold text-[#223f83]'>
+        <div className='rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black'>
           {card.fanAmount}
         </div>
       </div>
-      <div className='mt-4 rounded-[0.95rem] bg-[#f3f5f8] px-3 py-3'>
-        <p className='text-[12px] font-medium tracking-[-0.02em] text-black/76'>
+      <div className='mt-3 rounded-[0.95rem] bg-white/[0.06] px-3 py-2.5'>
+        <p className='text-[12px] font-medium tracking-[-0.02em] text-white/76'>
           {card.fanIntent}
         </p>
+      </div>
+      <div className='mt-2.5 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.25 text-[10.5px] font-semibold text-white/74'>
+        New music notifications enabled
       </div>
     </div>
   );
@@ -448,25 +444,25 @@ function SayThanksVisual({
   card: ArtistProfileLandingCopy['monetization']['thanksCard'];
 }>) {
   return (
-    <div className='w-[15rem] rounded-[1.1rem] bg-white p-3.5 shadow-[0_18px_34px_rgba(0,0,0,0.12)]'>
+    <div className='w-[15rem] rounded-[1.1rem] bg-[#0f131a] p-3.5 text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
       <div className='flex items-start gap-3'>
-        <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f1f3f6] text-black'>
+        <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white'>
           <Mail className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center justify-between gap-3'>
-            <p className='text-[12px] font-semibold tracking-[-0.02em] text-black'>
+            <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
               {card.appName}
             </p>
-            <p className='text-[11px] font-medium text-black/62'>now</p>
+            <p className='text-[11px] font-medium text-white/72'>now</p>
           </div>
-          <p className='mt-0.5 text-[11px] font-medium text-black/55'>
+          <p className='mt-0.5 text-[11px] font-medium text-white/72'>
             {card.sender}
           </p>
-          <p className='mt-3 text-[13px] font-semibold leading-[1.28] tracking-[-0.03em] text-black'>
+          <p className='mt-3 text-[13px] font-semibold leading-[1.28] tracking-[-0.03em] text-white'>
             {card.notificationTitle}
           </p>
-          <p className='mt-1.5 text-[12px] leading-[1.45] text-black/72'>
+          <p className='mt-1.5 text-[12px] leading-[1.45] text-white/74'>
             {card.notificationPreview}
           </p>
         </div>
@@ -514,7 +510,7 @@ function ReengageVisual({
                 <p className='text-[12.5px] font-semibold leading-[1.3] tracking-[-0.02em] text-white'>
                   {output.title}
                 </p>
-                <p className='mt-1.5 text-[11.5px] leading-[1.45] text-white/54'>
+                <p className='mt-1.5 text-[11.5px] leading-[1.45] text-white/72'>
                   {output.detail}
                 </p>
               </div>

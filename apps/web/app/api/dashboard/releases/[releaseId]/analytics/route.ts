@@ -114,6 +114,7 @@ export async function GET(
       .execute<{
         total_clicks: AggregateValue;
         clicks_last_7: AggregateValue;
+        last_click_at: string | Date | null;
         provider_clicks: JsonArray<{
           provider: string | null;
           clicks: number;
@@ -144,16 +145,23 @@ export async function GET(
           select
             (select count(*) from release_clicks) as total_clicks,
             (select count(*) from recent_clicks) as clicks_last_7,
+            (select max(created_at) from release_clicks) as last_click_at,
             coalesce((select json_agg(row_to_json(p)) from provider_clicks p), '[]'::json) as provider_clicks
           ;
         `
       )
       .then(res => res.rows?.[0]);
 
+    const lastClickAtRaw = aggregates?.last_click_at ?? null;
+    const lastClickAt = lastClickAtRaw
+      ? new Date(lastClickAtRaw).toISOString()
+      : null;
+
     return NextResponse.json(
       {
         totalClicks: Number(aggregates?.total_clicks ?? 0),
         last7DaysClicks: Number(aggregates?.clicks_last_7 ?? 0),
+        lastClickAt,
         providerClicks: parseJsonArray<{
           provider: string | null;
           clicks: number;

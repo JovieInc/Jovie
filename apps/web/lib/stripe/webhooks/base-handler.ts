@@ -106,12 +106,15 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    * 3. If active: Validates price ID, looks up plan, upgrades user (isPro = true)
    *
    * Error Handling:
-   * - Throws on unrecoverable errors (missing price ID, unknown plan)
+   * - Throws on unrecoverable errors (missing price ID)
+   * - Skips unknown price IDs with a captured critical error containing the
+   *   customerId, priceId, subscriptionId, and userId so webhook delivery can
+   *   be acknowledged without retry storms when Stripe price config drifts
    * - Returns error result on billing update failures
    *
    * @param options - Processing options including subscription, user ID, and event metadata
    * @returns Promise resolving to the processing result
-   * @throws If price ID is missing or unknown (unrecoverable errors)
+   * @throws If price ID is missing
    */
   protected async processSubscription(
     options: ProcessSubscriptionOptions
@@ -207,7 +210,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    * Handle an active subscription by upgrading the user.
    *
    * @private
-   * @throws If price ID is missing or unknown
+   * @returns A skipped result with reason `unknown_price_id` when the price ID
+   * does not map to a known plan.
+   * @throws If price ID is missing
    */
   private async handleActiveSubscription(
     subscription: Stripe.Subscription,
@@ -232,16 +237,23 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
 
     const plan = getPlanFromPriceId(priceId);
     if (!plan) {
+      const customerId = getCustomerId(subscription.customer);
       await captureCriticalError(
         'Unknown price ID in subscription',
         new Error(`Unknown price ID: ${priceId}`),
         {
+          customerId,
           priceId,
+          subscriptionId: subscription.id,
           userId,
           route: '/api/stripe/webhooks',
         }
       );
-      throw new Error(`Unknown price ID: ${priceId}`);
+      return {
+        success: true,
+        skipped: true,
+        reason: 'unknown_price_id',
+      };
     }
 
     // Update user's billing status

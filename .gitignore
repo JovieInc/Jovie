@@ -62,7 +62,11 @@ storybook-static/
 .claude/tasks/
 .claude_settings.json
 .auto-claude*
-.codex/
+# Codex team config is tracked; runtime/local artifacts stay ignored.
+.codex/*
+!.codex/config.toml
+!.codex/hooks.json
+!.codex/local-env.toml
 
 # App-specific node_modules and build output
 apps/should-i-make/node_modules
@@ -100,3 +104,4 @@ output/
 .audit/
 .gstack/
 .claude/skills/gstack/
+.claude/scheduled_tasks.lock

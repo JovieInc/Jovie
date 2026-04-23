@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { getRequestLocationFromHeaders } from '@/components/providers/clerkAvailability';
 import { STAGING_HOSTNAMES } from '@/constants/domains';
+import type { ClerkKeyStatus } from '@/lib/auth/clerk-key-status';
 import { publicEnv } from '@/lib/env-public';
 
 /**
@@ -18,6 +19,7 @@ export function isStagingHost(hostname: string): boolean {
 interface ClerkKeys {
   publishableKey: string | undefined;
   secretKey: string | undefined;
+  status: ClerkKeyStatus;
 }
 
 /**
@@ -44,9 +46,17 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
     // When explicit _STAGING vars exist, use only those (fail closed on partial).
     if (explicitPk || explicitSk) {
       if (!explicitPk || !explicitSk) {
-        return { publishableKey: undefined, secretKey: undefined };
+        return {
+          publishableKey: undefined,
+          secretKey: undefined,
+          status: 'staging_missing',
+        };
       }
-      return { publishableKey: explicitPk, secretKey: explicitSk };
+      return {
+        publishableKey: explicitPk,
+        secretKey: explicitSk,
+        status: 'ok',
+      };
     }
 
     // No _STAGING vars at all: fall back to the standard env vars read at
@@ -56,7 +66,11 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
     const runtimePk = runtimePublicEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
     const runtimeSk = process.env.CLERK_SECRET_KEY || undefined;
     if (!runtimePk || !runtimeSk) {
-      return { publishableKey: undefined, secretKey: undefined };
+      return {
+        publishableKey: undefined,
+        secretKey: undefined,
+        status: 'staging_missing',
+      };
     }
     // If the runtime PK matches the build-time production PK, the staging
     // environment doesn't have staging-specific Clerk keys — the Vercel
@@ -65,16 +79,29 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
     // isn't in the production Clerk app's allowlist.
     const buildTimePk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
     if (buildTimePk && runtimePk === buildTimePk) {
-      return { publishableKey: undefined, secretKey: undefined };
+      return {
+        publishableKey: undefined,
+        secretKey: undefined,
+        status: 'staging_inherits_prod',
+      };
     }
-    return { publishableKey: runtimePk, secretKey: runtimeSk };
+    return {
+      publishableKey: runtimePk,
+      secretKey: runtimeSk,
+      status: 'ok',
+    };
   }
 
+  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const secretKey = process.env.CLERK_SECRET_KEY || undefined;
   return {
-    publishableKey: publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY || undefined,
+    publishableKey,
+    secretKey,
+    status: publishableKey && secretKey ? 'ok' : 'no_publishable_key',
   };
 }
+
+export { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
 
 /**
  * Resolve the publishable key for dynamic server component layouts.

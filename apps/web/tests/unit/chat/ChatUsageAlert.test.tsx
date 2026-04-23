@@ -35,8 +35,8 @@ describe('ChatUsageAlert', () => {
 
     const { getByText } = fastRender(<ChatUsageAlert />);
 
-    expect(getByText("You're almost out of messages")).toBeDefined();
-    expect(getByText(/9 of 10 daily messages/)).toBeDefined();
+    expect(getByText("You're almost out of messages")).toBeInTheDocument();
+    expect(getByText(/9 of 10 daily messages/)).toBeInTheDocument();
   });
 
   it('shows exhausted state with upgrade CTA', () => {
@@ -54,8 +54,8 @@ describe('ChatUsageAlert', () => {
 
     const { getByText, getByRole } = fastRender(<ChatUsageAlert />);
 
-    expect(getByText("You're out of messages for today")).toBeDefined();
-    expect(getByRole('button', { name: /Upgrade to Pro/ })).toBeDefined();
+    expect(getByText("You're out of messages for today")).toBeInTheDocument();
+    expect(getByRole('button', { name: /Upgrade to Pro/ })).toBeInTheDocument();
   });
 
   it('shows view plans button for pro users at limit', () => {
@@ -75,7 +75,7 @@ describe('ChatUsageAlert', () => {
 
     expect(
       getByText(/Come back tomorrow when your quota refreshes/)
-    ).toBeDefined();
-    expect(getByRole('link', { name: 'View plans' })).toBeDefined();
+    ).toBeInTheDocument();
+    expect(getByRole('link', { name: 'View plans' })).toBeInTheDocument();
   });
 });

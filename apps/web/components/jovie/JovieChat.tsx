@@ -15,6 +15,7 @@ import {
   ScrollToBottom,
   SuggestedPrompts,
 } from './components';
+import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import {
   useChatImageAttachments,
@@ -63,6 +64,7 @@ export function JovieChat({
     setChatError,
     isRateLimited,
     stop,
+    chipTray,
   } = useJovieChat({
     profileId,
     artistContext,
@@ -275,6 +277,11 @@ export function JovieChat({
     pendingImages,
     onRemoveImage: removeImage,
     onPaste: handlePaste,
+    chips: chipTray.chips,
+    onRemoveChipAt: chipTray.removeAt,
+    onRemoveLastChip: chipTray.removeLast,
+    onAddSkill: chipTray.addSkill,
+    onAddEntity: chipTray.addEntity,
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
@@ -293,6 +300,9 @@ export function JovieChat({
       className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
       data-testid='chat-content'
     >
+      {/* Registers entity providers (release, artist) for the slash menu */}
+      {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
+
       {/* Hidden file input for image attachments */}
       <input
         ref={imageFileInputRef}
@@ -455,49 +465,46 @@ export function JovieChat({
           </div>
         </div>
       ) : (
-        <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
-          <div className='flex min-h-full flex-col'>
-            {/* Top spacer — pushes input to optical center */}
-            <div className='flex-1' />
-
-            {/* Centered anchor: heading + input */}
-            <div className='mx-auto flex w-full max-w-[34rem] flex-col items-center gap-5'>
+        <div className='flex flex-1 flex-col overflow-hidden'>
+          <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
+            <div className='mx-auto flex min-h-full w-full max-w-[34rem] flex-col items-center justify-center gap-5 py-6'>
               <h1 className='text-[1.2rem] font-[560] tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
                 {emptyStateHeading}
               </h1>
-              <div className='w-full space-y-2.5'>
-                {isRateLimited && (
-                  <p
-                    className='text-center text-xs text-tertiary-token'
-                    aria-live='polite'
-                  >
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
+              <div className='mx-auto flex w-full max-w-md flex-col items-center'>
+                <SuggestedPrompts
+                  onSelect={handleSuggestedPrompt}
+                  isFirstSession={isFirstSession}
+                  latestReleaseTitle={latestReleaseTitle}
+                  layout='flat'
+                />
+                {chatError && (
+                  <div className='mt-2.5 w-full'>
+                    <ErrorDisplay
+                      chatError={chatError}
+                      onRetry={handleRetry}
+                      isLoading={isLoading}
+                      isSubmitting={isSubmitting}
+                    />
+                  </div>
                 )}
-                <ChatUsageAlert />
-                <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
               </div>
             </div>
+          </div>
 
-            {/* Bottom section — items flow below center, don't shift input */}
-            <div className='mx-auto flex w-full max-w-md flex-1 flex-col items-center pt-2'>
-              <SuggestedPrompts
-                onSelect={handleSuggestedPrompt}
-                isFirstSession={isFirstSession}
-                latestReleaseTitle={latestReleaseTitle}
-                layout='flat'
-              />
-              {chatError && (
-                <div className='mt-2.5 w-full'>
-                  <ErrorDisplay
-                    chatError={chatError}
-                    onRetry={handleRetry}
-                    isLoading={isLoading}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
+          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className='mx-auto w-full max-w-[34rem] space-y-2.5'>
+              {isRateLimited && (
+                <p
+                  className='text-center text-xs text-tertiary-token'
+                  aria-live='polite'
+                >
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
               )}
+              <ChatUsageAlert />
+              <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
             </div>
           </div>
         </div>

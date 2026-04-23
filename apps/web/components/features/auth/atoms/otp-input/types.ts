@@ -34,4 +34,17 @@ export interface OtpInputProps {
    * Error message ID for aria-describedby association
    */
   readonly errorId?: string;
+  /**
+   * Visual density for the OTP boxes.
+   * - 'default': full-size boxes for the main subscribe surface
+   * - 'compact': smaller boxes for inline step-stack CTAs
+   * - 'hero': 32×26 dark-glass boxes tuned for the hero morph bar
+   * @default 'default'
+   */
+  readonly size?: 'default' | 'compact' | 'hero';
+  /**
+   * Whether to render the mobile progress dots above the OTP boxes.
+   * @default true
+   */
+  readonly showProgressDots?: boolean;
 }

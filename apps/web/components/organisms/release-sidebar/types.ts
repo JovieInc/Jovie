@@ -38,6 +38,7 @@ export type ReleaseSidebarTrack = Pick<
 export interface ReleaseSidebarAnalytics {
   totalClicks: number;
   last7DaysClicks: number;
+  lastClickAt: string | null;
   providerClicks: Array<{ provider: string; clicks: number }>;
 }
 
@@ -61,6 +62,12 @@ export interface ReleaseSidebarProps {
   >;
   /** Artist name to display in the sidebar header */
   readonly artistName?: string | null;
+  /**
+   * When provided, each artist name in the header becomes a button that
+   * invokes this callback with the clicked name. Used to set a filter on
+   * the surrounding release table.
+   */
+  readonly onArtistClick?: (artistName: string) => void;
   readonly canGenerateAlbumArt?: boolean;
   readonly onGenerateAlbumArt?: (release: Release) => void;
   readonly onClose?: () => void;

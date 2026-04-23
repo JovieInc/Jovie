@@ -23,6 +23,10 @@ pnpm --version   # MUST be 9.15.4
 
 Skip any Linear issue labeled `human-review-required` or containing "This issue requires human review" in its description. Do not work on, close, or comment on these issues. See `AGENTS.md` for full details.
 
+## Linear Ownership
+
+Every agent must mark its Linear issue `In Progress` BEFORE editing files. In Review (on PR open) and Done (on merge) are automated — do not transition them manually. See `AGENTS.md` → "Linear Ownership Contract" for the full rules and MCP snippets.
+
 ---
 
 ## gstack

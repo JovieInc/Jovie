@@ -1,24 +1,21 @@
 'use client';
 
-import { ArtistProfileCaptureVisual } from '@/components/marketing/MarketingStoryPrimitives';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileCaptureSectionProps {
-  readonly capture: ArtistProfileLandingCopy['capture'];
   readonly id?: string;
+  readonly capture: ArtistProfileLandingCopy['capture'];
 }
 
 export function ArtistProfileCaptureSection({
-  capture,
   id,
+  capture,
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   return (
-    <ArtistProfileSectionShell
-      id={id}
-      className='bg-white/[0.008] py-24 sm:py-28 lg:py-32'
-    >
+    <ArtistProfileSectionShell className='bg-white/[0.008]' id={id}>
       <div className='mx-auto max-w-[1120px]'>
         <ArtistProfileSectionHeader
           align='center'
@@ -27,7 +24,8 @@ export function ArtistProfileCaptureSection({
           className='max-w-[46rem]'
           bodyClassName='mx-auto max-w-[34rem]'
         />
-        <ArtistProfileCaptureVisual capture={capture} className='mt-10' />
+
+        <ArtistProfileCaptureVisual capture={capture} className='mt-12' />
       </div>
     </ArtistProfileSectionShell>
   );

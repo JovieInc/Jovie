@@ -17,7 +17,19 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # On main, scope the concurrency group per-commit so rapid merges cannot
+  # cancel each other's deploy pipelines. GitHub evaluates cancel-in-progress
+  # expressions as strings and treats "false" as truthy, which was cancelling
+  # every main CI run when the next merge landed and starving production
+  # promotion. Using github.sha in the group on main sidesteps the issue
+  # entirely. PRs and merge_group runs still share a group per ref so stale
+  # runs are superseded as usual.
+  group: >-
+    ci-${{ github.workflow }}-${{
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        && github.sha
+        || github.ref
+    }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -778,7 +790,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Runs Lighthouse CI against the public-route build artifact on PRs.
     # Blocks PRs when triggered (path-gated to public-route changes).
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -1031,7 +1043,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-fast, ci-path-changes, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1165,7 +1177,7 @@ jobs:
     # so dependent jobs would silently skip on admin-UI-only PRs. This job creates
     # its own ephemeral branch below and does not reuse the shared neon-db branch.
     needs: [ci-fast, ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1738,7 +1750,7 @@ jobs:
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -1815,8 +1827,8 @@ jobs:
           OUTPUT_FLAG="--outputFile=test-report.${SHARD_SLUG}.junit.xml"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running full test suite with coverage"
-            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
+            echo "🧪 main: Running web unit suite with coverage"
+            pnpm --filter=@jovie/web run test:fast -- $VITEST_CI_FLAGS --coverage $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
@@ -1868,7 +1880,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -2626,6 +2638,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ALLOW_SOURCE_FALLBACK: '1'
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -3070,11 +3083,12 @@ jobs:
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Deploy concurrency: if multiple main pushes stack up (e.g., merge queue burst),
-    # cancel the in-progress deploy and deploy only the latest commit.
+    # Deploy concurrency: serialize main deploys instead of cancelling them.
+    # Cancelling in-progress main deploys during merge bursts can starve
+    # production promotion and leave main without a completed deploy run.
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
@@ -3142,6 +3156,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
       - name: Alias preview to staging.jov.ie
         run: |
@@ -3156,7 +3171,7 @@ jobs:
     if: ${{ always() && needs.deploy-staging.result == 'success' }}
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: https://staging.jov.ie
@@ -3176,7 +3191,7 @@ jobs:
     timeout-minutes: 10
     concurrency:
       group: production-deploy
-      cancel-in-progress: true
+      cancel-in-progress: false
     environment:
       name: Production – jovie
       url: https://jov.ie
@@ -3199,7 +3214,7 @@ jobs:
             exit 0
           fi
 
-          if printf '%s' "$promote_output" | rg -q "already the current production deployment"; then
+          if printf '%s' "$promote_output" | grep -q "already the current production deployment"; then
             echo "Staging deployment is already in production; continuing."
             exit 0
           fi

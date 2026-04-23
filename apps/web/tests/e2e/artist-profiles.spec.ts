@@ -96,20 +96,25 @@ test.describe('Artist Profiles Landing', () => {
   });
 
   test('hero renders with headline and CTAs', async ({ page }) => {
+    const claimForm = page.getByTestId('homepage-claim-form');
+    const claimButton = page.getByRole('button', {
+      name: /claim your profile/i,
+    });
+
     await expect(
       page.getByRole('heading', {
         name: /the link your music deserves\./i,
       })
     ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /claim your profile/i })
-    ).toBeVisible();
+    await expect(claimButton).toBeVisible();
     await expect(page.getByLabel(/choose your handle/i)).toBeVisible();
+    await expectFullyInViewport(page, claimForm);
+    await expectFullyInViewport(page, claimButton);
   });
 
   test('final CTA renders with claim form', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /ready to amplify\?/i })
+      page.getByRole('heading', { name: /don't lose your next fan\./i })
     ).toBeVisible();
     await expect(
       page.getByTestId('final-cta-action').getByText(/claim your profile/i)
@@ -131,6 +136,7 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+    await expectFullyInViewport(page, page.getByTestId('homepage-claim-form'));
   });
 
   test('top story stays legible through the desktop hero-to-adaptive handoff', async ({
@@ -146,11 +152,12 @@ test.describe('Artist Profiles Landing', () => {
     const trust = page.getByTestId('homepage-trust');
     const adaptivePhone = adaptiveSection.getByRole('img').first();
     const phone = page.getByAltText(
-      'Jovie artist profile showing the default profile view before a mode is opened.'
+      "Jovie artist profile showing Tim White's live profile view."
     );
 
     await expect(heroHeading).toBeVisible();
     await expect(claimForm).toBeVisible();
+    await expectFullyInViewport(page, claimForm);
     await expect(phone).toBeVisible();
 
     const adaptiveTop = await getDocumentY(adaptiveSection);
@@ -159,7 +166,7 @@ test.describe('Artist Profiles Landing', () => {
     await expect(adaptiveHeading).toBeVisible();
     await expect(adaptiveSubcaption).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Drive Streams' })
+      page.getByRole('tab', { name: 'Drive Streams' })
     ).toBeVisible();
     await expect(
       page.getByText('Keep the latest music one tap away.')
@@ -170,11 +177,11 @@ test.describe('Artist Profiles Landing', () => {
     const viewportHeight = await getViewportHeight(page);
     expect(trustRect.top).toBeGreaterThanOrEqual(viewportHeight);
 
-    const stayBookedTab = page.getByRole('button', { name: 'Stay Booked' });
-    await expect(stayBookedTab).toBeVisible();
-    await stayBookedTab.click();
+    const contactTab = page.getByRole('tab', { name: 'Contact' });
+    await expect(contactTab).toBeVisible();
+    await contactTab.click();
     await expect(
-      page.getByText('Make booking, management, and press easy to reach.')
+      page.getByText('Keep booking, management, and press one tap away.')
     ).toBeVisible();
     await expect(
       page.getByAltText(
@@ -183,7 +190,19 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
 
     const trustTop = await getDocumentY(trust);
-    await scrollToY(page, Math.max(0, trustTop - 120));
+    await scrollToY(page, Math.max(0, trustTop - 220));
+    await expect(trust).toBeVisible();
+
+    const trustBoxDuringOverlay = await trust.boundingBox();
+    const adaptivePhoneBoxDuringOverlay = await adaptivePhone.boundingBox();
+    expect(trustBoxDuringOverlay).not.toBeNull();
+    expect(adaptivePhoneBoxDuringOverlay).not.toBeNull();
+    expect(trustBoxDuringOverlay?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      (adaptivePhoneBoxDuringOverlay?.y ?? 0) +
+        (adaptivePhoneBoxDuringOverlay?.height ?? 0)
+    );
+
+    await scrollToY(page, Math.max(0, trustTop - 40));
     await expect(trust).toBeVisible();
     await expectNotPartiallyVisible(page, adaptivePhone);
   });
@@ -202,11 +221,12 @@ test.describe('Artist Profiles Landing', () => {
     const adaptiveSection = page.getByTestId('artist-profile-section-adaptive');
     const trust = page.getByTestId('homepage-trust');
     const phone = page.getByAltText(
-      'Jovie artist profile showing the default profile view before a mode is opened.'
+      "Jovie artist profile showing Tim White's live profile view."
     );
 
     await expect(heroHeading).toBeVisible();
     await expect(page.getByTestId('homepage-claim-form')).toBeVisible();
+    await expectFullyInViewport(page, page.getByTestId('homepage-claim-form'));
     await expect(phone).toBeVisible();
 
     const adaptiveTop = await getDocumentY(adaptiveSection);
@@ -215,7 +235,7 @@ test.describe('Artist Profiles Landing', () => {
     await expect(adaptiveHeading).toBeVisible();
     await expect(page.getByText('Adapts to every fan.')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Drive Streams' })
+      page.getByRole('tab', { name: 'Drive Streams' })
     ).toBeVisible();
     await expectFullyInViewport(page, phone);
 
@@ -229,25 +249,69 @@ test.describe('Artist Profiles Landing', () => {
     await expectNotPartiallyVisible(page, phone);
   });
 
-  test('outcomes carousel hides scrollbars without causing page overflow', async ({
+  test('outcomes section comes right after the trust strip and keeps a stable grid across breakpoints', async ({
     page,
   }) => {
     await expectNoHorizontalOverflow(page);
 
+    const trust = page.getByTestId('artist-profile-section-trust');
     const outcomesSection = page.getByTestId('artist-profile-section-outcomes');
+    const captureSection = page.getByTestId('artist-profile-section-capture');
+    const grid = page.getByTestId('artist-profile-outcomes-grid');
+    const scroller = page.getByTestId('artist-profile-outcomes-scroller');
     await outcomesSection.scrollIntoViewIfNeeded();
 
-    const scroller = page.getByTestId('artist-profile-outcomes-scroller');
-    await expect(scroller).toBeVisible();
+    await expect(grid).toBeVisible();
+    await expect(scroller).toBeHidden();
     await expect(
-      page.getByRole('heading', { name: /drive streams/i })
+      outcomesSection.getByRole('heading', { name: /drive streams/i })
     ).toBeVisible();
+    await expect(
+      outcomesSection.getByRole('heading', { name: /sell out/i })
+    ).toBeVisible();
+    await expect(outcomesSection.getByText('Tim White')).toBeVisible();
+    await expect(outcomesSection.getByText('w/ Cosmic Gate')).toBeVisible();
+    await expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
+    ).toBeVisible();
+    await expect(
+      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
+    ).toBeVisible();
+    await expect(
+      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
+    ).toBeVisible();
+    await expect(page.getByText('Wired to my latest release')).toHaveCount(0);
+    const trustTop = await getDocumentY(trust);
+    const outcomesTop = await getDocumentY(outcomesSection);
+    const captureTop = await getDocumentY(captureSection);
+    expect(outcomesTop).toBeGreaterThan(trustTop);
+    expect(captureTop).toBeGreaterThan(outcomesTop);
+
+    const startScrollY = await page.evaluate(() => window.scrollY);
+    await grid.locator('article').first().hover();
+    await page.mouse.wheel(0, 720);
+    await page.waitForTimeout(180);
+    const endScrollY = await page.evaluate(() => window.scrollY);
+    expect(endScrollY).toBeGreaterThan(startScrollY);
 
     await expectNoHorizontalOverflow(page);
 
     await page.setViewportSize({ width: 375, height: 812 });
-    await outcomesSection.scrollIntoViewIfNeeded();
-    await expect(scroller).toBeVisible();
+    await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const mobileOutcomesSection = page.getByTestId(
+      'artist-profile-section-outcomes'
+    );
+    await mobileOutcomesSection.scrollIntoViewIfNeeded();
+    const mobileGrid = page.getByTestId('artist-profile-outcomes-grid');
+    const mobileScroller = page.getByTestId('artist-profile-outcomes-scroller');
+    await expect(mobileGrid).toBeVisible();
+    await expect(mobileScroller).toBeHidden();
+    await expect(
+      page.getByRole('heading', { name: /drive streams/i })
+    ).toBeVisible();
+
     await expectNoHorizontalOverflow(page);
   });
 
@@ -284,7 +348,7 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(
       specWallSection.getByRole('heading', {
-        name: 'Details that pull their weight.',
+        name: 'Details that matter.',
       })
     ).toBeVisible();
     await expect(

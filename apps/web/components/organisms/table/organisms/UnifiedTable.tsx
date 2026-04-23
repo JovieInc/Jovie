@@ -564,7 +564,11 @@ export function UnifiedTable<TData>({
         return (
           <React.Fragment key={row.id}>
             {wrappedRowElement}
-            {expandedContent}
+            <tr>
+              <td colSpan={columns.length} className='p-0'>
+                {expandedContent}
+              </td>
+            </tr>
           </React.Fragment>
         );
       }

@@ -24,6 +24,20 @@ const mockCaptureError = vi.fn();
 const mockCaptureException = vi.fn();
 const mockClerkClient = vi.fn();
 const mockSyncCanonicalUsername = vi.fn();
+const mockVerifyProfileOwnership = vi.fn();
+const mockGetAuthenticatedProfile = vi.fn();
+const mockGetUserByClerkId = vi.fn();
+const mockGetSocialLinksVerificationColumnSupport = vi.fn();
+const mockBuildSocialLinksVerificationSelect = vi.fn();
+const mockApplyRateLimiting = vi.fn();
+const mockValidateUpdateSocialLinksPayload = vi.fn();
+const mockCheckIdempotencyKey = vi.fn();
+const mockComputeLinkVersioning = vi.fn();
+const mockBuildSocialLinksInsertPayload = vi.fn();
+const mockStoreIdempotencyKey = vi.fn();
+const mockEnqueueProfileEnrichment = vi.fn();
+const mockProcessLinkValidation = vi.fn();
+const mockSyncPrimaryMusicUrlsFromSocialLinks = vi.fn();
 
 let dbSelectResponses: QueryRows[] = [];
 let dbSelectCallIndex = 0;
@@ -39,6 +53,7 @@ function createQueryResult(rows: QueryRows) {
     where: chain,
     orderBy: chain,
     limit: chain,
+    groupBy: chain,
     offset: async () => rows,
     values: chain,
     returning: chain,
@@ -90,6 +105,14 @@ vi.mock('@/lib/db/queries/analytics', () => ({
     mockGetUserDashboardAnalytics(...args),
 }));
 
+vi.mock('@/lib/db/queries/shared', () => ({
+  verifyProfileOwnership: (...args: any[]) =>
+    mockVerifyProfileOwnership(...args),
+  getAuthenticatedProfile: (...args: any[]) =>
+    mockGetAuthenticatedProfile(...args),
+  getUserByClerkId: (...args: any[]) => mockGetUserByClerkId(...args),
+}));
+
 vi.mock('@/lib/db/cache', () => ({
   cacheQuery: (...args: any[]) => mockCacheQuery(...args),
   invalidateCache: (...args: any[]) => mockInvalidateCache(...args),
@@ -118,6 +141,33 @@ vi.mock('@/lib/ingestion/magic-profile-avatar', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: (...args: any[]) => mockCaptureError(...args),
+}));
+
+vi.mock('@/lib/db/queries/social-links-verification', () => ({
+  getSocialLinksVerificationColumnSupport: (...args: any[]) =>
+    mockGetSocialLinksVerificationColumnSupport(...args),
+  buildSocialLinksVerificationSelect: (...args: any[]) =>
+    mockBuildSocialLinksVerificationSelect(...args),
+}));
+
+vi.mock('@/app/api/dashboard/social-links/route.shared', () => ({
+  applyRateLimiting: (...args: any[]) => mockApplyRateLimiting(...args),
+  validateUpdateSocialLinksPayload: (...args: any[]) =>
+    mockValidateUpdateSocialLinksPayload(...args),
+  checkIdempotencyKey: (...args: any[]) => mockCheckIdempotencyKey(...args),
+  computeLinkVersioning: (...args: any[]) => mockComputeLinkVersioning(...args),
+  buildSocialLinksInsertPayload: (...args: any[]) =>
+    mockBuildSocialLinksInsertPayload(...args),
+  storeIdempotencyKey: (...args: any[]) => mockStoreIdempotencyKey(...args),
+  enqueueProfileEnrichment: (...args: any[]) =>
+    mockEnqueueProfileEnrichment(...args),
+  processLinkValidation: (...args: any[]) => mockProcessLinkValidation(...args),
+}));
+
+vi.mock('@/lib/db/social-links-sync', () => ({
+  syncSocialLinksFromPrimaryMusicUrls: vi.fn(),
+  syncPrimaryMusicUrlsFromSocialLinks: (...args: any[]) =>
+    mockSyncPrimaryMusicUrlsFromSocialLinks(...args),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -196,6 +246,51 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbSelectResponses = [];
   dbSelectCallIndex = 0;
+  mockVerifyProfileOwnership.mockResolvedValue({ id: PROFILE_ID });
+  mockGetAuthenticatedProfile.mockResolvedValue({
+    id: PROFILE_ID,
+    usernameNormalized: 'artist',
+    avatarUrl: null,
+    avatarLockedByUser: false,
+    userId: 'user_internal',
+  });
+  mockGetUserByClerkId.mockResolvedValue({
+    id: 'user_internal',
+    clerkId: TEST_USER_ID,
+    email: 'artist@example.com',
+    isAdmin: false,
+    isPro: false,
+    userStatus: 'active',
+    deletedAt: null,
+  });
+  mockGetSocialLinksVerificationColumnSupport.mockResolvedValue(false);
+  mockBuildSocialLinksVerificationSelect.mockReturnValue({
+    verificationStatus: null,
+    verificationToken: null,
+    verifiedAt: null,
+  });
+  mockApplyRateLimiting.mockResolvedValue({
+    allowed: true,
+    headers: {},
+  });
+  mockValidateUpdateSocialLinksPayload.mockImplementation((rawBody: any) => ({
+    ok: true,
+    data: rawBody,
+  }));
+  mockCheckIdempotencyKey.mockResolvedValue({ cached: false });
+  mockComputeLinkVersioning.mockReturnValue({
+    ok: true,
+    currentVersion: 0,
+    nextVersion: 1,
+  });
+  mockBuildSocialLinksInsertPayload.mockReturnValue({
+    payload: [],
+    linkUrls: [],
+  });
+  mockStoreIdempotencyKey.mockResolvedValue(undefined);
+  mockEnqueueProfileEnrichment.mockResolvedValue(undefined);
+  mockProcessLinkValidation.mockReturnValue({ ok: true });
+  mockSyncPrimaryMusicUrlsFromSocialLinks.mockResolvedValue(undefined);
   mockCacheQuery.mockImplementation(
     async (_key: string, cb: () => Promise<unknown>) => cb()
   );
@@ -251,7 +346,7 @@ describe('Dashboard API contracts', () => {
     it('formats audience, visit, and click events into activity feed', async () => {
       mockSession();
       mockDb([
-        [{ id: PROFILE_ID }],
+        [],
         [
           {
             id: 'click_1',
@@ -300,18 +395,18 @@ describe('Dashboard API contracts', () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: 'click_1',
-            icon: '🎧',
+            icon: 'listen',
             description: expect.stringContaining('Spotify'),
             timestamp: '2024-01-02T00:00:00.000Z',
           }),
           expect.objectContaining({
             id: expect.stringContaining('visit_1'),
-            icon: '👀',
+            icon: 'visit',
             timestamp: '2024-01-03T00:00:00.000Z',
           }),
           expect.objectContaining({
             id: 'subscribe:sub_1',
-            icon: '📩',
+            icon: 'email',
             timestamp: '2024-01-04T00:00:00.000Z',
           }),
         ])
@@ -323,7 +418,6 @@ describe('Dashboard API contracts', () => {
     it('validates audience members requests and returns normalized payloads', async () => {
       const tx = {
         select: createSelectQueue([
-          [{ id: PROFILE_ID }],
           [
             {
               id: 'member_1',
@@ -346,7 +440,7 @@ describe('Dashboard API contracts', () => {
               createdAt: new Date('2023-12-31T00:00:00Z'),
             },
           ],
-          [{ total: 1 }],
+          [],
         ]),
       };
 
@@ -465,10 +559,30 @@ describe('Dashboard API contracts', () => {
 
     it('accepts update payloads and normalizes username in test mode', async () => {
       mockSession();
-      mockDb();
-
-      // Ensure doMock() applies to a fresh module import
       vi.resetModules();
+
+      vi.doMock('@/app/api/dashboard/profile/lib/db-operations', () => ({
+        getProfileByClerkId: vi.fn().mockResolvedValue({
+          profile: {
+            id: PROFILE_ID,
+            userId: TEST_USER_ID,
+            username: 'artist',
+            usernameNormalized: 'artist',
+            displayName: 'Artist',
+            avatarUrl: null,
+          },
+        }),
+        updateProfileRecords: vi.fn().mockResolvedValue({
+          updatedProfile: {
+            id: PROFILE_ID,
+            userId: TEST_USER_ID,
+            username: 'testuser',
+            usernameNormalized: 'testuser',
+            displayName: 'Test User',
+          },
+          oldUsernameNormalized: 'artist',
+        }),
+      }));
 
       vi.doMock('@clerk/nextjs/server', () => ({
         clerkClient: vi.fn().mockResolvedValue({
@@ -505,7 +619,6 @@ describe('Dashboard API contracts', () => {
     it('returns filtered social links for profile', async () => {
       mockSession();
       mockDb([
-        [{ id: PROFILE_ID, usernameNormalized: 'artist' }],
         [
           {
             profileId: PROFILE_ID,
@@ -566,18 +679,7 @@ describe('Dashboard API contracts', () => {
       mockSocialLinkDependencies();
 
       const tx = {
-        select: createSelectQueue([
-          [
-            {
-              id: PROFILE_ID,
-              usernameNormalized: 'artist',
-              avatarUrl: null,
-              avatarLockedByUser: false,
-              userId: 'user_internal',
-            },
-          ],
-          [],
-        ]),
+        select: createSelectQueue([[]]),
         delete: () => createQueryResult([]),
         insert: () => createQueryResult([]),
         update: () => createQueryResult([]),

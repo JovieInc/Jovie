@@ -16,12 +16,19 @@ vi.mock('sonner', () => ({
 }));
 
 // Mock Sentry - must use factory function pattern for hoisting
-vi.mock('@sentry/nextjs', () => ({
-  getClient: vi.fn(() => undefined),
-  captureException: vi.fn(),
-  addBreadcrumb: vi.fn(),
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>();
+  return {
+    ...actual,
+    getClient: vi.fn(() => undefined),
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    breadcrumbsIntegration: vi.fn(() => ({})),
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  };
+});
 
 import * as Sentry from '@sentry/nextjs';
 // Import the mocked modules for assertions

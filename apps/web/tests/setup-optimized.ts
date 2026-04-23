@@ -67,6 +67,7 @@ vi.mock('@sentry/nextjs', () => {
   return {
     captureException: vi.fn(),
     captureMessage: vi.fn(),
+    captureCheckIn: vi.fn(() => 'check-in-id'),
     captureRequestError: vi.fn(),
     captureRouterTransitionStart: vi.fn(),
     addBreadcrumb: vi.fn(),
@@ -109,21 +110,25 @@ vi.mock('@/lib/sentry/client-lite', () => ({
 // Mock next/navigation — commonly needed in tests that import components using
 // useRouter, usePathname, or useSearchParams. Missing mocks cause slow dynamic
 // import resolution that degrades p95 performance.
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
+vi.mock('next/navigation', () => {
+  const router = {
     push: vi.fn(),
     replace: vi.fn(),
     refresh: vi.fn(),
     back: vi.fn(),
     forward: vi.fn(),
     prefetch: vi.fn().mockResolvedValue(undefined),
-  }),
-  usePathname: () => '/',
-  useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({}),
-  redirect: vi.fn(),
-  notFound: vi.fn(),
-}));
+  };
+
+  return {
+    useRouter: () => router,
+    usePathname: () => '/',
+    useSearchParams: () => new URLSearchParams(),
+    useParams: () => ({}),
+    redirect: vi.fn(),
+    notFound: vi.fn(),
+  };
+});
 
 // Mock next/headers — avoids errors when server components call cookies() or
 // headers() outside of a real Next.js request context.

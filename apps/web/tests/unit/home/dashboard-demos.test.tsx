@@ -1,4 +1,6 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
 import { DashboardReleasesDemo } from '@/features/home/demo/DashboardReleasesDemo';
@@ -29,11 +31,17 @@ describe('Dashboard home demos', () => {
     expect(container.querySelector('.bg-surface-0.border-subtle')).toBeTruthy();
   });
 
-  it('renders releases demo with design-system utility classes', () => {
-    const { container } = render(<DashboardReleasesDemo />);
+  it('renders releases demo using the real ReleaseTable with demo data', () => {
+    const { container } = render(
+      <NuqsTestingAdapter>
+        <TooltipProvider>
+          <DashboardReleasesDemo />
+        </TooltipProvider>
+      </NuqsTestingAdapter>
+    );
 
-    expect(screen.getByText('+ Add release')).toBeInTheDocument();
-    expect(screen.getByText(/releases/)).toBeInTheDocument();
     expect(container.querySelector('.bg-surface-0.border-subtle')).toBeTruthy();
+    expect(container.querySelector('table')).toBeTruthy();
+    expect(screen.getAllByRole('row').length).toBeGreaterThan(1);
   });
 });

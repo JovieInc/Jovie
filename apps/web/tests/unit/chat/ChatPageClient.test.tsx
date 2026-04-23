@@ -41,18 +41,17 @@ function hasRegisteredRightPanel(): boolean {
   return mockUseRegisterRightPanel.mock.calls.some(([panel]) => panel !== null);
 }
 
-// Mock next/dynamic for ProfileContactSidebar (ssr:false doesn't render in jsdom)
+// Mock next/dynamic without kicking off real async imports. The chat panel
+// tests only care whether a right panel registers, not the lazy component
+// implementation behind that boundary.
 vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType }>) => {
-    let Component: React.ComponentType | null = null;
-    loader().then(mod => {
-      Component = mod.default;
-    });
-    return function DynamicWrapper(props: Record<string, unknown>) {
-      if (Component) return React.createElement(Component, props);
-      return null;
-    };
-  },
+  default: () =>
+    function DynamicWrapper(props: Record<string, unknown>) {
+      return React.createElement('div', {
+        'data-testid': 'dynamic-import-stub',
+        ...props,
+      });
+    },
 }));
 
 vi.mock('next/navigation', () => ({
