@@ -86,11 +86,11 @@ const StatCard = memo(function StatCard({
           >
             <Icon className={cn('h-3.5 w-3.5', iconClassName)} />
           </div>
-          <dt className='text-[13px] font-[510] text-secondary-token'>
+          <dt className='text-[13px] font-caption text-secondary-token'>
             {label}
           </dt>
         </div>
-        <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token sm:text-3xl'>
+        <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token sm:text-3xl'>
           {formatCount(value)}
         </dd>
         <dd className='mt-1.5 text-[11px] leading-4 text-tertiary-token sm:text-[13px]'>
@@ -124,7 +124,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
           type='button'
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
+          className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[13px] font-caption text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
         >
           <Wallet className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
           <span className='truncate'>@{venmoHandle}</span>
@@ -242,7 +242,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <Wallet className='h-4.5 w-4.5 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
-          <DialogTitle className='text-[15px] font-[590] tracking-[-0.011em] text-primary-token'>
+          <DialogTitle className='text-[15px] font-semibold tracking-[-0.011em] text-primary-token'>
             Connect Venmo
           </DialogTitle>
           <DialogDescription className='mt-0.5 text-[13px] leading-5 text-secondary-token'>
@@ -256,7 +256,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <div>
             <label
               htmlFor='venmo-handle'
-              className='mb-1.5 block text-[13px] font-[510] text-secondary-token'
+              className='mb-1.5 block text-[13px] font-caption text-secondary-token'
             >
               Venmo Username
             </label>
@@ -293,7 +293,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           </div>
           {saveSuccess && (
             <output
-              className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-[13px] font-[510] text-success'
+              className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-[13px] font-caption text-success'
               aria-live='polite'
             >
               <Check className='h-3.5 w-3.5' />
@@ -326,7 +326,9 @@ const TipLinkSection = memo(function TipLinkSection({
         >
           <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
         </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>Pay Link</h3>
+        <h3 className='text-[13px] font-caption text-primary-token'>
+          Pay Link
+        </h3>
       </div>
 
       <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
@@ -440,7 +442,7 @@ export function DashboardPay() {
                   >
                     <Wallet className='h-5 w-5 text-accent-token' />
                   </div>
-                  <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+                  <h2 className='text-[17px] font-semibold tracking-[-0.011em] text-primary-token sm:text-[18px]'>
                     Connect Venmo to unlock earnings
                   </h2>
                   <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
@@ -451,7 +453,7 @@ export function DashboardPay() {
                     onClick={() => setIsConnectOpen(true)}
                     variant='primary'
                     size='sm'
-                    className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
+                    className='mt-5 rounded-[10px] text-[11px] font-caption tracking-[-0.01em]'
                   >
                     Connect Venmo
                   </Button>
