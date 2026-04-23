@@ -50,3 +50,10 @@ export function useDashboardData(): DashboardData {
   }
   return context;
 }
+
+// Use when the consumer can render outside a DashboardDataProvider (e.g.,
+// components mounted in shared shells like AuthShellWrapper that can appear
+// on pre-auth routes). Returns null when no provider is above in the tree.
+export function useDashboardDataSafe(): DashboardData | null {
+  return useContext(DashboardDataContext);
+}
