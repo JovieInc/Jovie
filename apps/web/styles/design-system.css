@@ -882,6 +882,8 @@
   /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
   --text-sm: 0.875rem;
   /* 14px */
+  --text-mid: 0.9375rem;
+  /* 15px — between sm and base; intentional tight fit */
   --text-base: 1rem;
   /* 16px */
   --text-lg: 1.125rem;
