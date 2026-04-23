@@ -461,8 +461,7 @@ jobs:
 
           IN_PROGRESS_STATE_ID=$(echo "$ISSUE_STATES" | jq -r '
             .data.issue.team.states.nodes
-            | map(select(.type == "started"))
-            | (map(select((.name // "") | ascii_downcase | test("in progress|in-progress"))) + .)
+            | map(select(.type == "started" and ((.name // "") | ascii_downcase | test("^in[- ]progress$"))))
             | .[0].id // empty
           ')
 
@@ -478,7 +477,9 @@ jobs:
                   variables: { issueId: $issueId, stateId: $stateId }
                 }')" > /dev/null
           else
-            echo "No In Progress state found on team; leaving state untouched"
+            echo "No explicit In Progress state found on team; refusing to guess from started states."
+            echo "$ISSUE_STATES" | jq -r '.data.issue.team.states.nodes[] | "- \(.name) (\(.type))"'
+            exit 1
           fi
 
           curl -sS https://api.linear.app/graphql \
