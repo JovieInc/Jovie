@@ -3,7 +3,9 @@
 import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
@@ -50,6 +52,7 @@ function SignInPageContent() {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
+  const resetConfirmed = searchParams.get('reset') === '1';
   const initialValues = isValidEmail(email)
     ? { emailAddress: email }
     : undefined;
@@ -61,8 +64,21 @@ function SignInPageContent() {
     setIsMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (resetConfirmed) {
+      toast.success('Session cleared. Please sign in again.', {
+        id: 'auth-reset',
+      });
+    }
+  }, [resetConfirmed]);
+
   if (!isMounted) {
-    return <AuthFormSkeleton />;
+    return (
+      <>
+        <AuthFormSkeleton />
+        <SignInTimeoutEscape />
+      </>
+    );
   }
 
   return (
@@ -77,6 +93,7 @@ function SignInPageContent() {
           initialValues={initialValues}
         />
       </div>
+      <SignInTimeoutEscape />
     </>
   );
 }

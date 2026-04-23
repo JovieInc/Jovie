@@ -59,7 +59,7 @@ const tipperColumns = [
     size: 100,
     meta: { align: 'right' },
     cell: ({ getValue }) => (
-      <span className='text-right font-[510] tabular-nums text-primary-token'>
+      <span className='text-right font-caption tabular-nums text-primary-token'>
         {formatCents(getValue())}
       </span>
     ),
@@ -120,9 +120,11 @@ const StatCard = memo(function StatCard({
         >
           <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
         </div>
-        <dt className='text-[13px] font-[510] text-secondary-token'>{label}</dt>
+        <dt className='text-[13px] font-caption text-secondary-token'>
+          {label}
+        </dt>
       </div>
-      <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
+      <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
         {value}
       </dd>
     </ContentSurfaceCard>
@@ -273,7 +275,7 @@ export function EarningsTab() {
         >
           <QrCode className='h-6 w-6 text-tertiary-token' />
         </div>
-        <h2 className='text-base font-[590] text-primary-token'>
+        <h2 className='text-base font-semibold text-primary-token'>
           No handle set
         </h2>
         <p className='max-w-sm text-[13px] text-secondary-token'>
@@ -290,7 +292,7 @@ export function EarningsTab() {
   return (
     <div className='flex flex-col gap-4'>
       {/* ── Earnings Stats ─────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+      <p className='text-[13px] font-caption tracking-normal text-secondary-token'>
         Revenue
       </p>
 
@@ -333,7 +335,7 @@ export function EarningsTab() {
       )}
 
       {/* ── Tippers Table ──────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+      <p className='text-[13px] font-caption tracking-normal text-secondary-token'>
         Recent tippers
       </p>
 
@@ -355,7 +357,7 @@ export function EarningsTab() {
       </ContentSurfaceCard>
 
       {/* ── QR Code Card ───────────────────────────── */}
-      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+      <p className='text-[13px] font-caption tracking-normal text-secondary-token'>
         QR Code
       </p>
 
@@ -367,7 +369,7 @@ export function EarningsTab() {
           >
             <QrCode className='h-3.5 w-3.5 text-accent' />
           </div>
-          <h2 className='text-[13px] font-[510] text-primary-token'>
+          <h2 className='text-[13px] font-caption text-primary-token'>
             Tip QR Code
           </h2>
         </div>
@@ -381,7 +383,7 @@ export function EarningsTab() {
           {/* Actions */}
           <div className='flex flex-1 flex-col gap-4'>
             <div>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-caption text-primary-token'>
                 Share your tip page
               </p>
               <p className='mt-1 text-[13px] leading-5 text-secondary-token'>

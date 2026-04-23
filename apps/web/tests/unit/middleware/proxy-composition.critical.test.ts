@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   resolveClerkKeys: vi.fn().mockReturnValue({
     publishableKey: 'pk_test_real-key-123',
     secretKey: 'sk_test_real-key-456',
+    status: 'ok',
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
@@ -134,6 +135,7 @@ function resetMocks() {
   mocks.resolveClerkKeys.mockReturnValue({
     publishableKey: 'pk_test_real-key-123',
     secretKey: 'sk_test_real-key-456',
+    status: 'ok',
   });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
   mocks.isCookieBannerRequired.mockReturnValue(false);
@@ -253,6 +255,7 @@ describe('proxy composition (critical)', () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: 'pk_test_valid-key',
         secretKey: 'sk_test_valid-key',
+        status: 'ok',
       });
       mocks.shouldBypassClerkForRequest.mockReturnValue(true);
 
@@ -267,6 +270,7 @@ describe('proxy composition (critical)', () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: 'pk_live_valid-production-key',
         secretKey: undefined,
+        status: 'staging_missing',
       });
       mocks.shouldBypassClerkForRequest.mockReturnValue(true);
 
@@ -281,6 +285,7 @@ describe('proxy composition (critical)', () => {
       mocks.resolveClerkKeys.mockReturnValue({
         publishableKey: undefined,
         secretKey: undefined,
+        status: 'staging_missing',
       });
       mocks.shouldBypassClerkForRequest.mockReturnValue(true);
 

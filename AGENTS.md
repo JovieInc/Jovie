@@ -171,7 +171,7 @@ pnpm turbo build --filter=@jovie/web
 
 **Creating a Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate. Pass as `DOPPLER_TOKEN` env var.
 
-**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection (macOS/Linux), Doppler installation, and `.env.local` generation automatically.
+**Alternative:** Run `./scripts/codex-setup.sh`, the Codex wrapper that delegates to the canonical `./scripts/setup.sh` bootstrap. Codex lifecycle config in `.codex/` also runs that wrapper automatically when supported.
 
 ### Common Mistakes to Avoid
 

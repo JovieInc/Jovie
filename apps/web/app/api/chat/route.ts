@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
@@ -471,6 +471,14 @@ function sanitizeRetryAfterSeconds(value: unknown): number | null {
   const normalized = Math.ceil(value);
   if (normalized < 1) return 1;
   return Math.min(normalized, 3600);
+}
+
+function safeSetSentryContext(callback: () => void): void {
+  try {
+    callback();
+  } catch {
+    // Observability must never break the chat request path.
+  }
 }
 
 /**
@@ -1710,11 +1718,13 @@ export async function POST(req: Request) {
   // would otherwise go untagged. One call here covers all of them.
   // `request_id` is stored as extra (not tag) — it is unique per request and
   // would blow out Sentry's tag cardinality budget.
-  Sentry.getCurrentScope().setTag('feature', 'ai-chat');
-  Sentry.getCurrentScope().setExtra('request_id', requestId);
+  safeSetSentryContext(() => {
+    Sentry.setTag('feature', 'ai-chat');
+    Sentry.setExtra('request_id', requestId);
+  });
 
   // Auth check - ensure user is authenticated
-  const { userId } = await getCachedAuth();
+  const { userId } = await getOptionalAuth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },
@@ -1727,7 +1737,9 @@ export async function POST(req: Request) {
   // block" from Sentry without a second data source.
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
-  Sentry.getCurrentScope().setTag('plan_tier', userPlan);
+  safeSetSentryContext(() => {
+    Sentry.setTag('plan_tier', userPlan);
+  });
 
   // Kill switch: Statsig-backed, no deploy required. When a provider incident
   // happens, flip `ai_chat_disabled` to 503 all chat traffic with a friendly
@@ -1913,16 +1925,20 @@ export async function POST(req: Request) {
     // `chat_conversation_id` goes in `extra` (high cardinality per Sentry
     // guidance); `chat_has_tools` reflects the real plan capability boundary
     // rather than a count of always-on freeTools.
-    Sentry.getCurrentScope().setTags({
-      chat_model: selectedModel,
-      chat_force_light: String(forceLightModel),
-      chat_has_tools: String(planLimits.booleans.aiCanUseTools),
+    safeSetSentryContext(() => {
+      Sentry.setTags({
+        chat_model: selectedModel,
+        chat_force_light: String(forceLightModel),
+        chat_has_tools: String(planLimits.booleans.aiCanUseTools),
+      });
     });
     if (resolvedConversationId) {
-      Sentry.getCurrentScope().setExtra(
-        'chat_conversation_id',
-        resolvedConversationId.slice(0, 120)
-      );
+      safeSetSentryContext(() => {
+        Sentry.setExtra(
+          'chat_conversation_id',
+          resolvedConversationId.slice(0, 120)
+        );
+      });
     }
 
     const result = streamText({
