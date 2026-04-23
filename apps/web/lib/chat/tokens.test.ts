@@ -95,30 +95,16 @@ describe('tokens: roundtrip', () => {
     expect(serializeTokens(parseTokens(original))).toBe(original);
   });
 
-  it('roundtrips labels containing literal backslashes', () => {
+  it.each([
+    ['literal backslashes', 'path\\to\\thing'],
+    ['backslash followed by bracket', 'raw\\]edge'],
+    ['only a single backslash', '\\'],
+    ['only a single close-bracket', ']'],
+  ])('roundtrips labels containing %s', (_desc, label) => {
     const tokens = [
-      {
-        type: 'entity' as const,
-        kind: 'release' as const,
-        id: 'rel_1',
-        label: 'path\\to\\thing',
-      },
+      { type: 'entity' as const, kind: 'release' as const, id: 'rel_1', label },
     ];
-    const wire = serializeTokens(tokens);
-    expect(parseTokens(wire)).toEqual(tokens);
-  });
-
-  it('roundtrips labels containing backslash followed by bracket', () => {
-    const tokens = [
-      {
-        type: 'entity' as const,
-        kind: 'release' as const,
-        id: 'rel_1',
-        label: 'raw\\]edge',
-      },
-    ];
-    const wire = serializeTokens(tokens);
-    expect(parseTokens(wire)).toEqual(tokens);
+    expect(parseTokens(serializeTokens(tokens))).toEqual(tokens);
   });
 
   it('roundtrips multiple entities of different kinds', () => {
