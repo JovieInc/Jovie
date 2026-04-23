@@ -14,7 +14,7 @@ export function ReleaseTaskPastReleaseState({
       <p className='text-[14px] font-medium text-secondary-token mb-1'>
         This release is already out
       </p>
-      <p className='text-[12px] text-tertiary-token mb-4 max-w-[260px]'>
+      <p className='text-xs text-tertiary-token mb-4 max-w-[260px]'>
         Campaign tasks help you prepare for upcoming releases. Since this one is
         already live, there&apos;s nothing to prepare.
       </p>

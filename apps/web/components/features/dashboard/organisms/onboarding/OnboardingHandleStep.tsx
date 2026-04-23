@@ -176,7 +176,7 @@ export function OnboardingHandleStep({
             ) : null}
             {handleValidation.suggestions.length > 0 && (
               <div className='flex flex-wrap items-center gap-2'>
-                <span className='text-[12px] text-tertiary-token'>Try:</span>
+                <span className='text-xs text-tertiary-token'>Try:</span>
                 {handleValidation.suggestions.map(suggestion => (
                   <button
                     key={suggestion}

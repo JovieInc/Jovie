@@ -24,7 +24,7 @@ import {
 } from './DspProviderIcon';
 
 const BASE_PILL_CLASSNAME =
-  'inline-flex min-h-[28px] items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-[510] tracking-[-0.01em] transition-[background-color,border-color,color] duration-150';
+  'inline-flex min-h-[28px] items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-[510] tracking-[-0.01em] transition-[background-color,border-color,color] duration-150';
 
 const INTERACTIVE_PILL_CLASSNAME =
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 disabled:opacity-50 disabled:cursor-not-allowed';

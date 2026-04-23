@@ -64,7 +64,7 @@ export function ReleaseTaskPage({
       data-testid='release-task-page'
     >
       {/* Breadcrumb */}
-      <nav className='mb-4 text-[12px] text-tertiary-token'>
+      <nav className='mb-4 text-xs text-tertiary-token'>
         <span className='hover:text-secondary-token cursor-pointer'>
           Releases
         </span>

@@ -161,7 +161,7 @@ export function ReleaseEditDialog({
                         }
                         placeholder={`${provider.label} URL`}
                         data-testid={`provider-input-${release.id}-${provider.key}`}
-                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-xs'
                       />
                       <div className='flex items-center justify-between gap-2'>
                         <DrawerButton

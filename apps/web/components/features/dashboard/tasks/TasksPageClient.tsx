@@ -1697,7 +1697,7 @@ export function TasksPageClient() {
                 >
                   <div className='flex items-center justify-between px-4 pb-1 pt-3'>
                     <div>
-                      <p className='text-[12px] text-secondary-token'>
+                      <p className='text-xs text-secondary-token'>
                         {mobileScopeCounts.all} total tasks
                       </p>
                     </div>

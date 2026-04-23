@@ -158,7 +158,7 @@ function LocationField({
           trigger={
             <button
               type='button'
-              className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-[12px] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               <Icon
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -171,7 +171,7 @@ function LocationField({
       );
     }
     return (
-      <div className='flex items-center gap-2 text-[12px] text-tertiary-token'>
+      <div className='flex items-center gap-2 text-xs text-tertiary-token'>
         <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
         <span className='capitalize'>{label(value)}</span>
       </div>
@@ -187,7 +187,7 @@ function LocationField({
         trigger={
           <button
             type='button'
-            className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-[12px] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
+            className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
           >
             <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>Add your {addLabel.toLowerCase()}</span>
@@ -534,7 +534,7 @@ function PressPhotosSection({
                   <ImagePlus className='h-4 w-4' />
                 </div>
                 <div className='space-y-0.5'>
-                  <p className='text-[12px] font-medium text-secondary-token'>
+                  <p className='text-xs font-medium text-secondary-token'>
                     Add photo
                   </p>
                   <p className='text-[11px] text-tertiary-token'>
@@ -614,7 +614,7 @@ export function ProfileAboutTab({
             </p>
           )}
           {!onBioChange && !bio && (
-            <p className='text-[12px] text-tertiary-token'>
+            <p className='text-xs text-tertiary-token'>
               No bio yet. Use the chat to generate one.
             </p>
           )}
@@ -649,7 +649,7 @@ export function ProfileAboutTab({
             {Boolean(activeSinceYear) && (
               <div className='space-y-1' data-testid='active-since'>
                 <DetailLabel>Active Since</DetailLabel>
-                <div className='flex items-center gap-2 text-[12px] text-secondary-token'>
+                <div className='flex items-center gap-2 text-xs text-secondary-token'>
                   <Calendar
                     className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
                     aria-hidden='true'
@@ -711,7 +711,7 @@ export function ProfileAboutTab({
               trigger={
                 <button
                   type='button'
-                  className='flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
+                  className='flex items-center gap-1.5 text-xs text-tertiary-token transition-colors hover:text-secondary-token'
                 >
                   <Plus className='h-3.5 w-3.5' />
                   <span>Add genres</span>
@@ -720,7 +720,7 @@ export function ProfileAboutTab({
             />
           )}
           {!hasGenres && !onGenresChange && (
-            <p className='text-[12px] text-tertiary-token'>
+            <p className='text-xs text-tertiary-token'>
               Auto-detected from your music connections.
             </p>
           )}

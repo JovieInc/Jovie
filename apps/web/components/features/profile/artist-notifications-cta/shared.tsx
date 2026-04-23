@@ -37,7 +37,7 @@ export const subscriptionHeadingClassName =
   'text-balance text-center text-[1.55rem] font-[640] tracking-[-0.045em] text-primary-token sm:text-[1.8rem]';
 
 export const subscriptionDisclaimerClassName =
-  'text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
+  'text-center text-xs leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
 
 export const profilePrimaryPillClassName =
   'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
@@ -93,10 +93,10 @@ export const subscriptionFeedbackCopyClassName =
   'text-[11px] leading-4 tracking-[-0.01em] text-secondary-token/68';
 
 export const subscriptionErrorTextClassName =
-  'text-[12px] leading-4 tracking-[-0.012em] text-red-400';
+  'text-xs leading-4 tracking-[-0.012em] text-red-400';
 
 export const subscriptionSuccessTextClassName =
-  'text-[12px] leading-4 tracking-[-0.012em] text-emerald-400';
+  'text-xs leading-4 tracking-[-0.012em] text-emerald-400';
 
 export const subscriptionDesktopErrorAffordanceClassName =
   'inline-flex items-center gap-1.5 text-red-400';
@@ -524,7 +524,7 @@ export function SubscriptionSuccess({
           type='button'
           onClick={handleSkip}
           disabled={phase === 'saving'}
-          className='w-full text-center text-[12px] text-secondary-token/70 hover:text-secondary-token transition-colors'
+          className='w-full text-center text-xs text-secondary-token/70 hover:text-secondary-token transition-colors'
           style={noFontSynthesisStyle}
         >
           Skip

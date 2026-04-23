@@ -14,7 +14,7 @@ export function ReleaseTaskEmptyState({
       <p className='text-[13px] font-medium text-primary-token mb-1'>
         Your release playbook
       </p>
-      <p className='text-[12px] text-tertiary-token mb-4 max-w-[280px]'>
+      <p className='text-xs text-tertiary-token mb-4 max-w-[280px]'>
         20 battle-tested tasks to maximize your release — from DSP pitching to
         fan notifications.
       </p>
@@ -28,7 +28,7 @@ export function ReleaseTaskEmptyState({
         type='button'
         onClick={onSetUp}
         disabled={isLoading}
-        className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50'
+        className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50'
       >
         {isLoading ? 'Generating...' : 'Generate Release Plan'}
       </button>

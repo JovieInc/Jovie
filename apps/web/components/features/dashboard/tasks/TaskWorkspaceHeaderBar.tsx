@@ -69,7 +69,7 @@ export function TaskWorkspaceHeaderBar({
             ariaLabel='Search tasks'
             autoFocus
             className='h-8 max-w-[28rem] bg-transparent'
-            inputClassName='text-[12px]'
+            inputClassName='text-xs'
           />
         )}
         {mode === 'create' && (

@@ -61,7 +61,7 @@ export function InsightsSummaryWidget() {
             className='flex items-start gap-2 rounded-[8px] border border-transparent px-2 py-1.5 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
           >
             <InsightCategoryIcon category={insight.category} size='sm' />
-            <p className='line-clamp-2 text-[12px] leading-snug text-secondary-token'>
+            <p className='line-clamp-2 text-xs leading-snug text-secondary-token'>
               <span className='font-[510] text-primary-token'>
                 {insight.title}
               </span>

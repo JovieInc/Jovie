@@ -190,7 +190,7 @@ export function ArtistHero({
           <div className='flex items-start justify-between gap-4'>
             <div className='min-w-0 space-y-2 text-left'>
               {eyebrow ? (
-                <p className='text-[12px] font-[590] tracking-[0.01em] text-white/58'>
+                <p className='text-xs font-[590] tracking-[0.01em] text-white/58'>
                   {eyebrow}
                 </p>
               ) : null}
