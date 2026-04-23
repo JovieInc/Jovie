@@ -415,7 +415,7 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-lg font-[590] text-primary-token'>
+      <DialogTitle className='text-lg font-semibold text-primary-token'>
         Connect Spotify
       </DialogTitle>
       <DialogDescription className='text-[13px] text-secondary-token'>
@@ -428,7 +428,7 @@ export function SpotifyConnectDialog({
           className='overflow-visible bg-(--linear-app-content-surface) p-3.5'
         >
           <div className='mb-2.5'>
-            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+            <p className='text-[11px] font-caption leading-none text-tertiary-token'>
               Artist search
             </p>
             <p className='mt-1 text-[12px] leading-[17px] text-secondary-token'>
@@ -624,7 +624,7 @@ export function SpotifyConnectDialog({
                           )}
                         </div>
                         <div className='flex-1 min-w-0'>
-                          <div className='truncate text-[13px] font-[510] text-primary-token'>
+                          <div className='truncate text-[13px] font-caption text-primary-token'>
                             {artist.name}
                           </div>
                           {artist.isClaimed && (
@@ -680,7 +680,7 @@ export function SpotifyConnectDialog({
                     />
                   </div>
                   <div className='flex-1'>
-                    <div className='text-[13px] font-[510] text-primary-token'>
+                    <div className='text-[13px] font-caption text-primary-token'>
                       Paste a Spotify URL instead
                     </div>
                     <div className='text-[11px] text-tertiary-token'>
