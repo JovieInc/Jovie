@@ -56,9 +56,15 @@ export interface EntityProvider {
 const PROVIDERS: Partial<Record<EntityKind, EntityProvider>> = {};
 
 export function registerEntityProvider(provider: EntityProvider): void {
-  if (PROVIDERS[provider.kind]) {
-    throw new Error(
-      `EntityProvider already registered for kind: ${provider.kind}`
+  const existing = PROVIDERS[provider.kind];
+  if (existing && existing !== provider) {
+    // Dev warning only — multiple mount/unmount cycles (React strict mode,
+    // test renders, profile switches) legitimately create new provider
+    // instances for the same kind. Overwrite is the sane default; a true
+    // wiring bug still surfaces as a console warning for visibility.
+    console.warn(
+      `[commands] Replacing existing EntityProvider for kind="${provider.kind}". ` +
+        `If this is unexpected, check that the registrar is only mounted once.`
     );
   }
   PROVIDERS[provider.kind] = provider;
