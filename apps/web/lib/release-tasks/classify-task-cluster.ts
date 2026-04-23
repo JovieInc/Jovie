@@ -44,10 +44,11 @@ function tryExtractJson(text: string): unknown {
   } catch {
     // fall through
   }
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (match) {
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
     try {
-      return JSON.parse(match[0]);
+      return JSON.parse(trimmed.slice(start, end + 1));
     } catch {
       // fall through
     }
