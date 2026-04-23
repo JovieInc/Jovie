@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo } from 'react';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import type { DashboardData } from './actions';
 
-const DashboardDataContext = createContext<DashboardData | null>(null);
+export const DashboardDataContext = createContext<DashboardData | null>(null);
 
 const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
   percentage: 0,

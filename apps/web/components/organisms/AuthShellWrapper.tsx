@@ -28,6 +28,7 @@ import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileP
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
+import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 
 // TableMetaContext for audience/creators tables
@@ -350,6 +351,7 @@ export function AuthShellWrapper({
             {children}
           </AuthShellWrapperInner>
           <KeyboardShortcutsHandler />
+          <CommandPalette />
         </HeaderActionsProvider>
       </KeyboardShortcutsProvider>
     </TooltipProvider>
