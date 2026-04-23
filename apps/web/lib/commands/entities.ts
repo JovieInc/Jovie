@@ -57,7 +57,9 @@ const PROVIDERS: Partial<Record<EntityKind, EntityProvider>> = {};
 
 export function registerEntityProvider(provider: EntityProvider): void {
   if (PROVIDERS[provider.kind]) {
-    throw new Error(`EntityProvider already registered for kind: ${provider.kind}`);
+    throw new Error(
+      `EntityProvider already registered for kind: ${provider.kind}`
+    );
   }
   PROVIDERS[provider.kind] = provider;
 }
