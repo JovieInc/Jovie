@@ -122,7 +122,7 @@ export function ConfirmMatchDialog({
             {/* Artist Info */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <h3 className='truncate text-lg font-[590] text-primary-token'>
+                <h3 className='truncate text-lg font-semibold text-primary-token'>
                   {externalArtistName}
                 </h3>
                 {externalArtistUrl && (
@@ -143,7 +143,7 @@ export function ConfirmMatchDialog({
 
               <div className='mt-2 flex flex-wrap items-center gap-2'>
                 <ConfidenceBadge score={confidenceScore} size='md' showLabel />
-                <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
+                <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-caption text-secondary-token'>
                   {matchingIsrcCount} matching ISRCs
                 </span>
               </div>
@@ -154,7 +154,7 @@ export function ConfirmMatchDialog({
         {/* Confidence Breakdown */}
         {confidenceBreakdown && (
           <ContentSurfaceCard surface='details' className='p-4'>
-            <h4 className='mb-3 text-[13px] font-[510] text-primary-token'>
+            <h4 className='mb-3 text-[13px] font-caption text-primary-token'>
               Match confidence breakdown
             </h4>
             <MatchConfidenceBreakdown
@@ -183,7 +183,7 @@ export function ConfirmMatchDialog({
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
+          className='h-7 rounded-[8px] px-2.5 text-[11px] font-caption'
         >
           Cancel
         </Button>
@@ -192,7 +192,7 @@ export function ConfirmMatchDialog({
           size='sm'
           onClick={onConfirm}
           disabled={isConfirming}
-          className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
+          className='h-7 rounded-[8px] px-2.5 text-[11px] font-caption'
         >
           {isConfirming ? (
             <>
