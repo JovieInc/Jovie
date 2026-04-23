@@ -28,10 +28,11 @@ function buildExistingReleasePrompt(title: string, releaseId: string): string {
 
 function buildCreateReleasePrompt(title: string | null): string {
   const skill = serializeSkill('generateAlbumArt');
-  if (!title?.trim()) {
+  const trimmed = title?.trim();
+  if (!trimmed) {
     return `${skill} — help me create a new release and generate album art for it. Ask me for the release title first.`;
   }
-  return `${skill} for a new release titled "${title}" — create the release after I pick one option. Show three options.`;
+  return `${skill} for a new release titled "${trimmed}" — create the release after I pick one option. Show three options.`;
 }
 
 function submitChatPrompt(prompt: string): void {

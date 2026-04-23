@@ -21,16 +21,21 @@ export interface EntitySlot {
   readonly required: boolean;
 }
 
-/** A user-facing skill that wraps a single LLM tool. */
+/**
+ * A user-facing skill that wraps a single LLM tool.
+ *
+ * `id` is typed as `ToolSchemaKey` today so the registry can't declare a skill
+ * whose id doesn't correspond to a real tool. When composite skills land
+ * (one user action fanning out to multiple tools), widen this to a union.
+ */
 export interface SkillCommand {
   readonly kind: 'skill';
-  readonly id: string;
+  readonly id: ToolSchemaKey;
   readonly label: string;
   readonly description: string;
   /** Lucide icon name (resolved at render time). */
   readonly iconName: string;
   readonly surfaces: readonly CommandSurface[];
-  readonly toolId: ToolSchemaKey;
   readonly entitySlots: readonly EntitySlot[];
 }
 
@@ -61,7 +66,6 @@ export const COMMANDS: readonly Command[] = [
     description: 'Generate three album art options for a release.',
     iconName: 'Image',
     surfaces: ['chat-slash'],
-    toolId: 'generateAlbumArt',
     entitySlots: [{ kind: 'release', required: true }],
   },
   {
@@ -71,7 +75,6 @@ export const COMMANDS: readonly Command[] = [
     description: 'Open the profile photo upload widget in chat.',
     iconName: 'UserCircle',
     surfaces: ['chat-slash'],
-    toolId: 'proposeAvatarUpload',
     entitySlots: [],
   },
   {
@@ -81,7 +84,6 @@ export const COMMANDS: readonly Command[] = [
     description: 'Add a social profile URL to your artist profile.',
     iconName: 'Link',
     surfaces: ['chat-slash'],
-    toolId: 'proposeSocialLink',
     entitySlots: [],
   },
   {
@@ -91,7 +93,6 @@ export const COMMANDS: readonly Command[] = [
     description: 'Remove a social link from your artist profile.',
     iconName: 'Link2Off',
     surfaces: ['chat-slash'],
-    toolId: 'proposeSocialLinkRemoval',
     entitySlots: [],
   },
   {
@@ -101,7 +102,6 @@ export const COMMANDS: readonly Command[] = [
     description: 'Share feedback, report a bug, or request a feature.',
     iconName: 'MessageSquare',
     surfaces: ['chat-slash'],
-    toolId: 'submitFeedback',
     entitySlots: [],
   },
 ] as const;

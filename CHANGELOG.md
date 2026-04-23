@@ -23,11 +23,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `ChatMessage` renders user messages through `TokenizedText` instead of plain `whitespace-pre-wrap`, so chips display inline.
 - System prompt has a new "Entity & Skill Tokens" section teaching the model to interpret `@kind:id[label]` and `/skill:id` tokens directly (pass id as the tool's releaseId; don't echo tokens in replies).
 
-### Developer Notes
-
-- `AGENTS.md`: added rule to always open a Linear issue for deferred follow-ups and link dependencies with `blockedBy`.
-- Slash command menu, contenteditable chip input, and concrete EntityProviders are tracked in JOV-1793.
-- Global cmd+k palette that consumes this registry is tracked in JOV-1792.
+- [internal] `AGENTS.md`: added rule to always open a Linear issue for deferred follow-ups and link dependencies with `blockedBy`.
+- [internal] Slash command menu, contenteditable chip input, and concrete EntityProviders are tracked in JOV-1793. Global cmd+k palette that consumes this registry is tracked in JOV-1792.
+- [internal] Bumped version to `26.4.167` across `VERSION` and `package.json`.
 
 ## [26.4.166] - 2026-04-22
 

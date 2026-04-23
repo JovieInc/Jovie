@@ -95,6 +95,32 @@ describe('tokens: roundtrip', () => {
     expect(serializeTokens(parseTokens(original))).toBe(original);
   });
 
+  it('roundtrips labels containing literal backslashes', () => {
+    const tokens = [
+      {
+        type: 'entity' as const,
+        kind: 'release' as const,
+        id: 'rel_1',
+        label: 'path\\to\\thing',
+      },
+    ];
+    const wire = serializeTokens(tokens);
+    expect(parseTokens(wire)).toEqual(tokens);
+  });
+
+  it('roundtrips labels containing backslash followed by bracket', () => {
+    const tokens = [
+      {
+        type: 'entity' as const,
+        kind: 'release' as const,
+        id: 'rel_1',
+        label: 'raw\\]edge',
+      },
+    ];
+    const wire = serializeTokens(tokens);
+    expect(parseTokens(wire)).toEqual(tokens);
+  });
+
   it('roundtrips multiple entities of different kinds', () => {
     const original =
       '@release:rel_1[A] and @artist:art_2[B] and @track:trk_3[C]';

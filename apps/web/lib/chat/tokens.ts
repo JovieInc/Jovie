@@ -43,23 +43,23 @@ const ENTITY_KINDS: ReadonlySet<EntityKind> = new Set([
 /**
  * Match an entity mention: @kind:id[label]
  * - kind: release | artist | track
- * - id: non-empty, no whitespace, no ]
- * - label: any chars except unescaped ] (use \] to include a literal ])
+ * - id: non-empty, no whitespace, no ] or [
+ * - label: any sequence of (escaped char `\x`) or (non-] non-\ char)
  */
 const ENTITY_PATTERN =
-  /@(release|artist|track):([^\s[\]]+)\[((?:\\\]|[^\]])*)\]/g;
+  /@(release|artist|track):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]/g;
 
 /** Match a skill invocation: /skill:id (id: word chars, digits, underscores) */
 const SKILL_PATTERN = /\/skill:([A-Za-z]\w*)/g;
 
-const ESCAPED_BRACKET = String.raw`\]`;
-
+/** Escape `\` and `]` in labels so round-trip serialize→parse is lossless. */
 function escapeLabel(label: string): string {
-  return label.replaceAll(']', ESCAPED_BRACKET);
+  return label.replace(/[\\\]]/g, c => `\\${c}`);
 }
 
+/** Reverse escapeLabel — strip each `\` that precedes an escaped char. */
 function unescapeLabel(label: string): string {
-  return label.replaceAll(ESCAPED_BRACKET, ']');
+  return label.replace(/\\(.)/g, '$1');
 }
 
 export function serializeEntity(
