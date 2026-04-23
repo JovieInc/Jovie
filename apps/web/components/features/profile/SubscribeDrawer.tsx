@@ -1,9 +1,8 @@
 'use client';
 
-import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
-import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { Artist } from '@/types/db';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
+import { SubscribeView } from './views/SubscribeView';
 
 interface SubscribeDrawerProps {
   readonly open: boolean;
@@ -25,11 +24,7 @@ export function SubscribeDrawer({
       title='Turn on notifications'
       subtitle='New releases and shows.'
     >
-      {subscribeTwoStep ? (
-        <TwoStepNotificationsCTA artist={artist} />
-      ) : (
-        <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
-      )}
+      <SubscribeView artist={artist} subscribeTwoStep={subscribeTwoStep} />
     </ProfileDrawerShell>
   );
 }
