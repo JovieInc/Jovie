@@ -44,7 +44,7 @@ const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
  * a touch device while the media query is still resolving.
  */
 function isDesktopViewport(): boolean {
-  if (typeof globalThis.window === 'undefined') return false;
+  if (globalThis.window === undefined) return false;
   const matcher = globalThis.window.matchMedia;
   if (typeof matcher !== 'function') return false;
   // Require both viewport width AND hover+fine pointer so laptops with touch

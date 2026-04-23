@@ -35,6 +35,7 @@ import {
   getMessageText,
   getPreferredErrorMessage,
 } from '../utils';
+import { composeMessage, useChipTray } from './useChipTray';
 
 interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
@@ -90,6 +91,7 @@ export function useJovieChat({
   const lastAttemptedMessageRef = useRef<string>('');
   const hasHydratedRef = useRef<string | null>(null);
   const [input, setInput] = useState('');
+  const chipTray = useChipTray();
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
@@ -692,9 +694,11 @@ export function useJovieChat({
   const handleSubmit = useCallback(
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      rateLimitedSubmitter.maybeExecute({ text: input, files });
+      const composed = composeMessage(chipTray.chips, input);
+      rateLimitedSubmitter.maybeExecute({ text: composed, files });
+      chipTray.clear();
     },
-    [input, rateLimitedSubmitter]
+    [chipTray, input, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
@@ -728,10 +732,45 @@ export function useJovieChat({
     };
   }, [rateLimitedSubmitter]);
 
+  // Handles "insert-mention" from card buttons (ChatAlbumArtCard, etc.).
+  // Appends skill + entity chips to the tray; does NOT auto-submit. User
+  // reviews chips, types any extra context, hits Enter. Replaces the
+  // JSON-in-prompt auto-submit flow from the prior design.
+  useEffect(() => {
+    const handleInsertMention = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          skillId?: string;
+          mention?: {
+            kind: 'release' | 'artist' | 'track';
+            id: string;
+            label: string;
+            thumbnail?: string;
+          };
+        }>
+      ).detail;
+      if (!detail) return;
+      if (detail.skillId) chipTray.addSkill(detail.skillId);
+      if (detail.mention) chipTray.addEntity(detail.mention);
+    };
+
+    globalThis.addEventListener(
+      'jovie-chat-insert-mention',
+      handleInsertMention
+    );
+    return () => {
+      globalThis.removeEventListener(
+        'jovie-chat-insert-mention',
+        handleInsertMention
+      );
+    };
+  }, [chipTray]);
+
   return {
     // State
     input,
     setInput,
+    chipTray,
     messages,
     chatError,
     isLoading,

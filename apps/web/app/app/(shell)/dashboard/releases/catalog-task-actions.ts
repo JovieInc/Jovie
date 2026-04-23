@@ -329,18 +329,6 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
   const profileId = await requireProfileId();
   await requireReleaseAccess(releaseId, profileId);
 
-  const [existingSnapshot] = await db
-    .select({ id: releaseTaskSnapshots.id })
-    .from(releaseTaskSnapshots)
-    .where(
-      and(
-        eq(releaseTaskSnapshots.releaseId, releaseId),
-        eq(releaseTaskSnapshots.catalogSlug, slug)
-      )
-    )
-    .limit(1);
-  if (existingSnapshot) return getReleaseTasks(releaseId);
-
   const [row] = await db
     .select({
       slug: releaseTaskCatalog.slug,
@@ -379,63 +367,88 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
   const position = (positionRow?.maxPosition ?? -1) + 1;
   const releaseDate = release?.releaseDate ?? null;
 
-  await db.transaction(async tx => {
-    const [counterRow] = await tx
-      .update(creatorProfiles)
-      .set({
-        nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profileId))
-      .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
-    const taskNumber = (counterRow?.nextTaskNumber ?? 1) - 1;
+  try {
+    await db.transaction(async tx => {
+      // Re-check inside the transaction to close the read-before-write race.
+      // Defense-in-depth on top of the UNIQUE(release_id, catalog_slug) index.
+      const [existingSnapshot] = await tx
+        .select({ id: releaseTaskSnapshots.id })
+        .from(releaseTaskSnapshots)
+        .where(
+          and(
+            eq(releaseTaskSnapshots.releaseId, releaseId),
+            eq(releaseTaskSnapshots.catalogSlug, slug)
+          )
+        )
+        .limit(1);
+      if (existingSnapshot) return;
 
-    await tx.insert(tasks).values({
-      taskNumber,
-      creatorProfileId: profileId,
-      title: row.name,
-      description: row.shortDescription ?? null,
-      status: 'todo' as const,
-      priority: row.priority,
-      assigneeKind:
-        row.assigneeType === 'ai_workflow'
-          ? ('jovie' as const)
-          : ('human' as const),
-      agentType: row.aiSkillId ?? null,
-      agentStatus: 'idle' as const,
-      releaseId,
-      category: row.category,
-      dueAt:
-        releaseDate === null || row.flowStageDaysOffset === null
-          ? null
-          : computeDueDate(releaseDate, row.flowStageDaysOffset),
-      position,
-      sourceTemplateId: null,
-      metadata: {
-        dueDaysOffset: row.flowStageDaysOffset,
+      const [counterRow] = await tx
+        .update(creatorProfiles)
+        .set({
+          nextTaskNumber: drizzleSql`${creatorProfiles.nextTaskNumber} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profileId))
+        .returning({ nextTaskNumber: creatorProfiles.nextTaskNumber });
+      const taskNumber = (counterRow?.nextTaskNumber ?? 1) - 1;
+
+      await tx.insert(tasks).values({
+        taskNumber,
+        creatorProfileId: profileId,
+        title: row.name,
+        description: row.shortDescription ?? null,
+        status: 'todo' as const,
+        priority: row.priority,
+        assigneeKind:
+          row.assigneeType === 'ai_workflow'
+            ? ('jovie' as const)
+            : ('human' as const),
+        agentType: row.aiSkillId ?? null,
+        agentStatus: 'idle' as const,
+        releaseId,
+        category: row.category,
+        dueAt:
+          releaseDate === null || row.flowStageDaysOffset === null
+            ? null
+            : computeDueDate(releaseDate, row.flowStageDaysOffset),
+        position,
+        sourceTemplateId: null,
+        metadata: {
+          dueDaysOffset: row.flowStageDaysOffset,
+          catalogSlug: row.slug,
+          catalogVersion: row.catalogVersion,
+          selectionScore: null,
+          selectionReasons: ['manual_add'],
+        },
+      });
+      await tx.insert(releaseTaskSnapshots).values({
+        releaseId,
         catalogSlug: row.slug,
         catalogVersion: row.catalogVersion,
-        selectionScore: null,
-        selectionReasons: ['manual_add'],
-      },
+        name: row.name,
+        category: row.category,
+        clusterId: row.clusterId,
+        shortDescription: row.shortDescription,
+        priority: row.priority,
+        flowStageDaysOffset: row.flowStageDaysOffset,
+        assigneeType: row.assigneeType,
+        aiSkillId: row.aiSkillId,
+        aiSkillStatus: row.aiSkillStatus,
+        reasons: ['manual_add'],
+        score: null,
+      });
     });
-    await tx.insert(releaseTaskSnapshots).values({
-      releaseId,
-      catalogSlug: row.slug,
-      catalogVersion: row.catalogVersion,
-      name: row.name,
-      category: row.category,
-      clusterId: row.clusterId,
-      shortDescription: row.shortDescription,
-      priority: row.priority,
-      flowStageDaysOffset: row.flowStageDaysOffset,
-      assigneeType: row.assigneeType,
-      aiSkillId: row.aiSkillId,
-      aiSkillStatus: row.aiSkillStatus,
-      reasons: ['manual_add'],
-      score: null,
-    });
-  });
+  } catch (error) {
+    // A concurrent add that lost the race trips the UNIQUE(release_id,
+    // catalog_slug) constraint. Treat that as success and fall through to
+    // return the up-to-date task list.
+    const message = error instanceof Error ? error.message : String(error);
+    const isUniqueViolation =
+      message.includes('release_task_snapshots_release_catalog_slug_unique') ||
+      message.includes('23505');
+    if (!isUniqueViolation) throw error;
+  }
 
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   revalidatePath(APP_ROUTES.TASKS);
