@@ -15,6 +15,7 @@ import {
   ScrollToBottom,
   SuggestedPrompts,
 } from './components';
+import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import {
   useChatImageAttachments,
@@ -63,6 +64,7 @@ export function JovieChat({
     setChatError,
     isRateLimited,
     stop,
+    chipTray,
   } = useJovieChat({
     profileId,
     artistContext,
@@ -275,6 +277,11 @@ export function JovieChat({
     pendingImages,
     onRemoveImage: removeImage,
     onPaste: handlePaste,
+    chips: chipTray.chips,
+    onRemoveChipAt: chipTray.removeAt,
+    onRemoveLastChip: chipTray.removeLast,
+    onAddSkill: chipTray.addSkill,
+    onAddEntity: chipTray.addEntity,
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
@@ -293,6 +300,9 @@ export function JovieChat({
       className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
       data-testid='chat-content'
     >
+      {/* Registers entity providers (release, artist) for the slash menu */}
+      {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}
+
       {/* Hidden file input for image attachments */}
       <input
         ref={imageFileInputRef}
