@@ -221,13 +221,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             }}
             copyValue={value ?? null}
             actions={contactFieldActions(field, value)}
-            displayClassName='truncate text-[13px] text-primary-token'
+            displayClassName='truncate text-app text-primary-token'
             emptyClassName='text-tertiary-token italic'
-            inputClassName='h-8 text-[13px]'
+            inputClassName='h-8 text-app'
           />
         }
         labelWidth={96}
-        labelClassName='normal-case tracking-normal text-[12px]'
+        labelClassName='normal-case tracking-normal text-xs'
         valueClassName='overflow-visible'
       />
     );
@@ -261,7 +261,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               }
               meta={
                 territorySummary ? (
-                  <div className='flex flex-wrap items-center gap-1.5 text-[11px] text-tertiary-token'>
+                  <div className='flex flex-wrap items-center gap-1.5 text-2xs text-tertiary-token'>
                     <Badge
                       size='sm'
                       className='rounded-[6px] border border-subtle bg-surface-0 px-1.5 text-[10px] text-secondary-token'
@@ -296,11 +296,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {activeTab === 'info' && (
             <>
               <DrawerSection title='Role' className='space-y-2' surface='card'>
-                <Label className='text-[13px] text-secondary-token'>
+                <Label className='text-app text-secondary-token'>
                   Contact type
                 </Label>
                 <Select value={contact.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px]'>
+                  <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app'>
                     <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
@@ -308,7 +308,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       <SelectItem
                         key={option.value}
                         value={option.value}
-                        className='rounded-[6px] px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                        className='rounded-[6px] px-2 py-1.5 text-app font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                       >
                         <div className='flex items-center gap-2'>
                           <Icon
@@ -364,14 +364,14 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   surface='card'
                 >
                   <div className='space-y-2'>
-                    <Label className='text-[13px] text-secondary-token'>
+                    <Label className='text-app text-secondary-token'>
                       Default action
                     </Label>
                     <Select
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
                     >
-                      <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px]'>
+                      <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app'>
                         <SelectValue placeholder='Select preferred channel'>
                           {getPreferredChannelLabel(contact.preferredChannel)}
                         </SelectValue>
@@ -405,7 +405,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                     </Badge>
                   }
                   labelWidth={96}
-                  labelClassName='normal-case tracking-normal text-[12px]'
+                  labelClassName='normal-case tracking-normal text-xs'
                 />
                 <div className='flex flex-wrap gap-1.5'>
                   {CONTACT_TERRITORY_PRESETS.map(territory => {
@@ -416,7 +416,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         type='button'
                         onClick={() => handleTerritoryToggle(territory)}
                         className={cn(
-                          'rounded-[8px] border px-2.5 py-1 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
+                          'rounded-[8px] border px-2.5 py-1 text-xs font-[510] transition-[background-color,border-color,color] duration-150',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -433,13 +433,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {/* Error display */}
           {contact.error && (
             <div className='rounded-[8px] border border-destructive/15 bg-destructive/5 px-3 py-2'>
-              <p className='text-[13px] text-destructive'>{contact.error}</p>
+              <p className='text-app text-destructive'>{contact.error}</p>
             </div>
           )}
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-center text-[13px] text-tertiary-token'>
+            <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-center text-app text-tertiary-token'>
               Saving...
             </div>
           )}
