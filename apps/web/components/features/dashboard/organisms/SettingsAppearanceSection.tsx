@@ -89,12 +89,12 @@ export function SettingsAppearanceSection() {
                     <Icon className='h-4 w-4' aria-hidden='true' />
                   </span>
                   <span className='min-w-0 flex-1'>
-                    <span className='flex items-center gap-1 text-[13px] font-[510] text-primary-token'>
+                    <span className='flex items-center gap-1 text-app font-[510] text-primary-token'>
                       {option.label}
                       {option.value === 'system' && resolvedThemeLabel ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className='inline-flex cursor-help rounded text-[11px] text-tertiary-token underline decoration-dotted underline-offset-2'>
+                            <span className='inline-flex cursor-help rounded text-2xs text-tertiary-token underline decoration-dotted underline-offset-2'>
                               {resolvedThemeLabel}
                             </span>
                           </TooltipTrigger>
@@ -105,7 +105,7 @@ export function SettingsAppearanceSection() {
                         </Tooltip>
                       ) : null}
                     </span>
-                    <span className='mt-0.5 block text-[11px] leading-normal text-tertiary-token'>
+                    <span className='mt-0.5 block text-2xs leading-normal text-tertiary-token'>
                       {option.description}
                     </span>
                   </span>
