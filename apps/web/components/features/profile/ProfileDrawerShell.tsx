@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { useId } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
@@ -62,21 +62,21 @@ export function ProfileDrawerShell({
           <div className='h-[5px] w-10 rounded-full bg-white/[0.22]' />
         </div>
 
-        <div className='grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2.5 pt-5'>
+        <div className='grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 pt-5'>
           {showBackButton ? (
             <button
               type='button'
               onClick={onBack}
-              className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
               aria-label='Back'
               data-testid='profile-drawer-back-button'
             >
-              <ChevronLeft className='h-3.5 w-3.5' />
+              <ChevronLeft className='h-4 w-4' />
             </button>
           ) : (
             <span
               aria-hidden='true'
-              className='block h-8 w-8 shrink-0'
+              className='block h-11 w-11 shrink-0'
               data-testid='profile-drawer-back-placeholder'
             />
           )}
@@ -109,11 +109,15 @@ export function ProfileDrawerShell({
             </div>
           </div>
 
-          <span
-            aria-hidden='true'
-            className='block h-8 w-8 shrink-0'
-            data-testid='profile-drawer-right-placeholder'
-          />
+          <button
+            type='button'
+            onClick={() => onOpenChange(false)}
+            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+            aria-label='Close'
+            data-testid='profile-drawer-close-button'
+          >
+            <X className='h-4 w-4' />
+          </button>
         </div>
       </div>
 
