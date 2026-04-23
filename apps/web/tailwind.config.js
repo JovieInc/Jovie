@@ -48,6 +48,7 @@ module.exports = {
         '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }], // 11px
         app: ['var(--text-app)', { lineHeight: '1.4' }], // 13px — Linear's default
         caption: ['var(--linear-caption-size)', { lineHeight: '1.4' }], // 13px — compact app controls
+        mid: ['var(--text-mid)', { lineHeight: '1.4' }], // 15px — between sm and base
       },
 
       // Linear spacing tokens
