@@ -288,6 +288,13 @@
       "when": 1776979746921,
       "tag": "0040_thankful_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1776981996848,
+      "tag": "0041_cute_korvac",
+      "breakpoints": true
     }
   ]
 }

@@ -113,6 +113,7 @@ export const discogRecordings = pgTable(
     audioUrl: text('audio_url'),
     audioFormat: text('audio_format'),
     lyrics: text('lyrics'),
+    waveformPeaks: jsonb('waveform_peaks').$type<number[]>(),
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
       .notNull(),
