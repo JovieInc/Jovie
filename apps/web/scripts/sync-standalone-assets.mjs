@@ -62,8 +62,19 @@ function materializeSymlinks(rootDir) {
     const entryPath = path.join(rootDir, entry.name);
 
     if (entry.isSymbolicLink()) {
-      const resolvedPath = realpathSync(entryPath);
-      const resolvedStats = lstatSync(resolvedPath);
+      let resolvedPath;
+      let resolvedStats;
+      try {
+        resolvedPath = realpathSync(entryPath);
+        resolvedStats = lstatSync(resolvedPath);
+      } catch {
+        // Broken symlink (e.g. optional platform-specific native binary that
+        // wasn't installed on this runner). Drop it so the standalone tree is
+        // clean; the package is either not needed at runtime or will be
+        // resolved against node_modules by Vercel's function packager.
+        rmSync(entryPath, { force: true, recursive: true });
+        continue;
+      }
 
       rmSync(entryPath, { force: true, recursive: true });
 
