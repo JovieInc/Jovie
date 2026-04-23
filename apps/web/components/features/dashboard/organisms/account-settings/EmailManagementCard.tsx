@@ -69,7 +69,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
               <div className='min-w-0 flex-1'>
                 <div>
                   <div className='flex flex-wrap items-center gap-1.5'>
-                    <p className='text-[13px] font-[510] text-primary-token'>
+                    <p className='text-[13px] font-caption text-primary-token'>
                       {email.emailAddress}
                     </p>
                     {isPrimary ? (
@@ -101,7 +101,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     size='sm'
                     disabled={syncingEmailId === email.id}
                     onClick={() => handleMakePrimary(email)}
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   >
                     {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
                   </Button>
@@ -110,7 +110,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                     disabled={syncingEmailId === email.id}
                     onClick={() => setEmailToRemove(email)}
                   >
@@ -180,7 +180,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 disabled={
                   emailStatus === 'sending' || emailStatus === 'verifying'
                 }
-                className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
+                className='h-7 rounded-[8px] px-2.5 text-[11px] font-caption'
               >
                 {emailButtonLabel}
               </Button>
@@ -190,7 +190,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   variant='ghost'
                   size='sm'
                   onClick={resetEmailForm}
-                  className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                 >
                   Cancel
                 </Button>

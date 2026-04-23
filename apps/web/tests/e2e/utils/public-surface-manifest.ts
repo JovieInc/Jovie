@@ -273,6 +273,7 @@ const MARKETING_SURFACES = [
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
+    allowMultipleH1: true,
     lighthouse: false,
     perfGroups: ['marketing-public'],
     interactions: GLOBAL_INTERACTIONS,

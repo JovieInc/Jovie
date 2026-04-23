@@ -160,7 +160,7 @@ function Badge({
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-[510] rounded-full bg-accent text-white',
+        'flex items-center justify-center font-caption rounded-full bg-accent text-white',
         sizeClasses
       )}
     >
@@ -182,7 +182,7 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] transition-all duration-150',
+        'flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-caption transition-all duration-150',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
@@ -291,7 +291,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div className='my-2 mx-1 border-t border-default/30' />
-                  <p className='px-3 py-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
+                  <p className='px-3 py-1.5 text-[13px] font-caption tracking-normal text-secondary-token'>
                     Admin
                   </p>
                   {adminItems.map(item => (
@@ -311,7 +311,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-caption text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'
@@ -369,7 +369,7 @@ export function LiquidGlassMenu({
                 <span
                   className={cn(
                     'text-[10px] leading-tight',
-                    active ? 'font-[590]' : 'font-[510]'
+                    active ? 'font-semibold' : 'font-caption'
                   )}
                 >
                   {item.label}
@@ -400,7 +400,7 @@ export function LiquidGlassMenu({
             <span
               className={cn(
                 'text-[10px] leading-tight',
-                isExpanded ? 'font-[590]' : 'font-[510]'
+                isExpanded ? 'font-semibold' : 'font-caption'
               )}
             >
               More
@@ -416,7 +416,7 @@ export function LiquidGlassMenu({
               className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-[8px] py-1.5 text-tertiary-token transition-all duration-150 hover:text-secondary-token active:scale-95'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
-              <span className='text-[10px] leading-tight font-[510]'>
+              <span className='text-[10px] leading-tight font-caption'>
                 Search
               </span>
             </button>

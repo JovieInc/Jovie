@@ -459,7 +459,7 @@ export async function completeOnboarding({
     revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
 
     if (redirectToDashboard) {
-      redirect(APP_ROUTES.DASHBOARD);
+      redirect(`${APP_ROUTES.DASHBOARD}?interview=1`);
     }
 
     return completion;

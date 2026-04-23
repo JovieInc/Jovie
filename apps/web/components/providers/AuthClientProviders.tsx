@@ -2,7 +2,8 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import { ui } from '@clerk/ui';
-import type { ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
+import { type ReactNode, useEffect } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
@@ -10,7 +11,11 @@ import {
 } from '@/hooks/useClerkSafe';
 import { publicEnv } from '@/lib/env-public';
 import { authClerkAppearance } from './clerkAppearance';
-import { getClerkProxyUrl, shouldBypassClerk } from './clerkAvailability';
+import {
+  getClerkProxyUrl,
+  isPublicAuthHost,
+  shouldBypassClerk,
+} from './clerkAvailability';
 import { QueryProvider } from './QueryProvider';
 
 interface AuthClientProvidersProps {
@@ -35,6 +40,20 @@ export function AuthClientProviders({
       publicEnv.NEXT_PUBLIC_CLERK_MOCK,
       globalThis.location
     );
+
+  const bypassOnPublicHost =
+    shouldSkipClerk && isPublicAuthHost(globalThis.location);
+
+  useEffect(() => {
+    if (!bypassOnPublicHost) return;
+    Sentry.captureMessage('clerk_bypass_on_public_host', {
+      level: 'error',
+      tags: {
+        hostname: globalThis.location?.hostname ?? 'unknown',
+        has_runtime_pk: publishableKey ? '1' : '0',
+      },
+    });
+  }, [bypassOnPublicHost, publishableKey]);
 
   if (shouldSkipClerk) {
     return (

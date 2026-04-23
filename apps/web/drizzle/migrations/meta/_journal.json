@@ -253,6 +253,13 @@
       "when": 1776300243139,
       "tag": "0035_tranquil_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1776895603938,
+      "tag": "0036_striped_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }
