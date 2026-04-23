@@ -562,6 +562,9 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 
 ## Linear Issue Gating
 
+See also: [Linear Ownership Contract](#linear-ownership-contract) below for the
+state-transition rules every agent must follow.
+
 Before working on any Linear issue, check for the `human-review-required` label.
 If present, SKIP the issue entirely. Do not attempt to work on it, close it,
 or add comments. These issues require human decision-making.
@@ -598,6 +601,62 @@ inline `// TODO` comments, PR-body bullet lists, or chat memory to track it.
 
 ---
 
+## Linear Ownership Contract
+
+Every agent working a Linear-tracked task MUST follow this three-state contract.
+Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc sessions).
+Linear state is the shared signal other agents use to see what is in flight —
+if you do not mark your issue In Progress, you invite collisions where two agents
+edit the same files.
+
+### The contract
+
+1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading
+   code or editing files. If the issue is unassigned, assign it to yourself
+   (or the human owner) at the same time. This is the only manual transition.
+2. **On PR open — no action required.** `linear-ai-orchestrator.yml`
+   (`sync_linear_in_review` job) auto-transitions the issue to `In Review`
+   as long as the PR body contains the `<!-- linear-issue-id:... -->` comment
+   or the branch matches `jov-XXXX`. Do NOT strip that HTML comment or rename
+   the branch away from the pattern.
+3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions
+   the issue to `Done` and posts the merge SHA as a comment.
+
+Do NOT manually perform the In Review or Done transitions — you will race the
+workflows and produce confusing state.
+
+### Orchestrator-dispatched work
+
+When the Linear AI orchestrator dispatches work (`linear-ai-orchestrator.yml`
+`assign_to_codex` job), it sets `In Progress` at dispatch time. If your session
+was started by the orchestrator, the transition is already done — skip step 1.
+
+### How to transition
+
+With Linear MCP available (most Claude Code sessions):
+
+```
+# 1. Get the team's state IDs
+mcp__claude_ai_Linear__list_issue_statuses({ team: "<team-id-or-key>" })
+
+# 2. Set the issue to In Progress
+mcp__claude_ai_Linear__save_issue({ id: "<issue-id>", state: "<in-progress-state-id>" })
+```
+
+Without Linear MCP, use the GraphQL API directly (same pattern as
+`.github/workflows/linear-ai-orchestrator.yml` — look up the state where
+`name` matches `/in progress/i`, then call `issueUpdate`).
+
+### No Linear issue (ad-hoc work)
+
+If the user asks you to fix something without a Linear issue, either:
+
+1. Create a Linear issue for it and move it to In Progress, OR
+2. Explicitly state "no Linear issue — ad-hoc" in your first status message so
+   the human knows coordination is manual and other agents won't see this work.
+
+---
+
 ## PR Discipline (Required)
 
 ### Size Limits
@@ -622,6 +681,7 @@ The gstack skill pipeline handles verification. The standard agent workflow is:
 ### One PR = One Concern
 
 - Each PR addresses exactly one Linear issue or one bug fix
+- Mark the Linear issue `In Progress` before you start editing files (see [Linear Ownership Contract](#linear-ownership-contract))
 - No drive-by refactors, no "while I'm here" changes
 - If you find a related issue, create a separate Linear ticket
 
