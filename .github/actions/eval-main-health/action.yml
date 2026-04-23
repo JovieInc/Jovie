@@ -130,8 +130,19 @@ runs:
             ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
           );
 
+          const activeRunStartedAt = activeRun?.run_started_at ?? activeRun?.created_at ?? '';
+          const latestFailureCreatedAt = latestFailure?.created_at ?? '';
+
+          const hasNewerActiveMainRun = (() => {
+            if (!activeRun || !latestFailureCreatedAt || !activeRunStartedAt) return false;
+            return Date.parse(activeRunStartedAt) > Date.parse(latestFailureCreatedAt);
+          })();
+
           const failedForTooLong = (() => {
             if (!latestFailure) return false;
+            // A newer CI run is already in progress for main. Let it finish before
+            // treating the previous failed run as unresolved.
+            if (hasNewerActiveMainRun && !staleRun) return false;
             const failedAt = latestFailure.updated_at ?? latestFailure.created_at;
             if (!failedAt) return false;
             const failedAgeMinutes = (now - Date.parse(failedAt)) / (1000 * 60);
