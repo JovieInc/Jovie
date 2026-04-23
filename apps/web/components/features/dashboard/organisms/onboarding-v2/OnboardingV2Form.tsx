@@ -704,10 +704,10 @@ function OnboardingSidebar({
       ) : null}
       {/* Compact progress indicator for small screens */}
       <div className='flex items-center gap-3 sm:hidden'>
-        <span className='text-[13px] font-semibold text-primary-token'>
+        <span className='text-app font-semibold text-primary-token'>
           {currentLabel}
         </span>
-        <span className='text-[12px] text-tertiary-token'>
+        <span className='text-xs text-tertiary-token'>
           {currentIndex + 1}/{SIDEBAR_STEPS.length}
         </span>
         <div className='flex flex-1 gap-1'>
@@ -733,7 +733,7 @@ function OnboardingSidebar({
             <li key={step.id} aria-current={isCurrent ? 'step' : undefined}>
               <div
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-2 py-2 text-[13px] transition-colors',
+                  'flex items-center gap-3 rounded-xl px-2 py-2 text-app transition-colors',
                   isCurrent
                     ? 'bg-surface-1 text-primary-token'
                     : 'text-secondary-token'
@@ -1857,7 +1857,7 @@ export function OnboardingV2Form({
                 <FlatPanel key={item.id}>
                   <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                     <div className='min-w-0'>
-                      <p className='text-[11px] font-semibold text-tertiary-token'>
+                      <p className='text-2xs font-semibold text-tertiary-token'>
                         {item.providerLabel}
                       </p>
                       <p className='truncate text-base font-semibold text-primary-token'>
@@ -1946,7 +1946,7 @@ export function OnboardingV2Form({
                   <FlatPanel key={`${item.kind}:${item.id}`}>
                     <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                       <div className='min-w-0'>
-                        <p className='text-[11px] font-semibold text-tertiary-token'>
+                        <p className='text-2xs font-semibold text-tertiary-token'>
                           {item.platformLabel}
                         </p>
                         <p className='truncate text-base font-semibold text-primary-token'>
@@ -2082,7 +2082,7 @@ export function OnboardingV2Form({
           >
             {lateArrivals.map(item => (
               <FlatPanel key={item.id}>
-                <p className='text-[11px] font-semibold text-tertiary-token'>
+                <p className='text-2xs font-semibold text-tertiary-token'>
                   {item.subtitle}
                 </p>
                 <p className='mt-1 text-base font-semibold text-primary-token'>
@@ -2120,7 +2120,7 @@ export function OnboardingV2Form({
             <FlatPanel>
               <div className='space-y-4'>
                 <div>
-                  <p className='text-[11px] font-semibold text-tertiary-token'>
+                  <p className='text-2xs font-semibold text-tertiary-token'>
                     Your public link
                   </p>
                   <p className='mt-1 text-base font-semibold text-primary-token'>
@@ -2133,7 +2133,7 @@ export function OnboardingV2Form({
                 </div>
                 <ol className='space-y-3'>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-semibold text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       1
                     </span>
                     <div className='min-w-0'>
@@ -2148,7 +2148,7 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-semibold text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       2
                     </span>
                     <div className='min-w-0'>
@@ -2163,7 +2163,7 @@ export function OnboardingV2Form({
                     </div>
                   </li>
                   <li className='flex items-start gap-3'>
-                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-[11px] font-semibold text-primary-token'>
+                    <span className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-2xs font-semibold text-primary-token'>
                       3
                     </span>
                     <div className='min-w-0'>
