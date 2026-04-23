@@ -165,7 +165,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               />
             }
             tooltipLabel='Search'
-            className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
+            className='h-7 text-xs text-tertiary-token hover:text-primary-token'
           />
           <Suspense
             fallback={

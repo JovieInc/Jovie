@@ -86,8 +86,8 @@ export function CatalogTaskBuilderDialog({
       groups.set(key, list);
     }
     return Array.from(groups.entries()).sort((a, b) => {
-      const aOrder = a[0] === null ? Infinity : a[0];
-      const bOrder = b[0] === null ? Infinity : b[0];
+      const aOrder = a[0] ?? Infinity;
+      const bOrder = b[0] ?? Infinity;
       return aOrder - bOrder;
     });
   }, [filtered]);
@@ -148,7 +148,7 @@ export function CatalogTaskBuilderDialog({
             ) : (
               grouped.map(([clusterId, rows]) => {
                 const cluster =
-                  clusterId !== null ? clustersById.get(clusterId) : null;
+                  clusterId === null ? null : clustersById.get(clusterId);
                 const heading = cluster?.displayName ?? 'Uncategorized';
                 return (
                   <div key={String(clusterId ?? 'null')}>
@@ -159,6 +159,14 @@ export function CatalogTaskBuilderDialog({
                       {rows.map(row => {
                         const isAdded = addedSet.has(row.slug);
                         const isPending = pendingSlug === row.slug;
+                        let buttonLabel: string;
+                        if (isAdded) {
+                          buttonLabel = 'Added';
+                        } else if (isPending) {
+                          buttonLabel = 'Adding...';
+                        } else {
+                          buttonLabel = 'Add';
+                        }
                         return (
                           <li
                             key={row.slug}
@@ -185,11 +193,7 @@ export function CatalogTaskBuilderDialog({
                               onClick={() => handleAdd(row.slug)}
                               data-testid={`catalog-add-${row.slug}`}
                             >
-                              {isAdded
-                                ? 'Added'
-                                : isPending
-                                  ? 'Adding...'
-                                  : 'Add'}
+                              {buttonLabel}
                             </Button>
                           </li>
                         );

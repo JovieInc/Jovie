@@ -6,7 +6,7 @@ export function normalizeTaskText(s: string): string {
   if (!s) return '';
   return s
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s&-]/gu, ' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[^\p{L}\p{N}\s&-]/gu, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim();
 }

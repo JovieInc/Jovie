@@ -95,7 +95,7 @@ export function PhoneMockupPreview({
               {/* Bio */}
               <p
                 className={cn(
-                  'text-[14px] text-white/80 text-center mt-1 max-w-xs',
+                  'text-sm text-white/80 text-center mt-1 max-w-xs',
                   'transition-all duration-300 delay-100',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
@@ -173,10 +173,10 @@ export function PhoneMockupPreview({
                       </div>
 
                       <div className='min-w-0 flex-1'>
-                        <h3 className='truncate text-[13px] font-[510] text-primary-token'>
+                        <h3 className='truncate text-app font-[510] text-primary-token'>
                           {link.title || getPlatformName(link.platform)}
                         </h3>
-                        <p className='truncate text-[13px] text-secondary-token'>
+                        <p className='truncate text-app text-secondary-token'>
                           {link.url
                             .replace(/^https?:\/\//, '')
                             .replace(/\/$/, '')}
@@ -208,10 +208,10 @@ export function PhoneMockupPreview({
                       aria-hidden='true'
                     />
                   </div>
-                  <h3 className='mb-1 text-[13px] font-[510] text-primary-token'>
+                  <h3 className='mb-1 text-app font-[510] text-primary-token'>
                     No links yet
                   </h3>
-                  <p className='text-[13px] text-secondary-token'>
+                  <p className='text-app text-secondary-token'>
                     Add your first link to see it here
                   </p>
                 </div>

@@ -53,7 +53,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           {insight.actionSuggestion ? (
             <div className='mt-2 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-              <p className='text-[12px] font-[510] text-primary-token'>
+              <p className='text-xs font-[510] text-primary-token'>
                 {insight.actionSuggestion}
               </p>
             </div>

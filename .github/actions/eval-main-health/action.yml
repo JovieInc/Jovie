@@ -130,8 +130,30 @@ runs:
             ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
           );
 
+          const hasNewerActiveMainRun = (() => {
+            if (!activeRun || !latestFailure) return false;
+
+            const activeRunNumber = Number(activeRun.run_number ?? 0);
+            const failureRunNumber = Number(latestFailure.run_number ?? 0);
+            if (activeRunNumber > failureRunNumber) return true;
+
+            // Fallback for unexpected API payloads where run_number is missing:
+            // only treat it as newer if SHA changed and creation time is later.
+            if (!activeRun.head_sha || !latestFailure.head_sha) return false;
+            if (activeRun.head_sha === latestFailure.head_sha) return false;
+
+            const activeCreatedAt = activeRun.created_at ? Date.parse(activeRun.created_at) : Number.NaN;
+            const failureCreatedAt = latestFailure.created_at ? Date.parse(latestFailure.created_at) : Number.NaN;
+
+            if (Number.isNaN(activeCreatedAt) || Number.isNaN(failureCreatedAt)) return false;
+            return activeCreatedAt > failureCreatedAt;
+          })();
+
           const failedForTooLong = (() => {
             if (!latestFailure) return false;
+            // A newer CI run is already in progress for main. Let it finish before
+            // treating the previous failed run as unresolved.
+            if (hasNewerActiveMainRun && !staleRun) return false;
             const failedAt = latestFailure.updated_at ?? latestFailure.created_at;
             if (!failedAt) return false;
             const failedAgeMinutes = (now - Date.parse(failedAt)) / (1000 * 60);

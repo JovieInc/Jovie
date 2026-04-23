@@ -11,18 +11,18 @@ export const mobileReleaseTokens = {
     container:
       'flex w-full items-center gap-3 px-4 py-3 text-left transition-[background-color,border-color] active:bg-surface-0 focus-visible:outline-none focus-visible:bg-surface-0',
     title: 'text-[14px] font-semibold leading-tight text-primary-token',
-    subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
+    subtitle: 'mt-0.5 text-xs leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
       'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-3xs font-caption leading-none tracking-normal',
-    year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
+    year: 'shrink-0 text-xs tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
     dot: 'text-3xs text-quaternary-token',
   },
   groupHeader:
     'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
-  groupHeaderTitle: 'text-[12px] font-semibold text-primary-token',
+  groupHeaderTitle: 'text-xs font-semibold text-primary-token',
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {
     container:

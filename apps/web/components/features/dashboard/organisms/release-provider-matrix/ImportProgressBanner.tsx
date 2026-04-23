@@ -31,7 +31,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   if (compact) {
     return (
       <div
-        className='inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-[12px] text-primary-token'
+        className='inline-flex h-7.5 items-center gap-2 rounded-[6px] border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-xs text-primary-token'
         aria-live='polite'
       >
         <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />
@@ -62,13 +62,13 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
       >
         <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
-          <div className='flex items-center gap-2 text-[13px] text-primary-token'>
+          <div className='flex items-center gap-2 text-app text-primary-token'>
             <span className='truncate'>
               {artistName
                 ? `Importing releases from ${artistName}...`
                 : 'Importing releases from Spotify...'}
             </span>
-            <span className='shrink-0 text-[11px] text-secondary-token'>
+            <span className='shrink-0 text-2xs text-secondary-token'>
               {totalCount > 0
                 ? `${importedCount} of ${totalCount} imported`
                 : `${importedCount} imported`}
@@ -92,7 +92,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
             <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
           </div>
           <div className='flex min-w-0 flex-1 flex-col gap-1'>
-            <span className='text-[13px] text-primary-token'>
+            <span className='text-app text-primary-token'>
               Finding your music across streaming platforms...
             </span>
             <div className='h-1 overflow-hidden rounded-full bg-accent/12'>

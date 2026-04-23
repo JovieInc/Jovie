@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useCallback } from 'react';
+import { FilterChip } from '@/components/molecules/filters';
 import { cn } from '@/lib/utils';
 
 export type ClusterChip = {
@@ -42,39 +43,19 @@ function ClusterFilterChipsInner({
       className={cn('flex flex-wrap gap-1.5 px-4 py-2', className)}
       data-testid='cluster-filter-chips'
     >
-      <button
-        type='button'
-        onClick={clearAll}
-        aria-pressed={showingAll}
-        className={cn(
-          'px-2.5 py-1 rounded-full text-xs border transition-colors',
-          showingAll
-            ? 'bg-foreground text-background border-foreground'
-            : 'bg-transparent text-muted-foreground border-border hover:border-foreground/60'
-        )}
-      >
+      <FilterChip pressed={showingAll} onClick={clearAll}>
         All
-      </button>
-      {clusters.map(c => {
-        const selected = selectedSlugs.includes(c.slug);
-        return (
-          <button
-            key={c.slug}
-            type='button'
-            onClick={() => toggle(c.slug)}
-            aria-pressed={selected}
-            data-testid={`cluster-chip-${c.slug}`}
-            className={cn(
-              'px-2.5 py-1 rounded-full text-xs border transition-colors',
-              selected
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-transparent text-muted-foreground border-border hover:border-foreground/60'
-            )}
-          >
-            {c.displayName}
-          </button>
-        );
-      })}
+      </FilterChip>
+      {clusters.map(c => (
+        <FilterChip
+          key={c.slug}
+          pressed={selectedSlugs.includes(c.slug)}
+          onClick={() => toggle(c.slug)}
+          data-testid={`cluster-chip-${c.slug}`}
+        >
+          {c.displayName}
+        </FilterChip>
+      ))}
     </div>
   );
 }

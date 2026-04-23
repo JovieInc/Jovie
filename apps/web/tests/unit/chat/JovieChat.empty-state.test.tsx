@@ -22,6 +22,15 @@ const mockChatState = {
   setChatError: vi.fn(),
   isRateLimited: false,
   stop: vi.fn(),
+  chipTray: {
+    chips: [],
+    addSkill: vi.fn(),
+    addEntity: vi.fn(),
+    removeAt: vi.fn(),
+    removeLast: vi.fn(),
+    clear: vi.fn(),
+    serialized: '',
+  },
 };
 
 vi.mock('@tanstack/react-virtual', () => ({
