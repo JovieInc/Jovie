@@ -56,7 +56,7 @@ export function ArtistSelectionForm() {
             {state.error && (
               <div className='bg-surface-2 border border-subtle rounded-lg p-4 mb-6'>
                 <div className='flex items-center justify-between'>
-                  <p className='text-[13px] text-destructive'>{state.error}</p>
+                  <p className='text-app text-destructive'>{state.error}</p>
                   <Button
                     onClick={retryOperation}
                     variant='secondary'
@@ -113,10 +113,10 @@ export function ArtistSelectionForm() {
                       />
                     )}
                     <div className='flex-1 min-w-0'>
-                      <p className='text-[13px] font-[510] text-primary-token truncate'>
+                      <p className='text-app font-[510] text-primary-token truncate'>
                         {selectedArtist.name}
                       </p>
-                      <p className='text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1'>
+                      <p className='text-2xs text-green-600 dark:text-green-400 flex items-center gap-1'>
                         <CheckCircle2
                           className='h-3.5 w-3.5'
                           aria-hidden='true'
@@ -159,7 +159,7 @@ export function ArtistSelectionForm() {
 
             {/* Footer */}
             <div className='text-center mt-8'>
-              <p className='text-[13px] text-secondary-token transition-colors'>
+              <p className='text-app text-secondary-token transition-colors'>
                 You can always update your artist profile later
               </p>
             </div>
