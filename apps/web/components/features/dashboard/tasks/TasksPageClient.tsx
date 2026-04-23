@@ -689,7 +689,7 @@ function TaskDocumentPanel({
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
               />
               {showDescriptionHelper && descriptionHelper ? (
                 <TaskDescriptionHelper
@@ -1622,7 +1622,7 @@ export function TasksPageClient() {
         {isError ? (
           <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
             <div className='space-y-1'>
-              <h2 className='text-[15px] font-semibold text-primary-token'>
+              <h2 className='text-mid font-semibold text-primary-token'>
                 Couldn&apos;t Load Tasks
               </h2>
               <p className='text-[13px] text-secondary-token'>

@@ -102,7 +102,7 @@ function FunnelStage({
           {label}
         </span>
         <span className='flex items-baseline gap-1.5'>
-          <span className='tabular-nums text-[15px] font-semibold leading-none tracking-[-0.02em] text-primary-token'>
+          <span className='tabular-nums text-mid font-semibold leading-none tracking-[-0.02em] text-primary-token'>
             {numberFormatter.format(value)}
           </span>
           {rate && (
@@ -291,7 +291,7 @@ export function AnalyticsSidebarView({
             </div>
             <div className='flex items-start justify-between gap-3 pr-8'>
               <div className='space-y-0.5'>
-                <p className='text-[15px] font-semibold tracking-[-0.016em] text-primary-token'>
+                <p className='text-mid font-semibold tracking-[-0.016em] text-primary-token'>
                   Audience funnel
                 </p>
                 <p className='text-[12px] leading-[16px] text-secondary-token'>
