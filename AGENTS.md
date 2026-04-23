@@ -614,11 +614,10 @@ edit the same files.
 1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading
    code or editing files. If the issue is unassigned, assign it to yourself
    (or the human owner) at the same time. This is the only manual transition.
-2. **On PR open — no action required.** `linear-ai-orchestrator.yml`
-   (`sync_linear_in_review` job) auto-transitions the issue to `In Review`
-   as long as the PR body contains the `<!-- linear-issue-id:... -->` comment
-   or the branch matches `jov-XXXX`. Do NOT strip that HTML comment or rename
-   the branch away from the pattern.
+2. **On PR open —** behavior depends on how the work was started:
+   - **Orchestrator-dispatched work** (branches created by `linear-ai-orchestrator.yml`): no action required. The `sync_linear_in_review` job auto-transitions the issue to `In Review` when the PR opens.
+   - **Ad-hoc work** (direct agent sessions, manually opened PRs): manually transition the Linear issue to `In Review` when you open the PR. The orchestrator's `sync_linear_in_review` job does NOT run for branches it didn't dispatch.
+   In both cases, preserve the PR body's `<!-- linear-issue-id:... -->` comment and the `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the issue at merge time.
 3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions
    the issue to `Done` and posts the merge SHA as a comment.
 

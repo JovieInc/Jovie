@@ -411,7 +411,7 @@ jobs:
 
   assign_to_codex:
     name: Assign issue to Codex in Linear
-    needs: guard
+    needs: [guard, wait_for_coderabbit_plan]
     if: needs.guard.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
