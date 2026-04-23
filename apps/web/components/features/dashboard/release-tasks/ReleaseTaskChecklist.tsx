@@ -3,6 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { queryKeys } from '@/lib/queries';
 import {
   useReleaseSkillClustersQuery,
   useReleaseTaskCatalogQuery,
@@ -289,7 +290,7 @@ export function ReleaseTaskChecklist({
             onClose={() => setCatalogDialogOpen(false)}
             onAdded={() =>
               queryClient.invalidateQueries({
-                queryKey: ['release-tasks', releaseId],
+                queryKey: queryKeys.releaseTasks.byRelease(releaseId),
               })
             }
           />
