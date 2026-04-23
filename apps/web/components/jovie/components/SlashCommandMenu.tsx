@@ -52,6 +52,50 @@ function itemKey(item: SlashMenuItem): string {
   return `entity:${item.entity?.kind}:${item.entity?.id}`;
 }
 
+function SkillRow({ skill }: { readonly skill: SkillCommand }) {
+  return (
+    <>
+      <span className='font-medium'>{skill.label}</span>
+      <span className='ml-auto truncate text-[11px] text-tertiary-token'>
+        {skill.description}
+      </span>
+    </>
+  );
+}
+
+function EntityRow({ entity }: { readonly entity: EntityRef }) {
+  return (
+    <>
+      {entity.thumbnail ? (
+        <Image
+          src={entity.thumbnail}
+          alt=''
+          width={24}
+          height={24}
+          className='h-6 w-6 rounded-sm object-cover'
+          unoptimized
+        />
+      ) : (
+        <span className='h-6 w-6 rounded-sm bg-surface-2' />
+      )}
+      <span className='truncate'>{entity.label}</span>
+      <span className='ml-auto text-[11px] text-tertiary-token capitalize'>
+        {entity.kind}
+      </span>
+    </>
+  );
+}
+
+function SlashMenuRowContent({ item }: { readonly item: SlashMenuItem }) {
+  if (item.kind === 'skill' && item.skill) {
+    return <SkillRow skill={item.skill} />;
+  }
+  if (item.entity) {
+    return <EntityRow entity={item.entity} />;
+  }
+  return null;
+}
+
 /**
  * Slash command popover for the chat input.
  *
@@ -181,33 +225,7 @@ export function SlashCommandMenu({
                       : 'text-secondary-token hover:bg-surface-1'
                   )}
                 >
-                  {item.kind === 'skill' && item.skill ? (
-                    <>
-                      <span className='font-medium'>{item.skill.label}</span>
-                      <span className='ml-auto truncate text-[11px] text-tertiary-token'>
-                        {item.skill.description}
-                      </span>
-                    </>
-                  ) : item.entity ? (
-                    <>
-                      {item.entity.thumbnail ? (
-                        <Image
-                          src={item.entity.thumbnail}
-                          alt=''
-                          width={24}
-                          height={24}
-                          className='h-6 w-6 rounded-sm object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <span className='h-6 w-6 rounded-sm bg-surface-2' />
-                      )}
-                      <span className='truncate'>{item.entity.label}</span>
-                      <span className='ml-auto text-[11px] text-tertiary-token capitalize'>
-                        {item.entity.kind}
-                      </span>
-                    </>
-                  ) : null}
+                  <SlashMenuRowContent item={item} />
                 </button>
               );
             })

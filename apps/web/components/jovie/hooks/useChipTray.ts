@@ -47,11 +47,17 @@ function serializeChip(chip: TrayChip): string {
  * close affordance, if any). This matches how Linear and similar tools model
  * inline tokens — simple, predictable, no interleaving.
  */
+// Monotonic counter for chip uids in environments without crypto.randomUUID.
+// Uids are only used as React keys — not a security surface — so a
+// session-unique counter is sufficient (and avoids Sonar's Math.random flag).
+let uidCounter = 0;
+
 function freshUid(): string {
   if (globalThis.crypto !== undefined && 'randomUUID' in globalThis.crypto) {
     return globalThis.crypto.randomUUID();
   }
-  return `chip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  uidCounter += 1;
+  return `chip-${Date.now()}-${uidCounter}`;
 }
 
 export function useChipTray(): UseChipTrayResult {
