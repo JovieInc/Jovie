@@ -132,7 +132,7 @@ export function CountrySelector({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='flex h-12 items-center gap-1.5 rounded-full px-3 text-[15px] font-[590] tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
+          className='flex h-12 items-center gap-1.5 rounded-full px-3 text-mid font-[590] tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
           style={FONT_SYNTHESIS_STYLE}
           aria-label='Select country code'
         >

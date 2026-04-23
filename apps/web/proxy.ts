@@ -502,6 +502,11 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         resolvedKeys.publishableKey
       );
     }
+    // Always set the key-resolution status so downstream UI (signin page,
+    // AuthClientProviders) can distinguish "Clerk not configured" from
+    // "Clerk disabled for localhost" and show a specific error instead of
+    // silently falling back to the mock provider.
+    requestHeaders.set('x-clerk-key-status', resolvedKeys.status);
 
     // ========================================================================
     // Early exits that don't need CSP or user state (no DB/Redis calls)

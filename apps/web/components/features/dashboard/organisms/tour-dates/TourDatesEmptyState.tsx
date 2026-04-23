@@ -84,15 +84,15 @@ export function TourDatesEmptyState({
             aria-hidden='true'
           />
         </div>
-        <h3 className='mt-4 text-[13px] font-[510] text-secondary-token'>
+        <h3 className='mt-4 text-app font-[510] text-secondary-token'>
           Set up Bandsintown Integration
         </h3>
-        <p className='mt-1 max-w-md text-[13px] text-secondary-token'>
+        <p className='mt-1 max-w-md text-app text-secondary-token'>
           To sync your tour dates, you&apos;ll need a free Bandsintown API key.
         </p>
 
         <div className='mt-6 w-full max-w-md text-left'>
-          <ol className='mb-6 list-decimal space-y-2 pl-5 text-[13px] text-secondary-token'>
+          <ol className='mb-6 list-decimal space-y-2 pl-5 text-app text-secondary-token'>
             <li>
               Visit{' '}
               <a
@@ -151,7 +151,7 @@ export function TourDatesEmptyState({
             </Button>
           </div>
 
-          <p className='mt-4 text-center text-[11px] text-tertiary-token'>
+          <p className='mt-4 text-center text-2xs text-tertiary-token'>
             Your API key is encrypted and stored securely.
           </p>
         </div>
@@ -169,10 +169,10 @@ export function TourDatesEmptyState({
           aria-hidden='true'
         />
       </div>
-      <h3 className='mt-4 text-[13px] font-[510] text-secondary-token'>
+      <h3 className='mt-4 text-app font-[510] text-secondary-token'>
         Connect your tour dates
       </h3>
-      <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
+      <p className='mt-1 max-w-sm text-app text-secondary-token'>
         Enter your Bandsintown artist name to sync your upcoming shows.
       </p>
 
@@ -215,7 +215,7 @@ export function TourDatesEmptyState({
           </Button>
         </div>
 
-        <p className='mt-4 text-[11px] text-tertiary-token'>
+        <p className='mt-4 text-2xs text-tertiary-token'>
           Your tour dates will sync from Bandsintown and appear here. You can
           also add shows manually.
         </p>

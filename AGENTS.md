@@ -171,7 +171,7 @@ pnpm turbo build --filter=@jovie/web
 
 **Creating a Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate. Pass as `DOPPLER_TOKEN` env var.
 
-**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection (macOS/Linux), Doppler installation, and `.env.local` generation automatically.
+**Alternative:** Run `./scripts/codex-setup.sh`, the Codex wrapper that delegates to the canonical `./scripts/setup.sh` bootstrap. Codex lifecycle config in `.codex/` also runs that wrapper automatically when supported.
 
 ### Common Mistakes to Avoid
 
@@ -578,6 +578,23 @@ When scanning Linear for issues to work on, always filter with:
 - Architectural decisions requiring human judgment
 - Process or workflow changes
 - Issues filed by automated scanners that haven't been triaged
+
+### Always file a Linear issue for deferred follow-ups
+
+When you identify follow-up work in the course of a task — out-of-scope refactors,
+next-phase features, known gaps, TODOs — and **choose not to tackle it right away**,
+open a Linear issue for it before closing out the current work. Do not rely on
+inline `// TODO` comments, PR-body bullet lists, or chat memory to track it.
+
+- Create the issue on the relevant team (usually `Jovie`) with a clear title and
+  description of the deferred scope.
+- If the follow-up depends on the current work landing first, use `blockedBy` to
+  link it to the current issue so the dependency is explicit in Linear.
+- Reference the follow-up issue ID in the current PR description and in any
+  planning/design docs so future readers can navigate to it.
+- This applies equally to scope you deferred *to ship faster* (Approach C-style
+  decisions) and scope you noticed but chose not to do. If it's worth remembering,
+  it's worth a Linear issue.
 
 ---
 

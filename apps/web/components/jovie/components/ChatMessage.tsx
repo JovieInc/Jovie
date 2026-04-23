@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { TokenizedText } from './TokenizedText';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
@@ -102,8 +103,8 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='whitespace-pre-wrap text-[15px] leading-6 tracking-[-0.01em]'>
-              {messageText}
+            <div className='text-[15px] leading-6 tracking-[-0.01em]'>
+              <TokenizedText content={messageText} />
             </div>
           )}
         </div>

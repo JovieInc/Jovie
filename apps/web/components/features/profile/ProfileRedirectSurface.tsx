@@ -26,7 +26,7 @@ export function ProfileRedirectSurface({
           <div className='flex h-12 w-12 items-center justify-center rounded-full border border-subtle bg-surface-0'>
             <LoadingSpinner size='lg' tone='primary' />
           </div>
-          <p className='text-[12px] text-tertiary-token'>{helperText}</p>
+          <p className='text-xs text-tertiary-token'>{helperText}</p>
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>

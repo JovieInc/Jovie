@@ -30,6 +30,9 @@ import {
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
 const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
+const mockInstantiateReleaseTasksFromCatalog = vi
+  .fn()
+  .mockResolvedValue(undefined);
 const mockUsePlanGate = vi.fn(() => ({
   isLoading: false,
   smartLinksLimit: null,
@@ -92,6 +95,10 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 
 vi.mock('@/app/app/(shell)/dashboard/releases/task-actions', () => ({
   instantiateReleaseTasks: mockInstantiateReleaseTasks,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/catalog-task-actions', () => ({
+  instantiateReleaseTasksFromCatalog: mockInstantiateReleaseTasksFromCatalog,
 }));
 
 // Mock TanStack Query mutations
@@ -314,14 +321,22 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanPromptDialog',
   () => ({
-    ReleasePlanPromptDialog: ({
+    // Legacy mock retained; the live code now renders ReleasePlanWizard.
+    ReleasePlanPromptDialog: () => null,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard',
+  () => ({
+    ReleasePlanWizard: ({
       open,
       releaseTitle,
       isGateLoading,
       canGenerateReleasePlans,
       isGeneratingReleasePlan,
       onClose,
-      onGenerateReleasePlan,
+      onSubmit,
     }: {
       open: boolean;
       releaseTitle: string | null;
@@ -329,7 +344,7 @@ vi.mock(
       canGenerateReleasePlans: boolean;
       isGeneratingReleasePlan: boolean;
       onClose: () => void;
-      onGenerateReleasePlan: () => void;
+      onSubmit: (ctx: unknown) => void;
     }) =>
       open ? (
         <div role='dialog' aria-modal='true'>
@@ -362,7 +377,16 @@ vi.mock(
           ) : canGenerateReleasePlans ? (
             <button
               type='button'
-              onClick={onGenerateReleasePlan}
+              onClick={() =>
+                onSubmit({
+                  releaseFormat: 'single',
+                  distribution: 'diy',
+                  genre: 'pop',
+                  primaryGoal: 'streams',
+                  territory: ['GLOBAL'],
+                  hasPublisher: false,
+                })
+              }
               disabled={isGeneratingReleasePlan}
             >
               {isGeneratingReleasePlan
@@ -875,8 +899,15 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       await waitFor(() => {
-        expect(mockInstantiateReleaseTasks).toHaveBeenCalledWith(
-          'created-release'
+        expect(mockInstantiateReleaseTasksFromCatalog).toHaveBeenCalledWith(
+          'created-release',
+          expect.objectContaining({
+            releaseFormat: 'single',
+            distribution: 'diy',
+            genre: 'pop',
+            primaryGoal: 'streams',
+            hasPublisher: false,
+          })
         );
       });
       expect(mockRouterPush).toHaveBeenCalledWith(

@@ -119,7 +119,7 @@ describe('ChatMessage analytics cards', () => {
     const statusRow = screen.getByTestId('tool-status-row');
     expect(statusRow.getAttribute('role')).toBe('alert');
     expect(statusRow.getAttribute('data-tool-name')).toBe('unknownTool');
-    expect(screen.getByText('Unknown Tool Failed')).toBeTruthy();
+    expect(screen.getByText("Couldn't finish unknown tool")).toBeTruthy();
     expect(screen.getByText('Something broke')).toBeTruthy();
   });
 });

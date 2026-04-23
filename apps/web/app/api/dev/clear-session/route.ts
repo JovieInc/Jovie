@@ -1,13 +1,11 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { CLERK_COOKIE_PREFIXES } from '@/lib/auth/clerk-cookie-names';
 import { DEV_TEST_AUTH_COOKIE_NAMES } from '@/lib/auth/dev-test-auth.server';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-/** Clerk cookie prefixes — catches suffixed variants like __session_<suffix> */
-const CLERK_PREFIXES = ['__clerk', '__session', '__client', '__refresh'];
 
 /** Explicit app cookies to delete */
 const APP_COOKIES = new Set([
@@ -51,7 +49,7 @@ export async function POST() {
     // Skip preserved cookies
     if (PRESERVE_PREFIXES.some(p => name.startsWith(p))) continue;
 
-    const isClerkCookie = CLERK_PREFIXES.some(p => name.startsWith(p));
+    const isClerkCookie = CLERK_COOKIE_PREFIXES.some(p => name.startsWith(p));
     const isAppCookie = APP_COOKIES.has(name);
 
     if (isClerkCookie || isAppCookie) {

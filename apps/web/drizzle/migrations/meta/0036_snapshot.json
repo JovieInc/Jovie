@@ -1,5 +1,5 @@
 {
-  "id": "239d4c88-48a5-4216-a067-3e48bdc0d017",
+  "id": "5e2f0c97-ccba-476a-849a-f1ddfa37f026",
   "prevId": "34d827e8-da3d-4343-b42e-ba23e4196ccc",
   "version": "7",
   "dialect": "postgresql",
@@ -232,423 +232,6 @@
           "tableFrom": "admin_system_settings",
           "tableTo": "users",
           "columnsFrom": ["playlist_spotify_updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.agent_run_steps": {
-      "name": "agent_run_steps",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "run_id": {
-          "name": "run_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tool_slug": {
-          "name": "tool_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tool_version": {
-          "name": "tool_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'queued'"
-        },
-        "input": {
-          "name": "input",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "output": {
-          "name": "output",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "cost_cents": {
-          "name": "cost_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token_in": {
-          "name": "token_in",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token_out": {
-          "name": "token_out",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "image_count": {
-          "name": "image_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ended_at": {
-          "name": "ended_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_agent_run_steps_run": {
-          "name": "idx_agent_run_steps_run",
-          "columns": [
-            {
-              "expression": "run_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agent_run_steps_tool": {
-          "name": "idx_agent_run_steps_tool",
-          "columns": [
-            {
-              "expression": "tool_slug",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agent_run_steps_run_id_agent_runs_id_fk": {
-          "name": "agent_run_steps_run_id_agent_runs_id_fk",
-          "tableFrom": "agent_run_steps",
-          "tableTo": "agent_runs",
-          "columnsFrom": ["run_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.agent_runs": {
-      "name": "agent_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "release_id": {
-          "name": "release_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "parent_run_id": {
-          "name": "parent_run_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "agent_type": {
-          "name": "agent_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'queued'"
-        },
-        "schema_version": {
-          "name": "schema_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'v1'"
-        },
-        "trigger_run_id": {
-          "name": "trigger_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "idempotency_key": {
-          "name": "idempotency_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "input": {
-          "name": "input",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "output": {
-          "name": "output",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "budget_reserved_cents": {
-          "name": "budget_reserved_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "cost_cents": {
-          "name": "cost_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "ended_at": {
-          "name": "ended_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_agent_runs_user_started": {
-          "name": "idx_agent_runs_user_started",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "started_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agent_runs_parent": {
-          "name": "idx_agent_runs_parent",
-          "columns": [
-            {
-              "expression": "parent_run_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agent_runs_active_status": {
-          "name": "idx_agent_runs_active_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agent_runs_release": {
-          "name": "idx_agent_runs_release",
-          "columns": [
-            {
-              "expression": "release_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_agent_runs_idempotency": {
-          "name": "idx_agent_runs_idempotency",
-          "columns": [
-            {
-              "expression": "idempotency_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "idempotency_key IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "agent_runs_user_id_users_id_fk": {
-          "name": "agent_runs_user_id_users_id_fk",
-          "tableFrom": "agent_runs",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "agent_runs_profile_id_creator_profiles_id_fk": {
-          "name": "agent_runs_profile_id_creator_profiles_id_fk",
-          "tableFrom": "agent_runs",
-          "tableTo": "creator_profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "agent_runs_release_id_discog_releases_id_fk": {
-          "name": "agent_runs_release_id_discog_releases_id_fk",
-          "tableFrom": "agent_runs",
-          "tableTo": "discog_releases",
-          "columnsFrom": ["release_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -17079,8 +16662,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_credit_grants": {
-      "name": "user_credit_grants",
+    "public.user_interviews": {
+      "name": "user_interviews",
       "schema": "",
       "columns": {
         "id": {
@@ -17096,40 +16679,50 @@
           "primaryKey": false,
           "notNull": true
         },
-        "cents": {
-          "name": "cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
+        "source": {
+          "name": "source",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'onboarding'"
         },
-        "granted_by_user_id": {
-          "name": "granted_by_user_id",
-          "type": "uuid",
+        "transcript": {
+          "name": "transcript",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "consumed_cents": {
-          "name": "consumed_cents",
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "summary_attempts": {
+          "name": "summary_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'{}'::jsonb"
         },
-        "note": {
-          "name": "note",
-          "type": "text",
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -17139,101 +16732,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_user_credit_grants_user": {
-          "name": "idx_user_credit_grants_user",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_user_credit_grants_active": {
-          "name": "idx_user_credit_grants_active",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "user_credit_grants_user_id_users_id_fk": {
-          "name": "user_credit_grants_user_id_users_id_fk",
-          "tableFrom": "user_credit_grants",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "user_credit_grants_granted_by_user_id_users_id_fk": {
-          "name": "user_credit_grants_granted_by_user_id_users_id_fk",
-          "tableFrom": "user_credit_grants",
-          "tableTo": "users",
-          "columnsFrom": ["granted_by_user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.user_monthly_usage": {
-      "name": "user_monthly_usage",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "year_month": {
-          "name": "year_month",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reserved_cents": {
-          "name": "reserved_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "spent_cents": {
-          "name": "spent_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "updated_at": {
           "name": "updated_at",
@@ -17244,8 +16742,8 @@
         }
       },
       "indexes": {
-        "idx_user_monthly_usage_pk": {
-          "name": "idx_user_monthly_usage_pk",
+        "user_interviews_user_source_unique": {
+          "name": "user_interviews_user_source_unique",
           "columns": [
             {
               "expression": "user_id",
@@ -17254,7 +16752,7 @@
               "nulls": "last"
             },
             {
-              "expression": "year_month",
+              "expression": "source",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -17264,12 +16762,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "user_interviews_status_idx": {
+          "name": "user_interviews_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "user_monthly_usage_user_id_users_id_fk": {
-          "name": "user_monthly_usage_user_id_users_id_fk",
-          "tableFrom": "user_monthly_usage",
+        "user_interviews_user_id_users_id_fk": {
+          "name": "user_interviews_user_id_users_id_fk",
+          "tableFrom": "user_interviews",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
           "columnsTo": ["id"],

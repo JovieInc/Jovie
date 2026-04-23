@@ -27,6 +27,7 @@ import {
   useTextareaAutosize,
 } from '../hooks/useTextareaAutosize';
 import { MAX_MESSAGE_LENGTH } from '../types';
+import { ChipTray } from './ChipTray';
 import {
   CHAT_PROMPT_RAIL_CLASS,
   CHAT_PROMPT_RAIL_MASK_STYLE,
@@ -34,6 +35,8 @@ import {
   getChatPromptPillClass,
 } from './chat-prompt-styles';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
+import { SlashCommandMenu, type SlashMenuMode } from './SlashCommandMenu';
+import { detectSlashTriggerAt } from './slash-trigger';
 
 /** DESIGN.md standard easing */
 const EASE_INTERACTIVE = [0.25, 0.46, 0.45, 0.94] as const;
@@ -232,6 +235,14 @@ interface ChatInputProps {
   readonly isStreaming?: boolean;
   /** Stop the current generation */
   readonly onStop?: () => void;
+  /** Chip tray state (from useChipTray). When omitted, chip UI is not rendered. */
+  readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
+  readonly onRemoveChipAt?: (index: number) => void;
+  readonly onRemoveLastChip?: () => void;
+  readonly onAddSkill?: (id: string) => void;
+  readonly onAddEntity?: (
+    mention: Omit<import('@/lib/chat/tokens').EntityMentionToken, 'type'>
+  ) => void;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -253,6 +264,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onQuickActionSelect,
       isStreaming = false,
       onStop,
+      chips,
+      onRemoveChipAt,
+      onRemoveLastChip,
+      onAddSkill,
+      onAddEntity,
     },
     ref
   ) {
@@ -295,6 +311,91 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Dictation baseline snapshot
     const dictationBaselineRef = useRef('');
 
+    // Slash-command trigger detection. Opens the menu when the text ending at
+    // the caret matches `/<query>` at a word boundary (start-of-input or after
+    // whitespace). The query is everything after the `/` up to the caret.
+    // Mode switches to an entity kind when the user picks a skill with a
+    // required slot (orchestrated by the skill-select handler below).
+    const [slashMenuMode, setSlashMenuMode] = useState<SlashMenuMode | null>(
+      null
+    );
+    const [slashQuery, setSlashQuery] = useState('');
+    // Index in `value` where the `/` was typed — we slice it out when a pick
+    // commits, preserving any text the user typed outside the trigger.
+    const slashStartRef = useRef<number | null>(null);
+
+    const detectSlashTrigger = useCallback(
+      (text: string, caret: number) => detectSlashTriggerAt(text, caret),
+      []
+    );
+
+    const handleChange = useCallback(
+      (next: string) => {
+        onChange(next);
+        const el = internalTextareaRef.current;
+        const caret = el?.selectionStart ?? next.length;
+        const trigger = detectSlashTrigger(next, caret);
+        if (trigger) {
+          slashStartRef.current = trigger.startIdx;
+          setSlashQuery(trigger.query);
+          // Only auto-open in 'all' mode; if user is mid-entity-pick, keep scope.
+          setSlashMenuMode(prev => prev ?? 'all');
+        } else if (slashMenuMode === 'all') {
+          // Slash trigger gone (user deleted `/` or inserted whitespace) — close.
+          setSlashMenuMode(null);
+          slashStartRef.current = null;
+        }
+      },
+      [onChange, detectSlashTrigger, slashMenuMode]
+    );
+
+    const stripSlashQuery = useCallback(() => {
+      const startIdx = slashStartRef.current;
+      if (startIdx === null) return;
+      // Remove `/query` from the textarea; the chip is now the real token.
+      const el = internalTextareaRef.current;
+      const caret = el?.selectionStart ?? value.length;
+      const nextValue = value.slice(0, startIdx) + value.slice(caret);
+      onChange(nextValue);
+      slashStartRef.current = null;
+      setSlashQuery('');
+    }, [onChange, value]);
+
+    const closeSlashMenu = useCallback(() => {
+      setSlashMenuMode(null);
+      slashStartRef.current = null;
+      setSlashQuery('');
+    }, []);
+
+    const handleSelectSkill = useCallback(
+      (skill: import('@/lib/commands/registry').SkillCommand) => {
+        onAddSkill?.(skill.id);
+        stripSlashQuery();
+        const requiredSlot = skill.entitySlots.find(s => s.required);
+        if (requiredSlot) {
+          // Two-step picker: reopen menu scoped to the required entity kind.
+          setSlashMenuMode(requiredSlot.kind);
+          setSlashQuery('');
+        } else {
+          closeSlashMenu();
+        }
+      },
+      [onAddSkill, stripSlashQuery, closeSlashMenu]
+    );
+
+    const handleSelectEntity = useCallback(
+      (entity: import('@/lib/commands/entities').EntityRef) => {
+        onAddEntity?.({
+          kind: entity.kind,
+          id: entity.id,
+          label: entity.label,
+        });
+        stripSlashQuery();
+        closeSlashMenu();
+      },
+      [onAddEntity, stripSlashQuery, closeSlashMenu]
+    );
+
     const {
       isSupported: hasDictation,
       isListening,
@@ -320,16 +421,27 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onSubmit]
     );
 
-    // IME-safe Enter handling
+    // IME-safe Enter handling + backspace-on-empty removes the last chip
+    // (Linear-style: chips feel attached to the end of the input).
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
         if (e.key === 'Enter' && !e.shiftKey && canSend) {
           e.preventDefault();
           onSubmit();
+          return;
+        }
+        if (
+          e.key === 'Backspace' &&
+          !value &&
+          (chips?.length ?? 0) > 0 &&
+          onRemoveLastChip
+        ) {
+          e.preventDefault();
+          onRemoveLastChip();
         }
       },
-      [onSubmit, canSend]
+      [onSubmit, canSend, value, chips, onRemoveLastChip]
     );
 
     // Focus retention on toolbar button clicks
@@ -402,6 +514,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
+          {/* Chip tray — rendered above the textarea when chips are present */}
+          {chips && chips.length > 0 && onRemoveChipAt && (
+            <div className='px-4 pt-3'>
+              <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
+            </div>
+          )}
+
           {/* Textarea row */}
           <div
             ref={containerRef}
@@ -429,7 +548,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             <motion.textarea
               ref={internalTextareaRef}
               value={value}
-              onChange={e => onChange(e.target.value)}
+              onChange={e => handleChange(e.target.value)}
               placeholder={placeholder}
               rows={1}
               animate={reducedMotion ? undefined : { height: measuredHeight }}
@@ -459,6 +578,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               aria-label='Chat message input'
               aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             />
+
+            {/* Slash command menu — opens when user types `/` at word boundary */}
+            {slashMenuMode && onAddSkill && onAddEntity ? (
+              <SlashCommandMenu
+                open
+                anchorRef={internalTextareaRef}
+                query={slashQuery}
+                mode={slashMenuMode}
+                onSelectSkill={handleSelectSkill}
+                onSelectEntity={handleSelectEntity}
+                onClose={closeSlashMenu}
+              />
+            ) : null}
 
             {/* Mic toggle */}
             {hasDictation && (

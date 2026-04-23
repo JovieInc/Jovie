@@ -42,7 +42,7 @@ function ActivityEmptyState({
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
       <div className='flex min-h-[140px] items-center rounded-md bg-surface-1 px-2'>
-        <p className='text-[12px] leading-[17px] text-secondary-token'>
+        <p className='text-xs leading-[17px] text-secondary-token'>
           No recent activity. Share your profile to see engagement here.
         </p>
       </div>
@@ -78,7 +78,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         <ActivityGlyph icon={activity.icon} />
       </span>
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] leading-5 tracking-[-0.01em] text-secondary-token'>
+        <p className='text-app leading-5 tracking-[-0.01em] text-secondary-token'>
           <span className='tabular-nums text-tertiary-token'>
             {formatTimeAgo(activity.timestamp)}
           </span>
@@ -142,11 +142,11 @@ export function DashboardActivityFeed({
           <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
             <Zap className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
           </div>
-          <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>
+          <h3 className='text-app font-[510] tracking-[-0.01em] text-secondary-token'>
             Activity
           </h3>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-[510] text-tertiary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-[510] text-tertiary-token'>
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
@@ -159,7 +159,7 @@ export function DashboardActivityFeed({
         {(() => {
           if (error) {
             return (
-              <p className='text-[13px] text-error-token'>
+              <p className='text-app text-error-token'>
                 {error.message || 'Failed to load activity'}
               </p>
             );

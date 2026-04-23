@@ -58,17 +58,17 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-app font-[510] text-primary-token'>
               You have {props.releasedCount} smart links
             </p>
-            <p className='mt-0.5 text-[11px] leading-[1.35] text-secondary-token'>
+            <p className='mt-0.5 text-2xs leading-[1.35] text-secondary-token'>
               Need more than {props.softCap}? Request a higher limit.
             </p>
             <DrawerButton
               asChild
               tone='ghost'
               size='sm'
-              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-[11px]'
+              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-2xs'
             >
               <a href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'>
                 Email support
@@ -77,18 +77,18 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
           </>
         ) : (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-app font-[510] text-primary-token'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
-            <p className='mt-0.5 text-[11px] leading-[1.35] text-secondary-token'>
+            <p className='mt-0.5 text-2xs leading-[1.35] text-secondary-token'>
               Enable pre-release pages with countdowns and notify-me.
             </p>
             <DrawerButton
               asChild
               tone='ghost'
               size='sm'
-              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-[11px]'
+              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-2xs'
             >
               <Link href={APP_ROUTES.LAUNCH_PRICING}>Upgrade to Pro</Link>
             </DrawerButton>

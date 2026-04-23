@@ -570,6 +570,8 @@ describe('completeOnboarding', () => {
     ).rejects.toThrow(`REDIRECT:${APP_ROUTES.DASHBOARD}`);
 
     expect(cookieSetMock).toHaveBeenCalled();
-    expect(mockRedirect).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+    expect(mockRedirect).toHaveBeenCalledWith(
+      `${APP_ROUTES.DASHBOARD}?interview=1`
+    );
   });
 });

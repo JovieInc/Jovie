@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/scripts/codex-setup.sh\" --codex-hook",
+            "timeout": 600,
+            "statusMessage": "Running Jovie setup"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/scripts/codex-cleanup.sh\" --codex-hook",
+            "timeout": 300,
+            "statusMessage": "Running Jovie cleanup"
+          }
+        ]
+      }
+    ]
+  }
+}

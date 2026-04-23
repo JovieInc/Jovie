@@ -123,7 +123,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}
-              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
+              className='min-w-0 flex-1 text-[13px] font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
               tooltipSide='top'
               tooltipAlign='start'
             >
@@ -132,7 +132,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             {showType && typeStyle && hasPreview && (
               <span
                 className={cn(
-                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+                  'shrink-0 text-3xs font-caption leading-none tracking-normal',
                   typeStyle.text
                 )}
               >
@@ -143,7 +143,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {artistLine ? (
             <TruncatedText
               lines={1}
-              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              className='mt-px text-[11px] font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
             >
               {artistLine}
             </TruncatedText>
@@ -154,7 +154,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}
-              className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
+              className='min-w-0 flex-1 text-[13px] font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
               tooltipSide='top'
               tooltipAlign='start'
             >
@@ -163,7 +163,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             {showType && typeStyle && hasPreview && (
               <span
                 className={cn(
-                  'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+                  'shrink-0 text-3xs font-caption leading-none tracking-normal',
                   typeStyle.text
                 )}
               >
@@ -174,7 +174,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {artistLine ? (
             <TruncatedText
               lines={1}
-              className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              className='mt-px text-[11px] font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
             >
               {artistLine}
             </TruncatedText>

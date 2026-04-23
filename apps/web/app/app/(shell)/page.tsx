@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { OnboardingInterviewModal } from '@/components/onboarding/OnboardingInterviewModal';
 // Must render the same chat UI as /app/chat — see AGENTS.md guardrail #16
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
@@ -18,6 +20,9 @@ export default async function AppRootPage() {
   return (
     <HydrateClient state={getDehydratedState()}>
       <DeferredChatPageClient />
+      <Suspense fallback={null}>
+        <OnboardingInterviewModal />
+      </Suspense>
     </HydrateClient>
   );
 }

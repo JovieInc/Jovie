@@ -84,11 +84,11 @@ export function OnboardingHandleStep({
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
       <div className='space-y-3'>
-        <h1 className='text-3xl font-[620] tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
+        <h1 className='text-3xl font-semibold tracking-[-0.04em] text-primary-token sm:text-[2.7rem]'>
           {title}
         </h1>
         {prompt ? (
-          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-[15px]'>
+          <p className='max-w-xl text-sm leading-6 text-secondary-token sm:text-mid'>
             {prompt}
           </p>
         ) : null}
@@ -106,7 +106,7 @@ export function OnboardingHandleStep({
               hasError && 'border-destructive/60'
             )}
           >
-            <span className='pl-3 text-[15px] font-[560] whitespace-nowrap text-secondary-token'>
+            <span className='pl-3 text-mid font-semibold whitespace-nowrap text-secondary-token'>
               jov.ie/
             </span>
             <input
@@ -130,7 +130,7 @@ export function OnboardingHandleStep({
               autoCorrect='off'
               spellCheck={false}
               aria-invalid={hasError ? 'true' : undefined}
-              className='min-w-0 flex-1 bg-transparent text-[15px] font-[560] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
             />
             <button
               data-testid='onboarding-handle-submit'
@@ -176,7 +176,7 @@ export function OnboardingHandleStep({
             ) : null}
             {handleValidation.suggestions.length > 0 && (
               <div className='flex flex-wrap items-center gap-2'>
-                <span className='text-[12px] text-tertiary-token'>Try:</span>
+                <span className='text-xs text-tertiary-token'>Try:</span>
                 {handleValidation.suggestions.map(suggestion => (
                   <button
                     key={suggestion}

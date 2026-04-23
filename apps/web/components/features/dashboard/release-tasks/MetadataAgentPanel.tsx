@@ -331,7 +331,7 @@ export function MetadataAgentPanel({
     <section className='mb-6 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex flex-col gap-2 md:flex-row md:items-start md:justify-between'>
         <div>
-          <p className='text-[11px] font-medium uppercase tracking-[0.18em] text-tertiary-token'>
+          <p className='text-2xs font-medium uppercase tracking-[0.18em] text-tertiary-token'>
             Metadata Agent
           </p>
           <h2 className='mt-1 text-base font-semibold text-primary-token'>
@@ -350,7 +350,7 @@ export function MetadataAgentPanel({
 
       <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
         <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-          <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
             Source Of Truth
           </p>
           <p className='mt-2 text-sm text-primary-token'>{releaseTitle}</p>
@@ -361,7 +361,7 @@ export function MetadataAgentPanel({
         </div>
 
         <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-          <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
             Destinations
           </p>
           <div className='mt-2 space-y-1 text-sm text-primary-token'>
@@ -377,7 +377,7 @@ export function MetadataAgentPanel({
         </div>
 
         <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-          <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
             Review
           </p>
           <p className='mt-2 text-sm text-primary-token'>{reviewLabel}</p>
@@ -387,7 +387,7 @@ export function MetadataAgentPanel({
         </div>
 
         <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-          <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+          <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
             Tracking
           </p>
           <p className='mt-2 text-sm text-primary-token'>{trackingLabel}</p>
@@ -473,7 +473,7 @@ export function MetadataAgentPanel({
       {latestRequest && (
         <div className='mt-4 grid gap-4 lg:grid-cols-2'>
           <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-            <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
               Timeline
             </p>
             <div className='mt-2 space-y-2 text-sm text-primary-token'>
@@ -497,7 +497,7 @@ export function MetadataAgentPanel({
           </div>
 
           <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
-            <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
               Tracking State
             </p>
             {latestRequest.targets.length > 0 ? (

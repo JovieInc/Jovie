@@ -93,14 +93,12 @@ export function ProfileEditPreviewCard({
       <ContentSurfaceCard className='p-3'>
         <div className='flex items-center justify-between gap-2'>
           <div className='min-w-0 space-y-0.5'>
-            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+            <p className='truncate text-app font-semibold tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-[12px] text-secondary-token'>
-              Updated successfully
-            </p>
+            <p className='text-xs text-secondary-token'>Updated successfully</p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-success'>
+          <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-2xs font-caption tracking-[-0.01em] text-success'>
             <Check className='h-3.5 w-3.5' />
             Applied
           </span>
@@ -115,12 +113,12 @@ export function ProfileEditPreviewCard({
       <ContentSurfaceCard className='p-3 opacity-70'>
         <div className='flex items-center justify-between gap-2'>
           <div className='min-w-0 space-y-0.5'>
-            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+            <p className='truncate text-app font-semibold tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-[12px] text-secondary-token'>Edit cancelled</p>
+            <p className='text-xs text-secondary-token'>Edit cancelled</p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
+          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-2xs font-caption tracking-[-0.01em] text-secondary-token'>
             <X className='h-3.5 w-3.5' />
             Cancelled
           </span>
@@ -133,11 +131,11 @@ export function ProfileEditPreviewCard({
     <ContentSurfaceCard className='overflow-hidden'>
       <div className='px-3 py-2'>
         <div className='space-y-0.5'>
-          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+          <h4 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
             Update {preview.fieldLabel}
           </h4>
           {preview.reason && (
-            <p className='text-[11px] leading-[1.45] text-secondary-token'>
+            <p className='text-2xs leading-[1.45] text-secondary-token'>
               {preview.reason}
             </p>
           )}
@@ -146,12 +144,12 @@ export function ProfileEditPreviewCard({
 
       <div className='space-y-2 px-3 py-2'>
         <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-          <div className='mb-0.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
+          <div className='mb-0.5 text-app font-caption tracking-normal text-secondary-token'>
             Current
           </div>
           <div
             className={cn(
-              'text-[13px] tracking-[-0.01em] text-primary-token',
+              'text-app tracking-[-0.01em] text-primary-token',
               !preview.currentValue && 'italic text-tertiary-token'
             )}
           >
@@ -159,10 +157,10 @@ export function ProfileEditPreviewCard({
           </div>
         </div>
         <div className='rounded-[10px] border border-accent/20 bg-accent/5 px-2.5 py-2'>
-          <div className='mb-0.5 text-[13px] font-[510] tracking-normal text-(--linear-accent)'>
+          <div className='mb-0.5 text-app font-caption tracking-normal text-(--linear-accent)'>
             New
           </div>
-          <div className='text-[13px] tracking-[-0.01em] text-primary-token'>
+          <div className='text-app tracking-[-0.01em] text-primary-token'>
             {formatValue(preview.newValue)}
           </div>
         </div>

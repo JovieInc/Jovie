@@ -138,6 +138,20 @@ export function shouldDisableClerkProxyForLocation(
   );
 }
 
+/**
+ * Whether the caller is on a public https origin where Clerk misconfiguration
+ * should surface a visible error instead of silently falling back to the mock
+ * provider. Used to gate the ClerkUnavailableNotice — we only want to show it
+ * on real user-facing domains, never on localhost dev flows.
+ */
+export function isPublicAuthHost(
+  locationLike: LocationLike | undefined
+): boolean {
+  if (!locationLike) return false;
+  if (locationLike.protocol !== 'https:') return false;
+  return !isPrivateHostname(locationLike.hostname);
+}
+
 export function getClerkProxyUrl(
   locationLike: LocationLike | undefined = globalThis.window === undefined
     ? undefined

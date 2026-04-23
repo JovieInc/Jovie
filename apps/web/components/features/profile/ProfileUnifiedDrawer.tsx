@@ -326,7 +326,7 @@ function ReleasesDrawerContent({
                   {collabs ? `${collabs} \u00b7 ` : ''}
                   {metaParts.join(' \u00b7 ')}
                   {release.releaseType === 'music_video' ? (
-                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-[510] text-white/50'>
+                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-3xs font-[510] text-white/50'>
                       Video
                     </span>
                   ) : null}

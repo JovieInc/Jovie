@@ -88,7 +88,7 @@ function normalizeUrl(rawUrl: string): string | null {
 function deriveHandleFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    const pathSegment = parsed.pathname.split('/').filter(Boolean).pop();
+    const pathSegment = parsed.pathname.split('/').findLast(Boolean);
     const fallback = `${parsed.hostname}-${pathSegment ?? 'profile'}`;
     const normalized = fallback
       .toLowerCase()

@@ -44,11 +44,11 @@ function LoadingStateWithSystem() {
 function LoadingStateToggle() {
   return (
     <div className='flex items-center space-x-3'>
-      <span className='text-[13px] text-secondary-token'>Light</span>
+      <span className='text-app text-secondary-token'>Light</span>
       <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-subtle bg-surface-0 p-0.5 transition-colors duration-200 ease-out'>
         <span className='inline-block h-5 w-5 translate-x-0 transform rounded-full bg-surface-1 shadow ring-0 transition duration-200 ease-out' />
       </div>
-      <span className='text-[13px] text-secondary-token'>Dark</span>
+      <span className='text-app text-secondary-token'>Dark</span>
     </div>
   );
 }
@@ -79,7 +79,7 @@ function ThemeOptionGrid({
 
   return (
     <div className='space-y-3'>
-      <span className='text-[13px] font-[510] text-primary-token'>
+      <span className='text-app font-[510] text-primary-token'>
         Theme Preference
       </span>
       <div className='grid grid-cols-3 gap-2'>
@@ -100,16 +100,16 @@ function ThemeOptionGrid({
             <span className='mb-1 flex items-center justify-center'>
               {getThemeIcon(option.value)}
             </span>
-            <span className='text-[11px] font-[510]'>{option.label}</span>
+            <span className='text-2xs font-[510]'>{option.label}</span>
             {showResolvedTheme(option.value) && (
-              <span className='mt-1 text-[11px] text-secondary-token'>
+              <span className='mt-1 text-2xs text-secondary-token'>
                 ({resolvedTheme})
               </span>
             )}
           </button>
         ))}
       </div>
-      <p className='text-[11px] text-secondary-token'>
+      <p className='text-2xs text-secondary-token'>
         Choose how the interface appears. System follows your device settings.
       </p>
     </div>

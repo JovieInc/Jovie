@@ -27,12 +27,12 @@ export function ReleaseTaskCategoryGroup({
       <button
         type='button'
         onClick={() => setIsOpen(!isOpen)}
-        className='flex w-full items-center justify-between px-4 py-1 text-[12px] font-[510] text-secondary-token hover:bg-surface-1 rounded transition-colors'
+        className='flex w-full items-center justify-between px-4 py-1 text-xs font-[510] text-secondary-token hover:bg-surface-1 rounded transition-colors'
         aria-expanded={isOpen}
       >
         <span className='flex items-center gap-1.5'>
           {category}{' '}
-          <span className='text-[10px] text-tertiary-token font-normal'>
+          <span className='text-3xs text-tertiary-token font-normal'>
             ({done}/{total})
           </span>
           {allDone && (

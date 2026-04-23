@@ -982,9 +982,14 @@ async function measureRouteSample(
         );
         timingValues['interactive-shell-ready'] = Date.now() - startedAt;
       } else if (route.readySelectors.content?.length) {
-        await waitForAnyVisible(page, route.readySelectors.content).catch(
-          () => undefined
-        );
+        try {
+          await waitForAnyVisible(page, route.readySelectors.content);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `Route ${route.id} content selectors never became visible at ${page.url()} (expected ${resolvedPath}). Selectors: ${route.readySelectors.content.join(', ')}. Underlying: ${reason}`
+          );
+        }
       }
 
       if (hasTimingBudget(route, 'skeleton-to-content')) {
