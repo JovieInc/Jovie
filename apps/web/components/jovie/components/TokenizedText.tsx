@@ -1,9 +1,17 @@
 'use client';
 
 import { Fragment, useMemo } from 'react';
-import { parseTokens } from '@/lib/chat/tokens';
+import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
 import { cn } from '@/lib/utils';
 import { EntityChip } from './EntityChip';
+
+function tokenKey(token: ChatToken, index: number): string {
+  if (token.type === 'text') return `t:${index}:${token.value.length}`;
+  if (token.type === 'entity') {
+    return `${token.kind}:${token.id}:${index}`;
+  }
+  return `skill:${token.id}:${index}`;
+}
 
 interface TokenizedTextProps {
   readonly content: string;
@@ -35,10 +43,7 @@ export function TokenizedText({ content, className }: TokenizedTextProps) {
   return (
     <span className={cn('whitespace-pre-wrap', className)}>
       {tokens.map((token, i) => {
-        const key =
-          token.type === 'text'
-            ? `t:${i}:${token.value.length}`
-            : `${token.type === 'entity' ? token.kind : 'skill'}:${token.id}:${i}`;
+        const key = tokenKey(token, i);
         if (token.type === 'text') {
           return <Fragment key={key}>{token.value}</Fragment>;
         }

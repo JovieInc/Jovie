@@ -34,7 +34,11 @@ export interface TextToken {
 
 export type ChatToken = TextToken | EntityMentionToken | SkillToken;
 
-const ENTITY_KINDS: readonly EntityKind[] = ['release', 'artist', 'track'];
+const ENTITY_KINDS: ReadonlySet<EntityKind> = new Set([
+  'release',
+  'artist',
+  'track',
+]);
 
 /**
  * Match an entity mention: @kind:id[label]
@@ -46,14 +50,16 @@ const ENTITY_PATTERN =
   /@(release|artist|track):([^\s[\]]+)\[((?:\\\]|[^\]])*)\]/g;
 
 /** Match a skill invocation: /skill:id (id: word chars, digits, underscores) */
-const SKILL_PATTERN = /\/skill:([A-Za-z][\w]*)/g;
+const SKILL_PATTERN = /\/skill:([A-Za-z]\w*)/g;
+
+const ESCAPED_BRACKET = String.raw`\]`;
 
 function escapeLabel(label: string): string {
-  return label.replaceAll(']', '\\]');
+  return label.replaceAll(']', ESCAPED_BRACKET);
 }
 
 function unescapeLabel(label: string): string {
-  return label.replaceAll('\\]', ']');
+  return label.replaceAll(ESCAPED_BRACKET, ']');
 }
 
 export function serializeEntity(
@@ -83,7 +89,7 @@ export function parseTokens(input: string): ChatToken[] {
 
   for (const match of input.matchAll(ENTITY_PATTERN)) {
     const [full, kind, id, label] = match;
-    if (!ENTITY_KINDS.includes(kind as EntityKind)) continue;
+    if (!ENTITY_KINDS.has(kind as EntityKind)) continue;
     const start = match.index ?? 0;
     hits.push({
       start,
