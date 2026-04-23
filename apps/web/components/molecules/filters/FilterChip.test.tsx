@@ -54,18 +54,15 @@ describe('FilterChip', () => {
     expect(btn).toHaveAttribute('aria-label', 'Toggle foo filter');
   });
 
-  it('is keyboard activatable via Enter', () => {
-    const onClick = vi.fn();
+  it('is focusable (native button, keyboard-reachable)', () => {
     render(
-      <FilterChip pressed={false} onClick={onClick}>
+      <FilterChip pressed={false} onClick={vi.fn()}>
         Label
       </FilterChip>
     );
     const btn = screen.getByRole('button');
     btn.focus();
-    fireEvent.keyDown(btn, { key: 'Enter' });
-    fireEvent.click(btn);
-    expect(onClick).toHaveBeenCalled();
+    expect(document.activeElement).toBe(btn);
   });
 
   it('has type=button to prevent form submission', () => {
