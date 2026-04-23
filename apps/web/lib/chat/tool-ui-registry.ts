@@ -6,121 +6,138 @@ export interface ToolUiConfig {
   readonly uiHint: ToolUiHint;
   readonly renderer: ToolUiRenderer;
   readonly loadingTitle?: string;
+  readonly successTitle?: string;
   readonly errorTitle?: string;
 }
 
 export const TOOL_UI_REGISTRY = {
   proposeAvatarUpload: {
-    label: 'Avatar Upload',
+    label: 'Profile photo',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Preparing Photo Upload...',
-    errorTitle: 'Photo Upload Failed',
+    loadingTitle: 'Getting your photo ready…',
+    successTitle: 'Photo ready to upload',
+    errorTitle: "Couldn't prepare your photo",
   },
   proposeSocialLink: {
-    label: 'Social Link',
+    label: 'Link',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Adding Link...',
-    errorTitle: 'Link Update Failed',
+    loadingTitle: 'Adding your link…',
+    successTitle: 'Link added',
+    errorTitle: "Couldn't add that link",
   },
   proposeSocialLinkRemoval: {
-    label: 'Social Link Removal',
+    label: 'Link',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Removing Link...',
-    errorTitle: 'Link Removal Failed',
+    loadingTitle: 'Removing the link…',
+    successTitle: 'Link removed',
+    errorTitle: "Couldn't remove that link",
   },
   submitFeedback: {
     label: 'Feedback',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Submitting Feedback...',
-    errorTitle: 'Feedback Submission Failed',
+    loadingTitle: 'Sending your feedback…',
+    successTitle: 'Feedback sent',
+    errorTitle: "Couldn't send your feedback",
   },
   showTopInsights: {
-    label: 'Top Insights',
+    label: 'Insights',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Checking Your Signals...',
-    errorTitle: 'Insights Unavailable',
+    loadingTitle: 'Checking your signals…',
+    successTitle: 'Here are your insights',
+    errorTitle: "Couldn't load your insights",
   },
   proposeProfileEdit: {
-    label: 'Profile Edit',
+    label: 'Profile',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Editing Profile...',
-    errorTitle: 'Profile Edit Failed',
+    loadingTitle: 'Updating your profile…',
+    successTitle: 'Profile updated',
+    errorTitle: "Couldn't update your profile",
   },
   checkCanvasStatus: {
-    label: 'Canvas Status',
+    label: 'Canvas',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Checking Canvas Status...',
-    errorTitle: 'Canvas Check Failed',
+    loadingTitle: 'Checking Canvas…',
+    successTitle: 'Canvas checked',
+    errorTitle: "Couldn't check Canvas",
   },
   suggestRelatedArtists: {
-    label: 'Related Artists',
+    label: 'Related artists',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Finding Related Artists...',
-    errorTitle: 'Related Artist Search Failed',
+    loadingTitle: 'Finding related artists…',
+    successTitle: 'Found related artists',
+    errorTitle: "Couldn't find related artists",
   },
   writeWorldClassBio: {
-    label: 'Artist Bio',
+    label: 'Bio',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Writing Bio...',
-    errorTitle: 'Bio Draft Failed',
+    loadingTitle: 'Writing your bio…',
+    successTitle: 'Bio ready',
+    errorTitle: "Couldn't write your bio",
   },
   generateCanvasPlan: {
-    label: 'Canvas Plan',
+    label: 'Canvas plan',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Planning Canvas Video...',
-    errorTitle: 'Canvas Plan Failed',
+    loadingTitle: 'Planning your Canvas video…',
+    successTitle: 'Canvas plan ready',
+    errorTitle: "Couldn't plan your Canvas",
   },
   generateAlbumArt: {
-    label: 'Album Art',
+    label: 'Album art',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Generating Album Art...',
-    errorTitle: 'Album Art Failed',
+    loadingTitle: 'Creating your album art…',
+    successTitle: 'Album art ready',
+    errorTitle: "Couldn't create your album art",
   },
   createPromoStrategy: {
-    label: 'Promo Strategy',
+    label: 'Promo strategy',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Building Promo Strategy...',
-    errorTitle: 'Promo Strategy Failed',
+    loadingTitle: 'Building your promo plan…',
+    successTitle: 'Promo plan ready',
+    errorTitle: "Couldn't build your promo plan",
   },
   markCanvasUploaded: {
-    label: 'Canvas Upload',
+    label: 'Canvas',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Updating Canvas Status...',
-    errorTitle: 'Canvas Update Failed',
+    loadingTitle: 'Updating Canvas…',
+    successTitle: 'Canvas updated',
+    errorTitle: "Couldn't update Canvas",
   },
   formatLyrics: {
-    label: 'Lyrics Format',
+    label: 'Lyrics',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Formatting Lyrics...',
-    errorTitle: 'Lyrics Format Failed',
+    loadingTitle: 'Formatting your lyrics…',
+    successTitle: 'Lyrics formatted',
+    errorTitle: "Couldn't format your lyrics",
   },
   createRelease: {
-    label: 'Create Release',
+    label: 'Release',
     uiHint: 'status',
     renderer: 'status',
-    loadingTitle: 'Creating Release...',
-    errorTitle: 'Release Creation Failed',
+    loadingTitle: 'Creating your release…',
+    successTitle: 'Release created',
+    errorTitle: "Couldn't create your release",
   },
   generateReleasePitch: {
-    label: 'Release Pitch',
+    label: 'Release pitch',
     uiHint: 'artifact',
     renderer: 'artifact',
-    loadingTitle: 'Generating Pitches...',
-    errorTitle: 'Pitch Generation Failed',
+    loadingTitle: 'Writing your pitches…',
+    successTitle: 'Pitches ready',
+    errorTitle: "Couldn't write your pitches",
   },
 } as const satisfies Record<string, ToolUiConfig>;
 
@@ -134,13 +151,18 @@ function startCaseFromCamelCase(value: string): string {
 }
 
 export function getToolUiConfig(toolName: string): ToolUiConfig {
-  return (
-    TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY] ?? {
-      label: startCaseFromCamelCase(toolName),
-      uiHint: 'status',
-      renderer: 'status',
-      loadingTitle: `${startCaseFromCamelCase(toolName)} In Progress...`,
-      errorTitle: `${startCaseFromCamelCase(toolName)} Failed`,
-    }
-  );
+  const existing = TOOL_UI_REGISTRY[toolName as keyof typeof TOOL_UI_REGISTRY];
+  if (existing) return existing;
+
+  const pretty = startCaseFromCamelCase(toolName);
+  const sentence = pretty.charAt(0) + pretty.slice(1).toLowerCase();
+  const lowered = sentence.toLowerCase();
+  return {
+    label: pretty,
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: `Working on ${lowered}…`,
+    successTitle: `${sentence} done`,
+    errorTitle: `Couldn't finish ${lowered}`,
+  };
 }
