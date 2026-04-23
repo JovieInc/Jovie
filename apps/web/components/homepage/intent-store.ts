@@ -54,7 +54,7 @@ interface CreateInput {
  */
 export function sanitizeHomepagePrompt(value: string): string {
   return value
-    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .replaceAll(/[\u0000-\u001F\u007F]/g, '')
     .trim()
     .slice(0, HOMEPAGE_INTENT_MAX_CHARS);
 }
