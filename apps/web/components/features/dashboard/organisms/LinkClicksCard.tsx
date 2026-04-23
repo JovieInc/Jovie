@@ -39,7 +39,7 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
     return (
       <ContentSurfaceCard className='p-4 sm:p-5'>
         <div className='flex items-baseline justify-between'>
-          <h3 className='text-[13px] font-[510] text-secondary-token'>
+          <h3 className='text-[13px] font-caption text-secondary-token'>
             Link Clicks
           </h3>
         </div>
@@ -54,14 +54,14 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
     <ContentSurfaceCard className='p-4 sm:p-5' data-testid='link-clicks-card'>
       <div className='flex items-baseline justify-between'>
         <div>
-          <h3 className='text-[13px] font-[510] text-secondary-token'>
+          <h3 className='text-[13px] font-caption text-secondary-token'>
             Link Clicks
           </h3>
-          <p className='mt-0.5 text-[11px] font-[450] text-tertiary-token'>
+          <p className='mt-0.5 text-[11px] font-book text-tertiary-token'>
             Last 30 days
           </p>
         </div>
-        <p className='text-[24px] font-[590] tracking-[-0.04em] text-primary-token'>
+        <p className='text-[24px] font-semibold tracking-[-0.04em] text-primary-token'>
           {total.toLocaleString()}
         </p>
       </div>
@@ -87,10 +87,10 @@ export function LinkClicksCard({ stats, total }: LinkClicksCardProps) {
                     aria-hidden
                   />
                 </div>
-                <span className='flex-1 text-[13px] font-[450] text-primary-token'>
+                <span className='flex-1 text-[13px] font-book text-primary-token'>
                   {capitalizeFirst(stat.platform)}
                 </span>
-                <span className='text-[13px] font-[510] tabular-nums text-primary-token'>
+                <span className='text-[13px] font-caption tabular-nums text-primary-token'>
                   {formatCount(stat.clicks)}
                 </span>
               </div>
