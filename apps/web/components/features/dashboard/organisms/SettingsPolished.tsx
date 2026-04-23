@@ -96,7 +96,7 @@ const SettingsSidebar = memo(
       <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -165,7 +165,7 @@ function MobileProfilePanelTrigger() {
       className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
-        <p className='text-[14px] font-[510] text-primary-token'>
+        <p className='text-[14px] font-caption text-primary-token'>
           Links, music &amp; more
         </p>
         <p className='mt-0.5 text-[13px] text-secondary-token'>
@@ -201,7 +201,7 @@ export function SettingsPolished({
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='text-center py-4'>
-          <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
+          <h3 className='text-[14px] font-caption text-primary-token mb-3'>
             Account settings unavailable
           </h3>
           <p className='text-[13px] text-secondary'>
@@ -439,7 +439,7 @@ export function SettingsPolished({
             aria-label={`${group.label} settings group`}
             className='px-0.5'
           >
-            <h3 className='mb-2 px-1 text-[12px] font-[590] tracking-[-0.012em] text-secondary-token'>
+            <h3 className='mb-2 px-1 text-[12px] font-semibold tracking-[-0.012em] text-secondary-token'>
               {group.label}
             </h3>
             <div className='space-y-3'>
