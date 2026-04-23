@@ -40,6 +40,18 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
+function headerForMode(mode: SlashMenuMode): string {
+  if (mode === 'all') return 'Skills & references';
+  if (mode === 'release') return 'Pick a release';
+  if (mode === 'artist') return 'Pick an artist';
+  return 'Pick a track';
+}
+
+function itemKey(item: SlashMenuItem): string {
+  if (item.kind === 'skill' && item.skill) return `skill:${item.skill.id}`;
+  return `entity:${item.entity?.kind}:${item.entity?.id}`;
+}
+
 /**
  * Slash command popover for the chat input.
  *
@@ -117,20 +129,13 @@ export function SlashCommandMenu({
         onClose();
       }
     }
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    globalThis.addEventListener('keydown', onKey, true);
+    return () => globalThis.removeEventListener('keydown', onKey, true);
   }, [open, items, selectedIndex, commit, onClose]);
 
   if (!open) return null;
 
-  const headerLabel =
-    mode === 'all'
-      ? 'Skills & references'
-      : mode === 'release'
-        ? 'Pick a release'
-        : mode === 'artist'
-          ? 'Pick an artist'
-          : 'Pick a track';
+  const headerLabel = headerForMode(mode);
 
   // Radix's virtualRef type requires a non-null current; this is safe because
   // the menu only renders when the caller has a live textarea ref.
@@ -149,7 +154,7 @@ export function SlashCommandMenu({
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2 text-[11px] font-medium text-tertiary-token'>
           {headerLabel}
         </div>
-        <div className='max-h-[280px] overflow-y-auto py-1' role='listbox'>
+        <div className='max-h-[280px] overflow-y-auto py-1' role='menu'>
           {items.length === 0 ? (
             <div className='px-3 py-6 text-center text-[12px] text-tertiary-token'>
               {entitySearch.isLoading ? 'Searching…' : 'No matches'}
@@ -157,16 +162,13 @@ export function SlashCommandMenu({
           ) : (
             items.map((item, i) => {
               const isSelected = i === selectedIndex;
-              const key =
-                item.kind === 'skill' && item.skill
-                  ? `skill:${item.skill.id}`
-                  : `entity:${item.entity?.kind}:${item.entity?.id}`;
+              const key = itemKey(item);
               return (
                 <button
                   key={key}
                   type='button'
-                  role='option'
-                  aria-selected={isSelected}
+                  role='menuitem'
+                  aria-current={isSelected ? 'true' : undefined}
                   onMouseEnter={() => setSelectedIndex(i)}
                   onMouseDown={e => {
                     e.preventDefault();

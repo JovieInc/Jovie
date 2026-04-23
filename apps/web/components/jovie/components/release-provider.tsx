@@ -9,6 +9,30 @@ import type {
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { EntityChip } from './EntityChip';
 
+interface ReleaseLike {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string | null;
+  readonly artistNames?: readonly string[];
+}
+
+function releaseMatches(release: ReleaseLike, lowerQuery: string): boolean {
+  if (!lowerQuery) return true;
+  if (release.title.toLowerCase().includes(lowerQuery)) return true;
+  return (release.artistNames ?? []).some(n =>
+    n.toLowerCase().includes(lowerQuery)
+  );
+}
+
+function toEntityRef(release: ReleaseLike): EntityRef {
+  return {
+    kind: 'release',
+    id: release.id,
+    label: release.title,
+    thumbnail: release.artworkUrl ?? undefined,
+  };
+}
+
 /**
  * Build an EntityProvider for releases scoped to a given profile.
  *
@@ -24,22 +48,11 @@ export function createReleaseProvider(profileId: string): EntityProvider {
     useSearch(query: string): EntitySearchResult {
       const { data, isLoading } = useReleasesQuery(profileId);
       return useMemo(() => {
-        const items: EntityRef[] = (data ?? [])
-          .filter(r => {
-            if (!query) return true;
-            const q = query.toLowerCase();
-            return (
-              r.title.toLowerCase().includes(q) ||
-              (r.artistNames ?? []).some(n => n.toLowerCase().includes(q))
-            );
-          })
+        const lowerQuery = query.toLowerCase();
+        const items = (data ?? [])
+          .filter(r => releaseMatches(r, lowerQuery))
           .slice(0, 8)
-          .map(r => ({
-            kind: 'release',
-            id: r.id,
-            label: r.title,
-            thumbnail: r.artworkUrl,
-          }));
+          .map(toEntityRef);
         return { items, isLoading };
       }, [data, isLoading, query]);
     },

@@ -2,11 +2,17 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import {
-  type ChatToken,
   type EntityMentionToken,
   type SkillToken,
   serializeEntity,
   serializeSkill,
+} from '@/lib/chat/tokens';
+
+// Re-export so consumers can import from one place.
+export type {
+  ChatToken,
+  EntityMentionToken,
+  SkillToken,
 } from '@/lib/chat/tokens';
 
 /**
@@ -42,10 +48,7 @@ function serializeChip(chip: TrayChip): string {
  * inline tokens — simple, predictable, no interleaving.
  */
 function freshUid(): string {
-  if (
-    typeof globalThis.crypto !== 'undefined' &&
-    'randomUUID' in globalThis.crypto
-  ) {
+  if (globalThis.crypto !== undefined && 'randomUUID' in globalThis.crypto) {
     return globalThis.crypto.randomUUID();
   }
   return `chip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -106,7 +109,5 @@ export function isEntityChip(
   return chip.type === 'entity';
 }
 
-// Re-export so consumers can import from one place.
-export type { ChatToken, EntityMentionToken, SkillToken };
 /** Exported for tests — keeps the serializer single-sourced. */
 export { serializeChip };

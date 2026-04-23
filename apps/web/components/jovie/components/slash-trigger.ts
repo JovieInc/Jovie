@@ -24,7 +24,7 @@ export function detectSlashTriggerAt(
   caret: number
 ): SlashTrigger | null {
   const head = text.slice(0, caret);
-  const match = head.match(TRIGGER_PATTERN);
+  const match = TRIGGER_PATTERN.exec(head);
   if (!match) return null;
   const startIdx = (match.index ?? 0) + match[1].length;
   return { startIdx, query: match[2] };
