@@ -123,13 +123,13 @@ export function MarketingSignInModal({
     // Snapshot the current URL hash so we can restore it if Clerk's
     // `routing='hash'` writes step fragments (e.g. `#/sign-in/factor-one`)
     // that would otherwise stick around when the modal is dismissed.
-    const previousHash = window.location.hash;
+    const previousHash = globalThis.location.hash;
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
-      if (window.location.hash !== previousHash) {
-        const url = `${window.location.pathname}${window.location.search}${previousHash}`;
-        window.history.replaceState(null, '', url);
+      if (globalThis.location.hash !== previousHash) {
+        const url = `${globalThis.location.pathname}${globalThis.location.search}${previousHash}`;
+        globalThis.history.replaceState(null, '', url);
       }
       // Restore focus to whatever triggered the modal.
       const prev = previouslyFocusedRef.current;
@@ -166,10 +166,10 @@ export function MarketingSignInModal({
     });
     observer.observe(container, { childList: true, subtree: true });
     // Safety: stop watching after 5s even if Clerk never rendered.
-    const timeout = window.setTimeout(() => observer.disconnect(), 5000);
+    const timeout = globalThis.setTimeout(() => observer.disconnect(), 5000);
     return () => {
       observer.disconnect();
-      window.clearTimeout(timeout);
+      globalThis.clearTimeout(timeout);
     };
   }, [mounted]);
 
@@ -218,7 +218,7 @@ export function MarketingSignInModal({
             >
               <X className='h-4 w-4' strokeWidth={2} />
             </button>
-            {!clerkReady ? <SignInSkeleton /> : null}
+            {clerkReady ? null : <SignInSkeleton />}
             <SignIn
               appearance={clerkDarkCompact}
               routing='hash'
