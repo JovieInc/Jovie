@@ -73,4 +73,22 @@ describe('FilterChip', () => {
     );
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
   });
+
+  it('forwards arbitrary button attributes (disabled, tabIndex, aria-describedby)', () => {
+    render(
+      <FilterChip
+        pressed={false}
+        onClick={vi.fn()}
+        disabled
+        tabIndex={-1}
+        aria-describedby='help-text'
+      >
+        Label
+      </FilterChip>
+    );
+    const btn = screen.getByRole('button');
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('tabindex', '-1');
+    expect(btn).toHaveAttribute('aria-describedby', 'help-text');
+  });
 });

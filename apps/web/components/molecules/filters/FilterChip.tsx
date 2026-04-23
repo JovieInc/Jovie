@@ -1,15 +1,13 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-interface FilterChipProps {
+interface FilterChipProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'type'> {
   readonly pressed: boolean;
   readonly onClick: () => void;
   readonly children: ReactNode;
-  readonly className?: string;
-  readonly 'data-testid'?: string;
-  readonly 'aria-label'?: string;
 }
 
 export function FilterChip({
@@ -17,16 +15,14 @@ export function FilterChip({
   onClick,
   children,
   className,
-  'data-testid': testId,
-  'aria-label': ariaLabel,
+  ...rest
 }: FilterChipProps) {
   return (
     <button
       type='button'
       onClick={onClick}
       aria-pressed={pressed}
-      aria-label={ariaLabel}
-      data-testid={testId}
+      {...rest}
       className={cn(
         'rounded-full border px-2.5 py-1 text-xs transition-colors',
         pressed
