@@ -85,7 +85,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
         className='overflow-hidden'
       >
         <div className='px-4 py-3 sm:px-5'>
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-app text-secondary-token'>
             No connected accounts yet.
           </p>
         </div>
@@ -116,7 +116,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 </div>
                 <div className='min-w-0'>
                   <div className='flex flex-wrap items-center gap-1.5'>
-                    <p className='text-[13px] font-[510] text-primary-token'>
+                    <p className='text-app font-[510] text-primary-token'>
                       {label}
                     </p>
                     {isVerified ? (
@@ -126,7 +126,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                       </Badge>
                     ) : null}
                   </div>
-                  <p className='mt-0.5 truncate text-[11px] text-secondary-token'>
+                  <p className='mt-0.5 truncate text-2xs text-secondary-token'>
                     {identifier}
                   </p>
                 </div>
@@ -137,7 +137,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 size='sm'
                 disabled={disconnectingId === account.id}
                 onClick={() => setAccountToDisconnect(account)}
-                className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
               >
                 <Link2Off className='mr-1.5 h-4 w-4' aria-hidden />
                 {disconnectingId === account.id

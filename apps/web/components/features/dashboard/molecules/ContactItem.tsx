@@ -53,10 +53,10 @@ export const ContactItem = memo(function ContactItem({
     <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-[13px] font-[590] text-primary-token'>
+          <p className='text-app font-[590] text-primary-token'>
             {buildSummary(contact)}
           </p>
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-app text-secondary-token'>
             {preferredChannel
               ? `Default action: ${preferredChannel}`
               : 'Select a default action'}
@@ -67,7 +67,7 @@ export const ContactItem = memo(function ContactItem({
             size='sm'
             variant='ghost'
             onClick={() => onUpdate({ isExpanded: !contact.isExpanded })}
-            className='rounded-lg px-3 text-[11px] font-[510] tracking-[-0.01em]'
+            className='rounded-lg px-3 text-2xs font-[510] tracking-[-0.01em]'
           >
             {contact.isExpanded ? 'Collapse' : 'Edit'}
           </Button>
@@ -124,7 +124,7 @@ export const ContactItem = memo(function ContactItem({
           )}
 
           {contact.error ? (
-            <p className='text-[13px] text-error'>{contact.error}</p>
+            <p className='text-app text-error'>{contact.error}</p>
           ) : null}
 
           <ContactItemActions
