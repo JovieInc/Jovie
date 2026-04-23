@@ -36,7 +36,7 @@ export function ReleaseTaskCompactRow({
         } ${isAi ? 'opacity-70' : 'hover:text-[var(--linear-accent,#5e6ad2)]'}`}
       >
         {task.title}
-        {isAi && <span className='ml-1 text-[10px] text-purple-500'>AI</span>}
+        {isAi && <span className='ml-1 text-3xs text-purple-500'>AI</span>}
       </button>
       <ReleaseTaskDueBadge
         dueDate={task.dueDate}

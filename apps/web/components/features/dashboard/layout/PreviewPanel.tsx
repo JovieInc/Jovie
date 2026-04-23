@@ -64,7 +64,7 @@ function PreviewPanelEmpty({
           <div className='space-y-3 pb-5'>
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                   Live preview
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -289,7 +289,7 @@ export function PreviewPanel() {
   );
   const headerTitle: ReactNode = (
     <div className='min-w-0 space-y-0.5'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+      <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
         Live preview
       </p>
       <div className='flex min-w-0 items-center gap-1.5'>
@@ -329,7 +329,7 @@ export function PreviewPanel() {
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
               <div className='flex items-center justify-between gap-3'>
                 <div>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                     Public profile
                   </p>
                   <p className='text-xs text-secondary-token'>
@@ -337,14 +337,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-caption tracking-[-0.01em] text-secondary-token'>
+                    <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -354,7 +354,7 @@ export function PreviewPanel() {
               <div className='mx-auto w-full max-w-[320px]'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
-                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-caption tracking-[-0.01em] text-secondary-token'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                       <span>Preview</span>
                       <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
                         {username ? `@${username}` : 'Profile'}
@@ -440,7 +440,7 @@ export function PreviewPanel() {
 
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                   Share link
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -522,7 +522,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-caption tracking-[-0.01em] text-secondary-token'
+                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'
                   >
                     {tag}
                   </span>

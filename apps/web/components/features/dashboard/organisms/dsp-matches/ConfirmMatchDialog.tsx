@@ -143,7 +143,7 @@ export function ConfirmMatchDialog({
 
               <div className='mt-2 flex flex-wrap items-center gap-2'>
                 <ConfidenceBadge score={confidenceScore} size='md' showLabel />
-                <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-caption text-secondary-token'>
+                <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
                   {matchingIsrcCount} matching ISRCs
                 </span>
               </div>

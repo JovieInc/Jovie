@@ -264,7 +264,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   <div className='flex flex-wrap items-center gap-1.5 text-2xs text-tertiary-token'>
                     <Badge
                       size='sm'
-                      className='rounded-[6px] border border-subtle bg-surface-0 px-1.5 text-[10px] text-secondary-token'
+                      className='rounded-[6px] border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
                     >
                       {territorySummary}
                     </Badge>
@@ -399,7 +399,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   value={
                     <Badge
                       size='sm'
-                      className='rounded-[6px] border border-subtle bg-surface-0 px-1.5 text-[10px] text-secondary-token'
+                      className='rounded-[6px] border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
                     >
                       {territorySummary}
                     </Badge>

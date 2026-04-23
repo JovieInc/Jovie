@@ -149,7 +149,7 @@ export function RecentChats() {
                 </SidebarMenuButton>
 
                 <span
-                  className='absolute right-1 top-1 flex h-5 items-center px-1 text-[10px] tabular-nums text-sidebar-muted pointer-events-none transition-opacity duration-150 group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-data-[collapsible=icon]:hidden'
+                  className='absolute right-1 top-1 flex h-5 items-center px-1 text-3xs tabular-nums text-sidebar-muted pointer-events-none transition-opacity duration-150 group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-data-[collapsible=icon]:hidden'
                   title={updatedAt.toLocaleString()}
                 >
                   {timeAgo}

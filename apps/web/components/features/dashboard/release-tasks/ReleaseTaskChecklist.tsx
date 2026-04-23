@@ -188,7 +188,7 @@ export function ReleaseTaskChecklist({
           <button
             type='button'
             onClick={onNavigateToFullPage}
-            className='flex-shrink-0 text-[10px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
+            className='flex-shrink-0 text-3xs text-[var(--linear-accent,#5e6ad2)] hover:underline'
           >
             Open &rarr;
           </button>

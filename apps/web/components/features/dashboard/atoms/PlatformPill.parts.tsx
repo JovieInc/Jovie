@@ -111,7 +111,7 @@ export function ExpandedContent({
         {hasSecondary ? (
           <span
             className={cn(
-              'ml-2 text-[10px] text-tertiary-token/80',
+              'ml-2 text-3xs text-tertiary-token/80',
               secondaryText && secondaryText.length > 40 && 'truncate'
             )}
           >
@@ -121,13 +121,13 @@ export function ExpandedContent({
       </div>
 
       {badgeText ? (
-        <span className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
+        <span className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'>
           {badgeText}
         </span>
       ) : null}
 
       {suffix ? (
-        <span className='ml-0.5 shrink-0 text-[10px]' aria-hidden='true'>
+        <span className='ml-0.5 shrink-0 text-3xs' aria-hidden='true'>
           {suffix}
         </span>
       ) : null}

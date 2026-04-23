@@ -72,7 +72,7 @@ function MiniRankedList({
           className='flex h-7 items-center justify-between rounded-md px-1.5'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-[10px] font-[510] text-tertiary-token tabular-nums'>
+            <span className='w-3 text-3xs font-[510] text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
             <IconComponent className='h-3 w-3 text-tertiary-token' />

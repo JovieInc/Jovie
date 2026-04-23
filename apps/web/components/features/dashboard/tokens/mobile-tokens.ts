@@ -14,11 +14,11 @@ export const mobileReleaseTokens = {
     subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[10px] font-caption leading-none tracking-normal',
+      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-3xs font-caption leading-none tracking-normal',
     year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
-    dot: 'text-[10px] text-quaternary-token',
+    dot: 'text-3xs text-quaternary-token',
   },
   groupHeader:
     'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
@@ -33,7 +33,7 @@ export const mobileReleaseTokens = {
   swipeActions: {
     button:
       'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
-    label: 'text-[10px] font-caption tracking-normal',
+    label: 'text-3xs font-caption tracking-normal',
     edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
     link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:

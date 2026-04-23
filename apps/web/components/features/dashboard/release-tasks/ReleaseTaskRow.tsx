@@ -55,7 +55,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
         {task.title}
         {isAi && (
           <span
-            className='ml-1.5 text-[10px] font-medium'
+            className='ml-1.5 text-3xs font-medium'
             style={{ color: aiAccent.solid }}
           >
             Auto
@@ -80,7 +80,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       {/* Priority */}
       {priority.dots && (
         <span
-          className='flex-shrink-0 w-6 text-right text-[10px]'
+          className='flex-shrink-0 w-6 text-right text-3xs'
           style={priorityAccent ? { color: priorityAccent.solid } : undefined}
           title={task.priority}
         >

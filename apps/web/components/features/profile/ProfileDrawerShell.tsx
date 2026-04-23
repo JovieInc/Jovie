@@ -95,7 +95,7 @@ export function ProfileDrawerShell({
               {subtitle ? (
                 <p
                   id={subtitleId}
-                  className='truncate text-[10px] font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                  className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
                 >
                   {subtitle}
                 </p>

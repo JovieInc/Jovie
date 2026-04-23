@@ -171,7 +171,7 @@ export const TrackRow = memo(function TrackRow({
         {track.isExplicit ? (
           <Badge
             variant='secondary'
-            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
             title='Explicit content'
             aria-label='Explicit content'
           >
@@ -299,7 +299,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
                     title='Explicit content'
                     aria-label='Explicit content'
                   >
