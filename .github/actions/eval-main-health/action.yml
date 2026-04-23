@@ -130,12 +130,23 @@ runs:
             ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
           );
 
-          const activeRunStartedAt = activeRun?.run_started_at ?? activeRun?.created_at ?? '';
-          const latestFailureCreatedAt = latestFailure?.created_at ?? '';
-
           const hasNewerActiveMainRun = (() => {
-            if (!activeRun || !latestFailureCreatedAt || !activeRunStartedAt) return false;
-            return Date.parse(activeRunStartedAt) > Date.parse(latestFailureCreatedAt);
+            if (!activeRun || !latestFailure) return false;
+
+            const activeRunNumber = Number(activeRun.run_number ?? 0);
+            const failureRunNumber = Number(latestFailure.run_number ?? 0);
+            if (activeRunNumber > failureRunNumber) return true;
+
+            // Fallback for unexpected API payloads where run_number is missing:
+            // only treat it as newer if SHA changed and creation time is later.
+            if (!activeRun.head_sha || !latestFailure.head_sha) return false;
+            if (activeRun.head_sha === latestFailure.head_sha) return false;
+
+            const activeCreatedAt = activeRun.created_at ? Date.parse(activeRun.created_at) : Number.NaN;
+            const failureCreatedAt = latestFailure.created_at ? Date.parse(latestFailure.created_at) : Number.NaN;
+
+            if (Number.isNaN(activeCreatedAt) || Number.isNaN(failureCreatedAt)) return false;
+            return activeCreatedAt > failureCreatedAt;
           })();
 
           const failedForTooLong = (() => {
