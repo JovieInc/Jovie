@@ -61,7 +61,7 @@ function ShortcutKeys({ shortcut }: { readonly shortcut: KeyboardShortcut }) {
     return (
       <span className='inline-flex items-center gap-1 ml-2'>
         <Kbd variant='tooltip'>{first}</Kbd>
-        <span className='text-[10px] opacity-70'>then</span>
+        <span className='text-3xs opacity-70'>then</span>
         <Kbd variant='tooltip'>{second}</Kbd>
       </span>
     );

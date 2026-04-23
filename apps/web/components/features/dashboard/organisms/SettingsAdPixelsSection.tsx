@@ -70,10 +70,10 @@ function PlatformSection({
     <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <h4 className='text-[13px] font-caption text-primary-token'>
+          <h4 className='text-app font-caption text-primary-token'>
             {platform}
           </h4>
-          <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+          <p className='mt-1 text-app leading-[18px] text-secondary-token'>
             {description}
           </p>
         </div>
@@ -100,7 +100,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-[11px] font-caption uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-2xs font-caption uppercase tracking-[0.06em] text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -111,14 +111,14 @@ function PlatformSection({
             value={pixelIdValue}
             onChange={e => onPixelIdChange(e.target.value)}
             placeholder={pixelIdPlaceholder}
-            className='text-[13px]'
+            className='text-app'
           />
         </div>
 
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-[11px] font-caption uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-2xs font-caption uppercase tracking-[0.06em] text-tertiary-token'
           >
             {tokenLabel}
           </label>
@@ -130,7 +130,7 @@ function PlatformSection({
               value={tokenValue}
               onChange={e => onTokenChange(e.target.value)}
               placeholder={tokenPlaceholder}
-              className='pr-10 text-[13px]'
+              className='pr-10 text-app'
             />
             <button
               type='button'
@@ -181,7 +181,7 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-caption ${color}`}
+      className={`inline-flex items-center gap-1 text-2xs font-caption ${color}`}
     >
       <span aria-hidden='true'>{dot}</span>
       {label}
@@ -235,17 +235,17 @@ function TestEventButton({
         size='sm'
         disabled={status === 'loading'}
         onClick={handleTest}
-        className='h-7 px-2.5 text-[11px]'
+        className='h-7 px-2.5 text-2xs'
       >
         {status === 'loading' ? 'Testing...' : 'Test'}
       </Button>
       {status === 'success' && (
-        <span className='text-[11px] font-caption text-green-500'>
+        <span className='text-2xs font-caption text-green-500'>
           Event received
         </span>
       )}
       {status === 'error' && errorMessage && (
-        <span className='text-[11px] font-caption text-red-500'>
+        <span className='text-2xs font-caption text-red-500'>
           {errorMessage}
         </span>
       )}
@@ -457,7 +457,7 @@ export function SettingsAdPixelsSection({
         description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
         actions={
           <div className='flex items-center gap-2'>
-            <span className='text-[13px] font-caption tracking-normal text-secondary-token'>
+            <span className='text-app font-caption tracking-normal text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}
             </span>
             <Switch
@@ -470,14 +470,14 @@ export function SettingsAdPixelsSection({
       >
         <div className='space-y-3 px-4 py-4 sm:px-5'>
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-[13px] leading-[18px] text-secondary-token'>
+            <p className='text-app leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.
             </p>
           </ContentSurfaceCard>
 
           {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
             <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-              <p className='text-[13px] font-caption leading-[18px] text-primary-token'>
+              <p className='text-app font-caption leading-[18px] text-primary-token'>
                 {healthData.aggregate.totalEventsThisWeek.toLocaleString()}{' '}
                 events forwarded this week &middot;{' '}
                 {healthData.aggregate.overallSuccessRate}% success rate
@@ -569,7 +569,7 @@ export function SettingsAdPixelsSection({
           />
 
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-[13px] leading-[18px] text-secondary-token'>
+            <p className='text-app leading-[18px] text-secondary-token'>
               Events are sent server-side for better accuracy. No third-party
               JavaScript is injected on your profile, and credentials are
               encrypted.

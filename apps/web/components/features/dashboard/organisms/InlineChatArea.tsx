@@ -87,7 +87,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
                 : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
             )}
           >
-            <div className='whitespace-pre-wrap text-[13px] leading-relaxed'>
+            <div className='whitespace-pre-wrap text-app leading-relaxed'>
               {textContent}
             </div>
           </div>
@@ -203,11 +203,9 @@ export const InlineChatArea = forwardRef<
       >
         <div className='flex items-center gap-2'>
           <BrandLogo size={16} tone='auto' />
-          <span className='text-[13px] font-[510] text-primary-token'>
-            Jovie
-          </span>
+          <span className='text-app font-[510] text-primary-token'>Jovie</span>
           {messages.length > 0 && (
-            <span className='text-[11px] text-tertiary-token'>
+            <span className='text-2xs text-tertiary-token'>
               ({messages.length} messages)
             </span>
           )}
@@ -292,7 +290,7 @@ export const InlineChatArea = forwardRef<
                   <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
                 )}
                 <div className='flex-1'>
-                  <p className='text-[13px] text-primary-token'>
+                  <p className='text-app text-primary-token'>
                     {chatError.message}
                   </p>
                   {chatError.failedMessage && !chatError.retryAfter && (
@@ -302,7 +300,7 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 rounded-[8px] text-[11px] font-[510] tracking-[-0.01em]'
+                      className='mt-2 h-7 gap-1.5 rounded-[8px] text-2xs font-[510] tracking-[-0.01em]'
                     >
                       <RefreshCw className='h-3 w-3' />
                       Try again

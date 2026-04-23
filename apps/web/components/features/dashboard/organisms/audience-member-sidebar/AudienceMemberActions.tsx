@@ -31,7 +31,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
         <li
           key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
           className={cn(
-            'group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-[12px] text-primary-token transition-colors hover:bg-surface-0'
+            'group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-xs text-primary-token transition-colors hover:bg-surface-0'
           )}
         >
           <span

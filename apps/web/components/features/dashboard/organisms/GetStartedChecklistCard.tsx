@@ -171,7 +171,7 @@ export function GetStartedChecklistCard({
     <ContentSurfaceCard className='overflow-hidden p-0'>
       <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-xs font-[510] tracking-[-0.01em] text-primary-token'>
             Get started
           </h3>
           <span className='text-[11px] text-tertiary-token'>
@@ -237,7 +237,7 @@ export function GetStartedChecklistCard({
 
           const labelEl = (
             <p
-              className={`min-w-0 flex-1 text-[12px] leading-snug ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
+              className={`min-w-0 flex-1 text-xs leading-snug ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
             >
               {item.label}
             </p>
@@ -278,7 +278,7 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='rounded-full border border-transparent px-2 py-0.5 text-[10px] text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
+                  className='rounded-full border border-transparent px-2 py-0.5 text-3xs text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
                 >
                   Copy
                 </button>

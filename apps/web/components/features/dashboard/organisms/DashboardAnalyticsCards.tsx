@@ -53,26 +53,22 @@ function ErrorCards() {
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
             <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
           </div>
-          <p className='text-[13px] font-[510] text-secondary-token'>
+          <p className='text-app font-[510] text-secondary-token'>
             Profile views
           </p>
         </div>
-        <p className='text-[13px] text-tertiary-token'>
-          Temporarily unavailable
-        </p>
+        <p className='text-app text-tertiary-token'>Temporarily unavailable</p>
       </div>
       <div className='space-y-1 py-1'>
         <div className='flex items-center gap-1.5'>
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-[13px] font-[510] text-secondary-token'>
+          <p className='text-app font-[510] text-secondary-token'>
             Unique visitors
           </p>
         </div>
-        <p className='text-[13px] text-tertiary-token'>
-          Temporarily unavailable
-        </p>
+        <p className='text-app text-tertiary-token'>Temporarily unavailable</p>
       </div>
     </div>
   );
@@ -274,7 +270,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side='top' className='max-w-[200px]'>
-                  <p className='text-[13px]'>
+                  <p className='text-app'>
                     Total page views, including repeat visits from the same
                     person
                   </p>
@@ -301,7 +297,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side='top' className='max-w-[200px]'>
-                  <p className='text-[13px]'>
+                  <p className='text-app'>
                     Individual people who visited your profile, counted once per
                     person
                   </p>
@@ -310,12 +306,12 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             }
           >
             <div className='flex items-center justify-between'>
-              <p className='text-[13px] text-tertiary-token'>
+              <p className='text-app text-tertiary-token'>
                 Identified audience
               </p>
               <Link
                 href={APP_ROUTES.AUDIENCE}
-                className='text-[13px] font-[510] text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
+                className='text-app font-[510] text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
               >
                 View audience
               </Link>
@@ -336,10 +332,10 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     >
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='space-y-0.5'>
-          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+          <p className='text-app font-[510] tracking-normal text-secondary-token'>
             Overview
           </p>
-          <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>
+          <p className='text-app text-secondary-token'>{rangeLabel}</p>
         </div>
         <Button
           type='button'

@@ -143,7 +143,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-[6px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300'
+                          className='rounded-[6px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
                         >
                           Manual
                         </Badge>
@@ -161,7 +161,7 @@ export function ReleaseEditDialog({
                         }
                         placeholder={`${provider.label} URL`}
                         data-testid={`provider-input-${release.id}-${provider.key}`}
-                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-xs'
                       />
                       <div className='flex items-center justify-between gap-2'>
                         <DrawerButton

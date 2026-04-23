@@ -122,7 +122,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
       </div>
 
       {/* Description on hover */}
-      <p className='mt-0.5 text-[10px] text-tertiary-token/60 opacity-0 transition-opacity group-hover:opacity-100'>
+      <p className='mt-0.5 text-3xs text-tertiary-token/60 opacity-0 transition-opacity group-hover:opacity-100'>
         {description}
       </p>
     </div>

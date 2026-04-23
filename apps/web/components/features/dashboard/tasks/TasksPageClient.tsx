@@ -689,7 +689,7 @@ function TaskDocumentPanel({
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
                 placeholder='Start writing...'
-                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
+                className='min-h-[520px] w-full resize-none border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)]'
               />
               {showDescriptionHelper && descriptionHelper ? (
                 <TaskDescriptionHelper
@@ -764,7 +764,7 @@ function TaskEmptyState({
   return (
     <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
       <div className='space-y-1'>
-        <h2 className='text-[18px] font-semibold tracking-[-0.025em] text-primary-token'>
+        <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
           {hasFilters
             ? 'No tasks match your filters'
             : 'Your task list is empty'}
@@ -836,7 +836,7 @@ function MobileTaskScopeTabs({
               )}
             >
               <span>{label}</span>
-              <span className='text-[10px] text-tertiary-token'>
+              <span className='text-3xs text-tertiary-token'>
                 {counts[value]}
               </span>
             </button>
@@ -872,7 +872,7 @@ function MobileTaskSection({
         <h2 className='text-[11px] font-semibold text-tertiary-token'>
           {title}
         </h2>
-        <span className='text-[10px] text-tertiary-token'>{tasks.length}</span>
+        <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
       <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
@@ -967,7 +967,7 @@ function MobileTaskListItem({
           />
         ) : null}
         {task.releaseTitle ? (
-          <span className='text-[10px] font-semibold text-tertiary-token'>
+          <span className='text-3xs font-semibold text-tertiary-token'>
             Release
           </span>
         ) : null}
@@ -1622,7 +1622,7 @@ export function TasksPageClient() {
         {isError ? (
           <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
             <div className='space-y-1'>
-              <h2 className='text-[15px] font-semibold text-primary-token'>
+              <h2 className='text-mid font-semibold text-primary-token'>
                 Couldn&apos;t Load Tasks
               </h2>
               <p className='text-[13px] text-secondary-token'>
@@ -1697,7 +1697,7 @@ export function TasksPageClient() {
                 >
                   <div className='flex items-center justify-between px-4 pb-1 pt-3'>
                     <div>
-                      <p className='text-[12px] text-secondary-token'>
+                      <p className='text-xs text-secondary-token'>
                         {mobileScopeCounts.all} total tasks
                       </p>
                     </div>

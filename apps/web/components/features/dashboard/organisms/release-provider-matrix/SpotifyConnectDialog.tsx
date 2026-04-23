@@ -47,7 +47,7 @@ function SearchDropdownState({
       >
         <p
           className={cn(
-            'text-[12px] leading-[17px]',
+            'text-xs leading-[17px]',
             tone === 'error' ? 'text-error' : 'text-secondary-token'
           )}
         >
@@ -136,7 +136,7 @@ function SearchInputTrailing({
         disabled={claimButtonDisabled}
         onClick={onClaimArtist}
         className={cn(
-          'h-8 shrink-0 px-3 text-[13px]',
+          'h-8 shrink-0 px-3 text-app',
           claimButtonDisabled && 'text-white/60'
         )}
       >
@@ -418,7 +418,7 @@ export function SpotifyConnectDialog({
       <DialogTitle className='text-lg font-semibold text-primary-token'>
         Connect Spotify
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-app text-secondary-token'>
         Search for your artist profile to import releases.
       </DialogDescription>
 
@@ -428,10 +428,10 @@ export function SpotifyConnectDialog({
           className='overflow-visible bg-(--linear-app-content-surface) p-3.5'
         >
           <div className='mb-2.5'>
-            <p className='text-[11px] font-caption leading-none text-tertiary-token'>
+            <p className='text-2xs font-caption leading-none text-tertiary-token'>
               Artist search
             </p>
-            <p className='mt-1 text-[12px] leading-[17px] text-secondary-token'>
+            <p className='mt-1 text-xs leading-[17px] text-secondary-token'>
               Search by artist name or paste your Spotify artist URL to connect
               instantly.
             </p>
@@ -479,7 +479,7 @@ export function SpotifyConnectDialog({
                 autoCorrect='off'
                 autoComplete='off'
                 disabled={isPending}
-                className='min-w-0 flex-1 bg-transparent text-[13px] text-primary-token focus-visible:outline-none'
+                className='min-w-0 flex-1 bg-transparent text-app text-primary-token focus-visible:outline-none'
                 role='combobox'
                 aria-expanded={shouldShowDropdown}
                 aria-controls='spotify-connect-results'
@@ -499,7 +499,7 @@ export function SpotifyConnectDialog({
             </div>
 
             {formState.error && (
-              <p className='mt-1.5 text-[13px] text-error' role='alert'>
+              <p className='mt-1.5 text-app text-error' role='alert'>
                 {formState.error}
               </p>
             )}
@@ -624,16 +624,16 @@ export function SpotifyConnectDialog({
                           )}
                         </div>
                         <div className='flex-1 min-w-0'>
-                          <div className='truncate text-[13px] font-caption text-primary-token'>
+                          <div className='truncate text-app font-caption text-primary-token'>
                             {artist.name}
                           </div>
                           {artist.isClaimed && (
-                            <div className='text-[11px] text-tertiary-token'>
+                            <div className='text-2xs text-tertiary-token'>
                               Already claimed
                             </div>
                           )}
                           {!artist.isClaimed && artist.followers && (
-                            <div className='text-[11px] text-tertiary-token'>
+                            <div className='text-2xs text-tertiary-token'>
                               {formatFollowers(artist.followers)}
                             </div>
                           )}
@@ -680,10 +680,10 @@ export function SpotifyConnectDialog({
                     />
                   </div>
                   <div className='flex-1'>
-                    <div className='text-[13px] font-caption text-primary-token'>
+                    <div className='text-app font-caption text-primary-token'>
                       Paste a Spotify URL instead
                     </div>
-                    <div className='text-[11px] text-tertiary-token'>
+                    <div className='text-2xs text-tertiary-token'>
                       open.spotify.com/artist/...
                     </div>
                   </div>

@@ -37,17 +37,17 @@ export const subscriptionHeadingClassName =
   'text-balance text-center text-[1.55rem] font-[640] tracking-[-0.045em] text-primary-token sm:text-[1.8rem]';
 
 export const subscriptionDisclaimerClassName =
-  'text-center text-[12px] leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
+  'text-center text-xs leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
 
 export const profilePrimaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-[15px] font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-mid font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
 /** Pearl-Notify hero morph-bar CTA pill — glassy dark, sits over the hero image. */
 export const profileHeroMorphPillClassName =
   'inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-5 text-[13.5px] font-[560] tracking-[-0.01em] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-[background-color,color,opacity,box-shadow] duration-200 ease-out hover:bg-white/14 active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
 export const profileSecondaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-[15px] font-[580] tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--profile-pearl-bg-hover)] hover:border-[color:var(--profile-pearl-border)] hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+  'inline-flex h-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-mid font-[580] tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--profile-pearl-bg-hover)] hover:border-[color:var(--profile-pearl-border)] hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
 export const profileQuietIconButtonClassName =
   'border-transparent bg-transparent text-white/72 shadow-none hover:border-[color:var(--profile-pearl-border)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_86%,transparent)] hover:text-white focus-visible:border-[color:var(--profile-pearl-border)] focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,transparent)] focus-visible:text-white active:bg-[var(--profile-pearl-bg-active)] active:text-white';
@@ -67,7 +67,7 @@ export const subscriptionHeroComposerFocusClassName =
   'border-white/22 bg-white/14 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_8px_22px_rgba(0,0,0,0.28)]';
 
 export const subscriptionInputClassName =
-  'h-12 w-full bg-transparent px-2 text-[15px] font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
+  'h-12 w-full bg-transparent px-2 text-mid font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
 
 export const subscriptionHeroInputClassName =
   'h-11 w-full bg-transparent px-2 text-[13.5px] font-[560] tracking-[-0.01em] text-white placeholder:text-white/45 focus-visible:outline-none focus-visible:ring-0';
@@ -93,10 +93,10 @@ export const subscriptionFeedbackCopyClassName =
   'text-[11px] leading-4 tracking-[-0.01em] text-secondary-token/68';
 
 export const subscriptionErrorTextClassName =
-  'text-[12px] leading-4 tracking-[-0.012em] text-red-400';
+  'text-xs leading-4 tracking-[-0.012em] text-red-400';
 
 export const subscriptionSuccessTextClassName =
-  'text-[12px] leading-4 tracking-[-0.012em] text-emerald-400';
+  'text-xs leading-4 tracking-[-0.012em] text-emerald-400';
 
 export const subscriptionDesktopErrorAffordanceClassName =
   'inline-flex items-center gap-1.5 text-red-400';
@@ -524,7 +524,7 @@ export function SubscriptionSuccess({
           type='button'
           onClick={handleSkip}
           disabled={phase === 'saving'}
-          className='w-full text-center text-[12px] text-secondary-token/70 hover:text-secondary-token transition-colors'
+          className='w-full text-center text-xs text-secondary-token/70 hover:text-secondary-token transition-colors'
           style={noFontSynthesisStyle}
         >
           Skip
@@ -596,7 +596,7 @@ export function SubscriptionPendingConfirmation() {
         )}
       >
         <Mail className='h-5 w-5 text-primary-token/72' aria-hidden='true' />
-        <span className='text-[15px] font-semibold tracking-[-0.015em]'>
+        <span className='text-mid font-semibold tracking-[-0.015em]'>
           Check your inbox
         </span>
       </div>

@@ -41,7 +41,7 @@ export function InsightCard({ insight }: InsightCardProps) {
             <Badge
               variant='secondary'
               size='sm'
-              className={`rounded-[6px] px-1.5 py-0.5 text-[10px] ${PRIORITY_BADGE_STYLES[insight.priority]}`}
+              className={`rounded-[6px] px-1.5 py-0.5 text-3xs ${PRIORITY_BADGE_STYLES[insight.priority]}`}
             >
               {PRIORITY_LABELS[insight.priority]}
             </Badge>
@@ -53,7 +53,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           {insight.actionSuggestion ? (
             <div className='mt-2 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-              <p className='text-[12px] font-[510] text-primary-token'>
+              <p className='text-xs font-[510] text-primary-token'>
                 {insight.actionSuggestion}
               </p>
             </div>
@@ -61,10 +61,10 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
             <div className='flex items-center gap-2'>
-              <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token capitalize'>
+              <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token capitalize'>
                 {insight.category}
               </span>
-              <span className='text-[10px] text-tertiary-token tabular-nums'>
+              <span className='text-3xs text-tertiary-token tabular-nums'>
                 Confidence: {Math.round(Number(insight.confidence) * 100)}%
               </span>
             </div>

@@ -96,7 +96,7 @@ const SettingsSidebar = memo(
       <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -113,7 +113,7 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
                             isActive
                               ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
                               : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
@@ -126,7 +126,7 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-xs tracking-[-0.012em] transition-colors',
                             isActive
                               ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
                               : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
@@ -165,10 +165,10 @@ function MobileProfilePanelTrigger() {
       className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
-        <p className='text-[14px] font-caption text-primary-token'>
+        <p className='text-sm font-caption text-primary-token'>
           Links, music &amp; more
         </p>
-        <p className='mt-0.5 text-[13px] text-secondary-token'>
+        <p className='mt-0.5 text-app text-secondary-token'>
           Manage social links, music, earnings, and about info
         </p>
       </div>
@@ -201,10 +201,10 @@ export function SettingsPolished({
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='text-center py-4'>
-          <h3 className='text-[14px] font-caption text-primary-token mb-3'>
+          <h3 className='text-sm font-caption text-primary-token mb-3'>
             Account settings unavailable
           </h3>
-          <p className='text-[13px] text-secondary'>
+          <p className='text-app text-secondary'>
             Clerk is not configured (missing publishable key). Set
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
           </p>
@@ -439,7 +439,7 @@ export function SettingsPolished({
             aria-label={`${group.label} settings group`}
             className='px-0.5'
           >
-            <h3 className='mb-2 px-1 text-[12px] font-semibold tracking-[-0.012em] text-secondary-token'>
+            <h3 className='mb-2 px-1 text-xs font-semibold tracking-[-0.012em] text-secondary-token'>
               {group.label}
             </h3>
             <div className='space-y-3'>

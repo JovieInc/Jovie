@@ -115,7 +115,7 @@ export function AddPlatformDialog({
       <form noValidate onSubmit={handleSubmit} className='mt-5 space-y-4'>
         {/* Provider picker */}
         {availableProviders.length === 0 ? (
-          <p className='text-[13px] text-tertiary-token text-center py-4'>
+          <p className='text-app text-tertiary-token text-center py-4'>
             All platforms are already linked
           </p>
         ) : (
@@ -130,7 +130,7 @@ export function AddPlatformDialog({
                   setError(null);
                 }}
                 className={cn(
-                  'flex flex-col items-center gap-1 rounded-lg border border-subtle p-2 text-[11px] text-secondary-token hover:bg-surface-1 transition-colors',
+                  'flex flex-col items-center gap-1 rounded-lg border border-subtle p-2 text-2xs text-secondary-token hover:bg-surface-1 transition-colors',
                   selectedProvider === id && 'border-accent bg-surface-1'
                 )}
               >
@@ -156,7 +156,7 @@ export function AddPlatformDialog({
                 value={artistName}
                 onChange={e => setArtistName(e.target.value)}
                 placeholder='Artist name on this platform'
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
               />
             </div>
             <div>
@@ -169,11 +169,11 @@ export function AddPlatformDialog({
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
               />
             </div>
             {error && (
-              <p className='text-[12px] text-red-500' role='alert'>
+              <p className='text-xs text-red-500' role='alert'>
                 {error}
               </p>
             )}
