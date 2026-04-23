@@ -5,7 +5,7 @@ import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
-import { StaticListenInterface } from './StaticListenInterface';
+import { ListenView } from './views/ListenView';
 
 interface ListenDrawerProps {
   readonly open: boolean;
@@ -54,14 +54,11 @@ export function ListenDrawer({
       title='Listen everywhere'
       subtitle={`Stream ${artist.name} on your favorite platform.`}
     >
-      <div className='flex justify-center'>
-        <StaticListenInterface
-          artist={artist}
-          handle={artist.handle}
-          dspsOverride={dsps}
-          enableDynamicEngagement={enableDynamicEngagement}
-        />
-      </div>
+      <ListenView
+        artist={artist}
+        dsps={dsps}
+        enableDynamicEngagement={enableDynamicEngagement}
+      />
     </ProfileDrawerShell>
   );
 }
