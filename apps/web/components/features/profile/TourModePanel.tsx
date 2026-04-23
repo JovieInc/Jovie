@@ -54,10 +54,10 @@ function DateBox({ date }: { readonly date: string }) {
 
   return (
     <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-[12px] border border-white/6'>
-      <span className='text-[0.7rem] font-[600] uppercase tracking-[0.06em] text-white/44'>
+      <span className='text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-white/44'>
         {monthLabel}
       </span>
-      <span className='text-[1.2rem] font-[700] leading-tight text-white/80'>
+      <span className='text-[1.2rem] font-bold leading-tight text-white/80'>
         {dayLabel}
       </span>
     </div>
@@ -99,7 +99,7 @@ function TourDateRow({
       <DateBox date={date.startDate} />
 
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[0.95rem] font-[600] tracking-[-0.02em] text-white'>
+        <p className='truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-white'>
           {date.venueName}
         </p>
         <p className='mt-0.5 truncate text-[0.85rem] text-white/44'>
@@ -122,13 +122,13 @@ function TourDateRow({
             onClick={handleTicketClick}
             target='_blank'
             rel='noopener noreferrer'
-            className={`inline-flex items-center rounded-full border border-white/12 px-3 py-1 text-[0.82rem] font-[590] tracking-[-0.01em] transition-opacity hover:opacity-80 ${ticketStatusClassName}`}
+            className={`inline-flex items-center rounded-full border border-white/12 px-3 py-1 text-[0.82rem] font-semibold tracking-[-0.01em] transition-opacity hover:opacity-80 ${ticketStatusClassName}`}
           >
             {ticketStatusLabel}
           </a>
         ) : (
           <span
-            className={`inline-flex items-center rounded-full border border-white/6 px-3 py-1 text-[0.82rem] font-[590] tracking-[-0.01em] ${ticketStatusClassName}`}
+            className={`inline-flex items-center rounded-full border border-white/6 px-3 py-1 text-[0.82rem] font-semibold tracking-[-0.01em] ${ticketStatusClassName}`}
           >
             {ticketStatusLabel}
           </span>
@@ -141,7 +141,7 @@ function TourDateRow({
 /** Section header in small caps */
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='mb-2 text-[0.76rem] font-[600] uppercase tracking-[0.06em] text-white/34'>
+    <p className='mb-2 text-[0.76rem] font-semibold uppercase tracking-[0.06em] text-white/34'>
       {children}
     </p>
   );
@@ -168,7 +168,7 @@ function OtherCitiesDisclosure({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={listId}
-        className='flex w-full items-center justify-between py-3 text-[0.85rem] font-[590] text-white/48 transition-colors hover:text-white/62 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(24,24,28)]'
+        className='flex w-full items-center justify-between py-3 text-[0.85rem] font-semibold text-white/48 transition-colors hover:text-white/62 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(24,24,28)]'
       >
         <span>
           {count} {count === 1 ? 'event' : 'events'} in other cities
@@ -209,7 +209,7 @@ function TourDatesContent({
   if (allDates.length === 0) {
     return (
       <div className='space-y-4'>
-        <p className='text-[1.02rem] font-[600] tracking-[-0.02em] text-white'>
+        <p className='text-[1.02rem] font-semibold tracking-[-0.02em] text-white'>
           No upcoming events.
         </p>
         <ArtistNotificationsCTA
@@ -279,7 +279,7 @@ function TourDatesContent({
   return (
     <div className='space-y-4'>
       <section>
-        <p className='text-[1.02rem] font-[600] tracking-[-0.02em] text-white'>
+        <p className='text-[1.02rem] font-semibold tracking-[-0.02em] text-white'>
           No events near you.
         </p>
         <div className='mt-4'>

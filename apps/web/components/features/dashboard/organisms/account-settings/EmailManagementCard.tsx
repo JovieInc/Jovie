@@ -69,7 +69,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
               <div className='min-w-0 flex-1'>
                 <div>
                   <div className='flex flex-wrap items-center gap-1.5'>
-                    <p className='text-[13px] font-[510] text-primary-token'>
+                    <p className='text-app font-caption text-primary-token'>
                       {email.emailAddress}
                     </p>
                     {isPrimary ? (
@@ -78,7 +78,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                       </Badge>
                     ) : null}
                   </div>
-                  <div className='mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
+                  <div className='mt-1 flex flex-wrap items-center gap-1.5 text-2xs text-secondary-token'>
                     {isVerified ? (
                       <Badge variant='success' size='sm' className='gap-1'>
                         <CheckCircle className='h-3.5 w-3.5' aria-hidden />
@@ -101,7 +101,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     size='sm'
                     disabled={syncingEmailId === email.id}
                     onClick={() => handleMakePrimary(email)}
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   >
                     {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
                   </Button>
@@ -110,7 +110,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                    className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                     disabled={syncingEmailId === email.id}
                     onClick={() => setEmailToRemove(email)}
                   >
@@ -132,7 +132,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 <div>
                   <label
                     htmlFor='verify-code'
-                    className='mb-1.5 block text-[13px] text-primary-token'
+                    className='mb-1.5 block text-app text-primary-token'
                   >
                     Verification code
                   </label>
@@ -144,7 +144,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     value={verificationCode}
                     onChange={event => setVerificationCode(event.target.value)}
                     placeholder='Enter 6-digit code'
-                    className='h-8 border-subtle bg-surface-0 text-[13px]'
+                    className='h-8 border-subtle bg-surface-0 text-app'
                     required
                   />
                 </div>
@@ -152,7 +152,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 <div>
                   <label
                     htmlFor='new-email'
-                    className='mb-1.5 block text-[13px] text-primary-token'
+                    className='mb-1.5 block text-app text-primary-token'
                   >
                     Add email address
                   </label>
@@ -162,15 +162,13 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     value={newEmail}
                     placeholder='you@example.com'
                     onChange={event => setNewEmail(event.target.value)}
-                    className='h-8 border-subtle bg-surface-0 text-[13px]'
+                    className='h-8 border-subtle bg-surface-0 text-app'
                     required
                   />
                 </div>
               )}
               {emailError ? (
-                <p className='mt-1.5 text-[13px] text-destructive'>
-                  {emailError}
-                </p>
+                <p className='mt-1.5 text-app text-destructive'>{emailError}</p>
               ) : null}
             </div>
             <div className='flex shrink-0 gap-2'>
@@ -180,7 +178,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 disabled={
                   emailStatus === 'sending' || emailStatus === 'verifying'
                 }
-                className='h-7 rounded-[8px] px-2.5 text-[11px] font-[510]'
+                className='h-7 rounded-[8px] px-2.5 text-2xs font-caption'
               >
                 {emailButtonLabel}
               </Button>
@@ -190,7 +188,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   variant='ghost'
                   size='sm'
                   onClick={resetEmailForm}
-                  className='h-7 rounded-[8px] border border-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                 >
                   Cancel
                 </Button>

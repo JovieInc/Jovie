@@ -314,11 +314,11 @@ function PressPhotosSection({
         <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
         <div className='flex items-center gap-1.5'>
           {draftPhotos.length > 0 && (
-            <Badge variant='outline' className='text-[10px] tabular-nums'>
+            <Badge variant='outline' className='text-3xs tabular-nums'>
               {draftPhotos.length} awaiting approval
             </Badge>
           )}
-          <Badge variant='secondary' className='text-[10px] tabular-nums'>
+          <Badge variant='secondary' className='text-3xs tabular-nums'>
             {pressPhotos.length}/{MAX_PRESS_PHOTOS}
           </Badge>
         </div>
@@ -355,7 +355,7 @@ function PressPhotosSection({
       {/* Drafts section (awaiting approval) */}
       {draftPhotos.length > 0 && (
         <div className='space-y-1.5'>
-          <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+          <p className='text-3xs font-medium uppercase tracking-wider text-tertiary-token'>
             Awaiting approval
           </p>
           <div className='grid grid-cols-2 gap-2'>
@@ -425,7 +425,7 @@ function PressPhotosSection({
       {/* Other status section */}
       {otherStatusPhotos.length > 0 && (
         <div className='space-y-1.5'>
-          <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+          <p className='text-3xs font-medium uppercase tracking-wider text-tertiary-token'>
             Other status
           </p>
           <div className='grid grid-cols-2 gap-2'>
@@ -468,7 +468,7 @@ function PressPhotosSection({
       {(publishedPhotos.length > 0 || canUpload) && (
         <div className='space-y-1.5'>
           {draftPhotos.length > 0 && publishedPhotos.length > 0 && (
-            <p className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+            <p className='text-3xs font-medium uppercase tracking-wider text-tertiary-token'>
               Published
             </p>
           )}

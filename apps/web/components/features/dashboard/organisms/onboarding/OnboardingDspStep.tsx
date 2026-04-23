@@ -195,7 +195,7 @@ export function OnboardingDspStep({
                           <div className='h-8 w-8 shrink-0 rounded-full bg-surface-0' />
                         )}
                         <div className='min-w-0 flex-1'>
-                          <p className='truncate text-[13px] font-[510] text-primary-token'>
+                          <p className='truncate text-[13px] font-caption text-primary-token'>
                             {artist.name}
                           </p>
                           {artist.followers != null && (

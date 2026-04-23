@@ -157,7 +157,7 @@ export const TrackRow = memo(function TrackRow({
 
     const titleRow = (
       <div className='flex items-center gap-2'>
-        <span className='text-[11px] tabular-nums text-tertiary-token'>
+        <span className='text-2xs tabular-nums text-tertiary-token'>
           {trackLabel}.
         </span>
         <TruncatedText
@@ -171,7 +171,7 @@ export const TrackRow = memo(function TrackRow({
         {track.isExplicit ? (
           <Badge
             variant='secondary'
-            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+            className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
             title='Explicit content'
             aria-label='Explicit content'
           >
@@ -223,11 +223,11 @@ export const TrackRow = memo(function TrackRow({
                     railClassName='max-w-[180px]'
                   />
                 ) : (
-                  <span className='text-[11px] text-tertiary-token'>
+                  <span className='text-2xs text-tertiary-token'>
                     No DSP links
                   </span>
                 )}
-                <span className='text-[11px] text-secondary-token'>
+                <span className='text-2xs text-secondary-token'>
                   {track.durationMs ? formatDuration(track.durationMs) : '—'}
                 </span>
               </div>
@@ -281,7 +281,7 @@ export const TrackRow = memo(function TrackRow({
               className='absolute left-2 top-0.5 bottom-0.5 w-px rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_88%,transparent)]'
             />
             {/* Track number */}
-            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
+            <span className='w-7 shrink-0 text-right text-2xs tabular-nums text-tertiary-token'>
               {trackLabel}.
             </span>
 
@@ -290,7 +290,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-[12px] font-[510] text-primary-token'
+                  className='text-xs font-[510] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -299,7 +299,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[10px] text-tertiary-token'
+                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
                     title='Explicit content'
                     aria-label='Explicit content'
                   >
@@ -342,7 +342,7 @@ export const TrackRow = memo(function TrackRow({
                 railClassName='max-w-[132px] lg:max-w-[164px]'
               />
             ) : (
-              <span className='text-[11px] text-tertiary-token'>—</span>
+              <span className='text-2xs text-tertiary-token'>—</span>
             )}
           </div>
         </td>
@@ -358,11 +358,11 @@ export const TrackRow = memo(function TrackRow({
       {isVisible('metrics') && (
         <td className='py-2 align-top'>
           {track.durationMs ? (
-            <span className='text-[11px] tabular-nums text-secondary-token'>
+            <span className='text-2xs tabular-nums text-secondary-token'>
               {formatDuration(track.durationMs)}
             </span>
           ) : (
-            <span className='text-[11px] text-tertiary-token'>—</span>
+            <span className='text-2xs text-tertiary-token'>—</span>
           )}
         </td>
       )}
@@ -443,7 +443,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
   if (tracks.length === 0) {
     if (renderMode === 'stack') {
       return (
-        <div className='flex items-center gap-2 rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-[11px] text-tertiary-token'>
+        <div className='flex items-center gap-2 rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-2xs text-tertiary-token'>
           <Icon name='AlertCircle' className='h-3.5 w-3.5' />
           <span>No tracks found for this release</span>
         </div>
@@ -454,7 +454,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
       <tr className='bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)]'>
         <td
           colSpan={columnCount}
-          className='py-2.5 pl-20 text-[11px] text-tertiary-token'
+          className='py-2.5 pl-20 text-2xs text-tertiary-token'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />

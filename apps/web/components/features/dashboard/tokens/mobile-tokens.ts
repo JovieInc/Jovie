@@ -10,19 +10,19 @@ export const mobileReleaseTokens = {
   row: {
     container:
       'flex w-full items-center gap-3 px-4 py-3 text-left transition-[background-color,border-color] active:bg-surface-0 focus-visible:outline-none focus-visible:bg-surface-0',
-    title: 'text-[14px] font-[590] leading-tight text-primary-token',
+    title: 'text-[14px] font-semibold leading-tight text-primary-token',
     subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[10px] font-[510] leading-none tracking-normal',
+      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-3xs font-caption leading-none tracking-normal',
     year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
-    dot: 'text-[10px] text-quaternary-token',
+    dot: 'text-3xs text-quaternary-token',
   },
   groupHeader:
     'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
-  groupHeaderTitle: 'text-[12px] font-[590] text-primary-token',
+  groupHeaderTitle: 'text-[12px] font-semibold text-primary-token',
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {
     container:
@@ -33,7 +33,7 @@ export const mobileReleaseTokens = {
   swipeActions: {
     button:
       'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
-    label: 'text-[10px] font-[510] tracking-normal',
+    label: 'text-3xs font-caption tracking-normal',
     edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
     link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:

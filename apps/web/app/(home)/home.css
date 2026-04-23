@@ -32,11 +32,18 @@ body:has(.home-viewport)::-webkit-scrollbar {
  */
 .homepage-hero-flood {
   background: #06070b;
+  /* Isolate the hero's paint/layout from the rest of the page so the pulse
+   * animation can't invalidate below-the-fold content. */
+  contain: layout paint;
 }
 .homepage-hero-flood__layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Force the decorative gradient layers onto their own compositor layer so
+   * the pulse runs on GPU and never triggers a paint on the hero text. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 /* Low-pass room tone: almost imperceptible cool wash seeping up from the
  * floor. Desaturated toward neutral so it reads as "lighting in the room,"

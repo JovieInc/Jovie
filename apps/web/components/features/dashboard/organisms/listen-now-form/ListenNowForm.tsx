@@ -208,7 +208,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
+              <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
                 Spotify
               </span>
               {connectedDspInfo.spotify ? (
@@ -264,7 +264,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
+              <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
                 Apple Music
               </span>
               {connectedDspInfo.apple_music ? (
@@ -333,7 +333,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                 aria-hidden
               />
             </div>
-            <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
+            <span className='w-[100px] shrink-0 text-app font-medium text-primary-token'>
               YouTube
             </span>
             <Input
@@ -369,7 +369,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               className='mx-auto mb-2 h-5 w-5 text-tertiary-token'
               aria-hidden='true'
             />
-            <p className='mb-3 text-[13px] text-secondary-token'>
+            <p className='mb-3 text-app text-secondary-token'>
               SoundCloud, Bandcamp, Tidal, and more
             </p>
             <Button

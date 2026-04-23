@@ -106,7 +106,7 @@ function FunnelStage({
             {numberFormatter.format(value)}
           </span>
           {rate && (
-            <span className='tabular-nums text-[10px] font-caption text-tertiary-token'>
+            <span className='tabular-nums text-3xs font-caption text-tertiary-token'>
               {rate}
             </span>
           )}

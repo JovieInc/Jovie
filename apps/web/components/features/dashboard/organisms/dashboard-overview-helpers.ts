@@ -6,7 +6,7 @@
 const TASK_CONTAINER_BASE =
   'group flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1 transition-[background-color,border-color,color] duration-100';
 const TASK_INDICATOR_BASE =
-  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-[560]';
+  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-3xs font-[560]';
 const TASK_LABEL_BASE =
   'text-[12.5px] leading-[15px] tracking-[-0.01em] text-primary-token';
 

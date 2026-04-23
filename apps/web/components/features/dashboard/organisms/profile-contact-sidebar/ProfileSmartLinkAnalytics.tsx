@@ -184,7 +184,7 @@ function AnalyticsMetric({
       <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
         {value}
       </p>
-      <p className='text-[10px] leading-[13px] text-tertiary-token'>{hint}</p>
+      <p className='text-3xs leading-[13px] text-tertiary-token'>{hint}</p>
     </div>
   );
 }

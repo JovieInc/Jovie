@@ -132,7 +132,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             {showType && typeStyle && hasPreview && (
               <span
                 className={cn(
-                  'shrink-0 text-[10px] font-caption leading-none tracking-normal',
+                  'shrink-0 text-3xs font-caption leading-none tracking-normal',
                   typeStyle.text
                 )}
               >
@@ -163,7 +163,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             {showType && typeStyle && hasPreview && (
               <span
                 className={cn(
-                  'shrink-0 text-[10px] font-caption leading-none tracking-normal',
+                  'shrink-0 text-3xs font-caption leading-none tracking-normal',
                   typeStyle.text
                 )}
               >

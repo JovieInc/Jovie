@@ -123,7 +123,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
                 <span className='inline-flex items-center gap-1.5'>
                   <span>{filter.label}</span>
                   {count > 0 && (
-                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] text-secondary-token tabular-nums'>
+                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs text-secondary-token tabular-nums'>
                       {count}
                     </span>
                   )}
