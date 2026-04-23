@@ -101,7 +101,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
+                    className='rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -143,7 +143,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-[6px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
+                          className='rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
                         >
                           Manual
                         </Badge>
@@ -161,14 +161,14 @@ export function ReleaseEditDialog({
                         }
                         placeholder={`${provider.label} URL`}
                         data-testid={`provider-input-${release.id}-${provider.key}`}
-                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-xs'
+                        className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
                       />
                       <div className='flex items-center justify-between gap-2'>
                         <DrawerButton
                           tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
-                          className='h-7 rounded-[8px] px-2.5 text-[11px]'
+                          className='h-7 rounded-lg px-2.5 text-[11px]'
                           onClick={() => onSave(provider.key)}
                         >
                           Save
@@ -177,7 +177,7 @@ export function ReleaseEditDialog({
                           tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
-                          className='h-7 rounded-[8px] px-2.5 text-[11px]'
+                          className='h-7 rounded-lg px-2.5 text-[11px]'
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
@@ -194,7 +194,7 @@ export function ReleaseEditDialog({
       <DialogActions className='justify-end border-t border-(--linear-app-frame-seam) pt-4'>
         <DrawerButton
           onClick={onClose}
-          className='h-7 rounded-[8px] px-2.5 text-[11px]'
+          className='h-7 rounded-lg px-2.5 text-[11px]'
         >
           Done
         </DrawerButton>

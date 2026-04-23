@@ -111,7 +111,7 @@ export function FilterSubmenu<T extends string = string>({
           />
           <span>{label}</span>
           {selectedCount > 0 && (
-            <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'>
+            <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'>
               {selectedCount}
             </span>
           )}

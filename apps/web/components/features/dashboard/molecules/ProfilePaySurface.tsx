@@ -329,7 +329,7 @@ export function ProfilePaySurface({
             />
           ) : (
             <div className='space-y-2 text-center'>
-              <div className='mx-auto flex h-10 w-10 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1 text-tertiary-token'>
+              <div className='mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 text-tertiary-token'>
                 <Link2 className='h-4 w-4' aria-hidden='true' />
               </div>
               <p className='text-2xs leading-[14px] text-tertiary-token'>

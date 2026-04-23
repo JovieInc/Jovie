@@ -149,7 +149,7 @@ export const TrackRow = memo(function TrackRow({
 
   if (renderMode === 'stack') {
     const stackClassName = cn(
-      'group w-full rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] p-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out',
+      'group w-full rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] p-3 text-left transition-[background-color,border-color,box-shadow] duration-150 ease-out',
       isSelected
         ? 'bg-[color-mix(in_oklab,var(--linear-row-selected)_18%,var(--linear-bg-surface-1))] shadow-[inset_2px_0_0_0_var(--linear-border-focus)]'
         : 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))]'
@@ -191,7 +191,7 @@ export const TrackRow = memo(function TrackRow({
                 <button
                   type='button'
                   onClick={onClick}
-                  className='min-w-0 rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                  className='min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   aria-label={`Open details for ${track.title}`}
                 >
                   {titleRow}
@@ -443,7 +443,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
   if (tracks.length === 0) {
     if (renderMode === 'stack') {
       return (
-        <div className='flex items-center gap-2 rounded-[12px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-2xs text-tertiary-token'>
+        <div className='flex items-center gap-2 rounded-xl border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] px-3 py-2.5 text-2xs text-tertiary-token'>
           <Icon name='AlertCircle' className='h-3.5 w-3.5' />
           <span>No tracks found for this release</span>
         </div>

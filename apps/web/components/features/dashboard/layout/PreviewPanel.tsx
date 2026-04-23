@@ -80,9 +80,9 @@ function PreviewPanelEmpty({
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
                       <div className='h-2.5 w-16 rounded skeleton' />
-                      <div className='h-5 w-20 rounded-[8px] skeleton' />
+                      <div className='h-5 w-20 rounded-lg skeleton' />
                     </div>
-                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
@@ -90,9 +90,9 @@ function PreviewPanelEmpty({
                         <div className='h-16 w-16 rounded-full skeleton' />
                         <div className='h-3 w-28 rounded skeleton' />
                         <div className='h-3 w-40 rounded skeleton' />
-                        <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
-                        <div className='h-9 w-full rounded-[16px] skeleton' />
-                        <div className='h-9 w-full rounded-[16px] skeleton' />
+                        <div className='mt-2 h-9 w-full rounded-2xl skeleton' />
+                        <div className='h-9 w-full rounded-2xl skeleton' />
+                        <div className='h-9 w-full rounded-2xl skeleton' />
                       </div>
                       <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
                         <div className='h-1.5 w-28 rounded-full bg-black/55' />
@@ -337,14 +337,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
+                    <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -356,12 +356,12 @@ export function PreviewPanel() {
                   <div className='rounded-[24px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
+                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px] tracking-[-0.01em]'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
 
-                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
@@ -453,11 +453,11 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  className='shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -522,7 +522,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'
+                    className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-[-0.01em] text-secondary-token'
                   >
                     {tag}
                   </span>
