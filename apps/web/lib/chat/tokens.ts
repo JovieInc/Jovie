@@ -54,12 +54,12 @@ const SKILL_PATTERN = /\/skill:([A-Za-z]\w*)/g;
 
 /** Escape `\` and `]` in labels so round-trip serialize→parse is lossless. */
 function escapeLabel(label: string): string {
-  return label.replace(/[\\\]]/g, c => `\\${c}`);
+  return label.replaceAll(/[\\\]]/g, c => `\\${c}`);
 }
 
 /** Reverse escapeLabel — strip each `\` that precedes an escaped char. */
 function unescapeLabel(label: string): string {
-  return label.replace(/\\(.)/g, '$1');
+  return label.replaceAll(/\\(.)/g, '$1');
 }
 
 export function serializeEntity(
