@@ -77,56 +77,80 @@ const getRowClassName = () => 'group hover:bg-(--linear-row-hover)';
 
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
+// Column definitions are shared between the live table and its skeleton so that
+// loading and loaded states render identical row geometry (no layout shift when
+// the streamed data arrives).
+const ACTIVITY_COLUMNS: ColumnDef<AdminActivityItem, any>[] = [
+  // User column
+  columnHelper.accessor('user', {
+    id: 'user',
+    header: 'User',
+    cell: renderUserCell,
+    size: 200,
+  }),
+
+  // Action column
+  columnHelper.accessor('action', {
+    id: 'action',
+    header: 'Action',
+    cell: renderActionCell,
+  }),
+
+  // Timestamp column
+  columnHelper.accessor('timestamp', {
+    id: 'timestamp',
+    header: 'Timestamp',
+    cell: renderTimestampCell,
+    size: 180,
+    minSize: 150,
+  }),
+
+  // Status column
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: 'Status',
+    cell: ({ getValue }) => renderStatusCell(getValue() as AdminActivityStatus),
+    size: 140,
+  }),
+];
+
+// Per-column skeleton geometry, sized to match each cell's loaded content so the
+// skeleton row collapses into the real row without horizontal jitter.
+const ACTIVITY_SKELETON_COLUMN_CONFIG = [
+  { width: '120px', variant: 'text' as const }, // User (handle)
+  { width: '240px', variant: 'text' as const }, // Action
+  { width: '110px', variant: 'text' as const }, // Timestamp
+  { width: '64px', variant: 'badge' as const }, // Status badge
+];
+
+const ACTIVITY_TABLE_CLASSNAME =
+  'text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]';
+
+const ACTIVITY_SUBHEADER = (
+  <AdminTableSubheader
+    start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
+  />
+);
+
+const ACTIVITY_CONTAINER_CLASSNAME =
+  'h-full border-0 bg-(--linear-app-content-surface)';
+
 export function ActivityTableUnified({
   items,
 }: Readonly<ActivityTableUnifiedProps>) {
-  // Define table columns using TanStack Table
+  // Bind the shared column definitions through useMemo so React treats the
+  // reference as stable across renders.
   const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
-    () => [
-      // User column
-      columnHelper.accessor('user', {
-        id: 'user',
-        header: 'User',
-        cell: renderUserCell,
-        size: 200,
-      }),
-
-      // Action column
-      columnHelper.accessor('action', {
-        id: 'action',
-        header: 'Action',
-        cell: renderActionCell,
-      }),
-
-      // Timestamp column
-      columnHelper.accessor('timestamp', {
-        id: 'timestamp',
-        header: 'Timestamp',
-        cell: renderTimestampCell,
-        size: 180,
-        minSize: 150,
-      }),
-
-      // Status column
-      columnHelper.accessor('status', {
-        id: 'status',
-        header: 'Status',
-        cell: ({ getValue }) =>
-          renderStatusCell(getValue() as AdminActivityStatus),
-        size: 140,
-      }),
-    ],
+    () => ACTIVITY_COLUMNS,
     []
   );
 
   return (
     <div
-      className='h-full border-0 bg-(--linear-app-content-surface)'
+      className={ACTIVITY_CONTAINER_CLASSNAME}
       data-testid='admin-activity-content'
     >
-      <AdminTableSubheader
-        start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
-      />
+      {ACTIVITY_SUBHEADER}
       <div className='overflow-x-auto'>
         <UnifiedTable
           data={items}
@@ -149,7 +173,49 @@ export function ActivityTableUnified({
           getRowClassName={getRowClassName}
           enableVirtualization={true}
           minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-          className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
+          className={ACTIVITY_TABLE_CLASSNAME}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface ActivityTableSkeletonProps {
+  /**
+   * How many skeleton rows to render. Should approximate the typical loaded
+   * page so the page doesn't visibly grow when real data streams in.
+   * @default 8
+   */
+  readonly rows?: number;
+}
+
+/**
+ * Loading skeleton that mirrors `ActivityTableUnified` exactly — same chrome,
+ * same `UnifiedTable` primitives, same column count, same per-column skeleton
+ * widths, and the same row height token. Rendering through the real table
+ * primitives is what guarantees zero layout shift when the live table replaces
+ * it during streaming SSR / Suspense resolution.
+ */
+export function ActivityTableSkeleton({
+  rows = 8,
+}: Readonly<ActivityTableSkeletonProps> = {}) {
+  const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
+    () => ACTIVITY_COLUMNS,
+    []
+  );
+
+  return (
+    <div className={ACTIVITY_CONTAINER_CLASSNAME} aria-busy='true'>
+      {ACTIVITY_SUBHEADER}
+      <div className='overflow-x-auto'>
+        <UnifiedTable<AdminActivityItem>
+          data={[]}
+          columns={columns}
+          isLoading
+          skeletonRows={rows}
+          skeletonColumnConfig={ACTIVITY_SKELETON_COLUMN_CONFIG}
+          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+          className={ACTIVITY_TABLE_CLASSNAME}
         />
       </div>
     </div>
