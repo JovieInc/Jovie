@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.169] - 2026-04-23
+
+> The homepage now opens with a tighter premium hero, real product navigation, and a live trust strip right under the fold. Visitors can go straight to Product, Solutions, Pricing, or Resources, ask Jovie from the new hero composer, and see the trust bar immediately instead of waiting on a staged flag.
+
+### Added
+
+- `apps/web/public/brand-logos/black-hole-recordings.png` — added a monochrome-ready Black Hole Recordings asset for the live homepage trust strip.
+
+### Changed
+
+- `apps/web/app/(home)/layout.tsx`, `MarketingHeader`, `HeaderNav`, `MobileNav`, and `MarketingSignInLink` — the live `/` route now uses the shared marketing header with `Product`, `Solutions`, `Pricing`, and `Resources`, plus a single white `Sign in` pill and no duplicate mobile `Log in` link.
+- `apps/web/app/(home)/page.tsx` and `apps/web/app/(home)/home.css` — rebuilt the homepage hero into a contained near-black surface with rounded bottom corners, a centered glow, a perspective grid, and spacing tuned for the fixed header on desktop and mobile.
+- `apps/web/components/homepage/intent.ts` and `HomepageIntent.tsx` — refreshed the homepage brief to `Your AI Artist Manager.`, updated the subhead and `Ask Jovie...` placeholder, and replaced the prompt pills with `Plan a release`, `Generate album art`, `Pitch playlists`, `Build artist profile`, and `Analyze momentum`.
+- `apps/web/components/features/home/HomeTrustSection.tsx` and `label-logos.tsx` — shipped the trust bar live on `/` with the label `Trusted by artists`, explicit homepage styling, and refreshed monochrome label treatment for Universal Music Group, Armada Music, The Orchard, AWAL, Black Hole Recordings, and disco:wax.
+- `apps/web/tests/e2e/homepage.spec.ts`, `apps/web/tests/e2e/homepage-intent.spec.ts`, `apps/web/components/homepage/HomepageIntent.test.tsx`, `apps/web/components/homepage/intent.test.ts`, and `apps/web/tests/unit/home/intent-store.test.ts` — updated homepage coverage for the new hero copy, nav map, trust strip, mobile nav behavior, and prompt analytics payloads.
+- [internal] Synced `VERSION`, `version.json`, and all package manifests to `26.4.169` so the repo's version sources agree again.
+
 ## [26.4.168] - 2026-04-22
 
 > Profile edits through chat now actually show you the confirmation. "Update my bio to..." used to save the bio silently with no assistant reply, making it look like nothing happened. Every deterministic chat action (bio, name, add link, remove link, avatar upload, feedback) now streams back a visible assistant confirmation.
