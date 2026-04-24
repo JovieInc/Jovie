@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.173] - 2026-04-24
+
+> The back button inside the intercepted signup modal stops reading as "Back to chat" to screen readers when the user didn't come from chat. Screen-reader users arriving via profile claim, the dev unavailable card, or a direct `/signup` intercept now hear an accurate "Go back" label instead of being told they're returning to a chat they never had.
+
+### Fixed
+
+- `apps/web/components/auth/AuthModalShell.tsx` — added a `backButtonLabel` prop (default `Go back`) so the dismiss button's `aria-label` is always truthful. Removed the hardcoded `Back to chat` literal that was misleading for every non-chat entry point.
+- `apps/web/app/@auth/(.)signup/page.tsx` — only passes `Back to chat` when a homepage chat intent hint is actually present; otherwise falls through to the generic `Go back` default.
+
+### Added
+
+- `apps/web/tests/unit/auth/AuthModalShell.test.tsx` — regression test locking in the neutral default and the caller-supplied override so this can't regress back to the misleading literal.
+
 ## [26.4.172] - 2026-04-23
 
 > The intercepted signup modal no longer blows out to the full viewport when the intent hint is short. The dialog now hugs its content, centers cleanly, and the Clerk form sits flush inside our modal chrome instead of stacking a second card inside a card.
