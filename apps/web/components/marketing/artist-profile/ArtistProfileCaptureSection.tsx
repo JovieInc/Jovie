@@ -25,7 +25,7 @@ export function ArtistProfileCaptureSection({
           bodyClassName='mx-auto max-w-[34rem]'
         />
 
-        <ArtistProfileCaptureVisual capture={capture} className='mt-12' />
+        <ArtistProfileCaptureVisual capture={capture} className='mt-10' />
       </div>
     </ArtistProfileSectionShell>
   );
