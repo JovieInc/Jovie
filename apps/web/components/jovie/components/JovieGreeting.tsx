@@ -55,14 +55,21 @@ export function JovieGreeting({
   return (
     <div
       className={cn(
-        'mx-auto max-w-[42rem] rounded-[22px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-5 py-3.5 text-center dark:border-white/8 sm:px-6',
+        'mx-auto max-w-[42rem] rounded-[22px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-5 py-4 text-center dark:border-white/8 sm:px-6',
         className
       )}
     >
-      <p className='text-[11px] font-semibold tracking-[0.01em] text-tertiary-token'>
-        {greeting.label}
-      </p>
-      <p className='mt-1.5 text-balance text-[15px] leading-6 text-secondary-token'>
+      {greeting.label ? (
+        <p className='text-[11px] font-semibold tracking-[0.01em] text-tertiary-token'>
+          {greeting.label}
+        </p>
+      ) : null}
+      <p
+        className={cn(
+          'text-balance text-[15px] leading-6 text-secondary-token',
+          greeting.label ? 'mt-1.5' : null
+        )}
+      >
         {greeting.body}{' '}
         {greeting.profileHref && greeting.profileLabel ? (
           <>

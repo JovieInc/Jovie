@@ -2,7 +2,7 @@ import type { InsightResponse } from '@/types/insights';
 import type { ArtistContext } from '../types';
 
 export interface GreetingContent {
-  readonly label: string;
+  readonly label: string | null;
   readonly body: string;
   readonly profileHref: string | null;
   readonly profileLabel: string | null;
@@ -51,10 +51,13 @@ export function buildGreeting({
     };
   }
 
+  // Returning-user greetings intentionally drop the "Welcome back" eyebrow:
+  // DESIGN.md discourages eyebrow labels as a default hierarchy tool, and empty
+  // states default to a single sentence. The body carries the whole message.
   const topInsight = insights.find(insight => insight.title.trim().length > 0);
   if (topInsight) {
     return {
-      label: 'Welcome back',
+      label: null,
       body: ensureSentence(topInsight.title),
       profileHref: null,
       profileLabel: null,
@@ -63,7 +66,7 @@ export function buildGreeting({
 
   if (tippingStats.tipsSubmitted > 0) {
     return {
-      label: 'Welcome back',
+      label: null,
       body: `You've received ${tippingStats.tipsSubmitted} ${getPaymentLabel(tippingStats.tipsSubmitted)} since your last check-in.`,
       profileHref: null,
       profileLabel: null,
@@ -71,7 +74,7 @@ export function buildGreeting({
   }
 
   return {
-    label: 'Welcome back',
+    label: null,
     body: 'Share your profile to start building your audience.',
     profileHref: null,
     profileLabel: null,
