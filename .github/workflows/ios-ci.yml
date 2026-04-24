@@ -4,15 +4,15 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'apps/ios/**'
-      - 'package.json'
-      - '.github/workflows/ios-ci.yml'
+      - "apps/ios/**"
+      - "package.json"
+      - ".github/workflows/ios-ci.yml"
   push:
     branches: [main]
     paths:
-      - 'apps/ios/**'
-      - 'package.json'
-      - '.github/workflows/ios-ci.yml'
+      - "apps/ios/**"
+      - "package.json"
+      - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -96,6 +96,12 @@ jobs:
                 exit
               '
             )"
+          fi
+
+          if [[ -z "$DESTINATION" ]] &&
+            [[ "$DESTINATIONS" == *"platform:iOS Simulator"* ]] &&
+            [[ "$DESTINATIONS" == *"name:Any iOS Simulator Device"* ]]; then
+            DESTINATION="platform=iOS Simulator,name=Any iOS Simulator Device"
           fi
 
           if [[ -z "$DESTINATION" ]]; then
