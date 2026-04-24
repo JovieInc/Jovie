@@ -368,6 +368,11 @@ export default async function ArtistPage({
     notFound();
   }
 
+  // Kick off independent DB queries immediately so they overlap with the
+  // synchronous artist conversion, visitor-state, and tracking-token work below.
+  const tourDatesPromise = getPublicTourDates(profile.id);
+  const releasesPromise = getPublicReleases(profile.id);
+
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
   const directClaimSupported = supportsDirectProfileClaim({
@@ -395,8 +400,6 @@ export default async function ArtistPage({
     // Secret not configured — visit tracking will proceed without token auth
   }
 
-  const tourDatesPromise = getPublicTourDates(profile.id);
-  const releasesPromise = getPublicReleases(profile.id);
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
