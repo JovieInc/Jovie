@@ -46,7 +46,7 @@ export function InsightsSummaryWidget() {
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='inline-flex items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-[11px] font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+          className='inline-flex items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
           <span>View all</span>
           <ChevronRight className='h-3 w-3' aria-hidden='true' />

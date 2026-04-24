@@ -216,7 +216,7 @@ function RankedList({
           className='group flex h-9 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-[11px] font-caption text-tertiary-token tabular-nums'>
+            <span className='w-3 text-2xs font-caption text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
             <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />

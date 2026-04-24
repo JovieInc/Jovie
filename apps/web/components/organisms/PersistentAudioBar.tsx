@@ -91,7 +91,7 @@ export function PersistentAudioBar() {
           {(playbackState.releaseTitle || playbackState.artistName) && (
             <TruncatedText
               lines={1}
-              className='text-[11px] leading-[1.3] text-tertiary-token'
+              className='text-2xs leading-[1.3] text-tertiary-token'
             >
               {[playbackState.artistName, playbackState.releaseTitle]
                 .filter(Boolean)

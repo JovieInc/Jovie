@@ -44,7 +44,7 @@ export function ReleaseTaskExplainerPopover({
             href={learnMoreUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='mt-2 inline-block text-[11px] text-[var(--linear-accent,#5e6ad2)] hover:underline'
+            className='mt-2 inline-block text-2xs text-[var(--linear-accent,#5e6ad2)] hover:underline'
           >
             Learn more &rarr;
           </a>

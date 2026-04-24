@@ -32,7 +32,7 @@ export function AudienceRowSelectionCell({
       >
         <span
           className={cn(
-            'select-none text-[11px] tabular-nums text-tertiary-token transition-opacity',
+            'select-none text-2xs tabular-nums text-tertiary-token transition-opacity',
             isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
           )}
           aria-hidden='true'

@@ -268,7 +268,7 @@ function TrackListRow({
       </div>
 
       {trackDuration ? (
-        <span className='shrink-0 text-[11px] tabular-nums text-tertiary-token'>
+        <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
           {trackDuration}
         </span>
       ) : null}

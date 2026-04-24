@@ -31,9 +31,9 @@ const VARIANT_STYLES: Record<
 > = {
   compact: {
     container: 'space-y-1',
-    number: 'text-[11px]',
+    number: 'text-2xs',
     title: 'text-[12px]',
-    meta: 'text-[11px]',
+    meta: 'text-2xs',
   },
   drawer: {
     container: 'space-y-1.5',

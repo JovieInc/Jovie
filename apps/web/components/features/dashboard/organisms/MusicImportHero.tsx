@@ -133,7 +133,7 @@ export const MusicImportHero = memo(function MusicImportHero({
           variant='secondary'
           size='sm'
           asChild
-          className='rounded-[10px] text-[11px] font-caption tracking-[-0.01em]'
+          className='rounded-[10px] text-2xs font-caption tracking-[-0.01em]'
         >
           <Link href={APP_ROUTES.DASHBOARD_RELEASES}>
             {isImporting ? 'View All Releases' : 'Explore Your Releases'}

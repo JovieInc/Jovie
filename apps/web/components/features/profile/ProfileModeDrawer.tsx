@@ -160,7 +160,7 @@ function ProfileModeDrawerContactList({
                     {contact.roleLabel}
                   </span>
                   {contact.territorySummary ? (
-                    <span className='rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/58'>
+                    <span className='rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-2xs font-semibold text-white/58'>
                       {contact.territorySummary}
                     </span>
                   ) : null}

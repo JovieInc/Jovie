@@ -76,13 +76,13 @@ function CookieCategories({
             <div className='flex min-w-0 flex-1 flex-col gap-px'>
               <span
                 id={titleId}
-                className='text-[11px] font-medium text-primary-token'
+                className='text-2xs font-medium text-primary-token'
               >
                 {category.label}
               </span>
               <p
                 id={descId}
-                className='text-[11px] leading-snug text-secondary-token'
+                className='text-2xs leading-snug text-secondary-token'
               >
                 {category.description}
               </p>

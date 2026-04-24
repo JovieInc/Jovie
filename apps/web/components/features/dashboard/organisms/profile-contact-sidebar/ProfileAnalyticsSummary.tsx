@@ -84,7 +84,7 @@ export function ProfileAnalyticsSummary() {
             <DrawerButton
               type='button'
               tone='ghost'
-              className='h-6 rounded-full border-transparent px-1.5 py-0 text-[11px] font-normal text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
+              className='h-6 rounded-full border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown

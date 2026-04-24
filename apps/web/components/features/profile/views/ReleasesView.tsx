@@ -106,7 +106,7 @@ export function ReleasesView({
         return (
           <div key={release.id}>
             {showHeader ? (
-              <div className='px-4 pb-1 pt-4 text-[11px] font-caption text-white/30'>
+              <div className='px-4 pb-1 pt-4 text-2xs font-caption text-white/30'>
                 {year}
               </div>
             ) : null}

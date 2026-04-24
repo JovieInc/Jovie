@@ -111,7 +111,7 @@ export function ReleaseCreditsSection({
       testId='release-credits-card'
     >
       <div className='p-3'>
-        <p className='mb-2 text-[11px] font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
+        <p className='mb-2 text-2xs font-[550] uppercase tracking-[0.06em] text-quaternary-token'>
           Credits
         </p>
         {content}

@@ -88,7 +88,7 @@ export function BillingHistorySection({
                         </Badge>
                       </div>
                     </div>
-                    <time className='shrink-0 text-[11px] text-tertiary-token'>
+                    <time className='shrink-0 text-2xs text-tertiary-token'>
                       {formatDate(entry.timestamp)}
                     </time>
                   </div>
@@ -101,7 +101,7 @@ export function BillingHistorySection({
               <p className='mt-3 text-app text-secondary-token'>
                 No billing events yet.
               </p>
-              <p className='mt-1 text-[11px] text-tertiary-token'>
+              <p className='mt-1 text-2xs text-tertiary-token'>
                 Events will appear here as your subscription activity changes.
               </p>
             </div>

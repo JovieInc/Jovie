@@ -63,7 +63,7 @@ export function DspPresenceSummary({
   return (
     <PageToolbar
       start={
-        <div className='flex min-w-0 items-center gap-2 text-[11px] text-tertiary-token'>
+        <div className='flex min-w-0 items-center gap-2 text-2xs text-tertiary-token'>
           <span>
             {confirmedCount} matched platform
             {confirmedCount === 1 ? '' : 's'}

@@ -132,7 +132,7 @@ export const AvatarCell = React.memo(function AvatarCell({
               className={cn(
                 'line-clamp-1 overflow-hidden text-ellipsis',
                 displayName
-                  ? 'text-[11px] text-secondary-token'
+                  ? 'text-2xs text-secondary-token'
                   : 'text-app font-caption text-primary-token'
               )}
             >
@@ -144,7 +144,7 @@ export const AvatarCell = React.memo(function AvatarCell({
               className={cn(
                 'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
                 displayName
-                  ? 'text-[11px]'
+                  ? 'text-2xs'
                   : 'text-app font-caption text-primary-token'
               )}
               onClick={event => event.stopPropagation()}

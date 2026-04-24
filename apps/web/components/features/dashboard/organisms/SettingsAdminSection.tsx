@@ -100,7 +100,7 @@ export function SettingsAdminSection() {
         <div className='space-y-4 px-4 py-4 sm:px-5'>
           {quickLinkSections.map(section => (
             <div key={section.label} className='space-y-2'>
-              <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
                 {section.label}
               </p>
               <div className='divide-y divide-subtle/60'>

@@ -134,7 +134,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
             {displayName}
           </TruncatedText>
           {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-[11px] text-tertiary-token tabular-nums'>
+            <span className='flex-shrink-0 text-2xs text-tertiary-token tabular-nums'>
               {formatTimeAgo(member.lastSeenAt)}
             </span>
           )}
@@ -198,7 +198,7 @@ function MemberDetails({
   return (
     <div className='mt-0.5 space-y-0.5'>
       {/* Row 2: Intent + Returning + Source + City */}
-      <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
+      <p className='text-2xs flex items-center gap-1.5 min-w-0'>
         <span
           className={cn(
             'inline-block size-1.5 rounded-full shrink-0',
@@ -234,7 +234,7 @@ function MemberDetails({
 
       {/* Row 3: Last action + LTV value */}
       {(lastAction || hasValue) && (
-        <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
+        <p className='text-2xs flex items-center gap-1.5 min-w-0'>
           {lastAction && (
             <span className='truncate text-tertiary-token'>{lastAction}</span>
           )}
@@ -274,7 +274,7 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
         </p>
       )}
       {member.lastSeenAt && (
-        <p className='text-[11px] text-tertiary-token'>
+        <p className='text-2xs text-tertiary-token'>
           Subscribed {formatTimeAgo(member.lastSeenAt)}
         </p>
       )}

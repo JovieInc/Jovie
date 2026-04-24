@@ -18,7 +18,7 @@ export function ReleaseTaskEmptyState({
         20 battle-tested tasks to maximize your release — from DSP pitching to
         fan notifications.
       </p>
-      <ul className='text-[11px] text-secondary-token space-y-1 mb-5'>
+      <ul className='text-2xs text-secondary-token space-y-1 mb-5'>
         <li>• Pitch to Spotify editorial</li>
         <li>• Upload Spotify Canvas video</li>
         <li>• Submit lyrics to Genius</li>

@@ -68,7 +68,7 @@ function AudienceMemberEntityHeader({
           title={primaryLabel}
           subtitle={secondaryLabel}
           meta={
-            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
               {member.locationLabel ? (
                 <span className='inline-flex items-center gap-1'>
                   <MapPin className='h-3 w-3' />
