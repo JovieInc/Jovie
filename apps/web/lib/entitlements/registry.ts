@@ -635,7 +635,7 @@ const LEGACY_PLAN_ALIASES = {
 export function isValidPlanId(plan: string | null | undefined): boolean {
   if (typeof plan !== 'string' || plan.length === 0) return false;
   if ((PLAN_IDS as readonly string[]).includes(plan)) return true;
-  return plan in LEGACY_PLAN_ALIASES;
+  return Object.hasOwn(LEGACY_PLAN_ALIASES, plan);
 }
 
 /**
@@ -647,7 +647,7 @@ export function resolveCanonicalPlanId(
 ): PlanId | null {
   if (typeof plan !== 'string' || plan.length === 0) return null;
   if ((PLAN_IDS as readonly string[]).includes(plan)) return plan as PlanId;
-  if (plan in LEGACY_PLAN_ALIASES) {
+  if (Object.hasOwn(LEGACY_PLAN_ALIASES, plan)) {
     return LEGACY_PLAN_ALIASES[plan as keyof typeof LEGACY_PLAN_ALIASES];
   }
   return null;

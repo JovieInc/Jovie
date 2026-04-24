@@ -145,6 +145,7 @@ export async function invalidateStripeCustomerCache(
 export async function createCheckoutSession({
   customerId,
   priceId,
+  plan,
   userId,
   successUrl,
   cancelUrl,
@@ -153,6 +154,7 @@ export async function createCheckoutSession({
 }: {
   customerId: string;
   priceId: string;
+  plan?: string;
   userId: string;
   successUrl: string;
   cancelUrl: string;
@@ -180,6 +182,7 @@ export async function createCheckoutSession({
         // Add metadata for tracking
         metadata: {
           clerk_user_id: userId,
+          ...(plan ? { plan } : {}),
           ...(referralCode ? { referral_code: referralCode } : {}),
         },
 
@@ -187,6 +190,7 @@ export async function createCheckoutSession({
         subscription_data: {
           metadata: {
             clerk_user_id: userId,
+            ...(plan ? { plan } : {}),
             ...(referralCode ? { referral_code: referralCode } : {}),
           },
         },

@@ -22,6 +22,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
 import {
   getPlanDisplayName,
+  type PlanId,
   resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -32,6 +33,8 @@ interface UnlockTile {
   readonly title: string;
   readonly description: string;
 }
+
+type PaidPlanId = Exclude<PlanId, 'free'>;
 
 const PRO_UNLOCK_TILES: readonly UnlockTile[] = [
   {
@@ -88,12 +91,17 @@ const GENERIC_UNLOCK_TILES: readonly UnlockTile[] = [
 ];
 
 function resolveUnlockTiles(
-  canonicalPlan: string | null
+  canonicalPlan: PaidPlanId | null
 ): readonly UnlockTile[] {
   if (canonicalPlan === 'max') return MAX_UNLOCK_TILES;
   if (canonicalPlan === 'pro' || canonicalPlan === 'trial')
     return PRO_UNLOCK_TILES;
   return GENERIC_UNLOCK_TILES;
+}
+
+function resolvePaidPlan(plan: string | null | undefined): PaidPlanId | null {
+  const canonical = resolveCanonicalPlanId(plan);
+  return canonical && canonical !== 'free' ? canonical : null;
 }
 
 function getVerificationButtonLabel(state: string): string {
@@ -115,6 +123,7 @@ function FeatureCard({ icon: Icon, title, description }: UnlockTile) {
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
+  const checkoutSessionId = searchParams.get('session_id');
   const rawPlanIdParam = searchParams.get('plan_id');
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
@@ -122,33 +131,70 @@ export default function CheckoutSuccessPage() {
   const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [validatedSessionPlan, setValidatedSessionPlan] =
+    useState<PaidPlanId | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
-  // Resolve the plan used for display ONCE per render. We prefer the validated
-  // Stripe session `plan_id` (authoritative at checkout) over `billingData.plan`
-  // (eventually consistent via webhook). If both miss validation, we fall
-  // through to a generic "new plan" rendering — we never want to display
-  // "Welcome to Free" just because a value could not be recognized.
+  useEffect(() => {
+    if (!checkoutSessionId) {
+      setValidatedSessionPlan(null);
+      return;
+    }
+
+    const sessionId = checkoutSessionId;
+    const controller = new AbortController();
+
+    async function validateCheckoutSession() {
+      try {
+        const response = await fetch(
+          `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          setValidatedSessionPlan(null);
+          return;
+        }
+
+        const body = (await response.json()) as { plan?: string | null };
+        setValidatedSessionPlan(resolvePaidPlan(body.plan ?? null));
+      } catch (_error) {
+        if (controller.signal.aborted) return;
+        setValidatedSessionPlan(null);
+      }
+    }
+
+    void validateCheckoutSession();
+
+    return () => controller.abort();
+  }, [checkoutSessionId]);
+
   const resolvedPlan = useMemo<{
-    readonly canonical: 'free' | 'trial' | 'pro' | 'max' | null;
+    readonly canonical: PaidPlanId | null;
     readonly displayName: string | null;
   }>(() => {
-    const fromParam = resolveCanonicalPlanId(rawPlanIdParam);
-    if (fromParam && fromParam !== 'free') {
+    const fromBilling = resolvePaidPlan(billingData?.plan ?? null);
+    const fromParam = resolvePaidPlan(rawPlanIdParam);
+    const validatedParam =
+      fromParam &&
+      (fromParam === validatedSessionPlan ||
+        (!validatedSessionPlan && fromParam === fromBilling))
+        ? fromParam
+        : null;
+    const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
+
+    if (canonicalPlan) {
       return {
-        canonical: fromParam,
-        displayName: getPlanDisplayName(fromParam),
+        canonical: canonicalPlan,
+        displayName: getPlanDisplayName(canonicalPlan),
       };
     }
-    const fromBilling = resolveCanonicalPlanId(billingData?.plan ?? null);
-    if (fromBilling && fromBilling !== 'free') {
-      return {
-        canonical: fromBilling,
-        displayName: getPlanDisplayName(fromBilling),
-      };
-    }
+
     return { canonical: null, displayName: null };
-  }, [rawPlanIdParam, billingData?.plan]);
+  }, [billingData?.plan, rawPlanIdParam, validatedSessionPlan]);
 
   const unlockTiles = useMemo(
     () => resolveUnlockTiles(resolvedPlan.canonical),
@@ -165,7 +211,9 @@ export default function CheckoutSuccessPage() {
       section: 'success',
       conversion: true,
     });
+  }, []);
 
+  useEffect(() => {
     if (prefersReducedMotion) {
       setIsVisible(true);
       return;
