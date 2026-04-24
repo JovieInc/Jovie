@@ -41,64 +41,62 @@ interface ProfileHomeRailProps {
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
 }
 
-function toDateValue(value: Date | string | null | undefined) {
+const PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
+
+function getProfileDateValue(value: Date | string | null | undefined) {
   if (!value) {
     return null;
   }
 
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
+  const normalizedValue =
+    value instanceof Date
+      ? new Date(value)
+      : /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? `${value}T00:00:00`
+        : value;
+  const date = new Date(normalizedValue);
 
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
+function getProfileLocalDayTimestamp(value: Date | string | null | undefined) {
+  const date = getProfileDateValue(value);
+  if (!date) {
+    return null;
+  }
+
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }
 
-function getUpcomingTourDates(
+export function getUpcomingProfileTourDates(
   tourDates: readonly TourDateViewModel[],
   now = new Date()
 ) {
-  const today = startOfLocalDay(now);
+  const today = getProfileLocalDayTimestamp(now) ?? Number.NEGATIVE_INFINITY;
 
   return [...tourDates]
-    .filter(tourDate => {
-      const start = toDateValue(tourDate.startDate);
-      return (
-        start !== null && startOfLocalDay(start).getTime() >= today.getTime()
-      );
-    })
     .sort(
       (left, right) =>
-        (toDateValue(left.startDate)?.getTime() ?? 0) -
-        (toDateValue(right.startDate)?.getTime() ?? 0)
-    );
+        (getProfileLocalDayTimestamp(left.startDate) ??
+          Number.MAX_SAFE_INTEGER) -
+        (getProfileLocalDayTimestamp(right.startDate) ??
+          Number.MAX_SAFE_INTEGER)
+    )
+    .filter(tourDate => {
+      const start = getProfileLocalDayTimestamp(tourDate.startDate);
+      return start !== null && start >= today;
+    });
 }
 
-function formatReleaseDateLabel(value: Date | string | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) {
-    return 'Soon';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
+export function formatProfileDateLabel(
+  value: Date | string | null | undefined
+) {
+  const date = getProfileDateValue(value);
+  return date ? PROFILE_DATE_FORMATTER.format(date) : 'Soon';
 }
 
 function getFeaturedRailCardKind(
@@ -253,7 +251,7 @@ export function ProfileHomeRail({
   const railRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates),
+    () => getUpcomingProfileTourDates(tourDates),
     [tourDates]
   );
   const releaseVisibility = useMemo(
@@ -435,7 +433,7 @@ export function ProfileHomeRail({
       {featuredState.kind === 'release_countdown' && latestRelease ? (
         <p className='px-1 text-xs font-medium tracking-[-0.01em] text-primary-token/58'>
           Release spotlight: {latestRelease.title} drops{' '}
-          {formatReleaseDateLabel(latestRelease.releaseDate)}
+          {formatProfileDateLabel(latestRelease.releaseDate)}
         </p>
       ) : null}
     </div>

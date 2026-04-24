@@ -27,7 +27,11 @@ import type {
   ProfileRenderMode,
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
-import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
+import {
+  formatProfileDateLabel,
+  getUpcomingProfileTourDates,
+  ProfileHomeRail,
+} from '@/features/profile/ProfileHomeRail';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
@@ -166,67 +170,6 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function toDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
-
-function getUpcomingTourDate(
-  tourDates: readonly TourDateViewModel[]
-): TourDateViewModel | null {
-  const today = startOfLocalDay(new Date());
-
-  return (
-    [...tourDates]
-      .filter(tourDate => {
-        const start = toDateValue(tourDate.startDate);
-        return (
-          start !== null && startOfLocalDay(start).getTime() >= today.getTime()
-        );
-      })
-      .sort(
-        (left, right) =>
-          (toDateValue(left.startDate)?.getTime() ?? 0) -
-          (toDateValue(right.startDate)?.getTime() ?? 0)
-      )[0] ?? null
-  );
-}
-
-function formatCalendarLabel(date: Date | string | null | undefined) {
-  const value = toDateValue(date);
-  if (!value) {
-    return 'Soon';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(value);
-}
-
 function resolveActivePrimaryTab(mode: ProfileMode): ProfilePrimaryTab {
   switch (mode) {
     case 'listen':
@@ -265,7 +208,7 @@ function resolveModeSummary(params: {
       return {
         title: 'Live Dates',
         body: params.upcomingTourDate
-          ? `Next date: ${formatCalendarLabel(params.upcomingTourDate.startDate)} at ${params.upcomingTourDate.venueName}.`
+          ? `Next date: ${formatProfileDateLabel(params.upcomingTourDate.startDate)} at ${params.upcomingTourDate.venueName}.`
           : `No tour dates are live yet. Alerts stay ready for the next announcement.`,
       };
     case 'subscribe':
@@ -319,7 +262,7 @@ function resolveStatusPill(params: {
       params.upcomingTourDate.city || params.upcomingTourDate.venueName;
     return {
       icon: CalendarDays,
-      label: `Next show ${formatCalendarLabel(params.upcomingTourDate.startDate)} in ${city}`,
+      label: `Next show ${formatProfileDateLabel(params.upcomingTourDate.startDate)} in ${city}`,
     };
   }
 
@@ -331,7 +274,7 @@ function resolveStatusPill(params: {
     return releaseVisibility.isCountdown
       ? {
           icon: Bell,
-          label: `Release drops ${formatCalendarLabel(params.latestRelease.releaseDate)}`,
+          label: `Release drops ${formatProfileDateLabel(params.latestRelease.releaseDate)}`,
         }
       : {
           icon: Bell,
@@ -449,7 +392,7 @@ export function ProfileCompactSurface({
   const activePrimaryTab = resolveActivePrimaryTab(activeMode);
   const isHomeMode = activeMode === 'profile';
   const upcomingTourDate = useMemo(
-    () => getUpcomingTourDate(tourDates),
+    () => getUpcomingProfileTourDates(tourDates)[0] ?? null,
     [tourDates]
   );
   const statusPill = useMemo(
