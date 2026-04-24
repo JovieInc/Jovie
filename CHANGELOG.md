@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.174] - 2026-04-24
+
+> Settings route aliases now resolve to the right canonical pages instead of bouncing users into ambiguous surfaces, and paid checkout lands on a real upgrade moment instead of a transactional card. Account-focused settings now live under one canonical route, stale settings aliases redirect cleanly, checkout success titles are keyed to a validated plan hint, and the page points people straight into chat or releases with registry-backed unlock tiles.
+
+### Changed
+
+- `apps/web/app/app/(shell)/settings/account/page.tsx`, `apps/web/components/features/dashboard/organisms/SettingsPolished.tsx`, and `apps/web/constants/routes.ts` — made `/app/settings/account` the canonical focused route for the Account section, updated copy to describe security, theme, and creator verification preferences, and marked `SETTINGS_APPEARANCE` / `SETTINGS_NOTIFICATIONS` as deprecated aliases.
+- `apps/web/app/app/(shell)/settings/appearance/page.tsx`, `apps/web/app/app/(shell)/settings/notifications/page.tsx`, and `apps/web/app/app/(shell)/settings/delete-account/page.tsx` — converted legacy settings entrypoints into simple redirects so old URLs keep working without duplicating focused-page logic.
+- `apps/web/app/billing/success/page.tsx` and `apps/web/app/billing/success/loading.tsx` — redesigned checkout success into a plan-aware upgrade moment with one reduced-motion-safe entrance animation, flat unlock tiles sourced from `ENTITLEMENT_REGISTRY`, and direct CTAs to `/app/chat` and `/app/dashboard/releases`.
+- `apps/web/app/api/stripe/checkout/route.ts` — appended a validated `plan_id` hint to non-onboarding success URLs so the success page can prefer checkout intent over eventually consistent billing status.
+
+### Fixed
+
+- `apps/web/app/billing/success/page.test.tsx`, `apps/web/tests/unit/api/stripe/checkout.test.ts`, and `apps/web/tests/unit/dashboard/SettingsPolished.test.tsx` — added coverage for canonical account links, legacy settings redirects, billing plan precedence, invalid checkout plan hints, and success URL generation; removed the two stale duplicate billing-success test files so one suite owns that surface.
+
 ## [26.4.173] - 2026-04-24
 
 > Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
