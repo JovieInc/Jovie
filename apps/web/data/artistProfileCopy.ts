@@ -140,6 +140,35 @@ export interface ArtistProfileLandingCopy {
     readonly cards: readonly ArtistProfileOutcomeCard[];
     readonly syntheticProofs: ArtistProfileOutcomeProof;
   };
+  readonly outcomeDuo: {
+    readonly marketingHeadline: string;
+    readonly homepageHeadline: string;
+    readonly cards: {
+      readonly getPaid: {
+        readonly label: string;
+        readonly drawerTitle: string;
+        readonly amountRows: readonly {
+          readonly id: string;
+          readonly amount: string;
+          readonly currency: string;
+          readonly featured?: boolean;
+        }[];
+        readonly ctaLabel: string;
+      };
+      readonly sellOut: {
+        readonly label: string;
+        readonly drawerTitle: string;
+        readonly drawerRows: readonly {
+          readonly id: string;
+          readonly month: string;
+          readonly day: string;
+          readonly venue: string;
+          readonly location: string;
+          readonly ctaLabel: string;
+        }[];
+      };
+    };
+  };
   readonly monetization: {
     readonly headline: string;
     readonly subhead: string;
@@ -623,6 +652,60 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         url: 'jov.ie/tim',
         title: 'Share-ready',
         subtitle: 'Bio, QR, stories, and shows.',
+      },
+    },
+  },
+  outcomeDuo: {
+    marketingHeadline: 'Artist Profiles. Built to convert.',
+    homepageHeadline: 'Artist Profiles. Built to convert.',
+    cards: {
+      getPaid: {
+        label: 'Get Paid',
+        drawerTitle: 'Pay',
+        amountRows: [
+          { id: 'five', amount: '$5', currency: 'USD' },
+          { id: 'ten', amount: '$10', currency: 'USD', featured: true },
+          { id: 'twenty', amount: '$20', currency: 'USD' },
+        ],
+        ctaLabel: 'Continue with Venmo',
+      },
+      sellOut: {
+        label: 'Sell Out',
+        drawerTitle: 'Tour Dates',
+        drawerRows: [
+          {
+            id: 'los-angeles',
+            month: 'May',
+            day: '18',
+            venue: 'The Novo',
+            location: 'Los Angeles, CA',
+            ctaLabel: 'Tickets',
+          },
+          {
+            id: 'chicago',
+            month: 'May',
+            day: '24',
+            venue: 'Radius',
+            location: 'Chicago, IL',
+            ctaLabel: 'Tickets',
+          },
+          {
+            id: 'brooklyn',
+            month: 'Jun',
+            day: '07',
+            venue: 'Brooklyn Steel',
+            location: 'Brooklyn, NY',
+            ctaLabel: 'Tickets',
+          },
+          {
+            id: 'metro',
+            month: 'Jun',
+            day: '14',
+            venue: 'Metro',
+            location: 'Chicago, IL',
+            ctaLabel: 'Tickets',
+          },
+        ],
       },
     },
   },

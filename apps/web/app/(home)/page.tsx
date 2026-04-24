@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
@@ -11,6 +12,7 @@ import {
   HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
   buildOrganizationSchema,
@@ -186,6 +188,12 @@ export default function HomePage() {
         label='Trusted by artists'
         className='homepage-trust-reveal'
       />
+
+      <ArtistProfileOutcomeDuo
+        headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
+        duo={ARTIST_PROFILE_COPY.outcomeDuo}
+      />
+
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
         <HomepageV2SystemOverview />
       ) : null}
