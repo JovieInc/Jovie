@@ -219,8 +219,8 @@ export async function POST(request: NextRequest) {
         userId,
         successUrl:
           checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=success`
-            : `${baseUrl}/billing/success`,
+            ? `${baseUrl}${onboardingReturnTo}&upgrade=success${selectedPlan ? `&plan_id=${encodeURIComponent(selectedPlan)}` : ''}`
+            : `${baseUrl}/billing/success${selectedPlan ? `?plan_id=${encodeURIComponent(selectedPlan)}` : ''}`,
         cancelUrl:
           checkoutSource === 'onboarding'
             ? `${baseUrl}${onboardingReturnTo}&upgrade=cancel`
