@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import Link from 'next/link';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -25,37 +25,6 @@ export function ArtistProfileSocialProof({
         <p className='mt-5 max-w-[28rem] text-[clamp(1rem,1.55vw,1.16rem)] leading-[1.65] tracking-[-0.02em] text-secondary-token'>
           {socialProof.intro}
         </p>
-      </div>
-
-      <div className='mx-auto mt-10 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
-        {proofData.profileCards.map(card => (
-          <article
-            key={card.id}
-            className='overflow-hidden rounded-[1.15rem] bg-white/[0.018]'
-          >
-            <div className='relative aspect-[4/3]'>
-              <Image
-                src={card.src}
-                alt={`${card.name} profile image`}
-                fill
-                sizes='(max-width: 1024px) 100vw, 360px'
-                className='object-cover'
-              />
-              <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,12,0.06),rgba(8,9,12,0.72)_100%)]' />
-              <div className='absolute inset-x-0 bottom-0 z-10 p-5'>
-                <p className='font-mono text-[12px] tracking-[-0.02em] text-white/70'>
-                  jov.ie/{card.handle}
-                </p>
-                <p className='mt-2 text-[20px] font-medium tracking-[-0.02em] text-white'>
-                  {card.name}
-                </p>
-                <p className='mt-2 text-[13px] leading-[1.6] text-white/72'>
-                  {card.supportingLine}
-                </p>
-              </div>
-            </div>
-          </article>
-        ))}
       </div>
 
       {proofData.hasRealQuotes ? (
@@ -91,6 +60,12 @@ export function ArtistProfileSocialProof({
             <p className='text-[12px] tracking-[-0.01em] text-black/56'>
               {proofData.founderQuote.role}
             </p>
+            <Link
+              href='/tim'
+              className='mt-3 inline-flex w-fit font-mono text-[12px] tracking-[-0.02em] text-black/56 transition-colors hover:text-black'
+            >
+              jov.ie/tim
+            </Link>
           </div>
         </article>
       ) : null}

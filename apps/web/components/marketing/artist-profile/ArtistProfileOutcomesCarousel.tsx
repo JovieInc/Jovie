@@ -27,6 +27,17 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
   'share-anywhere': getAccentCssVars('orange').solid,
 };
 
+// Per-card widths. Horizontal rail lets each outcome take the room its
+// mockup actually needs. Drive streams and Sell out need side-by-side
+// proofs, so they get wider slots; Share anywhere is a single QR card
+// and can stay narrow.
+const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
+  'drive-streams': 'w-[85vw] sm:w-[34rem] lg:w-[38rem]',
+  'sell-out': 'w-[85vw] sm:w-[36rem] lg:w-[40rem]',
+  'get-paid': 'w-[85vw] sm:w-[30rem] lg:w-[32rem]',
+  'share-anywhere': 'w-[85vw] sm:w-[24rem] lg:w-[26rem]',
+};
+
 type OutcomeAccentStyle = CSSProperties & {
   readonly '--outcome-accent': string;
 };
@@ -63,14 +74,15 @@ export function ArtistProfileOutcomesCarousel({
           aria-hidden='true'
         />
 
-        <div
+        <section
           data-testid='artist-profile-outcomes-grid'
-          className='mx-auto mt-10 grid max-w-[var(--linear-content-max)] gap-4 px-5 sm:px-6 md:grid-cols-2 lg:px-0'
+          aria-label='Outcome showcase'
+          className='relative mt-10 flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth snap-x snap-mandatory pb-3 pl-5 pr-[10vw] scroll-pl-5 sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         >
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
           ))}
-        </div>
+        </section>
       </div>
     </ArtistProfileSectionShell>
   );
@@ -92,7 +104,10 @@ function OutcomeCard({
   return (
     <article
       data-testid='artist-profile-outcome-card'
-      className='group relative flex min-h-[29rem] flex-col overflow-hidden rounded-[1.6rem] border border-white/8 bg-[#050505] shadow-[0_28px_68px_rgba(0,0,0,0.3)]'
+      className={cn(
+        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-[1.6rem] border border-white/8 bg-[#050505] shadow-[0_28px_68px_rgba(0,0,0,0.3)]',
+        OUTCOME_CARD_WIDTHS[card.id]
+      )}
       style={style}
     >
       <div
