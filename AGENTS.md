@@ -248,6 +248,28 @@ git worktree remove ../Jovie-agent-1
 
 No configuration is needed -- Turbo detects worktrees automatically and shares the local cache. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
 
+#### Concurrent Commit Pitfall — `git stash` Races Across Worktrees
+
+`git stash` is **repo-global** — every worktree writes to the same `.git/refs/stash` stack. lint-staged backs up the working tree to a stash before running tasks and pops it on cleanup. When multiple worktrees invoke `git commit` concurrently, their lint-staged runs step on each other's backup stashes.
+
+Symptom (from a parallel swarm of worktree agents):
+
+```
+[STARTED] Cleaning up temporary files...
+[FAILED] lint-staged automatic backup is missing!
+husky - pre-commit script failed (code 1)
+```
+
+Important: the commit itself often **succeeds** before husky errors on cleanup. Check `git log --oneline origin/main..HEAD` before assuming the work was lost and retrying — a blind retry after "failure" is how duplicate commits get introduced.
+
+Mitigations (in priority order):
+
+1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
+2. Before commit, drop stale lint-staged stashes left by prior failed runs: `while git stash list | grep -q "lint-staged automatic backup"; do git stash drop "stash@{0}"; done`. Run this right before the commit, not preemptively.
+3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
+
+**Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.
+
 ### Affected Builds (CI Optimization)
 
 Use `--affected` to run tasks only for packages that changed relative to the base branch:
