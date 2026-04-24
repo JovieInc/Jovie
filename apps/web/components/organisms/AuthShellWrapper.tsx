@@ -272,7 +272,7 @@ function AuthShellWrapperInner({
         <div className='w-full max-w-3xl rounded-2xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
           <div className='flex items-center justify-between gap-4'>
             <div>
-              <p className='text-sm font-[560] tracking-[-0.02em] text-primary-token'>
+              <p className='text-sm font-semibold tracking-[-0.02em] text-primary-token'>
                 Opening Releases
               </p>
               <p className='mt-1 text-sm text-secondary-token'>

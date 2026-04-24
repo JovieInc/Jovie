@@ -58,11 +58,11 @@ export function DemoReleaseLandingSurface() {
               data-testid='demo-release-creator-capture'
             >
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
-                <p className='text-center text-[12px] font-[560] tracking-[0.12em] text-white/45 uppercase'>
+                <p className='text-center text-[12px] font-semibold tracking-[0.12em] text-white/45 uppercase'>
                   Creator Activation
                 </p>
                 <div className='mt-4 rounded-[20px] bg-white/[0.05] px-4 py-5 text-center'>
-                  <p className='text-[15px] font-[560] text-white'>
+                  <p className='text-[15px] font-semibold text-white'>
                     {RELEASE.title}
                   </p>
                   <p className='mt-1 text-[12px] text-white/58'>

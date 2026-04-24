@@ -49,7 +49,7 @@ function ReleaseArtwork({
       <div className='relative flex h-full min-h-[7rem] flex-col justify-between p-3'>
         <span className='text-[10px] font-medium text-white/72'>Single</span>
         <div className={cn(compact && 'max-w-[9rem]')}>
-          <p className='text-[14px] font-[560] tracking-[-0.02em] text-white'>
+          <p className='text-[14px] font-semibold tracking-[-0.02em] text-white'>
             {title}
           </p>
           {compact ? null : (

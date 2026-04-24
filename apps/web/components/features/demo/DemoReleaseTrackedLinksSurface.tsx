@@ -34,7 +34,7 @@ export function DemoReleaseTrackedLinksSurface() {
               </p>
               <div className='mt-2 flex items-center justify-between gap-4'>
                 <div>
-                  <p className='text-[14px] font-[560] text-primary-token'>
+                  <p className='text-[14px] font-semibold text-primary-token'>
                     {release.title}
                   </p>
                   <p className='text-[12px] text-secondary-token'>
@@ -49,16 +49,16 @@ export function DemoReleaseTrackedLinksSurface() {
 
             <div className='relative mt-6 h-[320px]'>
               <div className='absolute left-0 top-0 w-[250px] rounded-[18px] border border-subtle bg-surface-0 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.32)]'>
-                <div className='rounded-[14px] bg-surface-1 px-3 py-2 text-[12px] font-[560] text-primary-token'>
+                <div className='rounded-[14px] bg-surface-1 px-3 py-2 text-[12px] font-semibold text-primary-token'>
                   Share
                 </div>
-                <div className='mt-2 rounded-[14px] bg-[color-mix(in_oklab,var(--linear-row-selected)_14%,transparent)] px-3 py-2 text-[12px] font-[560] text-primary-token'>
+                <div className='mt-2 rounded-[14px] bg-[color-mix(in_oklab,var(--linear-row-selected)_14%,transparent)] px-3 py-2 text-[12px] font-semibold text-primary-token'>
                   UTM
                 </div>
               </div>
 
               <div className='absolute left-[218px] top-7 w-[390px] rounded-[18px] border border-subtle bg-surface-0 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.32)]'>
-                <div className='rounded-[14px] bg-surface-1 px-3 py-2 text-[12px] font-[560] text-primary-token'>
+                <div className='rounded-[14px] bg-surface-1 px-3 py-2 text-[12px] font-semibold text-primary-token'>
                   UTM
                 </div>
                 <div className='mt-2 space-y-1'>
@@ -68,7 +68,7 @@ export function DemoReleaseTrackedLinksSurface() {
                       className='flex items-center justify-between rounded-[14px] px-3 py-2'
                     >
                       <div>
-                        <p className='text-[12px] font-[560] text-primary-token'>
+                        <p className='text-[12px] font-semibold text-primary-token'>
                           {preset.label}
                         </p>
                         <p className='text-[11px] text-secondary-token'>

@@ -16,7 +16,7 @@ function MonitoringPanel() {
       <div className='flex items-center justify-between gap-3 border-b border-white/6 pb-3'>
         <div>
           <p className='text-[10px] font-medium text-white/42'>Monitoring</p>
-          <p className='mt-1 text-[12px] font-[560] text-white'>
+          <p className='mt-1 text-[12px] font-semibold text-white'>
             Coverage and sync
           </p>
         </div>

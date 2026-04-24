@@ -190,7 +190,7 @@ function PrimarySummaryCard({
       </div>
 
       <div className='space-y-1'>
-        <p className='text-[14px] font-[560] tracking-[-0.01em] text-primary-token'>
+        <p className='text-[14px] font-semibold tracking-[-0.01em] text-primary-token'>
           {statusTitle}
         </p>
         <p className='text-[12px] leading-[18px] text-secondary-token'>
@@ -230,7 +230,7 @@ function MetricTile({
         {icon}
         <span>{label}</span>
       </div>
-      <p className='mt-1 text-[12px] font-[560] text-primary-token'>{value}</p>
+      <p className='mt-1 text-[12px] font-semibold text-primary-token'>{value}</p>
     </div>
   );
 }
@@ -248,7 +248,7 @@ function PanelEmptyState({
 }>) {
   return (
     <DrawerSurfaceCard variant='card' className='space-y-2 p-3' testId={testId}>
-      <div className='flex items-center gap-2 text-[12px] font-[560] text-primary-token'>
+      <div className='flex items-center gap-2 text-[12px] font-semibold text-primary-token'>
         {icon}
         <span>{title}</span>
       </div>
@@ -314,7 +314,7 @@ function NeighbourRow({ neighbour }: Readonly<{ neighbour: ScoredNeighbour }>) {
 
       <div className='min-w-0 flex-1'>
         <div className='flex flex-wrap items-center gap-1.5'>
-          <p className='truncate text-[12px] font-[560] text-primary-token'>
+          <p className='truncate text-[12px] font-semibold text-primary-token'>
             {neighbour.artist.name}
           </p>
           <Badge variant={getSizeBadgeVariant(neighbour.size)} size='sm'>

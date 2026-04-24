@@ -240,7 +240,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         <ContentSurfaceCard className='space-y-4 p-4'>
           <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
             <div>
-              <p className='text-[12px] font-[560] text-primary-token'>
+              <p className='text-[12px] font-semibold text-primary-token'>
                 Filters
               </p>
               <p className='text-[12px] text-secondary-token'>
@@ -268,7 +268,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
           </div>
           <div className='space-y-2'>
-            <p className='text-[12px] font-[560] text-primary-token'>
+            <p className='text-[12px] font-semibold text-primary-token'>
               Capture Group
             </p>
             <div className='flex flex-wrap gap-2'>
@@ -290,7 +290,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
           </div>
           <div className='space-y-2'>
-            <p className='text-[12px] font-[560] text-primary-token'>
+            <p className='text-[12px] font-semibold text-primary-token'>
               Use Case
             </p>
             <div className='flex flex-wrap gap-2'>
@@ -316,7 +316,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {canonicalSections.length > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
                 Canonical Surfaces
               </h2>
               <p className='mt-1 text-[12px] text-secondary-token'>
@@ -333,7 +333,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   <div className='border-b border-subtle px-4 py-3'>
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
-                        <h3 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                        <h3 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
                           {surface.label}
                         </h3>
                         <p className='mt-1 text-[12px] text-secondary-token'>
@@ -363,7 +363,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {otherGroups.size > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
                 Other Captures
               </h2>
               <p className='mt-1 text-[12px] text-secondary-token'>
@@ -379,7 +379,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   className='overflow-hidden bg-surface-0'
                 >
                   <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
-                    <h3 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+                    <h3 className='truncate text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
                       {sourceLabel}
                     </h3>
                     <span className='shrink-0 text-[12px] text-secondary-token'>
@@ -397,7 +397,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
         {filteredScreenshots.length === 0 ? (
           <ContentSurfaceCard className='p-6'>
-            <p className='text-[13px] font-[560] text-primary-token'>
+            <p className='text-[13px] font-semibold text-primary-token'>
               No screenshots match the current filters.
             </p>
             <p className='mt-1 text-[12px] text-secondary-token'>
@@ -462,7 +462,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               </ContentSurfaceCard>
               <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-surface-0 p-3.5'>
                 <div>
-                  <p className='text-[13px] font-[560] text-primary-token'>
+                  <p className='text-[13px] font-semibold text-primary-token'>
                     {selected.title}
                   </p>
                   <div className='mt-1 flex flex-wrap gap-2 text-[12px] text-secondary-token'>

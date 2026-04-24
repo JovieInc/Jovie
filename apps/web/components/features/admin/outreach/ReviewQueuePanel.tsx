@@ -122,7 +122,7 @@ export function ReviewQueuePanel() {
           title='Manual review'
           subtitle='Leads requiring a human pass before outreach continues.'
           actions={
-            <span className='text-[12px] font-[560] tabular-nums text-secondary-token'>
+            <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
               {total} queued
             </span>
           }
@@ -154,7 +154,7 @@ export function ReviewQueuePanel() {
               leads.map(lead => (
                 <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-[560] text-primary-token'>
+                    <span className='font-semibold text-primary-token'>
                       {lead.displayName || '-'}
                     </span>
                   </td>

@@ -81,7 +81,7 @@ export function AdminTablePagination({
       <div className='flex shrink-0 items-center gap-2'>
         <span className='tabular-nums'>
           <span className='max-sm:hidden sm:inline'>Page </span>
-          <span className='font-[560] text-primary-token'>{page}</span>
+          <span className='font-semibold text-primary-token'>{page}</span>
           <span className='max-sm:hidden sm:inline'> of</span>
           <span className='sm:hidden'> /</span> {totalPages}
         </span>

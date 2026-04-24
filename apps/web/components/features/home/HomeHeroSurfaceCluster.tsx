@@ -79,7 +79,7 @@ function HeroTaskPanel() {
                   icon={statusStyle.icon}
                   className={statusStyle.iconClassName}
                 />
-                <p className='text-[12px] font-[560] leading-5 tracking-[-0.01em] text-white truncate'>
+                <p className='text-[12px] font-semibold leading-5 tracking-[-0.01em] text-white truncate'>
                   {task.title}
                 </p>
               </div>

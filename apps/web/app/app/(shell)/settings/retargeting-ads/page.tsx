@@ -33,7 +33,7 @@ function SummaryCard({
       <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
         {value}
       </p>
-      <p className='text-xs font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
+      <p className='text-xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
         {label}
       </p>
       <p className='text-[13px] leading-5 text-secondary-token'>
@@ -99,7 +99,7 @@ function AttributionStatsCard() {
                 surface='nested'
                 className='px-3 py-2'
               >
-                <p className='text-xs font-[560] text-primary-token'>
+                <p className='text-xs font-semibold text-primary-token'>
                   {platform.label}
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -228,7 +228,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-[560] text-primary-token'>
+          <p className='text-[13px] font-semibold text-primary-token'>
             {variant.label}
           </p>
           <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>

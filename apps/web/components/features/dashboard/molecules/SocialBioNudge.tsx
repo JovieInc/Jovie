@@ -66,7 +66,7 @@ function MilestoneRow({
         )}
       </span>
       <div className='min-w-0'>
-        <p className='text-app font-[560] text-primary-token'>{label}</p>
+        <p className='text-app font-semibold text-primary-token'>{label}</p>
         <p className='text-[12.5px] leading-5 text-secondary-token'>
           {description}
         </p>
@@ -228,7 +228,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             <p className='text-app leading-5 text-secondary-token'>
               {description}
             </p>
-            <p className='text-[12.5px] font-[560] text-primary-token'>
+            <p className='text-[12.5px] font-semibold text-primary-token'>
               {profileUrl}
             </p>
           </div>

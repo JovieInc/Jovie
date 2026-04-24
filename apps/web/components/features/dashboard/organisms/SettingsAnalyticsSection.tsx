@@ -74,7 +74,7 @@ export function SettingsAnalyticsSection({
           <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
             <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div>
-              <p className='text-[13px] font-[560] tracking-[-0.02em] text-primary-token'>
+              <p className='text-[13px] font-semibold tracking-[-0.02em] text-primary-token'>
                 Traffic Quality Filtering Active
               </p>
               <p className='mt-1 text-[13px] text-secondary-token'>

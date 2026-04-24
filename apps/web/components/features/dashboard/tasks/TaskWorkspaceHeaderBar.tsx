@@ -90,7 +90,7 @@ export function TaskWorkspaceHeaderBar({
         )}
         {mode !== 'search' && mode !== 'create' && (
           <div className='flex h-full items-center pl-1.5'>
-            <span className='text-[10.5px] font-[560] text-tertiary-token'>
+            <span className='text-[10.5px] font-semibold text-tertiary-token'>
               {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
             </span>
           </div>

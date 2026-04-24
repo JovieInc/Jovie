@@ -617,12 +617,12 @@ export function InvestorLinksManager() {
             <table className='w-full min-w-[700px] border-collapse text-[13px]'>
               <thead className='bg-surface-0'>
                 <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
-                  <th className='px-4 py-2.5 font-[560]'>Label</th>
-                  <th className='px-4 py-2.5 font-[560]'>Investor</th>
-                  <th className='px-4 py-2.5 font-[560]'>Stage</th>
-                  <th className='px-4 py-2.5 font-[560]'>Status</th>
-                  <th className='px-4 py-2.5 font-[560]'>Created</th>
-                  <th className='px-4 py-2.5 text-right font-[560]'>Actions</th>
+                  <th className='px-4 py-2.5 font-semibold'>Label</th>
+                  <th className='px-4 py-2.5 font-semibold'>Investor</th>
+                  <th className='px-4 py-2.5 font-semibold'>Stage</th>
+                  <th className='px-4 py-2.5 font-semibold'>Status</th>
+                  <th className='px-4 py-2.5 font-semibold'>Created</th>
+                  <th className='px-4 py-2.5 text-right font-semibold'>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -632,7 +632,7 @@ export function InvestorLinksManager() {
                     className='border-b border-subtle bg-transparent transition-colors duration-150 hover:bg-surface-1'
                   >
                     <td className='px-4 py-3 align-middle'>
-                      <span className='font-[560] text-primary-token'>
+                      <span className='font-semibold text-primary-token'>
                         {link.label}
                       </span>
                     </td>
