@@ -221,7 +221,7 @@ export function HomepageIntent() {
       <label htmlFor={INPUT_ID} className='sr-only'>
         Ask Jovie
       </label>
-      <div className='relative mt-10 flex w-full max-w-[760px] items-center'>
+      <div className='relative mt-8 flex w-full max-w-[780px] items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -231,7 +231,7 @@ export function HomepageIntent() {
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder='Ask Jovie...'
-          className='h-[66px] w-full rounded-full border border-white/[0.09] bg-[linear-gradient(180deg,rgba(18,20,28,0.9)_0%,rgba(12,13,18,0.94)_100%)] pl-7 pr-[5.25rem] text-[16px] tracking-[-0.016em] text-white shadow-[0_24px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-[border-color,box-shadow,transform] duration-150 placeholder:text-white/30 hover:border-white/[0.14] focus-visible:border-white/[0.2] focus-visible:shadow-[0_28px_84px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.03)] sm:h-[68px]'
+          className='h-[62px] w-full rounded-full border border-white/[0.09] bg-[linear-gradient(180deg,rgba(18,20,28,0.9)_0%,rgba(12,13,18,0.94)_100%)] pl-6 pr-[4.85rem] text-[16px] tracking-[-0.016em] text-white shadow-[0_14px_42px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-[border-color,box-shadow,transform] duration-150 placeholder:text-white/26 hover:border-white/[0.13] focus-visible:border-white/[0.18] focus-visible:shadow-[0_16px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.025)] sm:h-[64px]'
         />
         <button
           type='button'
@@ -239,9 +239,9 @@ export function HomepageIntent() {
           aria-disabled={!canSubmit}
           onClick={submit}
           className={[
-            'absolute right-[10px] inline-flex h-12 w-12 items-center justify-center rounded-full border transition-all duration-150 sm:h-[50px] sm:w-[50px]',
+            'absolute right-[9px] inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-150 sm:h-12 sm:w-12',
             canSubmit
-              ? 'border-white/[0.08] bg-white/[0.1] text-white shadow-[0_12px_30px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.14] active:scale-[0.97]'
+              ? 'border-white/[0.08] bg-white/[0.09] text-white shadow-[0_10px_24px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.12] active:scale-[0.97]'
               : 'border-white/[0.04] bg-white/[0.04] text-white/28 pointer-events-none opacity-80',
           ].join(' ')}
         >
@@ -249,14 +249,14 @@ export function HomepageIntent() {
         </button>
       </div>
 
-      <div className='relative mt-5 w-full max-w-[880px]'>
+      <div className='relative mt-4 w-full max-w-[888px]'>
         <button
           type='button'
           aria-label='Scroll prompts left'
           data-testid='homepage-pill-scroll-left'
           disabled={!canScrollPillsLeft}
           onClick={() => scrollPills(-1)}
-          className='absolute left-0 top-1/2 z-[1] hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-white/62 transition-all duration-150 hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-30 sm:inline-flex'
+          className='absolute left-0 top-1/2 z-[1] hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.05] bg-white/[0.025] text-white/56 transition-all duration-150 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white disabled:pointer-events-none disabled:opacity-0 sm:inline-flex'
         >
           <ChevronLeft className='h-4 w-4' strokeWidth={1.8} />
         </button>
@@ -276,7 +276,7 @@ export function HomepageIntent() {
               key={pill.id}
               type='button'
               onClick={() => handlePillClick(pill)}
-              className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.03] px-[15px] py-[9px] text-[13px] font-medium tracking-[-0.012em] text-white/66 transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white/88 focus-visible:border-white/[0.2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8 active:translate-y-0'
+              className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.05] bg-white/[0.025] px-[15px] py-[8px] text-[12.5px] font-medium tracking-[-0.012em] text-white/62 transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.1] hover:bg-white/[0.04] hover:text-white/84 focus-visible:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8 active:translate-y-0'
             >
               {pill.label}
             </button>
@@ -288,7 +288,7 @@ export function HomepageIntent() {
           data-testid='homepage-pill-scroll-right'
           disabled={!canScrollPillsRight}
           onClick={() => scrollPills(1)}
-          className='absolute right-0 top-1/2 z-[1] hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03] text-white/62 transition-all duration-150 hover:border-white/[0.12] hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-30 sm:inline-flex'
+          className='absolute right-0 top-1/2 z-[1] hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.05] bg-white/[0.025] text-white/56 transition-all duration-150 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white disabled:pointer-events-none disabled:opacity-0 sm:inline-flex'
         >
           <ChevronRight className='h-4 w-4' strokeWidth={1.8} />
         </button>

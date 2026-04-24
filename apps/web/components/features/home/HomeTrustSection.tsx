@@ -35,7 +35,7 @@ export function HomeTrustSection({
       data-presentation={presentation}
       className={cn(
         presentation === 'inline-strip'
-          ? 'relative z-[1] mx-auto w-full border-t border-white/[0.08] px-5 py-8 sm:px-6 sm:py-10 lg:px-0'
+          ? 'relative z-[1] mx-auto w-full border-t border-white/[0.08] px-5 py-7 sm:px-6 sm:py-8 lg:px-0'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
       )}
@@ -57,10 +57,10 @@ export function HomeTrustSection({
         <p
           className={cn(
             presentation === 'inline-strip'
-              ? 'text-center text-[11px] font-medium tracking-[0.18em] text-white/46 uppercase'
+              ? 'text-center text-[12px] font-medium tracking-[-0.01em] text-white/42'
               : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
             presentation === 'inline-strip'
-              ? 'mb-6 sm:mb-7'
+              ? 'mb-5 sm:mb-6'
               : variant === 'compact'
                 ? 'mb-4'
                 : 'mb-5 sm:mb-6'
@@ -71,7 +71,7 @@ export function HomeTrustSection({
         <div
           className={cn(
             presentation === 'inline-strip'
-              ? 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-0 sm:gap-y-4 lg:flex-nowrap'
+              ? 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-7 sm:gap-y-4 lg:flex-nowrap lg:gap-x-10'
               : 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
               presentation !== 'inline-strip' &&
@@ -81,8 +81,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08] lg:first:border-l-0'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <AwalLogo
@@ -95,8 +94,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08]'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <TheOrchardLogo
@@ -109,8 +107,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08]'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <UniversalMusicGroupLogo
@@ -123,8 +120,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08]'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <ArmadaMusicLogo
@@ -137,8 +133,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08]'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <BlackHoleRecordingsLogo
@@ -151,8 +146,7 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'sm:px-5 lg:flex-1 lg:border-l lg:border-white/[0.08]'
+              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
             <DiscoWaxLogo

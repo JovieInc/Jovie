@@ -82,6 +82,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** When a human calls out visual slop in marketing UI, convert that correction into a shared repo rule immediately. Do not rely on remembering the preference for one file. If the correction is "remove eyebrows," "remove cards," or "stop adding extra copy," update the shared guidance and then delete the source of that pattern from the shared components and copy contracts.
 
+### Premium homepage heroes cannot hide proof below the fold
+**Mistake:** The homepage refit treated the hero like a self-contained `100vh` card and then stacked the trust strip underneath it, which made the first screen feel empty and pushed the proof band out of the opening composition.
+
+**Rule:** On premium marketing homepages, the first viewport must read as one poster-like composition. Do not use a full-height hero shell that forces the first proof element below the fold, and do not solve premium art direction with inset hero cards or extra chrome.
+
 ---
 
 ## Email Personalization

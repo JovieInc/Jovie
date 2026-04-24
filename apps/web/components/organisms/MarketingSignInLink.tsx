@@ -46,7 +46,7 @@ export function MarketingSignInLink({
         className={cn(
           'focus-ring-themed transition-all duration-150',
           variant === 'pill'
-            ? 'inline-flex h-[42px] items-center justify-center rounded-full border border-white/90 bg-white px-5 text-[14px] font-medium tracking-[-0.012em] text-black shadow-[0_12px_30px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-[0.5px] hover:bg-white/94 active:translate-y-0'
+            ? 'inline-flex h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:-translate-y-[0.5px] hover:bg-white/95 active:translate-y-0 sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
             : 'text-[13px] text-white/60 hover:text-white/90'
         )}
       >
