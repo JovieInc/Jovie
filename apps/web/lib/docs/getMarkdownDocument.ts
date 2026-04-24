@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import DOMPurify from 'isomorphic-dompurify';
 import { toString } from 'mdast-util-to-string';
 import { cache } from 'react';
 import { remark } from 'remark';
@@ -72,8 +73,12 @@ export async function createMarkdownDocument(
   const transformed = await processor.run(ast);
   const htmlResult = processor.stringify(transformed as never);
 
+  // Sanitize HTML server-side so downstream readers can remain server components
+  // and avoid pulling DOMPurify into client bundles.
+  const sanitizedHtml = DOMPurify.sanitize(htmlResult.toString());
+
   return {
-    html: htmlResult.toString(),
+    html: sanitizedHtml,
     toc,
   };
 }

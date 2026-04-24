@@ -1,7 +1,3 @@
-'use client';
-
-import DOMPurify from 'isomorphic-dompurify';
-import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface LegalMarkdownReaderProps {
@@ -13,9 +9,8 @@ export function LegalMarkdownReader({
   html,
   className,
 }: LegalMarkdownReaderProps) {
-  // Sanitize HTML to prevent XSS from markdown content
-  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
-
+  // HTML is sanitized server-side in createMarkdownDocument() — see
+  // apps/web/lib/docs/getMarkdownDocument.ts.
   return (
     <article className={cn('relative', className)}>
       <div
@@ -42,8 +37,8 @@ export function LegalMarkdownReader({
           // Strong
           '[&_strong]:text-neutral-900 dark:[&_strong]:text-white [&_strong]:font-medium'
         )}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with DOMPurify
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized server-side in createMarkdownDocument
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>
   );
