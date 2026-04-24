@@ -33,7 +33,7 @@ test.describe('Homepage', () => {
   }) => {
     await expect(page.getByTestId('homepage-hero-shell')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Your AI Artist Manager.' })
+      page.getByRole('heading', { name: 'Release more music with less work.' })
     ).toBeVisible();
     await expect(
       page.getByText(
@@ -165,7 +165,7 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Your AI Artist Manager.' })
+      page.getByRole('heading', { name: 'Release more music with less work.' })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });

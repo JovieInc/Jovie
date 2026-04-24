@@ -24,7 +24,7 @@ export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = {
-    absolute: `${APP_NAME} | Your AI Artist Manager.`,
+    absolute: `${APP_NAME} | Release more music with less work.`,
   };
   const description =
     'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.';
