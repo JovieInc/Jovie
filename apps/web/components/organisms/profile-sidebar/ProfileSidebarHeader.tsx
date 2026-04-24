@@ -125,7 +125,7 @@ export function useProfileHeaderParts({
 
   const title: ReactNode = (
     <div className='flex min-w-0 items-center gap-1.5'>
-      <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+      <span className='truncate text-[12px] font-semibold tracking-[-0.01em] text-primary-token'>
         {primaryLabel}
       </span>
       {secondaryLabel ? (

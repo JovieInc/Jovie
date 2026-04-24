@@ -20,7 +20,7 @@ const TIER_STYLES = {
   none: 'text-tertiary-token',
   low: 'text-secondary-token',
   medium: 'text-amber-600 dark:text-amber-400 font-[510]',
-  high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
+  high: 'text-emerald-600 dark:text-emerald-400 font-semibold',
 } as const;
 
 export function formatDollars(cents: number): string {

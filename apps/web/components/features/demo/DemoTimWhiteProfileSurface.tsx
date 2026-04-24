@@ -513,7 +513,7 @@ export function DemoTimWhiteProfileSurface() {
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
                 <div className='flex items-start justify-between gap-3'>
                   <div>
-                    <p className='text-[12px] font-[560] text-white/50'>
+                    <p className='text-[12px] font-semibold text-white/50'>
                       About
                     </p>
                     <h2 className='mt-1 text-[20px] font-[600] tracking-[-0.03em] text-white'>
@@ -521,7 +521,7 @@ export function DemoTimWhiteProfileSurface() {
                     </h2>
                   </div>
                   <div className='rounded-[18px] border border-white/8 bg-[#10141c] p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]'>
-                    <div className='rounded-[12px] bg-white/[0.04] px-3 py-2 text-[12px] font-[560] text-white'>
+                    <div className='rounded-[12px] bg-white/[0.04] px-3 py-2 text-[12px] font-semibold text-white'>
                       Download press photos
                     </div>
                   </div>

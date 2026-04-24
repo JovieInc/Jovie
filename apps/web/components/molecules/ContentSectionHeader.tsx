@@ -40,7 +40,7 @@ export function ContentSectionHeader({
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
         <h2
           className={cn(
-            'truncate text-[12.5px] font-[560] tracking-[-0.012em] text-primary-token',
+            'truncate text-[12.5px] font-semibold tracking-[-0.012em] text-primary-token',
             titleClassName
           )}
         >

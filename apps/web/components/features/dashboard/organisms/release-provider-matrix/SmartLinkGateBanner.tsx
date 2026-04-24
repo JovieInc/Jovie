@@ -68,7 +68,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               asChild
               tone='ghost'
               size='sm'
-              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-2xs'
+              className='mt-1.5 h-7 w-fit rounded-lg px-2 text-2xs'
             >
               <a href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'>
                 Email support
@@ -88,7 +88,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               asChild
               tone='ghost'
               size='sm'
-              className='mt-1.5 h-7 w-fit rounded-[8px] px-2 text-2xs'
+              className='mt-1.5 h-7 w-fit rounded-lg px-2 text-2xs'
             >
               <Link href={APP_ROUTES.LAUNCH_PRICING}>Upgrade to Pro</Link>
             </DrawerButton>

@@ -28,94 +28,103 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('renders the hero with phone, headline, and CTA', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.'
-    );
-    await expect(page.getByTestId('homepage-claim-form')).toBeVisible();
+  test('renders the premium hero surface and refreshed intent composer', async ({
+    page,
+  }) => {
+    await expect(page.getByTestId('homepage-hero-shell')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Claim your profile' }).first()
+      page.getByRole('heading', { name: 'Your AI Artist Manager.' })
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-hero-composition')).toBeVisible();
-    await expect(page.getByTestId('homepage-live-proof')).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.'
+      )
+    ).toBeVisible();
+    await expect(page.getByPlaceholder('Ask Jovie...')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Plan a release' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Analyze momentum' })
+    ).toBeVisible();
   });
 
-  test('header shows auth actions without marketing nav links', async ({
+  test('header shows the live nav map and a single Sign in pill', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
+
     await expect(header).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
-    await expect(page.locator('a[href="#release"]')).toHaveCount(0);
-    await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    await expect(page.getByRole('link', { name: 'Solutions' })).toHaveAttribute(
+      'href',
+      '/artist-notifications'
+    );
+    await expect(page.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
+    await expect(page.getByRole('link', { name: 'Resources' })).toHaveAttribute(
+      'href',
+      '/blog'
+    );
+    await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'Sign up' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(0);
   });
 
-  test('renders the 7-chapter narrative structure', async ({ page }) => {
-    // Trust section
+  test('trust strip ships live with the refreshed label and logos', async ({
+    page,
+  }) => {
     await expect(page.getByTestId('homepage-trust')).toBeVisible();
-    await expect(page.getByText('One profile.')).toBeVisible();
-
-    // Chapter 1: Convert attention
-    await page.getByTestId('homepage-chapter-1').scrollIntoViewIfNeeded();
-    await expect(
-      page.getByRole('heading', { name: 'Turn attention into action.' })
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-sandbox')).toBeVisible();
-
-    // Chapter 2: Get paid
-    await page.getByTestId('homepage-chapter-2').scrollIntoViewIfNeeded();
-    await expect(
-      page.getByRole('heading', {
-        name: 'Get paid.',
-      })
-    ).toBeVisible();
-    await expect(page.getByText("That's it.")).toBeVisible();
-
-    // Chapter 3: Know your fans
-    await page.getByTestId('homepage-chapter-3').scrollIntoViewIfNeeded();
-    await expect(
-      page.getByText('Know who your fans are and when to reach them.')
-    ).toBeVisible();
-    await expect(page.getByText('Countdowns Built In.')).toBeVisible();
-    await expect(page.getByText('Location-Aware.')).toBeVisible();
-
-    // Philosophy
-    await page.getByTestId('homepage-spec-section').scrollIntoViewIfNeeded();
-    await expect(
-      page.getByRole('heading', { name: 'Built for artists' })
-    ).toBeVisible();
-    await expect(page.getByText('Opinionated.')).toBeVisible();
-    await expect(page.getByText('By design.')).toBeVisible();
-    await expect(page.getByText('Zero Setup.')).toBeVisible();
-    await expect(page.getByText('Stupid Fast.')).toBeVisible();
-
-    // Old sections gone
-    await expect(page.getByTestId('homepage-interstitial')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-action-rail')).toHaveCount(0);
-
-    // Final CTA
-    await page.getByTestId('final-cta-section').scrollIntoViewIfNeeded();
-    await expect(page.getByTestId('final-cta-headline')).toHaveText(
-      'Claim your profile.'
-    );
-    await expect(page.getByTestId('final-cta-action')).toHaveText(
-      'Claim your profile'
-    );
+    await expect(page.getByText('Trusted by artists')).toBeVisible();
+    await expect(page.getByLabel('Universal Music Group')).toBeVisible();
+    await expect(page.getByLabel('AWAL')).toBeVisible();
+    await expect(page.getByAltText('Black Hole Recordings')).toBeVisible();
+    await expect(page.getByLabel('disco:wax')).toBeVisible();
   });
 
-  test('renders mobile layout correctly', async ({ page }) => {
+  test('mobile keeps the hero readable and avoids duplicate auth in the nav drawer', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
-    await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.',
-      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
-    );
+    await expect(
+      page.getByRole('heading', { name: 'Your AI Artist Manager.' })
+    ).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByPlaceholder('Ask Jovie...')).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(1);
     await expect(page.getByTestId('homepage-trust')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+
+    await page.waitForTimeout(750);
+    await page.evaluate(() => {
+      const closeDevTools = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="Close Next.js Dev Tools"]'
+      );
+      closeDevTools?.click();
+    });
+
+    const openMenu = page.getByRole('button', { name: 'Open menu' });
+    await openMenu.dispatchEvent('click');
+    await expect(
+      page.getByRole('button', { name: 'Close menu' })
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Product' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Solutions' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Pricing' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Resources' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(0);
   });
 
   test('has no horizontal overflow across common viewports', async ({

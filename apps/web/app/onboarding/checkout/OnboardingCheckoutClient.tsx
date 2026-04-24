@@ -81,7 +81,7 @@ function ProfilePreviewCard({
           />
 
           <div className='text-center'>
-            <p className='text-[15px] font-[590] text-primary-token'>
+            <p className='text-[15px] font-semibold text-primary-token'>
               {displayName || username}
             </p>
             <p className='text-[12px] text-tertiary-token'>@{username}</p>

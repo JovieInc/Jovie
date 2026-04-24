@@ -112,7 +112,7 @@ function AdminUserMobileCard({
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
-            <p className='truncate text-[14px] font-[560] tracking-[-0.01em] text-primary-token'>
+            <p className='truncate text-[14px] font-semibold tracking-[-0.01em] text-primary-token'>
               {user.name || 'Email Subscriber'}
             </p>
             <p className='truncate text-[12px] text-secondary-token'>
@@ -639,7 +639,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                     <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
+                        <div className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>
@@ -690,7 +690,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                     <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
+                        <div className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
                         <div className='text-[12px] text-secondary-token'>

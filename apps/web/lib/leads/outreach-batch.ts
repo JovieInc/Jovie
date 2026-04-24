@@ -19,8 +19,14 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { isEmailSuppressed } from '@/lib/notifications/suppression';
 
 export const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
+
+// Postgres advisory lock key for serializing concurrent outreach batches.
+// Value is arbitrary but stable; picked high enough to avoid collision with
+// other advisory lock users in the codebase.
+const OUTREACH_BATCH_ADVISORY_LOCK_KEY = 4_827_391_284n;
 
 interface ProcessOutreachBatchOptions {
   readonly ignorePipelineEnabled?: boolean;
@@ -36,62 +42,6 @@ function getStartOfHour(now: Date): Date {
   const date = new Date(now);
   date.setUTCMinutes(0, 0, 0);
   return date;
-}
-
-async function getSendCapacity(
-  now: Date,
-  options: ProcessOutreachBatchOptions = {}
-): Promise<{
-  dailyRemaining: number;
-  hourlyRemaining: number;
-}> {
-  try {
-    const [settings] = await db
-      .select()
-      .from(leadPipelineSettings)
-      .where(eq(leadPipelineSettings.id, 1))
-      .limit(1);
-
-    if (!options.ignorePipelineEnabled && settings?.enabled === false) {
-      return { dailyRemaining: 0, hourlyRemaining: 0 };
-    }
-
-    const dailySendCap = settings?.dailySendCap ?? 10;
-    const maxPerHour = settings?.maxPerHour ?? 5;
-    const startOfDay = getStartOfDay(now);
-    const startOfHour = getStartOfHour(now);
-
-    const [[dayRow], [hourRow]] = await Promise.all([
-      db
-        .select({ total: count() })
-        .from(leads)
-        .where(
-          or(
-            gte(leads.outreachQueuedAt, startOfDay),
-            gte(leads.dmSentAt, startOfDay)
-          )
-        ),
-      db
-        .select({ total: count() })
-        .from(leads)
-        .where(
-          or(
-            gte(leads.outreachQueuedAt, startOfHour),
-            gte(leads.dmSentAt, startOfHour)
-          )
-        ),
-    ]);
-
-    return {
-      dailyRemaining: Math.max(0, dailySendCap - Number(dayRow?.total ?? 0)),
-      hourlyRemaining: Math.max(0, maxPerHour - Number(hourRow?.total ?? 0)),
-    };
-  } catch (error) {
-    await captureError('Failed to compute outreach send capacity', error, {
-      route: 'outreach-batch',
-    });
-    return { dailyRemaining: 0, hourlyRemaining: 0 };
-  }
 }
 
 function getPendingEmailWhereClause(now = new Date()) {
@@ -176,6 +126,151 @@ function isPermanentOutreachError(error: unknown): boolean {
   return status !== null && status >= 400 && status < 500 && status !== 429;
 }
 
+interface ClaimedLead {
+  id: string;
+  linktreeHandle: string;
+  displayName: string | null;
+  contactEmail: string | null;
+  claimToken: string | null;
+  priorityScore: number | null;
+  claimedAt: Date;
+}
+
+/**
+ * Claim phase: serialized via pg advisory lock. Holds a transaction that
+ * reads settings + capacity and atomically claims up to `limit` leads by
+ * setting their outreachQueuedAt. Concurrent batches either wait their
+ * turn or, if the lock is already held, return an empty claim set.
+ */
+async function claimOutreachLeads(
+  limit: number,
+  now: Date,
+  options: ProcessOutreachBatchOptions
+): Promise<ClaimedLead[]> {
+  const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
+  const pendingEmailWhereClause = getPendingEmailWhereClause(now);
+
+  return db.transaction(async tx => {
+    const lockRows = await tx.execute<{ locked: boolean }>(
+      drizzleSql`SELECT pg_try_advisory_xact_lock(${OUTREACH_BATCH_ADVISORY_LOCK_KEY}) AS locked`
+    );
+    const locked = Boolean(
+      (lockRows as unknown as { rows?: Array<{ locked: boolean }> }).rows?.[0]
+        ?.locked ??
+        (lockRows as unknown as Array<{ locked: boolean }>)[0]?.locked
+    );
+    if (!locked) {
+      return [];
+    }
+
+    const [settings] = await tx
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
+
+    if (!options.ignorePipelineEnabled && settings?.enabled === false) {
+      return [];
+    }
+
+    const dailySendCap = settings?.dailySendCap ?? 10;
+    const maxPerHour = settings?.maxPerHour ?? 5;
+    const startOfDay = getStartOfDay(now);
+    const startOfHour = getStartOfHour(now);
+
+    const [[dayRow], [hourRow]] = await Promise.all([
+      tx
+        .select({ total: count() })
+        .from(leads)
+        .where(
+          or(
+            gte(leads.outreachQueuedAt, startOfDay),
+            gte(leads.dmSentAt, startOfDay)
+          )
+        ),
+      tx
+        .select({ total: count() })
+        .from(leads)
+        .where(
+          or(
+            gte(leads.outreachQueuedAt, startOfHour),
+            gte(leads.dmSentAt, startOfHour)
+          )
+        ),
+    ]);
+
+    const dailyRemaining = Math.max(
+      0,
+      dailySendCap - Number(dayRow?.total ?? 0)
+    );
+    const hourlyRemaining = Math.max(
+      0,
+      maxPerHour - Number(hourRow?.total ?? 0)
+    );
+
+    const effectiveLimit = Math.max(
+      0,
+      Math.min(limit, dailyRemaining, hourlyRemaining)
+    );
+    if (effectiveLimit === 0) return [];
+
+    const candidates = await tx
+      .select({
+        id: leads.id,
+        linktreeHandle: leads.linktreeHandle,
+        displayName: leads.displayName,
+        contactEmail: leads.contactEmail,
+        claimToken: leads.claimToken,
+        priorityScore: leads.priorityScore,
+      })
+      .from(leads)
+      .where(pendingEmailWhereClause)
+      .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
+      .limit(effectiveLimit);
+
+    const claimed: ClaimedLead[] = [];
+    for (const lead of candidates) {
+      const claimedAt = new Date();
+      const [claimedLead] = await tx
+        .update(leads)
+        .set({ outreachQueuedAt: claimedAt, updatedAt: claimedAt })
+        .where(
+          and(
+            eq(leads.id, lead.id),
+            eq(leads.outreachStatus, 'pending'),
+            or(
+              isNull(leads.outreachQueuedAt),
+              lt(leads.outreachQueuedAt, claimCutoff)
+            )
+          )
+        )
+        .returning({ id: leads.id });
+
+      if (claimedLead) {
+        claimed.push({ ...lead, claimedAt });
+      }
+    }
+
+    return claimed;
+  });
+}
+
+async function isPipelineEnabled(): Promise<boolean> {
+  const [settings] = await db
+    .select({ enabled: leadPipelineSettings.enabled })
+    .from(leadPipelineSettings)
+    .where(eq(leadPipelineSettings.id, 1))
+    .limit(1);
+  return settings?.enabled !== false;
+}
+
+async function releaseClaim(leadId: string): Promise<void> {
+  await db
+    .update(leads)
+    .set({ outreachQueuedAt: null, updatedAt: new Date() })
+    .where(eq(leads.id, leadId));
+}
+
 /**
  * Process a batch of pending outreach emails.
  * Reusable from both the API route and the cron job.
@@ -185,61 +280,25 @@ export async function processOutreachBatch(
   options: ProcessOutreachBatchOptions = {}
 ): Promise<OutreachBatchResult> {
   const now = new Date();
-  const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
   const pendingEmailWhereClause = getPendingEmailWhereClause(now);
-  const sendCapacity = await getSendCapacity(now, options);
-  const effectiveLimit = Math.max(
-    0,
-    Math.min(limit, sendCapacity.dailyRemaining, sendCapacity.hourlyRemaining)
-  );
 
-  if (effectiveLimit === 0) {
-    return {
-      attempted: 0,
-      queued: 0,
-      failed: 0,
-      dismissed: 0,
-      remainingPending: 0,
-    };
-  }
-
-  const pendingEmailLeads = await db
-    .select({
-      id: leads.id,
-      linktreeHandle: leads.linktreeHandle,
-      displayName: leads.displayName,
-      contactEmail: leads.contactEmail,
-      claimToken: leads.claimToken,
-      priorityScore: leads.priorityScore,
-    })
-    .from(leads)
-    .where(pendingEmailWhereClause)
-    .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
-    .limit(effectiveLimit);
+  const claimedLeads = await claimOutreachLeads(limit, now, options);
 
   let attempted = 0;
   let queued = 0;
   let failed = 0;
   let dismissed = 0;
 
-  for (const lead of pendingEmailLeads) {
-    const claimedAt = new Date();
-    const [claimedLead] = await db
-      .update(leads)
-      .set({ outreachQueuedAt: claimedAt, updatedAt: claimedAt })
-      .where(
-        and(
-          eq(leads.id, lead.id),
-          eq(leads.outreachStatus, 'pending'),
-          or(
-            isNull(leads.outreachQueuedAt),
-            lt(leads.outreachQueuedAt, claimCutoff)
-          )
-        )
-      )
-      .returning({ id: leads.id });
-
-    if (!claimedLead) continue;
+  for (const lead of claimedLeads) {
+    // Fix #3: Re-check kill switch between each send so an admin flip takes
+    // effect mid-batch (at most one extra send per pipeline-disable event).
+    if (!options.ignorePipelineEnabled) {
+      const stillEnabled = await isPipelineEnabled();
+      if (!stillEnabled) {
+        await releaseClaim(lead.id);
+        continue;
+      }
+    }
 
     attempted++;
 
@@ -247,11 +306,40 @@ export async function processOutreachBatch(
       continue;
     }
 
+    // Fix #1: Hard block on suppression list (unsubscribes, bounces,
+    // complaints, abuse, legal). This is compliance-critical and was
+    // missing from the prior WHERE-clause-only filter.
+    try {
+      const suppression = await isEmailSuppressed(lead.contactEmail);
+      if (suppression.suppressed) {
+        dismissed++;
+        await db
+          .update(leads)
+          .set({
+            outreachQueuedAt: null,
+            outreachStatus: 'dismissed',
+            updatedAt: new Date(),
+          })
+          .where(eq(leads.id, lead.id));
+        continue;
+      }
+    } catch (suppressionError) {
+      // Fail closed: if suppression lookup errors, skip the send.
+      failed++;
+      await releaseClaim(lead.id);
+      await captureError(
+        'Outreach suppression lookup failed',
+        suppressionError,
+        { route: 'outreach-batch', contextData: { leadId: lead.id } }
+      );
+      continue;
+    }
+
     try {
       const hasDuplicate = await hasCompetingQueuedEmailLead(
         lead.contactEmail,
         lead.id,
-        claimedAt
+        lead.claimedAt
       );
       if (hasDuplicate) {
         dismissed++;
@@ -279,9 +367,9 @@ export async function processOutreachBatch(
         .set({
           instantlyLeadId,
           outreachStatus: 'queued',
-          firstContactedAt: claimedAt,
-          lastContactedAt: claimedAt,
-          updatedAt: claimedAt,
+          firstContactedAt: lead.claimedAt,
+          lastContactedAt: lead.claimedAt,
+          updatedAt: lead.claimedAt,
         })
         .where(eq(leads.id, lead.id));
 

@@ -120,7 +120,7 @@ export function ChatMessage({
                 >
                   <BrandLogo size={10} tone='auto' rounded={false} />
                 </span>
-                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
+                <span className='text-[11px] font-semibold tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
                 <span className='text-[11px] text-tertiary-token'>
@@ -151,7 +151,7 @@ export function ChatMessage({
                 <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
                   <BrandLogo size={10} tone='auto' rounded={false} />
                 </span>
-                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
+                <span className='text-[11px] font-semibold tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
                 <span className='text-[11px] text-tertiary-token'>

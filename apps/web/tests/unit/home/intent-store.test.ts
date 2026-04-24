@@ -23,10 +23,10 @@ import {
 
 function baseInput() {
   return {
-    finalPrompt: 'Create a release page for my next single',
-    pillId: 'create_release_page' as const,
-    pillLabel: 'Create release page',
-    insertedPrompt: 'Create a release page for ',
+    finalPrompt: 'Plan a release for my next single',
+    pillId: 'plan_a_release' as const,
+    pillLabel: 'Plan a release',
+    insertedPrompt: 'Plan a release for ',
   };
 }
 

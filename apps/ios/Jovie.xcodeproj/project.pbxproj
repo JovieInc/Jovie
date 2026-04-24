@@ -1,0 +1,842 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71445144CE0970267C0508C6 /* AppState.swift */; };
+		19328D236A7AE57920138038 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 47976CA8BC5B309FDB2B6215 /* Assets.xcassets */; };
+		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
+		2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */ = {isa = PBXBuildFile; fileRef = D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */; };
+		3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71290AE6A5F14D6941193B70 /* AppRouter.swift */; };
+		33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
+		4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0199C257CC5EA4F6FD36397D /* ClerkKit */; };
+		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
+		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
+		6853DA69F7459FE14462F48F /* Jovie-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 969C5D08D3E71A2D9824375A /* Jovie-logo.png */; };
+		6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */; };
+		70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
+		74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33DCDBD6A55190F563B419C /* DashboardView.swift */; };
+		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
+		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
+		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
+		A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */; };
+		ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */; };
+		B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611EE527D20DC6F6872CBF33 /* JovieUITests.swift */; };
+		BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */; };
+		BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */; };
+		C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C8753F36E077F69D925EE26 /* APIClientTests.swift */; };
+		CE7C4C47EFA23AFA2B205BE4 /* MobileMeResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */; };
+		D179CCF9F0BD00565174ACF6 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
+		D9CF5232BCCF1F895975D7B7 /* ClerkTokenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98CC57081FA315DA3E260B77 /* ClerkTokenProvider.swift */; };
+		DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */; };
+		E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9924B177AFB753A4C23A4098 /* APIClient.swift */; };
+		E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 37321F1DC431FDA58D969E72 /* ClerkKitUI */; };
+		EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAFC467F76300BCFC2659F /* Configuration.swift */; };
+		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
+		F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */; };
+		F8BC948A5A68297B746E217F /* MeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918FBCBCF600AA8C10191F60 /* MeCache.swift */; };
+		F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */; };
+		FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D156B3220339CAB0DBE1DD /* SplashView.swift */; };
+		FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		30A0C7A8558D4BD41F5A65F3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0FFB71BF91CEE5345F4B738 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1C737F8C637FECBAE37E4D41;
+			remoteInfo = Jovie;
+		};
+		B5F848CF3A168889D2C45016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0FFB71BF91CEE5345F4B738 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1C737F8C637FECBAE37E4D41;
+			remoteInfo = Jovie;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
+		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
+		178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenBrightnessManagerTests.swift; sourceTree = "<group>"; };
+		191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeRepositoryTests.swift; sourceTree = "<group>"; };
+		28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeRepository.swift; sourceTree = "<group>"; };
+		2E13A897DB2C3D06E845EC58 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponse.swift; sourceTree = "<group>"; };
+		3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenBrightnessManager.swift; sourceTree = "<group>"; };
+		448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRendererTests.swift; sourceTree = "<group>"; };
+		47976CA8BC5B309FDB2B6215 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4C8753F36E077F69D925EE26 /* APIClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Jovie.entitlements; sourceTree = "<group>"; };
+		549B9163EF50F377CA1A4C5B /* JovieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		611EE527D20DC6F6872CBF33 /* JovieUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieUITests.swift; sourceTree = "<group>"; };
+		6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		71290AE6A5F14D6941193B70 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		71445144CE0970267C0508C6 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VenueModeView.swift; sourceTree = "<group>"; };
+		88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NeedsOnboardingView.swift; sourceTree = "<group>"; };
+		918FBCBCF600AA8C10191F60 /* MeCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeCache.swift; sourceTree = "<group>"; };
+		95CA509F09ADCA8A54FCC85A /* Jovie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jovie.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		969C5D08D3E71A2D9824375A /* Jovie-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = "Jovie-logo.png"; sourceTree = "<group>"; };
+		969DB5F8041C9A004CDB5234 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		989D4251AFCEB0A633337F2C /* JovieUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		98CC57081FA315DA3E260B77 /* ClerkTokenProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClerkTokenProvider.swift; sourceTree = "<group>"; };
+		9924B177AFB753A4C23A4098 /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */ = {isa = PBXFileReference; includeInIndex = 1; path = "Inter-Variable.ttf"; sourceTree = "<group>"; };
+		A93DB506915B418D06E897A4 /* AppStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		B4D156B3220339CAB0DBE1DD /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
+		B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponseTests.swift; sourceTree = "<group>"; };
+		D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
+		DD30F57584F71E958D8C0514 /* LaunchMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchMode.swift; sourceTree = "<group>"; };
+		D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Configuration.local.plist; sourceTree = "<group>"; };
+		E33DCDBD6A55190F563B419C /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		E4EAFC467F76300BCFC2659F /* Configuration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		32B4081D6793A65D0C279A32 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D179CCF9F0BD00565174ACF6 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		67ABBC6FE841BBE2576C3F8D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9607D3EAD9248E14256BAD75 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */,
+				4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */,
+				E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		05015460AF84AD8DF5276AD4 = {
+			isa = PBXGroup;
+			children = (
+				55D872945D057DBB23C014CF /* Products */,
+				F5171E1AA9FD47B5DC6713D4 /* Frameworks */,
+				97F028CFFF6B312B90AC0518 /* Jovie */,
+				3ADDCDCDEBA3EA068410DC7B /* JovieTests */,
+				30EAB5C3B34D5A32AE3A9403 /* JovieUITests */,
+			);
+			sourceTree = "<group>";
+		};
+		05F2C63DC64DD882C7F220C8 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4D030230C47160EF0AAE5086 /* Fonts */,
+				969C5D08D3E71A2D9824375A /* Jovie-logo.png */,
+				47976CA8BC5B309FDB2B6215 /* Assets.xcassets */,
+			);
+			name = Resources;
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		30EAB5C3B34D5A32AE3A9403 /* JovieUITests */ = {
+			isa = PBXGroup;
+			children = (
+				611EE527D20DC6F6872CBF33 /* JovieUITests.swift */,
+			);
+			name = JovieUITests;
+			path = JovieUITests;
+			sourceTree = "<group>";
+		};
+		38A521B77CFB8C49A552F2BF /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				D38B16D4420C99A6D206BF5B /* Auth */,
+				A5A8CD9F74C3AE8AD7332D93 /* Dashboard */,
+				3BE73A70044C889546FD4A64 /* NeedsOnboarding */,
+				D8C70D614390928784D627FC /* Splash */,
+			);
+			name = Features;
+			path = Features;
+			sourceTree = "<group>";
+		};
+		3ADDCDCDEBA3EA068410DC7B /* JovieTests */ = {
+			isa = PBXGroup;
+			children = (
+				4C8753F36E077F69D925EE26 /* APIClientTests.swift */,
+				A93DB506915B418D06E897A4 /* AppStateTests.swift */,
+				191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */,
+				B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */,
+				448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */,
+				178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */,
+			);
+			name = JovieTests;
+			path = JovieTests;
+			sourceTree = "<group>";
+		};
+		3BE73A70044C889546FD4A64 /* NeedsOnboarding */ = {
+			isa = PBXGroup;
+			children = (
+				88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */,
+			);
+			name = NeedsOnboarding;
+			path = NeedsOnboarding;
+			sourceTree = "<group>";
+		};
+		447FB872611F29AB452FBAFB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		4A21A051CA70F90309561576 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */,
+			);
+			name = DesignSystem;
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		4D030230C47160EF0AAE5086 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */,
+			);
+			name = Fonts;
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		55D872945D057DBB23C014CF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				95CA509F09ADCA8A54FCC85A /* Jovie.app */,
+				549B9163EF50F377CA1A4C5B /* JovieTests.xctest */,
+				989D4251AFCEB0A633337F2C /* JovieUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		83A70DCC42A2C4A23FF9A69D /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				9924B177AFB753A4C23A4098 /* APIClient.swift */,
+				98CC57081FA315DA3E260B77 /* ClerkTokenProvider.swift */,
+				918FBCBCF600AA8C10191F60 /* MeCache.swift */,
+				28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */,
+				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
+				000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */,
+				3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */,
+			);
+			name = Core;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		97F028CFFF6B312B90AC0518 /* Jovie */ = {
+			isa = PBXGroup;
+			children = (
+				CD1E4E5554DA1BC0E409C363 /* App */,
+				83A70DCC42A2C4A23FF9A69D /* Core */,
+				4A21A051CA70F90309561576 /* DesignSystem */,
+				38A521B77CFB8C49A552F2BF /* Features */,
+				05F2C63DC64DD882C7F220C8 /* Resources */,
+				D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */,
+				2E13A897DB2C3D06E845EC58 /* Info.plist */,
+				535ED5D3D849F7B0F9DBB0E9 /* Jovie.entitlements */,
+			);
+			name = Jovie;
+			path = Jovie;
+			sourceTree = "<group>";
+		};
+		A5A8CD9F74C3AE8AD7332D93 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				E33DCDBD6A55190F563B419C /* DashboardView.swift */,
+				7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */,
+			);
+			name = Dashboard;
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		CD1E4E5554DA1BC0E409C363 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				71290AE6A5F14D6941193B70 /* AppRouter.swift */,
+				71445144CE0970267C0508C6 /* AppState.swift */,
+				E4EAFC467F76300BCFC2659F /* Configuration.swift */,
+				00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */,
+				DD30F57584F71E958D8C0514 /* LaunchMode.swift */,
+				969DB5F8041C9A004CDB5234 /* RootView.swift */,
+			);
+			name = App;
+			path = App;
+			sourceTree = "<group>";
+		};
+		D38B16D4420C99A6D206BF5B /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */,
+			);
+			name = Auth;
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		D8C70D614390928784D627FC /* Splash */ = {
+			isa = PBXGroup;
+			children = (
+				B4D156B3220339CAB0DBE1DD /* SplashView.swift */,
+			);
+			name = Splash;
+			path = Splash;
+			sourceTree = "<group>";
+		};
+		F5171E1AA9FD47B5DC6713D4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				447FB872611F29AB452FBAFB /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1C737F8C637FECBAE37E4D41 /* Jovie */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D80818ECC6DE72AB35D55F3 /* Build configuration list for PBXNativeTarget "Jovie" */;
+			buildPhases = (
+				43957A0BB64CCFBBA07B7195 /* Sources */,
+				9607D3EAD9248E14256BAD75 /* Frameworks */,
+				512E4DD09163D8BA50039830 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Jovie;
+			packageProductDependencies = (
+				0199C257CC5EA4F6FD36397D /* ClerkKit */,
+				37321F1DC431FDA58D969E72 /* ClerkKitUI */,
+			);
+			productName = Jovie;
+			productReference = 95CA509F09ADCA8A54FCC85A /* Jovie.app */;
+			productType = "com.apple.product-type.application";
+		};
+		319D35C35BCD93B89617C099 /* JovieTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 66DAB58156FF2E2A37A8780D /* Build configuration list for PBXNativeTarget "JovieTests" */;
+			buildPhases = (
+				0E7272CFD720FC77165DCF6E /* Sources */,
+				32B4081D6793A65D0C279A32 /* Frameworks */,
+				3666449E588ADD0326E313BC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				87AD3BF953180708922D0183 /* PBXTargetDependency */,
+			);
+			name = JovieTests;
+			productName = JovieTests;
+			productReference = 549B9163EF50F377CA1A4C5B /* JovieTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		FCC81F1690DD99C5774EB8AA /* JovieUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D53A01F5A8984D5494CBCBDB /* Build configuration list for PBXNativeTarget "JovieUITests" */;
+			buildPhases = (
+				FE54E8873E55B41680A5380E /* Sources */,
+				67ABBC6FE841BBE2576C3F8D /* Frameworks */,
+				645E20697184D9248CEAE3B6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4495BBFA7C126CA1F69E40DD /* PBXTargetDependency */,
+			);
+			name = JovieUITests;
+			productName = JovieUITests;
+			productReference = 989D4251AFCEB0A633337F2C /* JovieUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F0FFB71BF91CEE5345F4B738 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 668D535E3F55B5579BA2B937 /* Build configuration list for PBXProject "Jovie" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 05015460AF84AD8DF5276AD4;
+			minimizedProjectReferenceProxies = 0;
+			packageReferences = (
+				5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 55D872945D057DBB23C014CF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1C737F8C637FECBAE37E4D41 /* Jovie */,
+				319D35C35BCD93B89617C099 /* JovieTests */,
+				FCC81F1690DD99C5774EB8AA /* JovieUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3666449E588ADD0326E313BC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		512E4DD09163D8BA50039830 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */,
+				6853DA69F7459FE14462F48F /* Jovie-logo.png in Resources */,
+				19328D236A7AE57920138038 /* Assets.xcassets in Resources */,
+				296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		645E20697184D9248CEAE3B6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0E7272CFD720FC77165DCF6E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */,
+				EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */,
+				FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */,
+				CE7C4C47EFA23AFA2B205BE4 /* MobileMeResponseTests.swift in Sources */,
+				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
+				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		43957A0BB64CCFBBA07B7195 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */,
+				045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */,
+				EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */,
+				89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */,
+				4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */,
+				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
+				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
+				D9CF5232BCCF1F895975D7B7 /* ClerkTokenProvider.swift in Sources */,
+				F8BC948A5A68297B746E217F /* MeCache.swift in Sources */,
+				8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */,
+				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
+				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
+				A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */,
+				6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */,
+				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
+				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
+				BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */,
+				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
+				FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FE54E8873E55B41680A5380E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4495BBFA7C126CA1F69E40DD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Jovie;
+			target = 1C737F8C637FECBAE37E4D41 /* Jovie */;
+			targetProxy = B5F848CF3A168889D2C45016 /* PBXContainerItemProxy */;
+		};
+		87AD3BF953180708922D0183 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Jovie;
+			target = 1C737F8C637FECBAE37E4D41 /* Jovie */;
+			targetProxy = 30A0C7A8558D4BD41F5A65F3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		39E288037D02E4A46BF28D30 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Jovie/Jovie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = Jovie/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.Jovie;
+				PRODUCT_MODULE_NAME = Jovie;
+				PRODUCT_NAME = Jovie;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		63D229A289C7456641BA3602 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = Jovie/Jovie.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = Jovie/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.Jovie;
+				PRODUCT_MODULE_NAME = Jovie;
+				PRODUCT_NAME = Jovie;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6D441350815024A9E2CEEB6E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieUITests;
+				PRODUCT_NAME = JovieUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Jovie;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7C5BAD122C02DDD123E127FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieTests;
+				PRODUCT_NAME = JovieTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jovie.app/Jovie";
+				TEST_TARGET_NAME = Jovie;
+			};
+			name = Debug;
+		};
+		95ED85D6B5B396D65E6EFD47 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BEA96F1311D0754EC0FC35D6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		CD37A76AFD6633BD29517368 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieTests;
+				PRODUCT_NAME = JovieTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Jovie.app/Jovie";
+				TEST_TARGET_NAME = Jovie;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F46ECB1B16F61B2E1F52D90F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = ie.jov.JovieUITests;
+				PRODUCT_NAME = JovieUITests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Jovie;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4D80818ECC6DE72AB35D55F3 /* Build configuration list for PBXNativeTarget "Jovie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				39E288037D02E4A46BF28D30 /* Release */,
+				63D229A289C7456641BA3602 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		668D535E3F55B5579BA2B937 /* Build configuration list for PBXProject "Jovie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				95ED85D6B5B396D65E6EFD47 /* Debug */,
+				BEA96F1311D0754EC0FC35D6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		66DAB58156FF2E2A37A8780D /* Build configuration list for PBXNativeTarget "JovieTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CD37A76AFD6633BD29517368 /* Release */,
+				7C5BAD122C02DDD123E127FD /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D53A01F5A8984D5494CBCBDB /* Build configuration list for PBXNativeTarget "JovieUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D441350815024A9E2CEEB6E /* Release */,
+				F46ECB1B16F61B2E1F52D90F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0199C257CC5EA4F6FD36397D /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
+		37321F1DC431FDA58D969E72 /* ClerkKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKitUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F0FFB71BF91CEE5345F4B738 /* Project object */;
+}

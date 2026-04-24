@@ -20,7 +20,7 @@ import {
 } from '@/components/homepage/intent-store';
 
 function getInput() {
-  return screen.getByPlaceholderText('Message...') as HTMLInputElement;
+  return screen.getByPlaceholderText('Ask Jovie...') as HTMLInputElement;
 }
 
 function getSubmit() {
@@ -45,27 +45,30 @@ describe('HomepageIntent', () => {
     }));
   });
 
-  it('1. renders headline, subhead, input, and all 4 pills with correct labels', () => {
+  it('1. renders headline, subhead, input, and the refreshed pill set', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', { name: 'Your AI Artist Manager.' })
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Drop more music. Learn what hits. Build momentum before you burn out.'
+        'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Create release page' })
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plan a release' })).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Generate album art' })
     ).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Generate playlist pitch' })
+      screen.getByRole('button', { name: 'Pitch playlists' })
     ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Plan a release' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Build artist profile' })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Analyze momentum' })
+    ).toBeTruthy();
   });
 
   it('2. pill click prefills input with insertedPrompt and places cursor at end', () => {
@@ -74,15 +77,13 @@ describe('HomepageIntent', () => {
     const setSelectionRange = vi.spyOn(input, 'setSelectionRange');
     const focusSpy = vi.spyOn(input, 'focus');
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Create release page' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Plan a release' }));
 
-    expect(input.value).toBe('Create a release page for ');
+    expect(input.value).toBe('Plan a release for ');
     expect(focusSpy).toHaveBeenCalled();
     expect(setSelectionRange).toHaveBeenCalledWith(
-      'Create a release page for '.length,
-      'Create a release page for '.length
+      'Plan a release for '.length,
+      'Plan a release for '.length
     );
   });
 
@@ -128,12 +129,10 @@ describe('HomepageIntent', () => {
 
   it('5. submit fires homepage_prompt_submitted with expected shape', () => {
     render(<HomepageIntent />);
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Create release page' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Plan a release' }));
     const input = getInput();
     fireEvent.change(input, {
-      target: { value: 'Create a release page for my EP' },
+      target: { value: 'Plan a release for my EP' },
     });
     fireEvent.click(getSubmit());
 
@@ -142,9 +141,9 @@ describe('HomepageIntent', () => {
     );
     expect(call).toBeTruthy();
     const props = call?.[1] as Record<string, unknown>;
-    expect(props.pillId).toBe('create_release_page');
+    expect(props.pillId).toBe('plan_a_release');
     expect(props.pillUsed).toBe(true);
-    expect(props.promptLength).toBe('Create a release page for my EP'.length);
+    expect(props.promptLength).toBe('Plan a release for my EP'.length);
   });
 
   it('6. submit calls router.push with /signup?redirect_url=/onboarding', () => {

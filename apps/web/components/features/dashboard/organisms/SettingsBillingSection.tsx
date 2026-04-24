@@ -124,7 +124,7 @@ export function SettingsBillingSection() {
                 variant={badgeVariant}
                 size='sm'
                 className={cn(
-                  'rounded-[6px] px-1.5 text-3xs',
+                  'rounded-md px-1.5 text-3xs',
                   badgeVariant === 'secondary' &&
                     'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token',
                   badgeVariant === 'warning' &&

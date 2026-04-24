@@ -113,7 +113,7 @@ function CarouselCardHeader({
   return (
     <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
       <div>
-        <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
+        <p className='text-[11px] font-semibold tracking-normal text-tertiary-token'>
           Suggested identity
         </p>
         <p className='mt-0.5 text-[13px] font-medium text-secondary-token'>

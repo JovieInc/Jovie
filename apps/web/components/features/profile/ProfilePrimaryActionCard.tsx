@@ -399,15 +399,15 @@ export function ProfilePrimaryActionCard({
   );
   const artClassName = isShowcase
     ? 'h-14 w-14 rounded-[14px]'
-    : 'h-11 w-11 rounded-[12px]';
+    : 'h-11 w-11 rounded-xl';
   const titleClassName = isShowcase
     ? 'text-base font-[630] tracking-[-0.03em] text-white'
-    : 'text-[13px] font-[590] leading-[1.1] text-white/92';
+    : 'text-[13px] font-semibold leading-[1.1] text-white/92';
   const metaClassName = isShowcase
     ? 'text-[11.5px] text-white/56'
     : 'text-[10.5px] text-white/52';
   const artistMetaLine = (
-    <p className={cn('truncate font-[560]', metaClassName)}>{artist.name}</p>
+    <p className={cn('truncate font-semibold', metaClassName)}>{artist.name}</p>
   );
 
   if (state.kind === 'release_countdown' || state.kind === 'release_live') {
@@ -511,7 +511,7 @@ export function ProfilePrimaryActionCard({
             {state.tourDate.venueName ?? artist.name}
           </p>
           <div className='mt-1 space-y-0.5'>
-            <p className={cn('truncate font-[560]', metaClassName)}>
+            <p className={cn('truncate font-semibold', metaClassName)}>
               {locationLabel}
             </p>
             <p className={cn('truncate font-[520]', metaClassName)}>
@@ -602,7 +602,7 @@ export function ProfilePrimaryActionCard({
       <div className='min-w-0 flex-1'>
         <p className={cn('truncate', titleClassName)}>{artist.name}</p>
         <div className='mt-1 space-y-0.5'>
-          <p className={cn('truncate font-[560]', metaClassName)}>
+          <p className={cn('truncate font-semibold', metaClassName)}>
             Listen across your preferred platforms
           </p>
         </div>

@@ -30,7 +30,7 @@ export function SetupTaskItem({
         >
           {complete ? '✓' : index}
         </div>
-        <p className='truncate text-[13px] font-[590] text-primary-token'>
+        <p className='truncate text-[13px] font-semibold text-primary-token'>
           {title}
         </p>
       </div>

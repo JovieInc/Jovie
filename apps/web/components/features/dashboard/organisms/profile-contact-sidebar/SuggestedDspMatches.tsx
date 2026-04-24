@@ -62,7 +62,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
         {[1, 2, 3].map(i => (
           <div
             key={i}
-            className='flex items-center gap-2.5 rounded-[6px] px-2 py-1'
+            className='flex items-center gap-2.5 rounded-md px-2 py-1'
           >
             <div className='h-4 w-4 rounded skeleton' />
             <div className='h-3.5 flex-1 rounded skeleton' />
@@ -180,7 +180,7 @@ function SuggestedMatchRow({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: mouse events trigger popover display, not a click action
     <li
       className={cn(
-        'group flex items-center gap-2 rounded-[6px] px-2 py-1 transition-colors hover:bg-surface-1 focus-within:bg-surface-1',
+        'group flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-surface-1 focus-within:bg-surface-1',
         isLoading && 'opacity-60'
       )}
       onMouseEnter={handleMouseEnter}

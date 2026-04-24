@@ -59,7 +59,7 @@ export function JovieGreeting({
         className
       )}
     >
-      <p className='text-[11px] font-[560] tracking-[0.01em] text-tertiary-token'>
+      <p className='text-[11px] font-semibold tracking-[0.01em] text-tertiary-token'>
         {greeting.label}
       </p>
       <p className='mt-1.5 text-balance text-[15px] leading-6 text-secondary-token'>

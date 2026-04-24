@@ -187,7 +187,7 @@ function PreviewInlineNotifications({
             </div>
           </div>
         </SubscriptionPearlComposer>
-        <p className='px-1 text-[10px] font-[560] text-white/46'>{helper}</p>
+        <p className='px-1 text-[10px] font-semibold text-white/46'>{helper}</p>
       </div>
     );
   }
@@ -209,12 +209,12 @@ function PreviewInlineNotifications({
           }
         >
           <div className='min-w-0 px-2 py-1.5'>
-            <p className='truncate text-[15px] font-[560] tracking-[-0.02em] text-white/86'>
+            <p className='truncate text-[15px] font-semibold tracking-[-0.02em] text-white/86'>
               {notifications.value ?? 'fan@example.com'}
             </p>
           </div>
         </SubscriptionPearlComposer>
-        <p className='px-1 text-[10px] font-[560] text-white/46'>{helper}</p>
+        <p className='px-1 text-[10px] font-semibold text-white/46'>{helper}</p>
       </div>
     );
   }
@@ -236,13 +236,13 @@ function PreviewInlineNotifications({
           }
         >
           <div className='min-w-0 px-3 py-1.5'>
-            <p className='truncate text-[15px] font-[560] tracking-[-0.02em] text-white/86'>
+            <p className='truncate text-[15px] font-semibold tracking-[-0.02em] text-white/86'>
               {notifications.value ??
                 (kind === 'name' ? 'Your name' : 'MM/DD/YYYY')}
             </p>
           </div>
         </SubscriptionPearlComposer>
-        <p className='px-1 text-[10px] font-[560] text-white/46'>{helper}</p>
+        <p className='px-1 text-[10px] font-semibold text-white/46'>{helper}</p>
       </div>
     );
   }
@@ -261,7 +261,7 @@ function PreviewInlineNotifications({
           <CheckCircle2 className='h-4 w-4 shrink-0 text-green-400' />
           {notifications.label || 'Notifications on'}
         </button>
-        <p className='px-1 text-[10px] font-[560] text-white/46'>{helper}</p>
+        <p className='px-1 text-[10px] font-semibold text-white/46'>{helper}</p>
       </div>
     );
   }
@@ -279,7 +279,7 @@ function PreviewInlineNotifications({
         <Bell className='h-4 w-4' />
         {notifications.label || 'Turn on notifications'}
       </button>
-      <p className='px-1 text-[10px] font-[560] text-white/46'>{helper}</p>
+      <p className='px-1 text-[10px] font-semibold text-white/46'>{helper}</p>
     </div>
   );
 }
@@ -454,7 +454,7 @@ export function ProfileCompactSurface({
                 data-testid='profile-identity-link'
                 href={profileHref}
                 aria-label={`Go to ${artist.name}'s profile`}
-                className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               >
                 <span className='truncate'>{artist.name}</span>
                 {artist.is_verified ? (

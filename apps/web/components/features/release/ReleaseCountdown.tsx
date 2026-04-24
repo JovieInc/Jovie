@@ -102,7 +102,7 @@ export function ReleaseCountdown({
             <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
               {timeLeft.days}
             </span>
-            <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+            <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
               D
             </span>
           </span>
@@ -111,7 +111,7 @@ export function ReleaseCountdown({
           <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
             {timeLeft.hours}
           </span>
-          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
             H
           </span>
         </span>
@@ -119,7 +119,7 @@ export function ReleaseCountdown({
           <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
             {timeLeft.minutes}
           </span>
-          <span className='ml-0.5 text-[10px] font-[590] uppercase tracking-[0.08em] text-white/35'>
+          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
             M
           </span>
         </span>

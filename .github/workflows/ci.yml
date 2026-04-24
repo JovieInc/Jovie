@@ -17,7 +17,19 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # On main, scope the concurrency group per-commit so rapid merges cannot
+  # cancel each other's deploy pipelines. GitHub evaluates cancel-in-progress
+  # expressions as strings and treats "false" as truthy, which was cancelling
+  # every main CI run when the next merge landed and starving production
+  # promotion. Using github.sha in the group on main sidesteps the issue
+  # entirely. PRs and merge_group runs still share a group per ref so stale
+  # runs are superseded as usual.
+  group: >-
+    ci-${{ github.workflow }}-${{
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        && github.sha
+        || github.ref
+    }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -1738,7 +1750,7 @@ jobs:
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -1868,7 +1880,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

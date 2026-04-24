@@ -116,7 +116,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
       <div className='px-4 py-2.5 sm:px-5 sm:py-3'>
         <div className='mb-2.5 flex items-center gap-2'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'
             aria-hidden='true'
           >
             <ShoppingBag className='h-3.5 w-3.5 text-secondary-token' />
@@ -154,7 +154,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
 
         {errorMessage && (
           <output
-            className='flex items-center gap-2 rounded-[8px] border border-destructive/15 bg-destructive/5 px-3 py-2 text-app font-caption text-destructive'
+            className='flex items-center gap-2 rounded-lg border border-destructive/15 bg-destructive/5 px-3 py-2 text-app font-caption text-destructive'
             aria-live='polite'
           >
             <X className='h-3.5 w-3.5 shrink-0' />
@@ -164,7 +164,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
 
         {saveState === 'success' && (
           <output
-            className='flex items-center gap-2 rounded-[8px] border border-emerald-500/15 bg-emerald-500/6 px-3 py-2 text-app font-caption text-emerald-700 dark:text-emerald-300'
+            className='flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/6 px-3 py-2 text-app font-caption text-emerald-700 dark:text-emerald-300'
             aria-live='polite'
           >
             <Check className='h-3.5 w-3.5' />
@@ -178,7 +178,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             disabled={saveState === 'saving' || !hasChanges}
             variant='primary'
             size='sm'
-            className='h-7 rounded-[8px] px-2.5 text-2xs font-caption'
+            className='h-7 rounded-lg px-2.5 text-2xs font-caption'
           >
             {saveState === 'saving' ? 'Saving…' : 'Save'}
           </Button>
@@ -188,7 +188,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
               disabled={saveState === 'saving'}
               variant='ghost'
               size='sm'
-              className='h-7 rounded-[8px] border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+              className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
             >
               Disconnect
             </Button>
@@ -200,7 +200,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             href={shopPageUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token'
           >
             <ExternalLink className='h-3 w-3' />
             Preview shop link

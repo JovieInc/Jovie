@@ -60,7 +60,7 @@ export default async function ArtistsPage() {
               <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
                 {profiles.length}
               </p>
-              <p className='text-[12px] font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
+              <p className='text-[12px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
                 Public profiles
               </p>
               <p className='text-[13px] leading-5 text-secondary-token'>
@@ -68,7 +68,7 @@ export default async function ArtistsPage() {
               </p>
             </ContentSurfaceCard>
             <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-              <p className='text-[13px] font-[560] text-primary-token'>
+              <p className='text-[13px] font-semibold text-primary-token'>
                 Discover artists
               </p>
               <p className='text-[13px] leading-5 text-secondary-token'>
@@ -77,7 +77,7 @@ export default async function ArtistsPage() {
               </p>
             </ContentSurfaceCard>
             <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-              <p className='text-[13px] font-[560] text-primary-token'>
+              <p className='text-[13px] font-semibold text-primary-token'>
                 Jump straight in
               </p>
               <p className='text-[13px] leading-5 text-secondary-token'>
@@ -111,7 +111,7 @@ export default async function ArtistsPage() {
                   </div>
 
                   <div className='space-y-1'>
-                    <h2 className='text-[15px] font-[560] text-primary-token transition-colors group-hover:text-secondary-token'>
+                    <h2 className='text-[15px] font-semibold text-primary-token transition-colors group-hover:text-secondary-token'>
                       {profile.displayName || profile.username}
                     </h2>
                     {profile.bio ? (
@@ -125,7 +125,7 @@ export default async function ArtistsPage() {
                     )}
                   </div>
 
-                  <span className='inline-flex items-center gap-1 text-[12px] font-[560] text-tertiary-token transition-colors group-hover:text-primary-token'>
+                  <span className='inline-flex items-center gap-1 text-[12px] font-semibold text-tertiary-token transition-colors group-hover:text-primary-token'>
                     View profile
                     <Icon name='ChevronRight' className='h-4 w-4' />
                   </span>
@@ -136,7 +136,7 @@ export default async function ArtistsPage() {
         ) : (
           <ContentSurfaceCard surface='details'>
             <div className='px-5 py-8 text-center sm:px-6'>
-              <p className='text-[15px] font-[560] text-primary-token'>
+              <p className='text-[15px] font-semibold text-primary-token'>
                 No profiles found
               </p>
               <p className='mt-2 text-[13px] leading-5 text-secondary-token'>
