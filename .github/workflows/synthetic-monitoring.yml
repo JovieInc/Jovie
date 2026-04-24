@@ -59,12 +59,11 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          ALLOW_EMPTY_SYNTHETIC_SUITE: 'true'
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
         run: |
-          # Temporarily skip the signup->subscription path in synthetic runs.
-          # It is flaky in production due intermittent CAPTCHA bootstrap failures.
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results --grep-invert="complete user journey from signup to paid subscription"
+          # Run the dedicated synthetic suite and quarantine only the flaky
+          # full signup flow while keeping health/performance probes active.
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results --grep-invert="Production golden path monitoring"
         continue-on-error: true
 
       - name: Cleanup Synthetic E2E Users
@@ -84,9 +83,6 @@ jobs:
 
           const resultsFile = 'apps/web/test-results/results.json';
           const outputFile = process.env.GITHUB_OUTPUT;
-          const allowEmptySuite =
-            process.env.ALLOW_EMPTY_SYNTHETIC_SUITE === 'true';
-
           function emit(line) {
             if (outputFile) {
               fs.appendFileSync(outputFile, `${line}\n`);
@@ -149,11 +145,7 @@ jobs:
           emitMultiline('failed_tests', details);
 
           if (tests.length === 0) {
-            if (allowEmptySuite) {
-              emit('test_status=passed');
-            } else {
-              emit('test_status=error');
-            }
+            emit('test_status=error');
           } else if (failed.length > 0 || skipped.length > 0) {
             emit('test_status=failed');
           } else if (passed.length === tests.length) {
