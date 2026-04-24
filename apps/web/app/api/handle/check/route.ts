@@ -12,6 +12,7 @@ import {
 } from '@/lib/onboarding/handle-availability-cache';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { validateUsername } from '@/lib/validation/username';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -92,27 +93,17 @@ export async function GET(request: Request) {
     );
   }
 
-  // Validate handle format
-  if (handle.length < 3) {
+  // Validate handle format using the canonical shared validator so this API
+  // accepts the same inputs as the onboarding form and completeOnboarding
+  // server action. Previously this route used a stricter local regex that
+  // rejected dots and underscores, even though those characters are allowed
+  // throughout the rest of the system — users would see a "green" client-side
+  // validation for "my.handle" but then get blocked here with a confusing
+  // "letters, numbers, and hyphens" error.
+  const formatCheck = validateUsername(handle);
+  if (!formatCheck.isValid) {
     return respondWithConstantTime(
-      { available: false, error: 'Handle must be at least 3 characters' },
-      { status: 400 }
-    );
-  }
-
-  if (handle.length > 24) {
-    return respondWithConstantTime(
-      { available: false, error: 'Handle must be no more than 24 characters' },
-      { status: 400 }
-    );
-  }
-
-  if (!/^[a-zA-Z0-9-]+$/.test(handle)) {
-    return respondWithConstantTime(
-      {
-        available: false,
-        error: 'Handle can only contain letters, numbers, and hyphens',
-      },
+      { available: false, error: formatCheck.error ?? 'Invalid handle' },
       { status: 400 }
     );
   }
