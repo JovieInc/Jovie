@@ -92,17 +92,9 @@ function OutcomeCard({
   return (
     <article
       data-testid='artist-profile-outcome-card'
-      className='group relative flex min-h-[30rem] flex-col overflow-hidden rounded-[1.6rem] border border-white/8 bg-[#050608] shadow-[0_28px_68px_rgba(0,0,0,0.3)]'
+      className='group relative flex min-h-[30rem] flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#07090d]'
       style={style}
     >
-      <div
-        className='absolute inset-0 opacity-90'
-        style={{
-          background:
-            'radial-gradient(circle at 80% 78%, color-mix(in srgb, var(--outcome-accent) 18%, transparent), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015) 44%, rgba(0,0,0,0.42))',
-        }}
-        aria-hidden='true'
-      />
       <div className='relative flex h-full flex-col p-5 sm:p-6'>
         <div className='max-w-[21rem]'>
           <h3 className='max-w-[14ch] text-[clamp(1.4rem,2vw,1.7rem)] font-[620] leading-[1.18] tracking-[-0.035em] text-primary-token'>
@@ -161,11 +153,10 @@ function ProofActionCardFrame({
   return (
     <article
       className={cn(
-        'relative flex min-h-[12.5rem] overflow-hidden rounded-[1.28rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4 shadow-[0_22px_54px_rgba(0,0,0,0.28)]',
+        'relative flex min-h-[12.5rem] overflow-hidden rounded-[1.2rem] border border-white/8 bg-white/[0.02] p-4',
         className
       )}
     >
-      <div className='absolute inset-x-6 top-0 h-16 rounded-full bg-white/8 blur-3xl' />
       <ProofTag className='absolute left-3 top-3 z-10' label={label} />
       <div className='relative z-10 mt-7 flex w-full items-center'>
         {children}
@@ -240,8 +231,8 @@ function SellOutProof({
         />
       </ProofActionCardFrame>
 
-      <div className='flex-1 rounded-[1.25rem] border border-white/10 bg-black/34 px-4 pb-4 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'>
-        <div className='rounded-[1.05rem] border border-white/6 bg-white/[0.02] px-4 pb-2 pt-4 shadow-[0_18px_44px_rgba(0,0,0,0.2)]'>
+      <div className='flex-1 rounded-[1.2rem] border border-white/8 bg-white/[0.02] px-4 pb-2 pt-4'>
+        <div>
           <p className='text-[12px] font-semibold tracking-[-0.02em] text-white'>
             {proof.drawerTitle}
           </p>
@@ -284,7 +275,7 @@ function GetPaidProof({
 }>) {
   return (
     <div className='grid h-full min-h-[18.75rem] gap-3 sm:grid-cols-[0.92fr_1.08fr]'>
-      <div className='flex flex-col justify-between rounded-[1.25rem] border border-white/10 bg-black/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'>
+      <div className='flex flex-col justify-between rounded-[1.2rem] border border-white/8 bg-white/[0.02] p-4'>
         <div>
           <p className='text-[11px] font-medium tracking-[-0.01em] text-white/48'>
             {proof.drawerTitle}
