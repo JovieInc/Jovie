@@ -62,7 +62,7 @@ function HighlightedName({
   readonly matchIndices: number[];
 }) {
   if (matchIndices.length === 0) {
-    return <span className='font-[510]'>{name}</span>;
+    return <span className='font-caption'>{name}</span>;
   }
 
   const matchSet = new Set(matchIndices);
@@ -73,7 +73,7 @@ function HighlightedName({
   }));
 
   return (
-    <span className='font-[510]'>
+    <span className='font-caption'>
       {characters.map(character => (
         <span
           key={character.id}
@@ -664,7 +664,7 @@ export const UniversalLinkInput = forwardRef<
                           {groupIndex > 0 && (
                             <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[13px] font-[510] tracking-normal text-secondary-token'>
+                          <div className='px-3 pb-1 pt-2 text-[13px] font-caption tracking-normal text-secondary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

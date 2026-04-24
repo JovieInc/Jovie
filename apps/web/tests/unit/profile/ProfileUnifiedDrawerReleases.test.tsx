@@ -361,7 +361,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     // Should have year header dividers
     const headers = screen
       .getByTestId('profile-mode-drawer-releases')
-      .querySelectorAll('.font-\\[510\\]');
+      .querySelectorAll('.font-caption');
     expect(headers.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -383,7 +383,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     // No year header dividers
     const headers = screen
       .getByTestId('profile-mode-drawer-releases')
-      .querySelectorAll('.font-\\[510\\]');
+      .querySelectorAll('.font-caption');
     expect(headers.length).toBe(0);
   });
 

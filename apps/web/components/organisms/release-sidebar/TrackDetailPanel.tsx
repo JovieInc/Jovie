@@ -59,7 +59,7 @@ export function TrackDetailPanel({
         className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          <p className='text-[11px] font-caption leading-none text-tertiary-token'>
             Track
           </p>
         </div>
@@ -81,7 +81,7 @@ export function TrackDetailPanel({
         className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          <p className='text-[11px] font-caption leading-none text-tertiary-token'>
             Smart link
           </p>
         </div>
@@ -108,7 +108,7 @@ export function TrackDetailPanel({
           className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
         >
           <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+            <p className='text-[11px] font-caption leading-none text-tertiary-token'>
               Actions
             </p>
           </div>

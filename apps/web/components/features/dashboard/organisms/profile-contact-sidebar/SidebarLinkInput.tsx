@@ -72,7 +72,7 @@ function SidebarSuggestionItem({
       >
         <SocialIcon platform={option.icon} className='h-3.5 w-3.5' />
       </span>
-      <span className='font-[510]'>{option.name}</span>
+      <span className='font-caption'>{option.name}</span>
       <span className='text-xs text-tertiary-token'>{option.hint}</span>
       {active && (
         <span className='ml-auto max-sm:hidden text-xs text-tertiary-token sm:inline'>
@@ -219,7 +219,7 @@ export function SidebarLinkInput({
           <span className='min-w-0 flex-1 truncate'>
             {detectedLink.normalizedUrl}
           </span>
-          <span className='ml-auto shrink-0 text-app font-[510] text-accent'>
+          <span className='ml-auto shrink-0 text-app font-caption text-accent'>
             Add
           </span>
         </button>

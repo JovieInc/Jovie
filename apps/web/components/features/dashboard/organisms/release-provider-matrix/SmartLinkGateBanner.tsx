@@ -58,7 +58,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-app font-[510] text-primary-token'>
+            <p className='text-app font-caption text-primary-token'>
               You have {props.releasedCount} smart links
             </p>
             <p className='mt-0.5 text-2xs leading-[1.35] text-secondary-token'>
@@ -77,7 +77,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
           </>
         ) : (
           <>
-            <p className='text-app font-[510] text-primary-token'>
+            <p className='text-app font-caption text-primary-token'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>

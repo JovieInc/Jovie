@@ -100,7 +100,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       className={cn(
         'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-[background-color,color] duration-150',
         isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
-        isHighIntent && 'font-[510]',
+        isHighIntent && 'font-caption',
         hasValue && 'border-l-2 border-l-emerald-500/20'
       )}
       onClick={() => onTap(member)}
@@ -208,7 +208,7 @@ function MemberDetails({
         />
         <span
           className={cn(
-            'font-[510] shrink-0',
+            'font-caption shrink-0',
             INTENT_STYLES[member.intentLevel]
           )}
         >
@@ -216,7 +216,7 @@ function MemberDetails({
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='font-[510] text-secondary-token shrink-0'>
+          <span className='font-caption text-secondary-token shrink-0'>
             Returning
           </span>
         ) : (
@@ -240,7 +240,7 @@ function MemberDetails({
           )}
           {lastAction && hasValue && <DotSeparator />}
           {hasValue && (
-            <span className='shrink-0 font-[510] text-emerald-600 dark:text-emerald-400'>
+            <span className='shrink-0 font-caption text-emerald-600 dark:text-emerald-400'>
               {formatDollars(ltvCents)}
             </span>
           )}

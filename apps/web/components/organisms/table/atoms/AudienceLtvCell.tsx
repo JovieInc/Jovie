@@ -19,7 +19,7 @@ export interface AudienceLtvCellProps {
 const TIER_STYLES = {
   none: 'text-tertiary-token',
   low: 'text-secondary-token',
-  medium: 'text-amber-600 dark:text-amber-400 font-[510]',
+  medium: 'text-amber-600 dark:text-amber-400 font-caption',
   high: 'text-emerald-600 dark:text-emerald-400 font-semibold',
 } as const;
 
@@ -40,8 +40,8 @@ function LtvTooltipContent({
   return (
     <div className='flex min-w-56 flex-col gap-1.5 text-[12px]'>
       <div className='flex items-center justify-between gap-4 border-b border-subtle pb-1.5'>
-        <span className='font-[510] text-primary-token'>Lifetime Value</span>
-        <span className='font-[510] text-primary-token'>
+        <span className='font-caption text-primary-token'>Lifetime Value</span>
+        <span className='font-caption text-primary-token'>
           {formatDollars(breakdown.totalValueCents)}
         </span>
       </div>

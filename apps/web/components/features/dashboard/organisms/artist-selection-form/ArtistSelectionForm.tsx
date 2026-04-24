@@ -113,7 +113,7 @@ export function ArtistSelectionForm() {
                       />
                     )}
                     <div className='flex-1 min-w-0'>
-                      <p className='text-app font-[510] text-primary-token truncate'>
+                      <p className='text-app font-caption text-primary-token truncate'>
                         {selectedArtist.name}
                       </p>
                       <p className='text-2xs text-green-600 dark:text-green-400 flex items-center gap-1'>

@@ -15,7 +15,7 @@ import { type DetectedLink } from '@/lib/utils/platform-detection';
 import { compactUrlDisplay, suggestionIdentity } from './utils';
 
 const SWIPE_ACTION_CLASS =
-  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-[510] transition-colors active:opacity-80';
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-caption transition-colors active:opacity-80';
 
 /**
  * Determine the pill state based on visibility and validity.

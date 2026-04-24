@@ -53,7 +53,7 @@ function ErrorCards() {
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
             <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
           </div>
-          <p className='text-app font-[510] text-secondary-token'>
+          <p className='text-app font-caption text-secondary-token'>
             Profile views
           </p>
         </div>
@@ -64,7 +64,7 @@ function ErrorCards() {
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-app font-[510] text-secondary-token'>
+          <p className='text-app font-caption text-secondary-token'>
             Unique visitors
           </p>
         </div>
@@ -311,7 +311,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
               </p>
               <Link
                 href={APP_ROUTES.AUDIENCE}
-                className='text-app font-[510] text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
+                className='text-app font-caption text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
               >
                 View audience
               </Link>
@@ -332,7 +332,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     >
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='space-y-0.5'>
-          <p className='text-app font-[510] tracking-normal text-secondary-token'>
+          <p className='text-app font-caption tracking-normal text-secondary-token'>
             Overview
           </p>
           <p className='text-app text-secondary-token'>{rangeLabel}</p>

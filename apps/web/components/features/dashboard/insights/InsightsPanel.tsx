@@ -29,7 +29,7 @@ function PrioritySection({
   return (
     <section>
       <h3
-        className={`mb-3 text-[13px] font-[510] tracking-normal ${colorClass}`}
+        className={`mb-3 text-[13px] font-caption tracking-normal ${colorClass}`}
       >
         {label}
       </h3>

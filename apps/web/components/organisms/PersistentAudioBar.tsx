@@ -84,7 +84,7 @@ export function PersistentAudioBar() {
         <div className='min-w-0 shrink-0 w-[120px] lg:w-[180px]'>
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[510] leading-[1.2] text-primary-token'
+            className='text-[12.5px] font-caption leading-[1.2] text-primary-token'
           >
             {playbackState.trackTitle ?? ''}
           </TruncatedText>

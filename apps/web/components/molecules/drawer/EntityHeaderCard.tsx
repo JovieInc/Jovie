@@ -53,7 +53,7 @@ export function EntityHeaderCard({
       {image ?? null}
       <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
         {eyebrow ? (
-          <div className='text-[10.5px] font-[510] leading-none tracking-[0.03em] text-tertiary-token'>
+          <div className='text-[10.5px] font-caption leading-none tracking-[0.03em] text-tertiary-token'>
             {eyebrow}
           </div>
         ) : null}

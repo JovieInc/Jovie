@@ -53,7 +53,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           {insight.actionSuggestion ? (
             <div className='mt-2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-              <p className='text-xs font-[510] text-primary-token'>
+              <p className='text-xs font-caption text-primary-token'>
                 {insight.actionSuggestion}
               </p>
             </div>
@@ -61,7 +61,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
             <div className='flex items-center gap-2'>
-              <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token capitalize'>
+              <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token capitalize'>
                 {insight.category}
               </span>
               <span className='text-3xs text-tertiary-token tabular-nums'>

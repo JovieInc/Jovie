@@ -15,7 +15,7 @@ export function ContactPreferredChannel({
 }: ContactPreferredChannelProps) {
   return (
     <div className='space-y-2'>
-      <p className='text-[13px] font-[510] text-secondary-token tracking-normal'>
+      <p className='text-[13px] font-caption text-secondary-token tracking-normal'>
         Default action
       </p>
       <div className='flex flex-wrap gap-4'>

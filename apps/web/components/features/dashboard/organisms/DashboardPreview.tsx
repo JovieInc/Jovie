@@ -55,7 +55,9 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   return (
     <div data-testid='dashboard-preview'>
       <div className='mb-4'>
-        <h3 className='text-lg font-[510] text-primary-token'>Live Preview</h3>
+        <h3 className='text-lg font-caption text-primary-token'>
+          Live Preview
+        </h3>
         <p className='text-[13px] text-secondary-token mt-1'>
           This is how your profile will appear to visitors
         </p>
@@ -113,7 +115,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
           href={`/${artist.handle}`}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex items-center gap-1.5 text-[13px] font-[510] text-accent hover:text-accent/80 transition-colors'
+          className='inline-flex items-center gap-1.5 text-[13px] font-caption text-accent hover:text-accent/80 transition-colors'
         >
           View Profile
           <svg

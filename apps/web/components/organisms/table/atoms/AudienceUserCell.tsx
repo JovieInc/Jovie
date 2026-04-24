@@ -95,13 +95,13 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
       <span
         className={cn(
           'truncate',
-          isAnonymous ? 'font-[400] text-secondary-token' : 'font-[510]'
+          isAnonymous ? 'font-[400] text-secondary-token' : 'font-caption'
         )}
       >
         {primaryLabel}
       </span>
       {isBot ? (
-        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-[510] text-amber-700 dark:text-amber-300'>
+        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-caption text-amber-700 dark:text-amber-300'>
           Bot
         </span>
       ) : null}

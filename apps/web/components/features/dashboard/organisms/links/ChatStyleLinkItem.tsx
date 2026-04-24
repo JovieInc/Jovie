@@ -43,7 +43,7 @@ type LinkItemMenuItem = {
 };
 
 const SWIPE_ACTION_CLASS =
-  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-[510] transition-colors active:opacity-80';
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-caption transition-colors active:opacity-80';
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
   readonly id: string;
@@ -222,7 +222,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Content */}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-[13px] font-[510] text-primary-token'>
+            <div className='truncate text-[13px] font-caption text-primary-token'>
               {resolvedLabel}
             </div>
             {secondaryText && (

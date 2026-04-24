@@ -328,7 +328,7 @@ export function TrackSidebar({
                     <span className='tabular-nums'>{trackLabel}.</span>
                     {track.releaseTitle}
                     {track.isExplicit ? (
-                      <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-[510] text-tertiary-token'>
+                      <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-caption text-tertiary-token'>
                         E
                       </span>
                     ) : null}

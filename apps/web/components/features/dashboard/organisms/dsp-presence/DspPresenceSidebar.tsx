@@ -185,7 +185,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               <Button
                 variant='ghost'
                 size='sm'
-                className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-[510]'
+                className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
                 View on {label}
@@ -220,7 +220,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => rejectMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-full border border-subtle bg-surface-0 text-xs font-[510]'
+        className='h-8 flex-1 rounded-full border border-subtle bg-surface-0 text-xs font-caption'
       >
         {isRejecting ? 'Rejecting...' : 'Reject'}
       </Button>
@@ -229,7 +229,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => confirmMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-full text-xs font-[510]'
+        className='h-8 flex-1 rounded-full text-xs font-caption'
       >
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>

@@ -35,7 +35,7 @@ function MetricTile({
       className={METRIC_TILE_CLASSNAME}
       data-testid={`drawer-analytics-metric-${id}`}
     >
-      <p className='text-[10.5px] font-[510] leading-[14px] text-tertiary-token'>
+      <p className='text-[10.5px] font-caption leading-[14px] text-tertiary-token'>
         {label}
       </p>
       <p
