@@ -90,3 +90,153 @@ describe('verifyCronRequest', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('verifyTrustedCronOrigin', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('trusts the Vercel cron header', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    const trusted = verifyTrustedCronOrigin(
+      new Request('https://example.com/api/cron/test', {
+        headers: { 'x-vercel-cron': '1' },
+      })
+    );
+
+    expect(trusted).toBe(true);
+  });
+
+  it('trusts production and staging jov.ie forwarded hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    for (const host of ['jov.ie', 'www.jov.ie', 'staging.jov.ie']) {
+      expect(
+        verifyTrustedCronOrigin(
+          new Request('https://example.com/api/cron/test', {
+            headers: { 'x-forwarded-host': host },
+          })
+        )
+      ).toBe(true);
+    }
+  });
+
+  it('rejects attacker-controlled *.vercel.app forwarded hosts in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    for (const host of [
+      'attacker-project.vercel.app',
+      'some-random-preview.vercel.app',
+      'jov-ie-lookalike.vercel.app',
+    ]) {
+      expect(
+        verifyTrustedCronOrigin(
+          new Request('https://example.com/api/cron/test', {
+            headers: { 'x-forwarded-host': host },
+          })
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('rejects spoofed jov.ie-lookalike forwarded hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    for (const host of [
+      'jov.ie.evil.com',
+      'not-jov.ie',
+      'evil.com',
+      'fakejov.ie',
+    ]) {
+      expect(
+        verifyTrustedCronOrigin(
+          new Request('https://example.com/api/cron/test', {
+            headers: { 'x-forwarded-host': host },
+          })
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('honors CRON_TRUSTED_HOSTS allowlist for Jovie-owned previews', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv(
+      'CRON_TRUSTED_HOSTS',
+      'jovie-preview-abc.vercel.app, jovie-preview-xyz.vercel.app'
+    );
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'jovie-preview-abc.vercel.app' },
+        })
+      )
+    ).toBe(true);
+
+    // A different vercel.app project that is NOT in the allowlist must still
+    // be rejected, even though the env allows some preview aliases.
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'attacker-project.vercel.app' },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('ignores ports and proxy chains when matching hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'jov.ie:443' },
+        })
+      )
+    ).toBe(true);
+
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'jov.ie, internal-proxy:8080' },
+        })
+      )
+    ).toBe(true);
+
+    // Attacker leading in a proxy chain is still rejected — we only accept
+    // the first (outermost client-facing) host, which is untrusted here.
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: {
+            'x-forwarded-host': 'attacker.vercel.app, jov.ie',
+          },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('falls back to allowing development when no header matches', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    expect(
+      verifyTrustedCronOrigin(new Request('https://example.com/api/cron/test'))
+    ).toBe(true);
+  });
+});

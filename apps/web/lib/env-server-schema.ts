@@ -80,6 +80,10 @@ export const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+  // Optional allowlist of additional hosts (comma-separated) whose
+  // `x-forwarded-host` should be treated as trusted for cron routes.
+  // Used for Jovie-owned preview aliases. Never trusts `*.vercel.app`.
+  CRON_TRUSTED_HOSTS: z.string().optional(),
 
   // Security keys
   METADATA_HASH_KEY: z.string().optional(),
@@ -224,6 +228,7 @@ export const ENV_KEYS = [
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'CRON_TRUSTED_HOSTS',
   'METADATA_HASH_KEY',
   'PII_ENCRYPTION_KEY',
   'HUD_KIOSK_TOKEN',

@@ -29,19 +29,55 @@ export function extractBearerToken(
   return token;
 }
 
+/**
+ * Default set of Jovie-owned hosts that are always trusted as cron origins.
+ *
+ * Explicitly does NOT include a `*.vercel.app` wildcard. Anyone can deploy to
+ * `*.vercel.app`, so allowing the whole namespace lets an attacker forge the
+ * `x-forwarded-host` header from an unrelated preview project. Vercel Cron
+ * invocations are handled separately via the `x-vercel-cron: 1` header, and
+ * Jovie-owned preview aliases can be added via the `CRON_TRUSTED_HOSTS` env.
+ */
+const DEFAULT_TRUSTED_CRON_HOSTS: readonly string[] = [
+  'jov.ie',
+  'www.jov.ie',
+  'staging.jov.ie',
+];
+
+function normalizeHost(host: string | null | undefined): string | null {
+  if (!host) return null;
+  // `x-forwarded-host` may contain a port and/or a comma-separated list when
+  // the request traversed multiple proxies. Take the first entry and drop the
+  // port to compare against the allowlist.
+  const first = host.split(',')[0]?.trim().toLowerCase();
+  if (!first) return null;
+  const withoutPort = first.replace(/:\d+$/, '');
+  return withoutPort || null;
+}
+
+function parseTrustedHostsEnv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map(entry => normalizeHost(entry))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
 export function verifyTrustedCronOrigin(request: Request): boolean {
   const vercelCronHeader = request.headers.get('x-vercel-cron');
   if (vercelCronHeader === '1') {
     return true;
   }
 
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  if (
-    forwardedHost?.endsWith('.vercel.app') ||
-    forwardedHost?.endsWith('.jov.ie') ||
-    forwardedHost === 'jov.ie'
-  ) {
-    return true;
+  const forwardedHost = normalizeHost(request.headers.get('x-forwarded-host'));
+  if (forwardedHost) {
+    const trustedHosts = new Set<string>([
+      ...DEFAULT_TRUSTED_CRON_HOSTS,
+      ...parseTrustedHostsEnv(env.CRON_TRUSTED_HOSTS),
+    ]);
+    if (trustedHosts.has(forwardedHost)) {
+      return true;
+    }
   }
 
   return env.NODE_ENV === 'development';
