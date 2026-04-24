@@ -65,7 +65,7 @@ export function ArtistProfileOutcomesCarousel({
 
         <div
           data-testid='artist-profile-outcomes-grid'
-          className='mx-auto mt-10 grid max-w-[var(--linear-content-max)] gap-4 px-5 sm:px-6 md:grid-cols-2 lg:px-0'
+          className='mx-auto mt-8 grid max-w-[var(--linear-content-max)] gap-4 px-5 sm:px-6 md:auto-rows-fr md:grid-cols-2 lg:px-0'
         >
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
@@ -92,7 +92,7 @@ function OutcomeCard({
   return (
     <article
       data-testid='artist-profile-outcome-card'
-      className='group relative flex min-h-[29rem] flex-col overflow-hidden rounded-[1.6rem] border border-white/8 bg-[#050505] shadow-[0_28px_68px_rgba(0,0,0,0.3)]'
+      className='group relative flex min-h-[30rem] flex-col overflow-hidden rounded-[1.6rem] border border-white/8 bg-[#050608] shadow-[0_28px_68px_rgba(0,0,0,0.3)]'
       style={style}
     >
       <div
