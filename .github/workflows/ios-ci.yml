@@ -81,35 +81,7 @@ jobs:
             LAST_DESTINATIONS="$(xcodebuild -showdestinations -project "$PROJECT_PATH" -scheme "$SCHEME" 2>/dev/null || true)"
 
             DESTINATION="$(
-              DESTINATIONS="$LAST_DESTINATIONS" python3 <<'PY'
-import os
-import re
-
-destinations = os.environ.get("DESTINATIONS", "")
-preferred = []
-fallback = []
-
-for line in destinations.splitlines():
-    if "platform:iOS Simulator" not in line:
-        continue
-    if "name:Any iOS Simulator Device" in line:
-        continue
-
-    id_match = re.search(r"id:([^,}]+)", line)
-    if id_match is None:
-        continue
-
-    os_match = re.search(r"OS:([^,}]+)", line)
-    destination = f"platform=iOS Simulator,id={id_match.group(1).strip()}"
-    os_version = os_match.group(1).strip() if os_match is not None else ""
-
-    if os_version.startswith("18."):
-        preferred.append(destination)
-    else:
-        fallback.append(destination)
-
-print((preferred or fallback or [""])[0], end="")
-PY
+              printf '%s\n' "$LAST_DESTINATIONS" | ruby -e 'preferred=nil;fallback=nil;STDIN.each_line do |line|; next unless line.include?("platform:iOS Simulator"); next if line.include?("name:Any iOS Simulator Device"); id=line[/id:([^,}]+)/, 1]&.strip; next unless id; os_version=line[/OS:([^,}]+)/, 1]&.strip.to_s; destination="platform=iOS Simulator,id=#{id}"; if os_version.start_with?("18."); preferred=destination; break; end; fallback ||= destination; end; print(preferred || fallback || "")'
             )"
 
             if [[ -n "$DESTINATION" ]]; then
@@ -127,45 +99,7 @@ PY
 
           if [[ -z "$DESTINATION" ]]; then
             DESTINATION="$(
-              python3 <<'PY'
-import json
-import subprocess
-
-try:
-    raw = subprocess.check_output(
-        ["xcrun", "simctl", "list", "devices", "available", "-j"],
-        text=True,
-    )
-except Exception:
-    print("", end="")
-    raise SystemExit(0)
-
-devices_by_runtime = json.loads(raw).get("devices", {})
-preferred = []
-fallback = []
-
-for runtime, devices in devices_by_runtime.items():
-    if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
-        continue
-
-    for device in devices:
-        if not device.get("isAvailable"):
-            continue
-        if "iPhone" not in device.get("name", ""):
-            continue
-
-        udid = device.get("udid")
-        if not udid:
-            continue
-
-        destination = f"platform=iOS Simulator,id={udid}"
-        if ".iOS-18" in runtime:
-            preferred.append(destination)
-        else:
-            fallback.append(destination)
-
-print((preferred or fallback or [""])[0], end="")
-PY
+              xcrun simctl list devices available -j 2>/dev/null | ruby -rjson -e 'input=STDIN.read; if input.strip.empty?; print(""); exit 0; end; devices_by_runtime=JSON.parse(input).fetch("devices", {}); preferred=nil; fallback=nil; devices_by_runtime.each do |runtime, devices|; next unless runtime.include?("com.apple.CoreSimulator.SimRuntime.iOS"); devices.each do |device|; next unless device["isAvailable"]; next unless device["name"].to_s.include?("iPhone"); udid=device["udid"].to_s; next if udid.empty?; destination="platform=iOS Simulator,id=#{udid}"; if runtime.include?(".iOS-18"); preferred ||= destination; break; else; fallback ||= destination; end; end; break if preferred; end; print(preferred || fallback || "")'
             )"
           fi
 
