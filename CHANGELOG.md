@@ -7,16 +7,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.173] - 2026-04-24
 
-> The back button inside the intercepted signup modal stops reading as "Back to chat" to screen readers when the user didn't come from chat. Screen-reader users arriving via profile claim, the dev unavailable card, or a direct `/signup` intercept now hear an accurate "Go back" label instead of being told they're returning to a chat they never had.
+> Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
 
 ### Fixed
 
-- `apps/web/components/auth/AuthModalShell.tsx` — added a `backButtonLabel` prop (default `Go back`) so the dismiss button's `aria-label` is always truthful. Removed the hardcoded `Back to chat` literal that was misleading for every non-chat entry point.
-- `apps/web/app/@auth/(.)signup/page.tsx` — only passes `Back to chat` when a homepage chat intent hint is actually present; otherwise falls through to the generic `Go back` default.
+- `apps/web/app/api/profile/view/route.ts` — tightened the POST body schema from `z.string().min(1).max(100)` to the canonical lowercase handle pattern (3-24 chars, `[a-z0-9-]`), with pre-normalization to lowercase so mixed-case input is still accepted by legitimate clients. Closes three hardening gaps: Redis keyspace pollution via `profile:views:${attacker-supplied-bytes}`, per-handle rate-limit key pollution via `${handle}:${ip}`, and wasted DB lookups on handles that can never exist in `usernameNormalized`. No legitimate traffic breaks — the only caller (`ProfileViewTracker` on `/[username]/page.tsx`) always passes the canonical `artist.handle`.
 
 ### Added
 
-- `apps/web/tests/unit/auth/AuthModalShell.test.tsx` — regression test locking in the neutral default and the caller-supplied override so this can't regress back to the misleading literal.
+- `apps/web/tests/unit/profile/profile-view-api.test.ts` — 13 new adversarial test cases (script injection, path traversal, null byte, internal whitespace, RTL override, zero-width joiner, combining marks, emoji, whitespace padding, colon/slash for key pollution, underscore/dot outside charset) plus length-boundary tests and a mixed-case normalization test. All previously passing tests still pass.
 
 ## [26.4.172] - 2026-04-23
 
