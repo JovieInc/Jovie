@@ -4,12 +4,11 @@ export const HOMEPAGE_INTENT_EXPERIMENT_ID = 'homepage_intent_pills_v1';
 export const HOMEPAGE_INTENT_VARIANT_ID = 'release_assets_v1';
 
 export type HomepagePillId =
-  | 'create_release_page'
-  | 'generate_album_art'
-  | 'generate_playlist_pitch'
   | 'plan_a_release'
+  | 'generate_album_art'
+  | 'pitch_playlists'
   | 'build_artist_profile'
-  | 'setup_fan_notifications';
+  | 'analyze_momentum';
 
 export interface HomepagePill {
   readonly id: HomepagePillId;
@@ -19,9 +18,9 @@ export interface HomepagePill {
 
 export const PILLS: readonly HomepagePill[] = [
   {
-    id: 'create_release_page',
-    label: 'Create release page',
-    insertedPrompt: 'Create a release page for ',
+    id: 'plan_a_release',
+    label: 'Plan a release',
+    insertedPrompt: 'Plan a release for ',
   },
   {
     id: 'generate_album_art',
@@ -29,31 +28,26 @@ export const PILLS: readonly HomepagePill[] = [
     insertedPrompt: 'Generate album art for ',
   },
   {
-    id: 'generate_playlist_pitch',
-    label: 'Generate playlist pitch',
-    insertedPrompt: 'Generate a playlist pitch for ',
-  },
-  {
-    id: 'plan_a_release',
-    label: 'Plan a release',
-    insertedPrompt: 'Plan a release for ',
+    id: 'pitch_playlists',
+    label: 'Pitch playlists',
+    insertedPrompt: 'Pitch playlists for ',
   },
   {
     id: 'build_artist_profile',
     label: 'Build artist profile',
-    insertedPrompt: 'Build an artist profile for ',
+    insertedPrompt: 'Build artist profile for ',
   },
   {
-    id: 'setup_fan_notifications',
-    label: 'Set up fan notifications',
-    insertedPrompt: 'Set up fan notifications for ',
+    id: 'analyze_momentum',
+    label: 'Analyze momentum',
+    insertedPrompt: 'Analyze momentum for ',
   },
 ] as const;
 
 export const HERO_COPY = {
   headline: 'Your AI Artist Manager.',
   subhead:
-    'Drop more music. Learn what hits. Build momentum before you burn out.',
+    'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.',
 } as const;
 
 export interface HomepageIntent {
