@@ -100,10 +100,28 @@ export async function GET(request: Request) {
   // throughout the rest of the system — users would see a "green" client-side
   // validation for "my.handle" but then get blocked here with a confusing
   // "letters, numbers, and hyphens" error.
-  const formatCheck = validateUsername(handle);
-  if (!formatCheck.isValid) {
+  //
+  // Wrapped in try/catch so that an unexpected throw from the validator
+  // (e.g. content-filter loaded at runtime) still produces a constant-time
+  // 400 rather than bypassing the constant-time guarantee with a 500.
+  let formatCheck: { isValid: boolean; error?: string };
+  try {
+    formatCheck = validateUsername(handle);
+  } catch (error) {
+    await captureError('validateUsername threw', error, {
+      handle,
+      route: '/api/handle/check',
+    });
     return respondWithConstantTime(
-      { available: false, error: formatCheck.error ?? 'Invalid handle' },
+      { available: false, error: 'Invalid handle' },
+      { status: 400 }
+    );
+  }
+  if (!formatCheck.isValid) {
+    // `validateUsername` always populates `error` on the `isValid: false`
+    // branch (see `validateUsernameCore`), so no runtime fallback is needed.
+    return respondWithConstantTime(
+      { available: false, error: formatCheck.error },
       { status: 400 }
     );
   }
