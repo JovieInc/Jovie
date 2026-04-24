@@ -656,6 +656,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   outcomeDuo: {
+    // Two headlines by design: the /artist-profile page and the homepage
+    // render the same duo cards but are expected to diverge in voice over time.
+    // Keep both keys even when strings match so the seam stays visible.
     marketingHeadline: 'Artist Profiles. Built to convert.',
     homepageHeadline: 'Artist Profiles. Built to convert.',
     cards: {
