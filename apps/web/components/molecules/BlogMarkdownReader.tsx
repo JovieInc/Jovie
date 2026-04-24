@@ -1,7 +1,3 @@
-'use client';
-
-import DOMPurify from 'isomorphic-dompurify';
-import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface BlogMarkdownReaderProps {
@@ -76,15 +72,14 @@ export function BlogMarkdownReader({
   html,
   className,
 }: BlogMarkdownReaderProps) {
-  // Sanitize HTML to prevent XSS from markdown content
-  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
-
+  // HTML is sanitized server-side in createMarkdownDocument() — see
+  // apps/web/lib/docs/getMarkdownDocument.ts.
   return (
     <div className={cn('relative', className)}>
       <div
         className={MARKDOWN_STYLES}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with DOMPurify
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized server-side in createMarkdownDocument
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>
   );

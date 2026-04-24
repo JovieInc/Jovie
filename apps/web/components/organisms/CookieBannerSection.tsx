@@ -76,6 +76,9 @@ export function CookieBannerSection() {
           setCustomize(true);
         },
       };
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('jvconsent:ready'));
+      }
     }
   }, []);
 

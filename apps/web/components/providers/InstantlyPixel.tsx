@@ -36,32 +36,31 @@ export function InstantlyPixel() {
 
   useEffect(() => {
     if (skip) return;
+    if (typeof window === 'undefined') return;
 
     // Sync consent state on mount (covers SSR → client transition)
     setAllowed(isMarketingAllowed());
 
-    // Poll for JVConsent global (created by CookieBannerSection after dynamic import)
-    let retries = 0;
-    const maxRetries = 10;
     let unsubConsent: (() => void) | undefined;
-    const pollInterval = setInterval(() => {
-      retries++;
 
-      if (globalThis.JVConsent) {
-        clearInterval(pollInterval);
-        unsubConsent = globalThis.JVConsent.onChange(() => {
-          setAllowed(isMarketingAllowed());
-        });
-        return;
-      }
+    const attach = () => {
+      if (!globalThis.JVConsent) return;
+      unsubConsent = globalThis.JVConsent.onChange(() => {
+        setAllowed(isMarketingAllowed());
+      });
+    };
 
-      if (retries >= maxRetries) {
-        clearInterval(pollInterval);
-      }
-    }, 500);
+    if (globalThis.JVConsent) {
+      attach();
+      return () => {
+        unsubConsent?.();
+      };
+    }
 
+    const onReady = () => attach();
+    window.addEventListener('jvconsent:ready', onReady, { once: true });
     return () => {
-      clearInterval(pollInterval);
+      window.removeEventListener('jvconsent:ready', onReady);
       unsubConsent?.();
     };
   }, [skip]);

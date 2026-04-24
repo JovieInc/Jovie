@@ -429,31 +429,44 @@ export function JovieChat({
             />
           </div>
 
-          <div className='px-4 pt-3 sm:px-5'>
-            <ChatUsageAlert />
-          </div>
-
-          {/* Error display */}
-          {chatError && (
-            <div className='px-4 pb-3 sm:px-5'>
-              <ErrorDisplay
-                chatError={chatError}
-                onRetry={handleRetry}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
-              />
-            </div>
-          )}
-
-          {/* Input at bottom */}
-          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+          {/*
+            Composer region anchors at the bottom (shrink-0 keeps it from
+            collapsing under flex-1 siblings). Wrapper padding is fixed, so
+            the input never jumps when transient alerts appear/disappear:
+            previously, ChatUsageAlert was wrapped in an always-rendered
+            `pt-3` div even when the alert returned null, leaving permanent
+            empty chrome that flipped to actual content the moment the alert
+            mounted. Now each alert opts in to its own bottom margin and is
+            unmounted entirely when empty.
+          */}
+          <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
             <div className='mx-auto w-full max-w-[44rem]'>
+              {/* Transient alerts stack above the input. Each contributes its
+                  own bottom margin only when rendered, so toggling them does
+                  not leave residual padding behind. */}
+              <ChatUsageAlert />
+
+              {chatError && (
+                <div className='mb-2'>
+                  <ErrorDisplay
+                    chatError={chatError}
+                    onRetry={handleRetry}
+                    isLoading={isLoading}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+              )}
+
               {isRateLimited && (
-                <p className='text-xs text-tertiary-token' aria-live='polite'>
+                <p
+                  className='mb-1.5 text-xs text-tertiary-token'
+                  aria-live='polite'
+                >
                   Sending too fast. Please wait a second before your next
                   message.
                 </p>
               )}
+
               <ChatInput
                 {...chatInputProps}
                 placeholder='Ask a follow-up...'
@@ -492,18 +505,20 @@ export function JovieChat({
             </div>
           </div>
 
-          <div className='bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto w-full max-w-[34rem] space-y-2.5'>
+          <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className='mx-auto w-full max-w-[34rem]'>
+              <ChatUsageAlert />
+
               {isRateLimited && (
                 <p
-                  className='text-center text-xs text-tertiary-token'
+                  className='mb-1.5 text-center text-xs text-tertiary-token'
                   aria-live='polite'
                 >
                   Sending too fast. Please wait a second before your next
                   message.
                 </p>
               )}
-              <ChatUsageAlert />
+
               <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
             </div>
           </div>
