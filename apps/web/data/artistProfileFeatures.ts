@@ -115,12 +115,11 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     visual: 'cropped-screenshot',
     screenshotSrc: '/product-screenshots/artist-spec-rich-analytics-panel.png',
     screenshotAlt: 'Rich analytics funnel preview',
-    screenshotWidth: 344,
-    screenshotHeight: 540,
-    frameClassName:
-      'aspect-[1.58/1] min-h-[11.5rem] md:aspect-[1.64/1] xl:min-h-[12.5rem]',
-    imageClassName: 'object-top',
-    objectPosition: 'center top',
+    screenshotWidth: 390,
+    screenshotHeight: 390,
+    frameClassName: 'min-h-[11.5rem] xl:min-h-[14rem]',
+    imageClassName: 'object-contain object-center p-2',
+    objectPosition: 'center center',
   },
   {
     id: 'geo-insights',
@@ -133,11 +132,10 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     visual: 'cropped-screenshot',
     screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
     screenshotAlt: 'Jovie geo insights showing the top cities list.',
-    screenshotWidth: 344,
-    screenshotHeight: 540,
-    frameClassName:
-      'aspect-[1.14/1] min-h-[11.5rem] md:aspect-[1.18/1] xl:min-h-[12.5rem]',
-    imageClassName: 'object-top',
+    screenshotWidth: 403,
+    screenshotHeight: 946,
+    frameClassName: 'min-h-[11.5rem] xl:min-h-[14rem]',
+    imageClassName: 'object-cover object-top',
     objectPosition: 'center top',
   },
   {

@@ -47,15 +47,15 @@ function ScreenshotCrop({
   return (
     <div
       className={cn(
-        'relative h-full w-full overflow-hidden rounded-[0.9rem] bg-[#0a0d12]',
+        'relative h-full w-full overflow-hidden rounded-[0.75rem] bg-[#0a0d12] ring-1 ring-inset ring-white/5',
         className
       )}
     >
       <Image
         fill
         alt={alt}
-        className={cn('object-cover object-top', imageClassName)}
-        sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
+        className={cn('object-contain', imageClassName)}
+        sizes='(min-width: 1280px) 420px, (min-width: 768px) 45vw, 100vw'
         src={src}
         style={{ objectPosition }}
       />
