@@ -1,0 +1,11 @@
+{
+  "triggerOnUpdates": false,
+  "triggerOnDrafts": false,
+  "strictness": 3,
+  "commentTypes": ["logic"],
+  "excludeAuthors": ["dependabot[bot]", "renovate[bot]", "github-actions[bot]"],
+  "disabledLabels": ["human-review-required", "skip-greptile", "dependencies"],
+  "ignoreKeywords": "WIP\nDO NOT MERGE\n[skip ci]\nchore(deps)\nchore: bump\ndocs:",
+  "ignorePatterns": "greptile.json\n.coderabbit.yaml\n**/*.md\n**/*.mdx\n**/CHANGELOG*\n**/README*\npnpm-lock.yaml\nyarn.lock\npackage-lock.json\n**/*.snap\n**/__snapshots__/**\n**/fixtures/**\n**/*.fixture.*\n**/*.test.ts\n**/*.test.tsx\n**/*.spec.ts\n**/*.spec.tsx\napps/web/tests/**\ndrizzle/migrations/**\n**/*.sql\n**/.env.example\n**/*.svg\n**/*.png\n**/*.jpg\n**/*.webp\n**/*.ico\n**/*.woff*\npublic/**\n**/next-env.d.ts\n**/.next/**\n**/dist/**\n**/build/**\n**/coverage/**\n**/node_modules/**\napps/docs/**\napps/ios/**\n",
+  "instructions": "This is a Next.js 15 monorepo. Focus on: (1) logic bugs and race conditions, (2) SQL/trust-boundary issues in apps/web/app/api/**, (3) auth gaps in Clerk integration, (4) cross-file impacts. Do NOT comment on: style, formatting, naming, import order, TSDoc presence, or test coverage — Biome and CodeRabbit cover these. Prefer silence over nits — strictness is 3 for a reason."
+}

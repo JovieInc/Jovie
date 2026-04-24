@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.175] - 2026-04-24
+
+> Greptile PR review bot now runs once per PR instead of once per push. A missing `greptile.json` at repo root meant Greptile defaulted to `triggerOnUpdates: true`, re-reviewing on every commit — which billed 2,400 review runs in a single cycle. The new config keeps Greptile focused on logic bugs in primary code paths and hands styling, migrations, tests, and docs off to CodeRabbit and Biome, which already own those surfaces.
+
+### Added
+
+- `greptile.json` — repo-root config for the Greptile PR review bot. Sets `triggerOnUpdates: false` (reviews fire once on PR open, not on every push — the single biggest lever for review-volume cost), `strictness: 3` (most-critical-only), and `commentTypes: ["logic"]` (drops style/syntax categories since Biome and CodeRabbit's Biome tool already enforce those). Excludes dependency-bot authors, WIP/doc-only keywords, and a `skip-greptile` label escape hatch. `ignorePatterns` skips `drizzle/migrations/**` (already owned by CodeRabbit's 30-line migration rule set in `.coderabbit.yaml`), tests, snapshots, lockfiles, markdown/docs, images/fonts, build artifacts, and the `apps/docs` + `apps/ios` subtrees that aren't the primary reviewable surface. Custom `instructions` scope Greptile to the areas where codebase-aware reasoning actually helps — logic bugs, SQL/trust-boundary issues in `apps/web/app/api/**`, and Clerk auth gaps.
+
 ## [26.4.173] - 2026-04-24
 
 > Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
