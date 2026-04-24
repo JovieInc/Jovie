@@ -79,6 +79,24 @@
   backdrop-filter: blur(24px);
 }
 
+/* --- B2. Inside the intercepted auth modal, collapse Clerk's card chrome
+   so the dialog surface + Clerk form read as one unified panel. --- */
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 0;
+}
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-footer {
+  padding-top: 0;
+  background: transparent;
+}
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) [data-clerk-captcha],
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) #clerk-captcha {
+  display: none;
+}
+
 :is(.cl-signIn-root, .cl-signUp-root) .cl-form,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-footer,

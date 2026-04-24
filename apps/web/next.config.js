@@ -51,17 +51,20 @@ const nextConfig = {
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
-  // Node 22 standalone tracing can miss Sentry's runtime interception deps when
-  // Turbopack externalizes them for instrumentation. Keep them in the traced
-  // server bundle so public-route smoke and Lighthouse boots do not 500.
-  outputFileTracingIncludes: isVercelPreview
-    ? undefined
-    : {
-        '/*': [
-          '../../node_modules/.pnpm/node_modules/import-in-the-middle/**/*',
-          '../../node_modules/.pnpm/node_modules/require-in-the-middle/**/*',
-        ],
-      },
+  // Note: previously we set outputFileTracingIncludes with globs into
+  // node_modules/.pnpm/node_modules/{import,require}-in-the-middle. Those
+  // paths start with pnpm's virtual-store symlink layer AND the target
+  // directories contain nested symlinks (e.g. to acorn, debug). Vercel's
+  // serverless packager rejects serverless function bundles that contain
+  // symlinks with "patch_build_4xx: framework produced an invalid
+  // deployment package for a Serverless Function", which kept every
+  // production deploy in ERROR state from 2026-04-23 onward. The last
+  // known-good production deploy (b387eb1, 2026-04-16) shipped without
+  // this include and was healthy. If public-route smoke / Lighthouse
+  // starts 500ing again because Sentry's interception helpers get
+  // externalized, re-introduce the includes via a non-symlinked path
+  // (e.g. `.npmrc` public-hoist-pattern or a post-build dereference
+  // step) instead of pnpm virtual-store globs.
   // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
