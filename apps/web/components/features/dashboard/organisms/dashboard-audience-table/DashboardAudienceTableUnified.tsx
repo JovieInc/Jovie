@@ -149,10 +149,11 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
   memberColumnHelper.accessor('referrerHistory', {
     id: 'source',
-    header: 'Source',
+    header: () => <span className='ml-auto'>Source</span>,
     cell: renderSourceCell,
-    size: 76,
+    size: 48,
     enableSorting: false,
+    meta: { className: 'text-right' },
   }),
   memberColumnHelper.accessor('visits', {
     id: 'engagement',
