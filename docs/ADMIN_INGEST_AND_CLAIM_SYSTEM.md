@@ -627,7 +627,7 @@ Admins can then copy the claim link from the admin table actions menu.
      - `claimToken = null`
      - `claimedAt = now()`
 4. If onboarding not completed → redirect to `/onboarding?handle=<handle>`.
-5. Otherwise → redirect to `/dashboard/overview`.
+5. Otherwise → redirect to `/app`.
 
 #### Post-claim state
 

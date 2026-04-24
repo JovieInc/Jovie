@@ -8,7 +8,6 @@ Last updated: 2025-09-12 19:14 PT
 |---|---|---|---|---|
 | `app/dashboard/layout.tsx` | `DashboardLayoutClient` (client shell) | Auth gate, SSR data fetch, layout wrapper | Inline error UI; tokens used but one-off color classes; no shadcn/ui composition | Uses bespoke `Button`, `Sidebar`, `Tooltip` wrappers indirectly |
 | `app/dashboard/DashboardLayoutClient.tsx` | `Sidebar`, `DashboardNav`, `EnhancedThemeToggle`, `FeedbackButton`, `UserButton` | Shell + nav + utilities | BEFORE: gradient overlays + left-heavy content. AFTER (PR#1): sticky minimal header + breadcrumb, centered container `max-w-5xl`; redundant header buttons removed | Multiple Button/Tooltip implementations (to consolidate) |
-| `app/dashboard/overview/page.tsx` | `DashboardOverview` (server) | Overview tasks + CTA | Good SSR; uses local `Button`, Card; progress semantics OK | Button duplication |
 | `app/dashboard/analytics/page.tsx` + `components/dashboard/DashboardAnalytics.tsx` | `DashboardAnalytics` | Client fetch + simple cards | Not lazy-splitting heavier charts (future); OK for MVP | — |
 | `app/dashboard/audience/page.tsx` + `components/dashboard/DashboardAudience.tsx` | `DashboardAudience` | Placeholder CRM table | A11y hidden blur; table headers OK; uses bespoke buttons | Button duplication |
 | `app/dashboard/links/page.tsx` + `components/dashboard/organisms/*Links*` | `EnhancedDashboardLinks`, `GroupedLinksManager` | Link manager forms | Mixed inputs, dialogs, modals; Headless UI usage; token drift | Input/Dialog/Combobox duplicates |
