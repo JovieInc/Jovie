@@ -320,7 +320,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   hero: {
-    headline: 'Release more music with less work.',
+    headline: 'The link your music deserves.',
     subhead:
       'Streams, drops, support, bookings, and fan capture in a single page.',
     ctaLabel: 'Claim your profile',

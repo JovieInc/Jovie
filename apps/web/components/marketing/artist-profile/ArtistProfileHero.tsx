@@ -26,10 +26,10 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
         width='page'
         className='relative !max-w-[var(--linear-content-max)] !px-5 sm:!px-6 lg:!px-0'
       >
-        <div className='mx-auto flex max-w-[62rem] flex-col items-center pb-10 pt-[calc(var(--linear-header-height)+3rem)] text-center sm:pb-12 sm:pt-[calc(var(--linear-header-height)+3.5rem)] lg:pb-14 lg:pt-[calc(var(--linear-header-height)+4rem)]'>
+        <div className='mx-auto flex max-w-[48rem] flex-col items-center pb-10 pt-[calc(var(--linear-header-height)+3rem)] text-center sm:pb-12 sm:pt-[calc(var(--linear-header-height)+3.5rem)] lg:pb-14 lg:pt-[calc(var(--linear-header-height)+4rem)]'>
           <h1
             id='artist-profile-hero-heading'
-            className='max-w-[22ch] text-balance text-[clamp(3.125rem,7.15vw,5.625rem)] font-[660] leading-[0.95] tracking-[-0.055em] text-primary-token'
+            className='max-w-[11ch] text-[clamp(3.125rem,7.15vw,5.625rem)] font-[660] leading-[0.95] tracking-[-0.055em] text-primary-token'
           >
             {hero.headline}
           </h1>
