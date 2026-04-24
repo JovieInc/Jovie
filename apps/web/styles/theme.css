@@ -96,37 +96,8 @@
 .auth-showcase-copy {
   position: relative;
   z-index: 1;
-  max-width: 18rem;
-  padding: 1.75rem 1.75rem 0;
-}
-
-.auth-showcase-story {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 1.5rem;
-  padding: 1.5rem 1.75rem 1.75rem;
-}
-
-.auth-showcase-kicker {
-  color: rgba(255, 255, 255, 0.96);
-  font-size: clamp(1.55rem, 2vw, 1.9rem);
-  line-height: 1;
-  font-weight: 580;
-  letter-spacing: -0.05em;
-}
-
-.auth-showcase-body {
-  max-width: 17rem;
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 0.95rem;
-  line-height: 1.65;
-  font-weight: 420;
-  letter-spacing: -0.012em;
-  text-wrap: pretty;
+  max-width: 22rem;
+  padding: 1.9rem 1.9rem 0;
 }
 
 .auth-showcase-panel[data-variant="page"],
@@ -137,11 +108,7 @@
 .auth-showcase-panel[data-variant="page"] .auth-showcase-frame,
 .auth-showcase-panel[data-variant="image-only"] .auth-showcase-frame {
   width: 100%;
-  margin-top: 0.5rem;
-}
-
-.auth-showcase-panel[data-variant="image-only"] .auth-showcase-story {
-  padding-top: 0;
+  min-height: 12rem;
 }
 
 @media (min-width: 1024px) {
@@ -153,8 +120,8 @@
     display: none !important;
   }
 
-  .auth-showcase-story {
-    padding: 1.75rem 1.9rem 1.9rem;
+  .auth-showcase-copy {
+    padding: 2rem 2rem 0;
   }
 }
 
