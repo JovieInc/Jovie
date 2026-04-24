@@ -13,6 +13,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';
@@ -141,6 +142,10 @@ export async function handleNewProfileIngest({
       avatarUrl: hostedAvatarUrl,
       linkCount: extraction.links.length,
     });
+    const theme = await buildThemeWithProfileAccent({
+      existingTheme: null,
+      sourceUrl: hostedAvatarUrl,
+    });
 
     const [created] = await tx
       .insert(creatorProfiles)
@@ -158,7 +163,7 @@ export async function handleNewProfileIngest({
         claimToken: claimTokenHash,
         claimTokenExpiresAt,
         settings: {},
-        theme: {},
+        theme,
         ingestionStatus: 'processing',
         createdAt: new Date(),
         updatedAt: new Date(),
