@@ -23,7 +23,7 @@ export const mobileReleaseTokens = {
   groupHeader:
     'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
   groupHeaderTitle: 'text-xs font-semibold text-primary-token',
-  groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
+  groupHeaderCount: 'text-2xs tabular-nums text-tertiary-token',
   footer: {
     container:
       'flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-app text-secondary-token',

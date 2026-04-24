@@ -49,9 +49,9 @@ const METADATA_ROW_PROPS = {
 const METADATA_TEXT_CLASSNAME =
   'text-[12px] font-book leading-[16px] text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
-  'text-[11px] leading-[15px] text-tertiary-token';
+  'text-2xs leading-[15px] text-tertiary-token';
 const METADATA_LABEL_CLASSNAME =
-  'text-[11px] font-medium leading-[15px] tracking-normal text-quaternary-token';
+  'text-2xs font-medium leading-[15px] tracking-normal text-quaternary-token';
 const METADATA_VALUE_CLASSNAME =
   'text-[12px] leading-[16px] text-secondary-token';
 const METADATA_BADGE_CLASSNAME =
@@ -61,7 +61,7 @@ const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_DISPLAY_VALUE_CLASSNAME =
   'text-[11.5px] font-book leading-[16px] text-primary-token';
 const METADATA_INPUT_CLASSNAME =
-  'h-7 rounded-[8px] border-subtle bg-surface-0 px-2.5 text-[11px] font-book text-primary-token shadow-none';
+  'h-7 rounded-[8px] border-subtle bg-surface-0 px-2.5 text-2xs font-book text-primary-token shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));

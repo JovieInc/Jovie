@@ -297,7 +297,7 @@ export function PreviewPanel() {
           {displayName || username || 'Profile'}
         </span>
         {username && displayName !== username && (
-          <span className='truncate text-[11px] text-secondary-token'>
+          <span className='truncate text-2xs text-secondary-token'>
             @{username}
           </span>
         )}
@@ -398,7 +398,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[10px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-2xs'
                   disabled={isUrlCopied}
                   onClick={handleCopyUrl}
                 >
@@ -412,7 +412,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[10px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-2xs'
                   disabled={qrCodeDownload.isPending}
                   onClick={handleDownloadQr}
                 >
@@ -429,7 +429,7 @@ export function PreviewPanel() {
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  className='h-8 rounded-[10px] px-2 text-[11px]'
+                  className='h-8 rounded-[10px] px-2 text-2xs'
                   onClick={handleDownloadVcard}
                 >
                   <Download className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
@@ -453,7 +453,7 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-2xs'
                 />
                 <button
                   type='button'
@@ -467,7 +467,7 @@ export function PreviewPanel() {
                 </button>
               </div>
 
-              <p className='text-[11px] text-tertiary-token'>
+              <p className='text-2xs text-tertiary-token'>
                 Visitors will land on the published mobile profile shown above.
               </p>
             </div>
@@ -482,7 +482,7 @@ export function PreviewPanel() {
                 </p>
               </div>
 
-              <p className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
+              <p className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-2xs leading-5 text-secondary-token'>
                 {visibleLinkCount} visible link
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile

@@ -158,7 +158,7 @@ function ProfileEntityHeader({
         title={primaryLabel}
         subtitle={secondaryLabel}
         meta={
-          <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+          <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
             {detailChips.map(detail => (
               <span key={detail}>{detail}</span>
             ))}

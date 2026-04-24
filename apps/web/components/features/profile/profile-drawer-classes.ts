@@ -15,5 +15,4 @@ export const PROFILE_DRAWER_TOGGLE_ROW_CLASS =
 
 export const PROFILE_DRAWER_TITLE_CLASS = 'text-[14px] font-book text-white/92';
 
-export const PROFILE_DRAWER_META_CLASS =
-  'text-[11px] font-normal text-white/46';
+export const PROFILE_DRAWER_META_CLASS = 'text-2xs font-normal text-white/46';

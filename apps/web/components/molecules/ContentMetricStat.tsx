@@ -24,7 +24,7 @@ export function ContentMetricStat({
     <div className={cn('min-w-0 space-y-1', className)}>
       <p
         className={cn(
-          'truncate text-[11px] font-caption tracking-[0.04em] text-tertiary-token',
+          'truncate text-2xs font-caption tracking-[0.04em] text-tertiary-token',
           labelClassName
         )}
       >

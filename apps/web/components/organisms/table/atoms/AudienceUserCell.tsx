@@ -101,7 +101,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
         {primaryLabel}
       </span>
       {isBot ? (
-        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-[11px] font-caption text-amber-700 dark:text-amber-300'>
+        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-2xs font-caption text-amber-700 dark:text-amber-300'>
           Bot
         </span>
       ) : null}

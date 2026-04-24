@@ -53,7 +53,7 @@ export function ContentMetricCard({
             ) : null}
             <p
               className={cn(
-                'truncate text-[11px] font-semibold tracking-normal text-tertiary-token',
+                'truncate text-2xs font-semibold tracking-normal text-tertiary-token',
                 labelClassName
               )}
             >

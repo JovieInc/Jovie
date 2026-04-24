@@ -172,7 +172,7 @@ export function MismatchCard({
         <p className='truncate text-app font-book'>
           {mismatch.externalTrackName ?? mismatch.isrc}
         </p>
-        <p className='truncate text-[11px] text-muted-foreground'>
+        <p className='truncate text-2xs text-muted-foreground'>
           {mismatch.externalArtistNames ?? 'Unknown artist'}
           {mismatch.externalAlbumName ? ` · ${mismatch.externalAlbumName}` : ''}
         </p>

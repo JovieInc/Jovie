@@ -453,7 +453,7 @@ export function TrackSidebar({
                   </div>
                 </div>
 
-                <div className='space-y-1 text-[11px] text-tertiary-token'>
+                <div className='space-y-1 text-2xs text-tertiary-token'>
                   <p>{getPreviewStatusLabel(track.previewVerification)}</p>
                   {track.previewVerification === 'fallback' ? (
                     <p>
@@ -466,7 +466,7 @@ export function TrackSidebar({
                   ) : null}
                 </div>
 
-                <div className='text-[11px] text-tertiary-token'>
+                <div className='text-2xs text-tertiary-token'>
                   Providers: {track.providerConfidenceSummary?.canonical ?? 0}{' '}
                   canonical,{' '}
                   {track.providerConfidenceSummary?.searchFallback ?? 0}{' '}
@@ -477,7 +477,7 @@ export function TrackSidebar({
                 </div>
 
                 {unresolvedProviders.length > 0 ? (
-                  <p className='text-[11px] text-tertiary-token'>
+                  <p className='text-2xs text-tertiary-token'>
                     Unresolved:{' '}
                     {unresolvedProviders
                       .map(provider => PROVIDER_LABELS[provider])

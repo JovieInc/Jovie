@@ -33,7 +33,7 @@ export function AudienceActionsCell({
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-1.5 text-[11px]',
+        'flex items-center justify-end gap-1.5 text-2xs',
         className
       )}
     >

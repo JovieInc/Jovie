@@ -378,7 +378,7 @@ export function UserCellWithTouring({
           className='min-w-0'
         />
         {subtitleParts.length > 0 && (
-          <div className='flex items-center gap-1 min-w-0 pl-[22px] text-[11px] text-tertiary-token leading-tight'>
+          <div className='flex items-center gap-1 min-w-0 pl-[22px] text-2xs text-tertiary-token leading-tight'>
             {subtitleParts.map((part, i) => (
               <span key={part.key} className='flex items-center gap-1 min-w-0'>
                 {i > 0 && (

@@ -93,7 +93,7 @@ export function AudienceLastActionCell({
               ·
             </span>
           )}
-          <span className='shrink-0 text-[11px] text-tertiary-token tabular-nums'>
+          <span className='shrink-0 text-2xs text-tertiary-token tabular-nums'>
             {timeAgo}
           </span>
         </>

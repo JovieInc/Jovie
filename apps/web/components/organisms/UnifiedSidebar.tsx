@@ -162,20 +162,20 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
       <div>
-        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           Account
         </span>
         <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           Artist
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
       {isAdmin && (
         <div>
-          <span className='mb-1.5 block px-2.5 text-[11px] uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          <span className='mb-1.5 block px-2.5 text-2xs uppercase tracking-[0.08em] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
             Administration
           </span>
           <SettingsNavGroup

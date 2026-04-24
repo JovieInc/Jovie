@@ -386,7 +386,7 @@ function BandsintownConnectDialog({
       <DialogBody>
         <div className='space-y-3'>
           <div className='space-y-1.5'>
-            <Label htmlFor='bandsintown-artist' className='text-[11px]'>
+            <Label htmlFor='bandsintown-artist' className='text-2xs'>
               Artist name
             </Label>
             <Input
@@ -399,7 +399,7 @@ function BandsintownConnectDialog({
           </div>
 
           <div className='space-y-1.5'>
-            <Label htmlFor='bandsintown-api-key' className='text-[11px]'>
+            <Label htmlFor='bandsintown-api-key' className='text-2xs'>
               API key{' '}
               <span className='font-normal text-tertiary-token'>
                 (optional)

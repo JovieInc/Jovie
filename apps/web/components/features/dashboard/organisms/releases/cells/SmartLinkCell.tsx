@@ -35,7 +35,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
       <div
         className={cn(
           'flex h-7 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5',
-          'text-[11px] font-[430] tracking-[-0.01em] text-tertiary-token select-none transition-[background-color,border-color,color] duration-150'
+          'text-2xs font-[430] tracking-[-0.01em] text-tertiary-token select-none transition-[background-color,border-color,color] duration-150'
         )}
         title={
           isScheduled

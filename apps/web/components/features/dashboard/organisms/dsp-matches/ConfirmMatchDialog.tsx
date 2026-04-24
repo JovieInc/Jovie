@@ -183,7 +183,7 @@ export function ConfirmMatchDialog({
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='h-7 rounded-lg px-2.5 text-[11px] font-caption'
+          className='h-7 rounded-lg px-2.5 text-2xs font-caption'
         >
           Cancel
         </Button>
@@ -192,7 +192,7 @@ export function ConfirmMatchDialog({
           size='sm'
           onClick={onConfirm}
           disabled={isConfirming}
-          className='h-7 rounded-lg px-2.5 text-[11px] font-caption'
+          className='h-7 rounded-lg px-2.5 text-2xs font-caption'
         >
           {isConfirming ? (
             <>

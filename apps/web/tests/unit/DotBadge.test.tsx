@@ -46,7 +46,7 @@ describe('DotBadge', () => {
 
       expect(badge).toHaveClass('px-2');
       expect(badge).toHaveClass('py-0.5');
-      expect(badge).toHaveClass('text-[11px]');
+      expect(badge).toHaveClass('text-2xs');
     });
 
     it('renders small size', () => {
@@ -62,7 +62,7 @@ describe('DotBadge', () => {
       const badge = screen.getByText('Medium').closest('span');
 
       expect(badge).toHaveClass('px-2');
-      expect(badge).toHaveClass('text-[11px]');
+      expect(badge).toHaveClass('text-2xs');
     });
 
     it('applies correct dot size for small', () => {

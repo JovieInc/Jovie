@@ -139,7 +139,7 @@ export function AboutSection({
             return (
               <span
                 key={key}
-                className='rounded-full border px-3 py-1 text-[11px] font-caption capitalize'
+                className='rounded-full border px-3 py-1 text-2xs font-caption capitalize'
                 style={{
                   backgroundColor: hexToRgba(accent, 0.14),
                   color: lightenHex(accent, 0.35),

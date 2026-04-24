@@ -75,7 +75,7 @@ export function ProfileContactHeader({
           inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-semibold'
         />
 
-        <div className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>
+        <div className='truncate text-2xs leading-[14px] tracking-[-0.005em] text-secondary-token'>
           @{username || 'username'}
         </div>
 

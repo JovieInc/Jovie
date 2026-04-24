@@ -143,7 +143,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {artistLine ? (
             <TruncatedText
               lines={1}
-              className='mt-px text-[11px] font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
             >
               {artistLine}
             </TruncatedText>
@@ -174,7 +174,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {artistLine ? (
             <TruncatedText
               lines={1}
-              className='mt-px text-[11px] font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
+              className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
             >
               {artistLine}
             </TruncatedText>

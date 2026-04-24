@@ -219,7 +219,7 @@ export function ReleaseLyricsSection({
           type='button'
           disabled={isActionsDisabled || isCopying}
           onClick={handleCopy}
-          className='h-7 px-2 text-[11px]'
+          className='h-7 px-2 text-2xs'
         >
           {isCopying ? (
             <Check className='h-3.5 w-3.5 text-success' />
@@ -235,7 +235,7 @@ export function ReleaseLyricsSection({
               type='button'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-[11px]'
+              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-2xs'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />

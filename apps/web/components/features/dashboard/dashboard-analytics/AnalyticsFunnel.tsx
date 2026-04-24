@@ -67,7 +67,7 @@ export function AnalyticsFunnel({
               <div className='flex flex-col items-center py-2'>
                 <ArrowDown className='h-4 w-4 text-tertiary-token' />
                 {conversionRate && (
-                  <span className='mt-0.5 text-[11px] font-caption tabular-nums text-primary'>
+                  <span className='mt-0.5 text-2xs font-caption tabular-nums text-primary'>
                     {conversionRate}
                   </span>
                 )}
