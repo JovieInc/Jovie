@@ -3242,34 +3242,122 @@ jobs:
     environment:
       name: Production – jovie
       url: https://jov.ie
+    outputs:
+      # Emitted when promote-production exits non-zero so deploy-notify can
+      # distinguish silent-no-op regressions from generic promote failures.
+      # Values: "no_match" (no Vercel deployment for github.sha) | "verify_mismatch"
+      # (production keeps serving the old commit after promote).
+      failure_subtype: ${{ steps.promote.outputs.failure_subtype }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Promote verified staging to production
-        run: |
-          # Use the staging alias directly — GitHub Actions masks job outputs
-          # containing secret substrings (org name in Vercel URLs), so we
-          # cannot rely on deploy_url passed between jobs.
-          set +e
-          promote_output=$(./node_modules/.bin/vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
-          promote_exit_code=$?
-          set -e
-
-          printf '%s\n' "$promote_output"
-
-          if [ "$promote_exit_code" -eq 0 ]; then
-            exit 0
-          fi
-
-          if printf '%s' "$promote_output" | grep -q "already the current production deployment"; then
-            echo "Staging deployment is already in production; continuing."
-            exit 0
-          fi
-
-          exit "$promote_exit_code"
+      - name: Promote specific deployment for this SHA
+        id: promote
         env:
+          GITHUB_SHA: ${{ github.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          # Resolve the exact deployment URL for github.sha via the Vercel API.
+          # We deliberately do NOT promote the staging.jov.ie alias: if staging
+          # drifts (silent `vercel alias set` failure, stale alias), promoting
+          # the alias hits "already the current production deployment" and
+          # silently no-ops. That regression kept production 7 days stale in
+          # 2026-04. Looking up by SHA means the only way to silently succeed
+          # is if we actually promote the right commit.
+          set -euo pipefail
+          echo "Resolving deployment URL for SHA ${GITHUB_SHA}..."
+          deploy_url="$(python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("VERCEL_TOKEN", "")
+          org_id = os.environ.get("VERCEL_ORG_ID", "")
+          project_id = os.environ.get("VERCEL_PROJECT_ID", "")
+          commit_sha = os.environ.get("GITHUB_SHA", "")
+
+          if not token or not project_id or not commit_sha:
+              print("", end="")
+              sys.exit(0)
+
+          query_params = {
+              "projectId": project_id,
+              "state": "READY",
+              "limit": 50,
+          }
+          if org_id.startswith("team_"):
+              query_params["teamId"] = org_id
+
+          request = urllib.request.Request(
+              f"https://api.vercel.com/v6/deployments?{urllib.parse.urlencode(query_params)}",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              payload = json.load(response)
+
+          for deployment in payload.get("deployments", []):
+              meta = deployment.get("meta") or {}
+              if meta.get("githubCommitSha") == commit_sha:
+                  print(f"https://{deployment['url']}")
+                  break
+          PY
+          )"
+
+          if [ -z "$deploy_url" ]; then
+            echo "❌ No READY Vercel deployment found for SHA ${GITHUB_SHA}."
+            echo "   This is the silent-no-op regression state — failing loudly."
+            echo "failure_subtype=no_match" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "Found deployment for SHA: promoting..."
+
+          set +e
+          promote_output=$(./node_modules/.bin/vercel promote "$deploy_url" --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" 2>&1)
+          promote_exit_code=$?
+          set -e
+          printf '%s\n' "$promote_output"
+
+          if [ "$promote_exit_code" -ne 0 ]; then
+            # Re-running ship on the same SHA is legitimately idempotent.
+            if printf '%s' "$promote_output" | grep -q "already the current production deployment"; then
+              echo "Deployment for SHA ${GITHUB_SHA} is already in production; continuing to verify."
+            else
+              exit "$promote_exit_code"
+            fi
+          fi
+
+          # Verify production actually serves github.sha. /api/health/build-info
+          # returns commitSha as a 7-char slice of VERCEL_GIT_COMMIT_SHA (see
+          # apps/web/app/api/health/build-info/route.ts:35).
+          expected="${GITHUB_SHA:0:7}"
+          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
+          BYPASS_ARGS=()
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            BYPASS_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+
+          echo "Verifying production is serving ${expected}..."
+          actual=""
+          for attempt in 1 2 3 4 5 6; do
+            response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "https://jov.ie/api/health/build-info?_cb=$(date +%s%N)" || true)
+            actual=$(printf '%s' "$response" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
+            echo "  attempt ${attempt}: build-info commitSha=${actual:-<empty>}"
+            if [ "$actual" = "$expected" ]; then
+              echo "✅ Production now serves ${expected}"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "❌ Production still serves '${actual:-<empty>}' after promote; expected '${expected}'."
+          echo "   Either the alias flip didn't take effect or Vercel routed to a different deployment."
+          echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
+          exit 1
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
@@ -3392,6 +3480,25 @@ jobs:
             echo "failure_emoji=⛔" >> "$GITHUB_OUTPUT"
             echo "failure_title=Deploy cancelled mid-flight" >> "$GITHUB_OUTPUT"
             echo "failure_detail=Deploy chain was cancelled before production promotion completed (deploy=$DEPLOY_RESULT canary=$CANARY_RESULT promote=$PROMOTE_RESULT)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Distinguish the silent-no-op regression (production kept old SHA
+          # even though vercel promote exited 0) from a generic promote failure.
+          PROMOTE_SUBTYPE="${{ needs.promote-production.outputs.failure_subtype }}"
+          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "no_match" ]; then
+            echo "failure_type=promote_no_match" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🕳️" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Promote found no matching deployment for this SHA" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Vercel API returned no READY deployment for github.sha. Production was NOT promoted. This is the silent-no-op state we previously caught only by eyeballing /api/health/build-info." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "verify_mismatch" ]; then
+            echo "failure_type=promote_verify_mismatch" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production did not flip to the promoted SHA" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=vercel promote exited 0 but /api/health/build-info kept returning the previous commitSha. Check Vercel production alias." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -3536,7 +3643,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
