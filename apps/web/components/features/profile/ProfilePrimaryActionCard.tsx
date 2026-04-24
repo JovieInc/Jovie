@@ -92,7 +92,7 @@ interface ProfilePrimaryActionCardProps {
 
 const CTA_PILL_CLASS_NAME = cn(
   profileSecondaryPillClassName,
-  'h-7 rounded-full border-white/14 bg-white text-[11px] font-[620] text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
+  'h-7 rounded-full border-white/14 bg-white text-[11px] font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
 );
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -458,7 +458,7 @@ export function ProfilePrimaryActionCard({
           <div className='mt-1 space-y-0.5'>
             {artistMetaLine}
             {state.collaboratorLine ? (
-              <p className={cn('truncate font-[520]', metaClassName)}>
+              <p className={cn('truncate font-caption', metaClassName)}>
                 {state.collaboratorLine}
               </p>
             ) : null}
@@ -498,10 +498,10 @@ export function ProfilePrimaryActionCard({
             artClassName
           )}
         >
-          <span className='text-[9px] font-[620] uppercase tracking-[0.14em] text-white/48'>
+          <span className='text-[9px] font-semibold uppercase tracking-[0.14em] text-white/48'>
             {getMonthLabel(state.tourDate.startDate)}
           </span>
-          <span className='mt-1 text-xl font-[700] tracking-[-0.06em]'>
+          <span className='mt-1 text-xl font-bold tracking-[-0.06em]'>
             {getDayLabel(state.tourDate.startDate)}
           </span>
         </div>
@@ -514,7 +514,7 @@ export function ProfilePrimaryActionCard({
             <p className={cn('truncate font-semibold', metaClassName)}>
               {locationLabel}
             </p>
-            <p className={cn('truncate font-[520]', metaClassName)}>
+            <p className={cn('truncate font-caption', metaClassName)}>
               {state.kind === 'tour_nearby' ? 'Near you' : 'Next date'}
             </p>
           </div>
