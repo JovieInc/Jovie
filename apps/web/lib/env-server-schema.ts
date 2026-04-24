@@ -12,6 +12,20 @@ const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
   message: getDatabaseUrlErrorMessage(),
 });
 
+const HOST_WITH_OPTIONAL_PORT_REGEX =
+  /^(?!https?:\/\/)(?!.*\/)[a-z0-9.-]+(?::\d+)?$/i;
+
+function isHostWithOptionalPort(value: string): boolean {
+  return HOST_WITH_OPTIONAL_PORT_REGEX.test(value.trim());
+}
+
+function isTrustedHostList(value: string): boolean {
+  return value.split(',').every(entry => {
+    const trimmedEntry = entry.trim();
+    return trimmedEntry.length > 0 && isHostWithOptionalPort(trimmedEntry);
+  });
+}
+
 /**
  * Server-side environment variables schema
  */
@@ -23,7 +37,14 @@ export const ServerEnvSchema = z.object({
     .default('development'),
   VITEST: z.string().optional(),
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
-  VERCEL_URL: z.string().optional(),
+  VERCEL_URL: z
+    .string()
+    .trim()
+    .refine(isHostWithOptionalPort, {
+      message:
+        'VERCEL_URL must be a hostname or hostname:port without a scheme or path',
+    })
+    .optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -84,7 +105,14 @@ export const ServerEnvSchema = z.object({
   // Optional allowlist of additional hosts (comma-separated) whose
   // `x-forwarded-host` should be treated as trusted for cron routes.
   // Used for Jovie-owned preview aliases. Never trusts `*.vercel.app`.
-  CRON_TRUSTED_HOSTS: z.string().optional(),
+  CRON_TRUSTED_HOSTS: z
+    .string()
+    .trim()
+    .refine(isTrustedHostList, {
+      message:
+        'CRON_TRUSTED_HOSTS must be a comma-separated list of hostnames or hostname:port entries without schemes or paths',
+    })
+    .optional(),
 
   // Security keys
   METADATA_HASH_KEY: z.string().optional(),

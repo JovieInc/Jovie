@@ -71,6 +71,13 @@ function getTrustedCronHosts(): Set<string> {
   ]);
 }
 
+/**
+ * Validate cron origin using only trusted host headers.
+ *
+ * `x-vercel-cron` is intentionally ignored because callers can set it
+ * themselves. We trust only exact Jovie-owned hosts plus explicitly configured
+ * deployment hosts.
+ */
 export function verifyTrustedCronOrigin(request: Request): boolean {
   const forwardedHost = normalizeHost(request.headers.get('x-forwarded-host'));
   if (forwardedHost) {

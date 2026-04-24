@@ -204,8 +204,6 @@ describe('verifyTrustedCronOrigin', () => {
       )
     ).toBe(true);
 
-    // A different vercel.app project that is NOT in the allowlist must still
-    // be rejected, even though the env allows some preview aliases.
     expect(
       verifyTrustedCronOrigin(
         new Request('https://example.com/api/cron/test', {
@@ -236,8 +234,6 @@ describe('verifyTrustedCronOrigin', () => {
       )
     ).toBe(true);
 
-    // Attacker leading in a proxy chain is still rejected — we only accept
-    // the first (outermost client-facing) host, which is untrusted here.
     expect(
       verifyTrustedCronOrigin(
         new Request('https://example.com/api/cron/test', {
