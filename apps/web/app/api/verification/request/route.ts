@@ -5,6 +5,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  checkVerificationRequestRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import { notifyVerificationRequest } from '@/lib/verification/notifications';
 
 export const runtime = 'nodejs';
@@ -12,6 +16,20 @@ export const runtime = 'nodejs';
 export async function POST() {
   try {
     return await withDbSession(async clerkUserId => {
+      // Rate limit early (keyed on Clerk user) so repeated calls cannot spam
+      // the Slack webhook even before we hit the database.
+      const rateLimitResult =
+        await checkVerificationRequestRateLimit(clerkUserId);
+      if (!rateLimitResult.success) {
+        return NextResponse.json(
+          { error: rateLimitResult.reason ?? 'Rate limit exceeded' },
+          {
+            status: 429,
+            headers: createRateLimitHeaders(rateLimitResult),
+          }
+        );
+      }
+
       const [user] = await db
         .select({
           id: users.id,

@@ -74,7 +74,8 @@ describe('GET /api/handle/check', () => {
 
   it('returns 400 when handle is too long', async () => {
     const { GET } = await import('@/app/api/handle/check/route');
-    const longHandle = 'a'.repeat(25);
+    // USERNAME_MAX_LENGTH is 30 in the canonical validator; 31 is rejected
+    const longHandle = 'a'.repeat(31);
     const request = new Request(
       `http://localhost/api/handle/check?handle=${longHandle}`
     );
@@ -84,13 +85,13 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
-    expect(data.error).toContain('no more than 24');
+    expect(data.error).toContain('no more than 30');
   });
 
   it('returns 400 when handle has invalid characters', async () => {
     const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request(
-      'http://localhost/api/handle/check?handle=test@user'
+      'http://localhost/api/handle/check?handle=test%40user'
     );
 
     const response = await GET(request);
@@ -98,7 +99,69 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
-    expect(data.error).toContain('letters, numbers, and hyphens');
+    // Canonical error message now aligns with the onboarding form validator:
+    // letters, numbers, hyphens, underscores, and dots are accepted.
+    expect(data.error).toContain('letters, numbers');
+  });
+
+  it('accepts dotted handles like real.name and delegates to DB lookup', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=real.name'
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    // Pre-fix this returned 400 "letters, numbers, and hyphens" even though the
+    // onboarding form (and completeOnboarding) happily accept real.name.
+    expect(response.status).toBe(200);
+    expect(data.available).toBe(true);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith('real.name', true);
+  });
+
+  it('accepts underscored handles like real_name and delegates to DB lookup', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=real_name'
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.available).toBe(true);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith('real_name', true);
+  });
+
+  it('rejects reserved handles before hitting the database', async () => {
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=admin'
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.available).toBe(false);
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
   it('uses cached availability when present', async () => {

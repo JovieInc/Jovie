@@ -216,10 +216,11 @@ export function ProfileUnifiedDrawer({
     return parts.join(', ');
   }, [visibleReleases]);
 
+  const registryKey = view === 'releases' ? 'menu' : view;
   const meta =
     view === 'releases' && canOpenReleasesDrawer
       ? { title: 'Releases', subtitle: releasesSubtitle }
-      : PROFILE_VIEW_REGISTRY[view === 'releases' ? 'menu' : view];
+      : PROFILE_VIEW_REGISTRY[registryKey];
   const renderedView =
     view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
 

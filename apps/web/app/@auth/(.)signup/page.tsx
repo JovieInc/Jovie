@@ -70,7 +70,11 @@ function SignupModalBody() {
   ) : null;
 
   return (
-    <AuthModalShell ariaLabel='Create your Jovie account' statusRow={statusRow}>
+    <AuthModalShell
+      ariaLabel='Create your Jovie account'
+      statusRow={statusRow}
+      backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
+    >
       {isMounted ? (
         <SignUp
           routing='hash'

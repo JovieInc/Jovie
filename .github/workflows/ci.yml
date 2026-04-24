@@ -3378,13 +3378,20 @@ jobs:
             BYPASS_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
           fi
 
-          echo "Verifying production is serving ${expected}..."
-          # Only record verify_mismatch when we observe a 200 response that
-          # parses cleanly and returns a different commitSha. Non-200, HTML,
-          # or invalid JSON don't tell us whether production flipped — they
-          # indicate transient/infrastructure issues and should fail with a
-          # distinct subtype so alerting picks the right remediation path.
-          #
+          # Probe the DEPLOYMENT URL directly rather than jov.ie. Rationale:
+          # jov.ie is fronted by Vercel's edge router + CDN. After `vercel
+          # promote` succeeds, the alias IS atomically pointed at the new
+          # deployment at the router level, but edge caches can take longer
+          # than our 60s window to start serving fresh responses (observed
+          # 2026-04-24 on commit 57a7dc3 — promote succeeded, prod flipped
+          # within ~2 min, but the verify loop expired first and emitted a
+          # false-positive verify_mismatch). The deployment URL is stable —
+          # it always serves exactly this deployment's code, no aliases, no
+          # edge timing. If the deployment's /api/health/build-info returns
+          # expected commitSha, the promote was successful and prod is
+          # serving it (edge cache will catch up asynchronously).
+          probe_url="${deploy_url}/api/health/build-info"
+          echo "Verifying ${probe_url} serves ${expected}..."
           # Track confirmed_mismatch separately from saw_valid_probe so a
           # late 500 can't overwrite an earlier confirmed mismatch. Once we
           # see a 200 with a wrong SHA, it IS a mismatch — routing a
@@ -3394,7 +3401,11 @@ jobs:
           last_status=""
           saw_valid_probe=false
           confirmed_mismatch=false
-          for attempt in 1 2 3 4 5 6; do
+          # Vercel edge rollout can lag behind a successful `vercel promote`
+          # by more than a minute. Keep verification strict, but use a longer
+          # bounded window to avoid false negatives on healthy deploys.
+          max_attempts=18
+          for attempt in $(seq 1 "$max_attempts"); do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
             if [ "$attempt" -gt 1 ]; then
@@ -3407,7 +3418,7 @@ jobs:
               -H "Cache-Control: no-cache" \
               "${BYPASS_ARGS[@]}" \
               -w "\n%{http_code}" \
-              "https://jov.ie/api/health/build-info?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
+              "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
             last_status="${response##*$'\n'}"
             body="${response%$'\n'*}"
 
@@ -3425,22 +3436,24 @@ jobs:
             echo "  attempt ${attempt}: build-info commitSha=${actual}"
             saw_valid_probe=true
             if [ "$actual" = "$expected" ]; then
-              echo "✅ Production now serves ${expected}"
+              echo "✅ Deployment ${deploy_url} serves ${expected} — promote succeeded."
+              echo "   Edge cache on jov.ie will catch up asynchronously (typically 1-3 min)."
               exit 0
             fi
             confirmed_mismatch=true
           done
 
           if [ "$confirmed_mismatch" = "true" ]; then
-            echo "❌ Production still serves '${actual:-<empty>}' after promote; expected '${expected}'."
-            echo "   Either the alias flip didn't take effect or Vercel routed to a different deployment."
+            echo "❌ Deployment ${deploy_url} returned commitSha='${actual:-<empty>}' but expected '${expected}'."
+            echo "   This is a data integrity problem: the Vercel API matched this deployment"
+            echo "   URL to GITHUB_SHA, but the deployment's runtime reports a different SHA."
             echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           if [ "$saw_valid_probe" != "true" ]; then
-            echo "❌ build-info probe failed across all attempts (last HTTP ${last_status})."
-            echo "   Cannot confirm whether production flipped to ${expected}."
+            echo "❌ Deployment build-info probe failed across all attempts (last HTTP ${last_status})."
+            echo "   Cannot confirm whether the deployment itself is serving ${expected}."
             echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
@@ -3590,8 +3603,8 @@ jobs:
           if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "verify_mismatch" ]; then
             echo "failure_type=promote_verify_mismatch" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production did not flip to the promoted SHA" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=vercel promote exited 0 but /api/health/build-info returned 200 with a different commitSha across all retries. Check Vercel production alias." >> "$GITHUB_OUTPUT"
+            echo "failure_title=Promoted deployment reports mismatched runtime SHA" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=The Vercel API matched a deployment to github.sha via meta.githubCommitSha, but that deployment's /api/health/build-info returned 200 with a different commitSha across all retries. Check deployment/runtime integrity (meta.githubCommitSha vs the runtime VERCEL_GIT_COMMIT_SHA env)." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 

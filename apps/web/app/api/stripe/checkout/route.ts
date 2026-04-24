@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
@@ -134,13 +135,23 @@ export async function POST(request: NextRequest) {
     const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody<{
+      priceId?: unknown;
+      referralCode?: unknown;
+      returnTo?: unknown;
+      source?: unknown;
+    }>(request, {
+      route: '/api/stripe/checkout',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) return parsedBody.response;
+
     const {
       priceId,
       referralCode: rawReferralCode,
       returnTo: rawReturnTo,
       source: rawSource,
-    } = body;
+    } = parsedBody.data;
     const checkoutSource =
       rawSource === 'onboarding' ? 'onboarding' : undefined;
 
