@@ -615,3 +615,40 @@ export function getPlanDisplayName(plan: string | null | undefined): string {
 export function getAllPlanIds(): readonly PlanId[] {
   return PLAN_IDS;
 }
+
+/** Recognized legacy plan aliases that map to a canonical PlanId. */
+const LEGACY_PLAN_ALIASES = {
+  founding: 'pro',
+  growth: 'max',
+} as const satisfies Readonly<Record<string, PlanId>>;
+
+/**
+ * Validates whether the given string is a recognized plan identifier.
+ * Accepts canonical `PlanId` values as well as legacy aliases
+ * (`founding` -> pro, `growth` -> max).
+ *
+ * Prefer this over passing unknown strings to `getPlanDisplayName()` in
+ * user-facing UI — `getEntitlements()` silently falls back to Free for
+ * unrecognized values, which can render incorrect plan labels (e.g.,
+ * "Welcome to Free" on an upgrade success page).
+ */
+export function isValidPlanId(plan: string | null | undefined): boolean {
+  if (typeof plan !== 'string' || plan.length === 0) return false;
+  if ((PLAN_IDS as readonly string[]).includes(plan)) return true;
+  return Object.hasOwn(LEGACY_PLAN_ALIASES, plan);
+}
+
+/**
+ * Resolves a raw plan string to its canonical `PlanId`, handling legacy
+ * aliases. Returns `null` for unrecognized input.
+ */
+export function resolveCanonicalPlanId(
+  plan: string | null | undefined
+): PlanId | null {
+  if (typeof plan !== 'string' || plan.length === 0) return null;
+  if ((PLAN_IDS as readonly string[]).includes(plan)) return plan as PlanId;
+  if (Object.hasOwn(LEGACY_PLAN_ALIASES, plan)) {
+    return LEGACY_PLAN_ALIASES[plan as keyof typeof LEGACY_PLAN_ALIASES];
+  }
+  return null;
+}
