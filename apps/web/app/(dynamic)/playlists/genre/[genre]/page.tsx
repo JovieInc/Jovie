@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import { safeDecodeURIPathComponent } from '@/lib/utils/string-utils';
 import { PlaylistGrid } from '../../_components/PlaylistGrid';
 
 export const revalidate = 300;
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ genre: string }>;
 }): Promise<Metadata> {
   const { genre } = await params;
-  const decoded = safeDecodeURIComponent(genre);
+  const decoded = safeDecodeURIPathComponent(genre);
   const title = `Best ${decoded.charAt(0).toUpperCase() + decoded.slice(1)} Playlists`;
 
   return {
@@ -32,7 +32,7 @@ export async function generateMetadata({
 }
 
 async function getPlaylistsByGenre(genre: string) {
-  const decoded = safeDecodeURIComponent(genre);
+  const decoded = safeDecodeURIPathComponent(genre);
   return db
     .select({
       slug: joviePlaylists.slug,
@@ -56,7 +56,7 @@ export default async function GenreHubPage({
   params: Promise<{ genre: string }>;
 }>) {
   const { genre } = await params;
-  const decoded = safeDecodeURIComponent(genre);
+  const decoded = safeDecodeURIPathComponent(genre);
   const playlists = await getPlaylistsByGenre(genre);
 
   return (

@@ -7,16 +7,20 @@
  * Next.js passes through). Calling `decodeURIComponent` directly on such a
  * value throws `URIError: URI malformed`, surfacing as a 500 to the fan.
  *
- * Both pages must route path segments through `safeDecodeURIComponent`
- * (or another non-throwing decoder) to degrade gracefully — the underlying
- * DB query returns no matches, and the page renders an empty-state.
+ * Both pages must route path segments through `safeDecodeURIPathComponent`
+ * (which is like `safeDecodeURIComponent` but does NOT replace `+` with a
+ * space — form-encoding is a query-string convention, not a path one, so a
+ * literal `+` in a tag like "rock+roll" must survive).
  */
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import {
+  safeDecodeURIComponent,
+  safeDecodeURIPathComponent,
+} from '@/lib/utils/string-utils';
 
 const TEST_DIR = dirname(
   import.meta.url.startsWith('file:')
@@ -34,23 +38,35 @@ const MOOD_PAGE = join(
 );
 
 describe('public playlist hub pages — malformed URL decoding', () => {
-  it('safeDecodeURIComponent does not throw on malformed percent-encoding', () => {
-    // Sanity check on the shared helper itself.
-    expect(() => safeDecodeURIComponent('%ZZ')).not.toThrow();
-    expect(safeDecodeURIComponent('%ZZ')).toBe('%ZZ');
-    expect(() => safeDecodeURIComponent('%')).not.toThrow();
-    expect(() => safeDecodeURIComponent('%E0%A4')).not.toThrow(); // truncated
+  it('safeDecodeURIPathComponent does not throw on malformed percent-encoding', () => {
+    // Sanity check on the path-safe helper the pages use.
+    expect(() => safeDecodeURIPathComponent('%ZZ')).not.toThrow();
+    expect(safeDecodeURIPathComponent('%ZZ')).toBe('%ZZ');
+    expect(() => safeDecodeURIPathComponent('%')).not.toThrow();
+    expect(() => safeDecodeURIPathComponent('%E0%A4')).not.toThrow(); // truncated
   });
 
-  it('genre page does not call decodeURIComponent directly', () => {
+  it('safeDecodeURIPathComponent preserves literal + in path segments', () => {
+    // Regression: `+` is a form-encoding convention for query strings, NOT
+    // path segments. A genre tag like "rock+roll" (encoded as %2B, decoded
+    // to + by Next before the page runs) must stay "rock+roll", not become
+    // "rock roll", or the DB contains-query returns no results.
+    expect(safeDecodeURIPathComponent('rock+roll')).toBe('rock+roll');
+    // Contrast with the query-string variant that does substitute:
+    expect(safeDecodeURIComponent('rock+roll')).toBe('rock roll');
+  });
+
+  it('genre page uses path-safe decoder, not the form-encoding variant', () => {
     const source = readFileSync(GENRE_PAGE, 'utf8');
     expect(source).not.toMatch(/\bdecodeURIComponent\s*\(/);
-    expect(source).toContain('safeDecodeURIComponent');
+    expect(source).toContain('safeDecodeURIPathComponent');
+    expect(source).not.toMatch(/\bsafeDecodeURIComponent\b/);
   });
 
-  it('mood page does not call decodeURIComponent directly', () => {
+  it('mood page uses path-safe decoder, not the form-encoding variant', () => {
     const source = readFileSync(MOOD_PAGE, 'utf8');
     expect(source).not.toMatch(/\bdecodeURIComponent\s*\(/);
-    expect(source).toContain('safeDecodeURIComponent');
+    expect(source).toContain('safeDecodeURIPathComponent');
+    expect(source).not.toMatch(/\bsafeDecodeURIComponent\b/);
   });
 });

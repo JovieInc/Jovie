@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
-import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
+import { safeDecodeURIPathComponent } from '@/lib/utils/string-utils';
 import { PlaylistGrid } from '../../_components/PlaylistGrid';
 
 export const revalidate = 300;
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ mood: string }>;
 }): Promise<Metadata> {
   const { mood } = await params;
-  const decoded = safeDecodeURIComponent(mood);
+  const decoded = safeDecodeURIPathComponent(mood);
   const title = `${decoded.charAt(0).toUpperCase() + decoded.slice(1)} Playlists`;
 
   return {
@@ -26,7 +26,7 @@ export async function generateMetadata({
 }
 
 async function getPlaylistsByMood(mood: string) {
-  const decoded = safeDecodeURIComponent(mood);
+  const decoded = safeDecodeURIPathComponent(mood);
   return db
     .select({
       slug: joviePlaylists.slug,
@@ -50,7 +50,7 @@ export default async function MoodHubPage({
   params: Promise<{ mood: string }>;
 }>) {
   const { mood } = await params;
-  const decoded = safeDecodeURIComponent(mood);
+  const decoded = safeDecodeURIPathComponent(mood);
   const playlists = await getPlaylistsByMood(mood);
 
   return (
