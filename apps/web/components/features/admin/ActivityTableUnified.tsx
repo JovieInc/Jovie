@@ -11,7 +11,7 @@ import {
 } from '@/components/organisms/table';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 
 const statusVariant: Record<
   AdminActivityStatus,
@@ -214,6 +214,7 @@ export function ActivityTableSkeleton({
           isLoading
           skeletonRows={rows}
           skeletonColumnConfig={ACTIVITY_SKELETON_COLUMN_CONFIG}
+          rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
           minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
           className={ACTIVITY_TABLE_CLASSNAME}
         />
