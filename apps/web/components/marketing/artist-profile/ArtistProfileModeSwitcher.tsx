@@ -227,7 +227,7 @@ export function ArtistProfileModeSwitcher({
             size='sm'
             aria-label='Profile modes'
             className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
-            triggerClassName='min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
+            triggerClassName='min-h-11 min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
           />
         </div>
       </div>
