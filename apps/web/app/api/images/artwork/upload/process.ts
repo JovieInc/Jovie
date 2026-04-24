@@ -46,27 +46,35 @@ async function processArtworkInputBuffer(
 
   results.original = originalData;
 
-  // Generate each download size (square crop, no upscaling)
-  for (const size of ARTWORK_DOWNLOAD_SIZES) {
-    // Skip if original is smaller than this size
-    if (originalWidth < size && originalHeight < size) {
-      continue;
+  // Generate each download size in parallel (square crop, no upscaling)
+  const artworkSizeEntries = await Promise.all(
+    ARTWORK_DOWNLOAD_SIZES.map(async size => {
+      // Skip if original is smaller than this size
+      if (originalWidth < size && originalHeight < size) {
+        return null;
+      }
+
+      const { data } = await baseImage
+        .clone()
+        .resize({
+          width: size,
+          height: size,
+          fit: 'cover',
+          position: 'centre',
+          withoutEnlargement: true,
+        })
+        .toColourspace('srgb')
+        .avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT })
+        .toBuffer({ resolveWithObject: true });
+
+      return [String(size), data] as const;
+    })
+  );
+
+  for (const entry of artworkSizeEntries) {
+    if (entry) {
+      results[entry[0]] = entry[1];
     }
-
-    const { data } = await baseImage
-      .clone()
-      .resize({
-        width: size,
-        height: size,
-        fit: 'cover',
-        position: 'centre',
-        withoutEnlargement: true,
-      })
-      .toColourspace('srgb')
-      .avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT })
-      .toBuffer({ resolveWithObject: true });
-
-    results[String(size)] = data;
   }
 
   return results;
