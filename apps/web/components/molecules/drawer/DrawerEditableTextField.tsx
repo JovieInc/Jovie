@@ -35,6 +35,18 @@ export interface DrawerEditableTextFieldProps {
   readonly displayClassName?: string;
   readonly emptyClassName?: string;
   readonly inputClassName?: string;
+  /**
+   * Controls the density of the display-mode trigger so it can align with
+   * sibling static text rows.
+   *
+   * - `comfortable` (default) renders a padded chip-style trigger suitable
+   *   for standalone use.
+   * - `inline` removes the display-mode horizontal inset and shrinks the
+   *   trigger to the text baseline, keeping hover affordance via a
+   *   background chip. Use this inside property grids where editable rows
+   *   sit alongside static text rows.
+   */
+  readonly density?: 'comfortable' | 'inline';
 }
 
 export function DrawerEditableTextField({
@@ -54,6 +66,7 @@ export function DrawerEditableTextField({
   displayClassName,
   emptyClassName,
   inputClassName,
+  density = 'comfortable',
 }: Readonly<DrawerEditableTextFieldProps>) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -176,9 +189,16 @@ export function DrawerEditableTextField({
             onClick={() => setIsEditing(true)}
             onDoubleClick={() => setIsEditing(true)}
             className={cn(
-              'flex w-full min-w-0 cursor-text items-center text-left transition-colors h-8 rounded-[8px] px-2.5',
-              inputClassName,
-              'border border-transparent bg-transparent shadow-none hover:bg-surface-0',
+              'flex w-full min-w-0 cursor-text items-center text-left transition-colors',
+              density === 'inline'
+                ? // Align the text baseline with sibling static rows by
+                  // removing horizontal inset. The hover chip sits over the
+                  // text area so editable and static rows share the same
+                  // visual grid.
+                  'h-auto px-0 py-0 rounded-[6px] hover:bg-surface-0'
+                : 'h-8 rounded-[8px] px-2.5 hover:bg-surface-0',
+              density === 'inline' ? undefined : inputClassName,
+              'border border-transparent bg-transparent shadow-none',
               !hasValue && 'text-tertiary-token'
             )}
             aria-label={`Edit ${label}`}
