@@ -97,7 +97,7 @@ function ButtonChipVisual({
     <div
       role='img'
       aria-label={`${chipLabel} preview`}
-      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
+      className='flex h-full min-h-[9rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
     >
       <div className='inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[12px] font-semibold text-black shadow-[0_14px_26px_rgba(0,0,0,0.14)]'>
         <Icon className='h-3.5 w-3.5' strokeWidth={2} />
@@ -120,7 +120,7 @@ function IconBadgeVisual({
     <div
       role='img'
       aria-label={`${badgeLabel} preview`}
-      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
+      className='flex h-full min-h-[9rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
     >
       <div className='flex flex-col items-center gap-3 text-center'>
         <span className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-[0_16px_28px_rgba(0,0,0,0.14)]'>
@@ -182,8 +182,8 @@ function ArtistProfilePowerFeatureTile({
   return (
     <article
       className={cn(
-        'relative min-h-[15rem]',
-        tile.size === 'large' ? 'md:min-h-[18.5rem]' : 'md:min-h-[14.5rem]',
+        'relative min-h-[13rem]',
+        tile.size === 'large' ? 'md:min-h-[16.5rem]' : 'md:min-h-[13rem]',
         tile.layoutClassName
       )}
       style={style}
@@ -290,7 +290,7 @@ export function ArtistProfileSpecWall({
           bodyClassName='max-w-[36rem]'
         />
 
-        <div className='mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
+        <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
           {tiles.map(tile => (
             <ArtistProfilePowerFeatureTile key={tile.id} tile={tile} />
           ))}
