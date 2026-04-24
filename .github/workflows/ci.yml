@@ -3599,8 +3599,8 @@ jobs:
           if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "verify_mismatch" ]; then
             echo "failure_type=promote_verify_mismatch" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production did not flip to the promoted SHA" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=vercel promote exited 0 but /api/health/build-info returned 200 with a different commitSha across all retries. Check Vercel production alias." >> "$GITHUB_OUTPUT"
+            echo "failure_title=Promoted deployment reports mismatched runtime SHA" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=The Vercel API matched a deployment to github.sha via meta.githubCommitSha, but that deployment's /api/health/build-info returned 200 with a different commitSha across all retries. Check deployment/runtime integrity (meta.githubCommitSha vs the runtime VERCEL_GIT_COMMIT_SHA env)." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
