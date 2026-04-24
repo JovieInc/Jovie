@@ -3288,15 +3288,15 @@ jobs:
               print("__MISSING_CREDS__", end="")
               sys.exit(0)
 
-          # Paginate over READY production deployments until we find the SHA
-          # or the Vercel API says there are no more pages. `target=production`
-          # guards against picking up a preview deployment that happens to
-          # share the commit SHA. A hard page cap prevents runaway API calls
-          # on pathological account state.
+          # Paginate over READY deployments until we find the SHA or the Vercel
+          # API says there are no more pages. We intentionally do not filter by
+          # target here: deploy-staging creates a preview deployment for
+          # github.sha, and promote needs to resolve that URL before it becomes
+          # production. A hard page cap prevents runaway API calls on
+          # pathological account state.
           base_params = {
               "projectId": project_id,
               "state": "READY",
-              "target": "production",
               "limit": 100,
           }
           if org_id.startswith("team_"):
