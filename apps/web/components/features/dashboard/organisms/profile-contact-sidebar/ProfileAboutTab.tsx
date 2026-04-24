@@ -107,13 +107,11 @@ function EditableBio({
         className='w-full cursor-text rounded-[10px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0'
       >
         {value ? (
-          <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
+          <p className='text-app leading-relaxed text-secondary-token whitespace-pre-wrap'>
             {value}
           </p>
         ) : (
-          <p className='text-[13px] text-tertiary-token'>
-            Click to add a bio...
-          </p>
+          <p className='text-app text-tertiary-token'>Click to add a bio...</p>
         )}
       </button>
     );

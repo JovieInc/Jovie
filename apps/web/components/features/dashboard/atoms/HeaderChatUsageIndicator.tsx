@@ -35,7 +35,7 @@ export const HeaderChatUsageIndicator = memo(
     return (
       <Link
         href={APP_ROUTES.PRICING}
-        className='group inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-[13px] font-caption text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200'
+        className='group inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-app font-caption text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200'
         aria-label={
           isExhausted
             ? 'Daily AI message limit reached. Open pricing to upgrade.'

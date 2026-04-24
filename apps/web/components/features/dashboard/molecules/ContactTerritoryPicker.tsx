@@ -57,7 +57,7 @@ export function ContactTerritoryPicker({
 
   return (
     <div className='space-y-2'>
-      <p className='text-[13px] font-caption text-secondary-token tracking-normal'>
+      <p className='text-app font-caption text-secondary-token tracking-normal'>
         Territories
       </p>
       <div className='flex flex-wrap gap-2'>
@@ -86,7 +86,7 @@ export function ContactTerritoryPicker({
           </Button>
         </div>
       </div>
-      <p className='text-[13px] text-secondary-token'>
+      <p className='text-app text-secondary-token'>
         {territorySummary === 'General'
           ? 'Add a region to speed up routing'
           : territorySummary}

@@ -37,7 +37,7 @@ export function InsightsSummaryWidget() {
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-1.5'>
           <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
-          <span className='text-[13px] font-caption text-primary-token'>
+          <span className='text-app font-caption text-primary-token'>
             AI Insights
           </span>
           <span className='inline-flex min-w-[18px] items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption leading-none text-secondary-token tabular-nums'>

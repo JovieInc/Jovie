@@ -115,7 +115,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           aria-live='polite'
           as='output'
         >
-          <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
+          <p className='text-app text-emerald-600 dark:text-emerald-400'>
             Profile updated successfully!
           </p>
         </ContentSurfaceCard>

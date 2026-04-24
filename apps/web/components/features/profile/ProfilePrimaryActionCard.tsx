@@ -402,7 +402,7 @@ export function ProfilePrimaryActionCard({
     : 'h-11 w-11 rounded-xl';
   const titleClassName = isShowcase
     ? 'text-base font-[630] tracking-[-0.03em] text-white'
-    : 'text-[13px] font-semibold leading-[1.1] text-white/92';
+    : 'text-app font-semibold leading-[1.1] text-white/92';
   const metaClassName = isShowcase
     ? 'text-[11.5px] text-white/56'
     : 'text-[10.5px] text-white/52';

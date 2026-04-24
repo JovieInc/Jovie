@@ -35,7 +35,7 @@ function ToggleSwitch({
       onClick={onToggle}
       className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
-      <span className='text-[13px] text-secondary-token'>{label}</span>
+      <span className='text-app text-secondary-token'>{label}</span>
       <span
         className={cn(
           'flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-[13px] font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-app font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -153,7 +153,7 @@ export function DisplayMenuDropdown({
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
-          <span className='text-[13px] font-semibold text-primary-token'>
+          <span className='text-app font-semibold text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close
@@ -234,7 +234,7 @@ export function DisplayMenuDropdown({
               hasDensityOptions && 'border-b border-subtle'
             )}
           >
-            <p className='px-0.5 pb-1 text-[13px] font-caption tracking-normal text-secondary-token'>
+            <p className='px-0.5 pb-1 text-app font-caption tracking-normal text-secondary-token'>
               Display properties
             </p>
             <div className='flex flex-wrap gap-1'>
@@ -254,7 +254,7 @@ export function DisplayMenuDropdown({
         {/* ── Density ────────────────────────────────────────────── */}
         {hasDensityOptions && (
           <div className='px-2.5 py-1.5'>
-            <p className='px-0.5 pb-1 text-[13px] font-caption tracking-normal text-secondary-token'>
+            <p className='px-0.5 pb-1 text-app font-caption tracking-normal text-secondary-token'>
               Density
             </p>
             <div className='grid grid-cols-3 gap-1'>

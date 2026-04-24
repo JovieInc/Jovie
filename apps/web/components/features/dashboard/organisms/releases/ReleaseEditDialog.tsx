@@ -71,7 +71,7 @@ export function ReleaseEditDialog({
         />
         Edit release links
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-app text-secondary-token'>
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
@@ -136,7 +136,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-caption text-primary-token'>
+                        <p className='text-app font-caption text-primary-token'>
                           {provider.label}
                         </p>
                       </div>

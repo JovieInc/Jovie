@@ -52,7 +52,7 @@ export function CurrentPlanCard({
                   {isPro ? 'Active' : 'Limited'}
                 </Badge>
               </div>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+              <p className='mt-1 text-app leading-[18px] text-secondary-token'>
                 {isPro
                   ? 'Full access to release notifications, deeper analytics, and fan growth tools.'
                   : 'Upgrade to unlock release notifications, advanced analytics, and more.'}

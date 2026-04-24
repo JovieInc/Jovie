@@ -95,9 +95,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
       >
         <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
-          <span className='text-[13px] font-caption'>
-            Failed to load matches
-          </span>
+          <span className='text-app font-caption'>Failed to load matches</span>
         </div>
         <p className='mt-1 text-xs text-red-600/80 dark:text-red-400/80'>
           {error instanceof Error ? error.message : 'Unknown error'}

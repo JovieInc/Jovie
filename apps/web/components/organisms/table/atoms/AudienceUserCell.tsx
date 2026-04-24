@@ -81,7 +81,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-2 text-[13px] text-primary-token',
+        'flex min-w-0 items-center gap-2 text-app text-primary-token',
         className
       )}
     >

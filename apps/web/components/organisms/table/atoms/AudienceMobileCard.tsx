@@ -269,7 +269,7 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
   return (
     <div className='mt-0.5 space-y-0.5'>
       {(member.email || member.phone) && (
-        <p className='truncate text-[13px] leading-snug text-secondary-token'>
+        <p className='truncate text-app leading-snug text-secondary-token'>
           {subscriberLabel}
         </p>
       )}

@@ -65,7 +65,7 @@ export function ContactRoleSelector({
 
   return (
     <div className='space-y-2'>
-      <p className='text-[13px] font-caption text-secondary-token tracking-normal'>
+      <p className='text-app font-caption text-secondary-token tracking-normal'>
         Role
       </p>
       <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>

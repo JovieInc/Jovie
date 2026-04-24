@@ -84,7 +84,7 @@ export function DashboardFeedbackModal({
           <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
             Thank you!
           </DialogTitle>
-          <DialogDescription className='mt-2 text-[13px] text-secondary-token'>
+          <DialogDescription className='mt-2 text-app text-secondary-token'>
             Sent — thanks for the feedback.
           </DialogDescription>
         </div>
@@ -93,7 +93,7 @@ export function DashboardFeedbackModal({
           <div className='flex items-start justify-between gap-4'>
             <div>
               <DialogTitle className='text-balance'>Send feedback</DialogTitle>
-              <DialogDescription className='mt-1 text-[13px] text-secondary-token'>
+              <DialogDescription className='mt-1 text-app text-secondary-token'>
                 Tell us where the experience feels delightful, where it falls
                 short, or what you&apos;d love us to build next.
               </DialogDescription>

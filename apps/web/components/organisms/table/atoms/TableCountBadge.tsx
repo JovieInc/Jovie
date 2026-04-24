@@ -43,7 +43,7 @@ export function TableCountBadge({
   if (variant === 'text') {
     return (
       <span
-        className={cn('text-[13px] font-caption text-primary-token', className)}
+        className={cn('text-app font-caption text-primary-token', className)}
       >
         {displayText}
       </span>

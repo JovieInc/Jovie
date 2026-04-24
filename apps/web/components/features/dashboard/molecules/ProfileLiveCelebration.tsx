@@ -202,7 +202,7 @@ export function ProfileLiveCelebration({
         </h2>
 
         <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
-          <span className='text-[13px] font-medium text-primary-token'>
+          <span className='text-app font-medium text-primary-token'>
             {profileUrl}
           </span>
           <CopyToClipboardButton
@@ -223,7 +223,7 @@ export function ProfileLiveCelebration({
           type='button'
           onClick={completeCelebration}
           aria-label='Continue to the next step'
-          className='mt-2 text-[13px] text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+          className='mt-2 text-app text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
         >
           Continue →
         </button>

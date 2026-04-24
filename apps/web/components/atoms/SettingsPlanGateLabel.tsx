@@ -45,7 +45,7 @@ export function SettingsPlanGateLabel({
         <Link
           href={APP_ROUTES.PRICING}
           aria-label={`Upgrade to ${planName}`}
-          className='inline-flex items-center gap-1 rounded-sm text-[13px] text-tertiary-token underline underline-offset-2 transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20'
+          className='inline-flex items-center gap-1 rounded-sm text-app text-tertiary-token underline underline-offset-2 transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20'
           onClick={handleUpgradeClick}
         >
           <Lock className='h-3.5 w-3.5' aria-hidden='true' />

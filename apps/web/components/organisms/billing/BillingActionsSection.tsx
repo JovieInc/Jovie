@@ -78,7 +78,7 @@ export function BillingActionsSection({
                       features:
                     </p>
                     <ul className='space-y-2'>
-                      <li className='flex items-start gap-2 text-[13px]'>
+                      <li className='flex items-start gap-2 text-app'>
                         <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                         <span>
                           <strong>Branding removal</strong> - Jovie branding

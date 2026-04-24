@@ -123,7 +123,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}
-              className='min-w-0 flex-1 text-[13px] font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
+              className='min-w-0 flex-1 text-app font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
               tooltipSide='top'
               tooltipAlign='start'
             >
@@ -154,7 +154,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}
-              className='min-w-0 flex-1 text-[13px] font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
+              className='min-w-0 flex-1 text-app font-caption leading-[1.15] tracking-[-0.012em] text-primary-token'
               tooltipSide='top'
               tooltipAlign='start'
             >

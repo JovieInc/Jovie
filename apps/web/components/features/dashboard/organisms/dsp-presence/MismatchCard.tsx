@@ -169,7 +169,7 @@ export function MismatchCard({
 
       {/* Track info — desktop: single line, mobile: wraps */}
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[13px] font-book'>
+        <p className='truncate text-app font-book'>
           {mismatch.externalTrackName ?? mismatch.isrc}
         </p>
         <p className='truncate text-[11px] text-muted-foreground'>

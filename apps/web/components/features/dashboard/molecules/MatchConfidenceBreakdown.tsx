@@ -89,7 +89,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
 
   return (
     <div className='group'>
-      <div className='flex items-center justify-between text-[13px]'>
+      <div className='flex items-center justify-between text-app'>
         <div className='flex items-center gap-2'>
           <span className='font-caption text-secondary-token'>{label}</span>
           <span className='text-tertiary-token/60'>
@@ -171,7 +171,7 @@ export function MatchConfidenceBreakdown({
 
       {/* Total */}
       <div className='border-t border-(--linear-app-frame-seam) pt-2'>
-        <div className='flex items-center justify-between text-[13px]'>
+        <div className='flex items-center justify-between text-app'>
           <span className='font-caption text-primary-token'>
             Total Confidence
           </span>

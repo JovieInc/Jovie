@@ -103,7 +103,7 @@ export function AudienceLtvCell({
       : formatDollars(breakdown.totalValueCents);
 
   const content = (
-    <div className={cn('flex items-center text-[13px]', className)}>
+    <div className={cn('flex items-center text-app', className)}>
       <span className={cn('tabular-nums', TIER_STYLES[breakdown.tier])}>
         {displayLabel}
       </span>
