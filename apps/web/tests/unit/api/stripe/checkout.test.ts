@@ -12,9 +12,14 @@ const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -296,5 +301,9 @@ describe('POST /api/stripe/checkout', () => {
     expect(data.error).toBe('Invalid JSON in request body');
     // Must not reach Stripe when the body is malformed.
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    // Regression target: a malformed body must NOT page Sentry as a fatal
+    // server error — parseJsonBody catches the parse failure and returns a
+    // 400 directly, so captureCriticalError is never invoked.
+    expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
 });
