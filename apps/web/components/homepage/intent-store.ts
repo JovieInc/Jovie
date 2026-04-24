@@ -20,6 +20,7 @@ import {
 
 export const HOMEPAGE_INTENTS_KEY = 'jovie_homepage_intents';
 export const HOMEPAGE_ACTIVE_INTENT_KEY = 'jovie_active_homepage_intent_id';
+export const HOMEPAGE_DRAFT_KEY = 'jovie_homepage_draft';
 export const HOMEPAGE_INTENT_TTL_MS = 30 * 60 * 1000;
 export const HOMEPAGE_INTENT_MAX_CHARS = 140;
 
@@ -173,6 +174,10 @@ export function readHomepageIntent(id: string): StoredHomepageIntent | null {
 /**
  * Deletes an intent by id. Safe to call when the id is missing or storage is
  * unavailable. Clears the active-intent sentinel if it points to this id.
+ *
+ * Consumption happens when onboarding successfully renders the intent — i.e.
+ * the user has just completed signup — so we also clear the homepage draft
+ * here. After a successful account creation, the draft is stale.
  */
 export function consumeHomepageIntent(id: string): void {
   if (!id) return;
@@ -197,6 +202,61 @@ export function consumeHomepageIntent(id: string): void {
     } catch {
       // ignore
     }
+  }
+  clearHomepageDraft();
+}
+
+/**
+ * Read the in-progress homepage prompt draft. Returns an empty string when
+ * storage is unavailable or the key is missing. Sanitized on read in case the
+ * key was tampered with via devtools or cross-origin script.
+ */
+export function readHomepageDraft(): string {
+  const storage = getLocalStorage();
+  if (!storage) return '';
+  try {
+    const raw = storage.getItem(HOMEPAGE_DRAFT_KEY);
+    if (!raw) return '';
+    return sanitizeHomepagePrompt(raw);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Persist the in-progress homepage prompt draft so it survives a page reload
+ * or a fan coming back later. Empty / whitespace values delete the key
+ * instead of storing an empty string.
+ *
+ * Storage failures (quota, private mode) are swallowed — draft persistence is
+ * a nice-to-have, never a blocker for the user typing.
+ */
+export function writeHomepageDraft(value: string): void {
+  const storage = getLocalStorage();
+  if (!storage) return;
+  const sanitized = sanitizeHomepagePrompt(value);
+  try {
+    if (sanitized.length === 0) {
+      storage.removeItem(HOMEPAGE_DRAFT_KEY);
+    } else {
+      storage.setItem(HOMEPAGE_DRAFT_KEY, sanitized);
+    }
+  } catch {
+    // quota / private mode — non-fatal.
+  }
+}
+
+/**
+ * Remove the homepage draft. Called after a successful submission and after
+ * a successful account creation (via `consumeHomepageIntent`).
+ */
+export function clearHomepageDraft(): void {
+  const storage = getLocalStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(HOMEPAGE_DRAFT_KEY);
+  } catch {
+    // ignore
   }
 }
 

@@ -66,7 +66,7 @@ describe('buildGreeting', () => {
       tippingStats: emptyTippingStats,
     });
 
-    expect(greeting.label).toBe('Welcome back');
+    expect(greeting.label).toBeNull();
     expect(greeting.body).toBe('Your subscribers jumped 23% in LA this week.');
     expect(greeting.profileHref).toBeNull();
   });
@@ -81,6 +81,7 @@ describe('buildGreeting', () => {
       },
     });
 
+    expect(greeting.label).toBeNull();
     expect(greeting.body).toBe(
       "You've received 2 payments since your last check-in."
     );
@@ -93,6 +94,7 @@ describe('buildGreeting', () => {
       tippingStats: emptyTippingStats,
     });
 
+    expect(greeting.label).toBeNull();
     expect(greeting.body).toBe(
       'Share your profile to start building your audience.'
     );
