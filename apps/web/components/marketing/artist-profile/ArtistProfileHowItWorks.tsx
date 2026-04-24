@@ -52,10 +52,10 @@ export function ArtistProfileHowItWorks({
           bodyClassName='max-w-[30rem]'
         />
 
-        <div className='mt-12 grid gap-6 lg:grid-cols-3 lg:gap-5'>
-          <article className='flex flex-col gap-4'>
+        <div className='mt-10 grid gap-5 lg:grid-cols-3 lg:gap-5'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={1} />
-            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
@@ -110,7 +110,7 @@ export function ArtistProfileHowItWorks({
             </div>
           </article>
 
-          <article className='flex flex-col gap-4'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={2} />
             <DrawerSurfaceCard
               variant='card'
@@ -181,9 +181,9 @@ export function ArtistProfileHowItWorks({
             </div>
           </article>
 
-          <article className='flex flex-col gap-4'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={3} />
-            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
