@@ -42,7 +42,6 @@ export const APP_ROUTES = {
   SETTINGS_ACCOUNT: '/app/settings/account',
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
-  SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_PAYMENTS: '/app/settings/payments',
   SETTINGS_DATA_PRIVACY: '/app/settings/data-privacy',

@@ -173,7 +173,7 @@ Per Facebook spec: plaintext PII never leaves Jovie's servers.
 
 **Create** `apps/web/app/app/(shell)/settings/retargeting/page.tsx`
 
-Follow pattern from `settings/ad-pixels/page.tsx`:
+Follow pattern from `components/features/dashboard/organisms/SettingsAdPixelsSection.tsx` (the in-page section formerly at `settings/ad-pixels`):
 - Facebook Ad Account ID input (reuses existing pixel config pattern)
 - Exclusion audience status card (sync state, member count, last sync time)
 - Token permission indicator (test with a lightweight Marketing API call)
