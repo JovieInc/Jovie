@@ -179,6 +179,8 @@ export { TableStandardToolbar } from './molecules/TableStandardToolbar';
 
 export type { UnifiedTableProps } from './organisms/UnifiedTable';
 export { UnifiedTable } from './organisms/UnifiedTable';
+export type { UnifiedTableSkeletonProps } from './organisms/UnifiedTableSkeleton';
+export { UnifiedTableSkeleton } from './organisms/UnifiedTableSkeleton';
 
 // =============================================================================
 // Hooks
