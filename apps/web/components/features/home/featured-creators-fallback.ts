@@ -8,18 +8,6 @@ const FALLBACK_CREATOR_DATA = [
     tagline: 'The Deep End',
     src: TIM_WHITE_PROFILE.avatarSrc,
   },
-  {
-    handle: 'david-guetta',
-    name: 'David Guetta',
-    tagline: 'Release workflow',
-    src: '/images/avatars/music-maker.jpg',
-  },
-  {
-    handle: 'kaskade',
-    name: 'Kaskade',
-    tagline: 'Live profile',
-    src: '/images/avatars/music-maker.jpg',
-  },
 ] as const;
 
 export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_CREATOR_DATA.map(
