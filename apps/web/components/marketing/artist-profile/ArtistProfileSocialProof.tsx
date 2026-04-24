@@ -27,7 +27,7 @@ export function ArtistProfileSocialProof({
         </p>
       </div>
 
-      <div className='mx-auto mt-10 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
+      <div className='mx-auto mt-8 grid max-w-[1120px] gap-4 lg:grid-cols-3'>
         {proofData.profileCards.map(card => (
           <article
             key={card.id}
@@ -80,7 +80,7 @@ export function ArtistProfileSocialProof({
       ) : null}
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
-        <article className='mx-auto mt-8 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-7 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-9 lg:px-10 lg:py-10'>
+        <article className='mx-auto mt-6 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-6 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
           <blockquote className='max-w-[50rem] text-pretty text-[clamp(1.45rem,2.7vw,2.35rem)] font-semibold leading-[1.12] tracking-[-0.045em] text-black'>
             “{proofData.founderQuote.quote}”
           </blockquote>
