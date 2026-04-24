@@ -80,7 +80,7 @@ export function CopyableUrlRow({
     md: {
       container: 'h-7 gap-1.5 rounded-full px-2.5',
       icon: 'h-3 w-3',
-      value: 'text-[11px]',
+      value: 'text-2xs',
       button: 'h-5 w-5 rounded-full',
       glyph: 'h-3 w-3',
     },

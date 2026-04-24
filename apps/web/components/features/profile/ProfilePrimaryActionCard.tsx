@@ -92,7 +92,7 @@ interface ProfilePrimaryActionCardProps {
 
 const CTA_PILL_CLASS_NAME = cn(
   profileSecondaryPillClassName,
-  'h-7 rounded-full border-white/14 bg-white text-[11px] font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
+  'h-7 rounded-full border-white/14 bg-white text-2xs font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
 );
 
 function toDateValue(value: Date | string | null | undefined) {

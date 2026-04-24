@@ -77,7 +77,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-full px-2 py-0.5 text-[11px] font-caption transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:bg-surface-1',
+        'rounded-full px-2 py-0.5 text-2xs font-caption transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:bg-surface-1',
         isVisible
           ? 'bg-surface-1 text-secondary-token'
           : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
@@ -265,7 +265,7 @@ export function DisplayMenuDropdown({
                   onClick={() => onDensityChange?.(option.value)}
                   aria-pressed={density === option.value}
                   className={cn(
-                    'rounded px-1.5 py-0.5 text-[11px] font-caption transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                    'rounded px-1.5 py-0.5 text-2xs font-caption transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
                     density === option.value
                       ? 'bg-surface-2 text-primary-token'
                       : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'

@@ -87,7 +87,7 @@ export function ReleaseTaskPage({
       {/* Up Next section (only when tasks exist and not all done) */}
       {upNextTasks.length > 0 && !allDone && (
         <div className='mb-6'>
-          <h3 className='px-4 text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-2'>
+          <h3 className='px-4 text-2xs font-medium uppercase tracking-wider text-tertiary-token mb-2'>
             Up Next
           </h3>
           <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>

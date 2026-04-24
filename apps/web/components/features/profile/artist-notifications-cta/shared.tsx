@@ -90,7 +90,7 @@ export const subscriptionFeedbackRailClassName =
   'flex min-h-5 items-center justify-between gap-2 px-1';
 
 export const subscriptionFeedbackCopyClassName =
-  'text-[11px] leading-4 tracking-[-0.01em] text-secondary-token/68';
+  'text-2xs leading-4 tracking-[-0.01em] text-secondary-token/68';
 
 export const subscriptionErrorTextClassName =
   'text-xs leading-4 tracking-[-0.012em] text-red-400';
@@ -334,7 +334,7 @@ export function SubscriptionOtpResendAction({
     return (
       <button
         type='button'
-        className='text-[11px] leading-4 text-primary-token/72 underline underline-offset-2 transition-colors hover:text-primary-token'
+        className='text-2xs leading-4 text-primary-token/72 underline underline-offset-2 transition-colors hover:text-primary-token'
         onClick={onResend}
       >
         Resend code
@@ -344,14 +344,14 @@ export function SubscriptionOtpResendAction({
 
   if (isResending) {
     return (
-      <span className='text-[11px] leading-4 text-secondary-token/55'>
+      <span className='text-2xs leading-4 text-secondary-token/55'>
         Sending...
       </span>
     );
   }
 
   return (
-    <span className='text-[11px] leading-4 text-secondary-token/55'>
+    <span className='text-2xs leading-4 text-secondary-token/55'>
       Resend in 0:{remaining.toString().padStart(2, '0')}
     </span>
   );

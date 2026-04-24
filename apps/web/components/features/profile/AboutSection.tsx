@@ -87,7 +87,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-[14px] font-book text-white/40'>
+        <p className='text-sm font-book text-white/40'>
           No information available yet.
         </p>
       </div>
@@ -99,7 +99,7 @@ export function AboutSection({
       <p className='sr-only'>About {artist.name}</p>
 
       {hasBio && (
-        <p className='text-[14px] font-book leading-relaxed text-white/70 whitespace-pre-line'>
+        <p className='text-sm font-book leading-relaxed text-white/70 whitespace-pre-line'>
           {artist.tagline}
         </p>
       )}
@@ -139,7 +139,7 @@ export function AboutSection({
             return (
               <span
                 key={key}
-                className='rounded-full border px-3 py-1 text-[11px] font-caption capitalize'
+                className='rounded-full border px-3 py-1 text-2xs font-caption capitalize'
                 style={{
                   backgroundColor: hexToRgba(accent, 0.14),
                   color: lightenHex(accent, 0.35),

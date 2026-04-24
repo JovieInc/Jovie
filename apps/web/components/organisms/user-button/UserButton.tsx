@@ -111,7 +111,7 @@ function buildDropdownItems({
                 )}
               </div>
               {formattedUsername && (
-                <p className='truncate text-[11px] text-tertiary-token mt-0.5'>
+                <p className='truncate text-2xs text-tertiary-token mt-0.5'>
                   {formattedUsername}
                 </p>
               )}

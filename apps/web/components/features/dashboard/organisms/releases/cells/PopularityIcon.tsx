@@ -23,7 +23,7 @@ export const PopularityIcon = memo(function PopularityIcon({
   const isValidPopularity = popularity != null && Number.isFinite(popularity);
 
   if (!isValidPopularity) {
-    return <span className='text-[11px] text-tertiary-token'>—</span>;
+    return <span className='text-2xs text-tertiary-token'>—</span>;
   }
 
   const clampedPopularity = Math.min(100, Math.max(0, popularity));
@@ -80,7 +80,7 @@ export const PopularityIcon = memo(function PopularityIcon({
           />
         </button>
       </TooltipTrigger>
-      <TooltipContent side='top' className='text-[11px]'>
+      <TooltipContent side='top' className='text-2xs'>
         <span className='font-caption'>{displayPopularity}</span>
         <span className='text-secondary-token'>/100 popularity</span>
       </TooltipContent>

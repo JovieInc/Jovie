@@ -89,7 +89,7 @@ export function resetWelcomeChatBootstrapState(
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
     <span className='flex min-w-0 items-center gap-2 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 py-1.5'>
-      <span className='shrink-0 text-[11px] font-semibold tracking-normal text-tertiary-token'>
+      <span className='shrink-0 text-2xs font-semibold tracking-normal text-tertiary-token'>
         Thread
       </span>
       <span className='block max-w-[220px] truncate text-xs font-caption text-primary-token'>

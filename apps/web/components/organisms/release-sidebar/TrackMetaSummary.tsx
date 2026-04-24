@@ -31,14 +31,14 @@ const VARIANT_STYLES: Record<
 > = {
   compact: {
     container: 'space-y-1',
-    number: 'text-[11px]',
+    number: 'text-2xs',
     title: 'text-[12px]',
-    meta: 'text-[11px]',
+    meta: 'text-2xs',
   },
   drawer: {
     container: 'space-y-1.5',
     number: 'text-[10.5px]',
-    title: 'text-[14px] tracking-[-0.01em]',
+    title: 'text-sm tracking-[-0.01em]',
     meta: 'text-[10.5px]',
   },
 };

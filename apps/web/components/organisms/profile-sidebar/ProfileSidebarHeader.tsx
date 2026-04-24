@@ -129,7 +129,7 @@ export function useProfileHeaderParts({
         {primaryLabel}
       </span>
       {secondaryLabel ? (
-        <span className='truncate text-[11px] text-secondary-token'>
+        <span className='truncate text-2xs text-secondary-token'>
           {secondaryLabel}
         </span>
       ) : null}

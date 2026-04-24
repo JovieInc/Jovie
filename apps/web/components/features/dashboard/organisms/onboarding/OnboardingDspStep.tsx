@@ -199,7 +199,7 @@ export function OnboardingDspStep({
                             {artist.name}
                           </p>
                           {artist.followers != null && (
-                            <p className='text-[11px] text-tertiary-token'>
+                            <p className='text-2xs text-tertiary-token'>
                               {artist.followers.toLocaleString()} followers
                             </p>
                           )}

@@ -248,7 +248,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     expect(screen.getByText(/DJ Snake, Lil Jon/)).toBeDefined();
     // The owner name "Test Artist" should not appear as a collaborator
     const container = screen.getByTestId('profile-mode-drawer-releases');
-    const secondaryText = container.querySelectorAll('.text-\\[11px\\]');
+    const secondaryText = container.querySelectorAll('.text-2xs');
     for (const el of secondaryText) {
       expect(el.textContent).not.toMatch(/^Test Artist/);
     }
@@ -273,7 +273,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     expect(screen.getByText('Solo Track')).toBeDefined();
     // Only metadata, no collaborator prefix
     const container = screen.getByTestId('profile-mode-drawer-releases');
-    const metaEl = container.querySelector('.text-\\[11px\\]');
+    const metaEl = container.querySelector('.text-2xs');
     expect(metaEl?.textContent).toMatch(/Single/);
     expect(metaEl?.textContent).not.toContain('Test Artist');
   });
@@ -318,7 +318,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
     const container = screen.getByTestId('profile-mode-drawer-releases');
-    const metaEl = container.querySelector('.text-\\[11px\\]');
+    const metaEl = container.querySelector('.text-2xs');
     expect(metaEl?.textContent).toContain('Single');
     expect(metaEl?.textContent).not.toMatch(/\d{4}/);
   });

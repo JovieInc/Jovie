@@ -254,7 +254,7 @@ function PaletteItem({
       </span>
       <span className='flex-1 truncate text-app'>{label}</span>
       {hint ? (
-        <span className='ml-2 hidden truncate text-[11px] text-tertiary-token sm:inline'>
+        <span className='ml-2 hidden truncate text-2xs text-tertiary-token sm:inline'>
           {hint}
         </span>
       ) : null}

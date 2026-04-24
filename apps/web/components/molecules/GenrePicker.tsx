@@ -121,7 +121,7 @@ export function GenrePicker({
         {/* Cap indicator */}
         {atCap && (
           <div className='px-3 py-1.5 border-b border-subtle'>
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-2xs text-tertiary-token'>
               Maximum {maxGenres} genres reached
             </p>
           </div>

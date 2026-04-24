@@ -96,7 +96,7 @@ function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
         <p className='text-app leading-[18px] tracking-[-0.01em] text-secondary-token'>
           {event.description}
         </p>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-2xs text-tertiary-token'>
           {isSystem && (
             <>
               <Bot className='h-3 w-3' aria-hidden />

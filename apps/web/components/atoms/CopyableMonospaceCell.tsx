@@ -44,9 +44,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   );
 
   if (!value) {
-    return (
-      <span className='text-[11px] font-[400] text-tertiary-token'>—</span>
-    );
+    return <span className='text-2xs font-[400] text-tertiary-token'>—</span>;
   }
 
   const sizeClasses = {
@@ -55,7 +53,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       icon: 'h-3 w-3',
     },
     md: {
-      button: 'h-6 gap-1 rounded-full px-1 py-0.5 text-[11px]',
+      button: 'h-6 gap-1 rounded-full px-1 py-0.5 text-2xs',
       icon: 'h-3 w-3',
     },
   } as const;

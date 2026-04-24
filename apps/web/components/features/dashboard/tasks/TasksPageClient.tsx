@@ -369,7 +369,7 @@ function TaskMetaMenuNumber({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <TaskMetaTrigger ariaLabel='Open task controls'>
-          <span className='inline-flex items-center gap-1 text-[11px] font-semibold text-tertiary-token'>
+          <span className='inline-flex items-center gap-1 text-2xs font-semibold text-tertiary-token'>
             <span className='shrink-0'>J-{task.taskNumber}</span>
             <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
           </span>
@@ -544,7 +544,7 @@ function TaskDocumentPanel({
           <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
             <TaskTitleEditor value={title} onChange={onTitleChange} />
 
-            <div className='flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-3 text-[11px] text-secondary-token'>
+            <div className='flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-3 text-2xs text-secondary-token'>
               <TaskMetaMenuNumber
                 task={task}
                 onOpenRelease={onOpenRelease}
@@ -829,7 +829,7 @@ function MobileTaskScopeTabs({
               onClick={() => onChange(value)}
               aria-pressed={isActive}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-[background-color,color] duration-150',
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-2xs font-semibold transition-[background-color,color] duration-150',
                 isActive
                   ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
                   : 'text-secondary-token hover:text-primary-token'
@@ -869,9 +869,7 @@ function MobileTaskSection({
   return (
     <section className='px-3 pb-4'>
       <div className='mb-2 flex items-center justify-between px-1'>
-        <h2 className='text-[11px] font-semibold text-tertiary-token'>
-          {title}
-        </h2>
+        <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
       <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
@@ -935,7 +933,7 @@ function MobileTaskListItem({
       </span>
 
       <span className='min-w-0 flex-1'>
-        <span className='block truncate text-[14px] font-semibold leading-[1.25] text-primary-token'>
+        <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
         <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>

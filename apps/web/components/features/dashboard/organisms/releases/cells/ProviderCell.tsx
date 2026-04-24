@@ -204,7 +204,7 @@ export const ProviderCell = memo(function ProviderCell({
     }
 
     return (
-      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-tertiary-token'>
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-2xs text-tertiary-token'>
         —
       </span>
     );
