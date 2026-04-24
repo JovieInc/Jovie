@@ -18,7 +18,7 @@ export default function SettingsAccountPage() {
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='py-4 text-center'>
-          <h3 className='mb-3 text-[14px] font-caption text-primary-token'>
+          <h3 className='mb-3 text-sm font-caption text-primary-token'>
             Account settings unavailable
           </h3>
           <p className='text-[13px] text-secondary'>

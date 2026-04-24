@@ -21,7 +21,7 @@ function MobileProfilePanelTrigger() {
       className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
-        <p className='text-[14px] font-caption text-primary-token'>
+        <p className='text-sm font-caption text-primary-token'>
           Links, music &amp; more
         </p>
         <p className='mt-0.5 text-[13px] text-secondary-token'>

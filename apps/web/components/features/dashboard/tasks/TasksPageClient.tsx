@@ -935,7 +935,7 @@ function MobileTaskListItem({
       </span>
 
       <span className='min-w-0 flex-1'>
-        <span className='block truncate text-[14px] font-semibold leading-[1.25] text-primary-token'>
+        <span className='block truncate text-sm font-semibold leading-[1.25] text-primary-token'>
           {task.title}
         </span>
         <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-secondary-token'>
