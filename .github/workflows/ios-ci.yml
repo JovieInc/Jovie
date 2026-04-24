@@ -72,41 +72,41 @@ jobs:
         run: |
           set -euo pipefail
 
-          DESTINATIONS="$(xcodebuild -showdestinations -project apps/ios/Jovie.xcodeproj -scheme Jovie 2>/dev/null || true)"
+          PROJECT_PATH="apps/ios/Jovie.xcodeproj"
+          SCHEME="Jovie"
+          DESTINATION=""
+          LAST_DESTINATIONS=""
 
-          DESTINATION="$(
-            printf '%s\n' "$DESTINATIONS" | ruby -ne '
-              next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
-              os = Regexp.last_match(1)
-              name = Regexp.last_match(2).strip
-              if os.start_with?("18.")
-                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
-                exit
-              end
-            '
-          )"
+          for attempt in {1..6}; do
+            LAST_DESTINATIONS="$(xcodebuild -showdestinations -project "$PROJECT_PATH" -scheme "$SCHEME" 2>/dev/null || true)"
+
+            DESTINATION="$(
+              printf '%s\n' "$LAST_DESTINATIONS" | ruby -e 'preferred=nil;fallback=nil;STDIN.each_line do |line|; next unless line.include?("platform:iOS Simulator"); next if line.include?("name:Any iOS Simulator Device"); id=line[/id:([^,}]+)/, 1]&.strip; next unless id; os_version=line[/OS:([^,}]+)/, 1]&.strip.to_s; destination="platform=iOS Simulator,id=#{id}"; if os_version.start_with?("18."); preferred=destination; break; end; fallback ||= destination; end; print(preferred || fallback || "")'
+            )"
+
+            if [[ -n "$DESTINATION" ]]; then
+              break
+            fi
+
+            echo "No concrete simulator destination found on attempt $attempt/6."
+            if [[ "$LAST_DESTINATIONS" == *"name:Any iOS Simulator Device"* ]] && (( attempt < 6 )); then
+              sleep 10
+              continue
+            fi
+
+            break
+          done
 
           if [[ -z "$DESTINATION" ]]; then
             DESTINATION="$(
-              printf '%s\n' "$DESTINATIONS" | ruby -ne '
-                next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
-                os = Regexp.last_match(1)
-                name = Regexp.last_match(2).strip
-                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
-                exit
-              '
+              xcrun simctl list devices available -j 2>/dev/null | ruby -rjson -e 'input=STDIN.read; if input.strip.empty?; print(""); exit 0; end; devices_by_runtime=JSON.parse(input).fetch("devices", {}); preferred=nil; fallback=nil; devices_by_runtime.each do |runtime, devices|; next unless runtime.include?("com.apple.CoreSimulator.SimRuntime.iOS"); devices.each do |device|; next unless device["isAvailable"]; next unless device["name"].to_s.include?("iPhone"); udid=device["udid"].to_s; next if udid.empty?; destination="platform=iOS Simulator,id=#{udid}"; if runtime.include?(".iOS-18"); preferred ||= destination; break; else; fallback ||= destination; end; end; break if preferred; end; print(preferred || fallback || "")'
             )"
           fi
 
-          if [[ -z "$DESTINATION" ]] &&
-            [[ "$DESTINATIONS" == *"platform:iOS Simulator"* ]] &&
-            [[ "$DESTINATIONS" == *"name:Any iOS Simulator Device"* ]]; then
-            DESTINATION="platform=iOS Simulator,name=Any iOS Simulator Device"
-          fi
-
           if [[ -z "$DESTINATION" ]]; then
-            echo "Unable to find an iOS Simulator destination."
-            echo "$DESTINATIONS"
+            echo "Unable to find a concrete iOS Simulator destination."
+            echo "$LAST_DESTINATIONS"
+            xcrun simctl list devices available || true
             exit 1
           fi
 

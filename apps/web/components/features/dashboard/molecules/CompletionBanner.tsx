@@ -48,7 +48,7 @@ export const CompletionBanner = memo(
           <p className='text-app font-caption tracking-normal text-secondary-token'>
             Setup complete
           </p>
-          <p className='text-[14px] font-semibold leading-5 text-primary-token'>
+          <p className='text-sm font-semibold leading-5 text-primary-token'>
             Your profile is ready
           </p>
           <p className='text-app leading-5 text-secondary-token'>
