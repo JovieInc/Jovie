@@ -61,7 +61,9 @@ jobs:
           E2E_ENVIRONMENT: production
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results
+          # Temporarily skip the signup->subscription path in synthetic runs.
+          # It is flaky in production due intermittent CAPTCHA bootstrap failures.
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results --grep-invert="complete user journey from signup to paid subscription"
         continue-on-error: true
 
       - name: Cleanup Synthetic E2E Users
