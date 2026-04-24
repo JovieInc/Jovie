@@ -3288,15 +3288,21 @@ jobs:
               print("__MISSING_CREDS__", end="")
               sys.exit(0)
 
-          # Paginate over READY production deployments until we find the SHA
-          # or the Vercel API says there are no more pages. `target=production`
-          # guards against picking up a preview deployment that happens to
-          # share the commit SHA. A hard page cap prevents runaway API calls
-          # on pathological account state.
+          # Paginate over READY deployments until we find the SHA or the
+          # Vercel API says there are no more pages. A hard page cap prevents
+          # runaway API calls on pathological account state.
+          #
+          # No target filter: the upstream deploy-staging job uses
+          # `vercel deploy --prebuilt` (via vercel-prebuilt-deploy.sh) without
+          # --prod, which creates PREVIEW deployments. Filtering by
+          # target=production would never match and every promote would fail
+          # with no_match. Preview-collision safety comes from (a) projectId
+          # scoping the query to this project, (b) exact 40-char SHA match,
+          # and (c) the `vercel promote` step itself, which only accepts URLs
+          # from the same project.
           base_params = {
               "projectId": project_id,
               "state": "READY",
-              "target": "production",
               "limit": 100,
           }
           if org_id.startswith("team_"):
@@ -3378,9 +3384,16 @@ jobs:
           # or invalid JSON don't tell us whether production flipped — they
           # indicate transient/infrastructure issues and should fail with a
           # distinct subtype so alerting picks the right remediation path.
+          #
+          # Track confirmed_mismatch separately from saw_valid_probe so a
+          # late 500 can't overwrite an earlier confirmed mismatch. Once we
+          # see a 200 with a wrong SHA, it IS a mismatch — routing a
+          # subsequent edge hiccup to verify_probe_failed would send the
+          # wrong alert path.
           actual=""
           last_status=""
-          probe_failed=false
+          saw_valid_probe=false
+          confirmed_mismatch=false
           for attempt in 1 2 3 4 5 6; do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
@@ -3399,36 +3412,44 @@ jobs:
             body="${response%$'\n'*}"
 
             if [ "$last_status" != "200" ]; then
-              probe_failed=true
               echo "  attempt ${attempt}: build-info returned HTTP ${last_status}"
               continue
             fi
 
             actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
             if [ -z "$actual" ]; then
-              probe_failed=true
               echo "  attempt ${attempt}: build-info returned 200 without commitSha"
               continue
             fi
 
             echo "  attempt ${attempt}: build-info commitSha=${actual}"
-            probe_failed=false
+            saw_valid_probe=true
             if [ "$actual" = "$expected" ]; then
               echo "✅ Production now serves ${expected}"
               exit 0
             fi
+            confirmed_mismatch=true
           done
 
-          if [ "$probe_failed" = "true" ]; then
+          if [ "$confirmed_mismatch" = "true" ]; then
+            echo "❌ Production still serves '${actual:-<empty>}' after promote; expected '${expected}'."
+            echo "   Either the alias flip didn't take effect or Vercel routed to a different deployment."
+            echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ "$saw_valid_probe" != "true" ]; then
             echo "❌ build-info probe failed across all attempts (last HTTP ${last_status})."
             echo "   Cannot confirm whether production flipped to ${expected}."
             echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
-          echo "❌ Production still serves '${actual:-<empty>}' after promote; expected '${expected}'."
-          echo "   Either the alias flip didn't take effect or Vercel routed to a different deployment."
-          echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
+          # Unreachable: the loop either exits 0 on match, or both
+          # confirmed_mismatch=false and saw_valid_probe=false can't both
+          # hold — if we got here, something broke the control flow.
+          echo "❌ Verification loop finished in an unexpected state."
+          echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
           exit 1
 
   sentry-error-gate:
