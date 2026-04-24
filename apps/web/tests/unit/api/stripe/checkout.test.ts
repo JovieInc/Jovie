@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
@@ -11,10 +12,23 @@ const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
+
+vi.mock('@/lib/error-tracking', async () => {
+  // parseJsonBody uses captureError/captureWarning internally — we only want
+  // to spy on captureCriticalError (the fatal pager), so preserve the rest.
+  const actual = await vi.importActual<typeof import('@/lib/error-tracking')>(
+    '@/lib/error-tracking'
+  );
+  return {
+    ...actual,
+    captureCriticalError: mockCaptureCriticalError,
+  };
+});
 
 vi.mock('@/lib/stripe/client', () => ({
   createCheckoutSession: mockCreateCheckoutSession,
@@ -280,5 +294,24 @@ describe('POST /api/stripe/checkout', () => {
 
     expect(response.status).toBe(400);
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 400 (not 500) when the request body is not valid JSON', async () => {
+    // Regression: malformed JSON was being caught by the generic error handler
+    // and returned as a 500 with `captureCriticalError` (fatal severity).
+    // Malformed JSON is a client error, not a server error, and must not page.
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+
+    const response = await POST(malformedJsonRequest('/api/stripe/checkout'));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
+    // Must not reach Stripe when the body is malformed.
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    // Regression target: a malformed body must NOT page Sentry as a fatal
+    // server error — parseJsonBody catches the parse failure and returns a
+    // 400 directly, so captureCriticalError is never invoked.
+    expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
 });
