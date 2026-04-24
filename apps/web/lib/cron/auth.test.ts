@@ -97,24 +97,55 @@ describe('verifyTrustedCronOrigin', () => {
     vi.resetModules();
   });
 
-  it('trusts the current Vercel deployment host', async () => {
+  it('does not trust VERCEL_URL unless it is explicitly allowlisted', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_URL', 'jovie-prod-123.vercel.app');
 
     const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
 
-    const trusted = verifyTrustedCronOrigin(
+    const trustedWithVercelUrlOnly = verifyTrustedCronOrigin(
       new Request('https://example.com/api/cron/test', {
         headers: { 'x-forwarded-host': 'jovie-prod-123.vercel.app' },
       })
     );
+    const trustedWithExplicitAllowlist = verifyTrustedCronOrigin(
+      new Request('https://example.com/api/cron/test', {
+        headers: { 'x-forwarded-host': 'jovie-preview-abc.vercel.app' },
+      })
+    );
 
-    expect(trusted).toBe(true);
+    expect(trustedWithVercelUrlOnly).toBe(false);
+    expect(trustedWithExplicitAllowlist).toBe(false);
+  });
+
+  it('trusts Jovie-owned preview hosts only when explicitly allowlisted', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv(
+      'CRON_TRUSTED_HOSTS',
+      'jovie-prod-123.vercel.app, jovie-preview-abc.vercel.app'
+    );
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'jovie-prod-123.vercel.app' },
+        })
+      )
+    ).toBe(true);
+
+    expect(
+      verifyTrustedCronOrigin(
+        new Request('https://example.com/api/cron/test', {
+          headers: { 'x-forwarded-host': 'jovie-preview-abc.vercel.app' },
+        })
+      )
+    ).toBe(true);
   });
 
   it('rejects spoofed x-vercel-cron headers without a trusted host', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('VERCEL_URL', 'jovie-prod-123.vercel.app');
 
     const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
 
