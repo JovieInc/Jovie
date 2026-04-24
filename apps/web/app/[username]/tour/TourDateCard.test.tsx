@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TourDateCard } from '@/app/[username]/tour/TourDateCard';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { renderWithQueryClient } from '../utils/test-utils';
+import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 // The ticket-click hook uses useTrackingMutation; stub it so we don't need
 // the analytics wiring in this narrow render test.
