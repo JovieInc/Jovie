@@ -157,9 +157,12 @@ export function OnboardingInterviewModal({
 
   const entry = draft[current];
   const progress = draft
-    .map((_, idx) => (idx === current ? '●' : idx < current ? '●' : '○'))
+    .map((_, idx) => (idx <= current ? '●' : '○'))
     .join(' ');
   const canSubmit = !submitting;
+  const isLastQuestion = current === draft.length - 1;
+  let submitLabel = 'Next';
+  if (isLastQuestion) submitLabel = submitting ? 'Sending…' : 'Send';
 
   return (
     <dialog
@@ -217,11 +220,7 @@ export function OnboardingInterviewModal({
           disabled={!canSubmit || entry.answer.trim().length === 0}
           className='rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40'
         >
-          {current === draft.length - 1
-            ? submitting
-              ? 'Sending…'
-              : 'Send'
-            : 'Next'}
+          {submitLabel}
         </button>
       </div>
     </dialog>

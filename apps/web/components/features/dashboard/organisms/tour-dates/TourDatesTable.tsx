@@ -53,13 +53,10 @@ const StatusBadge = memo(function StatusBadge({
   status: string;
   isPastDate: boolean;
 }) {
-  const config = isPastDate
-    ? STATUS_BADGE.past
-    : status === 'sold_out'
-      ? STATUS_BADGE.sold_out
-      : status === 'cancelled'
-        ? STATUS_BADGE.cancelled
-        : STATUS_BADGE.on_sale;
+  let config = STATUS_BADGE.on_sale;
+  if (isPastDate) config = STATUS_BADGE.past;
+  else if (status === 'sold_out') config = STATUS_BADGE.sold_out;
+  else if (status === 'cancelled') config = STATUS_BADGE.cancelled;
 
   return (
     <Badge variant={config.variant} size='sm'>
