@@ -52,7 +52,7 @@ export function ArtistProfileOutcomesCarousel({
             headline={outcomes.headline}
             body={outcomes.body}
             className='max-w-[38rem]'
-            headlineClassName='max-w-none text-[clamp(2.7rem,4.6vw,4.25rem)]'
+            headlineClassName='max-w-none'
             bodyClassName='max-w-[28rem]'
           />
         </div>
@@ -105,7 +105,7 @@ function OutcomeCard({
       />
       <div className='relative flex h-full flex-col p-5 sm:p-6'>
         <div className='max-w-[21rem]'>
-          <h3 className='max-w-[12ch] text-[clamp(2.05rem,3.6vw,3.25rem)] font-semibold leading-[0.92] tracking-[-0.07em] text-primary-token'>
+          <h3 className='max-w-[14ch] text-[clamp(1.4rem,2vw,1.7rem)] font-[620] leading-[1.18] tracking-[-0.035em] text-primary-token'>
             {card.title}
           </h3>
           <p className='mt-3 max-w-[19rem] text-[13px] leading-[1.58] text-secondary-token'>

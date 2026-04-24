@@ -17,7 +17,7 @@ export function ArtistProfileSocialProof({
       <div className='max-w-[34rem]'>
         <h2
           aria-label={socialProof.headline}
-          className='max-w-none text-[clamp(2.8rem,5vw,4.1rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'
+          className='max-w-none text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'
         >
           <span className='block'>Real Artists.</span>
           <span className='mt-1 block'>Real Workflows.</span>

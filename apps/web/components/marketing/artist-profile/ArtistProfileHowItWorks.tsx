@@ -48,7 +48,7 @@ export function ArtistProfileHowItWorks({
           headline={howItWorks.headline}
           body={howItWorks.body}
           className='max-w-[40rem]'
-          headlineClassName='max-w-none text-[clamp(2.8rem,4.8vw,4.35rem)]'
+          headlineClassName='max-w-none'
           bodyClassName='max-w-[30rem]'
         />
 

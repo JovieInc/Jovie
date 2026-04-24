@@ -214,7 +214,7 @@ export function ArtistProfileMonetizationSection({
       <div>
         <div className='mx-auto max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
           <div className='max-w-[34rem]'>
-            <h2 className='text-[clamp(2.9rem,5.2vw,4.7rem)] font-semibold leading-[0.92] tracking-[-0.08em] text-primary-token'>
+            <h2 className='text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'>
               <span className='block'>Get paid.</span>
               <span className='block'>Again and again.</span>
             </h2>

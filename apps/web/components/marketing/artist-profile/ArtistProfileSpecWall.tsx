@@ -286,7 +286,7 @@ export function ArtistProfileSpecWall({
           headline={specWall.headline}
           body={specWall.subhead}
           className='max-w-[44rem]'
-          headlineClassName='text-[clamp(2.8rem,4.8vw,4.35rem)]'
+          headlineClassName=''
           bodyClassName='max-w-[36rem]'
         />
 

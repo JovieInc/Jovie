@@ -142,7 +142,7 @@ export function ArtistProfileModeSwitcher({
           }}
         >
           <div className='min-h-[4.5rem] sm:min-h-[5.1rem]'>
-            <h2 className='mx-auto max-w-[9ch] text-[clamp(2.05rem,4vw,3.75rem)] font-semibold leading-[0.9] tracking-[-0.07em] text-primary-token'>
+            <h2 className='mx-auto max-w-[11ch] text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'>
               {phoneCaption}
             </h2>
           </div>
