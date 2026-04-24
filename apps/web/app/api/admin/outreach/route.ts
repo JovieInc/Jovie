@@ -131,6 +131,55 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+
+    // Fast-path: ?counts=1 returns just the per-queue totals, skipping pagination
+    // and auth-repeating boot cost for the 3 separate fetches the admin dashboard
+    // would otherwise need to populate its overview KPIs.
+    if (searchParams.counts === '1') {
+      try {
+        const [[emailRow], [dmRow], [manualReviewRow]] = await Promise.all([
+          db
+            .select({ total: count() })
+            .from(leads)
+            .where(getOutreachRouteWhereClause('email')),
+          db
+            .select({ total: count() })
+            .from(leads)
+            .where(getOutreachRouteWhereClause('dm')),
+          db
+            .select({ total: count() })
+            .from(leads)
+            .where(getOutreachRouteWhereClause('manual_review')),
+        ]);
+
+        const email = emailRow?.total ?? 0;
+        const dm = dmRow?.total ?? 0;
+        const manualReview = manualReviewRow?.total ?? 0;
+
+        return NextResponse.json(
+          {
+            counts: {
+              email,
+              dm,
+              manualReview,
+              total: email + dm + manualReview,
+            },
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      } catch (error) {
+        await captureError('Failed to list outreach counts', error, {
+          route: '/api/admin/outreach',
+        });
+        return NextResponse.json(
+          {
+            error: getSafeErrorMessage(error, 'Failed to list outreach counts'),
+          },
+          { status: 500, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     const validated = outreachListQuerySchema.safeParse(searchParams);
 
     if (!validated.success) {
