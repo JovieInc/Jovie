@@ -209,6 +209,7 @@ export function ReleaseMetadata({
                 placeholder='Add ISRC'
                 emptyLabel='—'
                 monospace
+                density='inline'
                 normalizeValue={nextValue => {
                   const trimmed = nextValue.trim();
                   return trimmed
@@ -244,6 +245,7 @@ export function ReleaseMetadata({
                 placeholder='Add UPC'
                 emptyLabel='—'
                 monospace
+                density='inline'
                 normalizeValue={nextValue => {
                   const trimmed = nextValue.trim();
                   return trimmed || null;
@@ -285,6 +287,7 @@ export function ReleaseMetadata({
                 editable={canEditMetadata}
                 placeholder='Add Label'
                 emptyLabel='Unknown'
+                density='inline'
                 normalizeValue={nextValue => {
                   const trimmed = nextValue.trim();
                   return trimmed || null;
