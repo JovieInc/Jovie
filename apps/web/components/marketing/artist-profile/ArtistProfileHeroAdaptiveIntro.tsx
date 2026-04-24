@@ -50,7 +50,7 @@ export function ArtistProfileHeroAdaptiveIntro({
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}
         className='relative z-30 lg:-mt-28 xl:-mt-32'
       >
-        <HomeTrustSection label='Trusted by artists' />
+        <HomeTrustSection label='Trusted by Artists' />
       </div>
 
       <style>{`

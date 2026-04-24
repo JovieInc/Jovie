@@ -34,10 +34,10 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
 // proofs, so they get wider slots; Share anywhere is a single QR card
 // and can stay narrow.
 const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
-  'drive-streams': 'w-[84vw] sm:w-[31rem] lg:w-[34rem]',
-  'sell-out': 'w-[84vw] sm:w-[32rem] lg:w-[35rem]',
-  'get-paid': 'w-[80vw] sm:w-[26.5rem] lg:w-[28.5rem]',
-  'share-anywhere': 'w-[72vw] sm:w-[20.5rem] lg:w-[22rem]',
+  'drive-streams': 'w-[85vw] sm:w-[34rem] lg:w-[38rem]',
+  'sell-out': 'w-[85vw] sm:w-[36rem] lg:w-[40rem]',
+  'get-paid': 'w-[85vw] sm:w-[30rem] lg:w-[32rem]',
+  'share-anywhere': 'w-[85vw] sm:w-[24rem] lg:w-[26rem]',
 };
 
 type OutcomeAccentStyle = CSSProperties & {
