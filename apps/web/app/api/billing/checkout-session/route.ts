@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   type PlanId,
   resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
+import { captureError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { getPriceMappingDetails } from '@/lib/stripe/config';
 import {
@@ -19,6 +21,10 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 type PaidPlanId = Exclude<PlanId, 'free'>;
+
+const checkoutSessionQuerySchema = z.object({
+  session_id: z.string().startsWith('cs_'),
+});
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -45,10 +51,13 @@ export async function GET(request: NextRequest) {
     const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
-    const sessionId = request.nextUrl.searchParams.get('session_id');
-    if (!sessionId || !sessionId.startsWith('cs_')) {
+    const parsedQuery = checkoutSessionQuerySchema.safeParse({
+      session_id: request.nextUrl.searchParams.get('session_id'),
+    });
+    if (!parsedQuery.success) {
       return jsonError('Invalid checkout session ID', 400);
     }
+    const { session_id: sessionId } = parsedQuery.data;
 
     const session = await withStripeRetry('retrieveCheckoutSession', () =>
       stripe.checkout.sessions.retrieve(sessionId, {
@@ -83,6 +92,9 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error validating checkout session:', error);
+    await captureError('Checkout session validation failed', error, {
+      route: '/api/billing/checkout-session',
+    });
 
     if (
       error instanceof StripeRetryExhaustedError ||

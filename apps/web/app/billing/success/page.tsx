@@ -130,19 +130,30 @@ export default function CheckoutSuccessPage() {
   >('idle');
   const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [hasHydratedMotion, setHasHydratedMotion] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isSessionPlanPending, setIsSessionPlanPending] = useState(
+    Boolean(checkoutSessionId)
+  );
   const [validatedSessionPlan, setValidatedSessionPlan] =
     useState<PaidPlanId | null>(null);
   const prefersReducedMotion = useReducedMotion();
+  const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
+
+  useEffect(() => {
+    setHasHydratedMotion(true);
+  }, []);
 
   useEffect(() => {
     if (!checkoutSessionId) {
+      setIsSessionPlanPending(false);
       setValidatedSessionPlan(null);
       return;
     }
 
     const sessionId = checkoutSessionId;
     const controller = new AbortController();
+    setIsSessionPlanPending(true);
 
     async function validateCheckoutSession() {
       try {
@@ -164,6 +175,9 @@ export default function CheckoutSuccessPage() {
       } catch (_error) {
         if (controller.signal.aborted) return;
         setValidatedSessionPlan(null);
+      } finally {
+        if (controller.signal.aborted) return;
+        setIsSessionPlanPending(false);
       }
     }
 
@@ -214,24 +228,37 @@ export default function CheckoutSuccessPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasHydratedMotion) return;
+
     if (prefersReducedMotion) {
       setIsVisible(true);
       return;
     }
 
+    setIsVisible(false);
     const frame = requestAnimationFrame(() => setIsVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, [prefersReducedMotion]);
+  }, [hasHydratedMotion, prefersReducedMotion]);
 
   const onboardingTrackedRef = useRef(false);
+  const celebrationTrackedRef = useRef(false);
   useEffect(() => {
     if (!resolvedPlan.canonical) return;
-    track('checkout_celebration_shown', { planType: resolvedPlan.canonical });
+    if (checkoutSessionId && isSessionPlanPending) return;
+    if (!celebrationTrackedRef.current) {
+      celebrationTrackedRef.current = true;
+      track('checkout_celebration_shown', { planType: resolvedPlan.canonical });
+    }
     if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
       onboardingTrackedRef.current = true;
       track('onboarding_upgrade_success', { plan: resolvedPlan.canonical });
     }
-  }, [isOnboardingUpgrade, resolvedPlan.canonical]);
+  }, [
+    checkoutSessionId,
+    isOnboardingUpgrade,
+    isSessionPlanPending,
+    resolvedPlan.canonical,
+  ]);
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
@@ -285,7 +312,9 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      {prefersReducedMotion ? null : <ConfettiOverlay viewport />}
+      {shouldSuppressMotion ? null : hasHydratedMotion ? (
+        <ConfettiOverlay viewport />
+      ) : null}
 
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeader
@@ -296,7 +325,7 @@ export default function CheckoutSuccessPage() {
 
         <div
           className={
-            prefersReducedMotion
+            shouldSuppressMotion
               ? 'space-y-6 px-5 py-5 text-center sm:px-6'
               : isVisible
                 ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
@@ -315,7 +344,11 @@ export default function CheckoutSuccessPage() {
 
           <div className='flex flex-col items-center gap-3'>
             <Button asChild size='lg'>
-              <Link href={APP_ROUTES.CHAT}>
+              <Link
+                href={
+                  isOnboardingUpgrade ? APP_ROUTES.DASHBOARD : APP_ROUTES.CHAT
+                }
+              >
                 {isOnboardingUpgrade ? 'Explore your dashboard' : 'Go to chat'}
               </Link>
             </Button>

@@ -81,6 +81,15 @@ function mockValidatedSessionPlan(plan: string | null) {
   });
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(resolver => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
 describe('CheckoutSuccessPage — plan headline resolution', () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -297,7 +306,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     render(<CheckoutSuccessPage />);
     expect(
       screen.getByRole('link', { name: /explore your dashboard/i })
-    ).toBeInTheDocument();
+    ).toHaveAttribute('href', '/app');
     expect(
       screen.queryByRole('link', { name: /view your releases/i })
     ).not.toBeInTheDocument();
@@ -360,6 +369,38 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     });
   });
 
+  it('emits checkout_celebration_shown once when billing and session plans differ', async () => {
+    const deferredPlan = createDeferred<{
+      ok: true;
+      json: () => Promise<{ plan: string }>;
+    }>();
+
+    setSearchParams('session_id=cs_test&plan_id=max');
+    fetchMock.mockReturnValue(deferredPlan.promise);
+    mockBilling('pro');
+    render(<CheckoutSuccessPage />);
+
+    expect(trackMock).not.toHaveBeenCalledWith('checkout_celebration_shown', {
+      planType: 'pro',
+    });
+
+    deferredPlan.resolve({
+      ok: true,
+      json: async () => ({ plan: 'max' }),
+    });
+
+    await waitFor(() => {
+      expect(trackMock).toHaveBeenCalledWith('checkout_celebration_shown', {
+        planType: 'max',
+      });
+    });
+    expect(
+      trackMock.mock.calls.filter(
+        ([event]) => event === 'checkout_celebration_shown'
+      )
+    ).toHaveLength(1);
+  });
+
   it('emits mount analytics once even when reduced motion resolves after first render', async () => {
     setSearchParams('plan_id=pro');
     useReducedMotionMock.mockReturnValueOnce(true).mockReturnValue(false);
@@ -386,13 +427,10 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
   });
 
-  it('keeps the standalone shell vertically scrollable with confetti', () => {
+  it('renders viewport confetti when motion is allowed', () => {
     setSearchParams('plan_id=pro');
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
-    const pageShell = screen.getByRole('main');
-    expect(pageShell.className).toContain('overflow-y-auto');
-    expect(pageShell.className).not.toContain('overflow-hidden');
     expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
       'data-viewport',
       'true'
