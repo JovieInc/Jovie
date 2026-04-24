@@ -6,6 +6,12 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
+vi.mock('@/components/atoms/SocialIcon', () => ({
+  SocialIcon: ({ platform }: { platform: string }) => (
+    <span data-social-platform={platform}>social:{platform}</span>
+  ),
+}));
+
 vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));
@@ -212,6 +218,104 @@ describe('buildReleaseActions', () => {
         }),
       ])
     );
+  });
+
+  it('uses the platform SocialIcon for a single-provider flattened Open in action', async () => {
+    const { render } = await import('@testing-library/react');
+
+    const items = buildReleaseActions({
+      release: createRelease({
+        providers: [
+          {
+            key: 'spotify',
+            label: 'Spotify',
+            url: 'https://open.spotify.com/album/123',
+            path: '/spotify',
+            source: 'ingested',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            isPrimary: true,
+          },
+        ],
+      }),
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+    });
+
+    const openItem = items.find(
+      item => 'id' in item && item.id === 'open-release'
+    );
+
+    if (!openItem || !('icon' in openItem) || !openItem.icon) {
+      throw new Error('Expected open-release item with icon');
+    }
+
+    const { container } = render(<div>{openItem.icon}</div>);
+    expect(
+      container.querySelector('[data-social-platform="spotify"]')
+    ).not.toBeNull();
+  });
+
+  it('uses platform SocialIcons inside the multi-provider Open in submenu', async () => {
+    const { render } = await import('@testing-library/react');
+
+    const items = buildReleaseActions({
+      release: createRelease({
+        providers: [
+          {
+            key: 'spotify',
+            label: 'Spotify',
+            url: 'https://open.spotify.com/album/123',
+            path: '/spotify',
+            source: 'ingested',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            isPrimary: true,
+          },
+          {
+            key: 'apple_music',
+            label: 'Apple Music',
+            url: 'https://music.apple.com/album/123',
+            path: '/apple',
+            source: 'ingested',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            isPrimary: false,
+          },
+        ],
+      }),
+      onEdit: vi.fn(),
+      onCopy: vi.fn(),
+    });
+
+    const openMenu = items.find(
+      item => 'id' in item && item.id === 'open-release'
+    );
+    if (!openMenu || !('items' in openMenu)) {
+      throw new Error('Expected open submenu');
+    }
+
+    const spotify = openMenu.items.find(
+      item => 'id' in item && item.id === 'open-spotify'
+    );
+    const apple = openMenu.items.find(
+      item => 'id' in item && item.id === 'open-apple_music'
+    );
+    if (!spotify || !('icon' in spotify) || !spotify.icon) {
+      throw new Error('Expected spotify icon');
+    }
+    if (!apple || !('icon' in apple) || !apple.icon) {
+      throw new Error('Expected apple_music icon');
+    }
+
+    const spotifyRender = render(<div>{spotify.icon}</div>);
+    expect(
+      spotifyRender.container.querySelector('[data-social-platform="spotify"]')
+    ).not.toBeNull();
+
+    const appleRender = render(<div>{apple.icon}</div>);
+    expect(
+      appleRender.container.querySelector(
+        '[data-social-platform="apple_music"]'
+      )
+    ).not.toBeNull();
   });
 
   it('reuses source icons for tracked share submenu entries', () => {
