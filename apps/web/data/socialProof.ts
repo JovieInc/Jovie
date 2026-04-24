@@ -7,6 +7,7 @@ import {
   UniversalMusicGroupLogo,
 } from '@/components/features/home/label-logos';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 type LogoComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -41,6 +42,10 @@ export interface ArtistProfileSocialProofData {
     readonly quote: string;
     readonly name: string;
     readonly role: string;
+    readonly avatarSrc: string;
+    readonly spotifyArtistId: string;
+    readonly profileHref: string;
+    readonly profileLabel: string;
   };
   readonly founderFallback: string;
   readonly hasRealQuotes: boolean;
@@ -88,8 +93,12 @@ export const ARTIST_PROFILE_SOCIAL_PROOF: ArtistProfileSocialProofData = {
   founderQuote: {
     quote:
       'We built Jovie because we were tired of stitching together tools made for fashion influencers just to promote our music.',
-    name: 'Tim White',
+    name: TIM_WHITE_PROFILE.name,
     role: 'Founder, Jovie',
+    avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
+    spotifyArtistId: TIM_WHITE_PROFILE.spotifyArtistId,
+    profileHref: TIM_WHITE_PROFILE.publicProfileUrl,
+    profileLabel: TIM_WHITE_PROFILE.publicProfileDisplay,
   },
   founderFallback:
     'Built from real music-marketing and release workflow experience.',

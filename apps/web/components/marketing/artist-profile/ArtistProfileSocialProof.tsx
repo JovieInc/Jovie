@@ -61,10 +61,10 @@ export function ArtistProfileSocialProof({
               {proofData.founderQuote.role}
             </p>
             <Link
-              href='/tim'
+              href={proofData.founderQuote.profileHref}
               className='mt-3 inline-flex w-fit font-mono text-[12px] tracking-[-0.02em] text-black/56 transition-colors hover:text-black'
             >
-              jov.ie/tim
+              {proofData.founderQuote.profileLabel}
             </Link>
           </div>
         </article>

@@ -1,7 +1,9 @@
 'use client';
 
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
+import { useId, useRef } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
@@ -50,6 +52,21 @@ const SHOWCASE_VIEWER_LOCATION = {
 export function ArtistProfileOutcomesCarousel({
   outcomes,
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
+  const railId = useId();
+  const scrollerRef = useRef<HTMLElement | null>(null);
+
+  const scrollByDirection = (direction: 'prev' | 'next') => {
+    const rail = scrollerRef.current;
+    if (!rail) {
+      return;
+    }
+
+    const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
+    const nextLeft = direction === 'next' ? scrollStep : -scrollStep;
+
+    rail.scrollBy({ left: nextLeft, behavior: 'smooth' });
+  };
+
   return (
     <ArtistProfileSectionShell
       className='bg-white/[0.01]'
@@ -74,15 +91,74 @@ export function ArtistProfileOutcomesCarousel({
           aria-hidden='true'
         />
 
-        <section
-          data-testid='artist-profile-outcomes-grid'
-          aria-label='Outcome showcase'
-          className='relative mt-10 flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth snap-x snap-mandatory pb-3 pl-5 pr-[10vw] scroll-pl-5 sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-        >
-          {outcomes.cards.map(card => (
-            <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
-          ))}
-        </section>
+        <p id='artist-profile-outcomes-instructions' className='sr-only'>
+          Use the previous and next controls to browse the outcome cards.
+        </p>
+
+        <div className='relative mt-10 w-full overflow-x-hidden'>
+          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll outcomes left'
+              onClick={() => {
+                scrollByDirection('prev');
+              }}
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            >
+              <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+            </button>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll outcomes right'
+              onClick={() => {
+                scrollByDirection('next');
+              }}
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            >
+              <ChevronRight className='h-4 w-4' aria-hidden='true' />
+            </button>
+          </div>
+
+          <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-5 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2 sm:focus-within:left-6 lg:hidden'>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll outcomes left'
+              onClick={() => {
+                scrollByDirection('prev');
+              }}
+              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+            >
+              Prev
+            </button>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll outcomes right'
+              onClick={() => {
+                scrollByDirection('next');
+              }}
+              className='rounded-full border border-black/12 bg-[#f3efe6] px-3 py-2 text-[12px] font-semibold text-black shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+            >
+              Next
+            </button>
+          </div>
+
+          <section
+            ref={scrollerRef}
+            id={railId}
+            data-testid='artist-profile-outcomes-grid'
+            aria-label='Outcome showcase'
+            aria-describedby='artist-profile-outcomes-instructions'
+            className='relative flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth snap-x snap-mandatory pb-3 pl-5 pr-[10vw] scroll-pl-5 sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          >
+            {outcomes.cards.map(card => (
+              <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
+            ))}
+          </section>
+        </div>
       </div>
     </ArtistProfileSectionShell>
   );

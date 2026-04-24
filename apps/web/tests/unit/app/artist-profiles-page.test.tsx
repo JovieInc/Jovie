@@ -367,7 +367,7 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
-      4
+      ARTIST_PROFILE_COPY.outcomes.cards.length
     );
     expect(
       screen.getAllByTestId('artist-profile-monetization-card')
