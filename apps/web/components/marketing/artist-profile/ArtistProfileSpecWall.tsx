@@ -33,6 +33,7 @@ function ScreenshotCrop({
   className,
   imageClassName,
   objectPosition,
+  priority = false,
   src,
 }: Readonly<{
   alt: string;
@@ -40,6 +41,7 @@ function ScreenshotCrop({
   frameClassName?: string;
   imageClassName?: string;
   objectPosition?: string;
+  priority?: boolean;
   screenshotHeight?: number;
   screenshotWidth?: number;
   src: string;
@@ -55,6 +57,7 @@ function ScreenshotCrop({
         fill
         alt={alt}
         className={cn('object-contain', imageClassName)}
+        priority={priority}
         sizes='(min-width: 1280px) 420px, (min-width: 768px) 45vw, 100vw'
         src={src}
         style={{ objectPosition }}
@@ -203,6 +206,7 @@ function ArtistProfilePowerFeatureTile({
               frameClassName={tile.frameClassName}
               imageClassName={tile.imageClassName}
               objectPosition={tile.objectPosition}
+              priority={tile.id === 'rich-analytics'}
               screenshotHeight={tile.screenshotHeight}
               screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
