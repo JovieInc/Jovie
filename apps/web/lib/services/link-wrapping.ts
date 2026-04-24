@@ -167,10 +167,11 @@ export async function createWrappedLink(
 export async function getWrappedLink(
   shortId: string
 ): Promise<WrappedLink | null> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
   try {
     // Add timeout to prevent hanging on database issues
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Database timeout')), 5000); // 5 second timeout
+      timerId = setTimeout(() => reject(new Error('Database timeout')), 5000); // 5 second timeout
     });
 
     const [data] = await Promise.race([
@@ -220,6 +221,8 @@ export async function getWrappedLink(
   } catch (error: unknown) {
     captureError('Failed to get wrapped link', error, { shortId });
     return null;
+  } finally {
+    if (timerId !== undefined) clearTimeout(timerId);
   }
 }
 

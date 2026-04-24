@@ -131,18 +131,24 @@ export async function GET(request: Request) {
     }
 
     // Add timeout to prevent hanging on database issues
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Database timeout')), 3000); // 3 second timeout
-    });
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    let data: Array<{ username: string }>;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('Database timeout')), 3000); // 3 second timeout
+      });
 
-    const data = await Promise.race([
-      db
-        .select({ username: creatorProfiles.username })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, handleLower))
-        .limit(1),
-      timeoutPromise,
-    ]);
+      data = await Promise.race([
+        db
+          .select({ username: creatorProfiles.username })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.usernameNormalized, handleLower))
+          .limit(1),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timerId !== undefined) clearTimeout(timerId);
+    }
 
     const isAvailable = !data || data.length === 0;
     await cacheHandleAvailability(handleLower, isAvailable);

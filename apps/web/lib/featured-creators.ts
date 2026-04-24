@@ -100,34 +100,40 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     }
 
     // Add timeout to database query (10s) to prevent hanging
-    const data = await Promise.race([
-      db
-        .select({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          displayName: creatorProfiles.displayName,
-          bio: creatorProfiles.bio,
-          avatarUrl: creatorProfiles.avatarUrl,
-          creatorType: creatorProfiles.creatorType,
-          genres: creatorProfiles.genres,
-        })
-        .from(creatorProfiles)
-        .where(
-          and(
-            eq(creatorProfiles.isPublic, true),
-            eq(creatorProfiles.isFeatured, true),
-            eq(creatorProfiles.marketingOptOut, false)
-          )
+    let featuredQueryTimerId: ReturnType<typeof setTimeout> | undefined;
+    const featuredQuery = db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        bio: creatorProfiles.bio,
+        avatarUrl: creatorProfiles.avatarUrl,
+        creatorType: creatorProfiles.creatorType,
+        genres: creatorProfiles.genres,
+      })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true),
+          eq(creatorProfiles.marketingOptOut, false)
         )
-        .orderBy(creatorProfiles.displayName)
-        .limit(12),
-      new Promise<never>((_, reject) =>
-        setTimeout(
+      )
+      .orderBy(creatorProfiles.displayName)
+      .limit(12);
+    let data: Awaited<typeof featuredQuery>;
+    try {
+      const featuredTimeoutPromise = new Promise<never>((_, reject) => {
+        featuredQueryTimerId = setTimeout(
           () => reject(new Error('Featured creators query timeout after 10s')),
           10000
-        )
-      ),
-    ]);
+        );
+      });
+      data = await Promise.race([featuredQuery, featuredTimeoutPromise]);
+    } finally {
+      if (featuredQueryTimerId !== undefined)
+        clearTimeout(featuredQueryTimerId);
+    }
 
     const creatorIds = data.map(creator => creator.id);
     const releaseByCreatorId = new Map<
@@ -136,30 +142,38 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     >();
 
     if (creatorIds.length > 0 && (await doesTableExist('discog_releases'))) {
-      const latestReleases = await Promise.race([
-        db.query.discogReleases.findMany({
-          where: (releases, { inArray }) =>
-            inArray(releases.creatorProfileId, creatorIds),
-          columns: {
-            creatorProfileId: true,
-            title: true,
-            releaseType: true,
-            releaseDate: true,
-            createdAt: true,
-          },
-          orderBy: (releases, { desc }) => [
-            desc(releases.releaseDate),
-            desc(releases.createdAt),
-          ],
-          limit: 100,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
+      let discogTimerId: ReturnType<typeof setTimeout> | undefined;
+      const discogQuery = db.query.discogReleases.findMany({
+        where: (releases, { inArray }) =>
+          inArray(releases.creatorProfileId, creatorIds),
+        columns: {
+          creatorProfileId: true,
+          title: true,
+          releaseType: true,
+          releaseDate: true,
+          createdAt: true,
+        },
+        orderBy: (releases, { desc }) => [
+          desc(releases.releaseDate),
+          desc(releases.createdAt),
+        ],
+        limit: 100,
+      });
+      let latestReleases: Awaited<typeof discogQuery>;
+      try {
+        const discogTimeoutPromise = new Promise<never>((_, reject) => {
+          discogTimerId = setTimeout(
             () => reject(new Error('Discog releases query timeout after 10s')),
             10000
-          )
-        ),
-      ]);
+          );
+        });
+        latestReleases = await Promise.race([
+          discogQuery,
+          discogTimeoutPromise,
+        ]);
+      } finally {
+        if (discogTimerId !== undefined) clearTimeout(discogTimerId);
+      }
 
       for (const release of latestReleases) {
         if (!releaseByCreatorId.has(release.creatorProfileId)) {
@@ -239,54 +253,65 @@ async function queryCreatorByHandle(
 
     if (!tableExists) return null;
 
-    const [row] = await Promise.race([
-      db
-        .select({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          displayName: creatorProfiles.displayName,
-          bio: creatorProfiles.bio,
-          avatarUrl: creatorProfiles.avatarUrl,
-          genres: creatorProfiles.genres,
-        })
-        .from(creatorProfiles)
-        .where(
-          and(
-            eq(creatorProfiles.username, handle),
-            eq(creatorProfiles.isPublic, true),
-            eq(creatorProfiles.marketingOptOut, false)
-          )
+    let creatorTimerId: ReturnType<typeof setTimeout> | undefined;
+    const creatorQuery = db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        bio: creatorProfiles.bio,
+        avatarUrl: creatorProfiles.avatarUrl,
+        genres: creatorProfiles.genres,
+      })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.username, handle),
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.marketingOptOut, false)
         )
-        .limit(1),
-      new Promise<never>((_, reject) =>
-        setTimeout(
+      )
+      .limit(1);
+    let row: Awaited<typeof creatorQuery>[number] | undefined;
+    try {
+      const creatorTimeoutPromise = new Promise<never>((_, reject) => {
+        creatorTimerId = setTimeout(
           () => reject(new Error('Creator by handle query timeout after 10s')),
           10000
-        )
-      ),
-    ]);
+        );
+      });
+      [row] = await Promise.race([creatorQuery, creatorTimeoutPromise]);
+    } finally {
+      if (creatorTimerId !== undefined) clearTimeout(creatorTimerId);
+    }
 
     if (!row) return null;
+    const creatorRow = row;
 
     let latestReleaseTitle: string | null = null;
     let latestReleaseType: string | null = null;
 
     if (await doesTableExist('discog_releases')) {
-      const releases = await Promise.race([
-        db.query.discogReleases.findMany({
-          where: (releases, { eq: releaseEq }) =>
-            releaseEq(releases.creatorProfileId, row.id),
-          columns: { title: true, releaseType: true, releaseDate: true },
-          orderBy: (releases, { desc }) => [desc(releases.releaseDate)],
-          limit: 1,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
+      let releasesTimerId: ReturnType<typeof setTimeout> | undefined;
+      const releasesQuery = db.query.discogReleases.findMany({
+        where: (releases, { eq: releaseEq }) =>
+          releaseEq(releases.creatorProfileId, creatorRow.id),
+        columns: { title: true, releaseType: true, releaseDate: true },
+        orderBy: (releases, { desc }) => [desc(releases.releaseDate)],
+        limit: 1,
+      });
+      let releases: Awaited<typeof releasesQuery>;
+      try {
+        const releasesTimeoutPromise = new Promise<never>((_, reject) => {
+          releasesTimerId = setTimeout(
             () => reject(new Error('discog_releases query timeout after 10s')),
             10000
-          )
-        ),
-      ]);
+          );
+        });
+        releases = await Promise.race([releasesQuery, releasesTimeoutPromise]);
+      } finally {
+        if (releasesTimerId !== undefined) clearTimeout(releasesTimerId);
+      }
 
       if (releases[0]) {
         latestReleaseTitle = releases[0].title;
@@ -295,19 +320,22 @@ async function queryCreatorByHandle(
     }
 
     return {
-      id: row.id,
-      handle: row.username,
-      name: row.displayName || row.username,
-      src: transformImageUrl(row.avatarUrl || '/android-chrome-192x192.png', {
-        width: 256,
-        height: 256,
-        quality: 70,
-        format: 'webp',
-        crop: 'fill',
-        gravity: 'face',
-      }),
-      tagline: row.bio,
-      genres: row.genres?.slice(0, 2) ?? [],
+      id: creatorRow.id,
+      handle: creatorRow.username,
+      name: creatorRow.displayName || creatorRow.username,
+      src: transformImageUrl(
+        creatorRow.avatarUrl || '/android-chrome-192x192.png',
+        {
+          width: 256,
+          height: 256,
+          quality: 70,
+          format: 'webp',
+          crop: 'fill',
+          gravity: 'face',
+        }
+      ),
+      tagline: creatorRow.bio,
+      genres: creatorRow.genres?.slice(0, 2) ?? [],
       latestReleaseTitle,
       latestReleaseType,
     };
