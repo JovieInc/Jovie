@@ -44,7 +44,7 @@ export function BillingHistorySection({
 
         {!historyQuery.isLoading && historyQuery.error && (
           <div className='px-3 py-2'>
-            <p className='text-[13px] text-tertiary-token'>
+            <p className='text-app text-tertiary-token'>
               Unable to load billing history.
             </p>
           </div>
@@ -76,7 +76,7 @@ export function BillingHistorySection({
                         <IconComponent className='h-4 w-4 text-secondary-token' />
                       </div>
                       <div>
-                        <p className='text-[13px] font-caption text-primary-token'>
+                        <p className='text-app font-caption text-primary-token'>
                           {formatEventType(entry.eventType)}
                         </p>
                         <Badge
@@ -98,7 +98,7 @@ export function BillingHistorySection({
           ) : (
             <div className='px-3 py-5 text-center'>
               <Clock className='mx-auto h-8 w-8 text-tertiary-token' />
-              <p className='mt-3 text-[13px] text-secondary-token'>
+              <p className='mt-3 text-app text-secondary-token'>
                 No billing events yet.
               </p>
               <p className='mt-1 text-[11px] text-tertiary-token'>

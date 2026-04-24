@@ -6,12 +6,12 @@
 // Typography Scale - Visual Hierarchy
 export const typography = {
   tableHeader:
-    'text-[13px] font-caption text-secondary-token tracking-normal line-clamp-1',
-  cellPrimary: 'text-[13px] font-caption text-primary-token', // Main content
-  cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
+    'text-app font-caption text-secondary-token tracking-normal line-clamp-1',
+  cellPrimary: 'text-app font-caption text-primary-token', // Main content
+  cellSecondary: 'text-app text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
-  rowNumber: 'text-[13px] tabular-nums text-tertiary-token', // Monospace numbers
-  groupHeader: 'text-[13px] font-semibold text-primary-token', // Group headers
+  rowNumber: 'text-app tabular-nums text-tertiary-token', // Monospace numbers
+  groupHeader: 'text-app font-semibold text-primary-token', // Group headers
 } as const;
 
 // Alignment & Spacing - Perfect Vertical Alignment

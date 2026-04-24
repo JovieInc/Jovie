@@ -29,8 +29,8 @@ export function Calendar({
         months: 'flex flex-col gap-4',
         month: 'flex flex-col gap-3',
         month_caption:
-          'flex items-center justify-center h-8 text-[13px] font-medium tracking-[-0.01em] text-primary-token',
-        caption_label: 'text-[13px] font-medium',
+          'flex items-center justify-center h-8 text-app font-medium tracking-[-0.01em] text-primary-token',
+        caption_label: 'text-app font-medium',
         nav: 'flex items-center gap-1 absolute right-3 top-3',
         button_previous: cn(
           'inline-flex h-6 w-6 items-center justify-center rounded-md text-secondary-token',
@@ -49,7 +49,7 @@ export function Calendar({
         week: 'flex w-full mt-0.5',
         day: 'h-8 w-8 p-0 text-center',
         day_button: cn(
-          'inline-flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-normal text-primary-token',
+          'inline-flex h-8 w-8 items-center justify-center rounded-md text-app font-normal text-primary-token',
           'hover:bg-interactive-hover transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
         ),

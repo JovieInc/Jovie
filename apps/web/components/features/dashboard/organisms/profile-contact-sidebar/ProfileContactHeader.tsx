@@ -70,7 +70,7 @@ export function ProfileContactHeader({
               onDisplayNameChange(nextValue ?? '');
             }
           }}
-          displayClassName='text-[13px] font-semibold leading-[15px] tracking-[-0.01em] text-primary-token'
+          displayClassName='text-app font-semibold leading-[15px] tracking-[-0.01em] text-primary-token'
           emptyClassName='text-tertiary-token'
           inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-sm font-semibold'
         />

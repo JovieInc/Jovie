@@ -252,7 +252,7 @@ function PaletteItem({
       <span className='flex size-5 shrink-0 items-center justify-center'>
         {icon}
       </span>
-      <span className='flex-1 truncate text-[13px]'>{label}</span>
+      <span className='flex-1 truncate text-app'>{label}</span>
       {hint ? (
         <span className='ml-2 hidden truncate text-[11px] text-tertiary-token sm:inline'>
           {hint}

@@ -277,7 +277,7 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className='text-[13px] text-primary-token'
+      className='text-app text-primary-token'
       containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}

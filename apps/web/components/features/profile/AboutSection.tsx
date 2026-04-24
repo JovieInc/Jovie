@@ -107,19 +107,19 @@ export function AboutSection({
       {hasMetadata && (
         <div className='flex flex-wrap gap-x-5 gap-y-2'>
           {hasLocation && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>{artist.location}</span>
             </div>
           )}
           {hasHometown && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>From {artist.hometown}</span>
             </div>
           )}
           {hasActiveSince && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span>Active since {artist.active_since_year}</span>
             </div>
@@ -156,7 +156,7 @@ export function AboutSection({
       {hasPressPhotos && (
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
-            <h2 className='text-[13px] font-caption text-white/70'>
+            <h2 className='text-app font-caption text-white/70'>
               Press photos
             </h2>
           </div>

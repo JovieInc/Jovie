@@ -222,11 +222,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Content */}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-[13px] font-caption text-primary-token'>
+            <div className='truncate text-app font-caption text-primary-token'>
               {resolvedLabel}
             </div>
             {secondaryText && (
-              <div className='truncate text-[13px] text-secondary-token'>
+              <div className='truncate text-app text-secondary-token'>
                 {secondaryText}
               </div>
             )}

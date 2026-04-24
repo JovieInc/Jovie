@@ -45,7 +45,7 @@ export function SettingsSection({
           title={title}
           description={description}
           className='border-b-0'
-          titleClassName='text-[13px] font-caption'
+          titleClassName='text-app font-caption'
           subtitleClassName='text-xs text-secondary-token'
         />
         {headerAction}

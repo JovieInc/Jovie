@@ -311,7 +311,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-[13px] leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
+        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
         'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-item-foreground',

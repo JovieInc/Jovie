@@ -769,7 +769,7 @@ function TaskEmptyState({
             ? 'No tasks match your filters'
             : 'Your task list is empty'}
         </h2>
-        <p className='max-w-[520px] text-[13px] text-secondary-token'>
+        <p className='max-w-[520px] text-app text-secondary-token'>
           {hasFilters
             ? 'Try widening the filters or search query.'
             : 'Create your first task, or tasks will appear automatically when you set up a release.'}
@@ -1625,7 +1625,7 @@ export function TasksPageClient() {
               <h2 className='text-mid font-semibold text-primary-token'>
                 Couldn&apos;t Load Tasks
               </h2>
-              <p className='text-[13px] text-secondary-token'>
+              <p className='text-app text-secondary-token'>
                 Try reloading the task list.
               </p>
             </div>
@@ -1672,7 +1672,7 @@ export function TasksPageClient() {
                   enableVirtualization={false}
                   rowHeight={64}
                   skeletonRows={8}
-                  className='text-[13px]'
+                  className='text-app'
                   containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
                   minWidth='100%'
                   onRowClick={row => openTaskDocument(row)}

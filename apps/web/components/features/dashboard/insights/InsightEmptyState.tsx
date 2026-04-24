@@ -21,11 +21,11 @@ export function InsightEmptyState({
         <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
       </div>
 
-      <h3 className='mt-1.5 text-[13px] font-semibold text-primary-token'>
+      <h3 className='mt-1.5 text-app font-semibold text-primary-token'>
         {hasEnoughData ? 'No insights yet' : 'Not enough data yet'}
       </h3>
 
-      <p className='mt-0.5 max-w-sm text-[13px] text-secondary-token leading-snug'>
+      <p className='mt-0.5 max-w-sm text-app text-secondary-token leading-snug'>
         {hasEnoughData
           ? 'Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
           : 'Keep sharing your profile link to build up analytics data. Once you have enough traffic, we can generate insights for you.'}

@@ -176,7 +176,7 @@ export function SidebarLinkRow({
           <span className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
             {icon}
           </span>
-          <span className='text-[13px] font-[460] text-primary-token'>
+          <span className='text-app font-[460] text-primary-token'>
             {label}
           </span>
           {badge && (

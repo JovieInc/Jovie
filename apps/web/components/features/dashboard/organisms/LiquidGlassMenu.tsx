@@ -182,7 +182,7 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-caption transition-all duration-150',
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-all duration-150',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
@@ -291,7 +291,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div className='my-2 mx-1 border-t border-default/30' />
-                  <p className='px-3 py-1.5 text-[13px] font-caption tracking-normal text-secondary-token'>
+                  <p className='px-3 py-1.5 text-app font-caption tracking-normal text-secondary-token'>
                     Admin
                   </p>
                   {adminItems.map(item => (
@@ -311,7 +311,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-caption text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'

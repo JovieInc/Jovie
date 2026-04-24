@@ -64,7 +64,7 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
         {Icon && (
           <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
         )}
-        <span className='text-[13px] text-primary-token truncate'>
+        <span className='text-app text-primary-token truncate'>
           {shortcut.label}
         </span>
       </div>
@@ -87,7 +87,7 @@ function ShortcutCategorySection({
 
   return (
     <section className='space-y-1'>
-      <h3 className='px-2 py-0.5 text-[13px] font-medium tracking-normal text-secondary-token'>
+      <h3 className='px-2 py-0.5 text-app font-medium tracking-normal text-secondary-token'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
       <div className='space-y-0.5'>
@@ -182,7 +182,7 @@ export function KeyboardShortcutsSheet() {
             >
               <ChevronLeft className='h-4 w-4' />
             </Button>
-            <SheetTitle className='text-[13px] font-medium tracking-[-0.01em]'>
+            <SheetTitle className='text-app font-medium tracking-[-0.01em]'>
               Keyboard Shortcuts
             </SheetTitle>
             <Button
@@ -205,7 +205,7 @@ export function KeyboardShortcutsSheet() {
                 placeholder='Search shortcuts'
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className='bg-surface-1 pl-9 text-[13px]'
+                className='bg-surface-1 pl-9 text-app'
                 inputSize='sm'
               />
               {searchQuery && (

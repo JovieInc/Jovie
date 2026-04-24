@@ -139,7 +139,7 @@ export function ArtistHero({
                 <p className='text-[0.72rem] font-semibold tracking-[0.01em] text-white/52'>
                   {spotlightLabel}
                 </p>
-                <p className='mt-0.5 text-[13px] font-semibold tracking-[-0.015em] text-white/90 md:text-sm'>
+                <p className='mt-0.5 text-app font-semibold tracking-[-0.015em] text-white/90 md:text-sm'>
                   {spotlightValue}
                 </p>
               </div>

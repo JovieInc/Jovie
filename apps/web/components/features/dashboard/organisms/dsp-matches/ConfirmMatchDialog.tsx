@@ -154,7 +154,7 @@ export function ConfirmMatchDialog({
         {/* Confidence Breakdown */}
         {confidenceBreakdown && (
           <ContentSurfaceCard surface='details' className='p-4'>
-            <h4 className='mb-3 text-[13px] font-caption text-primary-token'>
+            <h4 className='mb-3 text-app font-caption text-primary-token'>
               Match confidence breakdown
             </h4>
             <MatchConfidenceBreakdown

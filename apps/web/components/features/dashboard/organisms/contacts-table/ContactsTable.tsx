@@ -232,7 +232,7 @@ export const ContactsTable = memo(function ContactsTable({
               isLoading={false}
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px]'
+              className='text-app'
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
               onFocusedRowChange={handleFocusedRowChange}

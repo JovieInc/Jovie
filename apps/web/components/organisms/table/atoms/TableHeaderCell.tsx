@@ -44,7 +44,7 @@ export function TableHeaderCell({
         onClick={onSort}
       />
     ) : (
-      <span className='text-[13px] font-caption tracking-normal text-secondary-token'>
+      <span className='text-app font-caption tracking-normal text-secondary-token'>
         {children}
       </span>
     );

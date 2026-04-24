@@ -68,7 +68,7 @@ export function OnboardingCompleteStep({
               {spotifyImportStage + 1}/3
             </span>
           </div>
-          <p className='text-center text-[13px] text-secondary-token'>
+          <p className='text-center text-app text-secondary-token'>
             {spotifyImportMessage}
           </p>
         </ContentSurfaceCard>

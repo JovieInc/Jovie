@@ -1023,7 +1023,7 @@ export const DashboardAudienceTableUnified = memo(
                         onSortingChange={handleSortingChange}
                         columnVisibility={columnVisibility}
                         minWidth={tableMinWidth}
-                        className='text-[13px]'
+                        className='text-app'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}
                         onFocusedRowChange={handleFocusedRowChange}

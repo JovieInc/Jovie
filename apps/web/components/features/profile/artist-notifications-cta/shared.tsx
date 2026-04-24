@@ -484,7 +484,7 @@ export function SubscriptionSuccess({
         </p>
 
         <p
-          className='text-center text-[13px] font-semibold tracking-[-0.015em] text-primary-token/88'
+          className='text-center text-app font-semibold tracking-[-0.015em] text-primary-token/88'
           style={noFontSynthesisStyle}
         >
           What should we call you?

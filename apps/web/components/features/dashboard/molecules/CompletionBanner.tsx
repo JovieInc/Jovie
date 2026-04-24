@@ -45,13 +45,13 @@ export const CompletionBanner = memo(
           <CheckCircle className='h-5 w-5 text-success' />
         </div>
         <div className='min-w-0 flex-1 space-y-1'>
-          <p className='text-[13px] font-caption tracking-normal text-secondary-token'>
+          <p className='text-app font-caption tracking-normal text-secondary-token'>
             Setup complete
           </p>
           <p className='text-sm font-semibold leading-5 text-primary-token'>
             Your profile is ready
           </p>
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-app leading-5 text-secondary-token'>
             You&apos;ve completed all the essential setup steps.
           </p>
         </div>
