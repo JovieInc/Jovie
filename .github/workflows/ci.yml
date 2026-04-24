@@ -3394,12 +3394,11 @@ jobs:
           last_status=""
           saw_valid_probe=false
           confirmed_mismatch=false
-          for attempt in 1 2 3 4 5 6; do
-            # Skip sleep on the first attempt; wait between retries so we
-            # don't burn 10s after the final failing attempt.
-            if [ "$attempt" -gt 1 ]; then
-              sleep 10
-            fi
+          # Vercel production alias + edge cache propagation can exceed 60s.
+          # Keep polling for up to 4 minutes before declaring verify_mismatch.
+          verify_deadline=$((SECONDS + 240))
+          attempt=1
+          while true; do
             response=$(curl -sS -L \
               --connect-timeout 5 \
               --max-time 10 \
@@ -3413,22 +3412,25 @@ jobs:
 
             if [ "$last_status" != "200" ]; then
               echo "  attempt ${attempt}: build-info returned HTTP ${last_status}"
-              continue
+            else
+              actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
+              if [ -z "$actual" ]; then
+                echo "  attempt ${attempt}: build-info returned 200 without commitSha"
+              else
+                echo "  attempt ${attempt}: build-info commitSha=${actual}"
+                saw_valid_probe=true
+                if [ "$actual" = "$expected" ]; then
+                  echo "✅ Production now serves ${expected}"
+                  exit 0
+                fi
+                confirmed_mismatch=true
+              fi
             fi
-
-            actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
-            if [ -z "$actual" ]; then
-              echo "  attempt ${attempt}: build-info returned 200 without commitSha"
-              continue
+            if [ "$SECONDS" -ge "$verify_deadline" ]; then
+              break
             fi
-
-            echo "  attempt ${attempt}: build-info commitSha=${actual}"
-            saw_valid_probe=true
-            if [ "$actual" = "$expected" ]; then
-              echo "✅ Production now serves ${expected}"
-              exit 0
-            fi
-            confirmed_mismatch=true
+            attempt=$((attempt + 1))
+            sleep 10
           done
 
           if [ "$confirmed_mismatch" = "true" ]; then
