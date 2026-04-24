@@ -52,11 +52,11 @@ vi.mock('@/lib/stripe/config', () => ({
   PRICE_MAPPINGS: {
     price_123: {
       priceId: 'price_123',
-      plan: 'standard',
+      plan: 'pro',
       amount: 500,
       currency: 'usd',
       interval: 'month',
-      description: 'Standard Monthly',
+      description: 'Pro Monthly',
     },
   },
 }));
@@ -79,11 +79,11 @@ describe('POST /api/stripe/checkout', () => {
     mockGetActivePriceIds.mockReturnValue(['price_123']);
     mockGetPriceMappingDetails.mockReturnValue({
       priceId: 'price_123',
-      plan: 'standard',
+      plan: 'pro',
       amount: 500,
       currency: 'usd',
       interval: 'month',
-      description: 'Standard Monthly',
+      description: 'Pro Monthly',
     });
     mockEnsureStripeCustomer.mockResolvedValue({
       success: true,
@@ -203,6 +203,11 @@ describe('POST /api/stripe/checkout', () => {
     expect(response.status).toBe(200);
     expect(data.url).toBeDefined();
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: 'https://jov.ie/billing/success?plan_id=pro',
+      })
+    );
   });
 
   it('retries transient Stripe errors and preserves idempotency key', async () => {

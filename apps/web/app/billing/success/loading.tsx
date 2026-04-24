@@ -1,48 +1,41 @@
-import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 
 /**
  * Billing success page loading skeleton.
- * Matches: celebration icon → 3 feature cards → dashboard button.
+ * Matches: status icon → headline → 3 unlock tiles → CTA row.
  */
 export default function BillingSuccessLoading() {
   return (
     <StandaloneProductPage width='lg' centered>
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
-        <ContentSectionHeaderSkeleton
-          titleWidth='w-56'
-          descriptionWidth='w-80'
-          className='min-h-0 px-4 py-3'
-        />
+        <div className='space-y-6 px-5 py-8 text-center sm:px-8 sm:py-10'>
+          <div className='mx-auto h-14 w-14 rounded-full skeleton motion-reduce:animate-none' />
 
-        <div className='space-y-6 px-5 py-5 text-center sm:px-6'>
-          {/* Celebration icon */}
-          <div className='mx-auto h-16 w-16 rounded-full skeleton motion-reduce:animate-none' />
+          <div className='space-y-2'>
+            <LoadingSkeleton height='h-9' width='w-72' className='mx-auto' />
+            <LoadingSkeleton height='h-4' width='w-80' className='mx-auto' />
+          </div>
 
-          {/* 3 feature cards */}
-          <div className='grid gap-4 sm:grid-cols-3'>
+          <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
             {Array.from({ length: 3 }, (_, i) => `feature-${i}`).map(key => (
               <ContentSurfaceCard
                 key={key}
                 surface='nested'
-                className='space-y-2 p-4 text-left'
+                className='space-y-3 rounded-[14px] bg-surface-0 p-4 text-left'
               >
-                <div className='h-5 w-5 rounded skeleton motion-reduce:animate-none' />
-                <LoadingSkeleton height='h-4' width='w-28' rounded='md' />
-                <LoadingSkeleton height='h-3' width='w-full' rounded='md' />
+                <div className='h-9 w-9 rounded-full skeleton motion-reduce:animate-none' />
+                <LoadingSkeleton height='h-3' width='w-16' rounded='md' />
+                <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
               </ContentSurfaceCard>
             ))}
           </div>
 
-          {/* Dashboard button */}
-          <LoadingSkeleton
-            height='h-10'
-            width='w-44'
-            rounded='md'
-            className='mx-auto'
-          />
+          <div className='flex flex-col items-center justify-center gap-3 sm:flex-row'>
+            <LoadingSkeleton height='h-10' width='w-40' rounded='md' />
+            <LoadingSkeleton height='h-10' width='w-40' rounded='md' />
+          </div>
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>

@@ -1,74 +1,149 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  BarChart3,
-  Bell,
-  PartyPopper,
-  ShieldCheck,
-  Upload,
-} from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { ConfettiOverlay } from '@/components/atoms/Confetti';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { useEffect, useMemo, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  getAllPlanIds,
+  type PlanId,
+} from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from '@/lib/queries';
 
-const UNLOCKED_FEATURES = [
-  {
-    icon: Bell,
-    title: 'Release Notifications',
-    description: 'Reach fans automatically when your next release goes live.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Advanced Analytics',
-    description: 'See 90-day trends, audience demographics, and more.',
-  },
-  {
-    icon: Upload,
-    title: 'Contact Export',
-    description: 'Download your fan list and use it anywhere.',
-  },
-] as const;
+type SuccessPlanKey = 'pro' | 'max';
+type ResolvedSuccessPlan = SuccessPlanKey | 'generic';
 
-function getVerificationButtonLabel(state: string): string {
-  if (state === 'success') return 'Verification requested';
-  if (state === 'submitting') return 'Sending request...';
-  return 'Request Verification';
+const PAID_SUCCESS_PLAN_IDS: readonly SuccessPlanKey[] = ['pro', 'max'];
+const GENERIC_UNLOCK_FEATURES = ENTITLEMENT_REGISTRY.pro.marketing.features;
+
+function isKnownPlanId(value: string): value is PlanId {
+  return (getAllPlanIds() as readonly string[]).includes(value);
 }
 
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-}: Readonly<(typeof UNLOCKED_FEATURES)[number]>) {
+function normalizeStripeSuccessPlan(
+  planId: string | null
+): SuccessPlanKey | 'invalid' | null {
+  if (!planId) return null;
+  if (!isKnownPlanId(planId)) return 'invalid';
+  return PAID_SUCCESS_PLAN_IDS.includes(planId as SuccessPlanKey)
+    ? (planId as SuccessPlanKey)
+    : 'invalid';
+}
+
+function normalizeBillingPlan(
+  plan: string | null | undefined
+): SuccessPlanKey | null {
+  if (plan === 'max' || plan === 'growth') return 'max';
+  if (plan === 'pro' || plan === 'founding' || plan === 'trial') return 'pro';
+  return null;
+}
+
+function getUnlockFeatures(plan: ResolvedSuccessPlan): readonly string[] {
+  const source =
+    plan === 'generic'
+      ? GENERIC_UNLOCK_FEATURES
+      : ENTITLEMENT_REGISTRY[plan].marketing.features;
+
+  return source.filter(feature => !feature.trim().endsWith('+')).slice(0, 3);
+}
+
+function getSuccessHeading(plan: ResolvedSuccessPlan): string {
+  if (plan === 'pro') return 'Welcome to Pro';
+  if (plan === 'max') return 'Welcome to Max';
+  return 'Welcome to your new plan';
+}
+
+function getSuccessSubtitle(plan: ResolvedSuccessPlan): string {
+  if (plan === 'generic') {
+    return 'Your upgrade is active. Here are a few things to try next.';
+  }
+
+  return ENTITLEMENT_REGISTRY[plan].marketing.tagline;
+}
+
+function SuccessFeatureTile({
+  feature,
+  index,
+}: Readonly<{
+  feature: string;
+  index: number;
+}>) {
   return (
-    <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
-      <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-      <p className='text-[13px] font-semibold text-primary-token'>{title}</p>
-      <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
+    <ContentSurfaceCard
+      surface='nested'
+      className='flex min-h-28 flex-col gap-3 rounded-[14px] bg-surface-0 p-4 text-left'
+    >
+      <div className='flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-app-shell-border) bg-surface-1 text-primary-token'>
+        <CheckCircle2 className='h-4 w-4' aria-hidden='true' />
+      </div>
+      <div className='space-y-1'>
+        <p className='text-2xs font-semibold tracking-[0.08em] text-tertiary-token'>
+          Unlock {index + 1}
+        </p>
+        <p className='text-sm font-medium leading-5 text-primary-token'>
+          {feature}
+        </p>
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
+function BillingSuccessSkeleton() {
+  return (
+    <ContentSurfaceCard
+      surface='details'
+      className='overflow-hidden'
+      data-testid='billing-success-skeleton'
+    >
+      <div className='space-y-4 px-5 py-8 text-center sm:px-8 sm:py-10'>
+        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-(--linear-app-shell-border) bg-surface-0'>
+          <div className='h-5 w-5 rounded-full skeleton motion-reduce:animate-none' />
+        </div>
+        <div className='space-y-2'>
+          <LoadingSkeleton height='h-9' width='w-72' className='mx-auto' />
+          <LoadingSkeleton height='h-4' width='w-80' className='mx-auto' />
+        </div>
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+          {Array.from({ length: 3 }, (_, index) => `success-tile-${index}`).map(
+            key => (
+              <ContentSurfaceCard
+                key={key}
+                surface='nested'
+                className='space-y-3 rounded-[14px] bg-surface-0 p-4 text-left'
+              >
+                <div className='h-9 w-9 rounded-full skeleton motion-reduce:animate-none' />
+                <LoadingSkeleton height='h-3' width='w-16' rounded='md' />
+                <LoadingSkeleton height='h-4' width='w-full' rounded='md' />
+              </ContentSurfaceCard>
+            )
+          )}
+        </div>
+      </div>
     </ContentSurfaceCard>
   );
 }
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
-  const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
-  const [requestState, setRequestState] = useState<
-    'idle' | 'submitting' | 'success' | 'error'
-  >('idle');
-  const { data: billingData } = useBillingStatusQuery();
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  const planName = getPlanDisplayName(billingData?.plan);
+  const sessionPlanHint = normalizeStripeSuccessPlan(
+    searchParams.get('plan_id')
+  );
+  const shouldReduceMotion = useReducedMotion();
+  const { data: billingData, status: billingStatus } = useBillingStatusQuery();
+  const [resolvedPlan, setResolvedPlan] = useState<ResolvedSuccessPlan | null>(
+    () => {
+      if (sessionPlanHint === 'invalid') return 'generic';
+      return sessionPlanHint;
+    }
+  );
 
   useEffect(() => {
     track('subscription_success', {
@@ -80,63 +155,43 @@ export default function CheckoutSuccessPage() {
       section: 'success',
       conversion: true,
     });
-
-    const frame = requestAnimationFrame(() => setIsVisible(true));
-    return () => cancelAnimationFrame(frame);
   }, []);
 
-  const onboardingTrackedRef = useRef(false);
   useEffect(() => {
-    if (!billingData?.plan) return;
-    track('checkout_celebration_shown', { planType: billingData.plan });
-    if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
-      onboardingTrackedRef.current = true;
-      track('onboarding_upgrade_success', { plan: billingData.plan });
+    if (resolvedPlan !== null) return;
+    if (sessionPlanHint === 'invalid') {
+      setResolvedPlan('generic');
+      return;
     }
-  }, [billingData?.plan, isOnboardingUpgrade]);
-
-  const handleRequestVerification = async () => {
-    if (requestState === 'submitting') return;
-
-    setRequestState('submitting');
-    setFeedback(null);
-
-    try {
-      const response = await fetch('/api/verification/request', {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(
-          body?.error ??
-            'We could not send your request. Please try again in a moment.'
-        );
-      }
-
-      track('verification_request_submitted', {
-        source: 'billing_success',
-      });
-      setRequestState('success');
-      setFeedback('Request sent. Tim has been notified.');
-    } catch (error) {
-      setRequestState('error');
-      setFeedback(
-        error instanceof Error
-          ? error.message
-          : 'We could not send your request. Please try again in a moment.'
-      );
+    if (sessionPlanHint) {
+      setResolvedPlan(sessionPlanHint);
+      return;
     }
-  };
+    if (billingStatus === 'pending') return;
 
-  const successTitle = isOnboardingUpgrade
-    ? 'Your profile is live and upgraded'
-    : `Welcome to ${planName}!`;
-  const successSubtitle = isOnboardingUpgrade
-    ? "You're all set. Here's what you just unlocked."
-    : "Your plan is active. Here's what you just unlocked.";
+    setResolvedPlan(normalizeBillingPlan(billingData?.plan) ?? 'generic');
+  }, [billingData?.plan, billingStatus, resolvedPlan, sessionPlanHint]);
+
+  useEffect(() => {
+    if (resolvedPlan === null) return;
+
+    track('checkout_celebration_shown', {
+      planType: resolvedPlan,
+    });
+  }, [resolvedPlan]);
+
+  const unlockFeatures = useMemo(
+    () => (resolvedPlan ? getUnlockFeatures(resolvedPlan) : []),
+    [resolvedPlan]
+  );
+
+  if (resolvedPlan === null) {
+    return (
+      <StandaloneProductPage width='lg' centered>
+        <BillingSuccessSkeleton />
+      </StandaloneProductPage>
+    );
+  }
 
   return (
     <StandaloneProductPage
@@ -145,68 +200,57 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      <ConfettiOverlay viewport />
+      <motion.div
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={
+          shouldReduceMotion
+            ? undefined
+            : { duration: 0.45, ease: [0.16, 1, 0.3, 1] }
+        }
+      >
+        <ContentSurfaceCard surface='details' className='overflow-hidden'>
+          <div className='space-y-6 px-5 py-8 text-center sm:px-8 sm:py-10'>
+            <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-(--linear-app-shell-border) bg-surface-0 text-primary-token'>
+              <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
+            </div>
 
-      <ContentSurfaceCard surface='details' className='overflow-hidden'>
-        <ContentSectionHeader
-          density='compact'
-          title={successTitle}
-          subtitle={successSubtitle}
-        />
+            <div className='space-y-2'>
+              <h1 className='text-balance text-[32px] font-[620] tracking-[-0.045em] text-primary-token sm:text-[40px]'>
+                {getSuccessHeading(resolvedPlan)}
+              </h1>
+              <p className='mx-auto max-w-2xl text-balance text-sm leading-6 text-secondary-token sm:text-[15px]'>
+                {getSuccessSubtitle(resolvedPlan)}
+              </p>
+            </div>
 
-        <div
-          className={
-            isVisible
-              ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
-              : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
-          }
-        >
-          <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
-            <PartyPopper className='h-8 w-8 text-success' />
-          </div>
+            <div
+              className='grid grid-cols-1 gap-3 text-left sm:grid-cols-3'
+              data-testid='billing-success-tiles'
+            >
+              {unlockFeatures.map((feature, index) => (
+                <SuccessFeatureTile
+                  key={`${resolvedPlan}-${feature}`}
+                  feature={feature}
+                  index={index}
+                />
+              ))}
+            </div>
 
-          <div className='grid gap-4 sm:grid-cols-3'>
-            {UNLOCKED_FEATURES.map(feature => (
-              <FeatureCard key={feature.title} {...feature} />
-            ))}
-          </div>
-
-          <div className='flex flex-col items-center gap-3'>
-            <Button asChild size='lg'>
-              <Link href={APP_ROUTES.DASHBOARD}>
-                {isOnboardingUpgrade
-                  ? 'Explore your dashboard'
-                  : 'Go to Dashboard'}
-              </Link>
-            </Button>
-
-            {billingData?.isPro ? (
-              <Button
-                type='button'
-                variant='ghost'
-                size='sm'
-                onClick={handleRequestVerification}
-                disabled={
-                  requestState === 'submitting' || requestState === 'success'
-                }
-              >
-                <ShieldCheck className='h-4 w-4' aria-hidden='true' />
-                {getVerificationButtonLabel(requestState)}
+            <div className='flex flex-col items-center justify-center gap-3 sm:flex-row'>
+              <Button asChild size='lg'>
+                <Link href={APP_ROUTES.CHAT}>
+                  Open Chat
+                  <ArrowRight className='h-4 w-4' aria-hidden='true' />
+                </Link>
               </Button>
-            ) : null}
-
-            {feedback ? (
-              <output
-                className='text-[13px] text-secondary-token'
-                aria-live='polite'
-                aria-atomic='true'
-              >
-                {feedback}
-              </output>
-            ) : null}
+              <Button asChild variant='secondary' size='lg'>
+                <Link href={APP_ROUTES.DASHBOARD_RELEASES}>View Releases</Link>
+              </Button>
+            </div>
           </div>
-        </div>
-      </ContentSurfaceCard>
+        </ContentSurfaceCard>
+      </motion.div>
     </StandaloneProductPage>
   );
 }

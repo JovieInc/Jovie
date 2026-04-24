@@ -209,6 +209,12 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
+    const successUrl =
+      checkoutSource === 'onboarding'
+        ? `${baseUrl}${onboardingReturnTo}&upgrade=success`
+        : selectedPlan
+          ? `${baseUrl}/billing/success?plan_id=${encodeURIComponent(selectedPlan)}`
+          : `${baseUrl}/billing/success`;
 
     const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
@@ -217,10 +223,7 @@ export async function POST(request: NextRequest) {
         customerId,
         priceId,
         userId,
-        successUrl:
-          checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=success`
-            : `${baseUrl}/billing/success`,
+        successUrl,
         cancelUrl:
           checkoutSource === 'onboarding'
             ? `${baseUrl}${onboardingReturnTo}&upgrade=cancel`
