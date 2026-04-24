@@ -18,9 +18,17 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
-vi.mock('@/lib/error-tracking', () => ({
-  captureCriticalError: mockCaptureCriticalError,
-}));
+vi.mock('@/lib/error-tracking', async () => {
+  // parseJsonBody uses captureError/captureWarning internally — we only want
+  // to spy on captureCriticalError (the fatal pager), so preserve the rest.
+  const actual = await vi.importActual<typeof import('@/lib/error-tracking')>(
+    '@/lib/error-tracking'
+  );
+  return {
+    ...actual,
+    captureCriticalError: mockCaptureCriticalError,
+  };
+});
 
 vi.mock('@/lib/stripe/client', () => ({
   createCheckoutSession: mockCreateCheckoutSession,
