@@ -46,8 +46,8 @@ export function MarketingSignInLink({
         className={cn(
           'focus-ring-themed transition-all duration-150',
           variant === 'pill'
-            ? 'inline-flex h-[34px] items-center justify-center rounded-full border border-white/95 bg-white px-4 text-[13px] font-medium text-black shadow-[0_10px_26px_rgba(0,0,0,0.22)] hover:bg-white/92'
-            : 'text-[13px] text-white/60 hover:text-white/90'
+            ? 'inline-flex h-[34px] items-center justify-center rounded-full border border-white/95 bg-white px-4 text-app font-medium text-black shadow-[0_10px_26px_rgba(0,0,0,0.22)] hover:bg-white/92'
+            : 'text-app text-white/60 hover:text-white/90'
         )}
       >
         Sign in

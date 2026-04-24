@@ -87,7 +87,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-[14px] font-book text-white/40'>
+        <p className='text-sm font-book text-white/40'>
           No information available yet.
         </p>
       </div>
@@ -99,7 +99,7 @@ export function AboutSection({
       <p className='sr-only'>About {artist.name}</p>
 
       {hasBio && (
-        <p className='text-[14px] font-book leading-relaxed text-white/70 whitespace-pre-line'>
+        <p className='text-sm font-book leading-relaxed text-white/70 whitespace-pre-line'>
           {artist.tagline}
         </p>
       )}
@@ -107,19 +107,19 @@ export function AboutSection({
       {hasMetadata && (
         <div className='flex flex-wrap gap-x-5 gap-y-2'>
           {hasLocation && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>{artist.location}</span>
             </div>
           )}
           {hasHometown && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span className='capitalize'>From {artist.hometown}</span>
             </div>
           )}
           {hasActiveSince && (
-            <div className='flex items-center gap-2 text-[13px] text-white/50'>
+            <div className='flex items-center gap-2 text-app text-white/50'>
               <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
               <span>Active since {artist.active_since_year}</span>
             </div>
@@ -139,7 +139,7 @@ export function AboutSection({
             return (
               <span
                 key={key}
-                className='rounded-full border px-3 py-1 text-[11px] font-[510] capitalize'
+                className='rounded-full border px-3 py-1 text-2xs font-caption capitalize'
                 style={{
                   backgroundColor: hexToRgba(accent, 0.14),
                   color: lightenHex(accent, 0.35),
@@ -156,7 +156,7 @@ export function AboutSection({
       {hasPressPhotos && (
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
-            <h2 className='text-[13px] font-[510] text-white/70'>
+            <h2 className='text-app font-caption text-white/70'>
               Press photos
             </h2>
           </div>

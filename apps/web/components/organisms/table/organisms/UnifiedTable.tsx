@@ -619,7 +619,7 @@ export function UnifiedTable<TData>({
 
   // Common table styles
   const tableClassName = cn(
-    'w-full border-separate border-spacing-0 text-[13px]',
+    'w-full border-separate border-spacing-0 text-app',
     className
   );
 
@@ -741,7 +741,7 @@ export function UnifiedTable<TData>({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className='py-1.5 text-center text-[11px] text-tertiary-token'
+                  className='py-1.5 text-center text-2xs text-tertiary-token'
                 >
                   <span className='inline-flex items-center gap-1.5'>
                     <LoadingSpinner

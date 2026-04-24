@@ -24,7 +24,7 @@ const GenreOption = memo(function GenreOption({
     <button
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors ${
         isSelected
           ? 'bg-interactive-hover text-primary-token font-medium'
           : 'text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
@@ -114,14 +114,14 @@ export function GenrePicker({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder='Search genres...'
-            className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+            className='flex-1 bg-transparent text-app text-primary-token placeholder:text-tertiary-token outline-none'
           />
         </div>
 
         {/* Cap indicator */}
         {atCap && (
           <div className='px-3 py-1.5 border-b border-subtle'>
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-2xs text-tertiary-token'>
               Maximum {maxGenres} genres reached
             </p>
           </div>
@@ -141,7 +141,7 @@ export function GenrePicker({
               );
             })
           ) : (
-            <p className='px-2.5 py-3 text-[13px] text-tertiary-token text-center'>
+            <p className='px-2.5 py-3 text-app text-tertiary-token text-center'>
               No matching genres
             </p>
           )}

@@ -39,9 +39,9 @@ function FunnelStep({
       label={label}
       value={value}
       subtitle={rate}
-      labelClassName='truncate text-[13px] font-[510] tracking-normal text-secondary-token'
+      labelClassName='truncate text-app font-caption tracking-normal text-secondary-token'
       valueClassName='text-xl font-semibold leading-none tracking-[-0.011em] text-primary-token tabular-nums'
-      subtitleClassName='text-[11px] text-tertiary-token tabular-nums'
+      subtitleClassName='text-2xs text-tertiary-token tabular-nums'
     />
   );
 }

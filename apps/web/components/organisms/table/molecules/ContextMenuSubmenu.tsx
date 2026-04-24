@@ -67,7 +67,7 @@ export function ContextMenuSubmenu({
       <button
         className={cn(
           'flex w-full items-center justify-between gap-2',
-          'px-2 py-1.5 text-left text-[13px]',
+          'px-2 py-1.5 text-left text-app',
           'hover:bg-surface-2 rounded',
           'transition-colors duration-150',
           className
@@ -143,7 +143,7 @@ export function ContextMenuItem({
       onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2',
-        'px-2 py-1.5 text-left text-[13px]',
+        'px-2 py-1.5 text-left text-app',
         'hover:bg-surface-2 rounded',
         'transition-colors duration-150',
         destructive && 'text-error hover:bg-error/10',

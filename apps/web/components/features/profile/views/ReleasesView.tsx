@@ -106,7 +106,7 @@ export function ReleasesView({
         return (
           <div key={release.id}>
             {showHeader ? (
-              <div className='px-4 pb-1 pt-4 text-[11px] font-[510] text-white/30'>
+              <div className='px-4 pb-1 pt-4 text-2xs font-caption text-white/30'>
                 {year}
               </div>
             ) : null}
@@ -132,7 +132,7 @@ export function ReleasesView({
                   {collabs ? `${collabs} \u00b7 ` : ''}
                   {metaParts.join(' \u00b7 ')}
                   {release.releaseType === 'music_video' ? (
-                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-3xs font-[510] text-white/50'>
+                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-3xs font-caption text-white/50'>
                       Video
                     </span>
                   ) : null}

@@ -71,7 +71,7 @@ export function ReleaseEditDialog({
         />
         Edit release links
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-app text-secondary-token'>
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
@@ -101,7 +101,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
+                    className='rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-2xs text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -136,7 +136,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-app font-caption text-primary-token'>
                           {provider.label}
                         </p>
                       </div>
@@ -168,7 +168,7 @@ export function ReleaseEditDialog({
                           tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
-                          className='h-7 rounded-lg px-2.5 text-[11px]'
+                          className='h-7 rounded-lg px-2.5 text-2xs'
                           onClick={() => onSave(provider.key)}
                         >
                           Save
@@ -177,7 +177,7 @@ export function ReleaseEditDialog({
                           tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
-                          className='h-7 rounded-lg px-2.5 text-[11px]'
+                          className='h-7 rounded-lg px-2.5 text-2xs'
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
@@ -194,7 +194,7 @@ export function ReleaseEditDialog({
       <DialogActions className='justify-end border-t border-(--linear-app-frame-seam) pt-4'>
         <DrawerButton
           onClick={onClose}
-          className='h-7 rounded-lg px-2.5 text-[11px]'
+          className='h-7 rounded-lg px-2.5 text-2xs'
         >
           Done
         </DrawerButton>

@@ -53,12 +53,12 @@ export function EntityHeaderCard({
       {image ?? null}
       <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
         {eyebrow ? (
-          <div className='text-[10.5px] font-[510] leading-none tracking-[0.03em] text-tertiary-token'>
+          <div className='text-[10.5px] font-caption leading-none tracking-[0.03em] text-tertiary-token'>
             {eyebrow}
           </div>
         ) : null}
         <div className='flex items-center gap-1'>
-          <span className='truncate text-[14px] font-semibold leading-[18px] tracking-[-0.015em] text-primary-token'>
+          <span className='truncate text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token'>
             {title}
           </span>
           {badge}

@@ -100,7 +100,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       className={cn(
         'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-[background-color,color] duration-150',
         isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
-        isHighIntent && 'font-[510]',
+        isHighIntent && 'font-caption',
         hasValue && 'border-l-2 border-l-emerald-500/20'
       )}
       onClick={() => onTap(member)}
@@ -134,7 +134,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
             {displayName}
           </TruncatedText>
           {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-[11px] text-tertiary-token tabular-nums'>
+            <span className='flex-shrink-0 text-2xs text-tertiary-token tabular-nums'>
               {formatTimeAgo(member.lastSeenAt)}
             </span>
           )}
@@ -198,7 +198,7 @@ function MemberDetails({
   return (
     <div className='mt-0.5 space-y-0.5'>
       {/* Row 2: Intent + Returning + Source + City */}
-      <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
+      <p className='text-2xs flex items-center gap-1.5 min-w-0'>
         <span
           className={cn(
             'inline-block size-1.5 rounded-full shrink-0',
@@ -208,7 +208,7 @@ function MemberDetails({
         />
         <span
           className={cn(
-            'font-[510] shrink-0',
+            'font-caption shrink-0',
             INTENT_STYLES[member.intentLevel]
           )}
         >
@@ -216,7 +216,7 @@ function MemberDetails({
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='font-[510] text-secondary-token shrink-0'>
+          <span className='font-caption text-secondary-token shrink-0'>
             Returning
           </span>
         ) : (
@@ -234,13 +234,13 @@ function MemberDetails({
 
       {/* Row 3: Last action + LTV value */}
       {(lastAction || hasValue) && (
-        <p className='text-[11px] flex items-center gap-1.5 min-w-0'>
+        <p className='text-2xs flex items-center gap-1.5 min-w-0'>
           {lastAction && (
             <span className='truncate text-tertiary-token'>{lastAction}</span>
           )}
           {lastAction && hasValue && <DotSeparator />}
           {hasValue && (
-            <span className='shrink-0 font-[510] text-emerald-600 dark:text-emerald-400'>
+            <span className='shrink-0 font-caption text-emerald-600 dark:text-emerald-400'>
               {formatDollars(ltvCents)}
             </span>
           )}
@@ -269,12 +269,12 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
   return (
     <div className='mt-0.5 space-y-0.5'>
       {(member.email || member.phone) && (
-        <p className='truncate text-[13px] leading-snug text-secondary-token'>
+        <p className='truncate text-app leading-snug text-secondary-token'>
           {subscriberLabel}
         </p>
       )}
       {member.lastSeenAt && (
-        <p className='text-[11px] text-tertiary-token'>
+        <p className='text-2xs text-tertiary-token'>
           Subscribed {formatTimeAgo(member.lastSeenAt)}
         </p>
       )}

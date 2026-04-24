@@ -112,7 +112,7 @@ function TanStackRowCheckbox({
     >
       <span
         className={cn(
-          'select-none text-[13px] tabular-nums text-tertiary-token transition-opacity',
+          'select-none text-app tabular-nums text-tertiary-token transition-opacity',
           isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
         )}
         aria-hidden='true'
@@ -162,7 +162,7 @@ function LegacyCheckboxCell({
         {!isHeader && rowNumber !== undefined && (
           <span
             className={cn(
-              'absolute inset-0 flex items-center justify-center text-[13px] tabular-nums text-tertiary-token transition-opacity',
+              'absolute inset-0 flex items-center justify-center text-app tabular-nums text-tertiary-token transition-opacity',
               checked ? 'opacity-0' : 'group-hover:opacity-0'
             )}
           >

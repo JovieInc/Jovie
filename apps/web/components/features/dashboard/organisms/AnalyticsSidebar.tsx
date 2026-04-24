@@ -216,15 +216,15 @@ function RankedList({
           className='group flex h-9 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-[11px] font-caption text-tertiary-token tabular-nums'>
+            <span className='w-3 text-2xs font-caption text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
             <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-semibold text-primary-token tabular-nums'>
+          <span className='ml-2 text-app font-semibold text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>

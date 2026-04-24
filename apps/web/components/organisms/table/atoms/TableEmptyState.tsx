@@ -65,11 +65,9 @@ export function TableEmptyState({
         </div>
       )}
       <div className='space-y-1.5'>
-        <p className='text-[13px] font-[510] text-secondary-token'>{title}</p>
+        <p className='text-app font-caption text-secondary-token'>{title}</p>
         {description && (
-          <p className='max-w-md text-[13px] text-tertiary-token'>
-            {description}
-          </p>
+          <p className='max-w-md text-app text-tertiary-token'>{description}</p>
         )}
       </div>
       {(action || secondaryAction) && (

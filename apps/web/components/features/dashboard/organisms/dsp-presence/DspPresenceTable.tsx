@@ -47,7 +47,7 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           <DspProviderIcon provider={item.providerId} size='sm' />
         </div>
       )}
-      <span className='truncate whitespace-nowrap font-[510] text-[13px] text-primary-token'>
+      <span className='truncate whitespace-nowrap font-caption text-app text-primary-token'>
         {item.externalArtistName ?? 'Unknown Artist'}
       </span>
     </div>
@@ -57,7 +57,7 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
 function StatusCell({ item }: Readonly<{ item: DspPresenceItem }>) {
   const isManual = item.matchSource === 'manual';
   return isManual ? (
-    <span className='text-[11px] text-tertiary-token'>Manual</span>
+    <span className='text-2xs text-tertiary-token'>Manual</span>
   ) : (
     <MatchStatusBadge status={item.status} size='sm' />
   );

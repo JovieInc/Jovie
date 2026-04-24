@@ -89,7 +89,7 @@ export function SettingsAppearanceSection() {
                     <Icon className='h-4 w-4' aria-hidden='true' />
                   </span>
                   <span className='min-w-0 flex-1'>
-                    <span className='flex items-center gap-1 text-app font-[510] text-primary-token'>
+                    <span className='flex items-center gap-1 text-app font-caption text-primary-token'>
                       {option.label}
                       {option.value === 'system' && resolvedThemeLabel ? (
                         <Tooltip>

@@ -62,7 +62,7 @@ function HighlightedName({
   readonly matchIndices: number[];
 }) {
   if (matchIndices.length === 0) {
-    return <span className='font-[510]'>{name}</span>;
+    return <span className='font-caption'>{name}</span>;
   }
 
   const matchSet = new Set(matchIndices);
@@ -73,7 +73,7 @@ function HighlightedName({
   }));
 
   return (
-    <span className='font-[510]'>
+    <span className='font-caption'>
       {characters.map(character => (
         <span
           key={character.id}
@@ -110,7 +110,7 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-[13px] text-primary-token transition',
+        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition',
         active ? 'bg-surface-2' : 'hover:bg-surface-2',
         'active:scale-[0.99]'
       )}
@@ -137,11 +137,11 @@ function PlatformSuggestionItem({
           matchIndices={option.matchIndices}
         />
         {/* Simplified hint */}
-        <span className='text-[13px] text-tertiary-token'>{option.hint}</span>
+        <span className='text-app text-tertiary-token'>{option.hint}</span>
       </span>
       {/* Only show Enter hint on active item */}
       {active && (
-        <span className='max-sm:hidden text-[13px] text-tertiary-token sm:inline'>
+        <span className='max-sm:hidden text-app text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -664,7 +664,7 @@ export const UniversalLinkInput = forwardRef<
                           {groupIndex > 0 && (
                             <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[13px] font-[510] tracking-normal text-secondary-token'>
+                          <div className='px-3 pb-1 pt-2 text-app font-caption tracking-normal text-secondary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

@@ -13,7 +13,7 @@ export function BillingHeader({ plan }: { readonly plan: string | null }) {
       <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-primary-token'>
         Billing
       </h1>
-      <p className='mt-2 text-[13px] text-secondary-token'>
+      <p className='mt-2 text-app text-secondary-token'>
         Manage your {getPlanDisplayName(plan)} plan, compare options, and review
         billing history.
       </p>

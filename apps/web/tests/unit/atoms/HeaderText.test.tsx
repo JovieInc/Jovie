@@ -4,7 +4,7 @@ import { headerTextClass } from '@/components/atoms/HeaderText';
 describe('headerTextClass', () => {
   it('returns base text classes', () => {
     const result = headerTextClass({});
-    expect(result).toContain('text-[14px]');
+    expect(result).toContain('text-sm');
     expect(result).toContain('font-medium');
     expect(result).toContain('leading-5');
     expect(result).toContain('tracking-[-0.01em]');

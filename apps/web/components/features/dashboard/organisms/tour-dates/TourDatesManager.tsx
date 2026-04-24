@@ -145,9 +145,9 @@ export function TourDatesManager({
                   className='h-4 w-4 text-teal-600 dark:text-teal-400'
                 />
               </div>
-              <span className='text-[13px] text-secondary-token'>
+              <span className='text-app text-secondary-token'>
                 Connected to{' '}
-                <span className='font-[510] text-primary-token'>
+                <span className='font-caption text-primary-token'>
                   {connectionStatus.artistName}
                 </span>{' '}
                 on Bandsintown
@@ -196,7 +196,7 @@ export function TourDatesManager({
           ) : (
             <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
-              <p className='mt-4 text-[13px] text-secondary-token'>
+              <p className='mt-4 text-app text-secondary-token'>
                 No upcoming tour dates
               </p>
               {isConnected && (

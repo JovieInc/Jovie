@@ -36,9 +36,7 @@ function SummaryCard({
       <p className='text-xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
         {label}
       </p>
-      <p className='text-[13px] leading-5 text-secondary-token'>
-        {description}
-      </p>
+      <p className='text-app leading-5 text-secondary-token'>{description}</p>
     </ContentSurfaceCard>
   );
 }
@@ -85,7 +83,7 @@ function AttributionStatsCard() {
           <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
             {stats.total}
           </p>
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-app text-secondary-token'>
             {stats.total === 1 ? 'Subscriber' : 'Subscribers'} attributed to
             retargeting campaigns this month.
           </p>
@@ -228,7 +226,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-semibold text-primary-token'>
+          <p className='text-app font-semibold text-primary-token'>
             {variant.label}
           </p>
           <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
@@ -342,7 +340,7 @@ export default function RetargetingAdsPage() {
               title='How to use these ads'
               subtitle='Upload the feed and story assets directly to Meta Ads Manager.'
             />
-            <ol className='list-decimal space-y-2 px-8 py-5 pt-4 text-[13px] text-secondary-token'>
+            <ol className='list-decimal space-y-2 px-8 py-5 pt-4 text-app text-secondary-token'>
               <li>Download the ad images above.</li>
               <li>
                 Create a new campaign in Meta Ads Manager with the Traffic

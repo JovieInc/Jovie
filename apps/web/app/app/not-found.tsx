@@ -57,7 +57,7 @@ export default function AppNotFound() {
         <h1 className='text-sm font-medium text-primary-token mb-1'>
           Not found
         </h1>
-        <p className='text-[13px] text-tertiary-token'>
+        <p className='text-app text-tertiary-token'>
           We could not find the page you were looking for
         </p>
       </div>

@@ -96,7 +96,7 @@ export function VerificationModal({
           >
             <CheckCircle2 className='h-5 w-5 text-success shrink-0' />
             <div>
-              <p className='text-app font-[510] text-success'>
+              <p className='text-app font-caption text-success'>
                 Domain verified!
               </p>
               <p className='mt-0.5 text-xs text-secondary-token'>
@@ -129,7 +129,7 @@ export function VerificationModal({
 
             {/* Token display with copy */}
             <div className='space-y-2'>
-              <span className='text-app font-[510] text-secondary-token'>
+              <span className='text-app font-caption text-secondary-token'>
                 TXT Record Value
               </span>
               <div className='flex items-center gap-2'>
@@ -170,7 +170,7 @@ export function VerificationModal({
               <button
                 type='button'
                 onClick={() => setShowProviders(prev => !prev)}
-                className='flex w-full items-center justify-between px-3 py-2.5 text-app font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                className='flex w-full items-center justify-between px-3 py-2.5 text-app font-caption text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 aria-expanded={showProviders}
                 data-testid='provider-tips-toggle'
               >

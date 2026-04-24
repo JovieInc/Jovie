@@ -308,7 +308,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       <SelectItem
                         key={option.value}
                         value={option.value}
-                        className='rounded-md px-2 py-1.5 text-app font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                        className='rounded-md px-2 py-1.5 text-app font-caption text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                       >
                         <div className='flex items-center gap-2'>
                           <Icon
@@ -407,7 +407,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   labelWidth={96}
                   labelClassName='normal-case tracking-normal text-xs'
                 />
-                <div className='flex flex-wrap gap-1.5'>
+                <div className='flex flex-wrap gap-1'>
                   {CONTACT_TERRITORY_PRESETS.map(territory => {
                     const isSelected = contact.territories.includes(territory);
                     return (
@@ -415,8 +415,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         key={territory}
                         type='button'
                         onClick={() => handleTerritoryToggle(territory)}
+                        aria-pressed={isSelected}
+                        title={territory}
                         className={cn(
-                          'rounded-lg border px-2.5 py-1 text-xs font-[510] transition-[background-color,border-color,color] duration-150',
+                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'

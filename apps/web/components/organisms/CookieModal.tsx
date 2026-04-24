@@ -76,13 +76,13 @@ function CookieCategories({
             <div className='flex min-w-0 flex-1 flex-col gap-px'>
               <span
                 id={titleId}
-                className='text-[11px] font-medium text-primary-token'
+                className='text-2xs font-medium text-primary-token'
               >
                 {category.label}
               </span>
               <p
                 id={descId}
-                className='text-[11px] leading-snug text-secondary-token'
+                className='text-2xs leading-snug text-secondary-token'
               >
                 {category.description}
               </p>
@@ -162,7 +162,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           hideClose
         >
           <SheetHeader className='pb-1'>
-            <SheetTitlePrimitive className='text-[13px] font-semibold text-primary-token'>
+            <SheetTitlePrimitive className='text-app font-semibold text-primary-token'>
               Cookie preferences
             </SheetTitlePrimitive>
             <SheetDescription className='sr-only'>
@@ -209,7 +209,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       size='xs'
       className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] sm:mx-auto sm:w-full'
     >
-      <DialogTitle className='text-[13px] font-semibold text-primary-token'>
+      <DialogTitle className='text-app font-semibold text-primary-token'>
         Cookie preferences
       </DialogTitle>
       <DialogDescription className='sr-only'>

@@ -71,7 +71,7 @@ export function AudienceLastActionCell({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 text-[13px] text-secondary-token min-w-0',
+        'flex items-center gap-1.5 text-app text-secondary-token min-w-0',
         className
       )}
     >
@@ -93,7 +93,7 @@ export function AudienceLastActionCell({
               ·
             </span>
           )}
-          <span className='shrink-0 text-[11px] text-tertiary-token tabular-nums'>
+          <span className='shrink-0 text-2xs text-tertiary-token tabular-nums'>
             {timeAgo}
           </span>
         </>

@@ -43,7 +43,7 @@ function ActionCard({
           {icon}
         </div>
         <div className='min-w-0'>
-          <p className='text-[13px] font-[510] text-primary-token'>{heading}</p>
+          <p className='text-app font-caption text-primary-token'>{heading}</p>
           <p className='truncate text-xs text-secondary-token'>{subtext}</p>
         </div>
       </div>

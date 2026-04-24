@@ -28,7 +28,7 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-2 text-[13px]',
+        'flex items-center justify-between gap-2 text-app',
         className
       )}
     >

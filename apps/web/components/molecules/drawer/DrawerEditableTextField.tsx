@@ -164,7 +164,7 @@ export function DrawerEditableTextField({
             placeholder={placeholder ?? emptyLabel}
             aria-label={`Edit ${label}`}
             className={cn(
-              'h-8 w-full rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px] text-primary-token',
+              'h-8 w-full rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
               monospace && 'font-mono tracking-[0.02em]',
               inputClassName
             )}
@@ -185,7 +185,7 @@ export function DrawerEditableTextField({
           >
             <span
               className={cn(
-                'block truncate text-[13px] text-primary-token',
+                'block truncate text-app text-primary-token',
                 monospace && 'font-mono tracking-[0.02em]',
                 !hasValue && 'italic text-tertiary-token',
                 displayClassName,
@@ -200,7 +200,7 @@ export function DrawerEditableTextField({
         {editable ? null : (
           <span
             className={cn(
-              'block min-w-0 w-full truncate text-[13px] text-primary-token',
+              'block min-w-0 w-full truncate text-app text-primary-token',
               monospace && 'font-mono tracking-[0.02em]',
               !hasValue && 'italic text-tertiary-token',
               displayClassName,

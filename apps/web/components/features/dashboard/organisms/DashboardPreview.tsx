@@ -55,8 +55,10 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   return (
     <div data-testid='dashboard-preview'>
       <div className='mb-4'>
-        <h3 className='text-lg font-[510] text-primary-token'>Live Preview</h3>
-        <p className='text-[13px] text-secondary-token mt-1'>
+        <h3 className='text-lg font-caption text-primary-token'>
+          Live Preview
+        </h3>
+        <p className='text-app text-secondary-token mt-1'>
           This is how your profile will appear to visitors
         </p>
       </div>
@@ -99,7 +101,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       {/* Profile URL and Actions */}
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
-          <code className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-1 text-[11px] text-secondary-token'>
+          <code className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-1 text-2xs text-secondary-token'>
             {BASE_URL}/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton
@@ -113,7 +115,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
           href={`/${artist.handle}`}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex items-center gap-1.5 text-[13px] font-[510] text-accent hover:text-accent/80 transition-colors'
+          className='inline-flex items-center gap-1.5 text-app font-caption text-accent hover:text-accent/80 transition-colors'
         >
           View Profile
           <svg

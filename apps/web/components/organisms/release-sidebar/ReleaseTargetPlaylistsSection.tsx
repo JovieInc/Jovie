@@ -73,7 +73,7 @@ export function ReleaseTargetPlaylistsSection({
       <div className='flex items-center justify-between'>
         <label
           htmlFor={`target-playlists-${releaseId}`}
-          className='text-[11px] font-medium text-secondary-token'
+          className='text-2xs font-medium text-secondary-token'
         >
           Target Playlists
         </label>
@@ -83,7 +83,7 @@ export function ReleaseTargetPlaylistsSection({
       </div>
       <p
         id={`target-playlists-helper-${releaseId}`}
-        className='text-[11px] leading-[15px] text-tertiary-token'
+        className='text-2xs leading-[15px] text-tertiary-token'
       >
         Playlists you&apos;re targeting for this release. Leave blank to use
         your defaults.

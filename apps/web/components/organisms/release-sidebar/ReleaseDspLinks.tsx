@@ -262,7 +262,7 @@ export function ReleaseDspLinks({
                         aria-label={label}
                       />
                     </span>
-                    <span className='text-[13px] font-[460] text-secondary-token'>
+                    <span className='text-app font-[460] text-secondary-token'>
                       {label}
                     </span>
                     <span className='shrink-0 text-[10px] text-tertiary-token'>

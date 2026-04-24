@@ -250,7 +250,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           <p className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
             Platform Availability
           </p>
-          <p className='text-[11px] text-secondary-token'>
+          <p className='text-2xs text-secondary-token'>
             {availableCount} of {totalCount} platforms linked
           </p>
         </div>
@@ -410,7 +410,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         onClick={() => setAddingProvider(providerKey)}
                         tone='secondary'
                         size='sm'
-                        className='min-w-[76px] rounded-full text-[11px] font-caption'
+                        className='min-w-[76px] rounded-full text-2xs font-caption'
                       >
                         + Add link
                       </DrawerButton>
@@ -426,7 +426,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
         {validationError && (
           <div className='min-h-[28px] border-t border-(--linear-app-frame-seam) px-3 py-1.5'>
-            <p className='text-[11px] text-error'>{validationError}</p>
+            <p className='text-2xs text-error'>{validationError}</p>
           </div>
         )}
       </PopoverContent>

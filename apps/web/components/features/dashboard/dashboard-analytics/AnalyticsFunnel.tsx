@@ -67,7 +67,7 @@ export function AnalyticsFunnel({
               <div className='flex flex-col items-center py-2'>
                 <ArrowDown className='h-4 w-4 text-tertiary-token' />
                 {conversionRate && (
-                  <span className='mt-0.5 text-[11px] font-[510] tabular-nums text-primary'>
+                  <span className='mt-0.5 text-2xs font-caption tabular-nums text-primary'>
                     {conversionRate}
                   </span>
                 )}
@@ -88,13 +88,13 @@ export function AnalyticsFunnel({
                   transition-all duration-200
                 `}
               >
-                <p className='mb-2 text-[13px] font-[510] tracking-normal text-secondary-token'>
+                <p className='mb-2 text-app font-caption tracking-normal text-secondary-token'>
                   {stage.label}
                 </p>
                 <p className='text-4xl font-semibold tracking-[-0.022em] text-primary-token tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
-                <p className='mt-1 text-[13px] text-secondary-token'>
+                <p className='mt-1 text-app text-secondary-token'>
                   {stage.description}
                 </p>
               </ContentSurfaceCard>

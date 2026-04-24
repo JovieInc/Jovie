@@ -61,7 +61,7 @@ function ContactListItem({
         <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-app font-caption text-primary-token'>
                 {roleLabel}
               </p>
               {territorySummary !== 'General' && (
@@ -69,7 +69,7 @@ function ContactListItem({
               )}
             </div>
             {secondaryLabel && (
-              <p className='truncate text-[13px] text-secondary-token'>
+              <p className='truncate text-app text-secondary-token'>
                 {secondaryLabel}
               </p>
             )}
@@ -216,7 +216,7 @@ export function ContactMode({
           size='sm'
           variant='ghost'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
-          className='w-full text-[13px] text-secondary-token'
+          className='w-full text-app text-secondary-token'
         >
           Manage contacts
         </Button>

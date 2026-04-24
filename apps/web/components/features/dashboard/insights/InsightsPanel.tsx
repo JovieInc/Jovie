@@ -29,7 +29,7 @@ function PrioritySection({
   return (
     <section>
       <h3
-        className={`mb-3 text-[13px] font-[510] tracking-normal ${colorClass}`}
+        className={`mb-3 text-app font-caption tracking-normal ${colorClass}`}
       >
         {label}
       </h3>
@@ -82,7 +82,7 @@ function InsightsPanelContent({
   if (error) {
     return (
       <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-[13px] text-secondary-token'>
+        <p className='text-app text-secondary-token'>
           Failed to load insights. Please try again.
         </p>
       </ContentSurfaceCard>

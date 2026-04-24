@@ -74,10 +74,10 @@ export function SettingsAnalyticsSection({
           <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
             <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div>
-              <p className='text-[13px] font-semibold tracking-[-0.02em] text-primary-token'>
+              <p className='text-app font-semibold tracking-[-0.02em] text-primary-token'>
                 Traffic Quality Filtering Active
               </p>
-              <p className='mt-1 text-[13px] text-secondary-token'>
+              <p className='mt-1 text-app text-secondary-token'>
                 Your own profile views and link clicks are being excluded from
                 your analytics. Likely bot traffic remains visible in Audience
                 with a bot label so you can review it without polluting clean

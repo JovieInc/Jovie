@@ -195,11 +195,11 @@ export function OnboardingDspStep({
                           <div className='h-8 w-8 shrink-0 rounded-full bg-surface-0' />
                         )}
                         <div className='min-w-0 flex-1'>
-                          <p className='truncate text-[13px] font-caption text-primary-token'>
+                          <p className='truncate text-app font-caption text-primary-token'>
                             {artist.name}
                           </p>
                           {artist.followers != null && (
-                            <p className='text-[11px] text-tertiary-token'>
+                            <p className='text-2xs text-tertiary-token'>
                               {artist.followers.toLocaleString()} followers
                             </p>
                           )}
@@ -220,7 +220,7 @@ export function OnboardingDspStep({
               <p
                 id='onboarding-dsp-search-error'
                 role='alert'
-                className='text-error text-[13px] text-center'
+                className='text-error text-app text-center'
               >
                 {state.error}
               </p>

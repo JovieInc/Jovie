@@ -76,7 +76,7 @@ export function DashboardHeader({
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'>
+              <span className='shrink-0 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
                 {rootLabel}
               </span>
               <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />

@@ -29,7 +29,7 @@ export function ContentMetricRow({
     >
       <div
         className={cn(
-          'flex min-w-0 items-center gap-2 text-[13px] font-caption text-primary-token',
+          'flex min-w-0 items-center gap-2 text-app font-caption text-primary-token',
           labelClassName
         )}
       >
@@ -42,7 +42,7 @@ export function ContentMetricRow({
       </div>
       <span
         className={cn(
-          'shrink-0 text-[13px] font-semibold text-primary-token tabular-nums',
+          'shrink-0 text-app font-semibold text-primary-token tabular-nums',
           valueClassName
         )}
       >

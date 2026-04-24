@@ -162,7 +162,7 @@ export const TrackRow = memo(function TrackRow({
         </span>
         <TruncatedText
           lines={1}
-          className='text-[12.5px] font-[510] text-primary-token'
+          className='text-[12.5px] font-caption text-primary-token'
           tooltipSide='top'
           tooltipAlign='start'
         >
@@ -290,7 +290,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-xs font-[510] text-primary-token'
+                  className='text-xs font-caption text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
