@@ -13,7 +13,13 @@ import {
   type HomepagePill,
   PILLS,
 } from './intent';
-import { createHomepageIntent, persistHomepageIntent } from './intent-store';
+import {
+  clearHomepageDraft,
+  createHomepageIntent,
+  persistHomepageIntent,
+  readHomepageDraft,
+  writeHomepageDraft,
+} from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
 
@@ -57,6 +63,14 @@ export function HomepageIntent() {
       experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
       variantId: HOMEPAGE_INTENT_VARIANT_ID,
     });
+
+    // Rehydrate any in-progress draft from a previous visit so the fan picks
+    // up where they left off. Cleared on submit and on successful signup
+    // (via consumeHomepageIntent at the end of onboarding).
+    const draft = readHomepageDraft();
+    if (draft) {
+      setValue(draft);
+    }
   }, []);
 
   const handlePillClick = useCallback((pill: HomepagePill) => {
@@ -74,6 +88,7 @@ export function HomepageIntent() {
   const handleChange = useCallback(
     (next: string) => {
       setValue(next);
+      writeHomepageDraft(next);
       if (activePill && !next.startsWith(activePill.insertedPrompt)) {
         setActivePill(null);
       }
@@ -125,6 +140,10 @@ export function HomepageIntent() {
       intentId: intent.id,
     });
 
+    // The intent is now the source of truth in flight; the draft is
+    // superseded and should not resurface if the fan navigates back here.
+    clearHomepageDraft();
+
     const authUrl = buildAuthUrl(intent.id);
     if (desktop) {
       // Soft nav: the @auth parallel slot's intercepting route renders the
@@ -146,6 +165,7 @@ export function HomepageIntent() {
         event.preventDefault();
         setValue('');
         setActivePill(null);
+        clearHomepageDraft();
       }
     },
     [submit]
