@@ -3394,7 +3394,11 @@ jobs:
           last_status=""
           saw_valid_probe=false
           confirmed_mismatch=false
-          for attempt in 1 2 3 4 5 6; do
+          # Vercel edge rollout can lag behind a successful `vercel promote`
+          # by more than a minute. Keep verification strict, but use a longer
+          # bounded window to avoid false negatives on healthy deploys.
+          max_attempts=18
+          for attempt in $(seq 1 "$max_attempts"); do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
             if [ "$attempt" -gt 1 ]; then
