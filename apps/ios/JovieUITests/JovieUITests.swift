@@ -27,7 +27,15 @@ final class JovieUITests: XCTestCase {
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
-    throw XCTSkip("Flaky assertion: transient 'Copied' state is timing-sensitive on simulator.")
+    let app = XCUIApplication()
+    app.launchArguments.append("-ui-testing-ready")
+    app.launch()
+
+    let copyButton = app.buttons["Copy URL"]
+    XCTAssertTrue(copyButton.waitForExistence(timeout: 2))
+    copyButton.tap()
+
+    XCTAssertTrue(app.buttons["Copied"].waitForExistence(timeout: 2))
   }
 
   func testLiveAuthViewRenders() throws {

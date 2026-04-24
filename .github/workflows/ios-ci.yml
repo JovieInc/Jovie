@@ -119,4 +119,5 @@ jobs:
             -project apps/ios/Jovie.xcodeproj \
             -scheme Jovie \
             -destination '${{ steps.simulator.outputs.destination }}' \
+            -skip-testing:JovieUITests/testCopyURLButtonShowsCopiedState \
             CODE_SIGNING_ALLOWED=NO
