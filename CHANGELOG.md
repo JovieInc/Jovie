@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.170] - 2026-04-23
+
+> Desktop auth screens get a split-screen brand panel — the sign-in form sits on the left, a clean white panel with the brand mark fills the right. Mobile is unchanged.
+
+### Changed
+
+- `apps/web/components/features/auth/AuthLayout.tsx` — wrapped the auth shell in a `lg` grid so desktop auth screens (signin, waitlist, etc.) render a centered form on a dark left column beside a white brand panel on the right. Mobile keeps its fixed-overlay behavior (scoped via `max-lg:` so non-responsive utilities can't win the cascade).
+
 ## [26.4.169] - 2026-04-23
 
 > The homepage now opens with a tighter premium hero, real product navigation, and a live trust strip right under the fold. Visitors can go straight to Product, Solutions, Pricing, or Resources, ask Jovie from the new hero composer, and see the trust bar immediately instead of waiting on a staged flag.
