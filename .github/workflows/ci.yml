@@ -532,18 +532,20 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-drizzle-neon-db-url
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
-          if [ ! -f "$CONNECTION_FILE" ]; then
-            echo "Neon DB connection artifact missing."
-            exit 1
-          fi
-
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
-          echo "Using direct-first Neon DB URL from neon-db artifact for Drizzle check"
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-drizzle-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1337,17 +1339,20 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-pr-neon-db-url
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
-          if [ ! -f "$CONNECTION_FILE" ]; then
-            echo "Neon DB connection artifact missing."
-            exit 1
-          fi
-
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-pr-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2305,17 +2310,20 @@ jobs:
           name: neon-db-connection-${{ github.run_id }}
           path: /tmp/neon-db-connection
 
+      - name: Resolve DATABASE_URL from Neon artifact
+        id: resolve-e2e-migrate-neon-db-url
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: /tmp/neon-db-connection/connection.json
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
       - name: Export DATABASE_URL
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          CONNECTION_FILE="/tmp/neon-db-connection/connection.json"
-          if [ ! -f "$CONNECTION_FILE" ]; then
-            echo "Neon DB connection artifact missing."
-            exit 1
-          fi
-
-          CANDIDATE=$(jq -r '.db_url // .db_url_pooled // empty' "$CONNECTION_FILE")
-          echo "DATABASE_URL=$CANDIDATE" >> "$GITHUB_ENV"
+        run: echo "DATABASE_URL=${{ steps.resolve-e2e-migrate-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
       - name: Fail if Neon DB URL is missing (E2E)
         if: steps.check_changes.outputs.run_full_ci == 'true'
