@@ -281,4 +281,25 @@ describe('POST /api/stripe/checkout', () => {
     expect(response.status).toBe(400);
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
   });
+
+  it('returns 400 (not 500) when the request body is not valid JSON', async () => {
+    // Regression: malformed JSON was being caught by the generic error handler
+    // and returned as a 500 with `captureCriticalError` (fatal severity).
+    // Malformed JSON is a client error, not a server error, and must not page.
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not valid json',
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
+    // Must not reach Stripe when the body is malformed.
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
 });

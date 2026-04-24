@@ -20,6 +20,8 @@ vi.mock('@/lib/stripe/plan-change', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
+  captureError: vi.fn(),
+  captureWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe/config', () => ({
@@ -135,5 +137,30 @@ describe('/api/stripe/plan-change/preview route', () => {
       customerId: 'cus_123',
       newPriceId: 'price_max_monthly',
     });
+  });
+
+  it('returns 400 (not 500) when the request body is not valid JSON', async () => {
+    // Regression: malformed JSON was being caught by the generic error
+    // handler and returned as a 500 with `captureCriticalError` (fatal).
+    // Malformed JSON is a client error and must not page.
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+
+    const { POST } = await import('@/app/api/stripe/plan-change/preview/route');
+    const request = new NextRequest(
+      'http://localhost/api/stripe/plan-change/preview',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not valid json',
+      }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'Invalid JSON in request body',
+    });
+    expect(mockPreviewPlanChange).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
 });
