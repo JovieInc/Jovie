@@ -5,6 +5,8 @@ import { POST } from '@/app/api/verification/request/route';
 const mockWithDbSession = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockNotifyVerificationRequest = vi.hoisted(() => vi.fn());
+const mockCheckVerificationRequestRateLimit = vi.hoisted(() => vi.fn());
+const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn(() => ({})));
 
 const mockLimit = vi.hoisted(() => vi.fn());
 const mockWhere = vi.hoisted(() => vi.fn(() => ({ limit: mockLimit })));
@@ -55,9 +57,21 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkVerificationRequestRateLimit: mockCheckVerificationRequestRateLimit,
+  createRateLimitHeaders: mockCreateRateLimitHeaders,
+}));
+
 describe('POST /api/verification/request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCheckVerificationRequestRateLimit.mockResolvedValue({
+      success: true,
+      limit: 3,
+      remaining: 2,
+      reset: Date.now() + 60_000,
+    });
+    mockCreateRateLimitHeaders.mockReturnValue({});
     mockWithDbSession.mockImplementation(
       async (callback: (clerkUserId: string) => Promise<NextResponse>) =>
         callback('clerk_123')
@@ -152,6 +166,36 @@ describe('POST /api/verification/request', () => {
       expect.objectContaining({
         route: '/api/verification/request',
       })
+    );
+  });
+
+  it('returns 429 and skips Slack notification when rate limited', async () => {
+    mockCheckVerificationRequestRateLimit.mockResolvedValueOnce({
+      success: false,
+      limit: 3,
+      remaining: 0,
+      reset: Date.now() + 60_000,
+      reason:
+        'You have submitted too many verification requests. Please try again later.',
+    });
+    mockCreateRateLimitHeaders.mockReturnValueOnce({
+      'X-RateLimit-Limit': '3',
+      'X-RateLimit-Remaining': '0',
+    });
+
+    const response = await POST();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('X-RateLimit-Limit')).toBe('3');
+    await expect(response.json()).resolves.toEqual({
+      error:
+        'You have submitted too many verification requests. Please try again later.',
+    });
+    // Critical: no Slack fanout when rate limited, and no DB lookup either.
+    expect(mockNotifyVerificationRequest).not.toHaveBeenCalled();
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockCheckVerificationRequestRateLimit).toHaveBeenCalledWith(
+      'clerk_123'
     );
   });
 

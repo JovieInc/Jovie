@@ -73,6 +73,7 @@ export {
   checkSpotifyRefreshRateLimit,
   checkSpotifySearchRateLimit,
   checkTrackingRateLimit,
+  checkVerificationRequestRateLimit,
   checkWrapLinkRateLimit,
   dashboardLinksLimiter,
   deployPromoteLimiter,
@@ -101,6 +102,7 @@ export {
   trackingIpClicksLimiter,
   trackingIpVisitsLimiter,
   trackingVisitsLimiter,
+  verificationRequestLimiter,
   wrapLinkAnonymousLimiter,
   wrapLinkLimiter,
 } from './limiters';
