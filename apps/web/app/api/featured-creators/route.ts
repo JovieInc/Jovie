@@ -11,38 +11,43 @@ export const revalidate = 3600; // Cache results for 1 hour
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 async function getFeaturedCreators() {
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Database timeout')), 3000);
-  });
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timerId = setTimeout(() => reject(new Error('Database timeout')), 3000);
+    });
 
-  const data = await Promise.race([
-    db
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        displayName: creatorProfiles.displayName,
-        avatarUrl: creatorProfiles.avatarUrl,
-        creatorType: creatorProfiles.creatorType,
-      })
-      .from(creatorProfiles)
-      .where(
-        and(
-          eq(creatorProfiles.isPublic, true),
-          eq(creatorProfiles.isFeatured, true),
-          eq(creatorProfiles.marketingOptOut, false)
+    const data = await Promise.race([
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          displayName: creatorProfiles.displayName,
+          avatarUrl: creatorProfiles.avatarUrl,
+          creatorType: creatorProfiles.creatorType,
+        })
+        .from(creatorProfiles)
+        .where(
+          and(
+            eq(creatorProfiles.isPublic, true),
+            eq(creatorProfiles.isFeatured, true),
+            eq(creatorProfiles.marketingOptOut, false)
+          )
         )
-      )
-      .orderBy(creatorProfiles.displayName)
-      .limit(12),
-    timeoutPromise,
-  ]);
+        .orderBy(creatorProfiles.displayName)
+        .limit(12),
+      timeoutPromise,
+    ]);
 
-  return data.map(a => ({
-    id: a.id,
-    handle: a.username,
-    name: a.displayName || a.username,
-    src: a.avatarUrl || '/android-chrome-192x192.png',
-  }));
+    return data.map(a => ({
+      id: a.id,
+      handle: a.username,
+      name: a.displayName || a.username,
+      src: a.avatarUrl || '/android-chrome-192x192.png',
+    }));
+  } finally {
+    if (timerId !== undefined) clearTimeout(timerId);
+  }
 }
 
 export async function GET() {
