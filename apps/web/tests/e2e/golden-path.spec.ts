@@ -852,4 +852,33 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       'Stripe checkout URL missing — checkout session not created'
     ).toMatch(/^https:\/\/checkout\.stripe\.com\//);
   });
+
+  test('production synthetic smoke validates homepage CTA path', async ({
+    page,
+  }) => {
+    await page.goto('/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+
+    const signupCta = page
+      .locator('#handle-input')
+      .or(page.locator('a[href*="/signup"]').first());
+    await expect(signupCta.first()).toBeVisible({ timeout: 20_000 });
+
+    const claimInput = page.locator('#handle-input');
+    const claimVisible = await claimInput
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+
+    if (claimVisible) {
+      const testHandle = `gp-smoke-${Date.now().toString(36)}`;
+      await claimInput.fill(testHandle);
+      await claimInput.press('Enter');
+    } else {
+      await page.locator('a[href*="/signup"]').first().click();
+    }
+
+    await page.waitForURL(/\/(signup|onboarding)/, { timeout: 30_000 });
+  });
 });
