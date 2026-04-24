@@ -89,6 +89,17 @@ vi.mock('@/lib/auth/proxy-state', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
+  captureWarning: vi.fn(),
+}));
+
+vi.mock('@/lib/profile/profile-theme.server', () => ({
+  buildThemeWithProfileAccent: vi.fn().mockResolvedValue({
+    profileAccent: {
+      version: 1,
+      primaryHex: '#d3834e',
+      sourceUrl: 'https://i.scdn.co/image/abc123',
+    },
+  }),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({

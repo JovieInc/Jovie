@@ -9,6 +9,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { mergeProfileTheme } from '@/lib/profile/profile-theme';
 import { logger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
@@ -54,11 +55,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const [currentProfile] = await db
+        .select({
+          theme: creatorProfiles.theme,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, artistId))
+        .limit(1);
+
       // Update the creator profile's theme preference
       const result = await db
         .update(creatorProfiles)
         .set({
-          theme: { mode: theme },
+          theme: mergeProfileTheme(currentProfile?.theme, { mode: theme }),
           updatedAt: new Date(),
         })
         .where(eq(creatorProfiles.id, artistId))

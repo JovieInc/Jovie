@@ -22,6 +22,7 @@ import {
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 
 const requestSchema = z.object({
   profileId: z.string().uuid(),
@@ -56,7 +57,11 @@ export async function POST(
 
     // Verify ownership
     const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
+      .select({
+        id: creatorProfiles.id,
+        clerkId: users.clerkId,
+        theme: creatorProfiles.theme,
+      })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
@@ -98,6 +103,10 @@ export async function POST(
       .set({
         avatarUrl: candidate.avatarUrl,
         avatarLockedByUser: true,
+        theme: await buildThemeWithProfileAccent({
+          existingTheme: profile.theme,
+          sourceUrl: candidate.avatarUrl,
+        }),
         updatedAt: now,
       })
       .where(eq(creatorProfiles.id, profileId));

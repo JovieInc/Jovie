@@ -5,6 +5,7 @@
 // Import SocialPlatform from the canonical source
 export type { SocialPlatform } from '@/constants/platforms';
 
+import type { ProfileThemeRecord } from '@/lib/profile/profile-theme';
 import { toISOStringSafe } from '@/lib/utils/date';
 
 // Creator type enum
@@ -136,7 +137,7 @@ export interface CreatorProfile {
   created_by?: string; // User ID who created this record
   updated_by?: string; // User ID who last updated this record
   settings: Record<string, unknown> | null;
-  theme: Record<string, unknown> | null;
+  theme: ProfileThemeRecord | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,7 +156,7 @@ export interface Artist {
   name: string; // maps to display_name
   image_url?: string; // maps to avatar_url
   tagline?: string; // maps to bio
-  theme?: Record<string, unknown>;
+  theme?: ProfileThemeRecord;
   settings?: ArtistSettings;
   spotify_url?: string;
   apple_music_url?: string;

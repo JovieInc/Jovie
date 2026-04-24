@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
@@ -94,8 +95,10 @@ export default function MarketingRenderPage() {
           }
           drawerOpen={state.drawerView !== null}
           drawerView={state.drawerView ?? 'menu'}
+          activeMode={getPreviewActiveMode(stateId)}
           onDrawerOpenChange={() => {}}
           onDrawerViewChange={() => {}}
+          onModeSelect={() => {}}
           onOpenMenu={() => {}}
           onPlayClick={() => {}}
           onShare={() => {}}

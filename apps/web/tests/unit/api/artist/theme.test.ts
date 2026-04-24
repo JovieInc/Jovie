@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockWithDbSession = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
+const mockDbSelect = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
   withDbSession: mockWithDbSession,
@@ -10,14 +11,21 @@ vi.mock('@/lib/auth/session', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    select: mockDbSelect,
     update: mockDbUpdate,
   },
-  eq: vi.fn(),
 }));
 
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-  users: {},
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((field, value) => ({ field, value })),
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: {
+    id: 'id',
+    theme: 'theme',
+    usernameNormalized: 'usernameNormalized',
+  },
 }));
 
 vi.mock('@/lib/cache/profile', () => ({
@@ -41,6 +49,26 @@ describe('POST /api/artist/theme', () => {
     vi.clearAllMocks();
     vi.resetModules();
   });
+
+  function createSelectChain(result: unknown[] = []) {
+    const chain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue(result),
+    };
+    mockDbSelect.mockReturnValue(chain);
+    return chain;
+  }
+
+  function createUpdateChain(result: unknown[] = []) {
+    const chain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue(result),
+    };
+    mockDbUpdate.mockReturnValue(chain);
+    return chain;
+  }
 
   it('returns 401 when not authenticated', async () => {
     mockWithDbSession.mockImplementation(async () => {
@@ -86,17 +114,30 @@ describe('POST /api/artist/theme', () => {
       usernameNormalized: 'testuser',
     });
 
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi
-            .fn()
-            .mockResolvedValue([
-              { theme: { mode: 'dark' }, usernameNormalized: 'testuser' },
-            ]),
-        }),
-      }),
-    });
+    createSelectChain([
+      {
+        theme: {
+          profileAccent: {
+            version: 1,
+            primaryHex: '#d3834e',
+            sourceUrl: 'https://example.com/avatar.jpg',
+          },
+        },
+      },
+    ]);
+    const updateChain = createUpdateChain([
+      {
+        theme: {
+          mode: 'dark',
+          profileAccent: {
+            version: 1,
+            primaryHex: '#d3834e',
+            sourceUrl: 'https://example.com/avatar.jpg',
+          },
+        },
+        usernameNormalized: 'testuser',
+      },
+    ]);
 
     const { POST } = await import('@/app/api/artist/theme/route');
     const request = new NextRequest('http://localhost/api/artist/theme', {
@@ -110,5 +151,17 @@ describe('POST /api/artist/theme', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        theme: {
+          mode: 'dark',
+          profileAccent: {
+            version: 1,
+            primaryHex: '#d3834e',
+            sourceUrl: 'https://example.com/avatar.jpg',
+          },
+        },
+      })
+    );
   });
 });

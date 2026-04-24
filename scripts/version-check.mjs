@@ -8,7 +8,7 @@
  * - CHANGELOG latest release equals current version
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,16 +40,16 @@ if (!parsed) {
   }
 }
 
-for (const rel of [
-  'package.json',
-  ...['apps', 'packages']
-    .flatMap(scope =>
-      readdirSync(join(ROOT, scope), { withFileTypes: true })
-        .filter(entry => entry.isDirectory())
-        .map(entry => `${scope}/${entry.name}/package.json`)
-    )
-    .sort(),
-]) {
+const workspacePackageJsons = ['apps', 'packages']
+  .flatMap(scope =>
+    readdirSync(join(ROOT, scope), { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => `${scope}/${entry.name}/package.json`)
+      .filter(rel => existsSync(join(ROOT, rel)))
+  )
+  .sort();
+
+for (const rel of ['package.json', ...workspacePackageJsons]) {
   const version = JSON.parse(readFileSync(join(ROOT, rel), 'utf-8')).version;
   if (version !== currentVersion) {
     errors.push(
