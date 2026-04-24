@@ -622,7 +622,9 @@ export function InvestorLinksManager() {
                   <th className='px-4 py-2.5 font-semibold'>Stage</th>
                   <th className='px-4 py-2.5 font-semibold'>Status</th>
                   <th className='px-4 py-2.5 font-semibold'>Created</th>
-                  <th className='px-4 py-2.5 text-right font-semibold'>Actions</th>
+                  <th className='px-4 py-2.5 text-right font-semibold'>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>

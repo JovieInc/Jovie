@@ -230,7 +230,9 @@ function MetricTile({
         {icon}
         <span>{label}</span>
       </div>
-      <p className='mt-1 text-[12px] font-semibold text-primary-token'>{value}</p>
+      <p className='mt-1 text-[12px] font-semibold text-primary-token'>
+        {value}
+      </p>
     </div>
   );
 }
