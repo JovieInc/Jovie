@@ -424,7 +424,7 @@ export function renderVisitsNumberCell({
 }: CellContext<AudienceMember, number>) {
   const visits = getValue();
   return (
-    <span className='tabular-nums text-[13px] font-[400] text-secondary-token'>
+    <span className='tabular-nums text-[13px] font-normal text-secondary-token'>
       {visits}
     </span>
   );

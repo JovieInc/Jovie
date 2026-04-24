@@ -201,7 +201,7 @@ function TourDateRow({
             new Date(tourDate.startDate)
           )}
         </span>
-        <span className='mt-1 text-[1.4rem] font-[680] tracking-[-0.06em] text-primary-token'>
+        <span className='mt-1 text-[1.4rem] font-bold tracking-[-0.06em] text-primary-token'>
           {new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(
             new Date(tourDate.startDate)
           )}

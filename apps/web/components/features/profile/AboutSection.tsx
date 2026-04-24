@@ -87,7 +87,7 @@ export function AboutSection({
   if (!hasContent) {
     return (
       <div className='py-4 text-center'>
-        <p className='text-[14px] font-[450] text-white/40'>
+        <p className='text-[14px] font-book text-white/40'>
           No information available yet.
         </p>
       </div>
@@ -99,7 +99,7 @@ export function AboutSection({
       <p className='sr-only'>About {artist.name}</p>
 
       {hasBio && (
-        <p className='text-[14px] font-[450] leading-relaxed text-white/70 whitespace-pre-line'>
+        <p className='text-[14px] font-book leading-relaxed text-white/70 whitespace-pre-line'>
           {artist.tagline}
         </p>
       )}

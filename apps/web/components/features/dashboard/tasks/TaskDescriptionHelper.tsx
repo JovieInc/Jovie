@@ -26,7 +26,7 @@ export function TaskDescriptionHelper({
       />
       <div className='pointer-events-none relative z-10 max-w-[40rem] space-y-3 px-5 py-5 text-left'>
         <div className='space-y-1'>
-          <h3 className='text-app font-[600] text-primary-token'>
+          <h3 className='text-app font-semibold text-primary-token'>
             {helper.title}
           </h3>
           {helper.intro.map(paragraph => {

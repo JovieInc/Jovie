@@ -33,7 +33,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       tone={isCopied ? 'secondary' : 'ghost'}
       size='sm'
       className={cn(
-        'group/btn h-7 gap-1.5 rounded-full px-2.5 text-[11px] font-[400]',
+        'group/btn h-7 gap-1.5 rounded-full px-2.5 text-[11px] font-normal',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
           : 'text-tertiary-token'
