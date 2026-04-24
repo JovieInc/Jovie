@@ -151,7 +151,7 @@ export function TaskListRow({
           <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}
           </span>
-          <span className='shrink-0 truncate font-[560] text-tertiary-token'>
+          <span className='shrink-0 truncate font-semibold text-tertiary-token'>
             J-{task.taskNumber}
           </span>
           <div className='min-w-0 max-w-full overflow-hidden text-left'>

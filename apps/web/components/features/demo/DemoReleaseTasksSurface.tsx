@@ -169,7 +169,7 @@ export function DemoReleaseTasksSurface() {
             </div>
             <div className='rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-3'>
               <p className='text-[11px] text-tertiary-token'>Next Review</p>
-              <p className='mt-2 flex items-center gap-2 text-[14px] font-[560] text-primary-token'>
+              <p className='mt-2 flex items-center gap-2 text-[14px] font-semibold text-primary-token'>
                 <CalendarDays className='h-4 w-4 text-tertiary-token' />
                 Today at 4:00 PM
               </p>

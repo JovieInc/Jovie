@@ -68,7 +68,7 @@ export function InterstitialClient({
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
           <CheckCircle2 className='h-6 w-6 text-success' aria-hidden='true' />
         </div>
-        <p className='text-[13px] font-[560] text-primary-token'>
+        <p className='text-[13px] font-semibold text-primary-token'>
           Verified. Redirecting...
         </p>
       </div>
@@ -87,7 +87,7 @@ export function InterstitialClient({
         <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
           Destination
         </p>
-        <p className='text-[13px] font-[560] text-primary-token'>
+        <p className='text-[13px] font-semibold text-primary-token'>
           {titleAlias}
         </p>
         {domain === 'External Site' ? null : (

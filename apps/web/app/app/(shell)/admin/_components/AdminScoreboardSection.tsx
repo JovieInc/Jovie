@@ -74,7 +74,7 @@ function FunnelStep({
         />
       )}
       <li className='min-w-[100px] shrink-0 list-none'>
-        <p className='text-[11px] font-[560] text-tertiary-token'>{label}</p>
+        <p className='text-[11px] font-semibold text-tertiary-token'>{label}</p>
         <p className='text-[24px] font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'>
           {count.toLocaleString('en-US')}
         </p>

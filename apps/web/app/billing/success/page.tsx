@@ -52,7 +52,7 @@ function FeatureCard({
   return (
     <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
       <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-      <p className='text-[13px] font-[560] text-primary-token'>{title}</p>
+      <p className='text-[13px] font-semibold text-primary-token'>{title}</p>
       <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
     </ContentSurfaceCard>
   );

@@ -68,7 +68,7 @@ function SectionEyebrow({
   children,
 }: Readonly<{ readonly children: ReactNode }>) {
   return (
-    <p className='text-[11px] font-[560] uppercase tracking-[0.16em] text-tertiary-token'>
+    <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
       {children}
     </p>
   );
@@ -82,7 +82,7 @@ function DeploymentRow({
   return (
     <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
-        <p className='truncate text-[13px] font-[560] text-primary-token'>
+        <p className='truncate text-[13px] font-semibold text-primary-token'>
           #{run.runNumber}
           <span className='ml-2 font-normal text-secondary-token'>
             {run.branch ?? '\u2014'}
@@ -93,7 +93,7 @@ function DeploymentRow({
         <p className='text-[11px] text-tertiary-token'>
           {formatDeploymentTime(run.createdAtIso)}
         </p>
-        <p className='mt-0.5 text-[11px] font-[560] uppercase tracking-[0.08em] text-secondary-token'>
+        <p className='mt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-token'>
           {run.status}
         </p>
       </div>

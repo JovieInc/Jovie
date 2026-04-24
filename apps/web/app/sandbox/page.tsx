@@ -23,7 +23,7 @@ export default function SandboxPage() {
           <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2 sm:p-4 sm:pt-0'>
             <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
               <div className='space-y-1'>
-                <h2 className='text-[13px] font-[560] text-primary-token'>
+                <h2 className='text-[13px] font-semibold text-primary-token'>
                   Buttons
                 </h2>
                 <p className='text-[12px] text-secondary-token'>
@@ -39,7 +39,7 @@ export default function SandboxPage() {
 
             <ContentSurfaceCard surface='nested' className='space-y-4 p-4'>
               <div className='space-y-1'>
-                <h2 className='text-[13px] font-[560] text-primary-token'>
+                <h2 className='text-[13px] font-semibold text-primary-token'>
                   Inputs
                 </h2>
                 <p className='text-[12px] text-secondary-token'>
