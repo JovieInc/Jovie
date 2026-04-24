@@ -23,6 +23,7 @@ export const ServerEnvSchema = z.object({
     .default('development'),
   VITEST: z.string().optional(),
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
+  VERCEL_URL: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -197,6 +198,7 @@ export const ENV_KEYS = [
   'NODE_ENV',
   'VITEST',
   'VERCEL_ENV',
+  'VERCEL_URL',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'RESEND_API_KEY',

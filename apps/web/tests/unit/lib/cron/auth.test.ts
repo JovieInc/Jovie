@@ -97,18 +97,37 @@ describe('verifyTrustedCronOrigin', () => {
     vi.resetModules();
   });
 
-  it('trusts the Vercel cron header', async () => {
+  it('trusts the current Vercel deployment host', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_URL', 'jovie-prod-123.vercel.app');
 
     const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
 
     const trusted = verifyTrustedCronOrigin(
       new Request('https://example.com/api/cron/test', {
-        headers: { 'x-vercel-cron': '1' },
+        headers: { 'x-forwarded-host': 'jovie-prod-123.vercel.app' },
       })
     );
 
     expect(trusted).toBe(true);
+  });
+
+  it('rejects spoofed x-vercel-cron headers without a trusted host', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_URL', 'jovie-prod-123.vercel.app');
+
+    const { verifyTrustedCronOrigin } = await import('@/lib/cron/auth');
+
+    const trusted = verifyTrustedCronOrigin(
+      new Request('https://example.com/api/cron/test', {
+        headers: {
+          'x-vercel-cron': '1',
+          'x-forwarded-host': 'attacker-project.vercel.app',
+        },
+      })
+    );
+
+    expect(trusted).toBe(false);
   });
 
   it('trusts production and staging jov.ie forwarded hosts', async () => {

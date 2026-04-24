@@ -34,9 +34,9 @@ export function extractBearerToken(
  *
  * Explicitly does NOT include a `*.vercel.app` wildcard. Anyone can deploy to
  * `*.vercel.app`, so allowing the whole namespace lets an attacker forge the
- * `x-forwarded-host` header from an unrelated preview project. Vercel Cron
- * invocations are handled separately via the `x-vercel-cron: 1` header, and
- * Jovie-owned preview aliases can be added via the `CRON_TRUSTED_HOSTS` env.
+ * `x-forwarded-host` header from an unrelated preview project. Legitimate
+ * Vercel cron invocations are accepted via exact deployment hosts
+ * (`VERCEL_URL`) or explicit Jovie-owned aliases in `CRON_TRUSTED_HOSTS`.
  */
 const DEFAULT_TRUSTED_CRON_HOSTS: readonly string[] = [
   'jov.ie',
@@ -63,18 +63,18 @@ function parseTrustedHostsEnv(raw: string | undefined): string[] {
     .filter((entry): entry is string => Boolean(entry));
 }
 
-export function verifyTrustedCronOrigin(request: Request): boolean {
-  const vercelCronHeader = request.headers.get('x-vercel-cron');
-  if (vercelCronHeader === '1') {
-    return true;
-  }
+function getTrustedCronHosts(): Set<string> {
+  return new Set<string>([
+    ...DEFAULT_TRUSTED_CRON_HOSTS,
+    ...parseTrustedHostsEnv(env.CRON_TRUSTED_HOSTS),
+    ...parseTrustedHostsEnv(env.VERCEL_URL),
+  ]);
+}
 
+export function verifyTrustedCronOrigin(request: Request): boolean {
   const forwardedHost = normalizeHost(request.headers.get('x-forwarded-host'));
   if (forwardedHost) {
-    const trustedHosts = new Set<string>([
-      ...DEFAULT_TRUSTED_CRON_HOSTS,
-      ...parseTrustedHostsEnv(env.CRON_TRUSTED_HOSTS),
-    ]);
+    const trustedHosts = getTrustedCronHosts();
     if (trustedHosts.has(forwardedHost)) {
       return true;
     }
