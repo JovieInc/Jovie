@@ -101,7 +101,7 @@ export function AccountDashboard() {
         />
         <div className='space-y-4 px-5 py-4'>
           <div>
-            <h4 className='text-[13px] font-[510] text-primary-token'>
+            <h4 className='text-[13px] font-caption text-primary-token'>
               Account Status
             </h4>
             <p className='text-[13px] text-secondary-token'>
@@ -109,7 +109,7 @@ export function AccountDashboard() {
             </p>
           </div>
           <div>
-            <h4 className='text-[13px] font-[510] text-primary-token'>
+            <h4 className='text-[13px] font-caption text-primary-token'>
               Data & Privacy
             </h4>
             <p className='text-[13px] text-secondary-token'>

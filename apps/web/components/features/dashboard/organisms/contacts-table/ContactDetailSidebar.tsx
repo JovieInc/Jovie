@@ -308,7 +308,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       <SelectItem
                         key={option.value}
                         value={option.value}
-                        className='rounded-md px-2 py-1.5 text-app font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                        className='rounded-md px-2 py-1.5 text-app font-caption text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                       >
                         <div className='flex items-center gap-2'>
                           <Icon
@@ -416,7 +416,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         type='button'
                         onClick={() => handleTerritoryToggle(territory)}
                         className={cn(
-                          'rounded-lg border px-2.5 py-1 text-xs font-[510] transition-[background-color,border-color,color] duration-150',
+                          'rounded-lg border px-2.5 py-1 text-xs font-caption transition-[background-color,border-color,color] duration-150',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'

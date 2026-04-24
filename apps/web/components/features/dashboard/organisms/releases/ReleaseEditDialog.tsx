@@ -136,7 +136,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-[13px] font-caption text-primary-token'>
                           {provider.label}
                         </p>
                       </div>

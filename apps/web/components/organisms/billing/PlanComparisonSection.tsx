@@ -164,7 +164,7 @@ export function PlanComparisonSection({
 
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
-                    <span className='text-[13px] font-[510] text-tertiary-token'>
+                    <span className='text-[13px] font-caption text-tertiary-token'>
                       Coming soon
                     </span>
                   ) : (

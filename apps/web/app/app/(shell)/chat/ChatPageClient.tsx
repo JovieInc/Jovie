@@ -92,7 +92,7 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
       <span className='shrink-0 text-[11px] font-semibold tracking-normal text-tertiary-token'>
         Thread
       </span>
-      <span className='block max-w-[220px] truncate text-xs font-[510] text-primary-token'>
+      <span className='block max-w-[220px] truncate text-xs font-caption text-primary-token'>
         {title}
       </span>
     </span>

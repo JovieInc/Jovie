@@ -116,7 +116,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 </div>
                 <div className='min-w-0'>
                   <div className='flex flex-wrap items-center gap-1.5'>
-                    <p className='text-app font-[510] text-primary-token'>
+                    <p className='text-app font-caption text-primary-token'>
                       {label}
                     </p>
                     {isVerified ? (
@@ -137,7 +137,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 size='sm'
                 disabled={disconnectingId === account.id}
                 onClick={() => setAccountToDisconnect(account)}
-                className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
               >
                 <Link2Off className='mr-1.5 h-4 w-4' aria-hidden />
                 {disconnectingId === account.id

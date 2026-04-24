@@ -139,7 +139,7 @@ export function AboutSection({
             return (
               <span
                 key={key}
-                className='rounded-full border px-3 py-1 text-[11px] font-[510] capitalize'
+                className='rounded-full border px-3 py-1 text-[11px] font-caption capitalize'
                 style={{
                   backgroundColor: hexToRgba(accent, 0.14),
                   color: lightenHex(accent, 0.35),
@@ -156,7 +156,7 @@ export function AboutSection({
       {hasPressPhotos && (
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
-            <h2 className='text-[13px] font-[510] text-white/70'>
+            <h2 className='text-[13px] font-caption text-white/70'>
               Press photos
             </h2>
           </div>

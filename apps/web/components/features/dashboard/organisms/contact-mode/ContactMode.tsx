@@ -61,7 +61,7 @@ function ContactListItem({
         <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-caption text-primary-token'>
                 {roleLabel}
               </p>
               {territorySummary !== 'General' && (

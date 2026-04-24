@@ -191,7 +191,7 @@ export function AppleMusicSyncBanner({
           <DspProviderIcon provider='apple_music' size='md' />
         </div>
         <div className='min-w-0 flex-1'>
-          <p className='text-app font-[510] text-primary-token'>
+          <p className='text-app font-caption text-primary-token'>
             No Apple Music match found
           </p>
           <p className='mt-0.5 text-2xs text-secondary-token'>
@@ -220,7 +220,7 @@ export function AppleMusicSyncBanner({
 
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-app font-[510] text-primary-token'>
+          <span className='min-w-0 truncate text-app font-caption text-primary-token'>
             {match.externalArtistName}
           </span>
           {externalArtistUrl && (

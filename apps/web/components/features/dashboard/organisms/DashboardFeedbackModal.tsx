@@ -143,7 +143,7 @@ export function DashboardFeedbackModal({
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
               loading={isSubmitting}
-              className='font-[510]'
+              className='font-caption'
             >
               Send feedback
             </Button>

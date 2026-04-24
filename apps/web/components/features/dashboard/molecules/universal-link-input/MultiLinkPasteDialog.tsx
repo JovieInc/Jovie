@@ -114,11 +114,11 @@ function LinkItem({
       {/* URL and info */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[13px] font-[510] text-primary-token'>
+          <span className='text-[13px] font-caption text-primary-token'>
             {platform.name}
           </span>
           {isDuplicate && (
-            <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-[510] text-amber-600 dark:text-amber-400'>
+            <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-caption text-amber-600 dark:text-amber-400'>
               <Icon name='AlertTriangle' className='h-3 w-3' />
               Already added
             </span>

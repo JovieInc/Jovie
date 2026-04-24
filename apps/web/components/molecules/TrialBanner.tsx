@@ -54,7 +54,7 @@ export function TrialBanner() {
       aria-live='polite'
     >
       <div className='flex items-center gap-3 text-[13px]'>
-        <span className='font-[510] text-primary-token'>{daysText}</span>
+        <span className='font-caption text-primary-token'>{daysText}</span>
         <UpgradeButton size='sm'>{ctaText}</UpgradeButton>
       </div>
       {!isUrgent && (

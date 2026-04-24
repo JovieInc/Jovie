@@ -117,7 +117,7 @@ export function DspMatchCard({
           {/* Artist Info */}
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <span className='truncate font-[510] text-primary-token'>
+              <span className='truncate font-caption text-primary-token'>
                 {externalArtistName}
               </span>
               {externalArtistUrl && (
@@ -183,7 +183,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-2xs font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+              className='h-7 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-2xs font-caption text-secondary-token hover:bg-surface-1 hover:text-primary-token'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>
@@ -194,7 +194,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onConfirm(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-lg px-2.5 text-2xs font-[510]'
+              className='h-7 rounded-lg px-2.5 text-2xs font-caption'
             >
               {isConfirming ? 'Confirming...' : 'Confirm Match'}
             </Button>

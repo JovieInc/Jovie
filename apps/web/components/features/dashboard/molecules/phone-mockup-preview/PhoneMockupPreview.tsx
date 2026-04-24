@@ -173,7 +173,7 @@ export function PhoneMockupPreview({
                       </div>
 
                       <div className='min-w-0 flex-1'>
-                        <h3 className='truncate text-app font-[510] text-primary-token'>
+                        <h3 className='truncate text-app font-caption text-primary-token'>
                           {link.title || getPlatformName(link.platform)}
                         </h3>
                         <p className='truncate text-app text-secondary-token'>
@@ -208,7 +208,7 @@ export function PhoneMockupPreview({
                       aria-hidden='true'
                     />
                   </div>
-                  <h3 className='mb-1 text-app font-[510] text-primary-token'>
+                  <h3 className='mb-1 text-app font-caption text-primary-token'>
                     No links yet
                   </h3>
                   <p className='text-app text-secondary-token'>

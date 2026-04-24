@@ -203,7 +203,9 @@ export const InlineChatArea = forwardRef<
       >
         <div className='flex items-center gap-2'>
           <BrandLogo size={16} tone='auto' />
-          <span className='text-app font-[510] text-primary-token'>Jovie</span>
+          <span className='text-app font-caption text-primary-token'>
+            Jovie
+          </span>
           {messages.length > 0 && (
             <span className='text-2xs text-tertiary-token'>
               ({messages.length} messages)
@@ -300,7 +302,7 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 rounded-lg text-2xs font-[510] tracking-[-0.01em]'
+                      className='mt-2 h-7 gap-1.5 rounded-lg text-2xs font-caption tracking-[-0.01em]'
                     >
                       <RefreshCw className='h-3 w-3' />
                       Try again

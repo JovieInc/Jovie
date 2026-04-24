@@ -250,7 +250,7 @@ export function UniversalLinkInputArtistSearchMode({
                     </div>
 
                     <div className='flex-1 min-w-0'>
-                      <div className='truncate font-[510] text-primary-token'>
+                      <div className='truncate font-caption text-primary-token'>
                         {artist.name}
                       </div>
                       {artist.followers && (

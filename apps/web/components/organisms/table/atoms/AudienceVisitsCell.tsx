@@ -17,7 +17,7 @@ export function AudienceVisitsCell({
 }: AudienceVisitsCellProps) {
   return (
     <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>
-      <span className='font-[510]'>{visits}</span>
+      <span className='font-caption'>{visits}</span>
       <AudienceIntentBadge intentLevel={intentLevel} />
     </div>
   );

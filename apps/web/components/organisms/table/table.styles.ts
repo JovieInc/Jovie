@@ -6,8 +6,8 @@
 // Typography Scale - Visual Hierarchy
 export const typography = {
   tableHeader:
-    'text-[13px] font-[510] text-secondary-token tracking-normal line-clamp-1',
-  cellPrimary: 'text-[13px] font-[510] text-primary-token', // Main content
+    'text-[13px] font-caption text-secondary-token tracking-normal line-clamp-1',
+  cellPrimary: 'text-[13px] font-caption text-primary-token', // Main content
   cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
   rowNumber: 'text-[13px] tabular-nums text-tertiary-token', // Monospace numbers

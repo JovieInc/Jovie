@@ -113,7 +113,7 @@ export function DspProviderIcon({
         </span>
       )}
       {showLabel && (
-        <span className='text-[13px] font-[510] text-secondary-token'>
+        <span className='text-[13px] font-caption text-secondary-token'>
           {label}
         </span>
       )}

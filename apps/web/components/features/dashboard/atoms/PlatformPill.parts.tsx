@@ -121,7 +121,7 @@ export function ExpandedContent({
       </div>
 
       {badgeText ? (
-        <span className='shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'>
+        <span className='shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
           {badgeText}
         </span>
       ) : null}

@@ -98,7 +98,7 @@ function ListSection({
     <ContentSurfaceCard className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
-        <h3 className='text-app font-[510] text-secondary-token'>{title}</h3>
+        <h3 className='text-app font-caption text-secondary-token'>{title}</h3>
       </div>
 
       {loading && (
@@ -119,14 +119,14 @@ function ListSection({
               className='flex items-center justify-between group'
             >
               <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='w-4 text-2xs font-[510] text-tertiary-token tabular-nums'>
+                <span className='w-4 text-2xs font-caption text-tertiary-token tabular-nums'>
                   {index + 1}
                 </span>
                 <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
                   {item.label}
                 </span>
               </div>
-              <span className='ml-2 text-app font-[510] text-primary-token tabular-nums'>
+              <span className='ml-2 text-app font-caption text-primary-token tabular-nums'>
                 {item.value}
               </span>
             </li>

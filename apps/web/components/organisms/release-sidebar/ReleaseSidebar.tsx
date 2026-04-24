@@ -201,7 +201,7 @@ function ReleaseEntityHeader({
           <div className='absolute right-2.5 top-2.5'>{actionBar}</div>
         ) : null}
         {headerLabel ? (
-          <p className='mb-1 truncate font-mono text-[10.5px] font-[510] leading-none tracking-[0.025em] text-quaternary-token'>
+          <p className='mb-1 truncate font-mono text-[10.5px] font-caption leading-none tracking-[0.025em] text-quaternary-token'>
             {headerLabel}
           </p>
         ) : null}

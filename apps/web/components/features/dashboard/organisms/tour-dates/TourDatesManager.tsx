@@ -147,7 +147,7 @@ export function TourDatesManager({
               </div>
               <span className='text-[13px] text-secondary-token'>
                 Connected to{' '}
-                <span className='font-[510] text-primary-token'>
+                <span className='font-caption text-primary-token'>
                   {connectionStatus.artistName}
                 </span>{' '}
                 on Bandsintown

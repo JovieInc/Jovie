@@ -43,7 +43,7 @@ export function TableCountBadge({
   if (variant === 'text') {
     return (
       <span
-        className={cn('text-[13px] font-[510] text-primary-token', className)}
+        className={cn('text-[13px] font-caption text-primary-token', className)}
       >
         {displayText}
       </span>
@@ -53,7 +53,7 @@ export function TableCountBadge({
   return (
     <span
       className={cn(
-        'rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] tabular-nums text-primary-token',
+        'rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-caption tabular-nums text-primary-token',
         className
       )}
     >

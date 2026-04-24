@@ -76,7 +76,7 @@ export function BillingHistorySection({
                         <IconComponent className='h-4 w-4 text-secondary-token' />
                       </div>
                       <div>
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-[13px] font-caption text-primary-token'>
                           {formatEventType(entry.eventType)}
                         </p>
                         <Badge

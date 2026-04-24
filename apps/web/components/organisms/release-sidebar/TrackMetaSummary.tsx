@@ -84,7 +84,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-[9px] font-[510] text-tertiary-token'
+              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-[9px] font-caption text-tertiary-token'
             >
               E
             </Badge>
