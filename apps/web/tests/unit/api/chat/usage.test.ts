@@ -16,9 +16,17 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: hoisted.getUserBillingInfoMock,
 }));
 
-vi.mock('@/lib/entitlements/registry', () => ({
-  getEntitlements: hoisted.getEntitlementsMock,
-}));
+vi.mock('@/lib/entitlements/registry', async () => {
+  // Preserve real exports (including `resolveChatUsagePlan`, extracted from
+  // the route in 45ef3d68) while only substituting `getEntitlements`.
+  const actual = await vi.importActual<
+    typeof import('@/lib/entitlements/registry')
+  >('@/lib/entitlements/registry');
+  return {
+    ...actual,
+    getEntitlements: hoisted.getEntitlementsMock,
+  };
+});
 
 vi.mock('@/lib/redis', () => ({
   getRedis: hoisted.getRedisMock,
