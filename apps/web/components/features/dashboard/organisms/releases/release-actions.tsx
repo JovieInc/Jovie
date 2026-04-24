@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { buildCopyMenuItems } from '@/features/ui/CopyableField';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -24,6 +25,32 @@ const menuIcon = (
     | 'Trash2'
     | 'Copy'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
+
+/**
+ * Platform icon for a provider's "Open in..." action.
+ *
+ * Uses SocialIcon (brand-shaped monochrome SVG) so the Spotify / Apple Music /
+ * YouTube Music / Deezer entries in the release row menu match the platform
+ * icons already used in the sibling "Tracked Links" submenu, instead of a
+ * generic ExternalLink.
+ *
+ * Falls back to ExternalLink for providers without a SocialIcon entry so new
+ * providers degrade gracefully.
+ */
+const PROVIDER_SOCIAL_ICON_MAP: Partial<Record<ProviderKey, string>> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  youtube: 'youtube_music',
+  deezer: 'deezer',
+};
+
+const providerMenuIcon = (provider: ProviderKey): ReactNode => {
+  const platform = PROVIDER_SOCIAL_ICON_MAP[provider];
+  if (!platform) {
+    return menuIcon('ExternalLink');
+  }
+  return <SocialIcon platform={platform} className='h-3.5 w-3.5' />;
+};
 
 export interface BuildReleaseActionsOptions {
   readonly release: ReleaseViewModel;
@@ -320,7 +347,7 @@ export function buildReleaseActions({
     items.push({
       id: 'open-release',
       label: `Open in ${providerLabels[provider.key] || provider.key}`,
-      icon: menuIcon('ExternalLink'),
+      icon: providerMenuIcon(provider.key),
       onClick: () => {
         globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
       },
@@ -333,7 +360,7 @@ export function buildReleaseActions({
       items: externalProviders.map(provider => ({
         id: `open-${provider.key}`,
         label: `Open in ${providerLabels[provider.key] || provider.key}`,
-        icon: menuIcon('ExternalLink'),
+        icon: providerMenuIcon(provider.key),
         onClick: () => {
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         },
