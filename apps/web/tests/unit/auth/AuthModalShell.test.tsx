@@ -51,4 +51,21 @@ describe('AuthModalShell', () => {
 
     expect(screen.getByLabelText('Back to chat')).toBeInTheDocument();
   });
+
+  it.each([
+    '',
+    '   ',
+    '\t\n',
+  ])('falls back to "Go back" when backButtonLabel is whitespace-only (%j)', emptyish => {
+    // Guards the render-time fallback added in c9ae3ce. An empty or
+    // whitespace-only aria-label would otherwise leave the button
+    // unlabeled for assistive tech.
+    render(
+      <AuthModalShell backButtonLabel={emptyish}>
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    expect(screen.getByLabelText('Go back')).toBeInTheDocument();
+  });
 });
