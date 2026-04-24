@@ -3,49 +3,43 @@ import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
   readonly className?: string;
-  readonly variant?: 'page' | 'image-only' | 'modal';
+  readonly variant?: 'page' | 'image-only';
 }
 
 export function AuthBrandPanel({
   className,
   variant = 'page',
 }: Readonly<AuthBrandPanelProps>) {
-  const isModalVariant = variant === 'modal';
   const showCopy = variant === 'page';
 
-  const showcaseAsset = isModalVariant
-    ? {
-        src: '/product-screenshots/release-sidebar-detail.png',
-        alt: 'Jovie release detail panel showing analytics and release properties',
-        aspectRatio: '391 / 845',
-        sizes: '320px',
-        imageClassName: 'object-cover object-top',
-      }
-    : {
-        src: '/product-screenshots/releases-dashboard-full.png',
-        alt: 'Jovie releases workspace showing artist releases, links, and audience context in one view',
-        aspectRatio: '2880 / 1800',
-        sizes: '(min-width: 1280px) 640px, (min-width: 1024px) 48vw, 100vw',
-        imageClassName: 'object-cover object-left-top',
-      };
+  const showcaseAsset = {
+    src: '/product-screenshots/releases-dashboard-full.png',
+    alt: 'Jovie releases workspace showing artist releases, links, and audience context in one view',
+    width: 2880,
+    height: 1800,
+    aspectRatio: variant === 'image-only' ? '1 / 1.12' : '1 / 1.48',
+    sizes: '(min-width: 1280px) 620px, (min-width: 1024px) 46vw, 100vw',
+    imageClassName:
+      variant === 'image-only'
+        ? 'object-cover object-[22%_top] brightness-[1.05] contrast-[1.03]'
+        : 'object-cover object-[24%_top] brightness-[1.05] contrast-[1.03]',
+  } as const;
 
   return (
     <div
       className={cn(
-        'auth-showcase-panel flex flex-col',
-        isModalVariant
-          ? 'min-h-[20rem] justify-center p-4 sm:p-5'
-          : 'min-h-[42rem] justify-between lg:min-h-[calc(100svh-8rem)]',
+        'auth-showcase-panel flex h-full flex-col',
+        'min-h-[42rem] lg:min-h-[calc(100svh-7.5rem)]',
         className
       )}
       data-variant={variant}
     >
       {showCopy ? (
-        <div className='auth-showcase-copy space-y-4'>
-          <h2 className='text-[clamp(2.95rem,4.2vw,4.05rem)] leading-[0.92] font-[590] tracking-[-0.065em] whitespace-nowrap text-white'>
+        <div className='auth-showcase-copy space-y-3'>
+          <h2 className='text-[clamp(2.15rem,2.95vw,2.9rem)] leading-[0.95] font-[600] tracking-[-0.055em] whitespace-nowrap text-white'>
             Built for Artists.
           </h2>
-          <p className='max-w-[21rem] text-[0.97rem] leading-[1.65] font-[420] text-white/56 text-pretty'>
+          <p className='max-w-[16rem] text-[0.92rem] leading-[1.58] font-[420] text-white/54 text-pretty'>
             Jovie keeps releases, profiles, and the audience behind them in one
             calm system.
           </p>
@@ -60,10 +54,11 @@ export function AuthBrandPanel({
           <Image
             src={showcaseAsset.src}
             alt={showcaseAsset.alt}
-            fill
-            priority={!isModalVariant}
+            width={showcaseAsset.width}
+            height={showcaseAsset.height}
+            priority
             sizes={showcaseAsset.sizes}
-            className={showcaseAsset.imageClassName}
+            className={`h-full w-full ${showcaseAsset.imageClassName}`}
           />
         </div>
       </div>

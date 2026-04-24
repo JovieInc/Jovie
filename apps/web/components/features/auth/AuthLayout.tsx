@@ -132,13 +132,13 @@ export function AuthLayout({
       ) : null}
 
       {isSplitVariant ? (
-        <div className='relative z-10 flex w-full max-w-[1280px] flex-1 items-center justify-center'>
-          <div className='grid w-full gap-8 lg:min-h-[calc(100svh-8rem)] lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-stretch lg:gap-10 xl:gap-14'>
-            <div className='flex min-h-0 flex-col justify-center lg:max-w-[520px] lg:py-8'>
+        <div className='relative z-10 flex w-full max-w-[1240px] flex-1 items-center justify-center'>
+          <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
+            <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
               {showLogo ? (
                 <div
                   className={cn(
-                    'mb-7 flex justify-center transition-opacity duration-200 ease-out lg:mb-8 lg:justify-start',
+                    'mb-5 flex justify-center transition-opacity duration-200 ease-out lg:mb-6 lg:justify-start',
                     isKeyboardVisible && 'pointer-events-none opacity-0'
                   )}
                   aria-hidden={isKeyboardVisible}
@@ -173,13 +173,13 @@ export function AuthLayout({
                 tabIndex={-1}
                 className='w-full scroll-mt-4'
               >
-                <div className='mx-auto w-full max-w-[520px] lg:mx-0'>
+                <div className='mx-auto w-full max-w-[500px] lg:mx-0'>
                   {children}
                 </div>
               </main>
 
               {showFooterPrompt && !isKeyboardVisible ? (
-                <p className='mt-7 text-center text-[13px] font-[400] text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+                <p className='mt-6 text-center text-[13px] font-[400] text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
                   {footerPrompt}{' '}
                   <Link
                     href={footerLinkHref}
@@ -195,7 +195,7 @@ export function AuthLayout({
               <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
                 <AuthBrandPanel
                   variant={showcaseVariant}
-                  className='ml-auto h-full w-full max-w-[640px]'
+                  className='ml-auto h-full w-full max-w-[620px]'
                 />
               </div>
             ) : null}

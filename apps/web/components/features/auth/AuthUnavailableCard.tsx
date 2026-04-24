@@ -9,15 +9,15 @@ export function AuthUnavailableCard({
   showResetAction = false,
 }: AuthUnavailableCardProps = {}) {
   const actionClassName =
-    'inline-flex min-h-[3.75rem] w-full items-center justify-center rounded-full border border-white/10 bg-white px-6 text-[15px] font-[590] tracking-[-0.02em] text-[#08090a] shadow-[0_18px_42px_rgba(0,0,0,0.28)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/15 hover:bg-[#f2f2f2] hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24 sm:w-auto';
+    'inline-flex min-h-[3.75rem] w-full items-center justify-center rounded-full border border-white/10 bg-white px-6 text-[15px] font-[590] tracking-[-0.02em] text-[#08090a] shadow-[0_18px_42px_rgba(0,0,0,0.28)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/15 hover:bg-[#f2f2f2] hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24';
 
   return (
     <section
       data-testid='auth-clerk-unavailable'
-      className='w-full max-w-[32rem] space-y-7 text-center lg:text-left'
+      className='w-full max-w-[30rem] space-y-6 text-center lg:text-left'
     >
       <div className='flex justify-center lg:justify-start'>
-        <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[12px] font-[510] tracking-[-0.012em] text-white/70'>
+        <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] font-[510] tracking-[-0.012em] text-white/70'>
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-white/55'
@@ -26,11 +26,11 @@ export function AuthUnavailableCard({
         </div>
       </div>
 
-      <div className='space-y-3'>
-        <h1 className='text-[clamp(3rem,7vw,4.85rem)] font-[590] leading-[0.9] tracking-[-0.06em] text-white text-balance'>
+      <div className='space-y-2.5'>
+        <h1 className='max-w-[10.5ch] text-[clamp(2.9rem,6.2vw,4.45rem)] font-[590] leading-[0.92] tracking-[-0.06em] text-white text-balance lg:max-w-[11.5ch]'>
           Sign in is temporarily unavailable
         </h1>
-        <p className='mx-auto max-w-[28rem] text-[15px] leading-[1.7] tracking-[-0.014em] text-white/62 text-pretty lg:mx-0'>
+        <p className='mx-auto max-w-[26rem] text-[0.96rem] leading-[1.65] tracking-[-0.014em] text-white/60 text-pretty lg:mx-0'>
           {showResetAction
             ? "Something is off with this environment's auth. Try resetting your session — if it still fails, we've been notified."
             : 'Clerk is not configured for this environment.'}

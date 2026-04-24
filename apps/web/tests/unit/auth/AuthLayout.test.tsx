@@ -122,4 +122,16 @@ describe('AuthLayout', () => {
       screen.getByRole('button', { name: 'Open menu' })
     ).toBeInTheDocument();
   });
+
+  it('keeps the split auth rail mounted when the split layout variant is used', async () => {
+    const { AuthLayout } = await import('@/features/auth/AuthLayout');
+
+    render(
+      <AuthLayout formTitle='Sign In' layoutVariant='split'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    expect(document.querySelector('.auth-showcase-panel')).not.toBeNull();
+  });
 });

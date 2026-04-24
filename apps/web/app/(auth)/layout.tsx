@@ -60,7 +60,6 @@ export default async function AuthLayout({
             showFormTitle={false}
             showFooterPrompt={false}
             layoutVariant='split'
-            showcaseVariant='image-only'
           >
             <AuthUnavailableCard showResetAction={onPublicHost} />
           </AuthShellLayout>
