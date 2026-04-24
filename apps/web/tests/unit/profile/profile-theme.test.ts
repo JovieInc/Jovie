@@ -58,7 +58,7 @@ describe('profile theme helpers', () => {
       '--profile-status-pill-bg': expect.stringContaining('rgba'),
       '--profile-rail-dot-active': expect.stringMatching(/^#/),
       '--profile-dock-bg': expect.stringContaining('rgba'),
-      '--color-focus-ring': expect.stringMatching(/^#/),
+      '--profile-pearl-primary-bg': expect.stringMatching(/^#/),
     });
   });
 });

@@ -107,7 +107,7 @@ describe('public profile contract guard', () => {
       '--profile-shell-card-radius'
     );
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
-      '--profile-action-radius'
+      '--profile-dock-border'
     );
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(
       '--profile-shell-header-max-width'

@@ -140,6 +140,16 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
+  describe('profile accent backfill', () => {
+    it('persists a newly derived accent into the stored theme payload', () => {
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+        'persistDerivedProfileAccent'
+      );
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('jsonb_set(');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain("'{profileAccent}'");
+    });
+  });
+
   describe('generateProfileStructuredData', () => {
     // We test the structured data generation logic directly
     // Since it's a private function, we replicate the logic here for testing

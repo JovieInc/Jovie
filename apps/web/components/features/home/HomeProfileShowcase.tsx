@@ -2,15 +2,13 @@
 
 import { type ReactNode, useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import type {
-  ProfilePrimaryTab,
-  ProfileShowcaseStateId,
-} from '@/features/profile/contracts';
+import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ProfileCompactSurface } from '../profile/templates/ProfileCompactSurface';
 import { HomePhoneFrame } from './HomePhoneFrame';
 import {
+  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
   HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
@@ -186,21 +184,6 @@ function getViewerLocation(stateId: ProfileShowcaseStateId) {
 
 function shouldResolveNearbyTour(stateId: ProfileShowcaseStateId) {
   return stateId === 'tour-nearby';
-}
-
-function getPreviewActiveMode(
-  stateId: ProfileShowcaseStateId
-): ProfilePrimaryTab {
-  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
-
-  switch (drawerView) {
-    case 'listen':
-    case 'subscribe':
-    case 'tour':
-      return drawerView;
-    default:
-      return 'profile';
-  }
 }
 
 function ShowcaseSurface({

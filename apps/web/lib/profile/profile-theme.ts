@@ -224,6 +224,5 @@ export function buildProfileAccentCssVars(
     '--profile-composer-border': hexToRgba(primaryHex, 0.22),
     '--profile-dock-border': hexToRgba(primaryHex, 0.18),
     '--profile-dock-bg': hexToRgba(primaryHex, 0.14),
-    '--color-focus-ring': primaryHex,
   };
 }
