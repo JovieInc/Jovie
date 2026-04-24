@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { StatusBarMock } from '@/features/dashboard/molecules/StatusBarMock';
