@@ -13,7 +13,8 @@
 export const APP_ROUTES = {
   // Dashboard
   DASHBOARD: '/app',
-  DASHBOARD_OVERVIEW: '/app/dashboard',
+  /** Legacy dashboard landing path. Kept as a constant so the legacy redirect in `next.config.js` has a referenceable source. Do NOT use for navigation. */
+  LEGACY_DASHBOARD: '/app/dashboard',
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
