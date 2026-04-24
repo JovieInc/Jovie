@@ -87,6 +87,36 @@ export function safeDecodeURIComponent(value: string): string {
 }
 
 /**
+ * Like `safeDecodeURIComponent` but for URL **path** segments.
+ *
+ * Differences:
+ * - Does NOT replace `+` with a space. In a path segment `+` is a literal `+`
+ *   (only query strings use form-encoding). Converting it would turn a tag
+ *   like `"rock+roll"` (encoded as `%2B` → `+` by Next) into `"rock roll"`.
+ * - Still swallows `URIError` on malformed percent-encoding, returning the
+ *   raw input so callers can fall through to empty-state rather than 500.
+ *
+ * Use this for dynamic route params like `/playlists/genre/[genre]`.
+ *
+ * @example
+ * ```ts
+ * safeDecodeURIPathComponent('New%20York') // 'New York'
+ * safeDecodeURIPathComponent('rock+roll') // 'rock+roll' (NOT "rock roll")
+ * safeDecodeURIPathComponent('%ZZ') // '%ZZ' (returns original on error)
+ * ```
+ */
+export function safeDecodeURIPathComponent(value: string): string {
+  if (!value) return value;
+  if (!value.includes('%')) return value;
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/**
  * Capitalize the first letter of a string, leaving the rest unchanged.
  * Returns empty string for null/undefined/empty input.
  */
