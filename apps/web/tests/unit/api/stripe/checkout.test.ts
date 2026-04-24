@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
@@ -288,13 +289,7 @@ describe('POST /api/stripe/checkout', () => {
     // Malformed JSON is a client error, not a server error, and must not page.
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
-    const request = new NextRequest('http://localhost/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{not valid json',
-    });
-
-    const response = await POST(request);
+    const response = await POST(malformedJsonRequest('/api/stripe/checkout'));
     const data = await response.json();
 
     expect(response.status).toBe(400);

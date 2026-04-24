@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
@@ -93,16 +94,9 @@ describe('/api/stripe/plan-change route', () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
 
       const { POST } = await routeModulePromise;
-      const request = new NextRequest(
-        'http://localhost/api/stripe/plan-change',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{not valid json',
-        }
+      const response = await POST(
+        malformedJsonRequest('/api/stripe/plan-change')
       );
-
-      const response = await POST(request);
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({
         error: 'Invalid JSON in request body',
