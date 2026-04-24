@@ -108,7 +108,7 @@ function ProfileModeFallback({
       className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'
       data-testid='profile-mode-drawer-fallback'
     >
-      <p className='text-sm font-[590] text-white/88'>{title}</p>
+      <p className='text-sm font-semibold text-white/88'>{title}</p>
       <p className='mt-2 text-sm leading-6 text-white/54'>{description}</p>
     </div>
   );
@@ -156,11 +156,11 @@ function ProfileModeDrawerContactList({
                 onClick={() => trackAction(primary, contact)}
               >
                 <div className='flex flex-wrap items-center gap-2'>
-                  <span className='text-sm font-[590] text-white/92'>
+                  <span className='text-sm font-semibold text-white/92'>
                     {contact.roleLabel}
                   </span>
                   {contact.territorySummary ? (
-                    <span className='rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-[590] text-white/58'>
+                    <span className='rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-white/58'>
                       {contact.territorySummary}
                     </span>
                   ) : null}

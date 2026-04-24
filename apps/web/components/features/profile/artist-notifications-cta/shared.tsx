@@ -40,7 +40,7 @@ export const subscriptionDisclaimerClassName =
   'text-center text-xs leading-5 font-normal tracking-[-0.01em] text-muted-foreground/80';
 
 export const profilePrimaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-mid font-[590] tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-[var(--profile-pearl-primary-bg)] px-5 text-mid font-semibold tracking-[-0.018em] text-[var(--profile-pearl-primary-fg)] shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-200 ease-out hover:opacity-[0.96] hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-[0.9] disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
 /** Pearl-Notify hero morph-bar CTA pill — glassy dark, sits over the hero image. */
 export const profileHeroMorphPillClassName =
@@ -67,7 +67,7 @@ export const subscriptionHeroComposerFocusClassName =
   'border-white/22 bg-white/14 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22),0_8px_22px_rgba(0,0,0,0.28)]';
 
 export const subscriptionInputClassName =
-  'h-12 w-full bg-transparent px-2 text-mid font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
+  'h-12 w-full bg-transparent px-2 text-mid font-semibold tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 transition-[color,opacity] duration-slow focus-visible:outline-none focus-visible:ring-0';
 
 export const subscriptionHeroInputClassName =
   'h-11 w-full bg-transparent px-2 text-[13.5px] font-[560] tracking-[-0.01em] text-white placeholder:text-white/45 focus-visible:outline-none focus-visible:ring-0';
@@ -484,7 +484,7 @@ export function SubscriptionSuccess({
         </p>
 
         <p
-          className='text-center text-[13px] font-[590] tracking-[-0.015em] text-primary-token/88'
+          className='text-center text-[13px] font-semibold tracking-[-0.015em] text-primary-token/88'
           style={noFontSynthesisStyle}
         >
           What should we call you?

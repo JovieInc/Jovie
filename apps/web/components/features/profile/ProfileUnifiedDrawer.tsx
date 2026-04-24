@@ -450,7 +450,7 @@ export function ProfileUnifiedDrawer({
                 />
               ) : (
                 <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
-                  <p className='text-sm font-[590] text-white/88'>
+                  <p className='text-sm font-semibold text-white/88'>
                     Payments not available yet
                   </p>
                   <p className='mt-2 text-sm leading-6 text-white/54'>

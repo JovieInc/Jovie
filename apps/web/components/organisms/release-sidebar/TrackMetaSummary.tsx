@@ -75,7 +75,7 @@ export function TrackMetaSummary({
           </span>
           <h3
             className={cn(
-              'min-w-0 truncate font-[590] text-primary-token',
+              'min-w-0 truncate font-semibold text-primary-token',
               styles.title
             )}
           >

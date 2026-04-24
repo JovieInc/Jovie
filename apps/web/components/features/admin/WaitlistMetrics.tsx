@@ -32,7 +32,7 @@ function MetricCard({
         <p className='text-[13px] font-[560] tracking-normal text-secondary-token'>
           {label}
         </p>
-        <p className='text-[15px] font-[590] leading-tight tabular-nums text-primary-token'>
+        <p className='text-[15px] font-semibold leading-tight tabular-nums text-primary-token'>
           {value.toLocaleString()}
         </p>
       </div>

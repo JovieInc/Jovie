@@ -70,7 +70,7 @@ export function OnboardingExperienceShell({
             <div className='sticky top-8'>
               {sidebarTitle ? (
                 <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-4'>
-                  <p className='text-[14px] font-[590] tracking-[-0.02em] text-primary-token'>
+                  <p className='text-[14px] font-semibold tracking-[-0.02em] text-primary-token'>
                     {sidebarTitle}
                   </p>
                 </div>

@@ -51,7 +51,7 @@ function StickyPhoneTourFallback({
                     {introTitle}
                   </h2>
 
-                  <h3 className='mt-6 text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'>
+                  <h3 className='mt-6 text-xl font-semibold leading-snug tracking-[-0.012em] text-secondary-token'>
                     {modes[0]?.headline}
                   </h3>
 

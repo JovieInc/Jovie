@@ -91,7 +91,7 @@ export function AnalyticsFunnel({
                 <p className='mb-2 text-[13px] font-[510] tracking-normal text-secondary-token'>
                   {stage.label}
                 </p>
-                <p className='text-4xl font-[590] tracking-[-0.022em] text-primary-token tabular-nums'>
+                <p className='text-4xl font-semibold tracking-[-0.022em] text-primary-token tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
                 <p className='mt-1 text-[13px] text-secondary-token'>

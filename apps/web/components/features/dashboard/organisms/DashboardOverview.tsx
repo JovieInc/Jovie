@@ -152,7 +152,7 @@ export function DashboardOverview({
     <ContentSurfaceCard as='header' className='overflow-hidden'>
       <ContentSectionHeader
         title={
-          <span className='text-mid font-[590] tracking-[-0.01em] text-primary-token'>
+          <span className='text-mid font-semibold tracking-[-0.01em] text-primary-token'>
             Welcome back, {greetingName}
           </span>
         }

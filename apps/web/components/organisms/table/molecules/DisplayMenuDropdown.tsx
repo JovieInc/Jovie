@@ -153,7 +153,7 @@ export function DisplayMenuDropdown({
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
-          <span className='text-[13px] font-[590] text-primary-token'>
+          <span className='text-[13px] font-semibold text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close

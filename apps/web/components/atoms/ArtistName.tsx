@@ -67,7 +67,7 @@ export function ArtistName({
 
   if (showLink) {
     return (
-      <Tag className={cn(sizeClasses[size], 'font-[590]')} itemProp='name'>
+      <Tag className={cn(sizeClasses[size], 'font-semibold')} itemProp='name'>
         <Link href={`/${handle}`} className='inline-block'>
           {content}
         </Link>
@@ -76,7 +76,7 @@ export function ArtistName({
   }
 
   return (
-    <Tag className={cn(sizeClasses[size], 'font-[590]')} itemProp='name'>
+    <Tag className={cn(sizeClasses[size], 'font-semibold')} itemProp='name'>
       {content}
     </Tag>
   );
