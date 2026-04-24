@@ -66,7 +66,7 @@ export function OnboardingInterviewModal({
     if (!isRequested) return;
 
     const alreadySubmitted =
-      typeof globalThis.window !== 'undefined' &&
+      globalThis.window !== undefined &&
       globalThis.sessionStorage.getItem(SESSION_KEY) === '1';
 
     if (alreadySubmitted) {
@@ -113,7 +113,7 @@ export function OnboardingInterviewModal({
       // Silent failure — this is a research feature, not a paywall.
       // Loss of one transcript is acceptable.
     } finally {
-      if (typeof globalThis.window !== 'undefined') {
+      if (globalThis.window !== undefined) {
         globalThis.sessionStorage.setItem(SESSION_KEY, '1');
       }
       setSubmitting(false);
@@ -131,7 +131,7 @@ export function OnboardingInterviewModal({
         );
 
         if (current === prev.length - 1) {
-          void submit(next);
+          submit(next);
         } else {
           setCurrent(current + 1);
         }
@@ -145,7 +145,7 @@ export function OnboardingInterviewModal({
     setDraft(prev => {
       const next = [...prev];
       if (hasAnyAnswer(next)) {
-        void submit(next);
+        submit(next);
       } else {
         setOpen(false);
       }

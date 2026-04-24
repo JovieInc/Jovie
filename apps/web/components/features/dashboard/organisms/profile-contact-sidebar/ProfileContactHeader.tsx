@@ -70,9 +70,9 @@ export function ProfileContactHeader({
               onDisplayNameChange(nextValue ?? '');
             }
           }}
-          displayClassName='text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'
+          displayClassName='text-[13px] font-semibold leading-[15px] tracking-[-0.01em] text-primary-token'
           emptyClassName='text-tertiary-token'
-          inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-[560]'
+          inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-semibold'
         />
 
         <div className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>

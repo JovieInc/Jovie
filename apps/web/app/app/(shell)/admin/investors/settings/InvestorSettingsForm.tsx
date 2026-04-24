@@ -106,7 +106,7 @@ function SettingRow({
   return (
     <div className='flex items-start justify-between gap-4 py-3'>
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] font-[560] text-primary-token'>{label}</p>
+        <p className='text-[13px] font-semibold text-primary-token'>{label}</p>
         <p className='mt-0.5 text-[12px] leading-[18px] text-secondary-token'>
           {description}
         </p>

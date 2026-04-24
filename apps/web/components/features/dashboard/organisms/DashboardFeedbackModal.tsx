@@ -81,7 +81,7 @@ export function DashboardFeedbackModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
-          <DialogTitle className='mt-4 text-balance text-lg font-[590] text-primary-token'>
+          <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
             Thank you!
           </DialogTitle>
           <DialogDescription className='mt-2 text-[13px] text-secondary-token'>

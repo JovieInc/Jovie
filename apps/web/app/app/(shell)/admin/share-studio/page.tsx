@@ -144,7 +144,9 @@ function SamplePicker(
 ) {
   return (
     <ContentSurfaceCard className='space-y-2.5 rounded-[12px] p-3.5'>
-      <p className='text-[12px] font-[560] text-primary-token'>{props.label}</p>
+      <p className='text-[12px] font-semibold text-primary-token'>
+        {props.label}
+      </p>
       <div className='flex flex-wrap gap-2'>
         {props.items.map(item => {
           const isSelected = item.key === props.selectedKey;
@@ -197,7 +199,7 @@ function PayloadCard(
     <ContentSurfaceCard className='space-y-4 rounded-[14px] p-4'>
       <div className='flex items-center justify-between gap-3'>
         <div>
-          <p className='text-[14px] font-[560] text-primary-token'>
+          <p className='text-[14px] font-semibold text-primary-token'>
             {props.title}
           </p>
           <p className='text-[12px] text-secondary-token'>
@@ -257,7 +259,9 @@ function PayloadCard(
 function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   return (
     <div className='space-y-1.5'>
-      <p className='text-[12px] font-[560] text-primary-token'>{props.label}</p>
+      <p className='text-[12px] font-semibold text-primary-token'>
+        {props.label}
+      </p>
       <pre className='overflow-x-auto rounded-[12px] border border-subtle bg-surface-0 px-3 py-2 text-[11px] leading-[1.5] text-secondary-token whitespace-pre-wrap'>
         {props.value}
       </pre>

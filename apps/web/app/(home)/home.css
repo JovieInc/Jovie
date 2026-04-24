@@ -26,89 +26,156 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /*
- * A2 · Lovable — Saturated Flood hero background.
- * Two radial-gradient layers behind the hero content. Kept in CSS to
- * keep the large gradient strings out of JSX.
+ * Homepage hero surface.
+ * The page background stays black; the hero is a contained premium surface
+ * with its own light, atmosphere, and floor grid.
  */
-.homepage-hero-flood {
-  background: #06070b;
-  /* Isolate the hero's paint/layout from the rest of the page so the pulse
-   * animation can't invalidate below-the-fold content. */
+.homepage-hero-stage {
+  background:
+    radial-gradient(
+      72% 58% at 50% 14%,
+      rgba(32, 36, 56, 0.34) 0%,
+      rgba(10, 12, 18, 0) 68%
+    ),
+    #050608;
+}
+
+.homepage-hero-shell {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 11, 15, 0.96) 0%,
+    rgba(4, 5, 8, 1) 100%
+  );
   contain: layout paint;
 }
-.homepage-hero-flood__layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  /* Force the decorative gradient layers onto their own compositor layer so
-   * the pulse runs on GPU and never triggers a paint on the hero text. */
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-/* Low-pass room tone: almost imperceptible cool wash seeping up from the
- * floor. Desaturated toward neutral so it reads as "lighting in the room,"
- * not "blue page." */
-.homepage-hero-flood__base {
-  background: radial-gradient(
-    1200px 720px at 50% 110%,
-    rgba(120, 125, 150, 0.07) 0%,
-    rgba(90, 90, 120, 0.04) 40%,
-    rgba(20, 18, 28, 0) 76%
-  );
-}
-/* Slow pulse point: a very faint glow that breathes at the floor. The color
- * is almost neutral with only a hint of cool. Amplitude is a whisper. */
-.homepage-hero-flood__glow {
-  background: radial-gradient(
-    480px 300px at 50% 98%,
-    rgba(170, 175, 200, 0.1) 0%,
-    rgba(130, 135, 170, 0.05) 42%,
-    transparent 76%
-  );
-  mix-blend-mode: screen;
-  opacity: 0.5;
-  animation: homepage-hero-pulse 7s ease-in-out infinite;
-  will-change: opacity, transform;
-}
-@keyframes homepage-hero-pulse {
-  0%,
-  100% {
-    opacity: 0.32;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.48;
-    transform: scale(1.03);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .homepage-hero-flood__glow {
-    animation: none;
-  }
-}
-/* Edge vignette — pulls the corners hard to black. Premium framing. */
-.homepage-hero-flood::after {
+
+.homepage-hero-shell::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background: radial-gradient(
-    1200px 820px at 50% 60%,
-    transparent 45%,
-    rgba(0, 0, 0, 0.7) 100%
+    78% 74% at 50% 36%,
+    transparent 0%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.54) 100%
   );
   z-index: 1;
 }
 
+.homepage-hero-shell__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.homepage-hero-shell__base {
+  background: radial-gradient(
+    1120px 720px at 50% 14%,
+    rgba(110, 117, 178, 0.12) 0%,
+    rgba(49, 56, 89, 0.08) 28%,
+    rgba(13, 15, 23, 0.02) 55%,
+    rgba(5, 6, 8, 0) 74%
+  );
+}
+
+.homepage-hero-shell__halo {
+  background: radial-gradient(
+    620px 360px at 50% 42%,
+    rgba(125, 132, 220, 0.16) 0%,
+    rgba(86, 92, 164, 0.12) 24%,
+    rgba(18, 20, 31, 0.02) 66%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.78;
+  animation: homepage-hero-pulse 7.5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+.homepage-hero-shell__beam {
+  inset: 13% 0 auto;
+  height: 48%;
+  margin: 0 auto;
+  width: min(22vw, 250px);
+  border-radius: 32px;
+  background: linear-gradient(
+    180deg,
+    rgba(102, 108, 196, 0.24) 0%,
+    rgba(72, 76, 138, 0.11) 40%,
+    rgba(72, 76, 138, 0) 100%
+  );
+  filter: blur(0.5px);
+  opacity: 0.72;
+}
+
+@keyframes homepage-hero-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.86;
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-shell__halo {
+    animation: none;
+  }
+}
+
+.homepage-hero-shell__grid-wrap {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  bottom: -24%;
+  height: 58%;
+  pointer-events: none;
+  perspective: 1160px;
+  z-index: 1;
+}
+
+.homepage-hero-shell__grid {
+  position: absolute;
+  inset: 0;
+  transform-origin: top center;
+  transform: rotateX(79deg);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.92) 8%,
+    rgba(0, 0, 0, 0.48) 62%,
+    transparent 100%
+  );
+  opacity: 0.42;
+}
+
 .homepage-hero-headline {
-  font-size: clamp(32px, 7vw, 68px);
-  font-weight: 680;
-  line-height: 1.02;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+  font-size: clamp(42px, 8vw, 88px);
+  font-weight: 690;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
   margin-left: auto;
   margin-right: auto;
+  max-width: 10ch;
+  text-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+
+.homepage-trust-reveal {
+  margin-top: -4.5rem;
+  padding-top: 2.75rem;
+  padding-bottom: 2rem;
+  background:
+    linear-gradient(180deg, rgba(5, 6, 8, 0) 0%, rgba(5, 6, 8, 1) 28%), #050608;
 }
 
 /* Entrance animation for the chat intake island */
@@ -120,5 +187,36 @@ body:has(.home-viewport)::-webkit-scrollbar {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .homepage-hero-shell {
+    border-radius: 28px;
+  }
+
+  .homepage-hero-shell__beam {
+    inset: 16% 0 auto;
+    width: min(44vw, 190px);
+    height: 38%;
+    opacity: 0.6;
+  }
+
+  .homepage-hero-shell__grid-wrap {
+    left: -18%;
+    right: -18%;
+    bottom: -18%;
+    height: 48%;
+  }
+
+  .homepage-hero-shell__grid {
+    background-size: 48px 48px;
+    opacity: 0.34;
+  }
+
+  .homepage-trust-reveal {
+    margin-top: -3.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 1.5rem;
   }
 }

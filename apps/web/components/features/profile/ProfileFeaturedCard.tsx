@@ -81,10 +81,10 @@ export function ProfileFeaturedCard({
           </div>
 
           <div className='min-w-0'>
-            <p className='text-[0.72rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
+            <p className='text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-secondary-token'>
               Featured release
             </p>
-            <h2 className='mt-2 text-[1.55rem] font-[590] tracking-[-0.04em] text-primary-token'>
+            <h2 className='mt-2 text-[1.55rem] font-semibold tracking-[-0.04em] text-primary-token'>
               {featuredContent.release.title}
             </h2>
             <p className='mt-2 text-sm text-secondary-token'>
@@ -96,7 +96,7 @@ export function ProfileFeaturedCard({
               <Link
                 href={`/${artist.handle}/${featuredContent.release.slug}`}
                 prefetch={false}
-                className='inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-[590] text-primary-foreground transition-opacity hover:opacity-90'
+                className='inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90'
                 aria-label={`Open ${featuredContent.release.title}`}
               >
                 <Play
@@ -122,12 +122,12 @@ export function ProfileFeaturedCard({
       <section className='overflow-hidden rounded-[var(--profile-card-radius)] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] shadow-[0_24px_70px_rgba(0,0,0,0.16)]'>
         <div className='grid gap-5 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:p-5'>
           <div className='flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center rounded-[var(--profile-drawer-radius-mobile)] border border-white/10 bg-black/15 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
-            <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
+            <span className='text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-secondary-token'>
               {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
                 new Date(tourDate.startDate)
               )}
             </span>
-            <span className='mt-1 text-[2rem] font-[680] tracking-[-0.06em] text-primary-token'>
+            <span className='mt-1 text-[2rem] font-bold tracking-[-0.06em] text-primary-token'>
               {new Intl.DateTimeFormat('en-US', { day: 'numeric' }).format(
                 new Date(tourDate.startDate)
               )}
@@ -135,12 +135,12 @@ export function ProfileFeaturedCard({
           </div>
 
           <div className='space-y-3'>
-            <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-3 py-1 text-[0.72rem] font-[590] uppercase tracking-[0.16em] text-secondary-token'>
+            <div className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-secondary-token'>
               <CalendarDays className='h-3.5 w-3.5' aria-hidden='true' />
               Upcoming show
             </div>
             <div className='space-y-1'>
-              <h2 className='text-[1.45rem] font-[590] tracking-[-0.04em] text-primary-token'>
+              <h2 className='text-[1.45rem] font-semibold tracking-[-0.04em] text-primary-token'>
                 {tourDate.venueName || artist.name}
               </h2>
               <p className='text-sm text-secondary-token'>
@@ -162,7 +162,7 @@ export function ProfileFeaturedCard({
               href={tourDate.ticketUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-[590] text-primary-foreground transition-opacity hover:opacity-90'
+              className='inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90'
             >
               <Ticket className='mr-2 h-4 w-4' aria-hidden='true' />
               Get tickets

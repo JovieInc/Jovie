@@ -81,7 +81,7 @@ export function UnreleasedReleaseHero({
         onMenuOpen={() => setMenuOpen(true)}
         heroOverlay={
           <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
-            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
               {release.title}
             </h1>
             <Link

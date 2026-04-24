@@ -1,3 +1,7 @@
+import Image from 'next/image';
+
+import { cn } from '@/lib/utils';
+
 /**
  * Record label logo components for the homepage logo bar.
  */
@@ -118,66 +122,46 @@ export function TheOrchardLogo(props: React.SVGProps<SVGSVGElement>) {
  * Black Hole Recordings — 4-arm galaxy spiral mark + wordmark
  * Spiral: 4 filled teardrop arms rotated 90° apart, tapered inward
  */
-export function BlackHoleRecordingsLogo(props: React.SVGProps<SVGSVGElement>) {
-  // One arm shape: tip at top, outer edge sweeps clockwise, narrows to center
-  const arm =
-    'M8,1.2 C12,1.2 14.8,4.2 13.2,7.4 C12,9.2 9.8,9.5 8,8 C7.4,6.8 7.4,3.8 8,1.2 Z';
+export function BlackHoleRecordingsLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
   return (
-    <svg
-      xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 108 16'
-      fill='currentColor'
-      aria-label='Black Hole Recordings'
-      {...props}
-    >
-      <title>Black Hole Recordings</title>
-
-      {/* 4-arm galaxy spiral — arms meet and merge at center naturally */}
-      <path d={arm} />
-      <path d={arm} transform='rotate(90 8 8)' />
-      <path d={arm} transform='rotate(180 8 8)' />
-      <path d={arm} transform='rotate(270 8 8)' />
-
-      {/* Wordmark */}
-      <text
-        x='21'
-        y='12'
-        fontFamily='system-ui, -apple-system, Arial, sans-serif'
-        fontSize='9'
-        fontWeight='680'
-        letterSpacing='1.4'
-      >
-        BLACK HOLE
-      </text>
-    </svg>
+    <Image
+      src='/brand-logos/black-hole-recordings.png'
+      alt='Black Hole Recordings'
+      width={1119}
+      height={146}
+      sizes='(min-width: 1024px) 140px, (min-width: 640px) 126px, 112px'
+      className={cn('select-none brightness-0 invert', className)}
+      loading='lazy'
+    />
   );
 }
 
 /**
- * Disco Wax — wordmark
+ * disco:wax — clean monochrome lockup using the canonical casing from Sony's
+ * label page. The official site exposes the mark separately, but not a usable
+ * monochrome wordmark asset for this strip.
  */
-export function DiscoWaxLogo(props: React.SVGProps<SVGSVGElement>) {
+export function DiscoWaxLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
   return (
-    <svg
-      xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 130 14'
-      fill='currentColor'
-      aria-label='Disco Wax'
-      {...props}
+    <span
+      role='img'
+      aria-label='disco:wax'
+      className={cn(
+        'inline-flex items-center justify-center select-none text-white/92',
+        className
+      )}
     >
-      <title>Disco Wax</title>
-      <text
-        x='0'
-        y='11'
-        fontFamily='system-ui, -apple-system, Arial, sans-serif'
-        fontSize='10'
-        fontWeight='590'
-        letterSpacing='1.8'
-        textLength='125'
-        lengthAdjust='spacing'
-      >
-        DISCO WAX
-      </text>
-    </svg>
+      <span className='text-[1em] font-semibold lowercase tracking-[-0.06em]'>
+        disco:wax
+      </span>
+    </span>
   );
 }

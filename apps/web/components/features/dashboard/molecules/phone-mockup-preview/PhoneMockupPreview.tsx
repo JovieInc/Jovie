@@ -72,7 +72,7 @@ export function PhoneMockupPreview({
                   />
                 ) : (
                   <div className='w-full h-full flex items-center justify-center bg-surface-2'>
-                    <span className='text-2xl font-[590] text-primary-token'>
+                    <span className='text-2xl font-semibold text-primary-token'>
                       {username.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -82,7 +82,7 @@ export function PhoneMockupPreview({
               {/* Username */}
               <h1
                 className={cn(
-                  'text-xl font-[590] text-white text-center',
+                  'text-xl font-semibold text-white text-center',
                   'transition-all duration-300',
                   isLoaded
                     ? 'opacity-100 translate-y-0'

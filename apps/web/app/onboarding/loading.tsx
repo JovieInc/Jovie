@@ -27,7 +27,7 @@ function SidebarLoadingState() {
               <span
                 className={
                   step === 'Handle'
-                    ? 'text-sm font-[560] text-primary-token'
+                    ? 'text-sm font-semibold text-primary-token'
                     : 'text-sm text-secondary-token'
                 }
               >
@@ -54,7 +54,7 @@ export default function OnboardingLoading() {
       <div className='flex h-full flex-col items-center justify-center'>
         <div className='flex w-full max-w-md flex-col items-center text-center'>
           <div className='mb-8 space-y-2'>
-            <h1 className='text-[30px] font-[590] leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-[36px]'>
+            <h1 className='text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-[36px]'>
               Preparing your setup
             </h1>
             <p className='text-[15px] leading-6 text-secondary-token'>

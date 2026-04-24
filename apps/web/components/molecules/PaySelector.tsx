@@ -57,7 +57,7 @@ export function PaySelector({
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-      <p className='text-[13px] font-[560] tracking-[-0.015em] text-secondary-token'>
+      <p className='text-[13px] font-semibold tracking-[-0.015em] text-secondary-token'>
         Choose Amount
       </p>
 

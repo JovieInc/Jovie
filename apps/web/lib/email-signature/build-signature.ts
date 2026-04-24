@@ -98,8 +98,9 @@ export function buildEmailSignature(
     ? `<div style="color:#525866;font-size:13px;line-height:1.45;">${escapeHtml(tagline)}</div>`
     : '';
 
+  const footerHref = `${BASE_URL}/${UTM_FOOTER_SUFFIX}`;
   const footer = showFooter
-    ? `<tr><td colspan="2" style="padding-top:8px;font-size:11px;color:#8b94a3;">Get yours at <a href="${escapeHtml(`${BASE_URL}/${UTM_FOOTER_SUFFIX}`)}" style="color:#8b94a3;text-decoration:none;">${HOSTNAME}</a></td></tr>`
+    ? `<tr><td colspan="2" style="padding-top:8px;font-size:11px;color:#8b94a3;">Get yours at <a href="${escapeHtml(footerHref)}" style="color:#8b94a3;text-decoration:none;">${HOSTNAME}</a></td></tr>`
     : '';
 
   const html = `<table cellpadding="0" cellspacing="0" border="0" style="font-family:${FONT_STACK};color:#0d0e12;font-size:14px;line-height:1.4;"><tr>${avatarCell}<td style="vertical-align:top;"><div style="font-weight:600;font-size:15px;color:#0d0e12;">${escapeHtml(name)}</div>${taglineLine}<div style="margin-top:4px;"><a href="${escapeHtml(profileUrl)}" style="color:#3b5bdb;text-decoration:none;font-weight:500;">${escapeHtml(profileUrlDisplay)}</a></div>${socialsLine}</td></tr>${footer}</table>`;

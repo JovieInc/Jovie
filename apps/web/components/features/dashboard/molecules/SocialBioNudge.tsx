@@ -66,7 +66,7 @@ function MilestoneRow({
         )}
       </span>
       <div className='min-w-0'>
-        <p className='text-app font-[560] text-primary-token'>{label}</p>
+        <p className='text-app font-semibold text-primary-token'>{label}</p>
         <p className='text-[12.5px] leading-5 text-secondary-token'>
           {description}
         </p>
@@ -182,7 +182,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
           </div>
           <div className='min-w-0 flex-1 space-y-1.5'>
             <div className='space-y-0.5'>
-              <p className='text-sm font-[590] text-primary-token'>
+              <p className='text-sm font-semibold text-primary-token'>
                 Instagram activated
               </p>
               <p className='text-app leading-5 text-secondary-token'>
@@ -224,11 +224,11 @@ export const SocialBioNudge = memo(function SocialBioNudge({
         </div>
         <div className='min-w-0 flex-1 space-y-3'>
           <div className='space-y-1'>
-            <p className='text-sm font-[590] text-primary-token'>{title}</p>
+            <p className='text-sm font-semibold text-primary-token'>{title}</p>
             <p className='text-app leading-5 text-secondary-token'>
               {description}
             </p>
-            <p className='text-[12.5px] font-[560] text-primary-token'>
+            <p className='text-[12.5px] font-semibold text-primary-token'>
               {profileUrl}
             </p>
           </div>

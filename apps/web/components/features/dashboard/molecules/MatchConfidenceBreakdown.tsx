@@ -177,7 +177,7 @@ export function MatchConfidenceBreakdown({
           </span>
           <span
             className={cn(
-              'font-[590]',
+              'font-semibold',
               getTotalScoreColorClass(totalPercentage)
             )}
           >

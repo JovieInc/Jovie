@@ -171,7 +171,7 @@ function ProfileEntityHeader({
             sizeClassName='h-[60px] w-[60px] rounded-[14px]'
             sizes='60px'
             fallback={
-              <span className='text-lg font-[590] text-secondary-token'>
+              <span className='text-lg font-semibold text-secondary-token'>
                 {fallbackLabel}
               </span>
             }
