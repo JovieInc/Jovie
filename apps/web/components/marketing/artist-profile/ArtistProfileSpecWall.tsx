@@ -1,4 +1,4 @@
-import { Download, Music2, RefreshCw, Zap } from 'lucide-react';
+import { BarChart2, Download, Music2, RefreshCw, Zap } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
@@ -93,10 +93,11 @@ function IconBadgeVisual({
   badgeIcon,
   badgeLabel,
 }: Readonly<{
-  badgeIcon: 'speed' | 'sync';
+  badgeIcon: 'speed' | 'sync' | 'chart';
   badgeLabel: string;
 }>) {
-  const Icon = badgeIcon === 'sync' ? RefreshCw : Zap;
+  const Icon =
+    badgeIcon === 'sync' ? RefreshCw : badgeIcon === 'chart' ? BarChart2 : Zap;
 
   return (
     <div

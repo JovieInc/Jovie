@@ -112,14 +112,9 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     accent: 'blue',
     layoutClassName:
       'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
-    visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-rich-analytics-panel.png',
-    screenshotAlt: 'Rich analytics funnel preview',
-    screenshotWidth: 390,
-    screenshotHeight: 390,
-    frameClassName: 'min-h-[11.5rem] xl:min-h-[14rem]',
-    imageClassName: 'object-contain object-center p-2',
-    objectPosition: 'center center',
+    visual: 'icon-badge',
+    badgeIcon: 'chart',
+    badgeLabel: 'Analytics at a glance',
   },
   {
     id: 'geo-insights',
