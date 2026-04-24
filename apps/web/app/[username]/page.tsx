@@ -1,7 +1,5 @@
 import { type Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { cache } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,21 +25,14 @@ import {
 } from '@/lib/constants/schemas';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
-import type {
-  CreatorContact as DbCreatorContact,
-  DiscogRelease,
-} from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
-import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
-import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
-import { isDspPlatform } from '@/lib/services/social-links/types';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
-import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -55,11 +46,9 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
-import type { PressPhoto } from '@/types/press-photos';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
-import { mapProfileWithLinksToCreatorProfile } from './_lib/profile-mapper';
 import { getProfileStaticParams } from './_lib/profile-static-params';
-import { shouldBypassPublicProfileQaCache } from './_lib/public-profile-qa';
+import { getProfileAndLinks } from './_lib/public-profile-loader';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 const MAX_EVENT_SCHEMAS = 5;
@@ -263,231 +252,9 @@ function generateProfileStructuredData(
   };
 }
 
-function calculateProfileCompletion(result: {
-  displayName?: string | null;
-  avatarUrl?: string | null;
-  userEmail?: string | null;
-  spotifyUrl?: string | null;
-  appleMusicUrl?: string | null;
-  youtubeUrl?: string | null;
-  socialLinks?: Array<{
-    platform?: string | null;
-    platformType?: string | null;
-  }> | null;
-}): number {
-  const hasMusicLinks =
-    Boolean(result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl) ||
-    Boolean(
-      result.socialLinks?.some(link => {
-        const platform = link.platform?.toLowerCase();
-        return (
-          link.platformType === 'dsp' ||
-          (typeof platform === 'string' && isDspPlatform(platform))
-        );
-      })
-    );
-
-  return calculateRequiredProfileCompletion({
-    displayName: result.displayName,
-    avatarUrl: result.avatarUrl,
-    email: result.userEmail,
-    hasMusicLinks,
-  }).percentage;
-}
-
-/** Fetches profile and social links in a single database call. */
-const fetchProfileAndLinks = async (
-  username: string
-): Promise<{
-  profile: CreatorProfile | null;
-  links: LegacySocialLink[];
-  contacts: DbCreatorContact[];
-  creatorIsPro: boolean;
-  creatorClerkId: string | null;
-  genres: string[] | null;
-  latestRelease: DiscogRelease | null;
-  pressPhotos: PressPhoto[];
-  status: 'ok' | 'not_found' | 'error';
-}> => {
-  try {
-    // The page-level unstable_cache is the canonical cache for public profile
-    // rendering. Bypass the profile service's Redis layer here because its
-    // Upstash fetch is `no-store`, which turns uncached ISR handles into
-    // static-to-dynamic runtime errors in production.
-    const result = await getCreatorProfileWithLinks(username, {
-      skipCache: true,
-    });
-
-    // Use truthy check (not strict equality) for isPublic because the neon-http
-    // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
-    // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
-    if (!result?.isPublic) {
-      // Expected 404 — profile not found or not public. No Sentry capture needed;
-      // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
-      return {
-        profile: null,
-        links: [],
-        contacts: [],
-        creatorIsPro: false,
-        creatorClerkId: null,
-        genres: null,
-        latestRelease: null,
-        pressPhotos: [],
-        status: 'not_found',
-      };
-    }
-
-    const creatorIsPro = Boolean(result.userIsPro);
-    const creatorClerkId =
-      typeof result.userClerkId === 'string' ? result.userClerkId : null;
-
-    const profile = mapProfileWithLinksToCreatorProfile(result, {
-      profileCompletionPct: calculateProfileCompletion(result),
-    });
-
-    const links: LegacySocialLink[] =
-      result.socialLinks?.map(link => ({
-        id: link.id,
-        artist_id: result.id,
-        platform: (link.platform ?? '').toLowerCase(),
-        url: link.url,
-        clicks: link.clicks || 0,
-        created_at: toISOStringSafe(link.createdAt),
-      })) ?? [];
-
-    // If the artist has a venmoHandle on their profile but no venmo social link,
-    // inject a synthetic venmo link so tipping works on the public profile page
-    const hasVenmoSocialLink = links.some(l => l.platform === 'venmo');
-    if (!hasVenmoSocialLink && result.venmoHandle) {
-      const handle = result.venmoHandle.replace(/^@/, '');
-      links.push({
-        id: `venmo-${result.id}`,
-        artist_id: result.id,
-        platform: 'venmo',
-        url: `https://venmo.com/${encodeURIComponent(handle)}`,
-        clicks: 0,
-        created_at: toISOStringSafe(result.createdAt),
-      });
-    }
-
-    const contacts: DbCreatorContact[] = result.contacts ?? [];
-
-    // Latest release is now fetched in parallel with profile data
-    const latestRelease = result.latestRelease ?? null;
-
-    return {
-      profile,
-      links,
-      contacts,
-      creatorIsPro,
-      creatorClerkId,
-      genres: result.genres ?? null,
-      latestRelease,
-      pressPhotos: result.pressPhotos ?? [],
-      status: 'ok',
-    };
-  } catch (error) {
-    logger.error(
-      'Error fetching creator profile',
-      {
-        error,
-        route: '/[username]',
-        username,
-      },
-      'public-profile'
-    );
-    return {
-      profile: null,
-      links: [],
-      contacts: [],
-      creatorIsPro: false,
-      creatorClerkId: null,
-      genres: null,
-      latestRelease: null,
-      pressPhotos: [],
-      status: 'error',
-    };
-  }
-};
-
-// Cache public profile reads across requests; tags keep updates fast and precise.
-// Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
-// Wrapped in try-catch to handle cache layer failures gracefully
-// IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
-// IMPORTANT: Successful profile payloads get long TTL. not_found gets a short TTL
-// to reduce repeated probe traffic while still allowing new profiles to appear fast.
-// error responses are never cached.
-
-const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
-
-class NonCacheableProfileResultError extends Error {
-  readonly result: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
-
-  constructor(result: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
-    super(`Profile fetch returned non-cacheable status: ${result.status}`);
-    this.name = 'NonCacheableProfileResultError';
-    this.result = result;
-  }
-}
-
-/**
- * Cached profile fetcher. Only caches successful (status: 'ok') results.
- *
- * IMPORTANT: We intentionally do NOT use a negative cache (caching not_found
- * results). The previous negative cache pattern used thrown errors to signal
- * "don't cache this" to unstable_cache, but unstable_cache treats background
- * revalidation failures by serving the stale value — causing not_found results
- * to become permanently sticky even after the profile becomes available.
- *
- * Instead, not_found and error results are always fetched fresh.
- */
-const getCachedProfileAndLinks = async (username: string) => {
-  // Skip Next.js cache in test/development environments
-  if (
-    process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development' ||
-    shouldBypassPublicProfileQaCache()
-  ) {
-    return fetchProfileAndLinks(username);
-  }
-
-  // Single fetch path via unstable_cache. The cached function is the sole
-  // fetch path, eliminating the previous double-fetch on first visit.
-  try {
-    const cachedFetch = unstable_cache(
-      async () => {
-        const data = await fetchProfileAndLinks(username);
-        if (data.status !== 'ok') {
-          // Don't cache not_found or error results — throw to prevent
-          // stale success from being served on background revalidation.
-          // Carry the original payload through the throw path so callers do not
-          // need to re-read storage just to render a fresh non-ok response.
-          throw new NonCacheableProfileResultError(data);
-        }
-        return data;
-      },
-      [`public-profile-${username}`],
-      {
-        tags: ['profiles-all', `profile:${username}`],
-        revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
-      }
-    );
-    return await cachedFetch();
-  } catch (error) {
-    if (error instanceof NonCacheableProfileResultError) {
-      return error.result;
-    }
-
-    // Cache layer failure — fetch fresh
-    return fetchProfileAndLinks(username);
-  }
-};
-
-// Memoize per-request to avoid duplicate DB work between generateMetadata and page render.
-// Now always uses unstable_cache (1-hour TTL) — claim logic moved to /[username]/claim
-const getProfileAndLinks = cache(async (username: string) => {
-  return getCachedProfileAndLinks(username.toLowerCase());
-});
+// Profile loader (fetch + cache + per-request memo) lives in
+// _lib/public-profile-loader.ts so per-mode routes (plan PR 3a-2b) can
+// reuse it without duplicating the cache, error class, or TTL contract.
 
 /**
  * Pre-render featured artist profiles at build time to eliminate cold-start latency.
