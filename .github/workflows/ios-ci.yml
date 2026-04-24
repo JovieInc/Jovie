@@ -72,41 +72,107 @@ jobs:
         run: |
           set -euo pipefail
 
-          DESTINATIONS="$(xcodebuild -showdestinations -project apps/ios/Jovie.xcodeproj -scheme Jovie 2>/dev/null || true)"
+          PROJECT_PATH="apps/ios/Jovie.xcodeproj"
+          SCHEME="Jovie"
+          DESTINATION=""
+          LAST_DESTINATIONS=""
 
-          DESTINATION="$(
-            printf '%s\n' "$DESTINATIONS" | ruby -ne '
-              next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
-              os = Regexp.last_match(1)
-              name = Regexp.last_match(2).strip
-              if os.start_with?("18.")
-                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
-                exit
-              end
-            '
-          )"
+          for attempt in {1..6}; do
+            LAST_DESTINATIONS="$(xcodebuild -showdestinations -project "$PROJECT_PATH" -scheme "$SCHEME" 2>/dev/null || true)"
+
+            DESTINATION="$(
+              DESTINATIONS="$LAST_DESTINATIONS" python3 <<'PY'
+              import os
+              import re
+
+              destinations = os.environ.get("DESTINATIONS", "")
+              preferred = []
+              fallback = []
+
+              for line in destinations.splitlines():
+                  if "platform:iOS Simulator" not in line:
+                      continue
+                  if "name:Any iOS Simulator Device" in line:
+                      continue
+
+                  id_match = re.search(r"id:([^,}]+)", line)
+                  if id_match is None:
+                      continue
+
+                  os_match = re.search(r"OS:([^,}]+)", line)
+                  destination = f"platform=iOS Simulator,id={id_match.group(1).strip()}"
+                  os_version = os_match.group(1).strip() if os_match is not None else ""
+
+                  if os_version.startswith("18."):
+                      preferred.append(destination)
+                  else:
+                      fallback.append(destination)
+
+              print((preferred or fallback or [""])[0], end="")
+              PY
+            )"
+
+            if [[ -n "$DESTINATION" ]]; then
+              break
+            fi
+
+            echo "No concrete simulator destination found on attempt $attempt/6."
+            if [[ "$LAST_DESTINATIONS" == *"name:Any iOS Simulator Device"* ]] && (( attempt < 6 )); then
+              sleep 10
+              continue
+            fi
+
+            break
+          done
 
           if [[ -z "$DESTINATION" ]]; then
             DESTINATION="$(
-              printf '%s\n' "$DESTINATIONS" | ruby -ne '
-                next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
-                os = Regexp.last_match(1)
-                name = Regexp.last_match(2).strip
-                puts "platform=iOS Simulator,OS=#{os},name=#{name}"
-                exit
-              '
+              python3 <<'PY'
+              import json
+              import subprocess
+
+              try:
+                  raw = subprocess.check_output(
+                      ["xcrun", "simctl", "list", "devices", "available", "-j"],
+                      text=True,
+                  )
+              except Exception:
+                  print("", end="")
+                  raise SystemExit(0)
+
+              devices_by_runtime = json.loads(raw).get("devices", {})
+              preferred = []
+              fallback = []
+
+              for runtime, devices in devices_by_runtime.items():
+                  if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
+                      continue
+
+                  for device in devices:
+                      if not device.get("isAvailable"):
+                          continue
+                      if "iPhone" not in device.get("name", ""):
+                          continue
+
+                      udid = device.get("udid")
+                      if not udid:
+                          continue
+
+                      destination = f"platform=iOS Simulator,id={udid}"
+                      if ".iOS-18" in runtime:
+                          preferred.append(destination)
+                      else:
+                          fallback.append(destination)
+
+              print((preferred or fallback or [""])[0], end="")
+              PY
             )"
           fi
 
-          if [[ -z "$DESTINATION" ]] &&
-            [[ "$DESTINATIONS" == *"platform:iOS Simulator"* ]] &&
-            [[ "$DESTINATIONS" == *"name:Any iOS Simulator Device"* ]]; then
-            DESTINATION="platform=iOS Simulator,name=Any iOS Simulator Device"
-          fi
-
           if [[ -z "$DESTINATION" ]]; then
-            echo "Unable to find an iOS Simulator destination."
-            echo "$DESTINATIONS"
+            echo "Unable to find a concrete iOS Simulator destination."
+            echo "$LAST_DESTINATIONS"
+            xcrun simctl list devices available || true
             exit 1
           fi
 
