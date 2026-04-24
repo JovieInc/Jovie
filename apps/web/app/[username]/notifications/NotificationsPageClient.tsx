@@ -6,7 +6,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
 import { BASE_URL } from '@/constants/app';
-import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import {
   buildProfileAccentCssVars,
   readProfileAccentTheme,
@@ -67,7 +67,12 @@ export function NotificationsPageClient({ artist }: Props) {
             </p>
           </div>
           <h1 className='sr-only'>Turn On Notifications for {artist.name}</h1>
-          <TwoStepNotificationsCTA artist={artist} startExpanded />
+          <ArtistNotificationsCTA
+            artist={artist}
+            variant='button'
+            autoOpen
+            forceExpanded
+          />
         </div>
       </div>
     </ProfileNotificationsContext.Provider>

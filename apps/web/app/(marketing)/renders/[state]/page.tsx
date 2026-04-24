@@ -116,6 +116,7 @@ export default function MarketingRenderPage() {
           onDrawerOpenChange={() => {}}
           onDrawerViewChange={() => {}}
           onModeSelect={() => {}}
+          onBack={() => {}}
           onOpenMenu={() => {}}
           onPlayClick={() => {}}
           onShare={() => {}}

@@ -292,6 +292,8 @@ export function useProfileShell({
       setSubscribedChannels,
       subscriptionDetails,
       setSubscriptionDetails,
+      contentPreferences: notificationsController.contentPreferences,
+      artistEmail: notificationsController.artistEmail,
       openSubscription,
       registerInputFocus,
       smsEnabled,
@@ -311,6 +313,8 @@ export function useProfileShell({
       smsEnabled,
       subscribedChannels,
       subscriptionDetails,
+      notificationsController.artistEmail,
+      notificationsController.contentPreferences,
     ]
   );
 

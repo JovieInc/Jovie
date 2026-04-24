@@ -135,6 +135,7 @@
     "qa:overnight:resume": "tsx scripts/overnight-qa-controller.ts --resume",
     "qa:overnight:status": "tsx scripts/overnight-qa-controller.ts --status",
     "qa:overnight:dry-run": "tsx scripts/overnight-qa-controller.ts --dry-run",
+    "profile:mock-diff": "tsx scripts/profile-mock-diff.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts",

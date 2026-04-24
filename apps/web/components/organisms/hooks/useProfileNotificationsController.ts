@@ -12,8 +12,10 @@ import {
   useUnsubscribeNotificationsMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
 import type {
+  NotificationArtistEmailState,
   NotificationChannel,
   NotificationContactValues,
+  NotificationContentPreferences,
   NotificationSubscriptionState,
 } from '@/types/notifications';
 
@@ -43,6 +45,8 @@ interface StatusCache {
   artistId: string;
   channels: NotificationSubscriptionState;
   details: NotificationContactValues;
+  contentPreferences?: NotificationContentPreferences;
+  artistEmail?: NotificationArtistEmailState;
   timestamp: number;
 }
 
@@ -88,7 +92,9 @@ function readCachedStatus(artistId: string): StatusCache | null {
 function writeCachedStatus(
   artistId: string,
   channels: NotificationSubscriptionState,
-  details: NotificationContactValues
+  details: NotificationContactValues,
+  contentPreferences?: NotificationContentPreferences,
+  artistEmail?: NotificationArtistEmailState
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -96,6 +102,8 @@ function writeCachedStatus(
       artistId,
       channels,
       details,
+      contentPreferences,
+      artistEmail,
       timestamp: Date.now(),
     };
     globalThis.localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify(cache));
@@ -152,6 +160,10 @@ export function useProfileNotificationsController({
     useState<NotificationSubscriptionState>({});
   const [subscriptionDetails, setSubscriptionDetails] =
     useState<NotificationContactValues>(() => storedContacts ?? {});
+  const [statusSnapshot, setStatusSnapshot] = useState<{
+    contentPreferences?: NotificationContentPreferences;
+    artistEmail?: NotificationArtistEmailState;
+  }>({});
   const [hasStoredContacts, setHasStoredContacts] = useState<boolean>(
     hasInitialStoredContacts
   );
@@ -248,6 +260,10 @@ export function useProfileNotificationsController({
       const cachedStatus = readCachedStatus(artistId);
       if (cachedStatus) {
         setSubscribedChannels(cachedStatus.channels);
+        setStatusSnapshot({
+          contentPreferences: cachedStatus.contentPreferences,
+          artistEmail: cachedStatus.artistEmail,
+        });
         const hasAny = Object.values(cachedStatus.channels).some(Boolean);
         if (hasAny) {
           setSubscriptionDetails(cachedStatus.details);
@@ -272,6 +288,10 @@ export function useProfileNotificationsController({
 
     if (statusQuery.data?.channels) {
       setSubscribedChannels(statusQuery.data.channels);
+      setStatusSnapshot({
+        contentPreferences: statusQuery.data.contentPreferences,
+        artistEmail: statusQuery.data.artistEmail,
+      });
       const hasAny = Object.values(statusQuery.data.channels).some(Boolean);
       if (hasAny) {
         setSubscriptionDetails(statusQuery.data.details ?? {});
@@ -280,7 +300,9 @@ export function useProfileNotificationsController({
       writeCachedStatus(
         artistId,
         statusQuery.data.channels,
-        statusQuery.data.details ?? {}
+        statusQuery.data.details ?? {},
+        statusQuery.data.contentPreferences,
+        statusQuery.data.artistEmail
       );
     }
 
@@ -448,7 +470,9 @@ export function useProfileNotificationsController({
   return {
     channel,
     channelBusy,
-    contentPreferences: statusQuery.data?.contentPreferences,
+    contentPreferences:
+      statusQuery.data?.contentPreferences ?? statusSnapshot.contentPreferences,
+    artistEmail: statusQuery.data?.artistEmail ?? statusSnapshot.artistEmail,
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,

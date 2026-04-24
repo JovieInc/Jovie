@@ -1,64 +1,24 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
 import type { Artist } from '@/types/db';
 
-/**
- * CLS-prevention tests: verify that fixed-height wrapper classes are present
- * on wrapper containers in all component states. jsdom can't measure
- * pixels, so we assert class presence instead.
- */
-
 const mockUseSubscriptionForm = vi.fn();
-const mockUseUserSafe = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
+const mockUseProfileNotifications = vi.fn();
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({
-    info: vi.fn(),
-    success: vi.fn(),
-    error: vi.fn(),
-  }),
-}));
-
 vi.mock('@/hooks/useClerkSafe', () => ({
-  useUserSafe: (...args: unknown[]) => mockUseUserSafe(...args),
+  useUserSafe: () => ({ user: null }),
 }));
 
-vi.mock('@/features/auth/atoms/otp-input', () => ({
-  OtpInput: ({
-    value,
-    onChange,
-    'aria-label': ariaLabel,
-  }: {
-    readonly value: string;
-    readonly onChange: (value: string) => void;
-    readonly 'aria-label': string;
-  }) => (
-    <input
-      aria-label={ariaLabel}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-    />
-  ),
-}));
+vi.mock('motion/react', async () => {
+  await import('react');
 
-vi.mock('motion/react', async importOriginal => {
-  const actual = await importOriginal<typeof import('motion/react')>();
   return {
-    ...actual,
     AnimatePresence: ({ children }: { readonly children: React.ReactNode }) => (
       <>{children}</>
     ),
@@ -72,6 +32,14 @@ vi.mock('motion/react', async importOriginal => {
 });
 
 vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    useProfileNotifications: (...args: unknown[]) =>
+      mockUseProfileNotifications(...args),
+  })
+);
+
+vi.mock(
   '@/features/profile/artist-notifications-cta/useSubscriptionForm',
   () => ({
     useSubscriptionForm: (...args: unknown[]) =>
@@ -79,27 +47,18 @@ vi.mock(
   })
 );
 
-vi.mock('@/lib/queries', () => ({
-  useUpdateSubscriberNameMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
-  useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
-    isPending: false,
-  }),
-  useSubscribeNotificationsMutation: () => ({ mutateAsync: vi.fn() }),
-  useVerifyEmailOtpMutation: () => ({ mutateAsync: vi.fn() }),
-}));
-
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
   }),
   useUpdateSubscriberBirthdayMutation: () => ({
-    mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
+  }),
+  useUpdateContentPreferencesMutation: () => ({
+    isPending: false,
+    mutateAsync: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -116,49 +75,69 @@ const artist: Artist = {
   created_at: new Date().toISOString(),
 } as Artist;
 
-function buildFormState(overrides: Record<string, unknown> = {}) {
+function buildProfileNotifications(
+  overrides: Partial<ProfileNotificationsContextValue> = {}
+): ProfileNotificationsContextValue {
   return {
-    country: { code: 'US', dialCode: '+1', label: 'United States', flag: 'US' },
-    setCountry: vi.fn(),
-    phoneInput: '',
-    emailInput: '',
-    error: null,
-    errorOrigin: null,
-    otpCode: '',
-    otpStep: 'input' as const,
-    isSubmitting: false,
-    isCountryOpen: false,
-    setIsCountryOpen: vi.fn(),
-    resendCooldownEnd: 0,
-    isResending: false,
-    notificationsState: 'idle',
+    state: 'idle',
+    setState: vi.fn(),
+    hydrationStatus: 'done',
+    hasStoredContacts: false,
     notificationsEnabled: true,
-    channel: 'email' as const,
+    channel: 'email',
+    setChannel: vi.fn(),
     subscribedChannels: {},
-    handleChannelChange: vi.fn(),
-    handlePhoneChange: vi.fn(),
-    handleEmailChange: vi.fn(),
-    handleFieldBlur: vi.fn(),
-    handleOtpChange: vi.fn(),
-    handleSubscribe: vi.fn().mockResolvedValue(undefined),
-    handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
-    handleResendOtp: vi.fn().mockResolvedValue(undefined),
-    handleKeyDown: vi.fn(),
+    setSubscribedChannels: vi.fn(),
+    subscriptionDetails: { email: 'fan@example.com' },
+    setSubscriptionDetails: vi.fn(),
+    contentPreferences: {
+      newMusic: true,
+      tourDates: true,
+      merch: true,
+      general: true,
+    },
+    artistEmail: {
+      optedIn: false,
+      pendingProvider: false,
+      visibleToArtist: false,
+    },
     openSubscription: vi.fn(),
     registerInputFocus: vi.fn(),
-    hydrationStatus: 'done' as const,
     smsEnabled: false,
     ...overrides,
   };
 }
 
-describe('CLS-prevention: min-h CSS classes', () => {
+function buildFormState(overrides: Record<string, unknown> = {}) {
+  return {
+    emailInput: '',
+    error: null,
+    otpCode: '',
+    isSubmitting: false,
+    resendCooldownEnd: 0,
+    isResending: false,
+    notificationsState: 'idle',
+    notificationsEnabled: true,
+    subscribedChannels: {},
+    handleChannelChange: vi.fn(),
+    handleEmailChange: vi.fn(),
+    handleOtpChange: vi.fn(),
+    handleSubscribe: vi.fn().mockResolvedValue('error'),
+    handleVerifyOtp: vi.fn().mockResolvedValue('error'),
+    handleResendOtp: vi.fn().mockResolvedValue(true),
+    openSubscription: vi.fn(),
+    hydrationStatus: 'done',
+    ...overrides,
+  };
+}
+
+describe('notification flow shell sizing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseUserSafe.mockReturnValue({ user: null });
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
   });
 
-  it('ArtistNotificationsCTA wraps skeleton in min-h-[180px]', async () => {
+  it('ArtistNotificationsCTA keeps the inline loading skeleton for hydration', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({ hydrationStatus: 'checking' })
     );
@@ -167,42 +146,40 @@ describe('CLS-prevention: min-h CSS classes', () => {
       '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
     );
 
-    const { container } = render(
-      <ArtistNotificationsCTA artist={artist} autoOpen />
-    );
+    render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    expect(container.querySelector('.min-h-\\[180px\\]')).toBeInTheDocument();
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
   });
 
-  it('ArtistNotificationsCTA wraps form in min-h-[180px]', async () => {
-    mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({
-        notificationsState: 'editing',
-        notificationsEnabled: true,
-      })
-    );
+  it('ArtistNotificationsCTA uses the full-height inline flow shell when expanded', async () => {
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ArtistNotificationsCTA } = await import(
       '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
     );
 
-    const { container } = render(
-      <ArtistNotificationsCTA artist={artist} autoOpen />
-    );
+    render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    expect(container.querySelector('.min-h-\\[180px\\]')).toBeInTheDocument();
+    const shell = await screen.findByTestId(
+      'profile-mobile-notifications-flow'
+    );
+    expect(shell.className).toContain('min-h-[640px]');
   });
 
-  it('ProfileInlineNotificationsCTA has h-[72px] on wrapper', async () => {
+  it('ProfileInlineNotificationsCTA reuses the same full-height inline shell', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
       '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
     );
 
-    render(<ProfileInlineNotificationsCTA artist={artist} />);
+    render(
+      <ProfileInlineNotificationsCTA artist={artist} presentation='inline' />
+    );
 
-    const wrapper = screen.getByTestId('profile-inline-cta');
-    expect(wrapper.className).toContain('h-[72px]');
+    const shell = await screen.findByTestId(
+      'profile-mobile-notifications-flow'
+    );
+    expect(shell.className).toContain('min-h-[640px]');
   });
 });

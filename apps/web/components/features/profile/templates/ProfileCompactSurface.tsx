@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bell,
   CalendarDays,
+  ChevronLeft,
   House,
   type LucideIcon,
   MoreHorizontal,
@@ -13,13 +14,11 @@ import {
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import { profilePrimaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
+import { profileHeroMorphPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type {
   ProfileMode,
   ProfilePreviewNotificationsState,
@@ -28,6 +27,7 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
+import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
@@ -131,6 +131,7 @@ interface ProfileCompactSurfaceProps {
   readonly onModeSelect?: (mode: ProfilePrimaryTab) => void;
   readonly onDrawerOpenChange: (open: boolean) => void;
   readonly onDrawerViewChange: (view: DrawerView) => void;
+  readonly onBack: () => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
   readonly onShare: () => void;
@@ -149,6 +150,7 @@ interface ProfileCompactSurfaceProps {
   readonly dataTestId?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
 }
 
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
@@ -215,18 +217,6 @@ function getUpcomingTourDate(
   );
 }
 
-function formatCalendarLabel(date: Date | string | null | undefined) {
-  const value = toDateValue(date);
-  if (!value) {
-    return 'Soon';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(value);
-}
-
 function resolveActivePrimaryTab(mode: ProfileMode): ProfilePrimaryTab {
   switch (mode) {
     case 'listen':
@@ -243,83 +233,16 @@ function resolveActivePrimaryTab(mode: ProfileMode): ProfilePrimaryTab {
   }
 }
 
-function resolveModeSummary(params: {
-  mode: ProfileMode;
-  artistName: string;
-  dspCount: number;
-  upcomingTourDate: TourDateViewModel | null;
-  isSubscribed: boolean;
-  pressPhotoCount: number;
-  hasReleases: boolean;
-}) {
-  switch (params.mode) {
-    case 'listen':
-      return {
-        title: 'Streaming Destinations',
-        body:
-          params.dspCount > 0
-            ? `${params.artistName} is linked on ${params.dspCount} listening destination${params.dspCount === 1 ? '' : 's'}.`
-            : `Open alerts for ${params.artistName} until listening destinations are live.`,
-      };
-    case 'tour':
-      return {
-        title: 'Live Dates',
-        body: params.upcomingTourDate
-          ? `Next date: ${formatCalendarLabel(params.upcomingTourDate.startDate)} at ${params.upcomingTourDate.venueName}.`
-          : `No tour dates are live yet. Alerts stay ready for the next announcement.`,
-      };
-    case 'subscribe':
-      return {
-        title: params.isSubscribed ? 'Manage Alerts' : 'Turn On Alerts',
-        body: params.isSubscribed
-          ? 'Music, shows, merch, and general updates are managed in one place.'
-          : 'Get notified about new releases, show announcements, and merch drops.',
-      };
-    case 'about':
-      return {
-        title: 'Artist Profile',
-        body:
-          params.pressPhotoCount > 0
-            ? `Bio, press photos, and key details stay collected in one place.`
-            : `Bio, highlights, and links stay cleanly organized here.`,
-      };
-    case 'pay':
-      return {
-        title: 'Support This Artist',
-        body: `Fans can support ${params.artistName} directly without leaving the profile shell.`,
-      };
-    case 'contact':
-      return {
-        title: 'Contact Links',
-        body: `Booking, management, and press details stay easy to reach.`,
-      };
-    case 'releases':
-      return {
-        title: 'Release Archive',
-        body: params.hasReleases
-          ? `Catalog and recent drops stay available from the overflow menu.`
-          : `The release archive will appear here as catalog builds out.`,
-      };
-    case 'profile':
-    default:
-      return {
-        title: 'Featured Moments',
-        body: `Swipe through releases, shows, alerts, and listening destinations.`,
-      };
-  }
-}
-
 function resolveStatusPill(params: {
   latestRelease?: ProfileCompactSurfaceProps['latestRelease'];
   profileSettings?: ProfileCompactSurfaceProps['profileSettings'];
   upcomingTourDate: TourDateViewModel | null;
+  isSubscribed: boolean;
 }) {
   if (params.upcomingTourDate) {
-    const city =
-      params.upcomingTourDate.city || params.upcomingTourDate.venueName;
     return {
       icon: CalendarDays,
-      label: `Next show ${formatCalendarLabel(params.upcomingTourDate.startDate)} in ${city}`,
+      label: 'On Tour',
     };
   }
 
@@ -331,18 +254,28 @@ function resolveStatusPill(params: {
     return releaseVisibility.isCountdown
       ? {
           icon: Bell,
-          label: `Release drops ${formatCalendarLabel(params.latestRelease.releaseDate)}`,
+          label: 'New Release',
         }
       : {
           icon: Bell,
-          label: 'New release out now',
+          label: 'New Release',
         };
   }
 
   return {
     icon: Bell,
-    label: 'Alerts ready for the next drop',
+    label: params.isSubscribed ? 'Alerts On' : 'Alerts Ready',
   };
+}
+
+function readHeroRoleLabel(artist: Artist) {
+  const label = artist.settings?.heroRoleLabel;
+  if (typeof label !== 'string') {
+    return null;
+  }
+
+  const trimmed = label.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function ProfileCompactSurface({
@@ -373,11 +306,10 @@ export function ProfileCompactSurface({
   onModeSelect = () => {},
   onDrawerOpenChange,
   onDrawerViewChange,
+  onBack,
   onOpenMenu,
   onPlayClick,
-  onShare,
   profileHref,
-  artistProfilesHref,
   isSubscribed = false,
   contentPrefs = DEFAULT_CONTENT_PREFS,
   onTogglePref = () => {},
@@ -385,16 +317,14 @@ export function ProfileCompactSurface({
   isUnsubscribing = false,
   onManageNotifications,
   onRegisterReveal,
-  onRevealNotifications,
   previewNotificationsState = {
     kind: 'button',
     tone: 'quiet',
     label: 'Get alerts',
   },
-  previewReleaseActionLabel = 'Listen',
   dataTestId,
-  hideJovieBranding = false,
   hideMoreMenu = false,
+  headerSocialLinksOverride,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const mergedDSPs = useMemo(
     () =>
@@ -430,24 +360,22 @@ export function ProfileCompactSurface({
     artistHandle: artist.handle,
   });
   const visibleSocialLinks = useMemo(
-    () => getHeaderSocialLinks(socialLinks, viewerCountryCode, 2),
-    [socialLinks, viewerCountryCode]
+    () =>
+      headerSocialLinksOverride
+        ? [...headerSocialLinksOverride]
+        : getHeaderSocialLinks(socialLinks, viewerCountryCode, 2),
+    [headerSocialLinksOverride, socialLinks, viewerCountryCode]
   );
   const hasTip = useMemo(
     () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
     [showPayButton, socialLinks]
   );
   const hasReleases = releases.length >= 2;
-  const hasAbout = Boolean(
-    artist.tagline ||
-      artist.location ||
-      artist.hometown ||
-      artist.active_since_year ||
-      (genres && genres.length > 0) ||
-      (allowPhotoDownloads && pressPhotos.length > 0)
-  );
   const activePrimaryTab = resolveActivePrimaryTab(activeMode);
-  const isHomeMode = activeMode === 'profile';
+  const isHomeMode = activePrimaryTab === 'profile';
+  const isPreviewEmbedded =
+    renderMode === 'preview' && presentation === 'embedded';
+  const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
   const upcomingTourDate = useMemo(
     () => getUpcomingTourDate(tourDates),
     [tourDates]
@@ -458,29 +386,9 @@ export function ProfileCompactSurface({
         latestRelease,
         profileSettings,
         upcomingTourDate,
-      }),
-    [latestRelease, profileSettings, upcomingTourDate]
-  );
-  const modeSummary = useMemo(
-    () =>
-      resolveModeSummary({
-        mode: activeMode,
-        artistName: artist.name,
-        dspCount: mergedDSPs.length,
-        upcomingTourDate,
         isSubscribed,
-        pressPhotoCount: pressPhotos.length,
-        hasReleases,
       }),
-    [
-      activeMode,
-      artist.name,
-      hasReleases,
-      isSubscribed,
-      mergedDSPs.length,
-      pressPhotos.length,
-      upcomingTourDate,
-    ]
+    [isSubscribed, latestRelease, profileSettings, upcomingTourDate]
   );
   const heroSubtitle = useMemo(() => {
     const tagline =
@@ -489,10 +397,12 @@ export function ProfileCompactSurface({
       return tagline;
     }
 
-    return getProfileModeDefinition(activeMode).subtitle;
-  }, [activeMode, artist.tagline]);
+    return getProfileModeDefinition(activePrimaryTab).subtitle;
+  }, [activePrimaryTab, artist.tagline]);
+  const heroRoleLabel = useMemo(() => readHeroRoleLabel(artist), [artist]);
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
-  const StatusIcon = statusPill.icon;
+  const topChromeButtonClassName =
+    '!h-12 !w-12 border-transparent bg-black/44 text-white shadow-[0_20px_44px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/56';
 
   return (
     <div
@@ -511,7 +421,13 @@ export function ProfileCompactSurface({
         <header
           className={cn(
             'relative shrink-0 overflow-hidden',
-            isHomeMode ? 'min-h-[430px]' : 'min-h-[320px]'
+            isHomeMode
+              ? isPreviewEmbedded
+                ? 'min-h-[454px]'
+                : 'min-h-[480px]'
+              : isPreviewEmbedded
+                ? 'min-h-[316px]'
+                : 'min-h-[408px]'
           )}
         >
           <div className='absolute inset-0'>
@@ -527,56 +443,64 @@ export function ProfileCompactSurface({
             />
           </div>
 
-          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.14)_26%,rgba(0,0,0,0.38)_54%,rgba(5,6,8,0.88)_100%)]' />
-          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_30%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.22)_58%,var(--profile-stage-bg)_100%)]' />
+          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.18)_0%,rgba(3,4,6,0.22)_20%,rgba(4,5,7,0.42)_52%,rgba(5,6,8,0.94)_100%)]' />
+          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
 
-          <div className='relative z-10 flex h-full flex-col justify-between px-5 pb-5 pt-[max(env(safe-area-inset-top),20px)]'>
-            <div className='flex items-center justify-between'>
-              {!hideJovieBranding ? (
-                <Link
-                  href={artistProfilesHref ?? BASE_URL}
-                  aria-label='Create your artist profile on Jovie'
-                  className='rounded-full opacity-55 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-                >
-                  <BrandLogo
-                    size={22}
-                    tone='white'
-                    rounded={false}
-                    className='block'
-                    aria-hidden={true}
-                  />
-                </Link>
-              ) : (
-                <span />
-              )}
+          <div
+            className={cn(
+              'relative z-10 flex h-full flex-col justify-between px-5 pb-6',
+              isPreviewEmbedded
+                ? 'pt-[74px]'
+                : 'pt-[max(env(safe-area-inset-top),20px)]'
+            )}
+          >
+            <div
+              className='flex items-center justify-between'
+              data-testid='profile-top-chrome'
+            >
+              <CircleIconButton
+                onClick={onBack}
+                size='lg'
+                variant='pearl'
+                className={topChromeButtonClassName}
+                ariaLabel='Back'
+              >
+                <ChevronLeft className='h-5 w-5' />
+              </CircleIconButton>
 
               {!hideMoreMenu ? (
                 <CircleIconButton
                   onClick={onOpenMenu}
-                  size='xs'
-                  variant='pearlQuiet'
-                  className={drawerOpen ? 'bg-white/12 text-white' : undefined}
+                  size='lg'
+                  variant='pearl'
+                  className={cn(
+                    topChromeButtonClassName,
+                    drawerOpen && 'bg-black/60'
+                  )}
                   ariaLabel='More options'
                   aria-haspopup='dialog'
                 >
-                  <MoreHorizontal className='h-[15px] w-[15px]' />
+                  <MoreHorizontal className='h-5 w-5' />
                 </CircleIconButton>
               ) : null}
             </div>
 
-            <div className='space-y-4'>
-              <span className='inline-flex w-fit items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-3.5 py-1.5 text-xs font-semibold text-[color:var(--profile-status-pill-fg)] shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'>
-                <StatusIcon className='h-3.5 w-3.5' />
-                <span>{statusPill.label}</span>
-              </span>
-
-              <div className='space-y-2'>
+            <div
+              className={cn(isPreviewEmbedded ? 'space-y-3.5' : 'space-y-4')}
+            >
+              <div
+                className={cn(isPreviewEmbedded ? 'space-y-1.5' : 'space-y-2')}
+                data-testid='profile-hero-identity-block'
+              >
                 <IdentityHeading className='min-w-0'>
                   <Link
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex min-w-0 items-center gap-1.5 rounded-md text-[34px] font-semibold leading-[1.02] tracking-[-0.035em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                    className={cn(
+                      'inline-flex min-w-0 items-center gap-1.5 rounded-md font-semibold leading-[1.02] tracking-[-0.035em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                      isPreviewEmbedded ? 'text-[38px]' : 'text-[34px]'
+                    )}
                   >
                     <span className='truncate'>{artist.name}</span>
                     {artist.is_verified ? (
@@ -591,52 +515,110 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p className='max-w-[28ch] text-sm font-medium leading-6 tracking-[-0.012em] text-white/74'>
+                <p
+                  className={cn(
+                    'max-w-[28ch] font-medium tracking-[-0.012em] text-white/74',
+                    isPreviewEmbedded
+                      ? 'text-[15px] leading-5'
+                      : 'text-sm leading-6'
+                  )}
+                >
                   {heroSubtitle}
                 </p>
               </div>
 
-              <div className='flex items-start gap-3'>
-                <div className='min-w-0 flex-1'>
-                  {renderMode === 'interactive' ? (
-                    <ProfileInlineNotificationsCTA
-                      artist={artist}
-                      onManageNotifications={onManageNotifications}
-                      onRegisterReveal={onRegisterReveal}
-                      variant='hero'
-                    />
-                  ) : (
-                    <button
-                      type='button'
-                      className={cn(
-                        profilePrimaryPillClassName,
-                        'w-full justify-center gap-2'
-                      )}
-                      tabIndex={-1}
+              <div
+                className={cn(
+                  'flex items-end justify-between gap-3.5',
+                  isPreviewEmbedded ? 'pt-1' : ''
+                )}
+              >
+                <div
+                  className='flex min-w-0 flex-1 flex-wrap items-center gap-2.5'
+                  data-testid='profile-hero-action-row'
+                >
+                  <div
+                    className='shrink-0'
+                    data-testid='profile-hero-notifications-cta'
+                  >
+                    {renderMode === 'interactive' ? (
+                      <ProfileInlineNotificationsCTA
+                        artist={artist}
+                        onManageNotifications={onManageNotifications}
+                        onRegisterReveal={onRegisterReveal}
+                        variant='hero'
+                      />
+                    ) : (
+                      <button
+                        type='button'
+                        className={cn(
+                          profileHeroMorphPillClassName,
+                          'gap-2 whitespace-nowrap px-4.5'
+                        )}
+                        tabIndex={-1}
+                      >
+                        <Bell className='h-4 w-4' />
+                        {isSubscribed
+                          ? 'Manage alerts'
+                          : 'Turn on notifications'}
+                      </button>
+                    )}
+                  </div>
+
+                  <span
+                    className='inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-4 text-[13px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+                    data-testid='profile-hero-status-pill'
+                  >
+                    <span className='h-2 w-2 rounded-full bg-[color:var(--profile-accent-primary)]' />
+                    <span>{statusPill.label}</span>
+                  </span>
+
+                  {heroRoleLabel ? (
+                    <span
+                      className='inline-flex h-11 shrink-0 items-center rounded-full border border-white/12 bg-black/18 px-4 text-[13px] font-medium tracking-[-0.01em] text-white/64 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+                      data-testid='profile-hero-role-pill'
                     >
-                      <Bell className='h-4 w-4' />
-                      {previewNotificationsState.label}
-                    </button>
-                  )}
+                      {heroRoleLabel}
+                    </span>
+                  ) : null}
                 </div>
 
                 {visibleSocialLinks.length > 0 ? (
-                  <div className='flex items-center gap-2'>
-                    {visibleSocialLinks.map(link =>
+                  <div
+                    className={cn(
+                      'flex shrink-0 items-center',
+                      isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
+                    )}
+                    data-testid='profile-hero-social-row'
+                  >
+                    {visibleSocialLinks.map((link, index) =>
                       link.platform && link.url ? (
-                        <a
+                        <div
                           key={link.id}
-                          href={link.url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] text-white shadow-[var(--profile-pearl-shadow)] backdrop-blur-2xl transition-[background-color,border-color,transform] duration-200 hover:bg-[var(--profile-pearl-bg-hover)] active:scale-[0.98]'
-                          aria-label={link.platform}
+                          className={cn(
+                            'flex items-center',
+                            isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
+                          )}
                         >
-                          <SocialIcon
-                            platform={link.platform}
-                            className='h-[18px] w-[18px]'
-                          />
-                        </a>
+                          <a
+                            href={link.url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/24 text-white shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color,transform] duration-200 hover:bg-black/34 active:scale-[0.98]'
+                            aria-label={link.platform}
+                          >
+                            <SocialIcon
+                              platform={link.platform}
+                              className='h-[18px] w-[18px]'
+                            />
+                          </a>
+                          {index < visibleSocialLinks.length - 1 ? (
+                            <span
+                              className='h-8 w-px bg-white/18'
+                              aria-hidden='true'
+                            />
+                          ) : null}
+                        </div>
                       ) : null
                     )}
                   </div>
@@ -646,7 +628,7 @@ export function ProfileCompactSurface({
           </div>
         </header>
 
-        <div className='relative z-10 flex flex-1 flex-col px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-4'>
+        <div className='relative z-10 flex flex-1 flex-col px-5 pt-4'>
           {showSubscriptionConfirmedBanner ? (
             <div className='pb-3'>
               <SubscriptionConfirmedBanner />
@@ -654,48 +636,51 @@ export function ProfileCompactSurface({
           ) : null}
 
           {isHomeMode ? (
-            <ProfileHomeRail
-              artist={artist}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              featuredPlaylistFallback={featuredPlaylistFallback}
-              tourDates={tourDates}
-              hasPlayableDestinations={mergedDSPs.length > 0}
+            <div>
+              <ProfileHomeRail
+                artist={artist}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                featuredPlaylistFallback={featuredPlaylistFallback}
+                tourDates={tourDates}
+                hasPlayableDestinations={mergedDSPs.length > 0}
+                renderMode={renderMode}
+                onPlayClick={onPlayClick}
+                onOpenAlerts={() => onModeSelect('subscribe')}
+                viewerLocation={viewerLocation}
+                resolveNearbyTour={resolveNearbyTour}
+                isSubscribed={isSubscribed}
+                previewNotificationsState={previewNotificationsState}
+              />
+            </div>
+          ) : (
+            <ProfilePrimaryTabPanel
+              mode={activePrimaryPanel ?? 'listen'}
               renderMode={renderMode}
-              previewActionLabel={previewReleaseActionLabel}
-              onPlayClick={onPlayClick}
-              onOpenAlerts={() => onModeSelect('subscribe')}
-              viewerLocation={viewerLocation}
-              resolveNearbyTour={resolveNearbyTour}
+              artist={artist}
+              dsps={mergedDSPs}
+              enableDynamicEngagement={enableDynamicEngagement}
+              subscribeTwoStep={subscribeTwoStep}
               isSubscribed={isSubscribed}
+              contentPrefs={contentPrefs}
+              onTogglePref={onTogglePref}
+              onUnsubscribe={onUnsubscribe}
+              isUnsubscribing={isUnsubscribing}
+              genres={genres}
+              pressPhotos={pressPhotos}
+              allowPhotoDownloads={allowPhotoDownloads}
+              tourDates={tourDates}
               previewNotificationsState={previewNotificationsState}
             />
-          ) : (
-            <div className='rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl'>
-              <p className='text-xs font-semibold tracking-[-0.01em] text-primary-token/56'>
-                {modeSummary.title}
-              </p>
-              <p className='mt-2 max-w-[30ch] text-base font-semibold leading-6 tracking-[-0.025em] text-primary-token'>
-                {modeSummary.body}
-              </p>
-            </div>
           )}
 
-          <div className='mt-auto space-y-3 pt-5'>
-            {!hideJovieBranding ? (
-              <a
-                href={BASE_URL}
-                className='block text-center text-[11px] font-semibold tracking-[-0.01em] text-primary-token/42 transition-colors duration-150 hover:text-primary-token/64'
-              >
-                Powered by Jovie
-              </a>
-            ) : null}
-
+          <div className='mt-auto pt-5'>
             <nav
-              className='rounded-[30px] border border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] p-1.5 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl'
+              className='mx-[-20px] border-t border-[color:var(--profile-dock-border)] bg-[color:color-mix(in_srgb,var(--profile-dock-bg)_72%,transparent)] px-3 pt-2 backdrop-blur-2xl'
               aria-label='Profile navigation'
+              data-testid='profile-bottom-nav'
             >
-              <div className='flex items-stretch gap-1'>
+              <div className='flex items-stretch gap-1 pb-[max(env(safe-area-inset-bottom),10px)]'>
                 {PRIMARY_TABS.map(tab => {
                   const Icon = tab.icon;
                   const isActive = tab.mode === activePrimaryTab;
@@ -705,14 +690,25 @@ export function ProfileCompactSurface({
                       type='button'
                       onClick={() => onModeSelect(tab.mode)}
                       className={cn(
-                        'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2.5 text-center transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                        'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                         isActive
-                          ? 'bg-[color:var(--profile-tab-active-bg)] text-[color:var(--profile-tab-active-fg)] shadow-[0_16px_34px_rgba(0,0,0,0.22)]'
-                          : 'text-primary-token/56 hover:bg-[var(--profile-pearl-bg)] hover:text-primary-token'
+                          ? 'text-white'
+                          : 'text-white/40 hover:text-white/62'
                       )}
                       aria-current={isActive ? 'page' : undefined}
                     >
-                      <Icon className='h-4 w-4 shrink-0' />
+                      {isActive ? (
+                        <span
+                          className='absolute left-1/2 top-0 h-1 w-9 -translate-x-1/2 rounded-full bg-[color:var(--profile-tab-active-bg)]'
+                          aria-hidden='true'
+                        />
+                      ) : null}
+                      <Icon
+                        className={cn(
+                          'h-5 w-5 shrink-0',
+                          isActive ? 'text-white' : 'text-white/52'
+                        )}
+                      />
                       <span className='truncate text-[11px] font-semibold tracking-[-0.012em]'>
                         {tab.label}
                       </span>
@@ -744,8 +740,6 @@ export function ProfileCompactSurface({
           isUnsubscribing={isUnsubscribing}
           enableDynamicEngagement={enableDynamicEngagement}
           subscribeTwoStep={subscribeTwoStep}
-          hasAbout={hasAbout}
-          hasTourDates={tourDates.length > 0}
           hasTip={hasTip}
           hasContacts={hasContacts}
           hasReleases={hasReleases}
@@ -754,7 +748,6 @@ export function ProfileCompactSurface({
           allowPhotoDownloads={allowPhotoDownloads}
           tourDates={tourDates}
           releases={releases}
-          onRevealNotifications={onRevealNotifications}
         />
       ) : null}
     </div>

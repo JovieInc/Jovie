@@ -44,7 +44,8 @@ export type UpdateContentPreferencesPayload = {
   artistId: string;
   email?: string;
   phone?: string;
-  preferences: Partial<NotificationContentPreferences>;
+  preferences?: Partial<NotificationContentPreferences>;
+  artistEmailOptIn?: boolean;
 };
 
 export const NOTIFICATION_COPY = {
@@ -209,6 +210,7 @@ export const updateContentPreferences = async (
       email: payload.email,
       phone: payload.phone,
       preferences: payload.preferences,
+      artist_email_opt_in: payload.artistEmailOptIn,
     },
     NOTIFICATION_COPY.errors.generic,
     undefined,

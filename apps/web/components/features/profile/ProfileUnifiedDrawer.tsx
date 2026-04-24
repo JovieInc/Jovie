@@ -69,8 +69,6 @@ interface ProfileUnifiedDrawerProps {
   readonly shareContext: ShareContext;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
-  readonly hasAbout: boolean;
-  readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
   readonly genres?: string[] | null;
@@ -79,8 +77,6 @@ interface ProfileUnifiedDrawerProps {
   readonly tourDates?: TourDateViewModel[];
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
-  /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
-  readonly onRevealNotifications?: () => void;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -172,8 +168,6 @@ export function ProfileUnifiedDrawer({
   shareContext,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
-  hasAbout,
-  hasTourDates,
   hasTip,
   hasContacts,
   genres,
@@ -182,7 +176,6 @@ export function ProfileUnifiedDrawer({
   tourDates = [],
   hasReleases,
   releases = [],
-  onRevealNotifications,
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
     () => releases.filter(r => Boolean(r.slug)),
@@ -322,14 +315,9 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'menu' && (
             <MenuView
               onNavigate={next => navigateTo(next as DrawerView)}
-              hasAbout={hasAbout}
               hasReleases={canOpenReleasesDrawer}
-              hasTourDates={hasTourDates}
               hasTip={hasTip}
               hasContacts={hasContacts}
-              isSubscribed={isSubscribed}
-              onRevealNotifications={onRevealNotifications}
-              onBeforeReveal={() => handleOpenChange(false)}
             />
           )}
 

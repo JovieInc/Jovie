@@ -1,15 +1,15 @@
 'use client';
 
-import { Bell, CheckCircle2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { profilePrimaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
+import { CheckCircle2, ChevronRight, Play } from 'lucide-react';
+import Link from 'next/link';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type {
   ProfilePreviewNotificationsState,
   ProfileRailCard,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
 import {
-  ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
 } from '@/features/profile/ProfilePrimaryActionCard';
@@ -20,6 +20,7 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 
 interface ProfileHomeRailProps {
@@ -40,6 +41,15 @@ interface ProfileHomeRailProps {
   readonly isSubscribed?: boolean;
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
 }
+
+type FeaturedRailKind =
+  | 'release_countdown'
+  | 'release_live'
+  | 'tour_nearby'
+  | 'tour_next'
+  | 'playlist_fallback'
+  | 'listen_fallback'
+  | 'none';
 
 function toDateValue(value: Date | string | null | undefined) {
   if (!value) {
@@ -89,7 +99,29 @@ function getUpcomingTourDates(
     );
 }
 
-function formatReleaseDateLabel(value: Date | string | null | undefined) {
+function formatMonthLabel(value: string | null | undefined) {
+  const date = toDateValue(value);
+  if (!date) {
+    return 'Soon';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+  }).format(date);
+}
+
+function formatDayLabel(value: string | null | undefined) {
+  const date = toDateValue(value);
+  if (!date) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+  }).format(date);
+}
+
+function formatDateLabel(value: string | Date | null | undefined) {
   const date = toDateValue(value);
   if (!date) {
     return 'Soon';
@@ -101,16 +133,19 @@ function formatReleaseDateLabel(value: Date | string | null | undefined) {
   }).format(date);
 }
 
-function getFeaturedRailCardKind(
-  kind:
-    | 'release_countdown'
-    | 'release_live'
-    | 'tour_nearby'
-    | 'tour_next'
-    | 'playlist_fallback'
-    | 'listen_fallback'
-    | 'none'
-) {
+function formatTourLocation(tourDate: TourDateViewModel) {
+  return [tourDate.city, tourDate.region].filter(Boolean).join(', ');
+}
+
+function formatReleaseType(value: string | null | undefined) {
+  if (!value) {
+    return 'Release';
+  }
+
+  return capitalizeFirst(value.replaceAll('_', ' '));
+}
+
+function getFeaturedRailCardKind(kind: FeaturedRailKind) {
   switch (kind) {
     case 'release_countdown':
     case 'release_live':
@@ -133,14 +168,7 @@ export function buildProfileRailCards(params: {
   hasAlertsCard: boolean;
   hasPlaylistFallback: boolean;
   hasListenFallback: boolean;
-  featuredKind:
-    | 'release_countdown'
-    | 'release_live'
-    | 'tour_nearby'
-    | 'tour_next'
-    | 'playlist_fallback'
-    | 'listen_fallback'
-    | 'none';
+  featuredKind: FeaturedRailKind;
 }): ProfileRailCard[] {
   const cards: ProfileRailCard[] = [];
   const usedKinds = new Set<ProfileRailCard['kind']>();
@@ -178,59 +206,254 @@ export function buildProfileRailCards(params: {
   return cards;
 }
 
+function RailCardShell({
+  href,
+  onClick,
+  className,
+  dataTestId,
+  dataState,
+  ariaLabel,
+  children,
+}: Readonly<{
+  href?: string | null;
+  onClick?: () => void;
+  className?: string;
+  dataTestId: string;
+  dataState?: string;
+  ariaLabel: string;
+  children: ReactNode;
+}>) {
+  const sharedProps = {
+    className: cn(
+      'group relative flex min-h-[208px] w-full overflow-hidden rounded-[32px] border border-white/10 bg-[#0d0f12] text-left shadow-[0_32px_72px_rgba(0,0,0,0.38)] transition-transform duration-200 hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+      className
+    ),
+    'data-testid': dataTestId,
+    'data-state': dataState,
+    'aria-label': ariaLabel,
+  };
+
+  if (href?.startsWith('/')) {
+    return (
+      <Link href={href} prefetch={false} {...sharedProps}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (href) {
+    return (
+      <a href={href} target='_blank' rel='noopener noreferrer' {...sharedProps}>
+        {children}
+      </a>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type='button' onClick={onClick} {...sharedProps}>
+        {children}
+      </button>
+    );
+  }
+
+  return <div {...sharedProps}>{children}</div>;
+}
+
+function LabelChip({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <span className='inline-flex h-10 w-fit items-center rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-3.5 text-[12px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] backdrop-blur-xl'>
+      {children}
+    </span>
+  );
+}
+
+function CircleAction({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <span className='inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/14 bg-black/46 text-white shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl'>
+      {children}
+    </span>
+  );
+}
+
+function ImageLedRailCard({
+  dataTestId,
+  ariaLabel,
+  imageUrl,
+  href,
+  onClick,
+  label,
+  title,
+  subtitle,
+  actionIcon,
+  dataState,
+}: Readonly<{
+  dataTestId: string;
+  ariaLabel: string;
+  imageUrl?: string | null;
+  href?: string | null;
+  onClick?: () => void;
+  label: string;
+  title: string;
+  subtitle: string;
+  actionIcon: ReactNode;
+  dataState?: string;
+}>) {
+  return (
+    <RailCardShell
+      href={href}
+      onClick={onClick}
+      dataTestId={dataTestId}
+      dataState={dataState}
+      ariaLabel={ariaLabel}
+    >
+      <div className='absolute inset-0'>
+        <ImageWithFallback
+          src={imageUrl}
+          alt={title}
+          fill
+          sizes='280px'
+          className='object-cover object-center'
+          fallbackVariant='release'
+          fallbackClassName='bg-surface-2'
+        />
+      </div>
+      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.08)_0%,rgba(4,5,6,0.18)_35%,rgba(4,5,6,0.82)_100%)]' />
+      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.02)_0%,rgba(4,5,6,0.18)_28%,rgba(4,5,6,0.84)_100%)]' />
+      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
+        <LabelChip>{label}</LabelChip>
+        <div className='space-y-3.5'>
+          <div className='space-y-1.5'>
+            <p className='max-w-[16ch] text-[18px] font-semibold leading-[1.02] tracking-[-0.05em] text-white'>
+              {title}
+            </p>
+            <p className='text-[14px] leading-5 text-white/76'>{subtitle}</p>
+          </div>
+          <CircleAction>{actionIcon}</CircleAction>
+        </div>
+      </div>
+    </RailCardShell>
+  );
+}
+
 function AlertsRailCard({
   isSubscribed,
   onOpenAlerts,
-  renderMode,
   previewNotificationsState,
 }: Readonly<{
   isSubscribed: boolean;
   onOpenAlerts?: () => void;
-  renderMode: ProfileRenderMode;
   previewNotificationsState?: ProfilePreviewNotificationsState;
 }>) {
-  const actionLabel =
-    renderMode === 'preview'
-      ? previewNotificationsState?.label || 'Get alerts'
-      : isSubscribed
-        ? 'Manage alerts'
-        : 'Get alerts';
-  const title = isSubscribed ? 'Alerts are on' : 'Never miss a release';
+  const title = isSubscribed ? 'Alerts On' : 'Never Miss A Release';
   const body = isSubscribed
-    ? 'Tune your music, tour, merch, and general update preferences.'
+    ? 'Manage music, show, merch, and general update preferences.'
     : 'Get new music and tour updates by text or email the moment they land.';
+  const label =
+    previewNotificationsState?.kind === 'status' || isSubscribed
+      ? 'Alerts On'
+      : 'Turn On Notifications';
 
   return (
-    <button
-      type='button'
+    <RailCardShell
       onClick={onOpenAlerts}
-      className='flex min-h-[176px] w-full flex-col justify-between rounded-[var(--profile-card-radius)] border border-[color:var(--profile-panel-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03))] p-5 text-left shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl transition-transform duration-200 hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-      data-testid='profile-rail-alerts-card'
+      dataTestId='profile-home-rail-alerts'
+      dataState='alerts'
+      ariaLabel={label}
+      className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
     >
-      <div className='space-y-3'>
-        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] text-[color:var(--profile-status-pill-fg)]'>
-          {isSubscribed ? (
-            <CheckCircle2 className='h-4 w-4' />
-          ) : (
-            <Bell className='h-4 w-4' />
-          )}
-        </span>
-        <div className='space-y-1'>
-          <p className='text-sm font-semibold tracking-[-0.018em] text-primary-token'>
-            {title}
-          </p>
-          <p className='text-sm leading-6 text-primary-token/70'>{body}</p>
+      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
+        <LabelChip>{isSubscribed ? 'Alerts On' : 'Alerts'}</LabelChip>
+
+        <div className='space-y-3.5'>
+          <div className='space-y-1.5'>
+            <p className='max-w-[14ch] text-[18px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
+              {title}
+            </p>
+            <p className='max-w-[22ch] text-[14px] leading-5 text-white/72'>
+              {body}
+            </p>
+          </div>
+
+          <div className='flex items-center justify-between'>
+            <span className='inline-flex items-center gap-2 text-sm font-semibold text-white/78'>
+              {label}
+            </span>
+            <CircleAction>
+              {isSubscribed ? (
+                <CheckCircle2 className='h-5 w-5' />
+              ) : (
+                <ChevronRight className='h-5 w-5' />
+              )}
+            </CircleAction>
+          </div>
         </div>
       </div>
-      <span
-        className={cn(
-          profilePrimaryPillClassName,
-          'mt-4 self-start border-transparent'
-        )}
-      >
-        {actionLabel}
-      </span>
-    </button>
+    </RailCardShell>
+  );
+}
+
+function TourRailCard({
+  artistHandle,
+  stateKind,
+  tourDate,
+}: Readonly<{
+  artistHandle: string;
+  stateKind: 'tour_nearby' | 'tour_next';
+  tourDate: TourDateViewModel;
+}>) {
+  const href = tourDate.ticketUrl ?? `/${artistHandle}?mode=tour`;
+  const locationLabel = formatTourLocation(tourDate) || 'Upcoming show';
+
+  return (
+    <RailCardShell
+      href={href}
+      dataTestId='profile-home-rail-tour'
+      dataState={stateKind}
+      ariaLabel={`Open ${tourDate.venueName ?? 'tour details'}`}
+      className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
+    >
+      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
+        <LabelChip>
+          {stateKind === 'tour_nearby' ? 'On Tour' : 'Upcoming Show'}
+        </LabelChip>
+
+        <div className='space-y-3.5'>
+          <div className='flex items-end justify-between gap-4'>
+            <div className='flex items-end gap-4'>
+              <div className='border-r border-white/12 pr-4'>
+                <p className='text-[12px] font-semibold tracking-[0.12em] text-white/46'>
+                  {formatMonthLabel(tourDate.startDate)}
+                </p>
+                <p className='mt-1 text-[42px] font-semibold leading-none tracking-[-0.08em] text-white'>
+                  {formatDayLabel(tourDate.startDate)}
+                </p>
+              </div>
+              <div className='space-y-1.5 pb-1'>
+                <p className='max-w-[10ch] text-[18px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
+                  {tourDate.venueName ?? 'Tour Date'}
+                </p>
+                <p className='text-[14px] leading-5 text-white/72'>
+                  {locationLabel}
+                </p>
+              </div>
+            </div>
+
+            <CircleAction>
+              <ChevronRight className='h-5 w-5' />
+            </CircleAction>
+          </div>
+
+          <p className='text-sm font-semibold text-white/54'>
+            {stateKind === 'tour_nearby' ? 'Near You' : 'Next Show'}
+          </p>
+        </div>
+      </div>
+    </RailCardShell>
   );
 }
 
@@ -242,7 +465,6 @@ export function ProfileHomeRail({
   tourDates = [],
   hasPlayableDestinations,
   renderMode = 'interactive',
-  previewActionLabel = 'Listen',
   onPlayClick,
   onOpenAlerts,
   viewerLocation,
@@ -256,6 +478,7 @@ export function ProfileHomeRail({
     () => getUpcomingTourDates(tourDates),
     [tourDates]
   );
+  const isPreviewRail = renderMode === 'preview';
   const releaseVisibility = useMemo(
     () => getProfileReleaseVisibility(latestRelease, profileSettings),
     [latestRelease, profileSettings]
@@ -353,52 +576,109 @@ export function ProfileHomeRail({
   }
 
   return (
-    <div className='space-y-3'>
+    <div className={cn(isPreviewRail ? 'space-y-3' : 'space-y-4')}>
       <div
         ref={railRef}
-        className='-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className={cn(
+          '-mx-1 flex snap-x snap-mandatory overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          isPreviewRail ? 'gap-3.5' : 'gap-4'
+        )}
         data-testid='profile-home-rail'
       >
         {cards.map((card, index) => (
           <div
             key={card.id}
-            className='min-w-[calc(100%-56px)] snap-start sm:min-w-[calc(100%-72px)]'
+            className={cn(
+              'snap-start',
+              isPreviewRail
+                ? 'min-w-[calc(100%-92px)] sm:min-w-[calc(100%-112px)]'
+                : 'min-w-[calc(100%-72px)] sm:min-w-[calc(100%-92px)]'
+            )}
             data-rail-card-index={index}
           >
+            {card.kind === 'release' && latestRelease ? (
+              <ImageLedRailCard
+                dataTestId='profile-home-rail-release'
+                ariaLabel={`Open ${latestRelease.title}`}
+                imageUrl={latestRelease.artworkUrl ?? artist.image_url}
+                href={
+                  featuredState.kind === 'release_live' && onPlayClick
+                    ? null
+                    : `/${artist.handle}/${latestRelease.slug}`
+                }
+                onClick={
+                  featuredState.kind === 'release_live'
+                    ? onPlayClick
+                    : undefined
+                }
+                label={
+                  featuredState.kind === 'release_countdown'
+                    ? 'Coming Soon'
+                    : 'Latest Release'
+                }
+                dataState={
+                  featuredState.kind === 'release_countdown'
+                    ? 'release_countdown'
+                    : 'release_live'
+                }
+                title={latestRelease.title}
+                subtitle={
+                  featuredState.kind === 'release_countdown'
+                    ? `Drops ${formatDateLabel(latestRelease.releaseDate)}`
+                    : formatReleaseType(latestRelease.releaseType)
+                }
+                actionIcon={<Play className='h-5 w-5 fill-current' />}
+              />
+            ) : null}
+
+            {card.kind === 'tour' && (nearbyTourDate ?? nextTourDate) ? (
+              <TourRailCard
+                artistHandle={artist.handle}
+                stateKind={
+                  nearbyTourDate && resolveNearbyTour
+                    ? 'tour_nearby'
+                    : 'tour_next'
+                }
+                tourDate={(nearbyTourDate ?? nextTourDate)!}
+              />
+            ) : null}
+
             {card.kind === 'alerts' ? (
               <AlertsRailCard
                 isSubscribed={isSubscribed}
                 onOpenAlerts={onOpenAlerts}
-                renderMode={renderMode}
                 previewNotificationsState={previewNotificationsState}
               />
-            ) : (
-              <ProfilePrimaryActionCard
-                artist={artist}
-                latestRelease={card.kind === 'release' ? latestRelease : null}
-                profileSettings={
-                  card.kind === 'release' ? profileSettings : null
-                }
-                featuredPlaylistFallback={
-                  card.kind === 'playlist' ? featuredPlaylistFallback : null
-                }
-                tourDates={card.kind === 'tour' ? tourDates : []}
-                hasPlayableDestinations={card.kind === 'listen'}
-                renderMode={renderMode}
-                previewActionLabel={
-                  card.kind === 'release'
-                    ? previewActionLabel
-                    : card.kind === 'listen'
-                      ? 'Listen'
-                      : previewActionLabel
-                }
-                onPlayClick={onPlayClick}
-                viewerLocation={viewerLocation}
-                resolveNearbyTour={card.kind === 'tour' && resolveNearbyTour}
-                dataTestId={`profile-home-rail-${card.kind}`}
-                size='showcase'
+            ) : null}
+
+            {card.kind === 'playlist' && featuredPlaylistFallback ? (
+              <ImageLedRailCard
+                dataTestId='profile-home-rail-playlist'
+                ariaLabel={`Open ${featuredPlaylistFallback.title}`}
+                imageUrl={featuredPlaylistFallback.imageUrl ?? artist.image_url}
+                href={featuredPlaylistFallback.url}
+                label='Featured Playlist'
+                dataState='playlist_fallback'
+                title={featuredPlaylistFallback.title}
+                subtitle='Open Playlist'
+                actionIcon={<Play className='h-5 w-5 fill-current' />}
               />
-            )}
+            ) : null}
+
+            {card.kind === 'listen' ? (
+              <ImageLedRailCard
+                dataTestId='profile-home-rail-listen'
+                ariaLabel={`Listen to ${artist.name}`}
+                imageUrl={artist.image_url}
+                href={onPlayClick ? null : `/${artist.handle}?mode=listen`}
+                onClick={onPlayClick}
+                label='Music'
+                dataState='listen_fallback'
+                title={artist.name}
+                subtitle='Listen Across Your Preferred Platforms'
+                actionIcon={<Play className='h-5 w-5 fill-current' />}
+              />
+            ) : null}
           </div>
         ))}
       </div>
@@ -423,20 +703,13 @@ export function ProfileHomeRail({
               className={cn(
                 'h-2.5 rounded-full transition-all duration-200',
                 index === activeIndex
-                  ? 'w-6 bg-[color:var(--profile-rail-dot-active)]'
+                  ? 'w-7 bg-[color:var(--profile-rail-dot-active)]'
                   : 'w-2.5 bg-[color:var(--profile-rail-dot-inactive)]'
               )}
               aria-label={`View rail card ${index + 1}`}
             />
           ))}
         </div>
-      ) : null}
-
-      {featuredState.kind === 'release_countdown' && latestRelease ? (
-        <p className='px-1 text-xs font-medium tracking-[-0.01em] text-primary-token/58'>
-          Release spotlight: {latestRelease.title} drops{' '}
-          {formatReleaseDateLabel(latestRelease.releaseDate)}
-        </p>
       ) : null}
     </div>
   );

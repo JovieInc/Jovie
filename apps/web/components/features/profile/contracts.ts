@@ -66,6 +66,7 @@ export interface ProfileRailCard {
 }
 
 export type ProfileShowcaseStateId =
+  | 'mock-home'
   | 'streams-latest'
   | 'streams-presave'
   | 'streams-release-day'

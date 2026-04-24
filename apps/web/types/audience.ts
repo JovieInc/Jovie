@@ -40,6 +40,7 @@ export type AudienceMember = {
   id: string;
   type: AudienceMemberType;
   displayName: string | null;
+  birthday?: string | null;
   locationLabel: string;
   geoCity: string | null;
   geoCountry: string | null;
@@ -51,6 +52,10 @@ export type AudienceMember = {
   utmParams: AudienceUtmParams;
   email: string | null;
   phone: string | null;
+  jovieEmailSubscribed?: boolean;
+  artistEmailOptedIn?: boolean;
+  artistEmailPendingProvider?: boolean;
+  emailVisibleToArtist?: boolean;
   spotifyConnected: boolean;
   purchaseCount: number;
   tipAmountTotalCents: number;

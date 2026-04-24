@@ -90,6 +90,7 @@ const SHOWCASE_VIEWER_LOCATION = {
 const SHOWCASE_NOW = new Date('2026-04-20T12:00:00.000Z');
 const DEMO_TIM_WHITE_SHOWCASE_MODES = ['cards', 'subscribe'] as const;
 const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
+  'mock-home',
   'streams-latest',
   'streams-presave',
   'streams-release-day',
@@ -455,7 +456,11 @@ function SubscribeShowcaseBoard() {
 
 function SingleStatePhonePreview({
   stateId,
-}: Readonly<{ stateId: ProfileShowcaseStateId }>) {
+  referenceImageSrc,
+}: Readonly<{
+  stateId: ProfileShowcaseStateId;
+  referenceImageSrc?: string;
+}>) {
   return (
     <DemoShowcaseShell
       testId='demo-showcase-tim-white-profile-state'
@@ -468,6 +473,8 @@ function SingleStatePhonePreview({
           presentation='full-phone'
           hideJovieBranding
           hideMoreMenu
+          phoneClassName='max-w-[24rem]'
+          referenceImageSrc={referenceImageSrc}
         />
       </div>
     </DemoShowcaseShell>
@@ -562,7 +569,16 @@ export function DemoTimWhiteProfileSurface() {
   }
 
   if (showcaseState) {
-    return <SingleStatePhonePreview stateId={showcaseState} />;
+    return (
+      <SingleStatePhonePreview
+        stateId={showcaseState}
+        referenceImageSrc={
+          captureMode === 'reference' && showcaseState === 'mock-home'
+            ? '/images/mock-profile/tim-white-mock-home-full.png'
+            : undefined
+        }
+      />
+    );
   }
 
   return (

@@ -12,6 +12,10 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
+const MOCK_HOME_HERO_IMAGE_URL =
+  '/images/mock-profile/tim-white-dont-look-down-hero.jpg';
+const MOCK_HOME_CARD_IMAGE_URL =
+  '/images/mock-profile/tim-white-dont-look-down-card.jpg';
 
 type HomepageContactInput = {
   readonly id: string;
@@ -183,6 +187,24 @@ export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   created_at: CREATED_AT,
 };
 
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
+  ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+  id: 'homepage-preview-artist-mock-home',
+  image_url: MOCK_HOME_HERO_IMAGE_URL,
+  tagline: "Don't Look Down",
+  settings: {
+    ...(HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings ?? {}),
+    heroRoleLabel: 'DJ / Producer',
+  },
+  theme: {
+    profileAccent: {
+      version: 1,
+      primaryHex: '#ed9962',
+      sourceUrl: MOCK_HOME_HERO_IMAGE_URL,
+    },
+  },
+};
+
 export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] =
   [
     {
@@ -218,6 +240,30 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
       platform: 'venmo',
       url: 'https://venmo.com/u/timwhite',
       clicks: 302,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+  ] as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS: readonly LegacySocialLink[] =
+  [
+    {
+      id: 'homepage-preview-mock-instagram',
+      artist_id: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      platform: 'instagram',
+      url: 'https://instagram.com/timwhitemusic',
+      clicks: 910,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+    {
+      id: 'homepage-preview-mock-spotify',
+      artist_id: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      platform: 'spotify',
+      url:
+        HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.spotify_url ??
+        'https://open.spotify.com/artist/4u',
+      clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
     },
@@ -316,6 +362,31 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
     },
   ] as const;
 
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES: readonly TourDateViewModel[] =
+  [
+    {
+      id: 'homepage-tour-mock-home-1',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      externalId: 'tour-mock-home-1',
+      provider: 'manual',
+      title: "Don't Look Down Tour",
+      startDate: '2026-06-21',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'The Echo',
+      city: 'Los Angeles',
+      region: 'CA',
+      country: 'US',
+      latitude: 34.0777,
+      longitude: -118.2606,
+      ticketUrl: 'https://tickets.example.com/the-echo',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+  ] as const;
+
 export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
   presave: {
     title: HOME_RELEASE_DESTINATION_PRESAVE_MOCK.title,
@@ -337,6 +408,17 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     metadata: {
       artistNames: ['Tim White', 'Cosmic Gate'],
     },
+  },
+} as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE = {
+  title: "Don't Look Down",
+  slug: 'dont-look-down',
+  artworkUrl: MOCK_HOME_CARD_IMAGE_URL,
+  releaseDate: '2025-10-01T07:00:00.000Z',
+  releaseType: 'single',
+  metadata: {
+    artistNames: ['Tim White'],
   },
 } as const;
 
@@ -364,6 +446,13 @@ export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
 export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   Record<ProfileShowcaseStateId, ProfileShowcaseState>
 > = {
+  'mock-home': createQuietButtonShowcaseState({
+    id: 'mock-home',
+    latestReleaseKey: 'live',
+    label: 'Mock Home',
+    helper: 'Controlled preview state for pixel diff review.',
+    releaseActionLabel: 'Listen',
+  }),
   'streams-latest': createQuietButtonShowcaseState({
     id: 'streams-latest',
     latestReleaseKey: 'live',

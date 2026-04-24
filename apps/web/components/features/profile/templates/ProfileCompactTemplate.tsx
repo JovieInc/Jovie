@@ -82,25 +82,21 @@ function resolveDrawerView(
   mode: ProfileMode,
   options: {
     readonly hasContacts: boolean;
-    readonly hasDSPs: boolean;
     readonly hasTip: boolean;
     readonly hasReleases: boolean;
   }
 ): DrawerView | null {
   switch (mode) {
-    case 'about':
-    case 'subscribe':
-      return mode;
     case 'contact':
       return options.hasContacts ? mode : null;
-    case 'listen':
-      return options.hasDSPs ? mode : null;
     case 'pay':
       return options.hasTip ? mode : null;
-    case 'tour':
-      return mode;
     case 'releases':
       return options.hasReleases ? mode : null;
+    case 'about':
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
     case 'profile':
     default:
       return null;
@@ -387,11 +383,10 @@ export function ProfileCompactTemplate({
     (nextMode: ProfileMode) =>
       resolveDrawerView(nextMode, {
         hasContacts,
-        hasDSPs: mergedDSPs.length > 0,
         hasTip,
         hasReleases,
       }),
-    [hasContacts, hasTip, hasReleases, mergedDSPs.length]
+    [hasContacts, hasTip, hasReleases]
   );
 
   const syncRequestedModeFromLocation = useCallback(() => {
@@ -537,11 +532,26 @@ export function ProfileCompactTemplate({
 
   const handlePlayClick = useCallback(() => {
     if (mergedDSPs.length === 0) {
-      openDrawerMode('subscribe');
+      clearCloseResetTimer();
+      setRequestedMode('subscribe');
       return;
     }
-    openDrawerMode('listen');
-  }, [mergedDSPs.length, openDrawerMode]);
+    clearCloseResetTimer();
+    setRequestedMode('listen');
+  }, [clearCloseResetTimer, mergedDSPs.length]);
+
+  const handleBack = useCallback(() => {
+    if (
+      globalThis.window !== undefined &&
+      globalThis.history.length > 1 &&
+      document.referrer.length > 0
+    ) {
+      globalThis.history.back();
+      return;
+    }
+
+    globalThis.location.assign(APP_ROUTES.ARTIST_PROFILES);
+  }, []);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -620,6 +630,7 @@ export function ProfileCompactTemplate({
                 }}
                 onDrawerOpenChange={handleDrawerOpenChange}
                 onDrawerViewChange={handleDrawerViewChange}
+                onBack={handleBack}
                 onOpenMenu={() => openDrawerMode('menu')}
                 onPlayClick={handlePlayClick}
                 onShare={handleShare}
@@ -630,7 +641,10 @@ export function ProfileCompactTemplate({
                 onTogglePref={handleTogglePref}
                 onUnsubscribe={handleUnsubscribe}
                 isUnsubscribing={unsubMutation.isPending}
-                onManageNotifications={() => openDrawerMode('notifications')}
+                onManageNotifications={() => {
+                  clearCloseResetTimer();
+                  setRequestedMode('subscribe');
+                }}
                 onRegisterReveal={fn => {
                   revealNotificationsRef.current = fn;
                 }}

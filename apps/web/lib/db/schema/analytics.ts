@@ -443,6 +443,8 @@ export const notificationSubscriptions = pgTable(
     emailOtpExpiresAt: timestamp('email_otp_expires_at'),
     emailOtpLastSentAt: timestamp('email_otp_last_sent_at'),
     emailOtpAttempts: integer('email_otp_attempts').notNull().default(0),
+    artistEmailOptInAt: timestamp('artist_email_opt_in_at'),
+    artistEmailOptOutAt: timestamp('artist_email_opt_out_at'),
     unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
