@@ -628,7 +628,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   monetization: {
     headline: 'Get paid. Again and again.',
-    subhead: 'Turn a $5 busking tip into a lifelong customer.',
+    subhead: 'Turn a $10 busking tip into a lifelong customer.',
     irlPaymentsCard: {
       textAnchor: 'top',
       title: 'Accept payments',
@@ -682,7 +682,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       outputs: [
         {
           id: 'payment',
-          title: 'Jessica paid you $5',
+          title: 'Jessica paid you $10',
           detail: 'From busking QR code',
         },
         {
