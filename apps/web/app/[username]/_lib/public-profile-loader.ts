@@ -6,8 +6,10 @@ import { cache } from 'react';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
+import { ensureThemeHasProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
+import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import type { CreatorProfile, LegacySocialLink } from '@/types/db';
@@ -100,9 +102,27 @@ const fetchProfileAndLinks = async (
     const creatorClerkId =
       typeof result.userClerkId === 'string' ? result.userClerkId : null;
 
-    const profile = mapProfileWithLinksToCreatorProfile(result, {
+    const mappedProfile = mapProfileWithLinksToCreatorProfile(result, {
       profileCompletionPct: calculateProfileCompletion(result),
     });
+    const profileSettings =
+      (mappedProfile.settings as Record<string, unknown> | null) ?? {};
+    const photoDownloadSizes = buildAvatarSizes(
+      profileSettings.avatarSizes as Record<string, string> | null | undefined,
+      mappedProfile.avatar_url
+    );
+    const accentSourceUrl =
+      photoDownloadSizes.find(size => size.key === 'large')?.url ??
+      photoDownloadSizes.find(size => size.key === 'original')?.url ??
+      mappedProfile.avatar_url ??
+      null;
+    const profile = {
+      ...mappedProfile,
+      theme: await ensureThemeHasProfileAccent({
+        existingTheme: mappedProfile.theme,
+        sourceUrl: accentSourceUrl,
+      }),
+    };
 
     const links: LegacySocialLink[] =
       result.socialLinks?.map(link => ({

@@ -21,6 +21,7 @@ import {
   enqueueMusicFetchEnrichmentJob,
   fireDspDiscovery,
 } from '@/lib/ingestion/jobs';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
@@ -306,11 +307,20 @@ export async function updateCreatorAvatarAsAdmin(
   }
 
   const sanitizedAvatarUrl = validateAvatarUrl(avatarUrl);
+  const [existingProfile] = await db
+    .select({ theme: creatorProfiles.theme })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
 
   const [updatedProfile] = await db
     .update(creatorProfiles)
     .set({
       avatarUrl: sanitizedAvatarUrl,
+      theme: await buildThemeWithProfileAccent({
+        existingTheme: existingProfile?.theme,
+        sourceUrl: sanitizedAvatarUrl,
+      }),
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))

@@ -10,6 +10,8 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { mergeProfileTheme } from '@/lib/profile/profile-theme';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getRedis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';
 
@@ -31,10 +33,34 @@ export async function updateProfileById(
   profileId: string,
   updates: ProfileUpdateData
 ): Promise<ProfileData | null> {
+  const [existingProfile] = await db
+    .select({
+      avatarUrl: creatorProfiles.avatarUrl,
+      theme: creatorProfiles.theme,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  const mergedTheme =
+    updates.theme &&
+    typeof updates.theme === 'object' &&
+    !Array.isArray(updates.theme)
+      ? mergeProfileTheme(existingProfile?.theme, updates.theme)
+      : undefined;
+  const finalTheme =
+    updates.avatarUrl && updates.avatarUrl !== existingProfile?.avatarUrl
+      ? await buildThemeWithProfileAccent({
+          existingTheme: mergedTheme ?? existingProfile?.theme,
+          sourceUrl: updates.avatarUrl,
+        })
+      : mergedTheme;
+
   const [updated] = await db
     .update(creatorProfiles)
     .set({
       ...updates,
+      ...(finalTheme === undefined ? {} : { theme: finalTheme }),
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))
@@ -69,10 +95,34 @@ export async function updateProfileByClerkId(
     throw new TypeError('User not found');
   }
 
+  const [existingProfile] = await db
+    .select({
+      avatarUrl: creatorProfiles.avatarUrl,
+      theme: creatorProfiles.theme,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, user.id))
+    .limit(1);
+
+  const mergedTheme =
+    updates.theme &&
+    typeof updates.theme === 'object' &&
+    !Array.isArray(updates.theme)
+      ? mergeProfileTheme(existingProfile?.theme, updates.theme)
+      : undefined;
+  const finalTheme =
+    updates.avatarUrl && updates.avatarUrl !== existingProfile?.avatarUrl
+      ? await buildThemeWithProfileAccent({
+          existingTheme: mergedTheme ?? existingProfile?.theme,
+          sourceUrl: updates.avatarUrl,
+        })
+      : mergedTheme;
+
   const [updated] = await db
     .update(creatorProfiles)
     .set({
       ...updates,
+      ...(finalTheme === undefined ? {} : { theme: finalTheme }),
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.userId, user.id))

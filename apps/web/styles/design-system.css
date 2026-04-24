@@ -264,6 +264,17 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 10px 24px rgba(15, 17, 24, 0.08);
   --profile-pearl-primary-bg: rgba(12, 12, 15, 0.94);
   --profile-pearl-primary-fg: rgba(255, 255, 255, 0.98);
+  --profile-accent-primary: #0c0c0f;
+  --profile-accent-on-primary: rgba(255, 255, 255, 0.98);
+  --profile-accent-soft: rgba(12, 12, 15, 0.12);
+  --profile-accent-soft-strong: rgba(12, 12, 15, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(12, 12, 15, 0.16);
+  --profile-status-pill-border: rgba(12, 12, 15, 0.22);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(12, 12, 15, 0.9);
+  --profile-rail-dot-inactive: rgba(12, 12, 15, 0.18);
   --profile-composer-bg: rgba(255, 255, 255, 0.78);
   --profile-composer-border: rgba(255, 255, 255, 0.8);
   --profile-composer-shadow:
@@ -497,6 +508,17 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
   --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
   --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
+  --profile-accent-primary: rgba(255, 255, 255, 0.96);
+  --profile-accent-on-primary: rgba(8, 9, 10, 0.96);
+  --profile-accent-soft: rgba(255, 255, 255, 0.12);
+  --profile-accent-soft-strong: rgba(255, 255, 255, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(255, 255, 255, 0.12);
+  --profile-status-pill-border: rgba(255, 255, 255, 0.18);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
+  --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
   --profile-composer-bg: rgba(255, 255, 255, 0.08);
   --profile-composer-border: rgba(255, 255, 255, 0.1);
   --profile-composer-shadow:

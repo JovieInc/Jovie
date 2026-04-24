@@ -5,6 +5,17 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import { DemoClientProviders } from './DemoClientProviders';
 
 const DEMO_PUBLIC_PROFILE = buildDemoProfile();
+const DEMO_PUBLIC_THEME = {
+  ...(DEMO_PUBLIC_PROFILE.theme ?? {}),
+  profileAccent: {
+    version: 1 as const,
+    primaryHex: '#cf824c',
+    sourceUrl:
+      DEMO_PUBLIC_PROFILE.avatarUrl ??
+      INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc ??
+      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f',
+  },
+};
 const DEMO_PUBLIC_ARTIST: Artist = {
   id: DEMO_PUBLIC_PROFILE.id,
   owner_user_id: DEMO_PUBLIC_PROFILE.userId ?? 'demo-user-001',
@@ -18,7 +29,7 @@ const DEMO_PUBLIC_ARTIST: Artist = {
     INTERNAL_DJ_DEMO_PERSONA.profile.displayName,
   image_url: DEMO_PUBLIC_PROFILE.avatarUrl ?? undefined,
   tagline: DEMO_PUBLIC_PROFILE.bio ?? undefined,
-  theme: DEMO_PUBLIC_PROFILE.theme ?? {},
+  theme: DEMO_PUBLIC_THEME,
   settings: DEMO_PUBLIC_PROFILE.settings ?? {},
   spotify_url: DEMO_PUBLIC_PROFILE.spotifyUrl ?? undefined,
   apple_music_url: DEMO_PUBLIC_PROFILE.appleMusicUrl ?? undefined,

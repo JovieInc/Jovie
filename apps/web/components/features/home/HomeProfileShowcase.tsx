@@ -2,7 +2,10 @@
 
 import { type ReactNode, useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
+import type {
+  ProfilePrimaryTab,
+  ProfileShowcaseStateId,
+} from '@/features/profile/contracts';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ProfileCompactSurface } from '../profile/templates/ProfileCompactSurface';
@@ -185,6 +188,21 @@ function shouldResolveNearbyTour(stateId: ProfileShowcaseStateId) {
   return stateId === 'tour-nearby';
 }
 
+function getPreviewActiveMode(
+  stateId: ProfileShowcaseStateId
+): ProfilePrimaryTab {
+  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
+
+  switch (drawerView) {
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+      return drawerView;
+    default:
+      return 'profile';
+  }
+}
+
 function ShowcaseSurface({
   stateId,
   hideJovieBranding,
@@ -218,8 +236,10 @@ function ShowcaseSurface({
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
         drawerOpen={state.drawerView !== null}
         drawerView={state.drawerView ?? 'menu'}
+        activeMode={getPreviewActiveMode(state.id)}
         onDrawerOpenChange={() => {}}
         onDrawerViewChange={() => {}}
+        onModeSelect={() => {}}
         onOpenMenu={() => {}}
         onPlayClick={() => {}}
         onShare={() => {}}
