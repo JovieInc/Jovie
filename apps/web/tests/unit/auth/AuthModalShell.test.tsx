@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: vi.fn() }),
@@ -8,10 +8,21 @@ vi.mock('next/navigation', () => ({
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 
 describe('AuthModalShell', () => {
+  // Snapshot native dialog prototype methods at module load so we can restore
+  // them between tests — otherwise the vi.fn() replacements would leak into
+  // any later test file in the same worker process.
+  const originalShowModal = HTMLDialogElement.prototype.showModal;
+  const originalClose = HTMLDialogElement.prototype.close;
+
   beforeEach(() => {
     // jsdom doesn't implement the native dialog API used by showModal().
     HTMLDialogElement.prototype.showModal = vi.fn();
     HTMLDialogElement.prototype.close = vi.fn();
+  });
+
+  afterEach(() => {
+    HTMLDialogElement.prototype.showModal = originalShowModal;
+    HTMLDialogElement.prototype.close = originalClose;
   });
 
   it('defaults the back button aria-label to a context-neutral "Go back"', () => {

@@ -48,6 +48,11 @@ export function AuthModalShell({
   ariaLabel = 'Authentication',
   backButtonLabel = 'Go back',
 }: AuthModalShellProps) {
+  // Guard against callers passing an empty or whitespace-only string — a
+  // literal '' on an aria-label makes the button invisible to assistive tech
+  // even though the default prop would otherwise have fallen through.
+  const resolvedBackButtonLabel =
+    backButtonLabel.trim().length > 0 ? backButtonLabel : 'Go back';
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -103,7 +108,7 @@ export function AuthModalShell({
         <button
           type='button'
           onClick={dismiss}
-          aria-label={backButtonLabel}
+          aria-label={resolvedBackButtonLabel}
           className='inline-flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
         >
           <ArrowLeft className='h-4 w-4' strokeWidth={2} aria-hidden='true' />
