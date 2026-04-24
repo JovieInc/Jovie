@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.171] - 2026-04-23
+
+> Main deploys stop starving when merge-queue bursts stack up. Only the commit that is still `main` HEAD at gate time deploys, intermediates skip cleanly, and mid-flight cancellations now page Slack instead of silently reporting success.
+
+### Changed
+
+- `.github/workflows/ci.yml` — added a `deploy-gate` job that checks whether the current SHA is still `origin/main` tip via the GitHub API. When it isn't, `deploy-staging`, `canary-health-gate`, and `promote-production` all skip cleanly so the six-commit pile-up observed on 2026-04-24 can't happen again. The gate reads `github.sha` against the live main tip on every run, so agent-pipeline merge-queue bursts collapse to a single deploy of the final tip.
+- `.github/workflows/ci.yml` — `deploy-notify` now classifies `cancelled` deploy-chain jobs alongside `failure`. Runs that get cancelled mid-flight (merge queue, concurrency preemption) post a `⛔ Deploy cancelled mid-flight` alert to `#alerts-critical` instead of silently succeeding like the cancelled `14d5a44` run did on 2026-04-24.
+
 ## [26.4.170] - 2026-04-23
 
 > Desktop auth screens get a split-screen brand panel — the sign-in form sits on the left, a clean white panel with the brand mark fills the right. Mobile is unchanged.
