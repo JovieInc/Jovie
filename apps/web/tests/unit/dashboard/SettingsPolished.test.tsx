@@ -113,5 +113,9 @@ describe('SettingsPolished', () => {
       'href',
       '/app/settings/touring'
     );
+    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'href',
+      '/app/settings/account'
+    );
   });
 });

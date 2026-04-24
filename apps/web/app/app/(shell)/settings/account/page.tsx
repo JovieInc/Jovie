@@ -12,7 +12,7 @@ export default function SettingsAccountPage() {
     <SettingsSection
       id='account'
       title='Account'
-      description='Security, theme, and notifications.'
+      description='Security, theme, and creator verification preferences.'
     >
       {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
         <AccountSettingsSection isGrowth={isGrowth} />

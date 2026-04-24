@@ -41,7 +41,9 @@ export const APP_ROUTES = {
   SETTINGS: '/app/settings',
   SETTINGS_ACCOUNT: '/app/settings/account',
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
+  /** @deprecated Use SETTINGS_ACCOUNT instead */
   SETTINGS_APPEARANCE: '/app/settings/appearance',
+  /** @deprecated Use SETTINGS_ACCOUNT instead */
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_PAYMENTS: '/app/settings/payments',

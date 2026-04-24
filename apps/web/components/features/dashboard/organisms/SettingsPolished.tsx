@@ -62,7 +62,7 @@ interface SettingsSidebarProps {
 function getFocusedSettingsHref(sectionId: string): string {
   switch (sectionId) {
     case 'account':
-      return APP_ROUTES.SETTINGS_APPEARANCE;
+      return APP_ROUTES.SETTINGS_ACCOUNT;
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
     case 'data-privacy':
@@ -220,7 +220,7 @@ export function SettingsPolished({
         id: 'account',
         title: 'Account',
         description:
-          'Manage your security, theme, and notification preferences.',
+          'Manage your security, theme, and creator verification preferences.',
         render: renderAccountSection,
       },
       {
