@@ -8,7 +8,7 @@ interface ArtistProfileFaqProps {
 
 export function ArtistProfileFaq({ faq }: Readonly<ArtistProfileFaqProps>) {
   return (
-    <ArtistProfileSectionShell className='py-24 sm:py-28 lg:py-32'>
+    <ArtistProfileSectionShell>
       <div className='mx-auto max-w-[760px]'>
         <FaqSection
           items={[...faq.items]}

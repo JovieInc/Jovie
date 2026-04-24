@@ -41,7 +41,7 @@ export function ArtistProfileOutcomesCarousel({
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
   return (
     <ArtistProfileSectionShell
-      className='bg-white/[0.01]'
+      className='bg-white/[0.012]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >

@@ -41,7 +41,7 @@ export function ArtistProfileHowItWorks({
   ]);
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.008] py-24 sm:py-28 lg:py-32'>
+    <ArtistProfileSectionShell className='bg-white/[0.012]'>
       <div className='mx-auto max-w-[1120px]'>
         <ArtistProfileSectionHeader
           align='left'

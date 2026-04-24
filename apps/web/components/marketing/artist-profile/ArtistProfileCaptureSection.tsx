@@ -15,7 +15,7 @@ export function ArtistProfileCaptureSection({
   capture,
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.008]' id={id}>
+    <ArtistProfileSectionShell className='bg-white/[0.012]' id={id}>
       <div className='mx-auto max-w-[1120px]'>
         <ArtistProfileSectionHeader
           align='center'

@@ -16,7 +16,7 @@ export function ArtistProfileReactivationSection({
 }: Readonly<ArtistProfileReactivationSectionProps>) {
   return (
     <ArtistProfileSectionShell
-      className='overflow-hidden bg-[#040506] py-24 sm:py-28 lg:py-32'
+      className='overflow-hidden bg-[#050608]'
       id={id}
       width='page'
     >

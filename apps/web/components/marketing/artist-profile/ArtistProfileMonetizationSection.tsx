@@ -207,7 +207,7 @@ export function ArtistProfileMonetizationSection({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-[#050505]'
+      className='bg-[#050608]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >

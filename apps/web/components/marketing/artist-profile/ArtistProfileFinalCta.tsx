@@ -18,7 +18,7 @@ export function ArtistProfileFinalCta({
   return (
     <ArtistProfileSectionShell
       className={cn(
-        'bg-white/[0.012] py-20 sm:py-24 lg:py-28',
+        'bg-white/[0.012]',
         roomy &&
           'flex min-h-[56svh] items-center sm:min-h-[60svh] lg:min-h-[66svh]'
       )}
