@@ -84,7 +84,7 @@ export function UsageLimitUpgradePrompt({
 
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-medium text-primary-token'>
+          <p className='text-app font-medium text-primary-token'>
             {isAtLimit
               ? `${featureName} limit reached`
               : `${current} of ${limit} ${featureName} used`}

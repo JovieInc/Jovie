@@ -101,7 +101,7 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
     <div className='space-y-8'>
       {billingInfo?.stale && (
         <ContentSurfaceCard
-          className='flex items-start gap-2 border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] px-4 py-3 text-[13px] text-primary-token'
+          className='flex items-start gap-2 border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] px-4 py-3 text-app text-primary-token'
           surface='nested'
         >
           <AlertCircle

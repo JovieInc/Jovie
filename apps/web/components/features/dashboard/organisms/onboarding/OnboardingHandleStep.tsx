@@ -160,7 +160,7 @@ export function OnboardingHandleStep({
             aria-live='polite'
           >
             {autoSubmitClaimed && handleInput ? (
-              <span className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'>
+              <span className='text-success text-app animate-in fade-in slide-in-from-top-1 duration-300'>
                 jov.ie/{handleInput} is yours.
               </span>
             ) : null}
@@ -169,7 +169,7 @@ export function OnboardingHandleStep({
               (hasError && handleInput && !handleValidation.checking)) ? (
               <span
                 data-testid='handle-unavailable'
-                className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300'
+                className='text-error text-app animate-in fade-in slide-in-from-top-1 duration-300'
               >
                 {stateError || handleValidation.error}
               </span>

@@ -114,7 +114,7 @@ export function CopyLinkInput({
         aria-label='URL to copy'
         className={cn(
           'w-full rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 pr-9',
-          'truncate font-mono text-[13px] text-secondary-token',
+          'truncate font-mono text-app text-secondary-token',
           'cursor-text focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           'transition-colors',
           size === 'sm' && 'h-7',

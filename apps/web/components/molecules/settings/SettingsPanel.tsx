@@ -42,7 +42,7 @@ export function SettingsPanel({
             {title ? (
               <h3
                 className={cn(
-                  'text-[13px] font-[540] tracking-[-0.02em] text-primary-token',
+                  'text-app font-[540] tracking-[-0.02em] text-primary-token',
                   titleClassName
                 )}
               >

@@ -131,7 +131,7 @@ function CompactSearchForm(
       </PopoverTrigger>
       <PopoverContent align='end' className='w-[320px] p-0'>
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-caption text-primary-token'>
+          <span className='text-app font-caption text-primary-token'>
             {triggerLabel}
           </span>
           <AppIconButton
@@ -169,7 +169,7 @@ function CompactSearchForm(
             autoFocus
             onEscape={() => onOpenChange(false)}
             className='w-full'
-            inputClassName='text-[13px]'
+            inputClassName='text-app'
           />
           <div className='flex items-center justify-end gap-2'>
             {showClearAction && isRouteSearch && (

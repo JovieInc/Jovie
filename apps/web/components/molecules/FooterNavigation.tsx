@@ -26,7 +26,7 @@ export function FooterNavigation({
 }: FooterNavigationProps) {
   const textSize =
     variant === 'light'
-      ? 'text-[13px] leading-5 font-medium tracking-tight'
+      ? 'text-app leading-5 font-medium tracking-tight'
       : 'text-[12px] leading-4 font-medium tracking-tight';
 
   return (

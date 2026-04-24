@@ -53,7 +53,7 @@ export function TrialBanner() {
       role='status'
       aria-live='polite'
     >
-      <div className='flex items-center gap-3 text-[13px]'>
+      <div className='flex items-center gap-3 text-app'>
         <span className='font-caption text-primary-token'>{daysText}</span>
         <UpgradeButton size='sm'>{ctaText}</UpgradeButton>
       </div>

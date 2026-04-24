@@ -47,7 +47,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
 
     const linkClassName = cn(
       'inline-flex items-center rounded-md px-2 py-1 -mx-2 -my-1',
-      'text-[13px] leading-5 font-medium tracking-[-0.01em]',
+      'text-app leading-5 font-medium tracking-[-0.01em]',
       'transition-all duration-150 ease-out',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
       palette,

@@ -97,7 +97,7 @@ export function AudienceTableHeader({
         headerElevated && 'shadow-inset-divider'
       )}
     >
-      <tr className='text-[13px] font-caption tracking-normal text-secondary-token'>
+      <tr className='text-app font-caption tracking-normal text-secondary-token'>
         <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
           <Checkbox
             aria-label='Select all'

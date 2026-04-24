@@ -217,7 +217,7 @@ function BandsintownConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-caption transition-colors',
+              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-app font-caption transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             )}
             style={
@@ -276,7 +276,7 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-[13px] font-caption text-secondary-token transition-colors',
+        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-app font-caption text-secondary-token transition-colors',
         'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={

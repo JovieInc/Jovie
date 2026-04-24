@@ -24,7 +24,7 @@ function MobileProfilePanelTrigger() {
         <p className='text-[14px] font-caption text-primary-token'>
           Links, music &amp; more
         </p>
-        <p className='mt-0.5 text-[13px] text-secondary-token'>
+        <p className='mt-0.5 text-app text-secondary-token'>
           Manage social links, music, tips, and about info
         </p>
       </div>

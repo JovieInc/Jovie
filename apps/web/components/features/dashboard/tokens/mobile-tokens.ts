@@ -26,9 +26,9 @@ export const mobileReleaseTokens = {
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {
     container:
-      'flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-[13px] text-secondary-token',
+      'flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-app text-secondary-token',
     resetButton:
-      'text-[13px] text-tertiary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover hover:text-secondary-token',
+      'text-app text-tertiary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover hover:text-secondary-token',
   },
   swipeActions: {
     button:

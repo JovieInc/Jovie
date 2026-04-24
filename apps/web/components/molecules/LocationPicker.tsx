@@ -27,7 +27,7 @@ const CityOption = memo(function CityOption({
     <button
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors ${
         isSelected
           ? 'bg-interactive-hover text-primary-token font-medium'
           : 'text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
@@ -101,7 +101,7 @@ export function LocationPicker({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={placeholder ?? 'Search cities...'}
-            className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+            className='flex-1 bg-transparent text-app text-primary-token placeholder:text-tertiary-token outline-none'
           />
         </div>
 
@@ -111,7 +111,7 @@ export function LocationPicker({
             <button
               type='button'
               onClick={() => handleSelect(search.trim())}
-              className='w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
+              className='w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
             >
               <span className='flex-1 text-left'>
                 Use &ldquo;{search.trim()}&rdquo;
@@ -133,7 +133,7 @@ export function LocationPicker({
           {filteredCities !== null &&
             filteredCities.length === 0 &&
             showFreeText === false && (
-              <p className='px-2.5 py-3 text-[13px] text-tertiary-token text-center'>
+              <p className='px-2.5 py-3 text-app text-tertiary-token text-center'>
                 No matching cities
               </p>
             )}

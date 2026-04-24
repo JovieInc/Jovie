@@ -52,7 +52,7 @@ const condensedDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='text-[13px] font-semibold tracking-[-0.015em] text-secondary-token'>
+    <p className='text-app font-semibold tracking-[-0.015em] text-secondary-token'>
       {children}
     </p>
   );

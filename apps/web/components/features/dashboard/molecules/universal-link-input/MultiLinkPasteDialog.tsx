@@ -114,7 +114,7 @@ function LinkItem({
       {/* URL and info */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[13px] font-caption text-primary-token'>
+          <span className='text-app font-caption text-primary-token'>
             {platform.name}
           </span>
           {isDuplicate && (
@@ -124,9 +124,7 @@ function LinkItem({
             </span>
           )}
         </div>
-        <p className='truncate text-[13px] text-tertiary-token'>
-          {normalizedUrl}
-        </p>
+        <p className='truncate text-app text-tertiary-token'>{normalizedUrl}</p>
       </div>
     </button>
   );

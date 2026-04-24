@@ -140,13 +140,11 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'empty' && (
             <div className='p-4 text-center'>
-              <p className='text-[13px] text-secondary-token'>
-                No artists found
-              </p>
+              <p className='text-app text-secondary-token'>No artists found</p>
               <button
                 type='button'
                 onClick={exitSearchMode}
-                className='mt-2 text-[13px] text-accent hover:underline'
+                className='mt-2 text-app text-accent hover:underline'
               >
                 Add link manually
               </button>
@@ -155,13 +153,13 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-[13px] text-destructive'>
+              <p className='text-app text-destructive'>
                 {error || 'Search failed'}
               </p>
               <button
                 type='button'
                 onClick={exitSearchMode}
-                className='mt-2 text-[13px] text-accent hover:underline'
+                className='mt-2 text-app text-accent hover:underline'
               >
                 Add link manually
               </button>
@@ -254,7 +252,7 @@ export function UniversalLinkInputArtistSearchMode({
                         {artist.name}
                       </div>
                       {artist.followers && (
-                        <div className='text-[13px] text-tertiary-token'>
+                        <div className='text-app text-tertiary-token'>
                           {formatFollowers(artist.followers)}
                         </div>
                       )}

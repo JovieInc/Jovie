@@ -21,7 +21,7 @@ export function SetupTaskItem({
     <li className='flex h-full flex-col gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4 shadow-none'>
       <div className='flex items-center gap-2'>
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-caption ${
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-app font-caption ${
             complete
               ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'
               : 'border border-accent/20 bg-accent/10 text-accent'
@@ -30,11 +30,11 @@ export function SetupTaskItem({
         >
           {complete ? '✓' : index}
         </div>
-        <p className='truncate text-[13px] font-semibold text-primary-token'>
+        <p className='truncate text-app font-semibold text-primary-token'>
           {title}
         </p>
       </div>
-      <span className='truncate text-[13px] leading-relaxed text-secondary-token'>
+      <span className='truncate text-app leading-relaxed text-secondary-token'>
         {complete ? completeLabel : incompleteLabel}
       </span>
       {!complete && action ? (

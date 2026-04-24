@@ -97,7 +97,7 @@ function buildDropdownItems({
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-[13px] font-medium text-primary-token'>
+                <span className='truncate text-app font-medium text-primary-token'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
@@ -206,7 +206,7 @@ function buildDropdownItems({
       type: 'custom',
       id: 'billing-loading',
       render: () => (
-        <div className='cursor-default px-2.5 py-2 text-[13px] h-9'>
+        <div className='cursor-default px-2.5 py-2 text-app h-9'>
           <div className='flex w-full items-center gap-2.5'>
             <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
             <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
@@ -384,7 +384,7 @@ export function UserButton({
           className='shrink-0'
         />
         <div className='min-w-0 flex-1'>
-          <p className='text-[13px] font-normal text-sidebar-item-foreground truncate'>
+          <p className='text-app font-normal text-sidebar-item-foreground truncate'>
             {displayName}
           </p>
         </div>

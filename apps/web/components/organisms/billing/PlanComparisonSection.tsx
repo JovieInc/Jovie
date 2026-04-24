@@ -157,14 +157,14 @@ export function PlanComparisonSection({
                   <h3 className='text-[15px] font-semibold tracking-[-0.018em] text-primary-token'>
                     {planData.name}
                   </h3>
-                  <p className='text-[13px] leading-[18px] text-tertiary-token'>
+                  <p className='text-app leading-[18px] text-tertiary-token'>
                     {planData.tagline}
                   </p>
                 </div>
 
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
-                    <span className='text-[13px] font-caption text-tertiary-token'>
+                    <span className='text-app font-caption text-tertiary-token'>
                       Coming soon
                     </span>
                   ) : (
@@ -172,7 +172,7 @@ export function PlanComparisonSection({
                       <span className='text-[28px] font-[620] tracking-[-0.03em] text-primary-token'>
                         {priceDisplay}
                       </span>
-                      <span className='text-[13px] text-secondary-token'>
+                      <span className='text-app text-secondary-token'>
                         {intervalLabel}
                       </span>
                     </>
@@ -196,7 +196,7 @@ export function PlanComparisonSection({
                   {planData.features.map(feature => (
                     <li
                       key={feature.label}
-                      className='flex items-start gap-2.5 text-[13px]'
+                      className='flex items-start gap-2.5 text-app'
                     >
                       <Check className='mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400' />
                       <span className='text-secondary-token'>

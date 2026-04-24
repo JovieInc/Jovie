@@ -35,7 +35,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
         <div className='min-w-0 flex-1'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
-            <h3 className='text-[13px] font-semibold leading-snug text-primary-token'>
+            <h3 className='text-app font-semibold leading-snug text-primary-token'>
               {insight.title}
             </h3>
             <Badge
@@ -47,7 +47,7 @@ export function InsightCard({ insight }: InsightCardProps) {
             </Badge>
           </div>
 
-          <p className='mt-1 text-[13px] leading-relaxed text-secondary-token'>
+          <p className='mt-1 text-app leading-relaxed text-secondary-token'>
             {insight.description}
           </p>
 

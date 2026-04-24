@@ -104,7 +104,7 @@ export function DataPrivacySection() {
           <div className='py-4'>
             <label
               htmlFor='delete-confirm'
-              className='mb-2 block text-[13px] text-secondary-token'
+              className='mb-2 block text-app text-secondary-token'
             >
               Type <strong>DELETE</strong> to confirm
             </label>

@@ -47,7 +47,7 @@ function ArtistCell({ item }: Readonly<{ item: DspPresenceItem }>) {
           <DspProviderIcon provider={item.providerId} size='sm' />
         </div>
       )}
-      <span className='truncate whitespace-nowrap font-caption text-[13px] text-primary-token'>
+      <span className='truncate whitespace-nowrap font-caption text-app text-primary-token'>
         {item.externalArtistName ?? 'Unknown Artist'}
       </span>
     </div>

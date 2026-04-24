@@ -71,7 +71,7 @@ export function AudienceLastActionCell({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 text-[13px] text-secondary-token min-w-0',
+        'flex items-center gap-1.5 text-app text-secondary-token min-w-0',
         className
       )}
     >

@@ -220,11 +220,11 @@ function RankedList({
               {index + 1}
             </span>
             <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <span className='truncate text-app text-secondary-token transition-colors group-hover:text-primary-token'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-semibold text-primary-token tabular-nums'>
+          <span className='ml-2 text-app font-semibold text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>

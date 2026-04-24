@@ -88,13 +88,13 @@ export function AnalyticsFunnel({
                   transition-all duration-200
                 `}
               >
-                <p className='mb-2 text-[13px] font-caption tracking-normal text-secondary-token'>
+                <p className='mb-2 text-app font-caption tracking-normal text-secondary-token'>
                   {stage.label}
                 </p>
                 <p className='text-4xl font-semibold tracking-[-0.022em] text-primary-token tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
-                <p className='mt-1 text-[13px] text-secondary-token'>
+                <p className='mt-1 text-app text-secondary-token'>
                   {stage.description}
                 </p>
               </ContentSurfaceCard>
