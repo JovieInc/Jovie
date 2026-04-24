@@ -31,11 +31,8 @@ interface ArtistProfileSpecWallProps {
 function ScreenshotCrop({
   alt,
   className,
-  frameClassName,
   imageClassName,
   objectPosition,
-  screenshotHeight,
-  screenshotWidth,
   src,
 }: Readonly<{
   alt: string;
@@ -47,39 +44,21 @@ function ScreenshotCrop({
   screenshotWidth?: number;
   src: string;
 }>) {
-  const frameStyle =
-    screenshotWidth && screenshotHeight
-      ? {
-          aspectRatio: `${screenshotWidth} / ${screenshotHeight}`,
-        }
-      : {
-          aspectRatio: '4 / 5',
-        };
-
   return (
     <div
       className={cn(
-        'flex h-full items-start overflow-hidden rounded-[1rem] bg-[#0d1015] p-2.5',
+        'relative h-full w-full overflow-hidden rounded-[0.9rem] bg-[#0a0d12]',
         className
       )}
     >
-      <div
-        className={cn(
-          'relative w-full overflow-hidden rounded-[0.95rem] bg-[#090d12]',
-          !frameClassName && 'aspect-[4/5]',
-          frameClassName
-        )}
-        style={frameClassName ? undefined : frameStyle}
-      >
-        <Image
-          fill
-          alt={alt}
-          className={cn('object-cover object-top', imageClassName)}
-          sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
-          src={src}
-          style={{ objectPosition }}
-        />
-      </div>
+      <Image
+        fill
+        alt={alt}
+        className={cn('object-cover object-top', imageClassName)}
+        sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
+        src={src}
+        style={{ objectPosition }}
+      />
     </div>
   );
 }
@@ -174,10 +153,6 @@ function ArtistProfilePowerFeatureTile({
   const style: AccentStyle = {
     '--tile-accent': SPEC_TILE_ACCENTS[tile.accent],
   };
-  const chromeStyle: CSSProperties = {
-    boxShadow:
-      '0 0 0 1px color-mix(in srgb, var(--tile-accent) 26%, rgba(255,255,255,0.08)), 0 22px 64px rgba(0,0,0,0.28), 0 0 42px color-mix(in srgb, var(--tile-accent) 14%, transparent)',
-  };
 
   return (
     <article
@@ -188,35 +163,8 @@ function ArtistProfilePowerFeatureTile({
       )}
       style={style}
     >
-      <div
-        className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-white/8 bg-[#07090d] p-4'
-        style={chromeStyle}
-      >
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-[1.35rem] border'
-          style={{
-            borderColor:
-              'color-mix(in srgb, var(--tile-accent) 38%, rgba(255,255,255,0.12))',
-          }}
-        />
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-6 top-0 h-px'
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tile-accent) 72%, white), transparent)',
-          }}
-        />
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-8 top-5 h-10 rounded-full blur-2xl'
-          style={{
-            background:
-              'color-mix(in srgb, var(--tile-accent) 18%, transparent)',
-          }}
-        />
-        <div className='relative z-10 flex-1'>
+      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-[#07090d] p-4'>
+        <div className='relative flex-1'>
           {tile.visual === 'button-chip' ? (
             <ButtonChipVisual
               chipIcon={tile.chipIcon}
