@@ -33,20 +33,22 @@ export interface ArtistProfileSocialProofLogo {
   readonly component: LogoComponent;
 }
 
+export interface ArtistProfileFounderQuote {
+  readonly quote: string;
+  readonly name: string;
+  readonly role: string;
+  readonly avatarSrc: string;
+  readonly spotifyArtistId: string;
+  readonly profileHref: string;
+  readonly profileLabel: string;
+}
+
 export interface ArtistProfileSocialProofData {
   readonly proofWhisper: string;
   readonly logos: readonly ArtistProfileSocialProofLogo[];
   readonly profileCards: readonly ArtistProfileSocialProofCard[];
   readonly quotes: readonly ArtistProfileQuote[];
-  readonly founderQuote?: {
-    readonly quote: string;
-    readonly name: string;
-    readonly role: string;
-    readonly avatarSrc: string;
-    readonly spotifyArtistId: string;
-    readonly profileHref: string;
-    readonly profileLabel: string;
-  };
+  readonly founderQuote?: ArtistProfileFounderQuote;
   readonly founderFallback: string;
   readonly hasRealQuotes: boolean;
 }
