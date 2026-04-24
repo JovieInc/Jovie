@@ -31,6 +31,12 @@ const HANDLE_PATTERN = /^[a-z0-9-]{3,24}$/;
 const viewSchema = z.object({
   handle: z
     .string()
+    // Cap the input length before the .toLowerCase() transform to avoid
+    // allocating a lowercased copy of an attacker-supplied body at the
+    // framework body-size ceiling (~4 MB). The regex would reject it at
+    // position 25 regardless, but making the cap explicit documents intent
+    // and saves the wasted allocation.
+    .max(24)
     .transform(value => value.toLowerCase())
     .pipe(z.string().regex(HANDLE_PATTERN)),
 });
