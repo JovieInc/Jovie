@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.174] - 2026-04-24
+
+> Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
+
+### Added
+
+- `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and related mutation paths now support a versioned `theme.profileAccent` payload. Avatar-driven accent colors are extracted server-side, normalized for contrast, reused as CSS vars, and persisted across avatar upload, suggestion selection, ingestion, and admin/dashboard update flows.
+- `apps/web/components/features/profile/ProfileHomeRail.tsx` adds a manual horizontal Home rail with dot pagination, driven from existing profile resolver data so featured release, tour, alerts, and listen states can rotate without changing route semantics.
+
+### Changed
+
+- `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` were rebuilt into the new shared public shell: full-bleed hero, verified identity row, contextual status pill, notifications-first CTA, quick social actions, and the five-tab bottom nav mapping `Home`, `Music`, `Events`, `Alerts`, and `Profile` to the existing profile modes.
+- Preview and demo profile surfaces now use the same accent/theme contract and refreshed shell so homepage showcases and live `/:username` pages stay visually aligned.
+
+### Fixed
+
+- Theme writes now merge instead of replacing the entire theme object, preventing user theme changes from wiping persisted `profileAccent` data.
+- Public render fallback accent derivation now skips local and `/_next/image` sources, avoiding invalid-host fetch noise while preserving neutral fallbacks when no usable remote image exists.
+
 ## [26.4.173] - 2026-04-24
 
 > Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
