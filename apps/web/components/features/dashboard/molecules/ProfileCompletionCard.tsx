@@ -86,7 +86,7 @@ export const ProfileCompletionCard = memo(
               {sectionLabel}
             </div>
             <div className='space-y-0.5'>
-              <p className='text-app font-[590] text-primary-token'>
+              <p className='text-app font-semibold text-primary-token'>
                 {heading}
               </p>
               <p className='text-app text-secondary-token'>{subtext}</p>

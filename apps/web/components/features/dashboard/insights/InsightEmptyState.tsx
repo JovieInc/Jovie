@@ -21,7 +21,7 @@ export function InsightEmptyState({
         <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
       </div>
 
-      <h3 className='mt-1.5 text-[13px] font-[590] text-primary-token'>
+      <h3 className='mt-1.5 text-[13px] font-semibold text-primary-token'>
         {hasEnoughData ? 'No insights yet' : 'Not enough data yet'}
       </h3>
 

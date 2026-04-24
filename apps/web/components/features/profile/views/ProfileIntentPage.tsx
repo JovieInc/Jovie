@@ -50,7 +50,7 @@ export function ProfileIntentPage({
           <ChevronLeft className='h-4 w-4' />
         </Link>
         <div className='min-w-0 flex-1'>
-          <h1 className='truncate text-mid font-[590] leading-[1.08] tracking-[-0.018em] text-primary-token'>
+          <h1 className='truncate text-mid font-semibold leading-[1.08] tracking-[-0.018em] text-primary-token'>
             {entry.title}
           </h1>
           {entry.subtitle ? (

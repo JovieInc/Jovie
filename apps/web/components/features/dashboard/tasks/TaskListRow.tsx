@@ -136,7 +136,7 @@ export function TaskListRow({
       <div className='min-w-0 flex-1'>
         <p
           className={cn(
-            'truncate text-[12.75px] font-[590] leading-[17px] text-primary-token',
+            'truncate text-[12.75px] font-semibold leading-[17px] text-primary-token',
             isDone && 'text-secondary-token',
             isCancelled && 'text-tertiary-token'
           )}

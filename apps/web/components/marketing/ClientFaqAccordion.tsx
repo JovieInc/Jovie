@@ -34,7 +34,7 @@ export function ClientFaqAccordion({
               type='button'
               aria-expanded={isOpen}
               aria-controls={panelId}
-              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-[17px] font-[590] leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-150 hover:opacity-90'
+              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-[17px] font-semibold leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-150 hover:opacity-90'
               onClick={() => {
                 setOpenIndex(isOpen ? null : index);
               }}

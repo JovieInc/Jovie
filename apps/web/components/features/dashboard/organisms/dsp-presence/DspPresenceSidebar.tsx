@@ -102,7 +102,7 @@ function SidebarEntityHeader({
             </div>
           )}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-sm font-[590] text-primary-token'>
+            <div className='truncate text-sm font-semibold text-primary-token'>
               {item.externalArtistName ?? 'Unknown Artist'}
             </div>
             <div className='mt-0.5 flex items-center gap-1.5 text-xs text-tertiary-token'>

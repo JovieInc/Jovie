@@ -58,7 +58,7 @@ export function EntityHeaderCard({
           </div>
         ) : null}
         <div className='flex items-center gap-1'>
-          <span className='truncate text-[14px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
+          <span className='truncate text-[14px] font-semibold leading-[18px] tracking-[-0.015em] text-primary-token'>
             {title}
           </span>
           {badge}

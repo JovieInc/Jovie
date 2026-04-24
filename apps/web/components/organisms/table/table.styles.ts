@@ -11,7 +11,7 @@ export const typography = {
   cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
   rowNumber: 'text-[13px] tabular-nums text-tertiary-token', // Monospace numbers
-  groupHeader: 'text-[13px] font-[590] text-primary-token', // Group headers
+  groupHeader: 'text-[13px] font-semibold text-primary-token', // Group headers
 } as const;
 
 // Alignment & Spacing - Perfect Vertical Alignment

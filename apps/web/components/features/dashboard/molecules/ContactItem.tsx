@@ -53,7 +53,7 @@ export const ContactItem = memo(function ContactItem({
     <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-app font-[590] text-primary-token'>
+          <p className='text-app font-semibold text-primary-token'>
             {buildSummary(contact)}
           </p>
           <p className='text-app text-secondary-token'>

@@ -52,7 +52,7 @@ const condensedDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function SectionLabel({ children }: { readonly children: React.ReactNode }) {
   return (
-    <p className='text-[13px] font-[590] tracking-[-0.015em] text-secondary-token'>
+    <p className='text-[13px] font-semibold tracking-[-0.015em] text-secondary-token'>
       {children}
     </p>
   );
@@ -115,7 +115,7 @@ function ArtistBioSection({
           {isLongBio ? (
             <button
               type='button'
-              className='mt-3 text-sm font-[590] text-primary-token transition-opacity hover:opacity-75'
+              className='mt-3 text-sm font-semibold text-primary-token transition-opacity hover:opacity-75'
               onClick={() => setExpanded(current => !current)}
             >
               {expanded ? 'Show less' : 'Read more'}
@@ -196,7 +196,7 @@ function TourDateRow({
       className={`${flatSurfaceClassName} grid gap-4 px-4 py-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center`}
     >
       <div className='flex h-[64px] w-[64px] flex-col items-center justify-center rounded-[var(--profile-drawer-radius-desktop)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-center shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
-        <span className='text-[0.68rem] font-[590] uppercase tracking-[0.18em] text-secondary-token'>
+        <span className='text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-secondary-token'>
           {new Intl.DateTimeFormat('en-US', { month: 'short' }).format(
             new Date(tourDate.startDate)
           )}
@@ -209,7 +209,7 @@ function TourDateRow({
       </div>
 
       <div className='min-w-0'>
-        <p className='truncate text-base font-[590] text-primary-token'>
+        <p className='truncate text-base font-semibold text-primary-token'>
           {tourDate.venueName || artistName}
         </p>
         <p className='mt-1 text-sm text-secondary-token'>

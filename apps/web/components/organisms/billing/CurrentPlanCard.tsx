@@ -45,7 +45,7 @@ export function CurrentPlanCard({
             </div>
             <div className='min-w-0'>
               <div className='flex flex-wrap items-center gap-2'>
-                <h2 className='text-[15px] font-[590] tracking-[-0.018em] text-primary-token'>
+                <h2 className='text-[15px] font-semibold tracking-[-0.018em] text-primary-token'>
                   {planName} Plan
                 </h2>
                 <Badge variant={isPro ? 'success' : 'warning'} size='sm'>

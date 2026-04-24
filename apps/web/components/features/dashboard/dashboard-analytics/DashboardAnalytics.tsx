@@ -61,7 +61,7 @@ function StatCard({
   return (
     <ContentSurfaceCard className='p-4 lg:p-5'>
       <p className='text-app text-secondary-token'>{label}</p>
-      <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+      <p className='mt-1 text-2xl font-semibold tracking-[-0.011em] text-primary-token tabular-nums'>
         {value}
       </p>
       {meta && (

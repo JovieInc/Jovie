@@ -63,7 +63,7 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-2.5 text-lg font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-2.5 text-lg font-semibold text-primary-token'>
         <Icon
           name='Link'
           className='h-4.5 w-4.5 text-secondary-token'
