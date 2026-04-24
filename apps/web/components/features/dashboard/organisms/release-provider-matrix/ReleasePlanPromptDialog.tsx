@@ -69,7 +69,7 @@ export function ReleasePlanPromptDialog({
       <DialogTitle>{dialogTitle}</DialogTitle>
       <DialogDescription>{dialogDescription}</DialogDescription>
       <DialogBody className='space-y-2'>
-        <p className='text-[13px] text-secondary-token'>
+        <p className='text-app text-secondary-token'>
           {releaseTitle ?? 'This release'} is ready.
         </p>
       </DialogBody>

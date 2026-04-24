@@ -4,7 +4,7 @@ import type { ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_SECTION_HEADING_CLASSNAME =
-  'text-[11px] font-[560] uppercase leading-[14px] tracking-[0.08em] text-tertiary-token';
+  'text-2xs font-semibold uppercase leading-[14px] tracking-[0.08em] text-tertiary-token';
 
 export interface DrawerSectionHeadingProps {
   readonly children: ReactNode;

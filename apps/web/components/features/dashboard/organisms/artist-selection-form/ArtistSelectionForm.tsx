@@ -42,7 +42,7 @@ export function ArtistSelectionForm() {
           <div className='w-full max-w-md'>
             {/* Header */}
             <div className='text-center mb-8'>
-              <h1 className='text-3xl font-[590] text-primary-token mb-2 transition-colors'>
+              <h1 className='text-3xl font-semibold text-primary-token mb-2 transition-colors'>
                 Select Your Artist
               </h1>
               <p className='text-secondary-token text-lg transition-colors'>
@@ -113,7 +113,7 @@ export function ArtistSelectionForm() {
                       />
                     )}
                     <div className='flex-1 min-w-0'>
-                      <p className='text-app font-[510] text-primary-token truncate'>
+                      <p className='text-app font-caption text-primary-token truncate'>
                         {selectedArtist.name}
                       </p>
                       <p className='text-2xs text-green-600 dark:text-green-400 flex items-center gap-1'>

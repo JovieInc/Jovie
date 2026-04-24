@@ -439,7 +439,7 @@ export function CatalogHealthSection({
 
               {/* Missing from DSP info row */}
               {missingFromDsp.length > 0 && (
-                <p className='mt-3 text-[11px] text-muted-foreground'>
+                <p className='mt-3 text-2xs text-muted-foreground'>
                   {missingFromDsp.length} track
                   {missingFromDsp.length === 1 ? '' : 's'} in your catalog{' '}
                   {missingFromDsp.length === 1 ? "isn't" : "aren't"} on Spotify

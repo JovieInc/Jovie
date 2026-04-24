@@ -144,7 +144,7 @@ export function RecentChats() {
                   className='h-7'
                 >
                   <Link href={href}>
-                    <span className='flex-1 truncate text-[13px]'>{title}</span>
+                    <span className='flex-1 truncate text-app'>{title}</span>
                   </Link>
                 </SidebarMenuButton>
 
@@ -206,7 +206,7 @@ export function RecentChats() {
             <AlertDialogTitle className='text-sm font-semibold text-primary-token'>
               Delete thread
             </AlertDialogTitle>
-            <AlertDialogDescription className='text-[13px] text-secondary-token'>
+            <AlertDialogDescription className='text-app text-secondary-token'>
               This will permanently delete &ldquo;
               {deleteTarget?.title ?? 'Untitled thread'}&rdquo;. This action
               cannot be undone.

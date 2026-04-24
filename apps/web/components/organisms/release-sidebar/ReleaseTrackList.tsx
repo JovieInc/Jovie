@@ -247,7 +247,7 @@ function TrackListRow({
         onClick={handleTogglePlayback}
         disabled={!playableUrl && !isActiveTrack}
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-[510] tabular-nums transition-[background-color,color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-caption tabular-nums transition-[background-color,color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           isActiveTrack
             ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
             : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token',
@@ -262,13 +262,13 @@ function TrackListRow({
       </button>
 
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-[12.5px] font-[510] leading-tight text-primary-token'>
+        <p className='truncate text-[12.5px] font-caption leading-tight text-primary-token'>
           {track.title}
         </p>
       </div>
 
       {trackDuration ? (
-        <span className='shrink-0 text-[11px] tabular-nums text-tertiary-token'>
+        <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
           {trackDuration}
         </span>
       ) : null}

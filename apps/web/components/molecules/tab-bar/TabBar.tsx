@@ -22,13 +22,13 @@ export const TAB_BAR_RAIL_CLASSNAME =
   'flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 py-1 text-[11.5px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
+  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 py-1 text-[11.5px] font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
 
 export const TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME =
   'border-subtle bg-surface-0 text-primary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
-  'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-transparent bg-transparent px-2.5 text-[12px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-fast hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
+  'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-transparent bg-transparent px-2.5 text-[12px] font-caption tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-fast hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'border-subtle bg-surface-0 text-primary-token';

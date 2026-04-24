@@ -65,7 +65,7 @@ export default function ContactsLoading() {
 
       {/* Desktop: table layout (hidden below sm) */}
       <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
-        <table className='w-full border-collapse text-[13px]'>
+        <table className='w-full border-collapse text-app'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
             <tr className='border-b border-subtle'>
               {CONTACTS_HEADER_KEYS.map(key => (

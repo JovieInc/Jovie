@@ -145,7 +145,7 @@ export const YouTubeCrossCategoryPrompt = React.memo(
       <div style={transitionStyle}>
         <dialog
           open
-          className={`m-0 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-3 text-[13px] ${className ?? ''}`}
+          className={`m-0 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-3 text-app ${className ?? ''}`}
           aria-labelledby='yt-cross-category-prompt-title'
           data-testid='youtube-cross-category-prompt'
         >

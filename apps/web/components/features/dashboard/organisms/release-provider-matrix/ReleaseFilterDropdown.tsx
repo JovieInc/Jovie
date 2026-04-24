@@ -382,7 +382,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-md bg-(--linear-accent-subtle) px-1.5 py-0.5 text-3xs font-[510] text-(--linear-accent)'>
+                          <span className='rounded-md bg-(--linear-accent-subtle) px-1.5 py-0.5 text-3xs font-caption text-(--linear-accent)'>
                             {labelFilterCount}
                           </span>
                         )}

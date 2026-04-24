@@ -142,11 +142,11 @@ export function DashboardActivityFeed({
           <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
             <Zap className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
           </div>
-          <h3 className='text-app font-[510] tracking-[-0.01em] text-secondary-token'>
+          <h3 className='text-app font-caption tracking-[-0.01em] text-secondary-token'>
             Activity
           </h3>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-[510] text-tertiary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'

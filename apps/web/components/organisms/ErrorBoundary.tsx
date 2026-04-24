@@ -46,7 +46,7 @@ export default function ErrorBoundary({
           <h3 className='text-sm font-medium text-secondary-token'>
             Something went wrong
           </h3>
-          <p className='text-[13px] text-tertiary-token'>{message}</p>
+          <p className='text-app text-tertiary-token'>{message}</p>
         </div>
 
         <div className='flex justify-center gap-3'>

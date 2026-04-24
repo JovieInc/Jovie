@@ -82,7 +82,7 @@ export function StickyPhoneTourClient({
       modes.map(mode => (
         <h3
           key={mode.id}
-          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
+          className='text-xl font-semibold leading-snug tracking-[-0.012em] text-secondary-token'
         >
           {mode.headline}
         </h3>

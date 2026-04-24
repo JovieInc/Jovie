@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-[510] text-tertiary-token'
+          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-caption text-tertiary-token'
         >
           <Icon name='Plus' className='h-3.5 w-3.5' aria-hidden='true' />
           <span className='line-clamp-1'>Add</span>
@@ -108,7 +108,7 @@ export function AddProviderUrlPopover({
                 style={{ backgroundColor: accent }}
                 aria-hidden='true'
               />
-              <span className='text-app font-[510] text-primary-token'>
+              <span className='text-app font-caption text-primary-token'>
                 Add {providerLabel} link
               </span>
             </div>

@@ -23,7 +23,7 @@ export function ArtistProfileModesShowcase() {
                 aria-pressed={isActive}
                 onClick={() => setActiveIndex(index)}
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-left text-[11px] font-[560] tracking-[-0.01em] transition-colors',
+                  'rounded-full border px-3 py-1.5 text-left text-[11px] font-semibold tracking-[-0.01em] transition-colors',
                   isActive
                     ? 'border-white/12 bg-white/[0.045] text-primary-token'
                     : 'border-transparent bg-transparent text-secondary-token hover:border-white/8 hover:bg-white/[0.02] hover:text-primary-token'

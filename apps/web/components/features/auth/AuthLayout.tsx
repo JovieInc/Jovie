@@ -32,6 +32,7 @@ interface AuthLayoutProps {
   readonly showLogoutButton?: boolean;
   readonly logoutRedirectUrl?: string;
   readonly layoutVariant?: 'stack' | 'split';
+  readonly showcaseVariant?: 'page' | 'image-only';
 }
 
 const LINK_FOCUS_CLASSES = 'focus-ring-themed rounded-md';
@@ -51,12 +52,14 @@ export function AuthLayout({
   showLogoutButton = false,
   logoutRedirectUrl = '/signin',
   layoutVariant = 'stack',
+  showcaseVariant = 'page',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 
-  // Scroll form into view when keyboard appears on mobile
+  void logoSpinDelayMs;
+
   useEffect(() => {
     if (isKeyboardVisible && formRef.current) {
       const timer = setTimeout(() => {
@@ -75,21 +78,14 @@ export function AuthLayout({
       data-auth-shell
       data-auth-layout-variant={layoutVariant}
       className={cn(
-        // Fixed positioning prevents iOS Safari rubber-band overscroll completely
-        // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
         'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] bg-[#08090a] text-white [color-scheme:dark]',
-        // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
-        // Vertical padding - reduced on mobile, balanced on larger screens
-        // Use smaller top padding when keyboard is visible
         isKeyboardVisible
           ? 'pt-8 pb-4'
           : 'pt-10 pb-10 sm:pt-14 sm:pb-12 lg:pt-16',
-        // Safe area insets for notched devices (iPhone X+, Android with notches)
         'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
         'pr-[max(1rem,env(safe-area-inset-right))]',
-        // Smooth transition when keyboard appears/disappears
         'transition-[padding] duration-200 ease-out'
       )}
     >
@@ -109,15 +105,14 @@ export function AuthLayout({
         />
       </div>
 
-      {/* Skip to main content link for keyboard users */}
-      {showSkipLink && (
+      {showSkipLink ? (
         <Link
           href='#auth-form'
-          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-surface-1 focus:text-primary-token focus:border focus:border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0'
+          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:border focus:border-subtle focus:bg-surface-1 focus:px-4 focus:py-2 focus:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0'
         >
           Skip to form
         </Link>
-      )}
+      ) : null}
 
       {showLogoutButton ? (
         <div className='absolute top-4 right-4 z-50'>
@@ -144,7 +139,7 @@ export function AuthLayout({
                 <div
                   className={cn(
                     'mb-7 flex justify-center transition-opacity duration-200 ease-out lg:mb-8 lg:justify-start',
-                    isKeyboardVisible && 'opacity-0 pointer-events-none'
+                    isKeyboardVisible && 'pointer-events-none opacity-0'
                   )}
                   aria-hidden={isKeyboardVisible}
                 >
@@ -163,8 +158,8 @@ export function AuthLayout({
                 <h1
                   className={cn(
                     formTitleClassName,
-                    'mb-8 transition-all duration-200 ease-out text-center lg:text-left',
-                    isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
+                    'mb-8 text-center transition-all duration-200 ease-out lg:text-left',
+                    isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
                   )}
                   aria-hidden={isKeyboardVisible}
                 >
@@ -198,29 +193,27 @@ export function AuthLayout({
 
             {showLogo ? (
               <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
-                <AuthBrandPanel className='ml-auto h-full w-full max-w-[640px]' />
+                <AuthBrandPanel
+                  variant={showcaseVariant}
+                  className='ml-auto h-full w-full max-w-[640px]'
+                />
               </div>
             ) : null}
           </div>
         </div>
       ) : (
         <>
-          {/* Form content - centered with mobile-optimized width */}
           <div
             className={cn(
-              `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10 flex flex-col items-center`,
-              // Allow step indicator to render without clipping
-              'overflow-visible'
+              `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
             )}
           >
-            {/* Logo container - inside form wrapper so it centers relative to the Clerk card */}
             <div
               className={cn(
-                'mb-6 h-6 w-6 flex items-center justify-center sm:mb-8',
+                'mb-6 flex h-6 w-6 items-center justify-center sm:mb-8',
                 'transition-opacity duration-200 ease-out',
-                // Hide visually when keyboard visible or showLogo=false, but preserve space
                 (isKeyboardVisible || !showLogo) &&
-                  'opacity-0 pointer-events-none'
+                  'pointer-events-none opacity-0'
               )}
               aria-hidden={isKeyboardVisible || !showLogo}
             >
@@ -236,19 +229,18 @@ export function AuthLayout({
               </Link>
             </div>
 
-            {/* Title - hide when keyboard is visible on mobile */}
-            {showFormTitle && formTitle && (
+            {showFormTitle && formTitle ? (
               <h1
                 className={cn(
                   formTitleClassName,
                   'transition-all duration-200 ease-out',
-                  isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
+                  isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
                 )}
                 aria-hidden={isKeyboardVisible}
               >
                 {formTitle}
               </h1>
-            )}
+            ) : null}
 
             <main
               ref={formRef}
@@ -260,9 +252,8 @@ export function AuthLayout({
             </main>
           </div>
 
-          {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}
-          {showFooterPrompt && !isKeyboardVisible && (
-            <p className='mt-auto pt-8 text-[13px] font-[400] text-[lch(68%_1.35_282)] text-center relative z-10 animate-in fade-in-0 duration-200'>
+          {showFooterPrompt && !isKeyboardVisible ? (
+            <p className='relative z-10 mt-auto pt-8 text-center text-[13px] font-[400] text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
@@ -271,7 +262,7 @@ export function AuthLayout({
                 {footerLinkText}
               </Link>
             </p>
-          )}
+          ) : null}
         </>
       )}
     </div>

@@ -216,10 +216,10 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon select-none pointer-events-none',
+      'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-2xs font-medium tabular-nums text-sidebar-item-icon select-none pointer-events-none',
       'peer-hover/menu-button:text-sidebar-item-foreground peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
       'peer-data-[size=sm]/menu-button:text-[10px]',
-      'peer-data-[size=default]/menu-button:text-[11px]',
+      'peer-data-[size=default]/menu-button:text-2xs',
       'peer-data-[size=lg]/menu-button:text-xs',
       'group-data-[collapsible=icon]:hidden',
       className
@@ -311,7 +311,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-[13px] leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
+        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
         'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-item-foreground',

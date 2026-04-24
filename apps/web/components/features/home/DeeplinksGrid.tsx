@@ -225,7 +225,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => ({
         id: mode.id,
         content: (
-          <h3 className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'>
+          <h3 className='text-xl font-semibold leading-snug tracking-[-0.012em] text-secondary-token'>
             {mode.headline}
           </h3>
         ),

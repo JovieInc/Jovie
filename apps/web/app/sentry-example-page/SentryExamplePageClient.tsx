@@ -99,7 +99,7 @@ export function SentryExamplePageClient() {
               surface='nested'
               className='border-[color-mix(in_oklab,var(--linear-success)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))] p-4'
             >
-              <div className='flex items-center justify-center gap-2 text-[13px] font-[560] text-primary-token'>
+              <div className='flex items-center justify-center gap-2 text-[13px] font-semibold text-primary-token'>
                 <CheckCircle2 className='h-4 w-4 text-[var(--linear-success)]' />
                 Error sent to Sentry.
               </div>
@@ -112,7 +112,7 @@ export function SentryExamplePageClient() {
               className='border-[color-mix(in_oklab,var(--linear-warning)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] p-4'
             >
               <div className='space-y-2 text-center'>
-                <div className='flex items-center justify-center gap-2 text-[13px] font-[560] text-primary-token'>
+                <div className='flex items-center justify-center gap-2 text-[13px] font-semibold text-primary-token'>
                   <TriangleAlert className='h-4 w-4 text-[var(--linear-warning)]' />
                   Sentry connectivity looks blocked.
                 </div>

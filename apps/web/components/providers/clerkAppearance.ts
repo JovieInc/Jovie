@@ -35,7 +35,7 @@ const clerkBaseElements = {
   formFieldErrorText: 'text-destructive',
   formFieldSuccessText: 'text-green-600 dark:text-green-400',
   formButtonPrimary:
-    'btn btn-primary btn-md rounded-xl shadow-sm hover:opacity-90 transition-all',
+    'btn btn-primary btn-md rounded-xl shadow-sm hover:opacity-90 transition-[background-color,border-color,box-shadow,opacity]',
   formButtonReset: 'text-secondary-token hover:text-primary-token',
   socialButtonsBlockButton:
     'btn btn-secondary btn-md border border-subtle hover:bg-surface-1 transition-colors',

@@ -40,7 +40,7 @@ export function DashboardHeader({
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
-        <h1 className='text-[17px] font-[560] leading-tight tracking-[-0.018em] text-primary-token'>
+        <h1 className='text-[17px] font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
@@ -71,12 +71,12 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.012em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-xs font-[560] tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'>
+              <span className='shrink-0 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
                 {rootLabel}
               </span>
               <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
@@ -85,7 +85,7 @@ export function DashboardHeader({
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-xs font-[560] tracking-[-0.01em] text-primary-token'>
+                <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
                   {currentLabel}
                 </span>
               )}

@@ -104,7 +104,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative h-[26px] rounded-full border border-transparent px-2.5 text-xs font-[510] tracking-[-0.01em] shadow-none transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
+            className={`relative h-[26px] rounded-full border border-transparent px-2.5 text-xs font-caption tracking-[-0.01em] shadow-none transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
           >
             {opt.label}
           </button>

@@ -34,9 +34,7 @@ const MAX_PRESS_PHOTOS = 6;
 
 function DetailLabel({ children }: { readonly children: string }) {
   return (
-    <span className='text-[11px] font-medium text-tertiary-token'>
-      {children}
-    </span>
+    <span className='text-2xs font-medium text-tertiary-token'>{children}</span>
   );
 }
 
@@ -107,13 +105,11 @@ function EditableBio({
         className='w-full cursor-text rounded-[10px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0'
       >
         {value ? (
-          <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
+          <p className='text-app leading-relaxed text-secondary-token whitespace-pre-wrap'>
             {value}
           </p>
         ) : (
-          <p className='text-[13px] text-tertiary-token'>
-            Click to add a bio...
-          </p>
+          <p className='text-app text-tertiary-token'>Click to add a bio...</p>
         )}
       </button>
     );
@@ -335,7 +331,7 @@ function PressPhotosSection({
           >
             <X className='h-3 w-3' />
           </button>
-          <p className='pr-5 text-[11px] text-secondary-token'>
+          <p className='pr-5 text-2xs text-secondary-token'>
             We found {draftPhotos.length} photo
             {draftPhotos.length > 1 ? 's' : ''} from your streaming profiles.
             Approve the ones you want on your public profile.
@@ -344,7 +340,7 @@ function PressPhotosSection({
             <button
               type='button'
               onClick={handleApproveAll}
-              className='mt-1.5 text-[11px] font-medium text-accent hover:underline'
+              className='mt-1.5 text-2xs font-medium text-accent hover:underline'
             >
               Approve all
             </button>
@@ -403,7 +399,7 @@ function PressPhotosSection({
                     type='button'
                     onClick={() => handleApprove(photo.id)}
                     disabled={approvingPhotoId === photo.id}
-                    className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-[11px] font-medium text-black transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
+                    className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-2xs font-medium text-black transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
                     aria-label='Approve press photo for public profile'
                   >
                     {approvingPhotoId === photo.id ? (
@@ -523,7 +519,7 @@ function PressPhotosSection({
                 <div className='absolute inset-0 bg-black/35' />
                 <div className='relative z-10 flex flex-col items-center gap-1 text-white'>
                   <LoaderCircle className='h-4 w-4 animate-spin' />
-                  <span className='text-[11px] font-medium'>
+                  <span className='text-2xs font-medium'>
                     Uploading {uploadProgress}%
                   </span>
                 </div>
@@ -537,7 +533,7 @@ function PressPhotosSection({
                   <p className='text-xs font-medium text-secondary-token'>
                     Add photo
                   </p>
-                  <p className='text-[11px] text-tertiary-token'>
+                  <p className='text-2xs text-tertiary-token'>
                     AVIF, JPG, PNG, HEIC
                   </p>
                 </div>
@@ -550,20 +546,20 @@ function PressPhotosSection({
       {!canUpload &&
         pressPhotos.length >= MAX_PRESS_PHOTOS &&
         remainingSlots === 0 && (
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             Remove a photo to upload another.
           </p>
         )}
       {!canUpload &&
         pressPhotos.length >= MAX_PRESS_PHOTOS &&
         remainingSlots > 0 && (
-          <p className='text-[11px] text-tertiary-token'>
+          <p className='text-2xs text-tertiary-token'>
             {remainingSlots} upload {remainingSlots === 1 ? 'slot' : 'slots'}{' '}
             remaining.
           </p>
         )}
 
-      {uploadError && <p className='text-[11px] text-danger'>{uploadError}</p>}
+      {uploadError && <p className='text-2xs text-danger'>{uploadError}</p>}
 
       <input
         ref={fileInputRef}
@@ -694,7 +690,7 @@ export function ProfileAboutTab({
                   trigger={
                     <button
                       type='button'
-                      className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
+                      className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-2xs font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
                     >
                       <Plus className='h-3 w-3' />
                       Add

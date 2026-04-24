@@ -304,13 +304,13 @@ function buildUserSubtitleParts(
     parts.push({
       key: 'intent',
       text: 'High',
-      className: 'font-[510] text-emerald-600 dark:text-emerald-400',
+      className: 'font-caption text-emerald-600 dark:text-emerald-400',
     });
   } else if (hiddenMetadataColumns.engagement && m.intentLevel === 'medium') {
     parts.push({
       key: 'intent',
       text: 'Medium',
-      className: 'font-[510] text-amber-600 dark:text-amber-400',
+      className: 'font-caption text-amber-600 dark:text-amber-400',
     });
   }
 
@@ -378,7 +378,7 @@ export function UserCellWithTouring({
           className='min-w-0'
         />
         {subtitleParts.length > 0 && (
-          <div className='flex items-center gap-1 min-w-0 pl-[22px] text-[11px] text-tertiary-token leading-tight'>
+          <div className='flex items-center gap-1 min-w-0 pl-[22px] text-2xs text-tertiary-token leading-tight'>
             {subtitleParts.map((part, i) => (
               <span key={part.key} className='flex items-center gap-1 min-w-0'>
                 {i > 0 && (
@@ -424,7 +424,7 @@ export function renderVisitsNumberCell({
 }: CellContext<AudienceMember, number>) {
   const visits = getValue();
   return (
-    <span className='tabular-nums text-[13px] font-[400] text-secondary-token'>
+    <span className='tabular-nums text-app font-normal text-secondary-token'>
       {visits}
     </span>
   );

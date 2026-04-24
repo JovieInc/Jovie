@@ -60,11 +60,7 @@ function SignupModalBody() {
   const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.ONBOARDING;
 
   const statusRow = promptHint ? (
-    <p
-      aria-live='polite'
-      className='flex-1 text-right text-[13px] leading-[1.4] text-tertiary-token'
-      title={promptHint}
-    >
+    <p aria-live='polite' className='truncate' title={promptHint}>
       Continuing with &ldquo;
       {promptHint.length > HOMEPAGE_PROMPT_HINT_TRUNCATE
         ? `${promptHint.slice(0, HOMEPAGE_PROMPT_HINT_TRUNCATE)}…`

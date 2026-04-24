@@ -92,7 +92,7 @@ function TableFilterSection<T extends string>({
         className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
       >
         <div className={cn(TOOLBAR_MENU_HEADER_CLASS, 'border-b-0 pb-1.25')}>
-          <span className='truncate text-[11px] font-[600] text-secondary-token'>
+          <span className='truncate text-2xs font-[600] text-secondary-token'>
             {headerLabel ?? category.label}
           </span>
           {shortcutHint ? (

@@ -84,14 +84,14 @@ export function PersistentAudioBar() {
         <div className='min-w-0 shrink-0 w-[120px] lg:w-[180px]'>
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[510] leading-[1.2] text-primary-token'
+            className='text-[12.5px] font-caption leading-[1.2] text-primary-token'
           >
             {playbackState.trackTitle ?? ''}
           </TruncatedText>
           {(playbackState.releaseTitle || playbackState.artistName) && (
             <TruncatedText
               lines={1}
-              className='text-[11px] leading-[1.3] text-tertiary-token'
+              className='text-2xs leading-[1.3] text-tertiary-token'
             >
               {[playbackState.artistName, playbackState.releaseTitle]
                 .filter(Boolean)

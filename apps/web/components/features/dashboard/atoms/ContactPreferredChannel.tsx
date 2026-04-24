@@ -15,11 +15,11 @@ export function ContactPreferredChannel({
 }: ContactPreferredChannelProps) {
   return (
     <div className='space-y-2'>
-      <p className='text-[13px] font-[510] text-secondary-token tracking-normal'>
+      <p className='text-app font-caption text-secondary-token tracking-normal'>
         Default action
       </p>
       <div className='flex flex-wrap gap-4'>
-        <label className='flex items-center gap-2 text-[13px] text-secondary-token'>
+        <label className='flex items-center gap-2 text-app text-secondary-token'>
           <input
             type='radio'
             name={`preferred-${contactId}`}
@@ -29,7 +29,7 @@ export function ContactPreferredChannel({
           />{' '}
           Email
         </label>
-        <label className='flex items-center gap-2 text-[13px] text-secondary-token'>
+        <label className='flex items-center gap-2 text-app text-secondary-token'>
           <input
             type='radio'
             name={`preferred-${contactId}`}

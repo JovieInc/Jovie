@@ -158,16 +158,14 @@ export function SettingsBillingSection() {
         <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
           <div className='flex items-start gap-2 text-amber-700 dark:text-amber-300'>
             <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
-            <p className='text-[13px] leading-[18px]'>
-              {billingData.staleReason}
-            </p>
+            <p className='text-app leading-[18px]'>{billingData.staleReason}</p>
           </div>
         </div>
       ) : null}
 
       {portalMutation.error ? (
         <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
-          <p className='text-[13px] leading-[18px] text-destructive'>
+          <p className='text-app leading-[18px] text-destructive'>
             {portalMutation.error instanceof Error
               ? portalMutation.error.message
               : 'Failed to open billing portal'}

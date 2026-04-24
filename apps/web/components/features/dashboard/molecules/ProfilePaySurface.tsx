@@ -67,7 +67,7 @@ function ProviderPill({
   if (provider === 'none') return null;
 
   return (
-    <span className='inline-flex items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-[510] text-secondary-token'>
+    <span className='inline-flex items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token'>
       {provider === 'stripe' ? 'Stripe' : 'Venmo'}
     </span>
   );
@@ -206,7 +206,7 @@ export function ProfilePaySurface({
     >
       <div className={cn('min-w-0', isDrawer ? 'space-y-4' : 'space-y-3')}>
         <div className='flex flex-wrap items-center gap-2'>
-          <span className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-[510] text-secondary-token'>
+          <span className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token'>
             <StatusIcon paymentState={summary.paymentState} />
             {getProfileMonetizationHeading(summary.paymentState)}
           </span>
@@ -282,7 +282,7 @@ export function ProfilePaySurface({
             <button
               type='button'
               onClick={onViewAnalytics}
-              className='inline-flex w-fit items-start gap-1.5 text-left text-xs font-[510] text-secondary-token transition-colors hover:text-primary-token'
+              className='inline-flex w-fit items-start gap-1.5 text-left text-xs font-caption text-secondary-token transition-colors hover:text-primary-token'
             >
               <span>View payment traffic in Analytics</span>
               <ArrowUpRight

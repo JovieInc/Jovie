@@ -50,7 +50,7 @@ export function CompactLinkRail({
     >
       {showSummaryPill ? (
         <div
-          className='inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
+          className='inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 text-2xs font-caption tracking-[-0.01em] text-secondary-token'
           title={summaryAriaLabel ?? `${displayCount} ${countLabel}`}
         >
           <div className='flex -space-x-1 overflow-hidden pr-0.5'>

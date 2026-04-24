@@ -93,7 +93,7 @@ function SetupTaskItem({
       {!isComplete && (
         <Link
           href={actionHref}
-          className='rounded-full border border-transparent px-2.5 py-1 text-xs font-[510] text-secondary-token transition-[background-color,border-color,color] hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+          className='rounded-full border border-transparent px-2.5 py-1 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
         >
           {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
@@ -152,7 +152,7 @@ export function DashboardOverview({
     <ContentSurfaceCard as='header' className='overflow-hidden'>
       <ContentSectionHeader
         title={
-          <span className='text-mid font-[590] tracking-[-0.01em] text-primary-token'>
+          <span className='text-mid font-semibold tracking-[-0.01em] text-primary-token'>
             Welcome back, {greetingName}
           </span>
         }

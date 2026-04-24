@@ -1013,7 +1013,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   aria-hidden='true'
                 />
               </div>
-              <h3 className='text-app font-[510] text-primary-token'>
+              <h3 className='text-app font-caption text-primary-token'>
                 No releases yet
               </h3>
               <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>

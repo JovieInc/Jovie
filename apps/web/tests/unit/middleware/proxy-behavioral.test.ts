@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
     status: 'ok',
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
+  isClerkRequiredPath: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
   isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
@@ -87,6 +88,7 @@ vi.mock('@/lib/auth/staging-clerk-keys', () => ({
   isStagingHost: mocks.isStagingHost,
 }));
 vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
+  isClerkRequiredPath: mocks.isClerkRequiredPath,
   shouldBypassClerkForRequest: mocks.shouldBypassClerkForRequest,
 }));
 vi.mock('@/lib/auth/test-mode', () => ({
@@ -329,6 +331,32 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(isRedirectTo(res, '/signup')).toBe(true);
+    });
+  });
+
+  describe('private-origin Clerk handling', () => {
+    it('keeps Clerk middleware enabled for authenticated mobile APIs on localhost', async () => {
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.shouldBypassClerkForRequest.mockReturnValue(false);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/api/mobile/v1/me',
+        headers: {
+          'x-forwarded-host': 'localhost:3000',
+          'x-forwarded-proto': 'http',
+        },
+      });
+
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.shouldBypassClerkForRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowAuthRouteBypass: true,
+          forceBypass: false,
+          pathname: '/api/mobile/v1/me',
+        })
+      );
     });
   });
 

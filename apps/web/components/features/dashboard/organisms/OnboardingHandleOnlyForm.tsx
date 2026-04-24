@@ -46,7 +46,7 @@ function HandleSidebar() {
               <span
                 className={
                   step.id === 'handle'
-                    ? 'text-sm font-[560] text-primary-token'
+                    ? 'text-sm font-semibold text-primary-token'
                     : 'text-sm text-secondary-token'
                 }
               >

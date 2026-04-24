@@ -28,7 +28,7 @@ export interface DrawerButtonProps
 }
 
 export const DRAWER_BUTTON_CLASSNAME =
-  'border font-[510] tracking-[-0.01em] shadow-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'border font-caption tracking-[-0.01em] shadow-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export const DrawerButton = React.forwardRef<
   HTMLButtonElement,

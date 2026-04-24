@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 export const DRAWER_FORM_GRID_ROW_CLASSNAME = 'grid items-center gap-2';
 
 export const DRAWER_FORM_GRID_LABEL_CLASSNAME =
-  'text-[11px] font-[500] leading-[15px] tracking-normal text-quaternary-token';
+  'text-2xs font-[500] leading-[15px] tracking-normal text-quaternary-token';
 
 export interface DrawerFormGridRowProps {
   readonly label: ReactNode;

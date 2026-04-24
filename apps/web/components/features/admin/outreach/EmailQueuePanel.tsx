@@ -226,7 +226,7 @@ export function EmailQueuePanel() {
               >
                 {queueing ? 'Queueing...' : 'Queue Next Batch'}
               </Button>
-              <span className='text-[12px] font-[560] tabular-nums text-secondary-token'>
+              <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
                 {pendingTotal} pending
               </span>
             </div>
@@ -273,7 +273,7 @@ export function EmailQueuePanel() {
               leads.map(lead => (
                 <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-[560] text-primary-token'>
+                    <span className='font-semibold text-primary-token'>
                       {lead.displayName || 'Unknown creator'}
                     </span>
                   </td>

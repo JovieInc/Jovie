@@ -14,7 +14,7 @@ export function StatusBarMock({ className }: StatusBarMockProps) {
         className
       )}
     >
-      <span className='text-3xs font-[510] text-primary-token'>9:41</span>
+      <span className='text-3xs font-caption text-primary-token'>9:41</span>
       <div className='flex items-center gap-1'>
         <div className='flex items-end gap-0.5'>
           <div className='w-0.5 h-1 rounded bg-(--fg)' />

@@ -116,6 +116,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** For Jovie product UI, default to small type, normal Title Case labels, restrained emphasis, and minimal chrome. Do not use uppercase labels or extra borders as the default way to make something feel designed. Solve hierarchy with spacing, typography, and surface contrast first.
 
+### Hover polish must stay visual, not positional
+
+**Mistake:** Auth polish reintroduced lift-on-hover motion for CTAs and Clerk buttons. The UI looked more like generic template chrome than a controlled Jovie surface, and the layout appeared to jump for no product reason.
+
+**Rule:** Default hover feedback to background, border, text-color, opacity, or shadow changes. Do not use translate/scale hover motion on product, auth, or marketing surfaces unless the motion is directly tied to spatial manipulation.
+
 ---
 
 ## Git Workflow

@@ -144,7 +144,7 @@ function ToolStatusRow({
           <div
             title={getToolStatusTitle(event)}
             className={cn(
-              'truncate font-[560] tracking-[-0.01em]',
+              'truncate font-semibold tracking-[-0.01em]',
               isInline ? 'text-[12px]' : 'text-[13px]'
             )}
           >

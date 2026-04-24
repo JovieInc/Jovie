@@ -38,7 +38,7 @@ export function AudienceEngagementCell({
     >
       <div
         className={cn(
-          'flex items-center gap-1.5 text-[13px] text-secondary-token',
+          'flex items-center gap-1.5 text-app text-secondary-token',
           className
         )}
       >

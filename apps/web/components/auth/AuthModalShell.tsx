@@ -7,34 +7,10 @@ import { AuthBrandPanel } from '@/features/auth/AuthBrandPanel';
 
 interface AuthModalShellProps {
   readonly children: React.ReactNode;
-  /**
-   * Optional status row rendered to the right of the back button.
-   * Used for the "Continuing with '{prompt}'" intent hint.
-   */
   readonly statusRow?: React.ReactNode;
-  /** aria-label for the dialog element. Defaults to "Authentication". */
   readonly ariaLabel?: string;
 }
 
-/**
- * Shared shell for intercepted auth modals (desktop signup/signin).
- *
- * Wraps children in a native `<dialog>` opened via `showModal()` for free
- * focus trap + Escape handling. Dismissal via Escape, backdrop click, or
- * the back affordance — all route through `router.back()` so the URL stays
- * in sync with modal state (refresh on /signup shows the full-page, which
- * is the documented intercepting-route behavior).
- *
- * Used by:
- *   - `@auth/(.)signup/page.tsx`      — around Clerk's <SignUp />
- *   - `@auth/layout.tsx` (unavailable) — around <AuthUnavailableCard /> in dev
- *
- * Having both paths use the same shell means dev:local:browse shows the
- * same modal chrome as production; the content inside differs (unavailable
- * card vs real Clerk form) but the dialog a11y and dismissal behavior stay
- * identical. This catches modal-layering bugs in dev without needing real
- * Clerk keys on every developer's machine.
- */
 export function AuthModalShell({
   children,
   statusRow,
@@ -43,13 +19,6 @@ export function AuthModalShell({
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Open as native modal for focus-trap behavior at no React cost.
-  //
-  // The cleanup does NOT call dialog.close(). In StrictMode dev, React runs
-  // effect cleanup between double-mount cycles, which would fire a `close`
-  // event on the dialog — and any handler listening for that event would
-  // trigger before the second mount, causing surprise navigation. Relying
-  // on DOM removal on unmount is enough; native dialogs handle it cleanly.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -60,9 +29,6 @@ export function AuthModalShell({
     router.back();
   }, [router]);
 
-  // Listen for `cancel` (Escape-only, user intent), NOT `close` (also fires
-  // on programmatic close from unmount/StrictMode cleanup). Keeps URL in
-  // sync when the user presses Escape to dismiss the modal.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -76,8 +42,6 @@ export function AuthModalShell({
 
   const onBackdropMouseDown = useCallback(
     (event: React.MouseEvent<HTMLDialogElement>) => {
-      // Native dialog backdrop click targets the dialog element itself. Only
-      // dismiss if the click originated on the backdrop, not on card content.
       if (event.target === dialogRef.current) dismiss();
     },
     [dismiss]
@@ -119,7 +83,7 @@ export function AuthModalShell({
         </div>
 
         <div className='auth-desktop-only lg:flex lg:w-80 lg:shrink-0 lg:items-center'>
-          <AuthBrandPanel compact className='w-full' />
+          <AuthBrandPanel variant='modal' className='w-full' />
         </div>
       </div>
     </dialog>

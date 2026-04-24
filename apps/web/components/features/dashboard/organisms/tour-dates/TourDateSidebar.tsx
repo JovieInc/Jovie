@@ -70,7 +70,7 @@ function MiniRankedList({
           className='flex h-7 items-center justify-between rounded-md px-1.5'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
-            <span className='w-3 text-3xs font-[510] text-tertiary-token tabular-nums'>
+            <span className='w-3 text-3xs font-caption text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
             <IconComponent className='h-3 w-3 text-tertiary-token' />
@@ -78,7 +78,7 @@ function MiniRankedList({
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-xs font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-xs font-caption text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>
@@ -484,7 +484,7 @@ export function TourDateSidebar({
                         }
                         disabled={isPending}
                         className={cn(
-                          'flex-1 rounded-full border px-3 py-2 text-xs font-[510] transition-[background-color,border-color,color] duration-150',
+                          'flex-1 rounded-full border px-3 py-2 text-xs font-caption transition-[background-color,border-color,color] duration-150',
                           formData.ticketStatus === status
                             ? 'border-accent/35 bg-accent/10 text-accent'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'

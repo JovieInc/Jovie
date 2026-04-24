@@ -77,7 +77,7 @@ export const ProfileCompletionCard = memo(
       <ContentSurfaceCard className='mb-2 border-(--linear-app-frame-seam) p-3.5 sm:mb-3 sm:p-4'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-1.5 text-2xs font-[510] tracking-[-0.01em] text-tertiary-token'>
+            <div className='flex items-center gap-1.5 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
               {profileIsLive ? (
                 <Sparkles className='h-3 w-3' aria-hidden='true' />
               ) : (
@@ -86,7 +86,7 @@ export const ProfileCompletionCard = memo(
               {sectionLabel}
             </div>
             <div className='space-y-0.5'>
-              <p className='text-app font-[590] text-primary-token'>
+              <p className='text-app font-semibold text-primary-token'>
                 {heading}
               </p>
               <p className='text-app text-secondary-token'>{subtext}</p>
@@ -109,7 +109,7 @@ export const ProfileCompletionCard = memo(
                     className='group flex items-center justify-between gap-3 rounded-md border border-transparent px-3 py-2 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
                   >
                     <div className='min-w-0'>
-                      <p className='text-app font-[510] text-primary-token'>
+                      <p className='text-app font-caption text-primary-token'>
                         {step.label}
                       </p>
                       <p className='truncate text-app text-secondary-token'>

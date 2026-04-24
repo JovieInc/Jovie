@@ -44,10 +44,10 @@ function TasksUpgradeContent({
           <CheckSquare className='h-5 w-5' aria-hidden='true' />
         )}
       </div>
-      <h2 className='text-lg font-[580] tracking-[-0.025em] text-primary-token'>
+      <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
         {heading}
       </h2>
-      <p className='mt-2 max-w-md text-[13px] leading-[1.5] text-secondary-token'>
+      <p className='mt-2 max-w-md text-app leading-[1.5] text-secondary-token'>
         {description}
       </p>
       <div className='mt-6 flex flex-wrap items-center justify-center gap-3'>

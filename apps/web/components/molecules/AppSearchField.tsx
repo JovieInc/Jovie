@@ -54,7 +54,7 @@ export function AppSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'h-full border-0 bg-transparent px-0 text-[13px] tracking-[-0.01em] text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0',
+          'h-full border-0 bg-transparent px-0 text-app tracking-[-0.01em] text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0',
           inputClassName
         )}
       />

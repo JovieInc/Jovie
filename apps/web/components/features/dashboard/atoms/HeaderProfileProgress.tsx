@@ -43,7 +43,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
       type='button'
       onClick={handleClick}
       aria-label={`Profile ${pct}% complete. Open chat for a guided completion plan.`}
-      className='group relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+      className='group relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-app font-caption text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
     >
       <svg
         width='20'
@@ -76,12 +76,10 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           className='text-accent transition-[stroke-dashoffset,color] duration-500 group-hover:text-accent-hover'
         />
       </svg>
-      <span className='max-sm:hidden sm:inline text-[11px] text-secondary-token'>
+      <span className='max-sm:hidden sm:inline text-2xs text-secondary-token'>
         Profile
       </span>
-      <span className='text-[11px] tabular-nums text-primary-token'>
-        {pct}%
-      </span>
+      <span className='text-2xs tabular-nums text-primary-token'>{pct}%</span>
     </button>
   );
 });

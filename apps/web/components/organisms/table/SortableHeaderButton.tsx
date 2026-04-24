@@ -25,7 +25,7 @@ export function SortableHeaderButton({
       type='button'
       onClick={onClick}
       className={cn(
-        'inline-flex w-full items-center gap-2 text-left text-[13px] font-[510] tracking-normal text-secondary-token hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'inline-flex w-full items-center gap-2 text-left text-app font-caption tracking-normal text-secondary-token hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
         className
       )}
     >

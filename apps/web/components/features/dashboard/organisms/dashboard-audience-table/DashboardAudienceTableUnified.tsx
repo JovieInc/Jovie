@@ -149,10 +149,11 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
   memberColumnHelper.accessor('referrerHistory', {
     id: 'source',
-    header: 'Source',
+    header: () => <div className='text-right'>Source</div>,
     cell: renderSourceCell,
-    size: 76,
+    size: 48,
     enableSorting: false,
+    meta: { className: 'text-right' },
   }),
   memberColumnHelper.accessor('visits', {
     id: 'engagement',
@@ -1023,7 +1024,7 @@ export const DashboardAudienceTableUnified = memo(
                         onSortingChange={handleSortingChange}
                         columnVisibility={columnVisibility}
                         minWidth={tableMinWidth}
-                        className='text-[13px]'
+                        className='text-app'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}
                         onFocusedRowChange={handleFocusedRowChange}

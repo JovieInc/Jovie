@@ -171,10 +171,10 @@ export function GetStartedChecklistCard({
     <ContentSurfaceCard className='overflow-hidden p-0'>
       <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-xs font-[510] tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
             Get started
           </h3>
-          <span className='text-[11px] text-tertiary-token'>
+          <span className='text-2xs text-tertiary-token'>
             {completedCount}/{CHECKLIST_ITEMS.length}
           </span>
         </div>
@@ -184,7 +184,7 @@ export function GetStartedChecklistCard({
               href={profileUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-[11px] text-secondary-token transition-colors hover:text-primary-token'
+              className='text-2xs text-secondary-token transition-colors hover:text-primary-token'
             >
               View profile
             </a>
@@ -192,7 +192,7 @@ export function GetStartedChecklistCard({
           <button
             type='button'
             onClick={handleDismiss}
-            className='rounded-full border border-transparent px-2 py-0.5 text-[11px] text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token'
+            className='rounded-full border border-transparent px-2 py-0.5 text-2xs text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
           </button>
