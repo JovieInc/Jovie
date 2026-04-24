@@ -132,24 +132,32 @@ async function processPressPhotoSizesFromBuffer(
 
   results.original = originalData;
 
-  for (const size of PRESS_DOWNLOAD_SIZES) {
-    if (originalWidth < size && originalHeight < size) {
-      continue;
+  const pressSizeEntries = await Promise.all(
+    PRESS_DOWNLOAD_SIZES.map(async size => {
+      if (originalWidth < size && originalHeight < size) {
+        return null;
+      }
+
+      const { data } = await baseImage
+        .clone()
+        .resize({
+          width: size,
+          height: size,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .toColourspace('srgb')
+        .avif({ quality: PRESS_AVIF_QUALITY, effort: 4 })
+        .toBuffer({ resolveWithObject: true });
+
+      return [String(size), data] as const;
+    })
+  );
+
+  for (const entry of pressSizeEntries) {
+    if (entry) {
+      results[entry[0]] = entry[1];
     }
-
-    const { data } = await baseImage
-      .clone()
-      .resize({
-        width: size,
-        height: size,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .toColourspace('srgb')
-      .avif({ quality: PRESS_AVIF_QUALITY, effort: 4 })
-      .toBuffer({ resolveWithObject: true });
-
-    results[String(size)] = data;
   }
 
   return results;
@@ -190,26 +198,34 @@ async function processAvatarSizesFromBuffer(
 
   results.original = originalData;
 
-  // Generate each download size (square crop, no upscaling)
-  for (const size of AVATAR_DOWNLOAD_SIZES) {
-    if (originalWidth < size && originalHeight < size) {
-      continue;
+  // Generate each download size in parallel (square crop, no upscaling)
+  const avatarSizeEntries = await Promise.all(
+    AVATAR_DOWNLOAD_SIZES.map(async size => {
+      if (originalWidth < size && originalHeight < size) {
+        return null;
+      }
+
+      const { data } = await baseImage
+        .clone()
+        .resize({
+          width: size,
+          height: size,
+          fit: 'cover',
+          position: 'centre',
+          withoutEnlargement: true,
+        })
+        .toColourspace('srgb')
+        .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
+        .toBuffer({ resolveWithObject: true });
+
+      return [String(size), data] as const;
+    })
+  );
+
+  for (const entry of avatarSizeEntries) {
+    if (entry) {
+      results[entry[0]] = entry[1];
     }
-
-    const { data } = await baseImage
-      .clone()
-      .resize({
-        width: size,
-        height: size,
-        fit: 'cover',
-        position: 'centre',
-        withoutEnlargement: true,
-      })
-      .toColourspace('srgb')
-      .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
-      .toBuffer({ resolveWithObject: true });
-
-    results[String(size)] = data;
   }
 
   return results;
