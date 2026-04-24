@@ -63,7 +63,9 @@ async function uploadPressPhoto(ctx: UploadContext): Promise<NextResponse> {
     throw new TypeError('Missing original press photo buffer');
   }
 
-  const blobUrl = await withTimeout(
+  // Upload original + all sized variants concurrently — each independent I/O
+  // to Vercel Blob. Promise.all preserves first-failure-aborts semantics.
+  const originalUploadPromise = withTimeout(
     uploadBufferToBlob(
       ctx.put,
       buildBlobPath(ctx.seoFileName, ctx.clerkUserId, 'press'),
@@ -74,34 +76,42 @@ async function uploadPressPhoto(ctx: UploadContext): Promise<NextResponse> {
     'Blob upload'
   );
 
+  const sizeUploadsPromise = Promise.all(
+    Object.entries(pressSizeBuffers)
+      .filter(([sizeKey]) => sizeKey !== 'original')
+      .map(async ([sizeKey, buffer]) => {
+        const sizeUrl = await withTimeout(
+          uploadBufferToBlob(
+            ctx.put,
+            buildBlobPath(
+              `${ctx.seoFileName}-${sizeKey}`,
+              ctx.clerkUserId,
+              'press'
+            ),
+            buffer,
+            AVIF_MIME_TYPE
+          ),
+          PROCESSING_TIMEOUT_MS,
+          `Blob upload (${sizeKey})`
+        );
+        if (!sizeUrl?.startsWith('https://')) {
+          throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
+        }
+        return [sizeKey, sizeUrl] as const;
+      })
+  );
+
+  const [blobUrl, sizeEntries] = await Promise.all([
+    originalUploadPromise,
+    sizeUploadsPromise,
+  ]);
+
   if (!blobUrl?.startsWith('https://')) {
     throw new TypeError('Invalid blob URL returned from storage');
   }
 
-  const pressPhotoSizes: Record<string, string> = {};
-  for (const [sizeKey, buffer] of Object.entries(pressSizeBuffers)) {
-    if (sizeKey === 'original') {
-      continue;
-    }
-    const sizeUrl = await withTimeout(
-      uploadBufferToBlob(
-        ctx.put,
-        buildBlobPath(
-          `${ctx.seoFileName}-${sizeKey}`,
-          ctx.clerkUserId,
-          'press'
-        ),
-        buffer,
-        AVIF_MIME_TYPE
-      ),
-      PROCESSING_TIMEOUT_MS,
-      `Blob upload (${sizeKey})`
-    );
-    if (!sizeUrl?.startsWith('https://')) {
-      throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
-    }
-    pressPhotoSizes[sizeKey] = sizeUrl;
-  }
+  const pressPhotoSizes: Record<string, string> =
+    Object.fromEntries(sizeEntries);
 
   const metadata = await withTimeout(
     getImageBufferMetadata(originalBuffer),
@@ -163,7 +173,9 @@ async function uploadAvatarPhoto(ctx: UploadContext): Promise<NextResponse> {
     'Avatar size processing'
   );
 
-  const avatarUrl = await withTimeout(
+  // Upload primary avatar + all sized variants concurrently — each independent
+  // I/O to Vercel Blob. Promise.all preserves first-failure-aborts semantics.
+  const avatarUrlPromise = withTimeout(
     uploadBufferToBlob(
       ctx.put,
       buildBlobPath(ctx.seoFileName, ctx.clerkUserId, 'avatar'),
@@ -174,32 +186,41 @@ async function uploadAvatarPhoto(ctx: UploadContext): Promise<NextResponse> {
     'Blob upload'
   );
 
+  const avatarSizeEntriesPromise = Promise.all(
+    Object.entries(avatarSizeBuffers).map(async ([sizeKey, buffer]) => {
+      const sizeSuffix = sizeKey === 'original' ? '-original' : `-${sizeKey}`;
+      const sizeUrl = await withTimeout(
+        uploadBufferToBlob(
+          ctx.put,
+          buildBlobPath(
+            `${ctx.seoFileName}${sizeSuffix}`,
+            ctx.clerkUserId,
+            'avatar'
+          ),
+          buffer,
+          AVIF_MIME_TYPE
+        ),
+        PROCESSING_TIMEOUT_MS,
+        `Blob upload (${sizeKey})`
+      );
+      if (!sizeUrl?.startsWith('https://')) {
+        throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
+      }
+      return [sizeKey, sizeUrl] as const;
+    })
+  );
+
+  const [avatarUrl, avatarSizeEntries] = await Promise.all([
+    avatarUrlPromise,
+    avatarSizeEntriesPromise,
+  ]);
+
   if (!avatarUrl?.startsWith('https://')) {
     throw new TypeError('Invalid blob URL returned from storage');
   }
 
-  const avatarSizes: Record<string, string> = {};
-  for (const [sizeKey, buffer] of Object.entries(avatarSizeBuffers)) {
-    const sizeSuffix = sizeKey === 'original' ? '-original' : `-${sizeKey}`;
-    const sizeUrl = await withTimeout(
-      uploadBufferToBlob(
-        ctx.put,
-        buildBlobPath(
-          `${ctx.seoFileName}${sizeSuffix}`,
-          ctx.clerkUserId,
-          'avatar'
-        ),
-        buffer,
-        AVIF_MIME_TYPE
-      ),
-      PROCESSING_TIMEOUT_MS,
-      `Blob upload (${sizeKey})`
-    );
-    if (!sizeUrl?.startsWith('https://')) {
-      throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
-    }
-    avatarSizes[sizeKey] = sizeUrl;
-  }
+  const avatarSizes: Record<string, string> =
+    Object.fromEntries(avatarSizeEntries);
 
   await ctx.tx
     .update(profilePhotos)
