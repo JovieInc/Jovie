@@ -75,13 +75,21 @@ async function fetchJsonFromPage<T>(
   readonly status: number;
   readonly data: T;
 }> {
+  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+
   return page.evaluate(
-    async ({ target, requestInit }) => {
+    async ({ target, requestInit, fallbackBaseUrl }) => {
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
 
       try {
-        const response = await fetch(target, {
+        // Route resolvers may run before first navigation (about:blank). Resolve
+        // API paths against a stable base URL so fetch never receives an invalid URL.
+        const resolvedTarget = /^[a-z]+:\/\//i.test(target)
+          ? target
+          : new URL(target, fallbackBaseUrl).toString();
+
+        const response = await fetch(resolvedTarget, {
           method: requestInit?.method,
           headers: requestInit?.headers,
           body: requestInit?.body,
@@ -106,7 +114,7 @@ async function fetchJsonFromPage<T>(
         window.clearTimeout(timeoutId);
       }
     },
-    { target: input, requestInit: init }
+    { target: input, requestInit: init, fallbackBaseUrl: baseUrl }
   );
 }
 

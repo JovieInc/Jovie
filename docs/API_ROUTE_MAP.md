@@ -111,12 +111,6 @@
 |-------|---------|------|-------------|
 | `/api/canvas/generate` | POST | `auth` | Generate Spotify Canvas video |
 
-### Capture Tip
-
-| Route | Methods | Auth | Description |
-|-------|---------|------|-------------|
-| `/api/capture-tip` | POST | `public` | Capture completed tip payment |
-
 ### Changelog
 
 | Route | Methods | Auth | Description |
