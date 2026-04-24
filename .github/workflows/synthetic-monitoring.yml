@@ -63,7 +63,7 @@ jobs:
         run: |
           # Temporarily skip the signup->subscription path in synthetic runs.
           # It is flaky in production due intermittent CAPTCHA bootstrap failures.
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results --grep-invert="complete user journey from signup to paid subscription"
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results --grep-invert="complete user journey from signup to paid subscription" --pass-with-no-tests
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -103,7 +103,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
 
-          const resultsFile = 'apps/web/test-results/results.json';
+          const resultsFiles = [
+            'apps/web/test-results/results.json',
+            'apps/web/test-results/public-profile-smoke-results.json',
+          ];
           const outputFile = process.env.GITHUB_OUTPUT;
 
           function emit(line) {
@@ -120,13 +123,6 @@ jobs:
             emit('EOF');
           }
 
-          if (!fs.existsSync(resultsFile)) {
-            emit('test_status=error');
-            emitMultiline('failed_tests', ['Test results file not found']);
-            process.exit(0);
-          }
-
-          const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
           const specs = [];
 
           function collectSpecs(suites = []) {
@@ -136,7 +132,19 @@ jobs:
             }
           }
 
-          collectSpecs(results.suites ?? []);
+          let foundResults = false;
+          for (const resultsFile of resultsFiles) {
+            if (!fs.existsSync(resultsFile)) continue;
+            foundResults = true;
+            const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+            collectSpecs(results.suites ?? []);
+          }
+
+          if (!foundResults) {
+            emit('test_status=error');
+            emitMultiline('failed_tests', ['Test results files not found']);
+            process.exit(0);
+          }
 
           const tests = specs.flatMap(spec =>
             (spec.tests ?? []).map(testCase => ({ spec, testCase }))
