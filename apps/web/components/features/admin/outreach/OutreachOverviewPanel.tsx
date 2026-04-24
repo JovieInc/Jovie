@@ -6,9 +6,13 @@ import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSect
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { OutreachKpis } from './OutreachKpis';
 
-interface QueueResponse {
-  items: unknown[];
-  total: number;
+interface OutreachCountsResponse {
+  counts?: {
+    email?: number;
+    dm?: number;
+    manualReview?: number;
+    total?: number;
+  };
 }
 
 export function OutreachOverviewPanel() {
@@ -25,31 +29,23 @@ export function OutreachOverviewPanel() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [emailRes, dmRes, reviewRes] = await Promise.all([
-        fetch('/api/admin/outreach?queue=email&limit=1'),
-        fetch('/api/admin/outreach?queue=dm&limit=1'),
-        fetch('/api/admin/outreach?queue=manual_review&limit=1'),
-      ]);
+      const res = await fetch('/api/admin/outreach?counts=1');
 
-      if (!emailRes.ok || !dmRes.ok || !reviewRes.ok) {
+      if (!res.ok) {
         throw new Error('Failed to fetch queue counts');
       }
 
-      const [emailData, dmData, reviewData] = (await Promise.all([
-        emailRes.json(),
-        dmRes.json(),
-        reviewRes.json(),
-      ])) as [QueueResponse, QueueResponse, QueueResponse];
+      const data = (await res.json()) as OutreachCountsResponse;
 
-      const email = emailData.total ?? 0;
-      const dm = dmData.total ?? 0;
-      const manualReview = reviewData.total ?? 0;
+      const email = data.counts?.email ?? 0;
+      const dm = data.counts?.dm ?? 0;
+      const manualReview = data.counts?.manualReview ?? 0;
 
       setCounts({
         email,
         dm,
         manualReview,
-        total: email + dm + manualReview,
+        total: data.counts?.total ?? email + dm + manualReview,
       });
     } catch {
       setCounts({ email: 0, dm: 0, manualReview: 0, total: 0 });
