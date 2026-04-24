@@ -153,10 +153,10 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <section className='homepage-hero-stage relative px-3 pb-5 pt-[calc(var(--linear-header-height)+12px)] sm:px-4 lg:px-6'>
+      <section className='homepage-hero-stage relative flex min-h-[100svh] flex-col'>
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative mx-auto flex min-h-[calc(100svh-var(--linear-header-height)-1rem)] w-full max-w-[1440px] flex-col overflow-hidden rounded-[32px] border border-white/[0.08] text-primary-token shadow-[0_48px_120px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)]'
+          className='homepage-hero-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
         >
           <div
             aria-hidden='true'
@@ -174,18 +174,19 @@ export default function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-5 pb-20 pt-20 sm:px-8 sm:pb-24 sm:pt-24 lg:px-12 lg:pb-28 lg:pt-28'>
-            <div className='w-full min-w-0 max-w-[860px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
+          <div className='relative z-[2] mx-auto flex w-full max-w-[1360px] min-w-0 flex-1 items-center justify-center px-5 pb-14 pt-[calc(var(--linear-header-height)+4.75rem)] sm:px-8 sm:pb-16 sm:pt-[calc(var(--linear-header-height)+5.25rem)] lg:px-12 lg:pb-20 lg:pt-[calc(var(--linear-header-height)+6rem)]'>
+            <div className='w-full min-w-0 max-w-[920px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
               <HomepageIntent />
             </div>
           </div>
         </div>
-      </section>
 
-      <HomeTrustSection
-        label='Trusted by artists'
-        className='homepage-trust-reveal'
-      />
+        <HomeTrustSection
+          label='Trusted by artists'
+          presentation='inline-strip'
+          className='homepage-trust-reveal'
+        />
+      </section>
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
         <HomepageV2SystemOverview />
       ) : null}
