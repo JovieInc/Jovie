@@ -1,14 +1,72 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
+import type { CellContext, ColumnDef } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
+import { useMemo } from 'react';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
-import type { AdminActivityItem } from '@/lib/admin/types';
+import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { ACTIVITY_COLUMNS } from './activity-table/activityColumns';
+
+const statusVariant: Record<
+  AdminActivityStatus,
+  'success' | 'warning' | 'error'
+> = {
+  success: 'success',
+  warning: 'warning',
+  error: 'error',
+};
+
+const statusLabel: Record<AdminActivityStatus, string> = {
+  success: 'Success',
+  warning: 'Needs review',
+  error: 'Error',
+};
+
+// Cell renderer functions extracted to module level to avoid nested component definitions (S6478)
+function renderUserCell({ getValue }: CellContext<AdminActivityItem, string>) {
+  return (
+    <span className='font-medium text-primary-token whitespace-nowrap'>
+      {getValue()}
+    </span>
+  );
+}
+
+function renderActionCell({
+  getValue,
+  row,
+}: CellContext<AdminActivityItem, string>) {
+  const item = row.original;
+  return (
+    <div>
+      <span className='block truncate text-secondary-token'>{getValue()}</span>
+      <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
+        {item.timestamp}
+      </span>
+    </div>
+  );
+}
+
+function renderTimestampCell({
+  getValue,
+}: CellContext<AdminActivityItem, string>) {
+  return (
+    <span className='whitespace-nowrap text-secondary-token'>{getValue()}</span>
+  );
+}
+
+function renderStatusCell(status: AdminActivityStatus) {
+  return (
+    <Badge variant={statusVariant[status]} size='sm'>
+      {statusLabel[status]}
+    </Badge>
+  );
+}
 
 interface ActivityTableUnifiedProps {
   readonly items: AdminActivityItem[];
@@ -17,9 +75,50 @@ interface ActivityTableUnifiedProps {
 /** Standard row class for activity table */
 const getRowClassName = () => 'group hover:bg-(--linear-row-hover)';
 
+const columnHelper = createColumnHelper<AdminActivityItem>();
+
 export function ActivityTableUnified({
   items,
 }: Readonly<ActivityTableUnifiedProps>) {
+  // Define table columns using TanStack Table
+  const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
+    () => [
+      // User column
+      columnHelper.accessor('user', {
+        id: 'user',
+        header: 'User',
+        cell: renderUserCell,
+        size: 200,
+      }),
+
+      // Action column
+      columnHelper.accessor('action', {
+        id: 'action',
+        header: 'Action',
+        cell: renderActionCell,
+      }),
+
+      // Timestamp column
+      columnHelper.accessor('timestamp', {
+        id: 'timestamp',
+        header: 'Timestamp',
+        cell: renderTimestampCell,
+        size: 180,
+        minSize: 150,
+      }),
+
+      // Status column
+      columnHelper.accessor('status', {
+        id: 'status',
+        header: 'Status',
+        cell: ({ getValue }) =>
+          renderStatusCell(getValue() as AdminActivityStatus),
+        size: 140,
+      }),
+    ],
+    []
+  );
+
   return (
     <div
       className='h-full border-0 bg-(--linear-app-content-surface)'
@@ -31,7 +130,7 @@ export function ActivityTableUnified({
       <div className='overflow-x-auto'>
         <UnifiedTable
           data={items}
-          columns={ACTIVITY_COLUMNS}
+          columns={columns}
           isLoading={false}
           emptyState={
             <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-secondary-token'>
