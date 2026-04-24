@@ -569,6 +569,27 @@ export function getLimit(
   return getEntitlements(plan).limits[key];
 }
 
+/**
+ * Resolve a raw plan string to the three-tier billing plan used by
+ * chat-usage accounting and client-facing plan gates. Unlike
+ * {@link getEntitlements}, this narrows to `'free' | 'pro' | 'max'`
+ * (no 'trial'), which is the invariant callers like the chat usage
+ * API and `usePlanGate` rely on. Maps legacy names ('founding' -> 'pro',
+ * 'growth' -> 'max') and returns 'free' for null, undefined, trial, or
+ * unknown plans.
+ */
+export function resolveChatUsagePlan(
+  plan: string | null | undefined
+): 'free' | 'pro' | 'max' {
+  if (plan === 'max' || plan === 'growth') {
+    return 'max';
+  }
+  if (plan === 'pro' || plan === 'founding') {
+    return 'pro';
+  }
+  return 'free';
+}
+
 /** Whether the plan is pro or higher. */
 export function isProPlan(plan: string | null | undefined): boolean {
   return (
