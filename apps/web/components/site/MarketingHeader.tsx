@@ -4,7 +4,11 @@ import { usePathname } from 'next/navigation';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
 
-export type MarketingHeaderVariant = 'landing' | 'content' | 'minimal';
+export type MarketingHeaderVariant =
+  | 'landing'
+  | 'content'
+  | 'minimal'
+  | 'homepage';
 export interface MarketingHeaderNavLink {
   readonly href: string;
   readonly label: string;
@@ -45,7 +49,9 @@ export function MarketingHeader({
       logoSize={logoSize}
       authMode='public-static'
       hideNav={variant === 'minimal'}
-      minimalAuth={variant === 'minimal'}
+      minimalAuth={variant === 'minimal' || variant === 'homepage'}
+      minimalAuthVariant={variant === 'homepage' ? 'pill' : 'link'}
+      includePublicLoginInMobileNav={variant !== 'homepage'}
       containerSize='homepage'
       navLinks={resolvedNavLinks}
     />

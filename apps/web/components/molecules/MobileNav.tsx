@@ -46,7 +46,8 @@ const GRABBER_STYLE: React.CSSProperties = {
 
 function buildNavLinks(
   customNavLinks: ReadonlyArray<NavLink> | undefined,
-  showAuthenticatedAction: boolean
+  showAuthenticatedAction: boolean,
+  includePublicLogin: boolean
 ): NavLink[] {
   let baseLinks: NavLink[];
   if (customNavLinks) {
@@ -55,7 +56,7 @@ function buildNavLinks(
     baseLinks = [];
   }
 
-  if (!showAuthenticatedAction) {
+  if (!showAuthenticatedAction && includePublicLogin) {
     baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
   }
 
@@ -97,8 +98,10 @@ function MobileNavCta({
 
 export function MobileNav({
   navLinks: customNavLinks,
+  includePublicLogin = true,
 }: {
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
+  readonly includePublicLogin?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -139,7 +142,11 @@ export function MobileNav({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, close]);
 
-  const navLinks = buildNavLinks(customNavLinks, showAuthenticatedAction);
+  const navLinks = buildNavLinks(
+    customNavLinks,
+    showAuthenticatedAction,
+    includePublicLogin
+  );
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document === 'undefined' ? null : document.body;

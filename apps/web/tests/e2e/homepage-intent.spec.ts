@@ -13,11 +13,11 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await setupClerkTestingToken({ page });
     await page.goto('/');
 
-    const input = page.getByPlaceholder('Message...');
+    const input = page.getByPlaceholder('Ask Jovie...');
     await expect(input).toBeVisible();
 
-    await page.getByRole('button', { name: 'Create release page' }).click();
-    await expect(input).toHaveValue('Create a release page for ');
+    await page.getByRole('button', { name: 'Plan a release' }).click();
+    await expect(input).toHaveValue('Plan a release for ');
 
     await input.pressSequentially('my new EP');
     await input.press('Enter');
@@ -49,8 +49,8 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     );
     expect(stored).not.toBeNull();
     expect(stored.source).toBe('homepage');
-    expect(stored.finalPrompt).toBe('Create a release page for my new EP');
-    expect(stored.pillId).toBe('create_release_page');
+    expect(stored.finalPrompt).toBe('Plan a release for my new EP');
+    expect(stored.pillId).toBe('plan_a_release');
     expect(stored.experimentId).toBe('homepage_intent_pills_v1');
     expect(typeof stored.id).toBe('string');
     expect(typeof stored.expiresAt).toBe('number');
@@ -60,7 +60,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
   test('free-form submit stores intent with pillId=null', async ({ page }) => {
     await setupClerkTestingToken({ page });
     await page.goto('/');
-    const input = page.getByPlaceholder('Message...');
+    const input = page.getByPlaceholder('Ask Jovie...');
     await input.pressSequentially('something completely custom');
     await input.press('Enter');
 
@@ -85,8 +85,10 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await page.goto('/');
 
     // Tab A prompt (simulated inline — same origin, same localStorage).
-    await page.getByPlaceholder('Message...').pressSequentially('release page');
-    await page.getByPlaceholder('Message...').press('Enter');
+    await page
+      .getByPlaceholder('Ask Jovie...')
+      .pressSequentially('release page');
+    await page.getByPlaceholder('Ask Jovie...').press('Enter');
     await page.waitForURL(/\/signup/);
     const tabAUrl = new URL(page.url());
     const tabARedirect = new URL(
@@ -97,8 +99,8 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
 
     // Go back to home and submit a second, different prompt.
     await page.goto('/');
-    await page.getByPlaceholder('Message...').pressSequentially('album art');
-    await page.getByPlaceholder('Message...').press('Enter');
+    await page.getByPlaceholder('Ask Jovie...').pressSequentially('album art');
+    await page.getByPlaceholder('Ask Jovie...').press('Enter');
     await page.waitForURL(/\/signup/);
     const tabBUrl = new URL(page.url());
     const tabBRedirect = new URL(
@@ -122,8 +124,8 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await setupClerkTestingToken({ page });
     await page.goto('/');
     const longPrompt = 'a'.repeat(300);
-    await page.getByPlaceholder('Message...').pressSequentially(longPrompt);
-    await page.getByPlaceholder('Message...').press('Enter');
+    await page.getByPlaceholder('Ask Jovie...').pressSequentially(longPrompt);
+    await page.getByPlaceholder('Ask Jovie...').press('Enter');
     await page.waitForURL(/\/signup/);
 
     const stored = await page.evaluate(key => {
@@ -183,9 +185,9 @@ test.describe('Homepage chat intake — ID-keyed intent store + viewport-split a
     await page.goto('/');
 
     const pills = page.getByRole('button', {
-      name: /Create release page|Generate album art|Generate playlist pitch|Plan a release/,
+      name: /Plan a release|Generate album art|Pitch playlists|Build artist profile|Analyze momentum/,
     });
-    await expect(pills).toHaveCount(4);
+    await expect(pills).toHaveCount(5);
 
     const tops = await pills.evaluateAll(els =>
       els.map(el => el.getBoundingClientRect().top)

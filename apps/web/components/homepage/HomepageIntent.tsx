@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  ArrowRight,
-  Bell,
-  Calendar,
-  FileText,
-  type LucideIcon,
-  Send,
-  Sparkles,
-  UserCircle,
-} from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -20,21 +11,11 @@ import {
   HOMEPAGE_INTENT_EXPERIMENT_ID,
   HOMEPAGE_INTENT_VARIANT_ID,
   type HomepagePill,
-  type HomepagePillId,
   PILLS,
 } from './intent';
 import { createHomepageIntent, persistHomepageIntent } from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
-
-const PILL_ICONS: Record<HomepagePillId, LucideIcon> = {
-  create_release_page: FileText,
-  generate_album_art: Sparkles,
-  generate_playlist_pitch: Send,
-  plan_a_release: Calendar,
-  build_artist_profile: UserCircle,
-  setup_fan_notifications: Bell,
-};
 
 /**
  * Viewport gate: desktop (≥768px) gets an intercepted modal via `router.push`;
@@ -185,14 +166,14 @@ export function HomepageIntent() {
       >
         {HERO_COPY.headline}
       </h1>
-      <p className='homepage-hero-subhead mt-5 max-w-[620px] self-center text-center text-[18px] leading-[1.45] tracking-[-0.01em] text-white/85'>
+      <p className='homepage-hero-subhead mt-5 max-w-[700px] self-center text-center text-[17px] leading-[1.55] tracking-[-0.015em] text-white/72 sm:text-[18px]'>
         {HERO_COPY.subhead}
       </p>
 
       <label htmlFor={INPUT_ID} className='sr-only'>
-        Message Jovie
+        Ask Jovie
       </label>
-      <div className='relative mt-7 flex w-full max-w-[640px] items-center'>
+      <div className='relative mt-8 flex w-full max-w-[720px] items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -201,8 +182,8 @@ export function HomepageIntent() {
           value={value}
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder='Message...'
-          className='h-[52px] w-full rounded-full border border-white/[0.06] bg-[var(--color-bg-surface-1)] pl-6 pr-14 text-[15px] tracking-[-0.005em] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-quaternary-token placeholder:tracking-[-0.005em] hover:border-white/[0.18] focus-visible:border-white/[0.32] focus-visible:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_0_0_3px_rgba(255,255,255,0.06),0_1px_3px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]'
+          placeholder='Ask Jovie...'
+          className='h-[58px] w-full rounded-full border border-white/[0.1] bg-[linear-gradient(180deg,rgba(22,24,30,0.96)_0%,rgba(13,14,18,0.98)_100%)] pl-6 pr-[4.5rem] text-[15px] tracking-[-0.01em] text-white shadow-[0_18px_48px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.07)] outline-none transition-[border-color,box-shadow,transform] duration-150 placeholder:text-white/34 hover:border-white/[0.16] focus-visible:border-white/[0.24] focus-visible:shadow-[0_20px_60px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.04)]'
         />
         <button
           type='button'
@@ -210,43 +191,35 @@ export function HomepageIntent() {
           aria-disabled={!canSubmit}
           onClick={submit}
           className={[
-            'absolute right-[6px] inline-flex h-10 w-10 items-center justify-center rounded-full transition-all duration-150',
+            'absolute right-[8px] inline-flex h-11 w-11 items-center justify-center rounded-full transition-all duration-150',
             canSubmit
-              ? 'bg-white text-black shadow-[0_1px_2px_rgba(0,0,0,0.4)] hover:bg-white/95 active:scale-95'
-              : 'bg-white/[0.04] text-quaternary-token pointer-events-none opacity-60',
+              ? 'bg-white text-black shadow-[0_10px_24px_rgba(0,0,0,0.24)] hover:bg-white/94 active:scale-[0.97]'
+              : 'bg-white/[0.05] text-white/32 pointer-events-none opacity-70',
           ].join(' ')}
         >
-          <ArrowRight className='h-[18px] w-[18px]' strokeWidth={2.25} />
+          <ArrowUp className='h-[18px] w-[18px]' strokeWidth={2.4} />
         </button>
       </div>
 
       <div
-        className='mt-4 flex w-full min-w-0 max-w-[640px] items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        className='mt-4 flex w-full min-w-0 max-w-[760px] items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
         style={{
           WebkitMaskImage:
-            'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',
+            'linear-gradient(to right, transparent 0, black 36px, black calc(100% - 36px), transparent 100%)',
           maskImage:
-            'linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%)',
+            'linear-gradient(to right, transparent 0, black 36px, black calc(100% - 36px), transparent 100%)',
         }}
       >
-        {PILLS.map(pill => {
-          const Icon = PILL_ICONS[pill.id];
-          return (
-            <button
-              key={pill.id}
-              type='button'
-              onClick={() => handlePillClick(pill)}
-              className='group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.05] bg-[var(--color-bg-surface-1)] px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-secondary-token shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.18] hover:bg-[var(--color-bg-surface-2)] hover:text-primary-token focus-visible:border-white/[0.32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/10 active:translate-y-0'
-            >
-              <Icon
-                className='h-[14px] w-[14px] text-quaternary-token transition-colors duration-150 group-hover:text-secondary-token'
-                strokeWidth={1.75}
-                aria-hidden='true'
-              />
-              {pill.label}
-            </button>
-          );
-        })}
+        {PILLS.map(pill => (
+          <button
+            key={pill.id}
+            type='button'
+            onClick={() => handlePillClick(pill)}
+            className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2 text-[13px] font-medium tracking-[-0.012em] text-white/66 transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white/88 focus-visible:border-white/[0.2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8 active:translate-y-0'
+          >
+            {pill.label}
+          </button>
+        ))}
       </div>
     </div>
   );
