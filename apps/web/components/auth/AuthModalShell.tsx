@@ -88,9 +88,9 @@ export function AuthModalShell({
       ref={dialogRef}
       aria-label={ariaLabel}
       onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-[440px] overflow-auto rounded-2xl border border-white/[0.08] bg-[var(--color-bg-surface-3,#2a2c32)] p-6 text-primary-token shadow-[0_5px_50px_rgba(0,0,0,0.5),0_4px_30px_rgba(0,0,0,0.4)] backdrop:bg-black/60 backdrop:backdrop-blur-sm'
+      className='jovie-auth-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-fit max-h-[calc(100svh-48px)] w-[calc(100%-32px)] max-w-[400px] overflow-auto rounded-2xl border border-white/[0.08] bg-[var(--color-bg-surface-3,#2a2c32)] p-5 text-primary-token shadow-[0_5px_50px_rgba(0,0,0,0.5),0_4px_30px_rgba(0,0,0,0.4)] backdrop:bg-black/60 backdrop:backdrop-blur-sm'
     >
-      <div className='mb-4 flex items-start justify-between gap-4'>
+      <div className='mb-2 flex items-center'>
         <button
           type='button'
           onClick={dismiss}
@@ -99,8 +99,12 @@ export function AuthModalShell({
         >
           <ArrowLeft className='h-4 w-4' strokeWidth={2} aria-hidden='true' />
         </button>
-        {statusRow ?? null}
       </div>
+      {statusRow ? (
+        <div className='mb-3 px-1 text-center text-[12px] leading-[1.4] text-tertiary-token'>
+          {statusRow}
+        </div>
+      ) : null}
       {children}
     </dialog>
   );

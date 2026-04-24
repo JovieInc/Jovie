@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.172] - 2026-04-23
+
+> The intercepted signup modal no longer blows out to the full viewport when the intent hint is short. The dialog now hugs its content, centers cleanly, and the Clerk form sits flush inside our modal chrome instead of stacking a second card inside a card.
+
+### Fixed
+
+- `apps/web/components/auth/AuthModalShell.tsx` — swapped `fixed inset-0 m-auto h-auto` for explicit `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-fit`, which was the root cause of the dialog stretching to full viewport height. Tightened to `max-w-[400px]` / `p-5`, and moved the `statusRow` out of the header flex into a centered single-line row beneath the back arrow so the "Continuing with…" hint no longer gets truncated mid-phrase.
+- `apps/web/app/@auth/(.)signup/page.tsx` — simplified the `statusRow` to a truncating `<p>`; placement now lives in the shell.
+- `apps/web/styles/theme.css` — scoped a `.jovie-auth-modal` override so Clerk's `.cl-card` renders flush inside the dialog (no nested border/background/shadow/backdrop-filter/padding) and hides any `[data-clerk-captcha]` / `#clerk-captcha` spacer that would otherwise force dialog height.
+
 ## [26.4.171] - 2026-04-23
 
 > Main deploys stop starving when merge-queue bursts stack up. Only the commit that is still `main` HEAD at gate time deploys, intermediates skip cleanly, and mid-flight cancellations now page Slack instead of silently reporting success.
