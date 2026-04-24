@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
@@ -11,19 +10,6 @@ export function AuthBrandPanel({
   variant = 'page',
 }: Readonly<AuthBrandPanelProps>) {
   const showCopy = variant === 'page';
-
-  const showcaseAsset = {
-    src: '/product-screenshots/releases-dashboard-full.png',
-    alt: 'Jovie releases workspace showing artist releases, links, and audience context in one view',
-    width: 2880,
-    height: 1800,
-    aspectRatio: variant === 'image-only' ? '1 / 1.12' : '1 / 1.48',
-    sizes: '(min-width: 1280px) 620px, (min-width: 1024px) 46vw, 100vw',
-    imageClassName:
-      variant === 'image-only'
-        ? 'object-cover object-[22%_top] brightness-[1.05] contrast-[1.03]'
-        : 'object-cover object-[24%_top] brightness-[1.05] contrast-[1.03]',
-  } as const;
 
   return (
     <div
@@ -47,19 +33,22 @@ export function AuthBrandPanel({
       ) : null}
 
       <div className='auth-showcase-frame w-full'>
-        <div
-          className='auth-showcase-screen'
-          style={{ aspectRatio: showcaseAsset.aspectRatio }}
-        >
-          <Image
-            src={showcaseAsset.src}
-            alt={showcaseAsset.alt}
-            width={showcaseAsset.width}
-            height={showcaseAsset.height}
-            priority
-            sizes={showcaseAsset.sizes}
-            className={`h-full w-full ${showcaseAsset.imageClassName}`}
-          />
+        <div className='auth-showcase-story'>
+          <div className='space-y-3'>
+            <p className='auth-showcase-kicker'>Release cleanly.</p>
+            <p className='auth-showcase-body'>
+              Keep every link, profile, and announcement aligned from one quiet
+              workspace.
+            </p>
+          </div>
+
+          <div className='space-y-3 border-t border-white/[0.08] pt-6'>
+            <p className='auth-showcase-kicker'>Keep momentum warm.</p>
+            <p className='auth-showcase-body'>
+              Stay ready for the next drop without rebuilding the whole system
+              each time.
+            </p>
+          </div>
         </div>
       </div>
 

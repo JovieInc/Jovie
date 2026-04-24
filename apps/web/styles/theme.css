@@ -81,15 +81,15 @@
 
 .auth-showcase-frame::before {
   position: absolute;
-  inset: auto 5% -2.6rem 22%;
-  height: 8rem;
+  inset: auto 8% -2.8rem 18%;
+  height: 10rem;
   border-radius: 9999px;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.03),
-    rgba(113, 112, 255, 0.16)
+    rgba(255, 255, 255, 0.025),
+    rgba(113, 112, 255, 0.18)
   );
-  filter: blur(72px);
+  filter: blur(82px);
   content: "";
 }
 
@@ -100,21 +100,33 @@
   padding: 1.75rem 1.75rem 0;
 }
 
-.auth-showcase-screen {
+.auth-showcase-story {
   position: relative;
+  z-index: 1;
+  display: flex;
   width: 100%;
-  overflow: hidden;
-  background: rgba(5, 6, 8, 0.78);
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  padding: 1.5rem 1.75rem 1.75rem;
 }
 
-.auth-showcase-screen::after {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 14%),
-    linear-gradient(0deg, rgba(4, 5, 7, 0.5), transparent 34%);
-  content: "";
-  pointer-events: none;
+.auth-showcase-kicker {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(1.55rem, 2vw, 1.9rem);
+  line-height: 1;
+  font-weight: 580;
+  letter-spacing: -0.05em;
+}
+
+.auth-showcase-body {
+  max-width: 17rem;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  font-weight: 420;
+  letter-spacing: -0.012em;
+  text-wrap: pretty;
 }
 
 .auth-showcase-panel[data-variant="page"],
@@ -124,27 +136,12 @@
 
 .auth-showcase-panel[data-variant="page"] .auth-showcase-frame,
 .auth-showcase-panel[data-variant="image-only"] .auth-showcase-frame {
-  width: calc(100% - 0.1rem);
-  margin-top: 0.45rem;
-  margin-left: auto;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
-.auth-showcase-panel[data-variant="page"] .auth-showcase-screen,
-.auth-showcase-panel[data-variant="image-only"] .auth-showcase-screen {
-  border-radius: 1.2rem 0 0 0;
-}
-
-.auth-showcase-panel[data-variant="page"] .auth-showcase-screen img,
-.auth-showcase-panel[data-variant="image-only"] .auth-showcase-screen img {
-  transform: none;
-}
-
-.auth-showcase-panel[data-variant="image-only"] .auth-showcase-frame {
-  margin-top: auto;
-}
-
-.auth-showcase-panel[data-variant="image-only"] .auth-showcase-screen {
-  border-top-left-radius: 1.35rem;
+.auth-showcase-panel[data-variant="image-only"] .auth-showcase-story {
+  padding-top: 0;
 }
 
 @media (min-width: 1024px) {
@@ -154,6 +151,10 @@
 
   .auth-mobile-only {
     display: none !important;
+  }
+
+  .auth-showcase-story {
+    padding: 1.75rem 1.9rem 1.9rem;
   }
 }
 
