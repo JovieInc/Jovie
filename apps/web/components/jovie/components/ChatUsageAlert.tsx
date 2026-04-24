@@ -29,7 +29,7 @@ export function ChatUsageAlert() {
       <InfoBox
         title="You're out of messages for today"
         variant='error'
-        className='rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
+        className='mb-2 rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
       >
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <p>
@@ -57,7 +57,7 @@ export function ChatUsageAlert() {
     <InfoBox
       title="You're almost out of messages"
       variant='warning'
-      className='rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
+      className='mb-2 rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
     >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <p>
