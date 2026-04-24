@@ -82,34 +82,34 @@ jobs:
 
             DESTINATION="$(
               DESTINATIONS="$LAST_DESTINATIONS" python3 <<'PY'
-              import os
-              import re
+import os
+import re
 
-              destinations = os.environ.get("DESTINATIONS", "")
-              preferred = []
-              fallback = []
+destinations = os.environ.get("DESTINATIONS", "")
+preferred = []
+fallback = []
 
-              for line in destinations.splitlines():
-                  if "platform:iOS Simulator" not in line:
-                      continue
-                  if "name:Any iOS Simulator Device" in line:
-                      continue
+for line in destinations.splitlines():
+    if "platform:iOS Simulator" not in line:
+        continue
+    if "name:Any iOS Simulator Device" in line:
+        continue
 
-                  id_match = re.search(r"id:([^,}]+)", line)
-                  if id_match is None:
-                      continue
+    id_match = re.search(r"id:([^,}]+)", line)
+    if id_match is None:
+        continue
 
-                  os_match = re.search(r"OS:([^,}]+)", line)
-                  destination = f"platform=iOS Simulator,id={id_match.group(1).strip()}"
-                  os_version = os_match.group(1).strip() if os_match is not None else ""
+    os_match = re.search(r"OS:([^,}]+)", line)
+    destination = f"platform=iOS Simulator,id={id_match.group(1).strip()}"
+    os_version = os_match.group(1).strip() if os_match is not None else ""
 
-                  if os_version.startswith("18."):
-                      preferred.append(destination)
-                  else:
-                      fallback.append(destination)
+    if os_version.startswith("18."):
+        preferred.append(destination)
+    else:
+        fallback.append(destination)
 
-              print((preferred or fallback or [""])[0], end="")
-              PY
+print((preferred or fallback or [""])[0], end="")
+PY
             )"
 
             if [[ -n "$DESTINATION" ]]; then
@@ -128,44 +128,44 @@ jobs:
           if [[ -z "$DESTINATION" ]]; then
             DESTINATION="$(
               python3 <<'PY'
-              import json
-              import subprocess
+import json
+import subprocess
 
-              try:
-                  raw = subprocess.check_output(
-                      ["xcrun", "simctl", "list", "devices", "available", "-j"],
-                      text=True,
-                  )
-              except Exception:
-                  print("", end="")
-                  raise SystemExit(0)
+try:
+    raw = subprocess.check_output(
+        ["xcrun", "simctl", "list", "devices", "available", "-j"],
+        text=True,
+    )
+except Exception:
+    print("", end="")
+    raise SystemExit(0)
 
-              devices_by_runtime = json.loads(raw).get("devices", {})
-              preferred = []
-              fallback = []
+devices_by_runtime = json.loads(raw).get("devices", {})
+preferred = []
+fallback = []
 
-              for runtime, devices in devices_by_runtime.items():
-                  if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
-                      continue
+for runtime, devices in devices_by_runtime.items():
+    if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
+        continue
 
-                  for device in devices:
-                      if not device.get("isAvailable"):
-                          continue
-                      if "iPhone" not in device.get("name", ""):
-                          continue
+    for device in devices:
+        if not device.get("isAvailable"):
+            continue
+        if "iPhone" not in device.get("name", ""):
+            continue
 
-                      udid = device.get("udid")
-                      if not udid:
-                          continue
+        udid = device.get("udid")
+        if not udid:
+            continue
 
-                      destination = f"platform=iOS Simulator,id={udid}"
-                      if ".iOS-18" in runtime:
-                          preferred.append(destination)
-                      else:
-                          fallback.append(destination)
+        destination = f"platform=iOS Simulator,id={udid}"
+        if ".iOS-18" in runtime:
+            preferred.append(destination)
+        else:
+            fallback.append(destination)
 
-              print((preferred or fallback or [""])[0], end="")
-              PY
+print((preferred or fallback or [""])[0], end="")
+PY
             )"
           fi
 
