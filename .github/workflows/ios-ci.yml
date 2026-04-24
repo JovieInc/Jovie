@@ -31,6 +31,32 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Ensure iOS local configuration exists
+        run: |
+          python3 <<'PY'
+          import os
+          import plistlib
+          from pathlib import Path
+
+          target = Path("apps/ios/Jovie/Configuration.local.plist")
+          if target.exists():
+              raise SystemExit(0)
+
+          target.parent.mkdir(parents=True, exist_ok=True)
+          payload = {
+              # UI tests default to non-live launch modes in CI, so a placeholder
+              # publishable key is sufficient to satisfy app bundle resources.
+              "ClerkPublishableKey": os.environ.get(
+                  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_test_ci_placeholder"
+              ),
+              "ApiBaseUrl": "http://localhost:3100",
+              "WebBaseUrl": "https://jov.ie",
+          }
+
+          with target.open("wb") as file_handle:
+              plistlib.dump(payload, file_handle, sort_keys=False)
+          PY
+
       - name: Show Xcode version
         run: xcodebuild -version
 
