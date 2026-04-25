@@ -147,6 +147,7 @@ The example above says one thing three times. Jovie should say it once.
 - Long helper paragraphs inside cards when a short label or one sentence would do
 - Multiple nested surfaces whose only job is to create the feeling of "designed"
 - Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
+- Hover motion that makes panels, buttons, screenshots, or cards jump, lift, or slide for no functional reason
 - **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Use accent color on title text only.
 - **Gold colors in brand/CTA expression** — banned. Avoid prestige-signaling metallic tones for identity or primary actions. (Feature accent orange/amber for Pro tier is a distinct, permitted use.)
 - **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are for feature differentiation only.
@@ -158,6 +159,7 @@ The example above says one thing three times. Jovie should say it once.
 - Linear is the baseline: small text, tight vertical rhythm, restrained emphasis, and very selective use of borders
 - Hierarchy should come primarily from layout and typography, not from uppercase text or extra boxes
 - If a section still reads clearly after removing its border or eyebrow label, that simpler version is usually the right one
+- Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
 ---

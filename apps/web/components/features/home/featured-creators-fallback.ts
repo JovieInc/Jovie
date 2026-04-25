@@ -8,18 +8,6 @@ const FALLBACK_CREATOR_DATA = [
     tagline: 'The Deep End',
     src: TIM_WHITE_PROFILE.avatarSrc,
   },
-  {
-    handle: 'david-guetta',
-    name: 'David Guetta',
-    tagline: 'Release workflow',
-    src: '/images/avatars/music-maker.jpg',
-  },
-  {
-    handle: 'kaskade',
-    name: 'Kaskade',
-    tagline: 'Live profile',
-    src: '/images/avatars/music-maker.jpg',
-  },
 ] as const;
 
 export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_CREATOR_DATA.map(
@@ -36,8 +24,9 @@ export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_CREATOR_DATA.map(
 );
 
 /**
- * Fill gaps with fallback avatars up to a custom minimum.
- * Used by SeeItInActionSafe which only needs 3 creators.
+ * Fill gaps with the available real fallback avatars toward a target minimum.
+ * This may still return fewer than `minimum` when we do not have enough
+ * canonical fallback creators to pad the set honestly.
  */
 export function fillToMinimum(
   creators: FeaturedCreator[],

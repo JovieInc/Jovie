@@ -93,80 +93,75 @@ export const HOMEPAGE_V2_NAV_LINKS = [
 
 export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   seo: {
-    title: 'Jovie | Make Every Release Feel Bigger.',
+    title: 'Jovie | Your AI Artist Manager.',
     description:
-      'Artist profiles, smart links, fan capture, and reactivation built as one release system for artists.',
+      'Plan releases, create assets, pitch playlists, and keep every drop moving from one AI workspace for artists.',
   },
   hero: {
-    headline: 'Make every release feel bigger.',
+    headline: 'Your AI Artist Manager.',
     subhead:
-      'Artist profiles, smart links, fan capture, and reactivation built as one quiet system for the fans already paying attention.',
-    primaryCtaLabel: 'Get started',
-    secondaryCtaLabel: 'Explore artist profiles',
+      'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.',
+    primaryCtaLabel: 'Start Free',
+    secondaryCtaLabel: 'Explore Artist Profiles',
     microproof: 'Start free. 14-day Pro trial. No credit card required.',
   },
   systemOverview: {
-    headline: 'One system for the whole release cycle.',
-    subhead:
-      'Profiles, release surfaces, smart linking, and audience intelligence built to move attention toward action.',
+    headline: 'What Jovie Handles for You.',
+    subhead: 'Plan the release, make the assets, and keep follow-up moving.',
     cards: [
       {
-        title: 'Artist Profiles',
-        body: 'One adaptive profile for listening, shows, support, capture, and follow-through.',
-        ctaLabel: 'See Artist Profiles',
-        href: APP_ROUTES.ARTIST_PROFILES,
+        title: 'Plan the Release.',
+        body: 'Keep timing, routing, and launch decisions in one place.',
       },
       {
-        title: 'Release Pages',
-        body: 'Launch pages for drops, pre-save windows, countdowns, and release-day routing.',
-        status: 'Preview',
+        title: 'Create the Assets.',
+        body: 'Build the art and copy without bouncing between tools.',
       },
       {
-        title: 'Audience & Growth',
-        body: 'Capture who showed up, understand intent, and bring the right fans back automatically.',
-        ctaLabel: 'See audience features',
-        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+        title: 'Keep Momentum Warm.',
+        body: 'Stay ready for the next song, show, or ask.',
       },
     ],
   },
   spotlight: {
-    headline: 'Artist profiles built to convert.',
-    body: 'Every profile is designed to move the next tap toward a stream, a ticket, a follow, or an opt-in.',
+    headline: 'One Link.\nAlways In Sync.',
+    body: 'Release, ticket, and CTA stay aligned without rebuilding the page.',
     ctaLabel: 'Explore Artist Profiles',
     href: APP_ROUTES.ARTIST_PROFILES,
   },
   captureReactivation: {
-    headline: 'Capture every fan. Send them every release automatically.',
-    body: 'Turn anonymous taps, QR scans, and support into people you can reach again when the next release or nearby show matters.',
-    captureLabel: 'Capture',
+    headline: 'Build the List Once.\nKeep It Working.',
+    body: 'Set up the growth loop once. Jovie keeps each release, ticket, or ask moving after that.',
+    captureLabel: 'Build the List',
     captureBody:
-      'Give every visit a clean opt-in path without making the page feel like a form.',
-    reactivateLabel: 'Reactivate',
+      'Turn profile traffic into a durable audience instead of starting from zero every drop.',
+    reactivateLabel: 'Always-On Follow-Up',
     reactivateBody:
-      'Send the right fans back to the right release or ticket page without turning yourself into a campaign manager.',
-    ctaLabel: 'See how it works',
-    href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+      'Each release, ticket, or ask reaches the right people without rebuilding the campaign.',
+    ctaLabel: 'See Artist Notifications',
+    href: APP_ROUTES.ARTIST_NOTIFICATIONS,
   },
   powerGrid: {
-    headline: 'Built for artists, by artists.',
-    subhead: "Jovie's built to help artists release faster.",
+    headline: 'What Jovie Keeps in Sync.',
+    subhead:
+      'Routing, audience signal, and release context stay ready without another pile of tools.',
   },
   socialProof: {
     headline: 'Real artists. Real workflows.',
     body: 'Real release behavior, not generic creator proof.',
   },
   pricing: {
-    headline: 'Pricing.',
-    body: 'Start free. Upgrade when you want notifications, deeper analytics, and fan reactivation.',
+    headline: 'Simple Pricing.',
+    body: 'One plan. 14-day free trial.',
     supportLine: '14-day Pro trial. No credit card required.',
-    ctaLabel: 'View pricing',
+    ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,
   },
   finalCta: {
-    headline: "Don't lose the next fan.",
-    body: 'One system for profiles, releases, audience capture, and return visits.',
-    primaryCtaLabel: 'Get started',
-    secondaryCtaLabel: 'View pricing',
+    headline: 'Start With the Next Drop.',
+    body: 'Jovie handles the plan, assets, and follow-up from there.',
+    primaryCtaLabel: 'Start Free',
+    secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [
     {
@@ -191,7 +186,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
       title: 'Account',
       links: [
         { href: APP_ROUTES.SIGNIN, label: 'Log in' },
-        { href: APP_ROUTES.SIGNUP, label: 'Get started' },
+        { href: APP_ROUTES.SIGNUP, label: 'Start Free' },
       ],
     },
   ],

@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import type { LogoVariant } from '@/components/atoms/Logo';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -27,6 +28,7 @@ const STAGED_NAV_PATHS = new Set<string>([
 export interface MarketingHeaderProps
   extends Readonly<{
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
     readonly variant?: MarketingHeaderVariant;
   }> {}
@@ -36,6 +38,7 @@ export interface MarketingHeaderProps
  */
 export function MarketingHeader({
   logoSize = 'xs',
+  logoVariant = 'word',
   navLinks,
   variant = 'landing',
 }: MarketingHeaderProps) {
@@ -47,12 +50,14 @@ export function MarketingHeader({
   return (
     <HeaderNav
       logoSize={logoSize}
+      logoVariant={logoVariant}
       authMode='public-static'
       hideNav={variant === 'minimal'}
       minimalAuth={variant === 'minimal' || variant === 'homepage'}
       minimalAuthVariant={variant === 'homepage' ? 'pill' : 'link'}
       includePublicLoginInMobileNav={variant !== 'homepage'}
       containerSize='homepage'
+      presentation={variant === 'homepage' ? 'homepage-embedded' : 'default'}
       navLinks={resolvedNavLinks}
     />
   );

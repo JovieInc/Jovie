@@ -48,7 +48,9 @@ describe('HomepageIntent', () => {
   it('1. renders headline, subhead, input, and the refreshed pill set', () => {
     render(<HomepageIntent />);
     expect(
-      screen.getByRole('heading', { name: 'Your AI Artist Manager.' })
+      screen.getByRole('heading', {
+        name: 'Release more music with less work.',
+      })
     ).toBeTruthy();
     expect(
       screen.getByText(

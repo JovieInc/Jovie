@@ -82,6 +82,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** When a human calls out visual slop in marketing UI, convert that correction into a shared repo rule immediately. Do not rely on remembering the preference for one file. If the correction is "remove eyebrows," "remove cards," or "stop adding extra copy," update the shared guidance and then delete the source of that pattern from the shared components and copy contracts.
 
+### Premium homepage heroes cannot hide proof below the fold
+**Mistake:** The homepage refit treated the hero like a self-contained `100vh` card and then stacked the trust strip underneath it, which made the first screen feel empty and pushed the proof band out of the opening composition.
+
+**Rule:** On premium marketing homepages, the first viewport must read as one poster-like composition. Do not use a full-height hero shell that forces the first proof element below the fold, and do not solve premium art direction with inset hero cards or extra chrome.
+
 ---
 
 ## Email Personalization
@@ -110,6 +115,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 **Mistake:** Agents produced generic AI-looking product UI with uppercase eyebrow labels, long explanatory copy, and bordered cards used as the main hierarchy device. The result felt cheap and off-brand instead of Linear-inspired and premium.
 
 **Rule:** For Jovie product UI, default to small type, normal Title Case labels, restrained emphasis, and minimal chrome. Do not use uppercase labels or extra borders as the default way to make something feel designed. Solve hierarchy with spacing, typography, and surface contrast first.
+
+### Hover polish must stay visual, not positional
+
+**Mistake:** Auth polish reintroduced lift-on-hover motion for CTAs and Clerk buttons. The UI looked more like generic template chrome than a controlled Jovie surface, and the layout appeared to jump for no product reason.
+
+**Rule:** Default hover feedback to background, border, text-color, opacity, or shadow changes. Do not use translate/scale hover motion on product, auth, or marketing surfaces unless the motion is directly tied to spatial manipulation.
 
 ---
 

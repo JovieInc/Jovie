@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -51,10 +51,13 @@ function buildAuthUrl(intentId: string): string {
 export function HomepageIntent() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const pillRailRef = useRef<HTMLDivElement>(null);
   const editedFiredRef = useRef(false);
   const viewedFiredRef = useRef(false);
   const [value, setValue] = useState('');
   const [activePill, setActivePill] = useState<HomepagePill | null>(null);
+  const [canScrollPillsLeft, setCanScrollPillsLeft] = useState(false);
+  const [canScrollPillsRight, setCanScrollPillsRight] = useState(false);
 
   useEffect(() => {
     if (viewedFiredRef.current) return;
@@ -73,6 +76,38 @@ export function HomepageIntent() {
     }
   }, []);
 
+  const syncPillRailControls = useCallback(() => {
+    const rail = pillRailRef.current;
+    if (!rail) return;
+    const maxScrollLeft = rail.scrollWidth - rail.clientWidth;
+    setCanScrollPillsLeft(rail.scrollLeft > 4);
+    setCanScrollPillsRight(maxScrollLeft - rail.scrollLeft > 4);
+  }, []);
+
+  useEffect(() => {
+    const rail = pillRailRef.current;
+    if (!rail) return;
+
+    const onScroll = () => syncPillRailControls();
+    const frame = globalThis.window.requestAnimationFrame(syncPillRailControls);
+    rail.addEventListener('scroll', onScroll, { passive: true });
+    globalThis.window.addEventListener('resize', onScroll);
+
+    const ResizeObserverCtor = globalThis.ResizeObserver;
+    const resizeObserver =
+      typeof ResizeObserverCtor === 'function'
+        ? new ResizeObserverCtor(() => syncPillRailControls())
+        : null;
+    resizeObserver?.observe(rail);
+
+    return () => {
+      globalThis.window.cancelAnimationFrame(frame);
+      rail.removeEventListener('scroll', onScroll);
+      globalThis.window.removeEventListener('resize', onScroll);
+      resizeObserver?.disconnect();
+    };
+  }, [syncPillRailControls]);
+
   const handlePillClick = useCallback((pill: HomepagePill) => {
     setActivePill(pill);
     setValue(pill.insertedPrompt);
@@ -84,6 +119,19 @@ export function HomepageIntent() {
       input.setSelectionRange(cursor, cursor);
     }
   }, []);
+
+  const scrollPills = useCallback(
+    (direction: -1 | 1) => {
+      const rail = pillRailRef.current;
+      if (!rail) return;
+      rail.scrollBy({
+        left: direction * Math.max(rail.clientWidth * 0.72, 180),
+        behavior: 'smooth',
+      });
+      globalThis.window.requestAnimationFrame(syncPillRailControls);
+    },
+    [syncPillRailControls]
+  );
 
   const handleChange = useCallback(
     (next: string) => {
@@ -186,14 +234,14 @@ export function HomepageIntent() {
       >
         {HERO_COPY.headline}
       </h1>
-      <p className='homepage-hero-subhead mt-5 max-w-[700px] self-center text-center text-[17px] leading-[1.55] tracking-[-0.015em] text-white/72 sm:text-[18px]'>
+      <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
         {HERO_COPY.subhead}
       </p>
 
       <label htmlFor={INPUT_ID} className='sr-only'>
         Ask Jovie
       </label>
-      <div className='relative mt-8 flex w-full max-w-[720px] items-center'>
+      <div className='relative mt-8 flex w-full max-w-[780px] items-center'>
         <input
           ref={inputRef}
           id={INPUT_ID}
@@ -203,7 +251,7 @@ export function HomepageIntent() {
           onChange={e => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder='Ask Jovie...'
-          className='h-[58px] w-full rounded-full border border-white/[0.1] bg-[linear-gradient(180deg,rgba(22,24,30,0.96)_0%,rgba(13,14,18,0.98)_100%)] pl-6 pr-[4.5rem] text-[15px] tracking-[-0.01em] text-white shadow-[0_18px_48px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.07)] outline-none transition-[border-color,box-shadow,transform] duration-150 placeholder:text-white/34 hover:border-white/[0.16] focus-visible:border-white/[0.24] focus-visible:shadow-[0_20px_60px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.04)]'
+          className='h-[62px] w-full rounded-full border border-white/[0.09] bg-[linear-gradient(180deg,rgba(18,20,28,0.9)_0%,rgba(12,13,18,0.94)_100%)] pl-6 pr-[4.85rem] text-[16px] tracking-[-0.016em] text-white shadow-[0_14px_42px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-[border-color,box-shadow,transform] duration-150 placeholder:text-white/26 hover:border-white/[0.13] focus-visible:border-white/[0.18] focus-visible:shadow-[0_16px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_4px_rgba(255,255,255,0.025)] sm:h-[64px]'
         />
         <button
           type='button'
@@ -211,35 +259,59 @@ export function HomepageIntent() {
           aria-disabled={!canSubmit}
           onClick={submit}
           className={[
-            'absolute right-[8px] inline-flex h-11 w-11 items-center justify-center rounded-full transition-all duration-150',
+            'absolute right-[9px] inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-150 sm:h-12 sm:w-12',
             canSubmit
-              ? 'bg-white text-black shadow-[0_10px_24px_rgba(0,0,0,0.24)] hover:bg-white/94 active:scale-[0.97]'
-              : 'bg-white/[0.05] text-white/32 pointer-events-none opacity-70',
+              ? 'border-white/[0.08] bg-white/[0.09] text-white shadow-[0_10px_24px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.12] active:scale-[0.97]'
+              : 'border-white/[0.04] bg-white/[0.04] text-white/28 pointer-events-none opacity-80',
           ].join(' ')}
         >
           <ArrowUp className='h-[18px] w-[18px]' strokeWidth={2.4} />
         </button>
       </div>
 
-      <div
-        className='mt-4 flex w-full min-w-0 max-w-[760px] items-center justify-center gap-2 overflow-x-auto scroll-smooth px-4 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-        style={{
-          WebkitMaskImage:
-            'linear-gradient(to right, transparent 0, black 36px, black calc(100% - 36px), transparent 100%)',
-          maskImage:
-            'linear-gradient(to right, transparent 0, black 36px, black calc(100% - 36px), transparent 100%)',
-        }}
-      >
-        {PILLS.map(pill => (
-          <button
-            key={pill.id}
-            type='button'
-            onClick={() => handlePillClick(pill)}
-            className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2 text-[13px] font-medium tracking-[-0.012em] text-white/66 transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white/88 focus-visible:border-white/[0.2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8 active:translate-y-0'
-          >
-            {pill.label}
-          </button>
-        ))}
+      <div className='relative mt-4 w-full max-w-[888px]'>
+        <button
+          type='button'
+          aria-label='Scroll prompts left'
+          data-testid='homepage-pill-scroll-left'
+          disabled={!canScrollPillsLeft}
+          onClick={() => scrollPills(-1)}
+          className='absolute left-0 top-1/2 z-[1] hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.05] bg-white/[0.025] text-white/56 transition-all duration-150 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white disabled:pointer-events-none disabled:opacity-0 sm:inline-flex'
+        >
+          <ChevronLeft className='h-4 w-4' strokeWidth={1.8} />
+        </button>
+        <div
+          ref={pillRailRef}
+          data-testid='homepage-pill-rail'
+          className='flex w-full min-w-0 items-center justify-start gap-2 overflow-x-auto scroll-smooth px-4 py-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-auto sm:max-w-[804px] sm:px-8 [&::-webkit-scrollbar]:hidden'
+          style={{
+            WebkitMaskImage:
+              'linear-gradient(to right, transparent 0, black 56px, black calc(100% - 56px), transparent 100%)',
+            maskImage:
+              'linear-gradient(to right, transparent 0, black 56px, black calc(100% - 56px), transparent 100%)',
+          }}
+        >
+          {PILLS.map(pill => (
+            <button
+              key={pill.id}
+              type='button'
+              onClick={() => handlePillClick(pill)}
+              className='shrink-0 whitespace-nowrap rounded-full border border-white/[0.05] bg-white/[0.025] px-[15px] py-[8px] text-[12.5px] font-medium tracking-[-0.012em] text-white/62 transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-[0.5px] hover:border-white/[0.1] hover:bg-white/[0.04] hover:text-white/84 focus-visible:border-white/[0.18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/8 active:translate-y-0'
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type='button'
+          aria-label='Scroll prompts right'
+          data-testid='homepage-pill-scroll-right'
+          disabled={!canScrollPillsRight}
+          onClick={() => scrollPills(1)}
+          className='absolute right-0 top-1/2 z-[1] hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.05] bg-white/[0.025] text-white/56 transition-all duration-150 hover:border-white/[0.1] hover:bg-white/[0.05] hover:text-white disabled:pointer-events-none disabled:opacity-0 sm:inline-flex'
+        >
+          <ChevronRight className='h-4 w-4' strokeWidth={1.8} />
+        </button>
       </div>
     </div>
   );
