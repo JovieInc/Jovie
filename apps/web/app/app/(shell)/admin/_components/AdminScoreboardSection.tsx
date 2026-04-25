@@ -41,10 +41,10 @@ interface HeroMetricProps {
 function HeroMetric({ label, value, ariaLabel, subtitle }: HeroMetricProps) {
   return (
     <section aria-label={ariaLabel}>
-      <p className='text-[36px] font-[680] leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
+      <p className='text-[36px] font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
         {value}
       </p>
-      <p className='mt-1.5 text-[13px] font-[450] text-tertiary-token'>
+      <p className='mt-1.5 text-[13px] font-book text-tertiary-token'>
         {label}
       </p>
       {subtitle}
@@ -159,7 +159,7 @@ export async function AdminScoreboardSection() {
           ariaLabel={`Week over week growth: ${wowGrowth.label}`}
           subtitle={
             <p
-              className={`mt-0.5 text-[13px] font-[450] ${wowGrowth.className}`}
+              className={`mt-0.5 text-[13px] font-book ${wowGrowth.className}`}
             >
               {wowGrowth.label === '\u2014' ? '' : 'vs. prior week'}
             </p>
