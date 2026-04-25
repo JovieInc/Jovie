@@ -73,4 +73,32 @@ describe('FilterChip', () => {
     );
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
   });
+
+  it('does not allow callers to override aria-pressed via rest props', () => {
+    const hostileProps = { 'aria-pressed': false } as Record<string, unknown>;
+    render(
+      <FilterChip pressed={true} onClick={vi.fn()} {...hostileProps}>
+        Label
+      </FilterChip>
+    );
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('forwards arbitrary button attributes (disabled, tabIndex, aria-describedby)', () => {
+    render(
+      <FilterChip
+        pressed={false}
+        onClick={vi.fn()}
+        disabled
+        tabIndex={-1}
+        aria-describedby='help-text'
+      >
+        Label
+      </FilterChip>
+    );
+    const btn = screen.getByRole('button');
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('tabindex', '-1');
+    expect(btn).toHaveAttribute('aria-describedby', 'help-text');
+  });
 });

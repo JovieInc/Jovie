@@ -374,7 +374,7 @@ export function ReleaseFilterDropdown({
                       }
                     }}
                   >
-                    <DropdownMenuSubTrigger className='justify-between rounded-[6px]'>
+                    <DropdownMenuSubTrigger className='justify-between rounded-md'>
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
@@ -382,7 +382,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-[6px] bg-(--linear-accent-subtle) px-1.5 py-0.5 text-3xs font-[510] text-(--linear-accent)'>
+                          <span className='rounded-md bg-(--linear-accent-subtle) px-1.5 py-0.5 text-3xs font-caption text-(--linear-accent)'>
                             {labelFilterCount}
                           </span>
                         )}
@@ -429,7 +429,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='rounded-[6px] text-tertiary-token hover:text-primary-token'
+                  className='rounded-md text-tertiary-token hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

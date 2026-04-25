@@ -411,7 +411,7 @@ jobs:
 
   assign_to_codex:
     name: Assign issue to Codex in Linear
-    needs: guard
+    needs: [guard, wait_for_coderabbit_plan]
     if: needs.guard.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -446,6 +446,40 @@ jobs:
                   query: "mutation AssignIssue($issueId: String!, $assigneeId: String!) { issueUpdate(id: $issueId, input: { assigneeId: $assigneeId }) { success } }",
                   variables: { issueId: $issueId, assigneeId: $assigneeId }
                 }')" > /dev/null
+          fi
+
+          # Transition issue to In Progress so other agents see it's in flight
+          # (collision-avoidance signal — see AGENTS.md "Linear Ownership Contract").
+          # Mirrors the pattern used by sync_linear_in_review below.
+          ISSUE_STATES=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -cn --arg issueId "$ISSUE_ID" '{
+              query: "query IssueStateTargets($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }",
+              variables: { issueId: $issueId }
+            }')")
+
+          IN_PROGRESS_STATE_ID=$(echo "$ISSUE_STATES" | jq -r '
+            .data.issue.team.states.nodes
+            | map(select(.type == "started" and ((.name // "") | ascii_downcase | test("^in[- ]progress$"))))
+            | .[0].id // empty
+          ')
+
+          if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg stateId "$IN_PROGRESS_STATE_ID" \
+                '{
+                  query: "mutation SetIssueInProgress($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
+                  variables: { issueId: $issueId, stateId: $stateId }
+                }')" > /dev/null
+          else
+            echo "No explicit In Progress state found on team; refusing to guess from started states."
+            echo "$ISSUE_STATES" | jq -r '.data.issue.team.states.nodes[] | "- \(.name) (\(.type))"'
+            exit 1
           fi
 
           curl -sS https://api.linear.app/graphql \

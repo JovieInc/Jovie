@@ -40,9 +40,9 @@ export function AnalyticsCard({
       iconClassName={iconClassName ?? 'text-accent-token'}
       headerRight={headerRight}
       headerClassName='gap-2'
-      labelClassName='text-[13px] text-secondary-token tracking-[-0.01em]'
-      valueClassName='text-3xl font-[590] tracking-[-0.022em]'
-      subtitleClassName='text-[13px] text-tertiary-token'
+      labelClassName='text-app text-secondary-token tracking-[-0.01em]'
+      valueClassName='text-3xl font-semibold tracking-[-0.022em]'
+      subtitleClassName='text-app text-tertiary-token'
       aria-label={`${title} metric`}
     />
   );

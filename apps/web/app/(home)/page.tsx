@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
@@ -11,6 +12,7 @@ import {
   HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
   buildOrganizationSchema,
@@ -153,26 +155,45 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <section className='homepage-hero-flood relative flex min-h-[100svh] flex-col overflow-hidden text-primary-token'>
+      <section className='homepage-hero-stage relative px-3 pb-5 pt-[calc(var(--linear-header-height)+12px)] sm:px-4 lg:px-6'>
         <div
-          aria-hidden='true'
-          className='homepage-hero-flood__layer homepage-hero-flood__base'
-        />
-        <div
-          aria-hidden='true'
-          className='homepage-hero-flood__layer homepage-hero-flood__glow'
-        />
+          data-testid='homepage-hero-shell'
+          className='homepage-hero-shell relative mx-auto flex min-h-[calc(100svh-var(--linear-header-height)-1rem)] w-full max-w-[1440px] flex-col overflow-hidden rounded-[32px] border border-white/[0.08] text-primary-token shadow-[0_48px_120px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)]'
+        >
+          <div
+            aria-hidden='true'
+            className='homepage-hero-shell__layer homepage-hero-shell__base'
+          />
+          <div
+            aria-hidden='true'
+            className='homepage-hero-shell__layer homepage-hero-shell__halo'
+          />
+          <div
+            aria-hidden='true'
+            className='homepage-hero-shell__layer homepage-hero-shell__beam'
+          />
+          <div aria-hidden='true' className='homepage-hero-shell__grid-wrap'>
+            <div className='homepage-hero-shell__grid' />
+          </div>
 
-        <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-4 pb-0'>
-          <div className='w-full min-w-0 max-w-[720px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
-            <HomepageIntent />
+          <div className='relative z-[2] flex min-w-0 flex-1 items-center justify-center px-5 pb-20 pt-20 sm:px-8 sm:pb-24 sm:pt-24 lg:px-12 lg:pb-28 lg:pt-28'>
+            <div className='w-full min-w-0 max-w-[860px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
+              <HomepageIntent />
+            </div>
           </div>
         </div>
       </section>
 
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_TRUST ? (
-        <HomeTrustSection label='Accelerating release cycles for artists on' />
-      ) : null}
+      <HomeTrustSection
+        label='Trusted by artists'
+        className='homepage-trust-reveal'
+      />
+
+      <ArtistProfileOutcomeDuo
+        headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
+        duo={ARTIST_PROFILE_COPY.outcomeDuo}
+      />
+
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
         <HomepageV2SystemOverview />
       ) : null}

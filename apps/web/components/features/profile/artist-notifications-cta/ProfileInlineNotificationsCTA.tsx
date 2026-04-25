@@ -159,7 +159,7 @@ function BirthdayInput({
   const isHero = tone === 'hero';
   const className = isHero
     ? `${subscriptionHeroInputClassName} text-left px-3`
-    : 'h-12 w-full rounded-full bg-transparent px-3 text-left text-mid font-[590] tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0';
+    : 'h-12 w-full rounded-full bg-transparent px-3 text-left text-mid font-semibold tracking-[-0.02em] text-primary-token placeholder:text-tertiary-token placeholder:opacity-70 focus-visible:outline-none focus-visible:ring-0';
 
   return (
     <input
@@ -1003,7 +1003,7 @@ export function ProfileInlineNotificationsCTA({
                 className='h-4 w-4 shrink-0 text-green-400'
                 aria-hidden='true'
               />
-              <span className='text-[14px] font-[560] tracking-[-0.015em] text-white/88'>
+              <span className='text-sm font-semibold tracking-[-0.015em] text-white/88'>
                 {isHero ? "You're on the list" : 'Notifications on'}
               </span>
             </button>

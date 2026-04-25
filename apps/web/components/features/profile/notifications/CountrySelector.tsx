@@ -91,7 +91,7 @@ const CountryOptionButton = memo(function CountryOptionButton({
     <button
       type='button'
       onClick={handleClick}
-      className={`flex w-full items-center gap-3 rounded-[var(--radius-2xl)] px-3 py-2 text-[13px] font-[590] leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
+      className={`flex w-full items-center gap-3 rounded-[var(--radius-2xl)] px-3 py-2 text-app font-semibold leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
         isSelected
           ? 'border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg-active)] text-primary-token'
           : 'text-primary-token hover:bg-[var(--profile-pearl-bg)]'
@@ -132,7 +132,7 @@ export function CountrySelector({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='flex h-12 items-center gap-1.5 rounded-full px-3 text-mid font-[590] tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
+          className='flex h-12 items-center gap-1.5 rounded-full px-3 text-mid font-semibold tracking-[-0.015em] text-primary-token transition-colors hover:text-primary-token focus-visible:outline-none'
           style={FONT_SYNTHESIS_STYLE}
           aria-label='Select country code'
         >

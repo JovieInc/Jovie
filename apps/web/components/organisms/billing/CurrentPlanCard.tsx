@@ -45,14 +45,14 @@ export function CurrentPlanCard({
             </div>
             <div className='min-w-0'>
               <div className='flex flex-wrap items-center gap-2'>
-                <h2 className='text-[15px] font-[590] tracking-[-0.018em] text-primary-token'>
+                <h2 className='text-[15px] font-semibold tracking-[-0.018em] text-primary-token'>
                   {planName} Plan
                 </h2>
                 <Badge variant={isPro ? 'success' : 'warning'} size='sm'>
                   {isPro ? 'Active' : 'Limited'}
                 </Badge>
               </div>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+              <p className='mt-1 text-app leading-[18px] text-secondary-token'>
                 {isPro
                   ? 'Full access to release notifications, deeper analytics, and fan growth tools.'
                   : 'Upgrade to unlock release notifications, advanced analytics, and more.'}

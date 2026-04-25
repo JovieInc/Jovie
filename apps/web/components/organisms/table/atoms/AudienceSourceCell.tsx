@@ -124,7 +124,11 @@ export function AudienceSourceCell({
 
   return (
     <SimpleTooltip content={sourceLabel} side='top'>
-      <div className={cn('flex items-center justify-center w-8', className)}>
+      <div
+        className={cn('flex items-center justify-end', className)}
+        role='img'
+        aria-label={sourceLabel}
+      >
         {icon}
       </div>
     </SimpleTooltip>

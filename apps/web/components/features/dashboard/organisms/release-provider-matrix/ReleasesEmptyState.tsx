@@ -30,7 +30,7 @@ export function ReleasesEmptyState({
           <Icon name='Sparkles' className='h-4 w-4 text-tertiary-token' />
         </div>
         <div className='mb-2.5 h-4.5 w-4.5 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
-        <h3 className='text-app font-[510] text-primary-token'>
+        <h3 className='text-app font-caption text-primary-token'>
           Finding your music...
         </h3>
         <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
@@ -52,7 +52,7 @@ export function ReleasesEmptyState({
         <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon name='Disc3' className='h-4 w-4 text-tertiary-token' />
         </div>
-        <h3 className='text-app font-[510] text-primary-token'>
+        <h3 className='text-app font-caption text-primary-token'>
           We found some of your music
         </h3>
         <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
@@ -63,7 +63,7 @@ export function ReleasesEmptyState({
           <DrawerButton
             tone='secondary'
             onClick={onRetryEnrichment}
-            className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+            className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
           >
             Try again
           </DrawerButton>
@@ -83,7 +83,7 @@ export function ReleasesEmptyState({
         <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
           <Icon name='SearchX' className='h-4 w-4 text-tertiary-token' />
         </div>
-        <h3 className='text-app font-[510] text-primary-token'>
+        <h3 className='text-app font-caption text-primary-token'>
           We had trouble finding your music
         </h3>
         <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
@@ -94,7 +94,7 @@ export function ReleasesEmptyState({
           <DrawerButton
             tone='primary'
             onClick={onRetryEnrichment}
-            className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+            className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
           >
             Try again
           </DrawerButton>
@@ -113,7 +113,7 @@ export function ReleasesEmptyState({
       <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
         <Icon name='Disc3' className='h-4 w-4 text-tertiary-token' />
       </div>
-      <h3 className='text-app font-[510] text-primary-token'>
+      <h3 className='text-app font-caption text-primary-token'>
         Connect Spotify
       </h3>
       <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
@@ -122,7 +122,7 @@ export function ReleasesEmptyState({
       <DrawerButton
         tone='primary'
         onClick={onConnectSpotify}
-        className='mt-3 h-7 rounded-[8px] px-2.5 text-2xs'
+        className='mt-3 h-7 rounded-lg px-2.5 text-2xs'
       >
         Connect Spotify
       </DrawerButton>

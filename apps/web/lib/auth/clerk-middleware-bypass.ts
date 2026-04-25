@@ -32,6 +32,7 @@ const AUTHENTICATED_API_PREFIXES = [
   '/api/dashboard',
   '/api/dsp',
   '/api/images',
+  '/api/mobile',
   '/api/metadata-submissions',
   '/api/onboarding',
   '/api/pre-save',
@@ -39,6 +40,7 @@ const AUTHENTICATED_API_PREFIXES = [
   '/api/referrals',
   '/api/stripe',
   '/api/suggestions',
+  '/api/waitlist',
 ] as const;
 
 const PUBLIC_API_EXACT_PATHS = [
@@ -48,7 +50,16 @@ const PUBLIC_API_EXACT_PATHS = [
 
 const PUBLIC_API_PREFIXES = ['/api/dev/test-auth/'] as const;
 
-function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
+/**
+ * Public — returns true when the path absolutely requires Clerk middleware to
+ * have populated request context before route handlers run. Used both for the
+ * per-request bypass decision AND for the cold-start "Clerk config missing"
+ * fallback in proxy.ts, so those two code paths can't diverge.
+ */
+export function isClerkRequiredPath(
+  pathname: string,
+  pathInfo: ClerkBypassPathInfo
+) {
   if (
     pathInfo.isProtectedPath ||
     pathInfo.isAuthPath ||

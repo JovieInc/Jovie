@@ -53,7 +53,7 @@ function DateBox({ date }: { readonly date: string }) {
   }).format(parsedDate);
 
   return (
-    <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-[12px] border border-white/6'>
+    <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-white/6'>
       <span className='text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-white/44'>
         {monthLabel}
       </span>

@@ -46,7 +46,7 @@ interface AvailabilityCellProps {
 function AvailabilityEmptyAction() {
   return (
     <div className='flex min-w-[140px] justify-end'>
-      <div className='h-7 w-[76px] rounded-[8px] border border-dashed border-subtle bg-surface-1' />
+      <div className='h-7 w-[76px] rounded-lg border border-dashed border-subtle bg-surface-1' />
     </div>
   );
 }
@@ -244,13 +244,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
+        className='w-[320px] rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-xs font-caption tracking-[-0.01em] text-primary-token'>
             Platform Availability
           </p>
-          <p className='text-[11px] text-secondary-token'>
+          <p className='text-2xs text-secondary-token'>
             {availableCount} of {totalCount} platforms linked
           </p>
         </div>
@@ -410,7 +410,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         onClick={() => setAddingProvider(providerKey)}
                         tone='secondary'
                         size='sm'
-                        className='min-w-[76px] rounded-full text-[11px] font-caption'
+                        className='min-w-[76px] rounded-full text-2xs font-caption'
                       >
                         + Add link
                       </DrawerButton>
@@ -426,7 +426,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
         {validationError && (
           <div className='min-h-[28px] border-t border-(--linear-app-frame-seam) px-3 py-1.5'>
-            <p className='text-[11px] text-error'>{validationError}</p>
+            <p className='text-2xs text-error'>{validationError}</p>
           </div>
         )}
       </PopoverContent>

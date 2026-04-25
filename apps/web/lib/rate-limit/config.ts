@@ -567,6 +567,23 @@ export const RATE_LIMITERS = {
     prefix: 'account:export',
     analytics: true,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Verification Operations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verification request: 3 requests per day per user.
+   * CRITICAL: each success fans out to a Slack webhook; spam protection for the
+   * internal Slack channel and the external webhook quota.
+   */
+  verificationRequest: {
+    name: 'Verification Request',
+    limit: 3,
+    window: '1 d',
+    prefix: 'verification:request',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

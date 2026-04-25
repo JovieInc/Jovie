@@ -68,7 +68,7 @@ function AnimatedHint({ hint }: { readonly hint: string | null }) {
         transform: visible ? 'translateY(0)' : 'translateY(-10px)',
         display: 'block',
       }}
-      className='rounded-lg border border-amber-300/40 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
+      className='rounded-lg border border-amber-300/40 bg-amber-50 px-3 py-2 text-app text-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
       aria-live='polite'
     >
       {displayHint}
@@ -244,7 +244,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
 
       {/* Prompt text when sidebar is open */}
       {sidebarOpen && (
-        <p className='text-[13px] text-secondary-token'>
+        <p className='text-app text-secondary-token'>
           What other profiles do you have?
         </p>
       )}

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 
 interface EnrichmentInput {
   profileId: string;
@@ -38,6 +39,19 @@ export async function applyProfileEnrichment(
   }
 
   if (Object.keys(updates).length === 0) return;
+
+  if (updates.avatarUrl) {
+    const [profile] = await tx
+      .select({ theme: creatorProfiles.theme })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, input.profileId))
+      .limit(1);
+
+    updates.theme = await buildThemeWithProfileAccent({
+      existingTheme: profile?.theme,
+      sourceUrl: updates.avatarUrl,
+    });
+  }
 
   updates.updatedAt = new Date();
 

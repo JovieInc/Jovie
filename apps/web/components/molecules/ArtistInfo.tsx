@@ -43,8 +43,8 @@ export function ArtistInfo({
     subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
   const subtitleClassName =
     resolvedSubtitle === DEFAULT_PROFILE_TAGLINE
-      ? 'text-[12px] font-[560] leading-none tracking-[-0.01em] text-tertiary-token'
-      : 'text-[13px] sm:text-[15px] font-[520] leading-[1.32] tracking-[-0.02em] text-secondary-token line-clamp-2';
+      ? 'text-[12px] font-semibold leading-none tracking-[-0.01em] text-tertiary-token'
+      : 'text-app sm:text-[15px] font-[520] leading-[1.32] tracking-[-0.02em] text-secondary-token line-clamp-2';
 
   const avatarSizeMap = {
     sm: { mobile: 'lg', desktop: 'display-sm' },

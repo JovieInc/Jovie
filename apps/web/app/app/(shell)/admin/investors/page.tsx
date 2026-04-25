@@ -137,13 +137,13 @@ async function InvestorTable() {
         <table className='w-full min-w-[760px] border-collapse text-[13px]'>
           <thead className='bg-surface-0'>
             <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
-              <th className='px-4 py-2.5 font-[560]'>Label</th>
-              <th className='px-4 py-2.5 font-[560]'>Investor</th>
-              <th className='px-4 py-2.5 font-[560]'>Stage</th>
-              <th className='px-4 py-2.5 font-[560]'>Score</th>
-              <th className='px-4 py-2.5 font-[560]'>Views</th>
-              <th className='px-4 py-2.5 font-[560]'>Last viewed</th>
-              <th className='px-4 py-2.5 font-[560]'>Status</th>
+              <th className='px-4 py-2.5 font-semibold'>Label</th>
+              <th className='px-4 py-2.5 font-semibold'>Investor</th>
+              <th className='px-4 py-2.5 font-semibold'>Stage</th>
+              <th className='px-4 py-2.5 font-semibold'>Score</th>
+              <th className='px-4 py-2.5 font-semibold'>Views</th>
+              <th className='px-4 py-2.5 font-semibold'>Last viewed</th>
+              <th className='px-4 py-2.5 font-semibold'>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -154,7 +154,7 @@ async function InvestorTable() {
               >
                 <td className='px-4 py-3 align-middle'>
                   <div className='flex min-w-0 flex-col'>
-                    <span className='truncate font-[560] text-primary-token'>
+                    <span className='truncate font-semibold text-primary-token'>
                       {link.label}
                     </span>
                     <TokenDisplay token={link.token} />
@@ -230,7 +230,7 @@ function ScoreBadge({ score }: Readonly<{ score: number }>) {
   return (
     <span
       className={cn(
-        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-[12px] font-[590] tabular-nums',
+        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-[12px] font-semibold tabular-nums',
         toneClassName
       )}
     >
@@ -276,7 +276,7 @@ function SummaryCard({
   return (
     <ContentSurfaceCard surface='nested' className='p-3.5'>
       <p className='text-[11px] text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-[14px] font-[560] tracking-[-0.016em] text-primary-token'>
+      <p className='mt-1 text-[14px] font-semibold tracking-[-0.016em] text-primary-token'>
         {value}
       </p>
       <p className='mt-1 text-[12px] leading-[18px] text-secondary-token'>

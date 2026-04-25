@@ -43,7 +43,7 @@ type LinkItemMenuItem = {
 };
 
 const SWIPE_ACTION_CLASS =
-  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-[510] transition-colors active:opacity-80';
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-caption transition-colors active:opacity-80';
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
   readonly id: string;
@@ -194,7 +194,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             <button
               type='button'
               className={cn(
-                'flex h-11 w-11 cursor-grab items-center justify-center rounded-[6px] sm:h-8 sm:w-8',
+                'flex h-11 w-11 cursor-grab items-center justify-center rounded-md sm:h-8 sm:w-8',
                 'text-tertiary-token transition-colors',
                 'hover:text-secondary-token active:cursor-grabbing active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
@@ -208,7 +208,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Platform icon - larger on mobile */}
           <div
-            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] sm:h-10 sm:w-10 sm:rounded-[8px]'
+            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] sm:h-10 sm:w-10 sm:rounded-lg'
             style={{
               backgroundColor: brandColor,
               color: getContrastTextOnBrand(brandColor),
@@ -222,11 +222,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Content */}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-[13px] font-[510] text-primary-token'>
+            <div className='truncate text-app font-caption text-primary-token'>
               {resolvedLabel}
             </div>
             {secondaryText && (
-              <div className='truncate text-[13px] text-secondary-token'>
+              <div className='truncate text-app text-secondary-token'>
                 {secondaryText}
               </div>
             )}
@@ -238,7 +238,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             aria-label={`Open actions for ${resolvedLabel}`}
             ref={floatingRefs.setReference}
             className={cn(
-              'inline-flex h-11 w-11 items-center justify-center rounded-[6px] sm:h-9 sm:w-9 sm:rounded-[8px]',
+              'inline-flex h-11 w-11 items-center justify-center rounded-md sm:h-9 sm:w-9 sm:rounded-lg',
               'text-secondary-token transition-colors',
               'hover:bg-surface-1 hover:text-primary-token',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',

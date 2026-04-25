@@ -23,7 +23,7 @@ export function SocialLinkSuggestionRows({
 
   return (
     <div className='space-y-2'>
-      <p className='text-[13px] font-[510] text-secondary-token'>
+      <p className='text-app font-caption text-secondary-token'>
         Detected profiles
       </p>
       <div className='rounded-lg border border-accent/20 bg-accent/5 divide-y divide-accent/10'>
@@ -41,7 +41,7 @@ export function SocialLinkSuggestionRows({
                 aria-hidden
               />
               <div className='min-w-0 flex-1'>
-                <p className='text-[13px] font-[510] text-primary-token truncate'>
+                <p className='text-app font-caption text-primary-token truncate'>
                   {suggestion.platformLabel}
                 </p>
                 <p className='text-xs text-tertiary-token truncate'>
@@ -56,7 +56,7 @@ export function SocialLinkSuggestionRows({
                   onClick={() => onConfirm(suggestion)}
                   disabled={isActioning}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-1 text-[13px] font-[510] rounded-md',
+                    'inline-flex items-center gap-1 px-2 py-1 text-app font-caption rounded-md',
                     'bg-accent text-accent-foreground hover:bg-accent/90',
                     'disabled:opacity-50 transition-colors'
                   )}

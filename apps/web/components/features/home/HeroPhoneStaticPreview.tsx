@@ -29,7 +29,7 @@ export function HeroPhoneStaticPreview() {
             </div>
           </div>
           <div className='mt-2.5 text-center'>
-            <p className='text-xl font-[590] text-primary-token sm:text-2xl'>
+            <p className='text-xl font-semibold text-primary-token sm:text-2xl'>
               <span className='inline-flex items-center justify-center gap-1'>
                 <span>{ARTIST.name}</span>
                 <VerifiedBadge className='shrink-0 text-accent' size='sm' />

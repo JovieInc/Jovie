@@ -417,7 +417,7 @@ function ConnectedDspListContent({
       <div className='space-y-3 px-4 py-3'>
         <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
           <div className='space-y-1'>
-            <p className='text-app font-[510] tracking-[-0.01em] text-primary-token'>
+            <p className='text-app font-caption tracking-[-0.01em] text-primary-token'>
               Primary platforms
             </p>
             <p className='text-app leading-[18px] text-secondary-token'>
@@ -442,7 +442,7 @@ function ConnectedDspListContent({
         {nonPrimaryMatches.length > 0 ? (
           <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
             <div className='space-y-1'>
-              <p className='text-app font-[510] tracking-[-0.01em] text-primary-token'>
+              <p className='text-app font-caption tracking-[-0.01em] text-primary-token'>
                 Other platforms
               </p>
               <p className='text-app leading-[18px] text-secondary-token'>

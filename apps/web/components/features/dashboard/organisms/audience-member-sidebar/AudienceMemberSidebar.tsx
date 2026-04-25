@@ -68,7 +68,7 @@ function AudienceMemberEntityHeader({
           title={primaryLabel}
           subtitle={secondaryLabel}
           meta={
-            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
               {member.locationLabel ? (
                 <span className='inline-flex items-center gap-1'>
                   <MapPin className='h-3 w-3' />
@@ -81,7 +81,7 @@ function AudienceMemberEntityHeader({
             </div>
           }
           image={
-            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-[14px] font-[590] text-secondary-token'>
+            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
               {primaryLabel.charAt(0).toUpperCase()}
             </div>
           }

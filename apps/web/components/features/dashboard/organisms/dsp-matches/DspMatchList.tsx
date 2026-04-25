@@ -95,7 +95,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
       >
         <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
-          <span className='text-[13px] font-[510]'>Failed to load matches</span>
+          <span className='text-app font-caption'>Failed to load matches</span>
         </div>
         <p className='mt-1 text-xs text-red-600/80 dark:text-red-400/80'>
           {error instanceof Error ? error.message : 'Unknown error'}
@@ -123,7 +123,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
                 <span className='inline-flex items-center gap-1.5'>
                   <span>{filter.label}</span>
                   {count > 0 && (
-                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs text-secondary-token tabular-nums'>
+                    <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs text-secondary-token tabular-nums'>
                       {count}
                     </span>
                   )}
@@ -149,8 +149,8 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
                   <div className='h-3 w-24 rounded skeleton' />
                 </div>
                 <div className='space-y-1'>
-                  <div className='h-5 w-16 rounded-[6px] skeleton' />
-                  <div className='h-5 w-12 rounded-[6px] skeleton' />
+                  <div className='h-5 w-16 rounded-md skeleton' />
+                  <div className='h-5 w-12 rounded-md skeleton' />
                 </div>
               </div>
             </ContentSurfaceCard>

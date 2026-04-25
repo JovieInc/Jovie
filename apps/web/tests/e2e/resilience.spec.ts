@@ -436,7 +436,7 @@ test.describe('MusicFetch enrichment chaos', () => {
       }
     });
 
-    await gotoWithRetry(page, APP_ROUTES.DASHBOARD_OVERVIEW, {
+    await gotoWithRetry(page, APP_ROUTES.LEGACY_DASHBOARD, {
       waitUntil: 'domcontentloaded',
       timeout: 90_000,
     });

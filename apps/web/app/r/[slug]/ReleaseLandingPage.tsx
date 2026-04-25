@@ -260,11 +260,10 @@ export function ReleaseLandingPage({
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
-  const sharePathname = artist.handle
-    ? `/${artist.handle}/${shareSlug}`
-    : tracking?.smartLinkSlug
-      ? `/r/${tracking.smartLinkSlug}`
-      : undefined;
+  let sharePathname: string | undefined;
+  if (artist.handle) sharePathname = `/${artist.handle}/${shareSlug}`;
+  else if (tracking?.smartLinkSlug)
+    sharePathname = `/r/${tracking.smartLinkSlug}`;
   const shareContext = useMemo(
     () =>
       buildReleaseShareContext({
@@ -345,7 +344,7 @@ export function ReleaseLandingPage({
       heroOverlay={
         <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
           <div className='min-w-0 flex-1'>
-            <h1 className='text-[28px] font-[590] leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
+            <h1 className='text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]'>
               {release.title}
             </h1>
             <SmartLinkArtistLine

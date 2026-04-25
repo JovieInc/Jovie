@@ -158,7 +158,7 @@ function ProfileEntityHeader({
         title={primaryLabel}
         subtitle={secondaryLabel}
         meta={
-          <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+          <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
             {detailChips.map(detail => (
               <span key={detail}>{detail}</span>
             ))}
@@ -171,7 +171,7 @@ function ProfileEntityHeader({
             sizeClassName='h-[60px] w-[60px] rounded-[14px]'
             sizes='60px'
             fallback={
-              <span className='text-lg font-[590] text-secondary-token'>
+              <span className='text-lg font-semibold text-secondary-token'>
                 {fallbackLabel}
               </span>
             }
@@ -674,7 +674,7 @@ export function ProfileContactSidebar() {
                 key={i}
                 className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
               >
-                <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
+                <div className='h-8 w-8 shrink-0 rounded-lg skeleton' />
                 <div className='flex-1 h-4 rounded skeleton' />
               </div>
             ))}

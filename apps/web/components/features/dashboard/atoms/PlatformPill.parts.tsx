@@ -41,7 +41,7 @@ export interface PillIconProps {
 export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
   return (
     <span
-      className='flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 p-0.5 transition-colors'
+      className='flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 p-0.5 transition-colors'
       style={style}
       aria-hidden='true'
     >
@@ -121,7 +121,7 @@ export function ExpandedContent({
       </div>
 
       {badgeText ? (
-        <span className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] text-secondary-token'>
+        <span className='shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
           {badgeText}
         </span>
       ) : null}

@@ -218,7 +218,7 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-1 text-[13px] font-[510]', styles.heading)}
+        className={cn('mb-1 text-app font-caption', styles.heading)}
       >
         {heading}
       </h3>
@@ -227,7 +227,7 @@ export function EmptyState({
         <p
           id={descriptionId}
           className={cn(
-            'mb-5 max-w-sm text-[13px] leading-[1.45]',
+            'mb-5 max-w-sm text-app leading-[1.45]',
             styles.description
           )}
         >

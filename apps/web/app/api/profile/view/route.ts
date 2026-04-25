@@ -11,8 +11,34 @@ import { extractClientIP } from '@/lib/utils/ip-extraction';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+/**
+ * Handles are the canonical 3-24 char, lowercase-letters/digits/hyphens slug
+ * used as the primary key for public profiles (see `onboarding.handleSchema`).
+ *
+ * We accept mixed case here for API ergonomics and normalize to lowercase
+ * before any downstream use (Redis key, rate-limit key, DB lookup), but we
+ * reject anything outside the canonical character class to prevent:
+ *   - Redis keyspace pollution via attacker-supplied bytes (`profile:views:${x}`)
+ *   - Per-handle rate-limit key pollution (`${handle}:${ip}`)
+ *   - Wasted DB lookups for handles that can never exist in `usernameNormalized`
+ *
+ * The prior `min(1).max(100)` on `z.string()` allowed arbitrary payloads
+ * (unicode, control chars, injection probes, path traversal) to reach Redis
+ * and the rate limiter.
+ */
+const HANDLE_PATTERN = /^[a-z0-9-]{3,24}$/;
+
 const viewSchema = z.object({
-  handle: z.string().min(1).max(100),
+  handle: z
+    .string()
+    // Cap the input length before the .toLowerCase() transform to avoid
+    // allocating a lowercased copy of an attacker-supplied body at the
+    // framework body-size ceiling (~4 MB). The regex would reject it at
+    // position 25 regardless, but making the cap explicit documents intent
+    // and saves the wasted allocation.
+    .max(24)
+    .transform(value => value.toLowerCase())
+    .pipe(z.string().regex(HANDLE_PATTERN)),
 });
 
 type ViewPayload = z.infer<typeof viewSchema>;

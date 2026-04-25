@@ -248,6 +248,28 @@ git worktree remove ../Jovie-agent-1
 
 No configuration is needed -- Turbo detects worktrees automatically and shares the local cache. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
 
+#### Concurrent Commit Pitfall — `git stash` Races Across Worktrees
+
+`git stash` is **repo-global** — every worktree writes to the same `.git/refs/stash` stack. lint-staged backs up the working tree to a stash before running tasks and pops it on cleanup. When multiple worktrees invoke `git commit` concurrently, their lint-staged runs step on each other's backup stashes.
+
+Symptom (from a parallel swarm of worktree agents):
+
+```
+[STARTED] Cleaning up temporary files...
+[FAILED] lint-staged automatic backup is missing!
+husky - pre-commit script failed (code 1)
+```
+
+Important: the commit itself often **succeeds** before husky errors on cleanup. Check `git log --oneline origin/main..HEAD` before assuming the work was lost and retrying — a blind retry after "failure" is how duplicate commits get introduced.
+
+Mitigations (in priority order):
+
+1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
+2. Before commit, drop stale lint-staged stashes left by prior failed runs: `while git stash list | grep -q "lint-staged automatic backup"; do git stash drop "stash@{0}"; done`. Run this right before the commit, not preemptively.
+3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
+
+**Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.
+
 ### Affected Builds (CI Optimization)
 
 Use `--affected` to run tasks only for packages that changed relative to the base branch:
@@ -562,6 +584,9 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 
 ## Linear Issue Gating
 
+See also: [Linear Ownership Contract](#linear-ownership-contract) below for the
+state-transition rules every agent must follow.
+
 Before working on any Linear issue, check for the `human-review-required` label.
 If present, SKIP the issue entirely. Do not attempt to work on it, close it,
 or add comments. These issues require human decision-making.
@@ -598,6 +623,61 @@ inline `// TODO` comments, PR-body bullet lists, or chat memory to track it.
 
 ---
 
+## Linear Ownership Contract
+
+Every agent working a Linear-tracked task MUST follow this three-state contract.
+Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc sessions).
+Linear state is the shared signal other agents use to see what is in flight —
+if you do not mark your issue In Progress, you invite collisions where two agents
+edit the same files.
+
+### The contract
+
+1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading
+   code or editing files. If the issue is unassigned, assign it to yourself
+   (or the human owner) at the same time. This is the only manual transition.
+2. **On PR open —** behavior depends on how the work was started:
+   - **Orchestrator-dispatched work** (branches created by `linear-ai-orchestrator.yml`): no action required. The `sync_linear_in_review` job auto-transitions the issue to `In Review` when the PR opens.
+   - **Ad-hoc work** (direct agent sessions, manually opened PRs): manually transition the Linear issue to `In Review` when you open the PR. The orchestrator's `sync_linear_in_review` job does NOT run for branches it didn't dispatch.
+   In both cases, preserve the PR body's `<!-- linear-issue-id:... -->` comment and the `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the issue at merge time.
+3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions
+   the issue to `Done` and posts the merge SHA as a comment.
+
+Do NOT manually perform the In Review or Done transitions — you will race the
+workflows and produce confusing state.
+
+### Orchestrator-dispatched work
+
+When the Linear AI orchestrator dispatches work (`linear-ai-orchestrator.yml`
+`assign_to_codex` job), it sets `In Progress` at dispatch time. If your session
+was started by the orchestrator, the transition is already done — skip step 1.
+
+### How to transition
+
+With Linear MCP available (most Claude Code sessions):
+
+```
+# 1. Get the team's state IDs
+mcp__claude_ai_Linear__list_issue_statuses({ team: "<team-id-or-key>" })
+
+# 2. Set the issue to In Progress
+mcp__claude_ai_Linear__save_issue({ id: "<issue-id>", state: "<in-progress-state-id>" })
+```
+
+Without Linear MCP, use the GraphQL API directly (same pattern as
+`.github/workflows/linear-ai-orchestrator.yml` — look up the state where
+`name` matches `/in progress/i`, then call `issueUpdate`).
+
+### No Linear issue (ad-hoc work)
+
+If the user asks you to fix something without a Linear issue, either:
+
+1. Create a Linear issue for it and move it to In Progress, OR
+2. Explicitly state "no Linear issue — ad-hoc" in your first status message so
+   the human knows coordination is manual and other agents won't see this work.
+
+---
+
 ## PR Discipline (Required)
 
 ### Size Limits
@@ -622,6 +702,7 @@ The gstack skill pipeline handles verification. The standard agent workflow is:
 ### One PR = One Concern
 
 - Each PR addresses exactly one Linear issue or one bug fix
+- Mark the Linear issue `In Progress` before you start editing files (see [Linear Ownership Contract](#linear-ownership-contract))
 - No drive-by refactors, no "while I'm here" changes
 - If you find a related issue, create a separate Linear ticket
 

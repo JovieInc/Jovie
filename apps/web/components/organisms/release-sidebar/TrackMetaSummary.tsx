@@ -31,14 +31,14 @@ const VARIANT_STYLES: Record<
 > = {
   compact: {
     container: 'space-y-1',
-    number: 'text-[11px]',
+    number: 'text-2xs',
     title: 'text-[12px]',
-    meta: 'text-[11px]',
+    meta: 'text-2xs',
   },
   drawer: {
     container: 'space-y-1.5',
     number: 'text-[10.5px]',
-    title: 'text-[14px] tracking-[-0.01em]',
+    title: 'text-sm tracking-[-0.01em]',
     meta: 'text-[10.5px]',
   },
 };
@@ -75,7 +75,7 @@ export function TrackMetaSummary({
           </span>
           <h3
             className={cn(
-              'min-w-0 truncate font-[590] text-primary-token',
+              'min-w-0 truncate font-semibold text-primary-token',
               styles.title
             )}
           >
@@ -84,7 +84,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-[9px] font-[510] text-tertiary-token'
+              className='shrink-0 rounded-full bg-surface-1 px-1.5 py-0 text-[9px] font-caption text-tertiary-token'
             >
               E
             </Badge>

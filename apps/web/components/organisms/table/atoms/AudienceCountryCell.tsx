@@ -16,7 +16,7 @@ export function AudienceCountryCell({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-2 text-[13px] text-secondary-token',
+        'inline-flex items-center gap-2 text-app text-secondary-token',
         className
       )}
     >

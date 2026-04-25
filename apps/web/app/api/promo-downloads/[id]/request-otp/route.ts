@@ -21,6 +21,7 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { requestEmailOtp } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
 
@@ -87,8 +88,7 @@ export async function POST(
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
     const country = request.headers.get('x-vercel-ip-country') ?? null;
-    const rawCity = request.headers.get('x-vercel-ip-city');
-    const city = rawCity ? decodeURIComponent(rawCity) : null;
+    const city = decodeCityHeader(request.headers.get('x-vercel-ip-city'));
 
     // Request OTP via shared service
     const result = await requestEmailOtp({

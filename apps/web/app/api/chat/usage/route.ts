@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getEntitlements } from '@/lib/entitlements/registry';
+import {
+  getEntitlements,
+  resolveChatUsagePlan,
+} from '@/lib/entitlements/registry';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import { getRedis } from '@/lib/redis';
@@ -25,16 +28,6 @@ type StaleChatUsageSnapshot = ChatUsageSnapshot & {
 
 const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v1:';
 const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
-
-function resolvePlan(plan: string | null | undefined): 'free' | 'pro' | 'max' {
-  if (plan === 'max' || plan === 'growth') {
-    return 'max';
-  }
-  if (plan === 'pro' || plan === 'founding') {
-    return 'pro';
-  }
-  return 'free';
-}
 
 async function readCachedChatUsage(
   userId: string
@@ -112,7 +105,7 @@ export async function GET() {
     );
   }
 
-  const plan = resolvePlan(billing.data?.plan);
+  const plan = resolveChatUsagePlan(billing.data?.plan);
   const entitlements = getEntitlements(plan);
   const dailyLimit = entitlements.limits.aiDailyMessageLimit;
   const status = aiChatDailyPlanAwareLimiter.getStatus(userId, plan);

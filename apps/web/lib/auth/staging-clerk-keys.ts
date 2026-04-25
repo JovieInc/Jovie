@@ -1,10 +1,7 @@
 import { headers } from 'next/headers';
 import { getRequestLocationFromHeaders } from '@/components/providers/clerkAvailability';
 import { STAGING_HOSTNAMES } from '@/constants/domains';
-import {
-  CLERK_KEY_STATUS_HEADER,
-  type ClerkKeyStatus,
-} from '@/lib/auth/clerk-key-status';
+import type { ClerkKeyStatus } from '@/lib/auth/clerk-key-status';
 import { publicEnv } from '@/lib/env-public';
 
 /**
@@ -104,7 +101,7 @@ export function resolveClerkKeys(hostname: string): ClerkKeys {
   };
 }
 
-export { CLERK_KEY_STATUS_HEADER };
+export { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
 
 /**
  * Resolve the publishable key for dynamic server component layouts.

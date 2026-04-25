@@ -28,6 +28,14 @@ const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/page.tsx'),
   'utf8'
 );
+// Profile loader (cache + error class + TTL) was extracted to its own file
+// so per-mode routes can reuse it; assertions in this suite that look for
+// loader internals search across both sources.
+const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
+  path.join(WEB_ROOT, 'app/[username]/_lib/public-profile-loader.ts'),
+  'utf8'
+);
+const PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE = `${PUBLIC_PROFILE_PAGE_SOURCE}\n${PUBLIC_PROFILE_LOADER_SOURCE}`;
 
 const mockProfile = {
   id: 'profile-123',
@@ -129,6 +137,16 @@ describe('Public Profile Page Logic', () => {
 
     it('delegates claim banner query handling to the client wrapper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
+    });
+  });
+
+  describe('profile accent backfill', () => {
+    it('persists a newly derived accent into the stored theme payload', () => {
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+        'persistDerivedProfileAccent'
+      );
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('jsonb_set(');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain("'{profileAccent}'");
     });
   });
 
@@ -660,16 +678,18 @@ describe('Public Profile Page Logic', () => {
     });
 
     it('carries the first non-ok payload through the unstable_cache throw path', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
         'NonCacheableProfileResultError'
       );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
         'throw new NonCacheableProfileResultError(data)'
       );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
         'if (error instanceof NonCacheableProfileResultError)'
       );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('return error.result');
+      expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).toContain(
+        'return error.result'
+      );
     });
   });
 });

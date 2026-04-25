@@ -74,7 +74,7 @@ export function AudienceIdentificationIndicator({
   const IconComponent = LEVEL_ICONS[level];
 
   return (
-    <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>
+    <div className={cn('flex items-center gap-1.5 text-app', className)}>
       <IconComponent
         className={cn('h-3.5 w-3.5 shrink-0', config.iconClassName)}
         aria-hidden='true'

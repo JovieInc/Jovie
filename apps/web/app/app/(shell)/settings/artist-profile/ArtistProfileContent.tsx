@@ -21,10 +21,10 @@ function MobileProfilePanelTrigger() {
       className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
-        <p className='text-[14px] font-[510] text-primary-token'>
+        <p className='text-sm font-caption text-primary-token'>
           Links, music &amp; more
         </p>
-        <p className='mt-0.5 text-[13px] text-secondary-token'>
+        <p className='mt-0.5 text-app text-secondary-token'>
           Manage social links, music, tips, and about info
         </p>
       </div>
@@ -56,7 +56,7 @@ export function ArtistProfileContent() {
               href={`/${artist.handle}`}
               target='_blank'
               rel='noopener noreferrer'
-              className='inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-xs font-[510] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='inline-flex h-8 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-xs font-caption text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               View as Visitor
               <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />

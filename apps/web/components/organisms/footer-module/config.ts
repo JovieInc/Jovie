@@ -71,7 +71,7 @@ export function getVariantConfigs(
 
 export const FOOTER_LINK_CLASS_NAME = cn(
   'inline-flex h-7 items-center',
-  'text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]',
+  'text-app leading-[19.5px] font-normal tracking-[-0.01em]',
   'transition-colors duration-100',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
 );
@@ -86,7 +86,7 @@ export const FOOTER_LINK_HOVER_CLASS =
 
 // Linear: 13px, weight 510, normal case, line-height 19.5px, tracking -0.01em, mb 24px
 export const SECTION_HEADING_CLASS_NAME =
-  'mb-5 text-[13px] font-semibold leading-[19.5px] tracking-[-0.01em]';
+  'mb-5 text-app font-semibold leading-[19.5px] tracking-[-0.01em]';
 
 // Linear-aligned: headings are PRIMARY (white), links are muted
 export const SECTION_HEADING_STYLE = {

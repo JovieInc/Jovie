@@ -211,7 +211,6 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/artist/theme` | POST | Clerk | Update artist theme |
 | `/api/calendar/[eventId]` | GET | Public | Get calendar event (.ics) |
 | `/api/canvas/generate` | POST | Clerk | Generate share canvas |
-| `/api/capture-tip` | POST | Public | Capture tip payment |
 | `/api/create-tip-intent` | POST | Public | Create Stripe tip intent |
 | `/api/creator` | GET | Clerk | Get current creator profile |
 | `/api/featured-creators` | GET | Public | Featured creators list |

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const loadModal = () =>
   import('./MarketingSignInModal').then(m => ({
@@ -19,7 +20,11 @@ const MarketingSignInModal = dynamic(loadModal, { ssr: false });
  * We prefetch the modal chunk + the Clerk bundle on first hover/focus so
  * the click-to-open delay is near-zero and the skeleton rarely flashes.
  */
-export function MarketingSignInLink() {
+export function MarketingSignInLink({
+  variant = 'ghost',
+}: Readonly<{
+  readonly variant?: 'ghost' | 'pill';
+}>) {
   const [open, setOpen] = useState(false);
   const prefetchedRef = useRef(false);
   const onOpen = useCallback(() => setOpen(true), []);
@@ -38,7 +43,12 @@ export function MarketingSignInLink() {
         onMouseEnter={prefetch}
         onFocus={prefetch}
         onTouchStart={prefetch}
-        className='focus-ring-themed text-[13px] text-white/60 transition-colors duration-150 hover:text-white/90'
+        className={cn(
+          'focus-ring-themed transition-all duration-150',
+          variant === 'pill'
+            ? 'inline-flex h-[34px] items-center justify-center rounded-full border border-white/95 bg-white px-4 text-app font-medium text-black shadow-[0_10px_26px_rgba(0,0,0,0.22)] hover:bg-white/92'
+            : 'text-app text-white/60 hover:text-white/90'
+        )}
       >
         Sign in
       </button>

@@ -30,7 +30,7 @@ function ErrorState({
 }>) {
   return (
     <div className='flex flex-col gap-3 px-4 py-4 sm:px-5'>
-      <p className='text-[13px] leading-[19px] text-secondary-token'>
+      <p className='text-app leading-[19px] text-secondary-token'>
         Could not load your payments summary right now.
       </p>
       <div>

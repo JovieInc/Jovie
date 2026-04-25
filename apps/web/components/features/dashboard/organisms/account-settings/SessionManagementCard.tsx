@@ -148,7 +148,7 @@ export function SessionManagementCard({
             >
               <div className='min-w-0'>
                 <div className='flex flex-wrap items-center gap-1.5'>
-                  <p className='text-app font-[510] text-primary-token'>
+                  <p className='text-app font-caption text-primary-token'>
                     {isCurrent
                       ? 'This device'
                       : activity?.browserName || 'Unknown device'}
@@ -173,7 +173,7 @@ export function SessionManagementCard({
                   size='sm'
                   disabled={endingSessionId === session.id}
                   onClick={() => setSessionToEnd(session)}
-                  className='h-7 shrink-0 rounded-[8px] border border-transparent bg-transparent px-2.5 text-2xs font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
+                  className='h-7 shrink-0 rounded-lg border border-transparent bg-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                 >
                   {endingSessionId === session.id ? 'Ending…' : 'End session'}
                 </Button>

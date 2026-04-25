@@ -18,10 +18,10 @@ export default function SettingsAccountPage() {
         <AccountSettingsSection isGrowth={isGrowth} />
       ) : (
         <div className='py-4 text-center'>
-          <h3 className='mb-3 text-[14px] font-[510] text-primary-token'>
+          <h3 className='mb-3 text-sm font-caption text-primary-token'>
             Account settings unavailable
           </h3>
-          <p className='text-[13px] text-secondary'>
+          <p className='text-app text-secondary'>
             Account management is currently unavailable. Please contact support
             if this issue persists.
           </p>

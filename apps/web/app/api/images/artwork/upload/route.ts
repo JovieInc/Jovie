@@ -31,39 +31,43 @@ async function uploadArtworkSizes(
   put: Awaited<ReturnType<typeof getVercelBlobUploader>>,
   token: string | undefined
 ): Promise<Record<string, string>> {
-  const sizes: Record<string, string> = {};
+  // Upload all sized variants concurrently — each is an independent PUT to
+  // Vercel Blob. Promise.all preserves first-failure-aborts semantics.
+  const entries = await Promise.all(
+    Object.entries(processed).map(async ([sizeKey, buffer]) => {
+      const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
 
-  for (const [sizeKey, buffer] of Object.entries(processed)) {
-    const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
-
-    if (!put || !token) {
-      if (process.env.NODE_ENV === 'production') {
-        throw new TypeError('Blob storage not configured');
+      if (!put || !token) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new TypeError('Blob storage not configured');
+        }
+        return [
+          sizeKey,
+          `https://blob.vercel-storage.com/${blobPath}`,
+        ] as const;
       }
-      sizes[sizeKey] = `https://blob.vercel-storage.com/${blobPath}`;
-      continue;
-    }
 
-    const blob = await withTimeout(
-      put(blobPath, buffer, {
-        access: 'public',
-        token,
-        contentType: AVIF_MIME_TYPE,
-        cacheControlMaxAge: 60 * 60 * 24 * 365,
-        addRandomSuffix: false,
-      }),
-      PROCESSING_TIMEOUT_MS,
-      `Blob upload (${sizeKey})`
-    );
+      const blob = await withTimeout(
+        put(blobPath, buffer, {
+          access: 'public',
+          token,
+          contentType: AVIF_MIME_TYPE,
+          cacheControlMaxAge: 60 * 60 * 24 * 365,
+          addRandomSuffix: false,
+        }),
+        PROCESSING_TIMEOUT_MS,
+        `Blob upload (${sizeKey})`
+      );
 
-    if (!blob.url?.startsWith('https://')) {
-      throw new TypeError('Invalid blob URL returned from storage');
-    }
+      if (!blob.url?.startsWith('https://')) {
+        throw new TypeError('Invalid blob URL returned from storage');
+      }
 
-    sizes[sizeKey] = blob.url;
-  }
+      return [sizeKey, blob.url] as const;
+    })
+  );
 
-  return sizes;
+  return Object.fromEntries(entries);
 }
 
 /**

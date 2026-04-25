@@ -23,13 +23,25 @@ export interface HeaderNavProps {
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly authMode?: 'client' | 'public-static';
   readonly minimalAuth?: boolean;
+  readonly minimalAuthVariant?: 'link' | 'pill';
+  readonly includePublicLoginInMobileNav?: boolean;
 }
 
-type PublicAuthActionsProps = Readonly<{ minimal?: boolean }>;
+type PublicAuthActionsProps = Readonly<{
+  readonly minimal?: boolean;
+  readonly minimalVariant?: 'link' | 'pill';
+}>;
 
-function PublicAuthActions({ minimal = false }: PublicAuthActionsProps = {}) {
+function PublicAuthActions({
+  minimal = false,
+  minimalVariant = 'link',
+}: PublicAuthActionsProps = {}) {
   if (minimal) {
-    return <MarketingSignInLink />;
+    return (
+      <MarketingSignInLink
+        variant={minimalVariant === 'pill' ? 'pill' : 'ghost'}
+      />
+    );
   }
   return (
     <div className='flex items-center gap-1'>
@@ -57,6 +69,8 @@ export function HeaderNav({
   navLinks,
   authMode = 'client',
   minimalAuth = false,
+  minimalAuthVariant = 'link',
+  includePublicLoginInMobileNav = true,
 }: HeaderNavProps = {}) {
   const navLinkClass = 'nav-link-linear focus-ring-themed';
   const hasNavLinks = !hideNav && !!navLinks?.length;
@@ -140,7 +154,10 @@ export function HeaderNav({
           {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
           <div className='flex items-center gap-1'>
             {authMode === 'public-static' ? (
-              <PublicAuthActions minimal={minimalAuth} />
+              <PublicAuthActions
+                minimal={minimalAuth}
+                minimalVariant={minimalAuthVariant}
+              />
             ) : (
               <AuthActions />
             )}
@@ -149,7 +166,10 @@ export function HeaderNav({
           {/* Mobile hamburger menu - shown on small screens only */}
           {hasNavLinks && (
             <div className='flex md:hidden items-center'>
-              <MobileNav navLinks={navLinks} />
+              <MobileNav
+                navLinks={navLinks}
+                includePublicLogin={includePublicLoginInMobileNav}
+              />
             </div>
           )}
         </div>

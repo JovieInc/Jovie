@@ -14,7 +14,7 @@ export function InsightsBadge() {
   if (count === 0) return null;
 
   return (
-    <span className='ml-auto inline-flex min-w-[18px] items-center justify-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-[510] leading-none text-secondary-token tabular-nums'>
+    <span className='ml-auto inline-flex min-w-[18px] items-center justify-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption leading-none text-secondary-token tabular-nums'>
       {count > 99 ? '99+' : count}
     </span>
   );

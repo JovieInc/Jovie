@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-[510] text-tertiary-token'
+          className='group/add h-6.5 min-w-[68px] gap-1 rounded-full px-2 text-2xs font-caption text-tertiary-token'
         >
           <Icon name='Plus' className='h-3.5 w-3.5' aria-hidden='true' />
           <span className='line-clamp-1'>Add</span>
@@ -91,7 +91,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
+        className='w-[280px] rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-popover'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
@@ -99,7 +99,7 @@ export function AddProviderUrlPopover({
       >
         <DrawerSurfaceCard
           variant='card'
-          className='rounded-[12px] border-0 bg-transparent p-2.5'
+          className='rounded-xl border-0 bg-transparent p-2.5'
         >
           <form onSubmit={handleSubmit} className='space-y-2.5'>
             <div className='flex items-center gap-2'>
@@ -108,7 +108,7 @@ export function AddProviderUrlPopover({
                 style={{ backgroundColor: accent }}
                 aria-hidden='true'
               />
-              <span className='text-app font-[510] text-primary-token'>
+              <span className='text-app font-caption text-primary-token'>
                 Add {providerLabel} link
               </span>
             </div>

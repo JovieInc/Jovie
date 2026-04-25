@@ -128,6 +128,11 @@ vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
 
 // Stub DashboardDataContext so it never imports from the barrel.
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+    Consumer: () => null,
+    displayName: 'DashboardDataContext',
+  },
   DashboardDataProvider: ({
     children,
   }: {

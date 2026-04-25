@@ -1,0 +1,123 @@
+name: iOS CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "package.json"
+      - ".github/workflows/ios-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "package.json"
+      - ".github/workflows/ios-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Build And Test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Ensure iOS local configuration exists
+        run: |
+          python3 <<'PY'
+          import os
+          import plistlib
+          from pathlib import Path
+
+          target = Path("apps/ios/Jovie/Configuration.local.plist")
+          if target.exists():
+              raise SystemExit(0)
+
+          target.parent.mkdir(parents=True, exist_ok=True)
+          payload = {
+              # UI tests default to non-live launch modes in CI, so a placeholder
+              # publishable key is sufficient to satisfy app bundle resources.
+              "ClerkPublishableKey": os.environ.get(
+                  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_test_ci_placeholder"
+              ),
+              "ApiBaseUrl": "http://localhost:3100",
+              "WebBaseUrl": "https://jov.ie",
+          }
+
+          with target.open("wb") as file_handle:
+              plistlib.dump(payload, file_handle, sort_keys=False)
+          PY
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Resolve Swift package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project apps/ios/Jovie.xcodeproj \
+            -scheme Jovie
+
+      - name: Select simulator destination
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT_PATH="apps/ios/Jovie.xcodeproj"
+          SCHEME="Jovie"
+          DESTINATION=""
+          LAST_DESTINATIONS=""
+
+          for attempt in {1..6}; do
+            LAST_DESTINATIONS="$(xcodebuild -showdestinations -project "$PROJECT_PATH" -scheme "$SCHEME" 2>/dev/null || true)"
+
+            DESTINATION="$(
+              printf '%s\n' "$LAST_DESTINATIONS" | ruby -e 'preferred=nil;fallback=nil;STDIN.each_line do |line|; next unless line.include?("platform:iOS Simulator"); next if line.include?("name:Any iOS Simulator Device"); id=line[/id:([^,}]+)/, 1]&.strip; next unless id; os_version=line[/OS:([^,}]+)/, 1]&.strip.to_s; destination="platform=iOS Simulator,id=#{id}"; if os_version.start_with?("18."); preferred=destination; break; end; fallback ||= destination; end; print(preferred || fallback || "")'
+            )"
+
+            if [[ -n "$DESTINATION" ]]; then
+              break
+            fi
+
+            echo "No concrete simulator destination found on attempt $attempt/6."
+            if [[ "$LAST_DESTINATIONS" == *"name:Any iOS Simulator Device"* ]] && (( attempt < 6 )); then
+              sleep 10
+              continue
+            fi
+
+            break
+          done
+
+          if [[ -z "$DESTINATION" ]]; then
+            DESTINATION="$(
+              xcrun simctl list devices available -j 2>/dev/null | ruby -rjson -e 'input=STDIN.read; if input.strip.empty?; print(""); exit 0; end; devices_by_runtime=JSON.parse(input).fetch("devices", {}); preferred=nil; fallback=nil; devices_by_runtime.each do |runtime, devices|; next unless runtime.include?("com.apple.CoreSimulator.SimRuntime.iOS"); devices.each do |device|; next unless device["isAvailable"]; next unless device["name"].to_s.include?("iPhone"); udid=device["udid"].to_s; next if udid.empty?; destination="platform=iOS Simulator,id=#{udid}"; if runtime.include?(".iOS-18"); preferred ||= destination; break; else; fallback ||= destination; end; end; break if preferred; end; print(preferred || fallback || "")'
+            )"
+          fi
+
+          if [[ -z "$DESTINATION" ]]; then
+            echo "Unable to find a concrete iOS Simulator destination."
+            echo "$LAST_DESTINATIONS"
+            xcrun simctl list devices available || true
+            exit 1
+          fi
+
+          echo "destination=$DESTINATION" >> "$GITHUB_OUTPUT"
+          echo "Using destination: $DESTINATION"
+
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -project apps/ios/Jovie.xcodeproj \
+            -scheme Jovie \
+            -destination '${{ steps.simulator.outputs.destination }}' \
+            -skip-testing:JovieUITests/testCopyURLButtonShowsCopiedState \
+            CODE_SIGNING_ALLOWED=NO

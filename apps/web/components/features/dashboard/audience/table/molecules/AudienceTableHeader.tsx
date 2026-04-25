@@ -97,7 +97,7 @@ export function AudienceTableHeader({
         headerElevated && 'shadow-inset-divider'
       )}
     >
-      <tr className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+      <tr className='text-app font-caption tracking-normal text-secondary-token'>
         <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
           <Checkbox
             aria-label='Select all'
@@ -174,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

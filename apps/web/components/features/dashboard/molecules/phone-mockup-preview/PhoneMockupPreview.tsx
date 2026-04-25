@@ -72,7 +72,7 @@ export function PhoneMockupPreview({
                   />
                 ) : (
                   <div className='w-full h-full flex items-center justify-center bg-surface-2'>
-                    <span className='text-2xl font-[590] text-primary-token'>
+                    <span className='text-2xl font-semibold text-primary-token'>
                       {username.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -82,7 +82,7 @@ export function PhoneMockupPreview({
               {/* Username */}
               <h1
                 className={cn(
-                  'text-xl font-[590] text-white text-center',
+                  'text-xl font-semibold text-white text-center',
                   'transition-all duration-300',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
@@ -173,7 +173,7 @@ export function PhoneMockupPreview({
                       </div>
 
                       <div className='min-w-0 flex-1'>
-                        <h3 className='truncate text-app font-[510] text-primary-token'>
+                        <h3 className='truncate text-app font-caption text-primary-token'>
                           {link.title || getPlatformName(link.platform)}
                         </h3>
                         <p className='truncate text-app text-secondary-token'>
@@ -208,7 +208,7 @@ export function PhoneMockupPreview({
                       aria-hidden='true'
                     />
                   </div>
-                  <h3 className='mb-1 text-app font-[510] text-primary-token'>
+                  <h3 className='mb-1 text-app font-caption text-primary-token'>
                     No links yet
                   </h3>
                   <p className='text-app text-secondary-token'>

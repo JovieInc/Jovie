@@ -18,28 +18,25 @@ describe('homepage intent constants', () => {
 
   it('PILLS exposes the intake pills in order', () => {
     expect(PILLS.map(p => p.id)).toEqual([
-      'create_release_page',
-      'generate_album_art',
-      'generate_playlist_pitch',
       'plan_a_release',
+      'generate_album_art',
+      'pitch_playlists',
       'build_artist_profile',
-      'setup_fan_notifications',
+      'analyze_momentum',
     ]);
     expect(PILLS.map(p => p.label)).toEqual([
-      'Create release page',
-      'Generate album art',
-      'Generate playlist pitch',
       'Plan a release',
+      'Generate album art',
+      'Pitch playlists',
       'Build artist profile',
-      'Set up fan notifications',
+      'Analyze momentum',
     ]);
     expect(PILLS.map(p => p.insertedPrompt)).toEqual([
-      'Create a release page for ',
-      'Generate album art for ',
-      'Generate a playlist pitch for ',
       'Plan a release for ',
-      'Build an artist profile for ',
-      'Set up fan notifications for ',
+      'Generate album art for ',
+      'Pitch playlists for ',
+      'Build artist profile for ',
+      'Analyze momentum for ',
     ]);
     expect(PILLS.every(p => p.insertedPrompt.endsWith(' '))).toBe(true);
   });

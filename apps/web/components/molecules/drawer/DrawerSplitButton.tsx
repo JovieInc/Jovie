@@ -25,7 +25,7 @@ const DRAWER_SPLIT_BUTTON_BASE_CLASSNAME =
   'inline-flex h-7 shrink-0 items-stretch overflow-hidden rounded-full border border-subtle bg-surface-1 text-secondary-token shadow-none';
 
 const DRAWER_SPLIT_BUTTON_SEGMENT_CLASSNAME =
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border-0 bg-transparent px-2.5 text-[11.5px] font-[510] tracking-[-0.01em] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-0 focus-visible:text-primary-token disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border-0 bg-transparent px-2.5 text-[11.5px] font-caption tracking-[-0.01em] text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-0 focus-visible:text-primary-token disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
 export function DrawerSplitButton({
   primaryAction,

@@ -56,23 +56,30 @@ export function OtpInput({
     onComplete,
     autoFocus,
   });
-  const compact = size === 'compact';
-  const hero = size === 'hero';
-  const fieldsetClassName = hero
-    ? 'flex justify-center gap-[3px] border-0 p-0 m-0 relative z-10'
-    : compact
-      ? 'flex justify-center gap-1.5 border-0 p-0 m-0 relative z-10'
-      : 'flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0 relative z-10';
-  const boxSizeClassName = hero
-    ? 'h-8 w-[26px] rounded-lg border-white/14 bg-white/[0.06] text-[13px] text-white shadow-none'
-    : compact
-      ? 'h-10 w-[34px] text-[1rem] sm:h-10 sm:w-[34px] sm:text-[1rem]'
-      : 'h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]';
-  const textSizeClassName = hero
-    ? 'text-[13px]'
-    : compact
-      ? 'text-[1rem] sm:text-[1rem]'
-      : 'text-[1.22rem] sm:text-[1.3rem]';
+  const sizeStyles = {
+    hero: {
+      fieldset: 'flex justify-center gap-[3px] border-0 p-0 m-0 relative z-10',
+      boxSize:
+        'h-8 w-[26px] rounded-lg border-white/14 bg-white/[0.06] text-[13px] text-white shadow-none',
+      textSize: 'text-[13px]',
+    },
+    compact: {
+      fieldset: 'flex justify-center gap-1.5 border-0 p-0 m-0 relative z-10',
+      boxSize: 'h-10 w-[34px] text-[1rem] sm:h-10 sm:w-[34px] sm:text-[1rem]',
+      textSize: 'text-[1rem] sm:text-[1rem]',
+    },
+    default: {
+      fieldset:
+        'flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0 relative z-10',
+      boxSize: 'h-12 w-11 text-[1.22rem] sm:h-12 sm:w-12 sm:text-[1.3rem]',
+      textSize: 'text-[1.22rem] sm:text-[1.3rem]',
+    },
+  } as const;
+  const {
+    fieldset: fieldsetClassName,
+    boxSize: boxSizeClassName,
+    textSize: textSizeClassName,
+  } = sizeStyles[size];
 
   return (
     <div className='relative' ref={containerRef}>

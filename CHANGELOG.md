@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.174] - 2026-04-24
+
+> Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
+
+### Added
+
+- `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and related mutation paths now support a versioned `theme.profileAccent` payload. Avatar-driven accent colors are extracted server-side, normalized for contrast, reused as CSS vars, and persisted across avatar upload, suggestion selection, ingestion, and admin/dashboard update flows.
+- `apps/web/components/features/profile/ProfileHomeRail.tsx` adds a manual horizontal Home rail with dot pagination, driven from existing profile resolver data so featured release, tour, alerts, and listen states can rotate without changing route semantics.
+
+### Changed
+
+- `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` were rebuilt into the new shared public shell: full-bleed hero, verified identity row, contextual status pill, notifications-first CTA, quick social actions, and the five-tab bottom nav mapping `Home`, `Music`, `Events`, `Alerts`, and `Profile` to the existing profile modes.
+- Preview and demo profile surfaces now use the same accent/theme contract and refreshed shell so homepage showcases and live `/:username` pages stay visually aligned.
+
+### Fixed
+
+- Theme writes now merge instead of replacing the entire theme object, preventing user theme changes from wiping persisted `profileAccent` data.
+- Public render fallback accent derivation now skips local and `/_next/image` sources, avoiding invalid-host fetch noise while preserving neutral fallbacks when no usable remote image exists.
+
+## [26.4.173] - 2026-04-24
+
+> Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
+
+### Fixed
+
+- `apps/web/app/api/profile/view/route.ts` — tightened the POST body schema from `z.string().min(1).max(100)` to the canonical lowercase handle pattern (3-24 chars, `[a-z0-9-]`), with pre-normalization to lowercase so mixed-case input is still accepted by legitimate clients. Closes three hardening gaps: Redis keyspace pollution via `profile:views:${attacker-supplied-bytes}`, per-handle rate-limit key pollution via `${handle}:${ip}`, and wasted DB lookups on handles that can never exist in `usernameNormalized`. No legitimate traffic breaks — the only caller (`ProfileViewTracker` on `/[username]/page.tsx`) always passes the canonical `artist.handle`.
+
+### Added
+
+- `apps/web/tests/unit/profile/profile-view-api.test.ts` — 13 new adversarial test cases (script injection, path traversal, null byte, internal whitespace, RTL override, zero-width joiner, combining marks, emoji, whitespace padding, colon/slash for key pollution, underscore/dot outside charset) plus length-boundary tests and a mixed-case normalization test. All previously passing tests still pass.
+
+## [26.4.172] - 2026-04-23
+
+> The intercepted signup modal no longer blows out to the full viewport when the intent hint is short. The dialog now hugs its content, centers cleanly, and the Clerk form sits flush inside our modal chrome instead of stacking a second card inside a card.
+
+### Fixed
+
+- `apps/web/components/auth/AuthModalShell.tsx` — swapped `fixed inset-0 m-auto h-auto` for explicit `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-fit`, which was the root cause of the dialog stretching to full viewport height. Tightened to `max-w-[400px]` / `p-5`, and moved the `statusRow` out of the header flex into a centered single-line row beneath the back arrow so the "Continuing with…" hint no longer gets truncated mid-phrase.
+- `apps/web/app/@auth/(.)signup/page.tsx` — simplified the `statusRow` to a truncating `<p>`; placement now lives in the shell.
+- `apps/web/styles/theme.css` — scoped a `.jovie-auth-modal` override so Clerk's `.cl-card` renders flush inside the dialog (no nested border/background/shadow/backdrop-filter/padding) and hides any `[data-clerk-captcha]` / `#clerk-captcha` spacer that would otherwise force dialog height.
+
+## [26.4.171] - 2026-04-23
+
+> Main deploys stop starving when merge-queue bursts stack up. Only the commit that is still `main` HEAD at gate time deploys, intermediates skip cleanly, and mid-flight cancellations now page Slack instead of silently reporting success.
+
+### Changed
+
+- `.github/workflows/ci.yml` — added a `deploy-gate` job that checks whether the current SHA is still `origin/main` tip via the GitHub API. When it isn't, `deploy-staging`, `canary-health-gate`, and `promote-production` all skip cleanly so the six-commit pile-up observed on 2026-04-24 can't happen again. The gate reads `github.sha` against the live main tip on every run, so agent-pipeline merge-queue bursts collapse to a single deploy of the final tip.
+- `.github/workflows/ci.yml` — `deploy-notify` now classifies `cancelled` deploy-chain jobs alongside `failure`. Runs that get cancelled mid-flight (merge queue, concurrency preemption) post a `⛔ Deploy cancelled mid-flight` alert to `#alerts-critical` instead of silently succeeding like the cancelled `14d5a44` run did on 2026-04-24.
+
+## [26.4.170] - 2026-04-23
+
+> Desktop auth screens get a split-screen brand panel — the sign-in form sits on the left, a clean white panel with the brand mark fills the right. Mobile is unchanged.
+
+### Changed
+
+- `apps/web/components/features/auth/AuthLayout.tsx` — wrapped the auth shell in a `lg` grid so desktop auth screens (signin, waitlist, etc.) render a centered form on a dark left column beside a white brand panel on the right. Mobile keeps its fixed-overlay behavior (scoped via `max-lg:` so non-responsive utilities can't win the cascade).
+
+## [26.4.169] - 2026-04-23
+
+> The homepage now opens with a tighter premium hero, real product navigation, and a live trust strip right under the fold. Visitors can go straight to Product, Solutions, Pricing, or Resources, ask Jovie from the new hero composer, and see the trust bar immediately instead of waiting on a staged flag.
+
+### Added
+
+- `apps/web/public/brand-logos/black-hole-recordings.png` — added a monochrome-ready Black Hole Recordings asset for the live homepage trust strip.
+
+### Changed
+
+- `apps/web/app/(home)/layout.tsx`, `MarketingHeader`, `HeaderNav`, `MobileNav`, and `MarketingSignInLink` — the live `/` route now uses the shared marketing header with `Product`, `Solutions`, `Pricing`, and `Resources`, plus a single white `Sign in` pill and no duplicate mobile `Log in` link.
+- `apps/web/app/(home)/page.tsx` and `apps/web/app/(home)/home.css` — rebuilt the homepage hero into a contained near-black surface with rounded bottom corners, a centered glow, a perspective grid, and spacing tuned for the fixed header on desktop and mobile.
+- `apps/web/components/homepage/intent.ts` and `HomepageIntent.tsx` — refreshed the homepage brief to `Your AI Artist Manager.`, updated the subhead and `Ask Jovie...` placeholder, and replaced the prompt pills with `Plan a release`, `Generate album art`, `Pitch playlists`, `Build artist profile`, and `Analyze momentum`.
+- `apps/web/components/features/home/HomeTrustSection.tsx` and `label-logos.tsx` — shipped the trust bar live on `/` with the label `Trusted by artists`, explicit homepage styling, and refreshed monochrome label treatment for Universal Music Group, Armada Music, The Orchard, AWAL, Black Hole Recordings, and disco:wax.
+- `apps/web/tests/e2e/homepage.spec.ts`, `apps/web/tests/e2e/homepage-intent.spec.ts`, `apps/web/components/homepage/HomepageIntent.test.tsx`, `apps/web/components/homepage/intent.test.ts`, and `apps/web/tests/unit/home/intent-store.test.ts` — updated homepage coverage for the new hero copy, nav map, trust strip, mobile nav behavior, and prompt analytics payloads.
+- [internal] Synced `VERSION`, `version.json`, and all package manifests to `26.4.169` so the repo's version sources agree again.
+
+## [26.4.168] - 2026-04-22
+
+> Profile edits through chat now actually show you the confirmation. "Update my bio to..." used to save the bio silently with no assistant reply, making it look like nothing happened. Every deterministic chat action (bio, name, add link, remove link, avatar upload, feedback) now streams back a visible assistant confirmation.
+
+### Fixed
+
+- `apps/web/app/api/chat/route.ts` — deterministic intent replies were returned as plain JSON, which the AI SDK `useChat` client (expecting `text/event-stream` UIMessage chunks) silently dropped. The reply now streams as a `text-delta` chunk via `createUIMessageStream` + `createUIMessageStreamResponse`, so the confirmation renders in the thread and persists to the conversation history.
+
+### Added
+
+- `apps/web/tests/unit/lib/chat/intent-response-sse-stream.test.ts` — regression test asserting deterministic intent responses use `text/event-stream` content type and contain the expected `text-delta` chunk, not plain JSON.
+
 ## [26.4.167] - 2026-04-22
 
 > Clicking "Generate album art" on a release no longer ships a raw JSON blob as your chat message. Release references render as a pill chip in the transcript, readable at a glance. The chip format is the groundwork for the upcoming `/` command menu — any release, artist, or skill will compose into the input as a chip instead of free text.

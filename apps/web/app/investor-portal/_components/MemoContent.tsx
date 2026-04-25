@@ -80,7 +80,7 @@ export function MemoContent({
               aria-label='Table of contents'
             >
               <div className='sticky top-8'>
-                <p className='mb-3 text-[length:var(--text-xs)] font-[590] uppercase tracking-widest text-[var(--color-text-quaternary-token)]'>
+                <p className='mb-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-widest text-[var(--color-text-quaternary-token)]'>
                   On this page
                 </p>
                 <ul className='flex flex-col gap-1.5'>

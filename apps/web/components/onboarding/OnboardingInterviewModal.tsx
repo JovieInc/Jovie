@@ -66,7 +66,7 @@ export function OnboardingInterviewModal({
     if (!isRequested) return;
 
     const alreadySubmitted =
-      typeof globalThis.window !== 'undefined' &&
+      globalThis.window !== undefined &&
       globalThis.sessionStorage.getItem(SESSION_KEY) === '1';
 
     if (alreadySubmitted) {
@@ -113,7 +113,7 @@ export function OnboardingInterviewModal({
       // Silent failure — this is a research feature, not a paywall.
       // Loss of one transcript is acceptable.
     } finally {
-      if (typeof globalThis.window !== 'undefined') {
+      if (globalThis.window !== undefined) {
         globalThis.sessionStorage.setItem(SESSION_KEY, '1');
       }
       setSubmitting(false);
@@ -131,7 +131,7 @@ export function OnboardingInterviewModal({
         );
 
         if (current === prev.length - 1) {
-          void submit(next);
+          submit(next);
         } else {
           setCurrent(current + 1);
         }
@@ -145,7 +145,7 @@ export function OnboardingInterviewModal({
     setDraft(prev => {
       const next = [...prev];
       if (hasAnyAnswer(next)) {
-        void submit(next);
+        submit(next);
       } else {
         setOpen(false);
       }
@@ -157,9 +157,12 @@ export function OnboardingInterviewModal({
 
   const entry = draft[current];
   const progress = draft
-    .map((_, idx) => (idx === current ? '●' : idx < current ? '●' : '○'))
+    .map((_, idx) => (idx <= current ? '●' : '○'))
     .join(' ');
   const canSubmit = !submitting;
+  const isLastQuestion = current === draft.length - 1;
+  let submitLabel = 'Next';
+  if (isLastQuestion) submitLabel = submitting ? 'Sending…' : 'Send';
 
   return (
     <dialog
@@ -217,11 +220,7 @@ export function OnboardingInterviewModal({
           disabled={!canSubmit || entry.answer.trim().length === 0}
           className='rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40'
         >
-          {current === draft.length - 1
-            ? submitting
-              ? 'Sending…'
-              : 'Send'
-            : 'Next'}
+          {submitLabel}
         </button>
       </div>
     </dialog>

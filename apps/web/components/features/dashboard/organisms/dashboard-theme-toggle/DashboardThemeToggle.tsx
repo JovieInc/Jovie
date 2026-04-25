@@ -79,7 +79,7 @@ function ThemeOptionGrid({
 
   return (
     <div className='space-y-3'>
-      <span className='text-app font-[510] text-primary-token'>
+      <span className='text-app font-caption text-primary-token'>
         Theme Preference
       </span>
       <div className='grid grid-cols-3 gap-2'>
@@ -100,7 +100,7 @@ function ThemeOptionGrid({
             <span className='mb-1 flex items-center justify-center'>
               {getThemeIcon(option.value)}
             </span>
-            <span className='text-2xs font-[510]'>{option.label}</span>
+            <span className='text-2xs font-caption'>{option.label}</span>
             {showResolvedTheme(option.value) && (
               <span className='mt-1 text-2xs text-secondary-token'>
                 ({resolvedTheme})

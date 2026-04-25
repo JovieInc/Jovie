@@ -46,7 +46,7 @@ function BentoCard({
       />
 
       <div className='relative'>
-        <h3 className='text-[15px] font-[560] tracking-[-0.01em] text-white'>
+        <h3 className='text-[15px] font-semibold tracking-[-0.01em] text-white'>
           {heading}
         </h3>
         {children}

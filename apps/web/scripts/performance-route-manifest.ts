@@ -1023,7 +1023,7 @@ const CREATOR_ALIAS_ROUTES = [
     id: 'creator-alias-dashboard-overview',
     group: 'creator-alias',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_OVERVIEW,
+    path: APP_ROUTES.LEGACY_DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',

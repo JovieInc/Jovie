@@ -23,6 +23,7 @@ import {
 } from '@/lib/db/schema/profiles';
 import { DSP_PROVIDER_AVATAR_CONFIDENCE } from '@/lib/dsp-provider-metadata';
 import { captureError } from '@/lib/error-tracking';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
 
@@ -361,6 +362,7 @@ async function updateProfileFromDspData(
     displayNameLocked: boolean;
     spotifyFollowers: number | null;
     genres: string[] | null;
+    theme: Record<string, unknown> | null;
   }
 ): Promise<boolean> {
   const updates: Record<string, unknown> = {};
@@ -383,6 +385,12 @@ async function updateProfileFromDspData(
     avatarUpdated || displayNameUpdated || followersUpdated || genresUpdated;
 
   if (hasUpdates) {
+    if (typeof updates.avatarUrl === 'string') {
+      updates.theme = await buildThemeWithProfileAccent({
+        existingTheme: existingProfile.theme,
+        sourceUrl: updates.avatarUrl,
+      });
+    }
     updates.updatedAt = new Date();
     await tx
       .update(creatorProfiles)
@@ -538,6 +546,7 @@ export async function processProfileEnrichmentJob(
       displayNameLocked: creatorProfiles.displayNameLocked,
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       genres: creatorProfiles.genres,
+      theme: creatorProfiles.theme,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))

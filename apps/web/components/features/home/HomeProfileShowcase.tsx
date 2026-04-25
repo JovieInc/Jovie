@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ProfileCompactSurface } from '../profile/templates/ProfileCompactSurface';
 import { HomePhoneFrame } from './HomePhoneFrame';
 import {
+  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
   HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
@@ -87,7 +88,7 @@ function HomeProfileOverlayCard({
         <p className='mt-3 text-[20px] font-[650] tracking-[-0.04em] text-slate-950'>
           {overlay.body}
         </p>
-        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/80 px-3 py-2.5 text-[11px] font-[560] text-slate-600'>
+        <div className='mt-4 flex items-center justify-between rounded-[1rem] bg-white/80 px-3 py-2.5 text-[11px] font-semibold text-slate-600'>
           <span>{overlay.accentLabel}</span>
           <span>Face ID</span>
         </div>
@@ -114,7 +115,7 @@ function HomeProfileOverlayCard({
         <p className='mt-2 text-[12px] leading-[1.6] text-white/68'>
           {overlay.body}
         </p>
-        <div className='mt-4 rounded-[1rem] border border-white/8 bg-white/[0.04] px-3 py-2.5 text-[11px] font-[560] text-white/76'>
+        <div className='mt-4 rounded-[1rem] border border-white/8 bg-white/[0.04] px-3 py-2.5 text-[11px] font-semibold text-white/76'>
           Take Me Over · Listen
         </div>
       </div>
@@ -136,7 +137,7 @@ function HomeProfileOverlayCard({
             {overlay.title}
           </p>
         </div>
-        <div className='rounded-full bg-white/10 px-2 py-1 text-[10px] font-[560] text-white/72'>
+        <div className='rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/72'>
           Email
         </div>
       </div>
@@ -218,8 +219,10 @@ function ShowcaseSurface({
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
         drawerOpen={state.drawerView !== null}
         drawerView={state.drawerView ?? 'menu'}
+        activeMode={getPreviewActiveMode(state.id)}
         onDrawerOpenChange={() => {}}
         onDrawerViewChange={() => {}}
+        onModeSelect={() => {}}
         onOpenMenu={() => {}}
         onPlayClick={() => {}}
         onShare={() => {}}

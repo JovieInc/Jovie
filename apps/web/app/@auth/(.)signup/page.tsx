@@ -60,11 +60,7 @@ function SignupModalBody() {
   const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.ONBOARDING;
 
   const statusRow = promptHint ? (
-    <p
-      aria-live='polite'
-      className='flex-1 text-right text-[13px] leading-[1.4] text-tertiary-token'
-      title={promptHint}
-    >
+    <p aria-live='polite' className='truncate' title={promptHint}>
       Continuing with &ldquo;
       {promptHint.length > HOMEPAGE_PROMPT_HINT_TRUNCATE
         ? `${promptHint.slice(0, HOMEPAGE_PROMPT_HINT_TRUNCATE)}…`
@@ -74,7 +70,11 @@ function SignupModalBody() {
   ) : null;
 
   return (
-    <AuthModalShell ariaLabel='Create your Jovie account' statusRow={statusRow}>
+    <AuthModalShell
+      ariaLabel='Create your Jovie account'
+      statusRow={statusRow}
+      backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
+    >
       {isMounted ? (
         <SignUp
           routing='hash'

@@ -17,7 +17,7 @@ export function DrawerBackButton({
   return (
     <DrawerButton
       tone='ghost'
-      className={className ?? 'h-7 rounded-full px-2.5 text-[11px]'}
+      className={className ?? 'h-7 rounded-full px-2.5 text-2xs'}
       {...props}
     >
       <ArrowLeft className='h-3.5 w-3.5' aria-hidden='true' />

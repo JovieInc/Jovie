@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, type BadgeProps, Button } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -36,6 +36,16 @@ interface TourDatesTableProps {
 
 const columnHelper = createColumnHelper<TourDateViewModel>();
 
+const STATUS_BADGE: Record<
+  'past' | 'sold_out' | 'cancelled' | 'on_sale',
+  { variant: BadgeProps['variant']; label: string }
+> = {
+  past: { variant: 'secondary', label: 'Past' },
+  sold_out: { variant: 'warning', label: 'Sold Out' },
+  cancelled: { variant: 'destructive', label: 'Cancelled' },
+  on_sale: { variant: 'success', label: 'On Sale' },
+};
+
 const StatusBadge = memo(function StatusBadge({
   status,
   isPastDate,
@@ -43,34 +53,16 @@ const StatusBadge = memo(function StatusBadge({
   status: string;
   isPastDate: boolean;
 }) {
-  if (isPastDate) {
-    return (
-      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-xs font-caption text-tertiary-token'>
-        Past
-      </span>
-    );
-  }
+  let config = STATUS_BADGE.on_sale;
+  if (isPastDate) config = STATUS_BADGE.past;
+  else if (status === 'sold_out') config = STATUS_BADGE.sold_out;
+  else if (status === 'cancelled') config = STATUS_BADGE.cancelled;
 
-  switch (status) {
-    case 'sold_out':
-      return (
-        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-xs font-caption text-amber-600 dark:text-amber-300'>
-          Sold Out
-        </span>
-      );
-    case 'cancelled':
-      return (
-        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-xs font-caption text-red-600 dark:text-red-400'>
-          Cancelled
-        </span>
-      );
-    default:
-      return (
-        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-xs font-caption text-emerald-600 dark:text-emerald-400'>
-          On Sale
-        </span>
-      );
-  }
+  return (
+    <Badge variant={config.variant} size='sm'>
+      {config.label}
+    </Badge>
+  );
 });
 
 const DateCell = memo(function DateCell({

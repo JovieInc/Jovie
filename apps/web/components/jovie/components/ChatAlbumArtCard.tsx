@@ -160,6 +160,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
     );
   }
 
+  let applyButtonLabel = 'Use This Art';
+  if (hasAppliedSelectedCandidate) applyButtonLabel = 'Applied';
+  else if (!result.releaseId) applyButtonLabel = 'Create Release With Art';
+  else if (result.hasExistingArtwork) applyButtonLabel = 'Replace Artwork';
+
   return (
     <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
       <div className='flex items-center justify-between gap-3'>
@@ -216,13 +221,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
             hasAppliedSelectedCandidate
           }
         >
-          {hasAppliedSelectedCandidate
-            ? 'Applied'
-            : result.releaseId
-              ? result.hasExistingArtwork
-                ? 'Replace Artwork'
-                : 'Use This Art'
-              : 'Create Release With Art'}
+          {applyButtonLabel}
         </Button>
         <Button
           type='button'

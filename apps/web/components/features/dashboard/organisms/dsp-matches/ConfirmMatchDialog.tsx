@@ -87,7 +87,7 @@ export function ConfirmMatchDialog({
   return (
     <Dialog open={open} onClose={onClose} size='md'>
       <DialogTitle className='flex items-center gap-3'>
-        <div className='flex h-8 w-8 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'>
+        <div className='flex h-8 w-8 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
           <Icon name='Link2' className='h-4 w-4 text-secondary-token' />
         </div>
         <span>Confirm artist match</span>
@@ -130,7 +130,7 @@ export function ConfirmMatchDialog({
                     href={externalArtistUrl}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
                   >
                     <Icon name='ExternalLink' className='h-4 w-4' />
                   </a>
@@ -143,7 +143,7 @@ export function ConfirmMatchDialog({
 
               <div className='mt-2 flex flex-wrap items-center gap-2'>
                 <ConfidenceBadge score={confidenceScore} size='md' showLabel />
-                <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
+                <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
                   {matchingIsrcCount} matching ISRCs
                 </span>
               </div>
@@ -154,7 +154,7 @@ export function ConfirmMatchDialog({
         {/* Confidence Breakdown */}
         {confidenceBreakdown && (
           <ContentSurfaceCard surface='details' className='p-4'>
-            <h4 className='mb-3 text-[13px] font-caption text-primary-token'>
+            <h4 className='mb-3 text-app font-caption text-primary-token'>
               Match confidence breakdown
             </h4>
             <MatchConfidenceBreakdown
@@ -183,7 +183,7 @@ export function ConfirmMatchDialog({
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='h-7 rounded-[8px] px-2.5 text-[11px] font-caption'
+          className='h-7 rounded-lg px-2.5 text-2xs font-caption'
         >
           Cancel
         </Button>
@@ -192,7 +192,7 @@ export function ConfirmMatchDialog({
           size='sm'
           onClick={onConfirm}
           disabled={isConfirming}
-          className='h-7 rounded-[8px] px-2.5 text-[11px] font-caption'
+          className='h-7 rounded-lg px-2.5 text-2xs font-caption'
         >
           {isConfirming ? (
             <>
