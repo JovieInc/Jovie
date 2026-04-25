@@ -247,31 +247,42 @@ export interface StarterSuggestionContext {
 }
 
 /**
- * Default suggestions shown on the empty chat state.
+ * Default chat-home suggestions. Mirrors the homepage hero pills
+ * (`components/homepage/intent.ts`) so the authenticated entrypoint
+ * starts from the same mental model ("Plan a release", "Pitch playlists",
+ * ...) instead of the old task-list-style "Preview profile" / "Change
+ * photo" actions — those belong in the profile switcher, not the chat
+ * home.
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Disc3',
-    label: 'Create a new release',
-    prompt: 'Help me create a new release.',
+    label: 'Plan a release',
+    prompt: 'Help me plan my next release.',
     accent: 'green',
   },
   {
-    icon: 'Eye',
-    label: 'Preview profile',
-    prompt: 'Preview my profile.',
+    icon: 'Camera',
+    label: 'Generate album art',
+    prompt: 'Generate album art for my latest release.',
     accent: 'purple',
   },
   {
-    icon: 'Camera',
-    label: 'Change photo',
-    prompt: 'Help me change my profile photo.',
+    icon: 'Music',
+    label: 'Pitch playlists',
+    prompt: 'Generate playlist pitches for my latest release.',
+    accent: 'blue',
+  },
+  {
+    icon: 'Eye',
+    label: 'Build artist profile',
+    prompt: 'Help me polish my artist profile.',
     accent: 'purple',
   },
   {
     icon: 'Link2',
-    label: 'Release link',
-    prompt: 'Set up a link for my latest release.',
+    label: 'Analyze momentum',
+    prompt: 'Analyze my audience momentum this week.',
     accent: 'blue',
   },
 ] as const;
@@ -301,26 +312,26 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Disc3',
-    label: 'Create a new release',
-    prompt: 'Help me create a new release.',
+    label: 'Plan a release',
+    prompt: 'Help me plan my first release.',
     accent: 'green',
   },
   {
-    icon: 'Link2',
-    label: 'Release link',
-    prompt: 'Set up a link for my latest release.',
+    icon: 'Camera',
+    label: 'Generate album art',
+    prompt: 'Generate album art for my next release.',
+    accent: 'purple',
+  },
+  {
+    icon: 'Music',
+    label: 'Pitch playlists',
+    prompt: 'Walk me through pitching my music to playlists.',
     accent: 'blue',
   },
   {
     icon: 'Eye',
-    label: 'Preview profile',
-    prompt: 'Preview my profile.',
+    label: 'Build artist profile',
+    prompt: 'Help me build my artist profile.',
     accent: 'purple',
-  },
-  {
-    icon: 'DollarSign',
-    label: 'Getting paid',
-    prompt: 'How do I get paid?',
-    accent: 'green',
   },
 ] as const;

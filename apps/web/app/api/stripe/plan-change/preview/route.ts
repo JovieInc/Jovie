@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { previewPlanChange } from '@/lib/stripe/plan-change';
@@ -31,8 +32,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { priceId } = body;
+    const parsedBody = await parseJsonBody<{ priceId?: unknown }>(request, {
+      route: '/api/stripe/plan-change/preview',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const { priceId } = parsedBody.data;
 
     if (!priceId || typeof priceId !== 'string') {
       return NextResponse.json(

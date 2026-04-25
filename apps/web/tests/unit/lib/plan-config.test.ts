@@ -5,6 +5,8 @@ import {
   getPlanDisplayName,
   hasAdvancedFeatures,
   isProPlan,
+  isValidPlanId,
+  resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
 
 describe('Plan Configuration (Entitlement Registry)', () => {
@@ -209,6 +211,22 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(getPlanDisplayName('enterprise')).toBe('Free');
       expect(getPlanDisplayName('')).toBe('Free');
       expect(getPlanDisplayName('MAX')).toBe('Free');
+    });
+  });
+
+  describe('plan id validation helpers', () => {
+    it('accepts legacy aliases and resolves them to canonical plans', () => {
+      expect(isValidPlanId('founding')).toBe(true);
+      expect(isValidPlanId('growth')).toBe(true);
+      expect(resolveCanonicalPlanId('founding')).toBe('pro');
+      expect(resolveCanonicalPlanId('growth')).toBe('max');
+    });
+
+    it('rejects inherited prototype properties', () => {
+      expect(isValidPlanId('toString')).toBe(false);
+      expect(isValidPlanId('__proto__')).toBe(false);
+      expect(resolveCanonicalPlanId('constructor')).toBeNull();
+      expect(resolveCanonicalPlanId('toString')).toBeNull();
     });
   });
 

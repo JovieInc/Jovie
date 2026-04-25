@@ -103,7 +103,11 @@ export async function GET(request: Request) {
   //
   // Wrapped in try/catch so that an unexpected throw from the validator
   // (e.g. content-filter loaded at runtime) still produces a constant-time
-  // 400 rather than bypassing the constant-time guarantee with a 500.
+  // response rather than bypassing the constant-time guarantee with a 500.
+  //
+  // A validator throw is a transient internal failure, not bad client input,
+  // so return 503 — a 400 here would mislead clients into believing their
+  // input was rejected and hide incident semantics from monitoring.
   let formatCheck: { isValid: boolean; error?: string };
   try {
     formatCheck = validateUsername(handle);
@@ -113,8 +117,8 @@ export async function GET(request: Request) {
       route: '/api/handle/check',
     });
     return respondWithConstantTime(
-      { available: false, error: 'Invalid handle' },
-      { status: 400 }
+      { available: false, error: 'Handle check temporarily unavailable' },
+      { status: 503 }
     );
   }
   if (!formatCheck.isValid) {

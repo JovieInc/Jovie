@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { buildSeoFilename } from '@/lib/images/config';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
 import { normalizeString } from '@/lib/utils/string-utils';
 import { uploadBufferToBlob } from './blob-uploader';
@@ -210,9 +211,23 @@ export async function maybeSetProfileAvatarFromLinks(params: {
       })
       .where(eq(profilePhotos.id, photoRecord.id));
 
+    const [profile] = await db
+      .select({ theme: creatorProfiles.theme })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+
     await db
       .update(creatorProfiles)
-      .set({ avatarUrl: blobUrl, updatedAt: new Date() })
+      .set({
+        avatarUrl: blobUrl,
+        theme: await buildThemeWithProfileAccent({
+          existingTheme: profile?.theme,
+          sourceUrl: blobUrl,
+          sourceBuffer: optimized.data,
+        }),
+        updatedAt: new Date(),
+      })
       .where(eq(creatorProfiles.id, profileId));
 
     return blobUrl;

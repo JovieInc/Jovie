@@ -480,16 +480,16 @@ export function JovieChat({
       ) : (
         <div className='flex flex-1 flex-col overflow-hidden'>
           <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
-            <div className='mx-auto flex min-h-full w-full max-w-[34rem] flex-col items-center justify-center gap-5 py-6'>
-              <h1 className='text-[1.2rem] font-semibold tracking-[-0.03em] text-primary-token sm:text-[1.35rem]'>
+            <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
+              <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
                 {emptyStateHeading}
               </h1>
-              <div className='mx-auto flex w-full max-w-md flex-col items-center'>
+              <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
                 <SuggestedPrompts
                   onSelect={handleSuggestedPrompt}
                   isFirstSession={isFirstSession}
                   latestReleaseTitle={latestReleaseTitle}
-                  layout='flat'
+                  layout='rail'
                 />
                 {chatError && (
                   <div className='mt-2.5 w-full'>

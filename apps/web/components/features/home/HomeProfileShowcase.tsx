@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ProfileCompactSurface } from '../profile/templates/ProfileCompactSurface';
 import { HomePhoneFrame } from './HomePhoneFrame';
 import {
+  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
   HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
@@ -218,8 +219,10 @@ function ShowcaseSurface({
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
         drawerOpen={state.drawerView !== null}
         drawerView={state.drawerView ?? 'menu'}
+        activeMode={getPreviewActiveMode(state.id)}
         onDrawerOpenChange={() => {}}
         onDrawerViewChange={() => {}}
+        onModeSelect={() => {}}
         onOpenMenu={() => {}}
         onPlayClick={() => {}}
         onShare={() => {}}
