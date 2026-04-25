@@ -23,7 +23,7 @@ export function ImagePreviewStrip({
     <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-3'>
       <div className='mb-3 flex items-center justify-between gap-3'>
         <div>
-          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
             Attachments
           </p>
           <p className='text-xs text-tertiary-token'>
@@ -51,7 +51,7 @@ export function ImagePreviewStrip({
                 unoptimized
               />
               <div className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-2 pb-2 pt-5'>
-                <p className='truncate text-[11px] font-medium text-white'>
+                <p className='truncate text-2xs font-medium text-white'>
                   {image.name}
                 </p>
               </div>

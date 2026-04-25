@@ -63,7 +63,7 @@ export function TokenizedText({ content, className }: TokenizedTextProps) {
         return (
           <span
             key={key}
-            className='inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 align-baseline text-[12px] font-medium text-secondary-token'
+            className='inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 align-baseline text-xs font-medium text-secondary-token'
             title={`Skill: ${token.id}`}
           >
             /{token.id}

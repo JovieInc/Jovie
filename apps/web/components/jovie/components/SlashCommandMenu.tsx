@@ -56,7 +56,7 @@ function SkillRow({ skill }: { readonly skill: SkillCommand }) {
   return (
     <>
       <span className='font-medium'>{skill.label}</span>
-      <span className='ml-auto truncate text-[11px] text-tertiary-token'>
+      <span className='ml-auto truncate text-2xs text-tertiary-token'>
         {skill.description}
       </span>
     </>
@@ -79,7 +79,7 @@ function EntityRow({ entity }: { readonly entity: EntityRef }) {
         <span className='h-6 w-6 rounded-sm bg-surface-2' />
       )}
       <span className='truncate'>{entity.label}</span>
-      <span className='ml-auto text-[11px] text-tertiary-token capitalize'>
+      <span className='ml-auto text-2xs text-tertiary-token capitalize'>
         {entity.kind}
       </span>
     </>
@@ -195,12 +195,12 @@ export function SlashCommandMenu({
         className='w-[320px] p-0'
         onOpenAutoFocus={e => e.preventDefault()}
       >
-        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2 text-[11px] font-medium text-tertiary-token'>
+        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2 text-2xs font-medium text-tertiary-token'>
           {headerLabel}
         </div>
         <div className='max-h-[280px] overflow-y-auto py-1' role='menu'>
           {items.length === 0 ? (
-            <div className='px-3 py-6 text-center text-[12px] text-tertiary-token'>
+            <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
               {entitySearch.isLoading ? 'Searching…' : 'No matches'}
             </div>
           ) : (
@@ -219,7 +219,7 @@ export function SlashCommandMenu({
                     commit(i);
                   }}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px]',
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-app',
                     isSelected
                       ? 'bg-surface-1 text-primary-token'
                       : 'text-secondary-token hover:bg-surface-1'

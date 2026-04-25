@@ -55,7 +55,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           <CheckCircle2 className='h-5 w-5' />
         </div>
         <div className='mt-4 space-y-1'>
-          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
             Feedback sent
           </p>
           <p className='text-sm font-medium text-primary-token'>
@@ -70,7 +70,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='mt-5 rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
+          className='mt-5 rounded-[10px] px-4 text-2xs font-medium tracking-[-0.01em]'
         >
           Back to chat
         </Button>
@@ -81,7 +81,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   return (
     <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6'>
       <div className='space-y-1'>
-        <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
+        <p className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
           Share feedback
         </p>
         <h3 className='text-sm font-semibold text-primary-token'>
@@ -122,7 +122,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           size='sm'
           onClick={onClose}
           disabled={feedbackMutation.isPending}
-          className='rounded-[10px] px-3 text-[11px] font-[510] tracking-[-0.01em]'
+          className='rounded-[10px] px-3 text-2xs font-medium tracking-[-0.01em]'
         >
           Cancel
         </Button>
@@ -132,7 +132,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           onClick={handleSubmit}
           loading={feedbackMutation.isPending}
           disabled={trimmedLength < 5}
-          className='rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
+          className='rounded-[10px] px-4 text-2xs font-medium tracking-[-0.01em]'
         >
           <Send className='mr-1.5 h-3.5 w-3.5' />
           Submit
