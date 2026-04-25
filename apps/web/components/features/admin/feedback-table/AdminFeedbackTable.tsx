@@ -78,7 +78,7 @@ const columnHelper = createColumnHelper<FeedbackRow>();
 function renderUserCell({ getValue }: { getValue: () => any }) {
   const user = getValue() as FeedbackRow['user'];
   return (
-    <span className='text-[13px] font-[510] text-primary-token'>
+    <span className='text-[13px] font-medium text-primary-token'>
       {getFeedbackUserLabel(user)}
     </span>
   );
@@ -109,8 +109,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-medium tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
