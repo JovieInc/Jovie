@@ -43,7 +43,7 @@ export function GrowthStatusPanel() {
   if (settings) {
     headerActions = (
       <div className='flex items-center gap-2'>
-        <span className='text-[12px] font-semibold text-secondary-token'>
+        <span className='text-xs font-semibold text-secondary-token'>
           {settings.enabled ? 'On' : 'Off'}
         </span>
         <Switch
