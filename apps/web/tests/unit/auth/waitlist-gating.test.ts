@@ -819,12 +819,9 @@ describe('default-deny security', () => {
     expect(DEFAULT_WAITLIST_STATE.needsWaitlist).toBe(true);
   });
 
-  it('documents that proxy.ts filters banned users at DB level', () => {
-    // executeUserStateQuery filters: ne(users.userStatus, 'banned')
-    // and: isNull(users.deletedAt)
-    // This means banned/deleted users return no result → default waitlist state
-    expect(true).toBe(true); // Contract documentation
-  });
+  it.todo(
+    'documents that proxy.ts filters banned users at DB level — contract documentation'
+  );
 });
 
 // ============================================================================
@@ -849,15 +846,9 @@ describe('cache invalidation contract', () => {
     );
   });
 
-  it('documents that state changes must call invalidateProxyUserStateCache', () => {
-    // When these events occur, invalidateProxyUserStateCache(clerkUserId)
-    // must be called to prevent stale routing:
-    // - Waitlist approval
-    // - Onboarding completion
-    // - User deletion/ban
-    // Max staleness without invalidation: Redis TTL (2-5 min)
-    expect(true).toBe(true); // Contract documentation
-  });
+  it.todo(
+    'documents that state changes must call invalidateProxyUserStateCache — contract documentation'
+  );
 });
 
 // ============================================================================
