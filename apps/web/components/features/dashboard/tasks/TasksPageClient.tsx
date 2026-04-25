@@ -974,6 +974,164 @@ function MobileTaskListItem({
   );
 }
 
+function useTaskActions({
+  artistName,
+  deleteTask,
+  openReleaseSidebar,
+  openTaskDocument,
+  updateTask,
+}: {
+  artistName: string | null | undefined;
+  deleteTask: (taskId: string, opts: { onError: () => void }) => void;
+  openReleaseSidebar: (task: TaskView) => void;
+  openTaskDocument: (task: TaskView) => void;
+  updateTask: (
+    params: {
+      taskId: string;
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>;
+    },
+    opts: { onError: () => void }
+  ) => void;
+}) {
+  const updateTaskField = useCallback(
+    (
+      taskId: string,
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
+    ) => {
+      updateTask(
+        { taskId, data },
+        { onError: () => toast.error("Couldn't update task") }
+      );
+    },
+    [updateTask]
+  );
+
+  const handleDeleteTask = useCallback(
+    (task: TaskView) => {
+      const shouldDelete = globalThis.confirm(
+        `Delete "${task.title}"? This can't be undone.`
+      );
+      if (!shouldDelete) return;
+      deleteTask(task.id, {
+        onError: () => toast.error("Couldn't delete task"),
+      });
+    },
+    [deleteTask]
+  );
+
+  const getTaskContextMenuItems = useCallback(
+    (task: TaskView): ContextMenuItemType[] => {
+      const StageIcon = getTaskStageVisual(task.status, task.agentStatus).icon;
+      const statusIcon = (
+        <StageIcon
+          className={cn('h-4 w-4', task.status === 'done' && 'fill-current')}
+        />
+      );
+      return [
+        {
+          id: 'open-task',
+          label: 'Open Task',
+          icon: <FileText className='h-4 w-4' />,
+          onClick: () => openTaskDocument(task),
+        },
+        ...(task.releaseId
+          ? [
+              {
+                id: 'open-release',
+                label: 'Open Release',
+                icon: <Disc3 className='h-4 w-4' />,
+                onClick: () => openReleaseSidebar(task),
+              } satisfies ContextMenuItemType,
+              { type: 'separator' } satisfies ContextMenuItemType,
+            ]
+          : []),
+        {
+          id: 'change-status',
+          label: 'Status',
+          icon: statusIcon,
+          items: TASK_STATUS_OPTIONS.map(([value, label]) => ({
+            id: `status-${value}`,
+            label,
+            icon: <TaskStatusLeadingVisual status={value} />,
+            onClick: () => updateTaskField(task.id, { status: value }),
+            disabled: task.status === value,
+          })),
+        },
+        {
+          id: 'change-priority',
+          label: 'Priority',
+          icon: <TaskPriorityLeadingVisual priority={task.priority} />,
+          items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
+            id: `priority-${value}`,
+            label,
+            icon: <TaskPriorityLeadingVisual priority={value} />,
+            onClick: () => updateTaskField(task.id, { priority: value }),
+            disabled: task.priority === value,
+          })),
+        },
+        {
+          id: 'change-assignee',
+          label: 'Assignee',
+          icon: (
+            <span aria-hidden='true'>
+              <TaskAssigneeLeadingVisual
+                assigneeKind={task.assigneeKind}
+                artistName={artistName}
+              />
+            </span>
+          ),
+          items: [
+            {
+              id: 'assignee-human',
+              label: 'You',
+              icon: (
+                <span aria-hidden='true'>
+                  <TaskAssigneeLeadingVisual
+                    assigneeKind='human'
+                    artistName={artistName}
+                  />
+                </span>
+              ),
+              onClick: () =>
+                updateTaskField(task.id, { assigneeKind: 'human' }),
+              disabled: task.assigneeKind === 'human',
+            },
+            {
+              id: 'assignee-jovie',
+              label: 'Jovie',
+              icon: (
+                <span aria-hidden='true'>
+                  <TaskAssigneeLeadingVisual assigneeKind='jovie' />
+                </span>
+              ),
+              onClick: () =>
+                updateTaskField(task.id, { assigneeKind: 'jovie' }),
+              disabled: task.assigneeKind === 'jovie',
+            },
+          ],
+        },
+        { type: 'separator' },
+        {
+          id: 'delete-task',
+          label: 'Delete Task',
+          icon: <Trash2 className='h-4 w-4' />,
+          destructive: true,
+          onClick: () => handleDeleteTask(task),
+        },
+      ];
+    },
+    [
+      artistName,
+      handleDeleteTask,
+      openReleaseSidebar,
+      openTaskDocument,
+      updateTaskField,
+    ]
+  );
+
+  return { getTaskContextMenuItems, handleDeleteTask, updateTaskField };
+}
+
 export function TasksPageClient() {
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
@@ -1180,6 +1338,14 @@ export function TasksPageClient() {
     [canShowTaskDocumentAlongsideReleaseSidebar]
   );
 
+  const { getTaskContextMenuItems, updateTaskField } = useTaskActions({
+    artistName,
+    deleteTask,
+    openReleaseSidebar,
+    openTaskDocument,
+    updateTask,
+  });
+
   // Close release sidebar when the active task changes — the sidebar is only
   // useful alongside the task that owns the release.
   useEffect(() => {
@@ -1322,158 +1488,6 @@ export function TasksPageClient() {
     };
   }, [selectNextTask, selectPreviousTask, selectedTask]);
 
-  const updateTaskField = useCallback(
-    (
-      taskId: string,
-      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
-    ) => {
-      updateTask(
-        {
-          taskId,
-          data,
-        },
-        {
-          onError: () => {
-            toast.error("Couldn't update task");
-          },
-        }
-      );
-    },
-    [updateTask]
-  );
-
-  const handleDeleteTask = useCallback(
-    (task: TaskView) => {
-      const shouldDelete = globalThis.confirm(
-        `Delete "${task.title}"? This can't be undone.`
-      );
-
-      if (!shouldDelete) {
-        return;
-      }
-
-      deleteTask(task.id, {
-        onError: () => {
-          toast.error("Couldn't delete task");
-        },
-      });
-    },
-    [deleteTask]
-  );
-
-  const getTaskContextMenuItems = useCallback(
-    (task: TaskView): ContextMenuItemType[] => [
-      {
-        id: 'open-task',
-        label: 'Open Task',
-        icon: <FileText className='h-4 w-4' />,
-        onClick: () => openTaskDocument(task),
-      },
-      ...(task.releaseId
-        ? [
-            {
-              id: 'open-release',
-              label: 'Open Release',
-              icon: <Disc3 className='h-4 w-4' />,
-              onClick: () => openReleaseSidebar(task),
-            } satisfies ContextMenuItemType,
-            { type: 'separator' } satisfies ContextMenuItemType,
-          ]
-        : []),
-      {
-        id: 'change-status',
-        label: 'Status',
-        icon: (() => {
-          const StageIcon = getTaskStageVisual(
-            task.status,
-            task.agentStatus
-          ).icon;
-          return (
-            <StageIcon
-              className={cn(
-                'h-4 w-4',
-                task.status === 'done' && 'fill-current'
-              )}
-            />
-          );
-        })(),
-        items: TASK_STATUS_OPTIONS.map(([value, label]) => ({
-          id: `status-${value}`,
-          label,
-          icon: <TaskStatusLeadingVisual status={value} />,
-          onClick: () => updateTaskField(task.id, { status: value }),
-          disabled: task.status === value,
-        })),
-      },
-      {
-        id: 'change-priority',
-        label: 'Priority',
-        icon: <TaskPriorityLeadingVisual priority={task.priority} />,
-        items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
-          id: `priority-${value}`,
-          label,
-          icon: <TaskPriorityLeadingVisual priority={value} />,
-          onClick: () => updateTaskField(task.id, { priority: value }),
-          disabled: task.priority === value,
-        })),
-      },
-      {
-        id: 'change-assignee',
-        label: 'Assignee',
-        icon: (
-          <span aria-hidden='true'>
-            <TaskAssigneeLeadingVisual
-              assigneeKind={task.assigneeKind}
-              artistName={artistName}
-            />
-          </span>
-        ),
-        items: [
-          {
-            id: 'assignee-human',
-            label: 'You',
-            icon: (
-              <span aria-hidden='true'>
-                <TaskAssigneeLeadingVisual
-                  assigneeKind='human'
-                  artistName={artistName}
-                />
-              </span>
-            ),
-            onClick: () => updateTaskField(task.id, { assigneeKind: 'human' }),
-            disabled: task.assigneeKind === 'human',
-          },
-          {
-            id: 'assignee-jovie',
-            label: 'Jovie',
-            icon: (
-              <span aria-hidden='true'>
-                <TaskAssigneeLeadingVisual assigneeKind='jovie' />
-              </span>
-            ),
-            onClick: () => updateTaskField(task.id, { assigneeKind: 'jovie' }),
-            disabled: task.assigneeKind === 'jovie',
-          },
-        ],
-      },
-      { type: 'separator' },
-      {
-        id: 'delete-task',
-        label: 'Delete Task',
-        icon: <Trash2 className='h-4 w-4' />,
-        destructive: true,
-        onClick: () => handleDeleteTask(task),
-      },
-    ],
-    [
-      artistName,
-      handleDeleteTask,
-      openReleaseSidebar,
-      openTaskDocument,
-      updateTaskField,
-    ]
-  );
-
   const sidebarPanel = selectedRelease ? (
     <ReleaseSidebar
       release={selectedRelease}
@@ -1512,6 +1526,40 @@ export function TasksPageClient() {
     };
   }, [headerActions, setHeaderActions]);
 
+  const renderTaskCell = useCallback(
+    (info: { row: { original: TaskView } }) => (
+      <TaskListRow
+        task={info.row.original}
+        onOpenRelease={openReleaseSidebar}
+        artistName={artistName}
+        isSelected={info.row.original.id === effectiveSelectedTaskId}
+        actionSlot={
+          <TableActionMenu
+            items={convertContextMenuItems(
+              getTaskContextMenuItems(info.row.original)
+            )}
+            trigger='custom'
+          >
+            <button
+              type='button'
+              onClick={event => event.stopPropagation()}
+              aria-label='Open task actions'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
+            >
+              <MoreVertical className='h-3.5 w-3.5' />
+            </button>
+          </TableActionMenu>
+        }
+      />
+    ),
+    [
+      artistName,
+      effectiveSelectedTaskId,
+      getTaskContextMenuItems,
+      openReleaseSidebar,
+    ]
+  );
+
   const columns = useMemo(
     () =>
       [
@@ -1519,40 +1567,11 @@ export function TasksPageClient() {
           id: 'title',
           header: 'Tasks',
           size: 9999,
-          cell: info => (
-            <TaskListRow
-              task={info.row.original}
-              onOpenRelease={openReleaseSidebar}
-              artistName={artistName}
-              isSelected={info.row.original.id === effectiveSelectedTaskId}
-              actionSlot={
-                <TableActionMenu
-                  items={convertContextMenuItems(
-                    getTaskContextMenuItems(info.row.original)
-                  )}
-                  trigger='custom'
-                >
-                  <button
-                    type='button'
-                    onClick={event => event.stopPropagation()}
-                    aria-label='Open task actions'
-                    className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
-                  >
-                    <MoreVertical className='h-3.5 w-3.5' />
-                  </button>
-                </TableActionMenu>
-              }
-            />
-          ),
+          cell: renderTaskCell,
           meta: { className: 'px-0' },
         }),
       ] as ColumnDef<TaskView, unknown>[],
-    [
-      artistName,
-      effectiveSelectedTaskId,
-      getTaskContextMenuItems,
-      openReleaseSidebar,
-    ]
+    [renderTaskCell]
   );
 
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
@@ -1573,6 +1592,98 @@ export function TasksPageClient() {
       toast.error("Couldn't create task");
     }
   };
+
+  let desktopTaskPane: React.ReactNode;
+  if (showTaskWorkbenchEmptyState) {
+    desktopTaskPane = (
+      <div className='flex h-full items-center justify-center px-6 py-6'>
+        <div className='w-full max-w-[26rem] px-6 py-8'>
+          <TaskEmptyState
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+            onOpenComposer={() => setHeaderMode('create')}
+          />
+        </div>
+      </div>
+    );
+  } else if (isXlUp) {
+    desktopTaskPane = (
+      <UnifiedTable
+        data={visibleTasks}
+        columns={columns}
+        isLoading={isLoading}
+        getRowId={row => row.id}
+        hideHeader
+        enableVirtualization={false}
+        rowHeight={64}
+        skeletonRows={8}
+        className='text-app'
+        containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+        minWidth='100%'
+        onRowClick={row => openTaskDocument(row)}
+        getContextMenuItems={getTaskContextMenuItems}
+        getRowClassName={_row =>
+          cn(
+            'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
+          )
+        }
+        emptyState={
+          <TaskEmptyState
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+            onOpenComposer={() => setHeaderMode('create')}
+          />
+        }
+      />
+    );
+  } else {
+    desktopTaskPane = null;
+  }
+
+  let mobileTaskContent: React.ReactNode;
+  if (mobileScopedTasks.length === 0) {
+    mobileTaskContent = (
+      <div className='px-4 pt-6'>
+        <TaskEmptyState
+          hasFilters={hasFilters || mobileScope !== 'all'}
+          onClearFilters={clearFilters}
+          onOpenComposer={() => setHeaderMode('create')}
+        />
+      </div>
+    );
+  } else if (mobileScope === 'all') {
+    mobileTaskContent = (
+      <>
+        <MobileTaskSection
+          title='Open'
+          tasks={mobileTaskSections.activeTasks}
+          selectedTaskId={selectedTaskId}
+          artistName={artistName}
+          onOpenTask={openTaskDocument}
+          onOpenRelease={openReleaseSidebar}
+        />
+        <MobileTaskSection
+          title='Closed'
+          tasks={mobileTaskSections.completedTasks}
+          selectedTaskId={selectedTaskId}
+          artistName={artistName}
+          onOpenTask={openTaskDocument}
+          onOpenRelease={openReleaseSidebar}
+        />
+      </>
+    );
+  } else {
+    mobileTaskContent = (
+      <MobileTaskSection
+        title={mobileScope === 'open' ? 'Open' : 'Closed'}
+        tasks={mobileScopedTasks}
+        selectedTaskId={selectedTaskId}
+        artistName={artistName}
+        onOpenTask={openTaskDocument}
+        onOpenRelease={openReleaseSidebar}
+      />
+    );
+  }
 
   return (
     <PageShell
@@ -1650,45 +1761,7 @@ export function TasksPageClient() {
                 !selectedTask && 'xl:max-w-none'
               )}
             >
-              {showTaskWorkbenchEmptyState ? (
-                <div className='flex h-full items-center justify-center px-6 py-6'>
-                  <div className='w-full max-w-[26rem] px-6 py-8'>
-                    <TaskEmptyState
-                      hasFilters={hasFilters}
-                      onClearFilters={clearFilters}
-                      onOpenComposer={() => setHeaderMode('create')}
-                    />
-                  </div>
-                </div>
-              ) : isXlUp ? (
-                <UnifiedTable
-                  data={visibleTasks}
-                  columns={columns}
-                  isLoading={isLoading}
-                  getRowId={row => row.id}
-                  hideHeader
-                  enableVirtualization={false}
-                  rowHeight={64}
-                  skeletonRows={8}
-                  className='text-app'
-                  containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
-                  minWidth='100%'
-                  onRowClick={row => openTaskDocument(row)}
-                  getContextMenuItems={getTaskContextMenuItems}
-                  getRowClassName={_row =>
-                    cn(
-                      'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
-                    )
-                  }
-                  emptyState={
-                    <TaskEmptyState
-                      hasFilters={hasFilters}
-                      onClearFilters={clearFilters}
-                      onOpenComposer={() => setHeaderMode('create')}
-                    />
-                  }
-                />
-              ) : (
+              {desktopTaskPane ?? (
                 <div
                   className='flex h-full min-h-0 flex-col overflow-hidden'
                   data-testid='mobile-task-list'
@@ -1718,43 +1791,7 @@ export function TasksPageClient() {
                     onChange={setMobileScope}
                   />
                   <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6'>
-                    {mobileScopedTasks.length === 0 ? (
-                      <div className='px-4 pt-6'>
-                        <TaskEmptyState
-                          hasFilters={hasFilters || mobileScope !== 'all'}
-                          onClearFilters={clearFilters}
-                          onOpenComposer={() => setHeaderMode('create')}
-                        />
-                      </div>
-                    ) : mobileScope === 'all' ? (
-                      <>
-                        <MobileTaskSection
-                          title='Open'
-                          tasks={mobileTaskSections.activeTasks}
-                          selectedTaskId={selectedTaskId}
-                          artistName={artistName}
-                          onOpenTask={openTaskDocument}
-                          onOpenRelease={openReleaseSidebar}
-                        />
-                        <MobileTaskSection
-                          title='Closed'
-                          tasks={mobileTaskSections.completedTasks}
-                          selectedTaskId={selectedTaskId}
-                          artistName={artistName}
-                          onOpenTask={openTaskDocument}
-                          onOpenRelease={openReleaseSidebar}
-                        />
-                      </>
-                    ) : (
-                      <MobileTaskSection
-                        title={mobileScope === 'open' ? 'Open' : 'Closed'}
-                        tasks={mobileScopedTasks}
-                        selectedTaskId={selectedTaskId}
-                        artistName={artistName}
-                        onOpenTask={openTaskDocument}
-                        onOpenRelease={openReleaseSidebar}
-                      />
-                    )}
+                    {mobileTaskContent}
                   </div>
                 </div>
               )}
