@@ -338,6 +338,7 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else
 - For marketing sections, the default composition is: one headline, one subhead, one visual. Do not add eyebrow text, labels, proof bars, separators, helper rows, or extra wrapper cards unless a human explicitly asks for that exact element
 - Eyebrow text is banned by default on marketing pages. Only add an eyebrow when a human explicitly requests it for that exact section
+- For homepage-style marketing heroes, treat the first viewport like a poster: do not inset the hero inside a floating card, and do not push the primary proof element below the fold with a `100vh` shell plus extra stacked content. The initial viewport must include the full hero composition and the first proof beat together
 - Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast
 - Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed
 - Borders are a supporting tool, not the main design language; if a border can be removed without losing meaning, remove it
@@ -371,6 +372,13 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 - Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
 
 This is 4b (subtraction principle) applied specifically to container boundaries. When in doubt, remove the inner chrome.
+
+### 4e. No Decorative Hover Motion
+
+- Hover states must not move layout or shift components without a product reason
+- Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move
+- Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback
+- If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction
 
 ### 5. Conventional Commits Required
 

@@ -35,7 +35,7 @@ const clerkBaseElements = {
   formFieldErrorText: 'text-destructive',
   formFieldSuccessText: 'text-green-600 dark:text-green-400',
   formButtonPrimary:
-    'btn btn-primary btn-md rounded-xl shadow-sm hover:opacity-90 transition-all',
+    'btn btn-primary btn-md rounded-xl shadow-sm hover:opacity-90 transition-[background-color,border-color,box-shadow,opacity]',
   formButtonReset: 'text-secondary-token hover:text-primary-token',
   socialButtonsBlockButton:
     'btn btn-secondary btn-md border border-subtle hover:bg-surface-1 transition-colors',
@@ -67,13 +67,19 @@ const clerkBaseElements = {
 const authClerkElements = {
   rootBox: {
     width: '100%',
+    background: 'transparent',
   },
   cardBox: {
     width: '100%',
     background: 'transparent',
+    boxShadow: 'none',
   },
   card: {
-    overflow: 'hidden',
+    overflow: 'visible',
+    background: 'transparent',
+    border: '0',
+    boxShadow: 'none',
+    borderRadius: '0',
   },
 } as const;
 
@@ -93,13 +99,13 @@ const authClerkVariables = {
   colorPrimary: '#ffffff',
   colorPrimaryForeground: '#08090a',
   colorForeground: '#ffffff',
-  colorMutedForeground: '#e3e4e6',
-  colorBackground: '#0f1011',
-  colorInput: '#191b1f',
+  colorMutedForeground: 'rgba(255, 255, 255, 0.64)',
+  colorBackground: 'transparent',
+  colorInput: 'rgba(255, 255, 255, 0.035)',
   colorInputForeground: '#ffffff',
-  colorMuted: '#17171a',
-  colorBorder: 'rgba(255, 255, 255, 0.05)',
-  colorShadow: 'rgb(0 0 0 / 0.35)',
+  colorMuted: 'rgba(255, 255, 255, 0.045)',
+  colorBorder: 'rgba(255, 255, 255, 0.08)',
+  colorShadow: 'rgb(0 0 0 / 0.42)',
   colorDanger: 'var(--linear-error)',
   colorSuccess: 'var(--linear-success)',
   colorRing: 'rgb(113 112 255 / 0.28)',

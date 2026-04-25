@@ -45,7 +45,7 @@ export const PILLS: readonly HomepagePill[] = [
 ] as const;
 
 export const HERO_COPY = {
-  headline: 'Your AI Artist Manager.',
+  headline: 'Release more music with less work.',
   subhead:
     'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.',
 } as const;

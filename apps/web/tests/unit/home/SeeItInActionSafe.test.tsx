@@ -15,10 +15,8 @@ describe('SeeItInActionSafe', () => {
     render(<SeeItInActionSafe enabled />);
 
     expect(screen.getByTestId('homepage-live-proof')).toBeInTheDocument();
-    expect(FALLBACK_AVATARS.slice(0, 3).map(creator => creator.name)).toEqual([
-      'Tim White',
-      'David Guetta',
-      'Kaskade',
+    expect(FALLBACK_AVATARS.map(creator => creator.name)).toEqual([
+      TIM_WHITE_PROFILE.name,
     ]);
     expect(FALLBACK_AVATARS[0]).toMatchObject({
       handle: TIM_WHITE_PROFILE.handle,
@@ -26,7 +24,7 @@ describe('SeeItInActionSafe', () => {
       src: TIM_WHITE_PROFILE.avatarSrc,
     });
 
-    for (const creator of FALLBACK_AVATARS.slice(0, 3)) {
+    for (const creator of FALLBACK_AVATARS) {
       expect(screen.getByText(creator.name)).toBeInTheDocument();
       expect(screen.getByText(`jov.ie/${creator.handle}`)).toBeInTheDocument();
     }

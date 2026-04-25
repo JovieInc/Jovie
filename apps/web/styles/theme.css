@@ -1,44 +1,149 @@
-/* Feature Accents & Animations - Extends design-system.css */
+/* Auth shell and Clerk styling */
 
-/* Animation classes now provided by tw-animate-css */
-/* Shimmer keyframes defined in globals.css */
+.auth-shell-grain {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.08) 0.7px,
+    transparent 0
+  );
+  background-size: 28px 28px;
+}
 
-/* ============================================
-   Clerk Auth Surfaces
-   ============================================
-   Uses stable cl-* selectors so the auth shell stays on-brand
-   even when Clerk changes its internal styling implementation.
-   This is the single source of truth for auth visual styling.
-   Structural layout properties live in clerkAppearance.ts.
-   ============================================ */
+.auth-desktop-only {
+  display: none;
+}
 
-/* --- A. Custom properties scoped to auth roots --- */
-/* Auth pages always render on a dark background (hardcoded gradient overlay).
-   Use fixed dark-theme values so Clerk components (card, footer, branding)
-   display correctly regardless of the user's system light/dark mode. */
+.auth-mobile-only {
+  display: flex;
+}
+
+[data-auth-modal-shell] [data-auth-modal-body] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.auth-showcase-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 2rem;
+  background:
+    radial-gradient(
+      circle at 18% 12%,
+      rgba(255, 255, 255, 0.05),
+      transparent 18%
+    ),
+    radial-gradient(
+      circle at 84% 16%,
+      rgba(113, 112, 255, 0.12),
+      transparent 28%
+    ),
+    linear-gradient(180deg, rgba(18, 20, 24, 0.98), rgba(8, 9, 11, 0.98));
+  box-shadow:
+    0 34px 92px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.auth-showcase-panel::before {
+  position: absolute;
+  inset: auto auto 12% -10%;
+  width: 16rem;
+  height: 16rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  filter: blur(92px);
+  content: "";
+}
+
+.auth-showcase-panel::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025),
+    transparent 16%,
+    transparent 78%,
+    rgba(0, 0, 0, 0.1)
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.auth-showcase-frame {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-end;
+  margin-top: auto;
+}
+
+.auth-showcase-frame::before {
+  position: absolute;
+  inset: auto 8% -2.8rem 18%;
+  height: 10rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.025),
+    rgba(113, 112, 255, 0.18)
+  );
+  filter: blur(82px);
+  content: "";
+}
+
+.auth-showcase-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 22rem;
+  padding: 1.9rem 1.9rem 0;
+}
+
+.auth-showcase-panel[data-variant="page"],
+.auth-showcase-panel[data-variant="image-only"] {
+  padding-top: 0.2rem;
+}
+
+.auth-showcase-panel[data-variant="page"] .auth-showcase-frame,
+.auth-showcase-panel[data-variant="image-only"] .auth-showcase-frame {
+  width: 100%;
+  min-height: 12rem;
+}
+
+@media (min-width: 1024px) {
+  .auth-desktop-only {
+    display: block;
+  }
+
+  .auth-mobile-only {
+    display: none !important;
+  }
+
+  .auth-showcase-copy {
+    padding: 2rem 2rem 0;
+  }
+}
+
+/* Clerk auth surfaces */
+
 :is(.cl-signIn-root, .cl-signUp-root) {
-  --clerk-color-primary: var(--color-accent);
-  --clerk-color-primary-foreground: #ffffff;
+  --clerk-color-primary: #ffffff;
+  --clerk-color-primary-foreground: #08090a;
   --clerk-color-foreground: #ffffff;
   --clerk-color-neutral: #ffffff;
-  --clerk-color-muted-foreground: #e3e4e6;
-  --clerk-color-background: #0f1011;
-  --clerk-color-input: #191b1f;
+  --clerk-color-muted-foreground: rgba(255, 255, 255, 0.64);
+  --clerk-color-background: transparent;
+  --clerk-color-input: rgba(255, 255, 255, 0.035);
   --clerk-color-input-foreground: #ffffff;
-  --clerk-color-muted: #17171a;
-  --clerk-color-border: rgba(255, 255, 255, 0.05);
-  --clerk-color-border-strong: rgba(255, 255, 255, 0.08);
-  --clerk-color-tertiary-foreground: #969799;
-  --clerk-color-surface-2: #23252a;
+  --clerk-color-muted: rgba(255, 255, 255, 0.045);
+  --clerk-color-border: rgba(255, 255, 255, 0.08);
+  --clerk-color-border-strong: rgba(255, 255, 255, 0.14);
+  --clerk-color-tertiary-foreground: rgba(255, 255, 255, 0.42);
   --clerk-color-ring: rgba(113, 112, 255, 0.28);
-  --clerk-color-modal-backdrop: rgba(8, 9, 10, 0.72);
-  --clerk-color-shadow: rgba(0, 0, 0, 0.35);
-  --clerk-border-radius: var(--radius-xl);
-  --clerk-font-family: var(--font-sans);
-  --clerk-spacing: 1.125rem;
-  --clerk-focus-ring: 0 0 0 2px rgba(113, 112, 255, 0.28);
+  --clerk-color-shadow: rgba(0, 0, 0, 0.3);
+  --clerk-radius-pill: 999px;
   --clerk-motion-duration: 220ms;
-  --clerk-motion-duration-fast: 180ms;
   --clerk-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
   font-feature-settings: var(--linear-font-features);
 }
@@ -54,33 +159,27 @@
   }
 }
 
-/* --- A2. Hide Clerk's built-in logo (we render our own BrandLogo above the card) --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-logoBox {
   display: none;
 }
 
-/* --- B. Card container --- */
 :is(.cl-signIn-root, .cl-signUp-root),
-:is(.cl-signIn-root, .cl-signUp-root) .cl-cardBox {
+:is(.cl-signIn-root, .cl-signUp-root) .cl-rootBox,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-main,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-cardBox,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-card {
   width: 100%;
   background: transparent;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-card {
-  overflow: hidden;
-  border: 1px solid var(--clerk-color-border);
-  background: color-mix(
-    in srgb,
-    var(--clerk-color-background) 94%,
-    transparent
-  );
-  border-radius: var(--radius-3xl);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(24px);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
-/* --- B2. Inside the intercepted auth modal, collapse Clerk's card chrome
-   so the dialog surface + Clerk form read as one unified panel. --- */
 .jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-card {
   background: transparent;
   border: 0;
@@ -88,184 +187,212 @@
   backdrop-filter: none;
   padding: 0;
 }
+
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root),
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-rootBox,
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-main,
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-cardBox,
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-card {
+  width: 100%;
+  max-width: none;
+}
+
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-header {
+  margin-bottom: 1.2rem;
+}
+
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
+  font-size: clamp(2.45rem, 7.4vw, 3.35rem);
+}
+
+.jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle {
+  margin-top: 0.72rem;
+  max-width: 22rem;
+}
+
 .jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) .cl-footer {
   padding-top: 0;
   background: transparent;
 }
+
 .jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) [data-clerk-captcha],
 .jovie-auth-modal :is(.cl-signIn-root, .cl-signUp-root) #clerk-captcha {
   display: none;
 }
 
+:is(.cl-signIn-root, .cl-signUp-root) .cl-header,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-form,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerRow,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldRow,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton {
+:is(.cl-signIn-root, .cl-signUp-root) .cl-alert,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreview {
   animation: clerk-auth-enter var(--clerk-motion-duration)
     var(--clerk-motion-ease) both;
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
-  animation: clerk-auth-enter var(--clerk-motion-duration)
-    var(--clerk-motion-ease) both;
-  animation-delay: 40ms;
+:is(.cl-signIn-root, .cl-signUp-root) .cl-header {
+  margin-bottom: 1.45rem;
 }
 
-/* --- C. Typography --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
   color: var(--clerk-color-foreground);
-  font-size: clamp(1.75rem, 2vw, 1.875rem);
+  font-size: clamp(2.85rem, 6.2vw, 4.35rem);
   font-weight: 590;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  text-align: center;
+  line-height: 0.92;
+  letter-spacing: -0.06em;
+  text-align: left;
+  text-wrap: balance;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle {
-  margin-top: 0.5rem;
+  margin-top: 0.85rem;
+  max-width: 24rem;
   color: var(--clerk-color-muted-foreground);
-  font-size: 0.9375rem;
-  line-height: 1.45;
-  text-align: center;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  text-align: left;
+  text-wrap: pretty;
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldLabel {
-  margin-bottom: 0.25rem;
-  color: var(--clerk-color-muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 510;
-  letter-spacing: -0.012em;
-}
-
-/* Step-specific headers (OTP verification, etc.) */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderTitle {
   color: var(--clerk-color-foreground);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 590;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  text-align: left;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderSubtitle {
   color: var(--clerk-color-muted-foreground);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-align: left;
 }
 
-/* --- D. Inputs --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput {
-  min-height: 48px;
-  padding-inline: 1rem;
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 1rem;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
+  width: 100%;
+  min-height: 3.85rem;
+  justify-content: center;
+  gap: 0.8rem;
+  padding-inline: 1.5rem;
   border: 1px solid var(--clerk-color-border);
+  border-radius: var(--clerk-radius-pill);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--clerk-color-foreground);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+  transition:
+    box-shadow 180ms var(--clerk-motion-ease),
+    border-color 180ms var(--clerk-motion-ease),
+    background-color 180ms var(--clerk-motion-ease);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton__google {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #ffffff;
+  color: #08090a;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-socialButtonsBlockButton__google
+  .cl-socialButtonsBlockButtonText {
+  color: #08090a;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton__spotify {
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
+  border-color: var(--clerk-color-border-strong);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.24);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsProviderIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButtonText {
+  font-size: 1.0625rem;
+  font-weight: 590;
+  letter-spacing: -0.02em;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerRow {
+  margin: 1rem 0 0.9rem;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerLine {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerText {
+  color: var(--clerk-color-tertiary-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldLabel {
+  margin-bottom: 0.5rem;
+  color: var(--clerk-color-muted-foreground);
+  font-size: 0.76rem;
+  font-weight: 510;
+  letter-spacing: -0.01em;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-phoneInputBox,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
+  min-height: 3.6rem;
+  border: 1px solid var(--clerk-color-border);
+  border-radius: var(--clerk-radius-pill);
   background: var(--clerk-color-input);
   color: var(--clerk-color-input-foreground);
-  border-radius: var(--radius-pill);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 10px 24px rgba(0, 0, 0, 0.14);
   transition:
-    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
+    border-color 180ms var(--clerk-motion-ease),
+    box-shadow 180ms var(--clerk-motion-ease),
+    background-color 180ms var(--clerk-motion-ease);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput {
+  padding-inline: 1.15rem;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput::placeholder {
-  color: var(--clerk-color-tertiary-foreground);
+  color: rgba(255, 255, 255, 0.34);
 }
 
-/* Input error state — Clerk uses data-feedback="error" and aria-invalid="true" */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput[data-feedback="error"],
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput[aria-invalid="true"] {
   border-color: var(--linear-error);
   box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
     0 0 0 1px var(--linear-error);
 }
 
-/* Input disabled state */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: var(--clerk-color-muted);
-}
-
-/* --- E. OTP fields --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField {
-  gap: 8px;
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput {
-  min-height: 48px;
-  width: 44px;
-  border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-input);
-  color: var(--clerk-color-input-foreground);
-  border-radius: var(--radius-xl);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
-  font-size: 1.25rem;
-  font-weight: 510;
-  letter-spacing: 0.05em;
-  text-align: center;
-  transition:
-    border-color 150ms var(--ease-interactive),
-    box-shadow 150ms var(--ease-interactive),
-    background-color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput::placeholder {
-  color: var(--clerk-color-tertiary-foreground);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldSeparator {
-  color: var(--clerk-color-tertiary-foreground);
-}
-
-/* OTP filled state — active input being typed into */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-active] {
-  border-color: var(--clerk-color-border-strong);
-  background: var(--clerk-color-muted);
-}
-
-/* OTP error state — covers @clerk/ui (data-error, data-feedback) and Clerk Elements (data-invalid) */
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeFieldInput[data-feedback="error"],
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-error],
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-invalid],
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeFieldInput[aria-invalid="true"],
-:is(.cl-signIn-root, .cl-signUp-root) .cl-error .cl-otpCodeFieldInput {
-  border-color: var(--linear-error);
-  animation: otp-shake 300ms var(--ease-interactive);
-}
-
-/* OTP success state */
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeFieldInput[data-feedback="success"] {
-  border-color: var(--linear-success);
-}
-
-@keyframes otp-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  @keyframes otp-shake {
-    0%,
-    100% {
-      transform: none;
-    }
-  }
-}
-
-/* --- F. Focus rings (consolidated) --- */
 :is(.cl-signIn-root, .cl-signUp-root)
   :is(
     .cl-formFieldInput,
@@ -282,52 +409,36 @@
     .cl-selectButton,
     .cl-selectSearchInput,
     .cl-phoneInputBox,
-    .cl-formButtonReset
+    .cl-formButtonReset,
+    .cl-socialButtonsBlockButton,
+    .cl-formButtonPrimary
   ):focus-visible {
   outline: none;
   border-color: var(--clerk-color-border-strong);
-  box-shadow: var(--clerk-focus-ring);
+  box-shadow: 0 0 0 2px rgba(113, 112, 255, 0.28);
 }
 
-/* --- G. Interactive element states --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInputShowPasswordButton,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton {
-  color: var(--clerk-color-muted-foreground);
-  transition: color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-formFieldInputShowPasswordButton:hover,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton:hover {
-  color: var(--clerk-color-foreground);
-}
-
-/* --- H. Primary button --- */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
-  min-height: 48px;
-  padding-inline: 1.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 3.75rem;
+  margin-top: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--clerk-radius-pill);
   background: #ffffff;
   color: #08090a;
-  border-radius: var(--radius-pill);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.32);
-  font-size: 0.9375rem;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.24);
+  font-size: 1.0625rem;
   font-weight: 590;
+  letter-spacing: -0.02em;
   transition:
-    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
+    box-shadow 180ms var(--clerk-motion-ease),
+    background-color 180ms var(--clerk-motion-ease),
+    border-color 180ms var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:hover {
-  background: #f0f0f0;
-}
-
-@media (hover: hover) {
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.36);
-  }
+  background: #f2f2f2;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:disabled {
@@ -337,49 +448,67 @@
   box-shadow: none;
 }
 
-/* Spinner inside buttons */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-spinner,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-buttonSpinner {
   color: currentColor;
 }
 
-/* --- I. Social buttons --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
-  min-height: 48px;
-  padding-inline: 1rem;
-  border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-muted);
-  color: var(--clerk-color-foreground);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  transition:
-    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    box-shadow var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
-  border-color: var(--clerk-color-border-strong);
-  background: var(--clerk-color-surface-2);
-}
-
-@media (hover: hover) {
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  }
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton * {
-  font-size: 0.9375rem;
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButtonText {
-  color: var(--clerk-color-foreground);
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldAction,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-backLink,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-headerBackLink,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonReset {
+  color: var(--clerk-color-muted-foreground);
+  font-size: 0.84rem;
   font-weight: 510;
+  transition: color 160ms var(--clerk-motion-ease);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root)
+  :is(
+    .cl-formFieldAction,
+    .cl-backLink,
+    .cl-headerBackLink,
+    .cl-formButtonReset
+  ):hover {
+  color: var(--clerk-color-foreground);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footer {
+  background: transparent;
+  padding-top: 1rem;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionText {
+  color: var(--clerk-color-muted-foreground);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formResendCodeLink,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldResendButton {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 160ms var(--clerk-motion-ease);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root)
+  :is(
+    .cl-footerActionLink,
+    .cl-formResendCodeLink,
+    .cl-otpCodeFieldResendButton
+  ):hover {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+:is(.cl-signIn-root, .cl-signUp-root) .cl-alert,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreview,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-verificationLinkStatusBox {
+  border: 1px solid var(--clerk-color-border);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--clerk-color-foreground);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alertText,
@@ -387,206 +516,108 @@
   color: var(--clerk-color-foreground);
 }
 
-/* --- J. Divider --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerLine {
-  background: var(--clerk-color-border);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-dividerText {
-  color: var(--clerk-color-tertiary-foreground);
-  font-size: 0.75rem;
-  font-weight: 510;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* --- K. Footer --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footer {
-  background: transparent;
-  padding-top: 0.5rem;
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionText {
-  color: var(--clerk-color-muted-foreground);
-  font-size: 0.8125rem;
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formResendCodeLink,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldResendButton {
-  color: var(--clerk-color-foreground);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink:hover,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formResendCodeLink:hover,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldResendButton:hover {
-  color: var(--color-accent);
-  text-decoration-color: var(--color-accent);
-}
-
-/* --- L. Alerts & identity preview --- */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-alert,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreview {
-  border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-muted);
-  color: var(--clerk-color-foreground);
-  border-radius: var(--radius-xl);
-}
-
-/* --- M. Missing elements --- */
-
-/* Forgot password / form field action links */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldAction {
-  color: var(--clerk-color-muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 450;
-  transition: color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldAction:hover {
-  color: var(--clerk-color-foreground);
-}
-
-/* Back link (OTP/verification screens) */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-backLink,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-headerBackLink {
-  color: var(--clerk-color-muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 510;
-  transition: color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-backLink:hover,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-headerBackLink:hover {
-  color: var(--clerk-color-foreground);
-}
-
-/* Helper/hint text below inputs */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldHintText {
   color: var(--clerk-color-tertiary-foreground);
   font-size: 0.75rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
-/* Warning text */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldWarningText {
   color: var(--linear-warning);
   font-size: 0.8125rem;
 }
 
-/* Error text */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldErrorText {
   color: var(--linear-error);
   font-size: 0.8125rem;
 }
 
-/* Reset/back button */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonReset {
-  color: var(--clerk-color-muted-foreground);
-  font-size: 0.8125rem;
-  font-weight: 510;
-  transition: color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonReset:hover {
-  color: var(--clerk-color-foreground);
-}
-
-/* Alternative verification methods */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton {
-  min-height: 48px;
-  padding-inline: 1rem;
+  min-height: 3.5rem;
   border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-muted);
+  border-radius: var(--clerk-radius-pill);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--clerk-color-foreground);
-  border-radius: var(--radius-pill);
-  font-size: 0.875rem;
-  font-weight: 450;
-  transition:
-    background-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    border-color var(--clerk-motion-duration-fast) var(--clerk-motion-ease),
-    transform var(--clerk-motion-duration-fast) var(--clerk-motion-ease);
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton:hover {
-  border-color: var(--clerk-color-border-strong);
-  background: var(--clerk-color-surface-2);
-  transform: translateY(-1px);
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField {
+  gap: 0.55rem;
 }
 
-/* Magic link verification status */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-verificationLinkStatusBox {
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput {
+  width: 2.9rem;
+  min-height: 3.1rem;
   border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-muted);
-  border-radius: var(--radius-xl);
-  padding: 12px 16px;
-}
-
-/* Phone input */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-phoneInputBox {
-  min-height: 44px;
-  border: 1px solid var(--clerk-color-border);
+  border-radius: 1rem;
   background: var(--clerk-color-input);
-  border-radius: var(--radius-xl);
-}
-
-/* Country/region selectors */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton {
-  border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-muted);
-  border-radius: var(--radius-xl);
-  color: var(--clerk-color-foreground);
-  transition:
-    background-color 150ms var(--ease-interactive),
-    border-color 150ms var(--ease-interactive);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton:hover {
-  border-color: var(--clerk-color-border-strong);
-  background: var(--clerk-color-surface-2);
-}
-
-:is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
-  background: var(--clerk-color-input);
-  border: 1px solid var(--clerk-color-border);
   color: var(--clerk-color-input-foreground);
-  border-radius: var(--radius-xl);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
+  font-size: 1.125rem;
+  font-weight: 590;
+  text-align: center;
 }
 
-/* Badge */
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-otpCodeFieldInput[data-feedback="error"],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-error],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-invalid],
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-otpCodeFieldInput[aria-invalid="true"],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-error .cl-otpCodeFieldInput {
+  border-color: var(--linear-error);
+}
+
 :is(.cl-signIn-root, .cl-signUp-root) .cl-badge {
   border: 1px solid var(--clerk-color-border);
-  background: var(--clerk-color-surface-2);
-  color: var(--clerk-color-muted-foreground);
   border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--clerk-color-muted-foreground);
 }
 
-/* Modal — Clerk renders modals via ReactDOM.createPortal, so they are NOT
-   descendants of .cl-signIn-root/.cl-signUp-root. Target them at top level. */
 .cl-modalBackdrop {
-  background: rgba(8, 9, 10, 0.72);
+  background: rgba(8, 9, 10, 0.74);
   backdrop-filter: blur(16px);
 }
 
 .cl-modalContent {
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-0);
-  border-radius: var(--radius-3xl);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2rem;
+  background: rgba(9, 10, 13, 0.98);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(24px);
 }
 
+@media (max-width: 1023px) {
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
+    font-size: clamp(2.45rem, 10.8vw, 3.7rem);
+    text-align: center;
+  }
+
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderTitle,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderSubtitle,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionText {
+    text-align: center;
+  }
+
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle {
+    margin-inline: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-form,
+  .auth-showcase-panel,
+  .auth-showcase-frame::before,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-header,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons,
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-dividerRow,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldRow,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-footer,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeField,
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-alternativeMethodsBlockButton,
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-alert,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreview {
     animation: none;
+    transition: none;
   }
 }

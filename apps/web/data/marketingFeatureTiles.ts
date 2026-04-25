@@ -32,7 +32,7 @@ export interface MarketingButtonChipFeatureTile
 export interface MarketingIconBadgeFeatureTile
   extends MarketingFeatureTileBase {
   readonly visual: 'icon-badge';
-  readonly badgeIcon: 'speed' | 'sync';
+  readonly badgeIcon: 'speed' | 'sync' | 'chart';
   readonly badgeLabel: string;
 }
 
