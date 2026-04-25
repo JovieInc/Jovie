@@ -24,17 +24,34 @@ export function HomeTrustSection({
   presentation = 'card',
   label = 'Trusted by artists on',
 }: Readonly<HomeTrustSectionProps>) {
-  const logoTone =
-    presentation === 'inline-strip' ? 'text-white/68' : 'text-white/92';
-  const discoWaxSize =
-    presentation === 'inline-strip' ? 'h-[15px]' : 'h-[16px]';
+  const isInlineStrip = presentation === 'inline-strip';
+  const logoTone = isInlineStrip ? 'text-white/68' : 'text-white/92';
+  const discoWaxSize = isInlineStrip ? 'h-[15px]' : 'h-[16px]';
+
+  const innerBoxClass = isInlineStrip
+    ? 'px-0'
+    : cn(
+        'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
+        variant === 'compact'
+          ? 'px-5 py-5 sm:px-6 sm:py-6'
+          : 'px-6 py-7 sm:px-8 sm:py-9'
+      );
+
+  let labelMarginClass: string;
+  if (isInlineStrip) {
+    labelMarginClass = 'mb-5 sm:mb-6';
+  } else if (variant === 'compact') {
+    labelMarginClass = 'mb-4';
+  } else {
+    labelMarginClass = 'mb-5 sm:mb-6';
+  }
 
   return (
     <section
       data-testid='homepage-trust'
       data-presentation={presentation}
       className={cn(
-        presentation === 'inline-strip'
+        isInlineStrip
           ? 'relative z-[1] mx-auto w-full border-t border-white/[0.08] px-5 py-7 sm:px-6 sm:py-8 lg:px-0'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
@@ -44,26 +61,15 @@ export function HomeTrustSection({
       <div
         className={cn(
           'mx-auto max-w-[var(--linear-content-max)]',
-          presentation === 'inline-strip'
-            ? 'px-0'
-            : cn(
-                'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
-                variant === 'compact'
-                  ? 'px-5 py-5 sm:px-6 sm:py-6'
-                  : 'px-6 py-7 sm:px-8 sm:py-9'
-              )
+          innerBoxClass
         )}
       >
         <p
           className={cn(
-            presentation === 'inline-strip'
+            isInlineStrip
               ? 'text-center text-[12px] font-medium tracking-[-0.01em] text-white/42'
               : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
-            presentation === 'inline-strip'
-              ? 'mb-5 sm:mb-6'
-              : variant === 'compact'
-                ? 'mb-4'
-                : 'mb-5 sm:mb-6'
+            labelMarginClass
           )}
         >
           {label}
