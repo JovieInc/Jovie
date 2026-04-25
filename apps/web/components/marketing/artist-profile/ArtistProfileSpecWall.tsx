@@ -1,4 +1,4 @@
-import { Download, Music2, RefreshCw, Zap } from 'lucide-react';
+import { BarChart2, Download, Music2, RefreshCw, Zap } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
@@ -31,11 +31,9 @@ interface ArtistProfileSpecWallProps {
 function ScreenshotCrop({
   alt,
   className,
-  frameClassName,
   imageClassName,
   objectPosition,
-  screenshotHeight,
-  screenshotWidth,
+  priority = false,
   src,
 }: Readonly<{
   alt: string;
@@ -43,43 +41,27 @@ function ScreenshotCrop({
   frameClassName?: string;
   imageClassName?: string;
   objectPosition?: string;
+  priority?: boolean;
   screenshotHeight?: number;
   screenshotWidth?: number;
   src: string;
 }>) {
-  const frameStyle =
-    screenshotWidth && screenshotHeight
-      ? {
-          aspectRatio: `${screenshotWidth} / ${screenshotHeight}`,
-        }
-      : {
-          aspectRatio: '4 / 5',
-        };
-
   return (
     <div
       className={cn(
-        'flex h-full items-start overflow-hidden rounded-[1rem] bg-[#0d1015] p-2.5',
+        'relative h-full w-full overflow-hidden rounded-[0.75rem] bg-[#0a0d12] ring-1 ring-inset ring-white/5',
         className
       )}
     >
-      <div
-        className={cn(
-          'relative w-full overflow-hidden rounded-[0.95rem] bg-[#090d12]',
-          !frameClassName && 'aspect-[4/5]',
-          frameClassName
-        )}
-        style={frameClassName ? undefined : frameStyle}
-      >
-        <Image
-          fill
-          alt={alt}
-          className={cn('object-cover object-top', imageClassName)}
-          sizes='(min-width: 1280px) 28vw, (min-width: 768px) 45vw, 100vw'
-          src={src}
-          style={{ objectPosition }}
-        />
-      </div>
+      <Image
+        fill
+        alt={alt}
+        className={cn('object-contain', imageClassName)}
+        priority={priority}
+        sizes='(min-width: 1280px) 420px, (min-width: 768px) 45vw, 100vw'
+        src={src}
+        style={{ objectPosition }}
+      />
     </div>
   );
 }
@@ -97,7 +79,7 @@ function ButtonChipVisual({
     <div
       role='img'
       aria-label={`${chipLabel} preview`}
-      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
+      className='flex h-full min-h-[9rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
     >
       <div className='inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[12px] font-semibold text-black shadow-[0_14px_26px_rgba(0,0,0,0.14)]'>
         <Icon className='h-3.5 w-3.5' strokeWidth={2} />
@@ -111,16 +93,17 @@ function IconBadgeVisual({
   badgeIcon,
   badgeLabel,
 }: Readonly<{
-  badgeIcon: 'speed' | 'sync';
+  badgeIcon: 'speed' | 'sync' | 'chart';
   badgeLabel: string;
 }>) {
-  const Icon = badgeIcon === 'sync' ? RefreshCw : Zap;
+  const Icon =
+    badgeIcon === 'sync' ? RefreshCw : badgeIcon === 'chart' ? BarChart2 : Zap;
 
   return (
     <div
       role='img'
       aria-label={`${badgeLabel} preview`}
-      className='flex h-full min-h-[10rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
+      className='flex h-full min-h-[9rem] items-center justify-center rounded-[1rem] bg-[#0b0f14]'
     >
       <div className='flex flex-col items-center gap-3 text-center'>
         <span className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-[0_16px_28px_rgba(0,0,0,0.14)]'>
@@ -174,49 +157,18 @@ function ArtistProfilePowerFeatureTile({
   const style: AccentStyle = {
     '--tile-accent': SPEC_TILE_ACCENTS[tile.accent],
   };
-  const chromeStyle: CSSProperties = {
-    boxShadow:
-      '0 0 0 1px color-mix(in srgb, var(--tile-accent) 26%, rgba(255,255,255,0.08)), 0 22px 64px rgba(0,0,0,0.28), 0 0 42px color-mix(in srgb, var(--tile-accent) 14%, transparent)',
-  };
 
   return (
     <article
       className={cn(
-        'relative min-h-[15rem]',
-        tile.size === 'large' ? 'md:min-h-[18.5rem]' : 'md:min-h-[14.5rem]',
+        'relative min-h-[13rem]',
+        tile.size === 'large' ? 'md:min-h-[16.5rem]' : 'md:min-h-[13rem]',
         tile.layoutClassName
       )}
       style={style}
     >
-      <div
-        className='relative flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-white/8 bg-[#07090d] p-4'
-        style={chromeStyle}
-      >
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-[1.35rem] border'
-          style={{
-            borderColor:
-              'color-mix(in srgb, var(--tile-accent) 38%, rgba(255,255,255,0.12))',
-          }}
-        />
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-6 top-0 h-px'
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tile-accent) 72%, white), transparent)',
-          }}
-        />
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-8 top-5 h-10 rounded-full blur-2xl'
-          style={{
-            background:
-              'color-mix(in srgb, var(--tile-accent) 18%, transparent)',
-          }}
-        />
-        <div className='relative z-10 flex-1'>
+      <div className='relative flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-[#07090d] p-4'>
+        <div className='relative flex-1'>
           {tile.visual === 'button-chip' ? (
             <ButtonChipVisual
               chipIcon={tile.chipIcon}
@@ -255,6 +207,7 @@ function ArtistProfilePowerFeatureTile({
               frameClassName={tile.frameClassName}
               imageClassName={tile.imageClassName}
               objectPosition={tile.objectPosition}
+              priority={tile.id === 'rich-analytics'}
               screenshotHeight={tile.screenshotHeight}
               screenshotWidth={tile.screenshotWidth}
               src={tile.screenshotSrc}
@@ -286,11 +239,11 @@ export function ArtistProfileSpecWall({
           headline={specWall.headline}
           body={specWall.subhead}
           className='max-w-[44rem]'
-          headlineClassName='text-[clamp(2.8rem,4.8vw,4.35rem)]'
+          headlineClassName=''
           bodyClassName='max-w-[36rem]'
         />
 
-        <div className='mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
+        <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
           {tiles.map(tile => (
             <ArtistProfilePowerFeatureTile key={tile.id} tile={tile} />
           ))}

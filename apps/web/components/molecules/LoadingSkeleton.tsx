@@ -212,24 +212,41 @@ export function SocialBarSkeleton() {
 export function AuthFormSkeleton() {
   return (
     <output
-      className='block space-y-4'
+      className='block space-y-5'
       aria-label='Loading authentication form'
       aria-busy='true'
     >
       <span
-        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        className='block h-4 w-24 rounded-full skeleton motion-reduce:animate-none'
         aria-hidden='true'
       />
       <span
-        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        className='block h-16 w-full max-w-[17rem] rounded-[2rem] skeleton motion-reduce:animate-none'
         aria-hidden='true'
       />
       <span
-        className='block h-10 w-full rounded-md skeleton motion-reduce:animate-none'
+        className='block h-4 w-full max-w-[19rem] rounded-full skeleton motion-reduce:animate-none'
         aria-hidden='true'
       />
       <span
-        className='block h-12 w-full rounded-md skeleton motion-reduce:animate-none'
+        className='block h-[3.9rem] w-full rounded-full skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <span
+        className='block h-[3.9rem] w-full rounded-full skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <div className='flex items-center gap-4 py-1' aria-hidden='true'>
+        <span className='h-px flex-1 bg-white/8' />
+        <span className='block h-3 w-6 rounded-full skeleton motion-reduce:animate-none' />
+        <span className='h-px flex-1 bg-white/8' />
+      </div>
+      <span
+        className='block h-[3.75rem] w-full rounded-full skeleton motion-reduce:animate-none'
+        aria-hidden='true'
+      />
+      <span
+        className='block h-[3.9rem] w-full rounded-full skeleton motion-reduce:animate-none'
         aria-hidden='true'
       />
     </output>

@@ -25,6 +25,7 @@ export interface HeaderNavProps {
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
   readonly includePublicLoginInMobileNav?: boolean;
+  readonly presentation?: 'default' | 'homepage-embedded';
 }
 
 type PublicAuthActionsProps = Readonly<{
@@ -71,8 +72,14 @@ export function HeaderNav({
   minimalAuth = false,
   minimalAuthVariant = 'link',
   includePublicLoginInMobileNav = true,
+  presentation = 'default',
 }: HeaderNavProps = {}) {
-  const navLinkClass = 'nav-link-linear focus-ring-themed';
+  const navLinkClass = cn(
+    'focus-ring-themed',
+    presentation === 'homepage-embedded'
+      ? 'homepage-header-nav-link'
+      : 'nav-link-linear'
+  );
   const hasNavLinks = !hideNav && !!navLinks?.length;
   const containerClass =
     _containerSize === 'homepage'
@@ -82,16 +89,31 @@ export function HeaderNav({
     <header
       data-testid='header-nav'
       className={cn(
-        'fixed top-0 left-0 right-0 w-full border-b transition-colors duration-200',
+        'fixed top-0 left-0 right-0 w-full transition-colors duration-200',
+        presentation === 'homepage-embedded'
+          ? 'border-b border-transparent'
+          : 'border-b',
         className
       )}
       style={{
         fontSynthesisWeight: 'none',
-        borderColor: 'var(--linear-border-default)',
-        backgroundColor: 'var(--linear-bg-header)',
+        borderColor:
+          presentation === 'homepage-embedded'
+            ? 'transparent'
+            : 'var(--linear-border-default)',
+        backgroundColor:
+          presentation === 'homepage-embedded'
+            ? 'transparent'
+            : 'var(--linear-bg-header)',
         zIndex: 100,
-        backdropFilter: `blur(var(--linear-blur-header))`,
-        WebkitBackdropFilter: `blur(var(--linear-blur-header))`,
+        backdropFilter:
+          presentation === 'homepage-embedded'
+            ? 'none'
+            : `blur(var(--linear-blur-header))`,
+        WebkitBackdropFilter:
+          presentation === 'homepage-embedded'
+            ? 'none'
+            : `blur(var(--linear-blur-header))`,
         minWidth: 0,
         minHeight: 0,
         /* iOS safe area: push header content below the notch/Dynamic Island */
@@ -144,7 +166,7 @@ export function HeaderNav({
           )}
 
           {/* Divider between nav and auth - desktop only */}
-          {hasNavLinks ? (
+          {hasNavLinks && presentation !== 'homepage-embedded' ? (
             <div
               className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
               aria-hidden='true'

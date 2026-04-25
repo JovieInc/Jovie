@@ -118,7 +118,7 @@ export function ArtistProfileCaptureVisual({
   const reducedMotion = useReducedMotion();
   const [activated, setActivated] = useState(reducedMotion);
   const [phase, setPhase] = useState<CapturePhase>(
-    reducedMotion ? 'done' : 'idle'
+    reducedMotion ? 'done' : 'typing'
   );
 
   useEffect(() => {
@@ -143,13 +143,10 @@ export function ArtistProfileCaptureVisual({
         }
 
         setActivated(true);
-        setPhase(currentPhase =>
-          currentPhase === 'idle' ? 'typing' : currentPhase
-        );
         observer.disconnect();
       },
       {
-        threshold: 0.55,
+        threshold: 0.15,
       }
     );
 
@@ -185,6 +182,20 @@ export function ArtistProfileCaptureVisual({
 
     return () => {
       globalThis.clearTimeout(finishTimer);
+    };
+  }, [activated, phase, reducedMotion]);
+
+  useEffect(() => {
+    if (!activated || reducedMotion || phase !== 'done') {
+      return;
+    }
+
+    const loopTimer = globalThis.setTimeout(() => {
+      setPhase('typing');
+    }, 2600);
+
+    return () => {
+      globalThis.clearTimeout(loopTimer);
     };
   }, [activated, phase, reducedMotion]);
 

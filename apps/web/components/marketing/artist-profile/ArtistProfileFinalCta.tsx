@@ -18,7 +18,7 @@ export function ArtistProfileFinalCta({
   return (
     <ArtistProfileSectionShell
       className={cn(
-        'bg-white/[0.012] py-20 sm:py-24 lg:py-28',
+        'bg-white/[0.012]',
         roomy &&
           'flex min-h-[56svh] items-center sm:min-h-[60svh] lg:min-h-[66svh]'
       )}
@@ -29,7 +29,7 @@ export function ArtistProfileFinalCta({
     >
       <h2
         data-testid='final-cta-headline'
-        className='mx-auto max-w-[14ch] text-balance text-[clamp(2.9rem,5vw,5rem)] font-semibold leading-[0.92] tracking-[-0.075em] text-primary-token lg:max-w-none'
+        className='mx-auto max-w-[14ch] text-balance text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token lg:max-w-none'
       >
         {finalCta.headline}
       </h2>

@@ -23,11 +23,14 @@ export function HomeHeroCTA() {
   return (
     <form
       onSubmit={onSubmit}
-      className='homepage-claim-form'
       data-testid='homepage-claim-form'
+      className='flex w-full max-w-[26rem] items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl'
     >
-      <div className='homepage-claim-input-wrap'>
-        <span className='homepage-claim-prefix' aria-hidden='true'>
+      <label className='flex h-11 flex-1 items-center rounded-full border border-white/8 bg-black/30 pl-4 pr-2'>
+        <span
+          aria-hidden='true'
+          className='shrink-0 font-mono text-[14px] tracking-[-0.02em] text-white/56'
+        >
           jov.ie/
         </span>
         <input
@@ -37,16 +40,16 @@ export function HomeHeroCTA() {
           onChange={e => setHandle(e.target.value)}
           placeholder='you'
           aria-label='Choose your handle'
-          className='homepage-claim-input'
           autoComplete='off'
           autoCapitalize='off'
           spellCheck={false}
+          className='w-full min-w-0 bg-transparent font-mono text-[14px] tracking-[-0.02em] text-primary-token placeholder:text-white/36 focus:outline-none'
         />
-      </div>
+      </label>
       <button
         type='submit'
         data-testid='homepage-primary-cta'
-        className='homepage-pill-primary'
+        className='inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-white px-5 text-[13px] font-semibold tracking-[-0.02em] text-black transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
       >
         Claim your profile
       </button>

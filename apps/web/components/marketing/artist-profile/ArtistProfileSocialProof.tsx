@@ -17,10 +17,10 @@ export function ArtistProfileSocialProof({
       <div className='max-w-[34rem]'>
         <h2
           aria-label={socialProof.headline}
-          className='max-w-none text-[clamp(2.8rem,5vw,4.1rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token'
+          className='max-w-none text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'
         >
-          <span className='block'>Real Artists.</span>
-          <span className='mt-1 block'>Real Workflows.</span>
+          <span className='block'>Built by an artist.</span>
+          <span className='mt-1 block'>For artists.</span>
         </h2>
         <p className='mt-5 max-w-[28rem] text-[clamp(1rem,1.55vw,1.16rem)] leading-[1.65] tracking-[-0.02em] text-secondary-token'>
           {socialProof.intro}
@@ -49,7 +49,7 @@ export function ArtistProfileSocialProof({
       ) : null}
 
       {!proofData.hasRealQuotes && proofData.founderQuote ? (
-        <article className='mx-auto mt-8 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-7 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-9 lg:px-10 lg:py-10'>
+        <article className='mx-auto mt-6 max-w-[1120px] overflow-hidden rounded-[1.9rem] border border-black/10 bg-white px-6 py-6 text-black shadow-[0_22px_60px_rgba(0,0,0,0.16)] sm:px-8 sm:py-7 lg:px-10 lg:py-8'>
           <blockquote className='max-w-[50rem] text-pretty text-[clamp(1.45rem,2.7vw,2.35rem)] font-semibold leading-[1.12] tracking-[-0.045em] text-black'>
             “{proofData.founderQuote.quote}”
           </blockquote>
