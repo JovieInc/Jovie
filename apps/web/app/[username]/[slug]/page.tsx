@@ -9,6 +9,7 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import type React from 'react';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { PreserveSearchRedirect } from '@/app/[username]/[slug]/PreserveSearchRedirect';
 import {
@@ -250,6 +251,78 @@ export default async function ContentSmartLinkPage({
   );
 }
 
+type ArtistShape = {
+  id: string;
+  name: string;
+  handle: string;
+  avatarUrl: string | null;
+};
+
+function makeArtistShape(creator: Creator, artistName: string): ArtistShape {
+  return {
+    id: creator.id,
+    name: artistName,
+    handle: creator.usernameNormalized,
+    avatarUrl: creator.avatarUrl,
+  };
+}
+
+function renderMysteryPhase(
+  content: Content,
+  artist: ArtistShape,
+  showUnreleasedHero: boolean
+): React.ReactNode {
+  if (!content.revealDate) return null;
+  return (
+    <MysteryReleasePage
+      revealDate={new Date(content.revealDate)}
+      artist={artist}
+      minimal={!showUnreleasedHero}
+    />
+  );
+}
+
+function renderVideoRelease(
+  content: Content,
+  creator: Creator,
+  artistName: string
+): React.ReactNode | null {
+  const videoMeta = (content.metadata ??
+    {}) as unknown as Partial<MusicVideoMetadata>;
+  const youtubeLink = content.providerLinks.find(
+    l => l.providerId === 'youtube'
+  );
+  if (!videoMeta.youtubeVideoId) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        `[ContentPageBody] music_video release "${content.slug}" missing youtubeVideoId`
+      );
+    }
+    return null;
+  }
+  return (
+    <VideoReleasePage
+      release={{
+        title: content.title,
+        slug: content.slug,
+        artworkUrl: content.artworkUrl,
+      }}
+      artist={{
+        id: creator.id,
+        name: artistName,
+        handle: creator.usernameNormalized,
+        avatarUrl: creator.avatarUrl,
+        ownerUserId: creator.userId ?? '',
+      }}
+      videoId={videoMeta.youtubeVideoId}
+      youtubeUrl={
+        youtubeLink?.url ??
+        `https://www.youtube.com/watch?v=${videoMeta.youtubeVideoId}`
+      }
+    />
+  );
+}
+
 function ContentPageBody({
   isUnreleased,
   releasePhase,
@@ -278,6 +351,7 @@ function ContentPageBody({
   downloadUrl: string | null;
 }>) {
   const artistName = creator.displayName ?? creator.username;
+  const artist = makeArtistShape(creator, artistName);
 
   // Extract featured artists from credits for inline display
   const featuredArtists: FeaturedArtist[] =
@@ -287,32 +361,7 @@ function ContentPageBody({
 
   // Mystery phase: revealDate is in the future, hide all details
   if (releasePhase === 'mystery' && content.revealDate) {
-    if (showUnreleasedHero) {
-      return (
-        <MysteryReleasePage
-          revealDate={new Date(content.revealDate)}
-          artist={{
-            id: creator.id,
-            name: artistName,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-        />
-      );
-    }
-    // Free plan: minimal mystery page
-    return (
-      <MysteryReleasePage
-        revealDate={new Date(content.revealDate)}
-        artist={{
-          id: creator.id,
-          name: artistName,
-          handle: creator.usernameNormalized,
-          avatarUrl: creator.avatarUrl,
-        }}
-        minimal
-      />
-    );
+    return renderMysteryPhase(content, artist, showUnreleasedHero);
   }
 
   // Revealed phase: show full details with countdown to release
@@ -336,12 +385,7 @@ function ContentPageBody({
             link => link.providerId === 'apple_music'
           ),
         }}
-        artist={{
-          id: creator.id,
-          name: artistName,
-          handle: creator.usernameNormalized,
-          avatarUrl: creator.avatarUrl,
-        }}
+        artist={artist}
       />
     );
   }
@@ -355,51 +399,15 @@ function ContentPageBody({
           artworkUrl: content.artworkUrl,
           releaseDate: toISOStringOrNull(content.releaseDate)!,
         }}
-        artist={{
-          id: creator.id,
-          name: artistName,
-          handle: creator.usernameNormalized,
-          avatarUrl: creator.avatarUrl,
-        }}
+        artist={artist}
       />
     );
   }
 
   // Music video releases render an embedded YouTube player + email CTA
   if (content.releaseType === 'music_video') {
-    const videoMeta = (content.metadata ??
-      {}) as unknown as Partial<MusicVideoMetadata>;
-    const youtubeLink = content.providerLinks.find(
-      l => l.providerId === 'youtube'
-    );
-    if (videoMeta.youtubeVideoId) {
-      return (
-        <VideoReleasePage
-          release={{
-            title: content.title,
-            slug: content.slug,
-            artworkUrl: content.artworkUrl,
-          }}
-          artist={{
-            id: creator.id,
-            name: artistName,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-            ownerUserId: creator.userId ?? '',
-          }}
-          videoId={videoMeta.youtubeVideoId}
-          youtubeUrl={
-            youtubeLink?.url ??
-            `https://www.youtube.com/watch?v=${videoMeta.youtubeVideoId}`
-          }
-        />
-      );
-    }
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        `[ContentPageBody] music_video release "${content.slug}" missing youtubeVideoId`
-      );
-    }
+    const videoNode = renderVideoRelease(content, creator, artistName);
+    if (videoNode) return videoNode;
   }
 
   return (
@@ -521,6 +529,39 @@ function buildContentDescription(
   return `Listen to "${content.title}"${releaseYear} by ${artistName} on Jovie. Available on ${streamingPlatforms} and more.`;
 }
 
+function buildMetadataTitle(
+  artistName: string,
+  contentTitle: string,
+  isMystery: boolean,
+  isUnreleased: boolean
+): string {
+  if (isMystery) return `New music from ${artistName} - Coming Soon`;
+  if (isUnreleased) return `${contentTitle} by ${artistName} - Coming Soon`;
+  return `${contentTitle} by ${artistName} - Stream Now`;
+}
+
+function buildMetadataKeywords(
+  artistName: string,
+  contentTitle: string,
+  contentType: string,
+  isMystery: boolean
+): string[] {
+  if (isMystery) {
+    return [artistName, `${artistName} music`, 'new music', 'coming soon'];
+  }
+  return [
+    contentTitle,
+    artistName,
+    `${artistName} ${contentTitle}`,
+    `${contentTitle} lyrics`,
+    `${contentTitle} stream`,
+    `${artistName} music`,
+    `${artistName} ${contentType}`,
+    'stream music',
+    'music links',
+  ];
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -555,39 +596,30 @@ export async function generateMetadata({
   const isUnreleased = metadataPhase !== 'released';
   const isMystery = metadataPhase === 'mystery';
 
-  // In mystery phase, hide release title and artwork from OG tags
-  let title: string;
-  if (isMystery) {
-    title = `New music from ${artistName} - Coming Soon`;
-  } else if (isUnreleased) {
-    title = `${content.title} by ${artistName} - Coming Soon`;
-  } else {
-    title = `${content.title} by ${artistName} - Stream Now`;
-  }
-
+  const title = buildMetadataTitle(
+    artistName,
+    content.title,
+    isMystery,
+    isUnreleased
+  );
   const description = isMystery
     ? `${artistName} has something new coming. Get notified when it drops.`
     : buildContentDescription(content, artistName, !!isUnreleased);
-
-  const keywords = isMystery
-    ? [artistName, `${artistName} music`, 'new music', 'coming soon']
-    : [
-        content.title,
-        artistName,
-        `${artistName} ${content.title}`,
-        `${content.title} lyrics`,
-        `${content.title} stream`,
-        `${artistName} music`,
-        `${artistName} ${contentType}`,
-        'stream music',
-        'music links',
-      ];
+  const keywords = buildMetadataKeywords(
+    artistName,
+    content.title,
+    contentType,
+    isMystery
+  );
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
   const ogImage = isMystery
     ? null
     : resolveOgImage(content.artworkSizes, content.artworkUrl);
   const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
+  const ogTitle = isMystery
+    ? `New music from ${artistName}`
+    : `${content.title} by ${artistName}`;
 
   return {
     title,
@@ -612,9 +644,7 @@ export async function generateMetadata({
     },
     openGraph: {
       type: ogType,
-      title: isMystery
-        ? `New music from ${artistName}`
-        : `${content.title} by ${artistName}`,
+      title: ogTitle,
       description,
       url: canonicalUrl,
       siteName: 'Jovie',
@@ -637,9 +667,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: ogImage ? 'summary_large_image' : 'summary',
-      title: isMystery
-        ? `New music from ${artistName}`
-        : `${content.title} by ${artistName}`,
+      title: ogTitle,
       description,
       creator: '@jovieapp',
       site: '@jovieapp',

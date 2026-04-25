@@ -122,6 +122,97 @@ function resolveVisitSourceLabel(
   }
 }
 
+function parseReferrerHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+async function writeReferrer(
+  tx: DbOrTransaction,
+  audienceMemberId: string,
+  referrerUrl: string,
+  now: Date
+): Promise<void> {
+  try {
+    await tx.insert(audienceReferrers).values({
+      audienceMemberId,
+      url: referrerUrl,
+      source: parseReferrerHostname(referrerUrl),
+      timestamp: now,
+    });
+  } catch (error) {
+    if (!isMissingAudienceReferrersTableError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function writeDailyProfileViews(
+  tx: DbOrTransaction,
+  profileId: string,
+  viewDate: string,
+  now: Date
+): Promise<void> {
+  try {
+    await incrementDailyProfileViews(tx, profileId, viewDate, now);
+  } catch (error) {
+    if (!isMissingDailyProfileViewsTableError(error)) {
+      throw error;
+    }
+    await captureWarning(
+      '[audience/visit] daily_profile_views table missing; skipping aggregate write',
+      error,
+      { profileId, viewDate }
+    );
+  }
+}
+
+async function writeInstagramActivation(
+  tx: DbOrTransaction,
+  profileId: string,
+  instagramReferrerHost: string | null,
+  utmParams:
+    | { source?: string; medium?: string; campaign?: string; content?: string }
+    | undefined,
+  now: Date
+): Promise<void> {
+  try {
+    await tx
+      .insert(creatorDistributionEvents)
+      .values({
+        createdAt: now,
+        creatorProfileId: profileId,
+        dedupeKey: buildDistributionDedupeKey(
+          profileId,
+          INSTAGRAM_DISTRIBUTION_PLATFORM,
+          'activated'
+        ),
+        eventType: 'activated',
+        metadata: {
+          referrerHost: instagramReferrerHost,
+          surface: 'onboarding',
+          utmContent: utmParams?.content ?? null,
+          utmMedium: utmParams?.medium ?? null,
+          utmSource: utmParams?.source ?? null,
+        },
+        platform: INSTAGRAM_DISTRIBUTION_PLATFORM,
+      })
+      .onConflictDoNothing();
+  } catch (error) {
+    if (!isMissingCreatorDistributionEventsTableError(error)) {
+      throw error;
+    }
+    await captureWarning(
+      '[audience/visit] creator_distribution_events table missing; skipping activation write',
+      error,
+      { profileId }
+    );
+  }
+}
+
 async function incrementDailyProfileViews(
   tx: DbOrTransaction,
   profileId: string,
@@ -449,56 +540,19 @@ export async function POST(request: NextRequest) {
           : (existing?.utmParams ?? {});
         const instagramReferrerHost =
           getInstagramReferrerHost(resolvedReferrer);
-        if (hasDailyProfileViewsTable && !isBotAudienceMember) {
-          try {
-            await incrementDailyProfileViews(tx, profileId, viewDate, now);
-          } catch (error) {
-            if (!isMissingDailyProfileViewsTableError(error)) {
-              throw error;
-            }
 
-            await captureWarning(
-              '[audience/visit] daily_profile_views table missing; skipping aggregate write',
-              error,
-              { profileId, viewDate }
-            );
-          }
+        if (hasDailyProfileViewsTable && !isBotAudienceMember) {
+          await writeDailyProfileViews(tx, profileId, viewDate, now);
         }
 
         if (shouldTrackInstagramActivation && !isBotAudienceMember) {
-          try {
-            await tx
-              .insert(creatorDistributionEvents)
-              .values({
-                createdAt: now,
-                creatorProfileId: profileId,
-                dedupeKey: buildDistributionDedupeKey(
-                  profileId,
-                  INSTAGRAM_DISTRIBUTION_PLATFORM,
-                  'activated'
-                ),
-                eventType: 'activated',
-                metadata: {
-                  referrerHost: instagramReferrerHost,
-                  surface: 'onboarding',
-                  utmContent: utmParams?.content ?? null,
-                  utmMedium: utmParams?.medium ?? null,
-                  utmSource: utmParams?.source ?? null,
-                },
-                platform: INSTAGRAM_DISTRIBUTION_PLATFORM,
-              })
-              .onConflictDoNothing();
-          } catch (error) {
-            if (!isMissingCreatorDistributionEventsTableError(error)) {
-              throw error;
-            }
-
-            await captureWarning(
-              '[audience/visit] creator_distribution_events table missing; skipping activation write',
-              error,
-              { profileId }
-            );
-          }
+          await writeInstagramActivation(
+            tx,
+            profileId,
+            instagramReferrerHost,
+            utmParams,
+            now
+          );
         }
 
         // Summary column value for fast list views
@@ -523,27 +577,8 @@ export async function POST(request: NextRequest) {
             })
             .where(eq(audienceMembers.id, existing.id));
 
-          // Dual-write: insert into normalized referrer table
           if (latestReferrerUrl) {
-            try {
-              const referrerSource = (() => {
-                try {
-                  return new URL(latestReferrerUrl).hostname;
-                } catch {
-                  return null;
-                }
-              })();
-              await tx.insert(audienceReferrers).values({
-                audienceMemberId: existing.id,
-                url: latestReferrerUrl,
-                source: referrerSource,
-                timestamp: now,
-              });
-            } catch (error) {
-              if (!isMissingAudienceReferrersTableError(error)) {
-                throw error;
-              }
-            }
+            await writeReferrer(tx, existing.id, latestReferrerUrl, now);
           }
           await recordAudienceEvent(tx, {
             creatorProfileId: profileId,
@@ -596,27 +631,8 @@ export async function POST(request: NextRequest) {
           })
           .returning({ id: audienceMembers.id });
 
-        // Dual-write: insert first referrer for new members
         if (inserted && latestReferrerUrl) {
-          try {
-            const referrerSource = (() => {
-              try {
-                return new URL(latestReferrerUrl).hostname;
-              } catch {
-                return null;
-              }
-            })();
-            await tx.insert(audienceReferrers).values({
-              audienceMemberId: inserted.id,
-              url: latestReferrerUrl,
-              source: referrerSource,
-              timestamp: now,
-            });
-          } catch (error) {
-            if (!isMissingAudienceReferrersTableError(error)) {
-              throw error;
-            }
-          }
+          await writeReferrer(tx, inserted.id, latestReferrerUrl, now);
         }
         if (inserted) {
           await recordAudienceEvent(tx, {
