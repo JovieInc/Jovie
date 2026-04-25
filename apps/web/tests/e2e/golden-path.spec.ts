@@ -522,8 +522,13 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       const testHandle = `gp-${Date.now().toString(36)}`;
       await claimInput.fill(testHandle);
 
-      // Wait for availability check to complete
-      await page.waitForTimeout(2_000);
+      // Wait for availability check to complete. The spinner is rendered
+      // with accessible name "Checking availability" while the debounced
+      // API check is in flight; once hidden, the form's aria-busy flips
+      // false and Enter submission will proceed without racing the check.
+      await expect(page.getByLabel('Checking availability')).toBeHidden({
+        timeout: 10_000,
+      });
 
       // Submit the form
       await claimInput.press('Enter');
