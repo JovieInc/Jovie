@@ -26,6 +26,7 @@ interface AuthLayoutProps {
   readonly footerLinkHref?: string;
   readonly showFooterPrompt?: boolean;
   readonly showFormTitle?: boolean;
+  /** Accepted for API compatibility; not used in this layout. */
   readonly logoSpinDelayMs?: number;
   readonly showSkipLink?: boolean;
   readonly showLogo?: boolean;
@@ -37,6 +38,186 @@ interface AuthLayoutProps {
 
 const LINK_FOCUS_CLASSES = 'focus-ring-themed rounded-md';
 
+interface AuthLayoutInnerProps {
+  readonly children: ReactNode;
+  readonly formTitle: string;
+  readonly formTitleClassName: string;
+  readonly footerPrompt: string;
+  readonly footerLinkText: string;
+  readonly footerLinkHref: string;
+  readonly showFooterPrompt: boolean;
+  readonly showFormTitle: boolean;
+  readonly showLogo: boolean;
+  readonly showcaseVariant: 'page' | 'image-only';
+  readonly isKeyboardVisible: boolean;
+  readonly formRef: React.RefObject<HTMLElement | null>;
+}
+
+function SplitLayoutContent({
+  children,
+  formTitle,
+  formTitleClassName,
+  footerPrompt,
+  footerLinkText,
+  footerLinkHref,
+  showFooterPrompt,
+  showFormTitle,
+  showLogo,
+  showcaseVariant,
+  isKeyboardVisible,
+  formRef,
+}: AuthLayoutInnerProps) {
+  return (
+    <div className='relative z-10 flex w-full max-w-[1240px] flex-1 items-center justify-center'>
+      <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
+        <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
+          {showLogo ? (
+            <div
+              className={cn(
+                'mb-5 flex justify-center transition-opacity duration-200 ease-out lg:mb-6 lg:justify-start',
+                isKeyboardVisible && 'pointer-events-none opacity-0'
+              )}
+              aria-hidden={isKeyboardVisible}
+            >
+              <Link
+                href='/'
+                className='inline-flex items-center justify-center text-white/92 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+                aria-label='Go to homepage'
+                tabIndex={isKeyboardVisible ? -1 : undefined}
+              >
+                <BrandLogo size={20} tone='white' aria-hidden />
+              </Link>
+            </div>
+          ) : null}
+
+          {showFormTitle && formTitle ? (
+            <h1
+              className={cn(
+                formTitleClassName,
+                'mb-8 text-center transition-all duration-200 ease-out lg:text-left',
+                isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
+              )}
+              aria-hidden={isKeyboardVisible}
+            >
+              {formTitle}
+            </h1>
+          ) : null}
+
+          <main
+            ref={formRef}
+            id='auth-form'
+            tabIndex={-1}
+            className='w-full scroll-mt-4'
+          >
+            <div className='mx-auto w-full max-w-[500px] lg:mx-0'>
+              {children}
+            </div>
+          </main>
+
+          {showFooterPrompt && !isKeyboardVisible ? (
+            <p className='mt-6 text-center text-[13px] font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+              {footerPrompt}{' '}
+              <Link
+                href={footerLinkHref}
+                className={`text-white underline ${LINK_FOCUS_CLASSES}`}
+              >
+                {footerLinkText}
+              </Link>
+            </p>
+          ) : null}
+        </div>
+
+        {showLogo ? (
+          <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
+            <AuthBrandPanel
+              variant={showcaseVariant}
+              className='ml-auto h-full w-full max-w-[620px]'
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function StackLayoutContent({
+  children,
+  formTitle,
+  formTitleClassName,
+  footerPrompt,
+  footerLinkText,
+  footerLinkHref,
+  showFooterPrompt,
+  showFormTitle,
+  showLogo,
+  isKeyboardVisible,
+  formRef,
+}: Omit<AuthLayoutInnerProps, 'showcaseVariant'>) {
+  return (
+    <>
+      <div
+        className={cn(
+          `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
+        )}
+      >
+        <div
+          className={cn(
+            'mb-6 flex h-6 w-6 items-center justify-center sm:mb-8',
+            'transition-opacity duration-200 ease-out',
+            (isKeyboardVisible || !showLogo) && 'pointer-events-none opacity-0'
+          )}
+          aria-hidden={isKeyboardVisible || !showLogo}
+        >
+          <Link
+            href='/'
+            className={`block ${LINK_FOCUS_CLASSES}`}
+            aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
+          >
+            <span className='inline-flex'>
+              <BrandLogo size={24} tone='auto' />
+            </span>
+          </Link>
+        </div>
+
+        {showFormTitle && formTitle ? (
+          <h1
+            className={cn(
+              formTitleClassName,
+              'transition-all duration-200 ease-out',
+              isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
+            )}
+            aria-hidden={isKeyboardVisible}
+          >
+            {formTitle}
+          </h1>
+        ) : null}
+
+        <main
+          ref={formRef}
+          id='auth-form'
+          tabIndex={-1}
+          className='w-full scroll-mt-4'
+        >
+          {children}
+        </main>
+      </div>
+
+      {showFooterPrompt && !isKeyboardVisible ? (
+        <p className='relative z-10 mt-auto pt-8 text-center text-[13px] font-normal text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
+          {footerPrompt}{' '}
+          <Link
+            href={footerLinkHref}
+            className={`text-white underline ${LINK_FOCUS_CLASSES}`}
+          >
+            {footerLinkText}
+          </Link>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 export function AuthLayout({
   children,
   formTitle,
@@ -46,7 +227,7 @@ export function AuthLayout({
   footerLinkHref = '/waitlist',
   showFooterPrompt = true,
   showFormTitle = true,
-  logoSpinDelayMs,
+  logoSpinDelayMs: _logoSpinDelayMs,
   showSkipLink = true,
   showLogo = true,
   showLogoutButton = false,
@@ -57,8 +238,6 @@ export function AuthLayout({
   const { isKeyboardVisible } = useMobileKeyboard();
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
-
-  void logoSpinDelayMs;
 
   useEffect(() => {
     if (isKeyboardVisible && formRef.current) {
@@ -72,6 +251,21 @@ export function AuthLayout({
     }
     return undefined;
   }, [isKeyboardVisible]);
+
+  const innerProps: AuthLayoutInnerProps = {
+    children,
+    formTitle,
+    formTitleClassName,
+    footerPrompt,
+    footerLinkText,
+    footerLinkHref,
+    showFooterPrompt,
+    showFormTitle,
+    showLogo,
+    showcaseVariant,
+    isKeyboardVisible,
+    formRef,
+  };
 
   return (
     <div
@@ -132,138 +326,9 @@ export function AuthLayout({
       ) : null}
 
       {isSplitVariant ? (
-        <div className='relative z-10 flex w-full max-w-[1240px] flex-1 items-center justify-center'>
-          <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
-            <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
-              {showLogo ? (
-                <div
-                  className={cn(
-                    'mb-5 flex justify-center transition-opacity duration-200 ease-out lg:mb-6 lg:justify-start',
-                    isKeyboardVisible && 'pointer-events-none opacity-0'
-                  )}
-                  aria-hidden={isKeyboardVisible}
-                >
-                  <Link
-                    href='/'
-                    className='inline-flex items-center justify-center text-white/92 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
-                    aria-label='Go to homepage'
-                    tabIndex={isKeyboardVisible ? -1 : undefined}
-                  >
-                    <BrandLogo size={20} tone='white' aria-hidden />
-                  </Link>
-                </div>
-              ) : null}
-
-              {showFormTitle && formTitle ? (
-                <h1
-                  className={cn(
-                    formTitleClassName,
-                    'mb-8 text-center transition-all duration-200 ease-out lg:text-left',
-                    isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
-                  )}
-                  aria-hidden={isKeyboardVisible}
-                >
-                  {formTitle}
-                </h1>
-              ) : null}
-
-              <main
-                ref={formRef}
-                id='auth-form'
-                tabIndex={-1}
-                className='w-full scroll-mt-4'
-              >
-                <div className='mx-auto w-full max-w-[500px] lg:mx-0'>
-                  {children}
-                </div>
-              </main>
-
-              {showFooterPrompt && !isKeyboardVisible ? (
-                <p className='mt-6 text-center text-[13px] font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
-                  {footerPrompt}{' '}
-                  <Link
-                    href={footerLinkHref}
-                    className={`text-white underline ${LINK_FOCUS_CLASSES}`}
-                  >
-                    {footerLinkText}
-                  </Link>
-                </p>
-              ) : null}
-            </div>
-
-            {showLogo ? (
-              <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
-                <AuthBrandPanel
-                  variant={showcaseVariant}
-                  className='ml-auto h-full w-full max-w-[620px]'
-                />
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <SplitLayoutContent {...innerProps} />
       ) : (
-        <>
-          <div
-            className={cn(
-              `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
-            )}
-          >
-            <div
-              className={cn(
-                'mb-6 flex h-6 w-6 items-center justify-center sm:mb-8',
-                'transition-opacity duration-200 ease-out',
-                (isKeyboardVisible || !showLogo) &&
-                  'pointer-events-none opacity-0'
-              )}
-              aria-hidden={isKeyboardVisible || !showLogo}
-            >
-              <Link
-                href='/'
-                className={`block ${LINK_FOCUS_CLASSES}`}
-                aria-label='Go to homepage'
-                tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
-              >
-                <span className='inline-flex'>
-                  <BrandLogo size={24} tone='auto' />
-                </span>
-              </Link>
-            </div>
-
-            {showFormTitle && formTitle ? (
-              <h1
-                className={cn(
-                  formTitleClassName,
-                  'transition-all duration-200 ease-out',
-                  isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
-                )}
-                aria-hidden={isKeyboardVisible}
-              >
-                {formTitle}
-              </h1>
-            ) : null}
-
-            <main
-              ref={formRef}
-              id='auth-form'
-              tabIndex={-1}
-              className='w-full scroll-mt-4'
-            >
-              {children}
-            </main>
-          </div>
-
-          {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='relative z-10 mt-auto pt-8 text-center text-[13px] font-normal text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
-              {footerPrompt}{' '}
-              <Link
-                href={footerLinkHref}
-                className={`text-white underline ${LINK_FOCUS_CLASSES}`}
-              >
-                {footerLinkText}
-              </Link>
-            </p>
-          ) : null}
-        </>
+        <StackLayoutContent {...innerProps} />
       )}
     </div>
   );
