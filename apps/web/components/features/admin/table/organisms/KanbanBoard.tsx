@@ -191,11 +191,11 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
             {column.title}
           </h3>
         </div>
-        <span className='text-[11px] tabular-nums text-tertiary-token'>
+        <span className='text-2xs tabular-nums text-tertiary-token'>
           {column.count}
         </span>
       </div>
@@ -211,7 +211,7 @@ function KanbanColumn<TData>({
           if (column.items.length === 0) {
             return (
               <div className='flex h-28 items-center justify-center rounded-md border border-dashed border-subtle bg-surface-0'>
-                <div className='text-[12px] text-tertiary-token'>
+                <div className='text-xs text-tertiary-token'>
                   {emptyState ?? 'No items'}
                 </div>
               </div>

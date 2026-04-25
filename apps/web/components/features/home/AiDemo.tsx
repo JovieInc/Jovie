@@ -124,32 +124,34 @@ export function AiDemo({
     setIsTyping(true);
   }, []);
 
+  const handleIntersection = useCallback(
+    (entry: IntersectionObserverEntry | undefined) => {
+      if (!entry?.isIntersecting || hasStarted) return;
+      setHasStarted(true);
+      if (prefersReducedMotion) {
+        if (currentDemo) setVisibleCount(currentDemo.segments.length);
+      } else {
+        startTyping();
+      }
+    },
+    [currentDemo, hasStarted, prefersReducedMotion, startTyping]
+  );
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && !hasStarted) {
-          setHasStarted(true);
-          if (prefersReducedMotion) {
-            if (currentDemo) setVisibleCount(currentDemo.segments.length);
-          } else {
-            startTyping();
-          }
-        }
-      },
+      ([entry]) => handleIntersection(entry),
       { threshold: 0.3 }
     );
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [currentDemo, hasStarted, prefersReducedMotion, startTyping]);
+  }, [handleIntersection]);
 
-  useEffect(() => {
-    if (!isTyping || isPaused || prefersReducedMotion) return;
+  const advanceTypingTick = useCallback(() => {
     if (!currentDemo) return;
-
     if (visibleCount >= currentDemo.segments.length) {
       setIsTyping(false);
       timeoutRef.current = setTimeout(() => {
@@ -160,22 +162,18 @@ export function AiDemo({
       }, PAUSE_BETWEEN_DEMOS);
       return;
     }
-
     timeoutRef.current = setTimeout(() => {
       setVisibleCount(prev => prev + 1);
     }, randomDelay());
+  }, [currentDemo, demoIndex, visibleCount]);
 
+  useEffect(() => {
+    if (!isTyping || isPaused || prefersReducedMotion) return;
+    advanceTypingTick();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [
-    currentDemo,
-    demoIndex,
-    isPaused,
-    isTyping,
-    prefersReducedMotion,
-    visibleCount,
-  ]);
+  }, [advanceTypingTick, isPaused, isTyping, prefersReducedMotion]);
 
   useEffect(() => {
     return () => {
@@ -187,11 +185,8 @@ export function AiDemo({
     setIsPaused(prev => !prev);
     if (isPaused && timeoutRef.current) {
       clearTimeout(timeoutRef.current);
-      if (isTyping) {
-        setVisibleCount(prev => prev);
-      }
     }
-  }, [isPaused, isTyping]);
+  }, [isPaused]);
 
   const showNextDemo = useCallback(() => {
     const nextIndex = (demoIndex + 1) % DEMOS.length;
