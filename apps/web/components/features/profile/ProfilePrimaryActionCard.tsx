@@ -90,6 +90,301 @@ interface ProfilePrimaryActionCardProps {
   readonly now?: Date;
 }
 
+type CardStyles = {
+  shellClassName: string;
+  artClassName: string;
+  titleClassName: string;
+  metaClassName: string;
+  isShowcase: boolean;
+};
+
+function buildCardStyles(
+  size: 'compact' | 'showcase',
+  className?: string
+): CardStyles {
+  const isShowcase = size === 'showcase';
+  return {
+    isShowcase,
+    shellClassName: cn(
+      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,transform,box-shadow] duration-150 hover:bg-white/[0.08] active:scale-[0.985]',
+      isShowcase
+        ? 'min-h-[92px] px-4 py-3.5 shadow-[0_22px_58px_rgba(0,0,0,0.34)]'
+        : 'min-h-[64px] px-3 py-2.5',
+      className
+    ),
+    artClassName: isShowcase
+      ? 'h-14 w-14 rounded-[14px]'
+      : 'h-11 w-11 rounded-xl',
+    titleClassName: isShowcase
+      ? 'text-base font-[630] tracking-[-0.03em] text-white'
+      : 'text-app font-semibold leading-[1.1] text-white/92',
+    metaClassName: isShowcase
+      ? 'text-[11.5px] text-white/56'
+      : 'text-[10.5px] text-white/52',
+  };
+}
+
+function ReleaseCard({
+  state,
+  artist,
+  styles,
+  renderMode,
+  previewActionLabel,
+  onPlayClick,
+  dataTestId,
+}: Readonly<{
+  state: ProfileCardReleaseState;
+  artist: Artist;
+  styles: CardStyles;
+  renderMode: ProfileRenderMode;
+  previewActionLabel: string;
+  onPlayClick?: () => void;
+  dataTestId?: string;
+}>) {
+  const href = `/${artist.handle}/${state.release.slug}`;
+  const wrapperHref =
+    state.kind === 'release_countdown' || !onPlayClick ? href : undefined;
+  const actionClick = state.kind === 'release_live' ? onPlayClick : undefined;
+  const actionLabel = renderMode === 'preview' ? previewActionLabel : 'Listen';
+  const releaseDate = toDateValue(state.release.releaseDate);
+
+  return (
+    <ActionCardShell
+      kind={state.kind}
+      href={wrapperHref}
+      onClick={actionClick}
+      className={styles.shellClassName}
+      dataTestId={dataTestId}
+    >
+      {state.release.artworkUrl ? (
+        <div
+          className={cn(
+            'relative shrink-0 overflow-hidden',
+            styles.artClassName
+          )}
+        >
+          <ImageWithFallback
+            src={state.release.artworkUrl}
+            alt={`${state.release.title} artwork`}
+            fill
+            sizes={styles.isShowcase ? '56px' : '44px'}
+            className='object-cover'
+            fallbackVariant='release'
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
+            styles.artClassName
+          )}
+        >
+          <Play className='h-4 w-4 fill-current' />
+        </div>
+      )}
+      <div className='min-w-0 flex-1'>
+        <p className={cn('truncate', styles.titleClassName)}>
+          {state.release.title}
+        </p>
+        <div className='mt-1 space-y-0.5'>
+          <p className={cn('truncate font-semibold', styles.metaClassName)}>
+            {artist.name}
+          </p>
+          {state.collaboratorLine ? (
+            <p className={cn('truncate font-caption', styles.metaClassName)}>
+              {state.collaboratorLine}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      {state.kind === 'release_countdown' && releaseDate ? (
+        <div className='shrink-0 rounded-[18px] border border-white/10 bg-black/16 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+          <ReleaseCountdown releaseDate={releaseDate} compact />
+        </div>
+      ) : (
+        <ActionPill label={actionLabel} />
+      )}
+    </ActionCardShell>
+  );
+}
+
+function TourCard({
+  state,
+  artist,
+  styles,
+  dataTestId,
+}: Readonly<{
+  state: ProfileCardTourState;
+  artist: Artist;
+  styles: CardStyles;
+  dataTestId?: string;
+}>) {
+  const locationLabel = getTourLocationLabel(state.tourDate) || 'Upcoming show';
+  const ctaLabel = state.tourDate.ticketUrl ? 'Tickets' : 'Details';
+  const proximityLabel =
+    state.kind === 'tour_nearby' ? 'Near you' : 'Next date';
+
+  return (
+    <ActionCardShell
+      kind={state.kind}
+      href={state.tourDate.ticketUrl ?? `/${artist.handle}/tour`}
+      className={styles.shellClassName}
+      dataTestId={dataTestId}
+    >
+      <div
+        className={cn(
+          'flex shrink-0 flex-col items-center justify-center bg-white/[0.04] leading-none text-white',
+          styles.artClassName
+        )}
+      >
+        <span className='text-[9px] font-semibold uppercase tracking-[0.14em] text-white/48'>
+          {getMonthLabel(state.tourDate.startDate)}
+        </span>
+        <span className='mt-1 text-xl font-bold tracking-[-0.06em]'>
+          {getDayLabel(state.tourDate.startDate)}
+        </span>
+      </div>
+      <div className='min-w-0 flex-1'>
+        <p className={cn('truncate', styles.titleClassName)}>
+          {state.tourDate.venueName ?? artist.name}
+        </p>
+        <div className='mt-1 space-y-0.5'>
+          <p className={cn('truncate font-semibold', styles.metaClassName)}>
+            {locationLabel}
+          </p>
+          <p className={cn('truncate font-caption', styles.metaClassName)}>
+            {proximityLabel}
+          </p>
+        </div>
+      </div>
+      <ActionPill label={ctaLabel} emphasis='dark' />
+    </ActionCardShell>
+  );
+}
+
+function PlaylistCard({
+  state,
+  artist,
+  styles,
+  dataTestId,
+}: Readonly<{
+  state: ProfileCardPlaylistState;
+  artist: Artist;
+  styles: CardStyles;
+  dataTestId?: string;
+}>) {
+  return (
+    <ActionCardShell
+      kind={state.kind}
+      href={state.playlist.url}
+      className={styles.shellClassName}
+      dataTestId={dataTestId}
+    >
+      {state.playlist.imageUrl ? (
+        <div
+          className={cn(
+            'relative shrink-0 overflow-hidden',
+            styles.artClassName
+          )}
+        >
+          <ImageWithFallback
+            src={state.playlist.imageUrl}
+            alt={state.playlist.title}
+            fill
+            sizes={styles.isShowcase ? '56px' : '44px'}
+            className='object-cover'
+            fallbackVariant='release'
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
+            styles.artClassName
+          )}
+        >
+          <Play className='h-4 w-4 fill-current' />
+        </div>
+      )}
+      <div className='min-w-0 flex-1'>
+        <p className={cn('truncate', styles.titleClassName)}>
+          {state.playlist.title}
+        </p>
+        <div className='mt-1 space-y-0.5'>
+          <p className={cn('truncate font-semibold', styles.metaClassName)}>
+            {artist.name}
+          </p>
+        </div>
+      </div>
+      <ActionPill label='Open playlist' emphasis='dark' />
+    </ActionCardShell>
+  );
+}
+
+function ListenCard({
+  artist,
+  styles,
+  renderMode,
+  previewActionLabel,
+  onPlayClick,
+  dataTestId,
+}: Readonly<{
+  artist: Artist;
+  styles: CardStyles;
+  renderMode: ProfileRenderMode;
+  previewActionLabel: string;
+  onPlayClick?: () => void;
+  dataTestId?: string;
+}>) {
+  const actionLabel = renderMode === 'preview' ? previewActionLabel : 'Listen';
+
+  return (
+    <ActionCardShell
+      kind='listen_fallback'
+      href={onPlayClick ? undefined : `/${artist.handle}/listen`}
+      onClick={onPlayClick}
+      className={styles.shellClassName}
+      dataTestId={dataTestId}
+    >
+      {artist.image_url ? (
+        <div
+          className={cn(
+            'relative shrink-0 overflow-hidden',
+            styles.artClassName
+          )}
+        >
+          <ImageWithFallback
+            src={artist.image_url}
+            alt={artist.name}
+            fill
+            sizes={styles.isShowcase ? '56px' : '44px'}
+            className='object-cover'
+            fallbackVariant='avatar'
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
+            styles.artClassName
+          )}
+        >
+          <Play className='h-4 w-4 fill-current' />
+        </div>
+      )}
+      <div className='min-w-0 flex-1'>
+        <p className={cn('truncate', styles.titleClassName)}>{artist.name}</p>
+        <div className='mt-1 space-y-0.5'>
+          <p className={cn('truncate font-semibold', styles.metaClassName)}>
+            Listen across your preferred platforms
+          </p>
+        </div>
+      </div>
+      <ActionPill label={actionLabel} />
+    </ActionCardShell>
+  );
+}
+
 const CTA_PILL_CLASS_NAME = cn(
   profileSecondaryPillClassName,
   'h-7 rounded-full border-white/14 bg-white text-2xs font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
@@ -389,228 +684,52 @@ export function ProfilePrimaryActionCard({
     return null;
   }
 
-  const isShowcase = size === 'showcase';
-  const shellClassName = cn(
-    'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,transform,box-shadow] duration-150 hover:bg-white/[0.08] active:scale-[0.985]',
-    isShowcase
-      ? 'min-h-[92px] px-4 py-3.5 shadow-[0_22px_58px_rgba(0,0,0,0.34)]'
-      : 'min-h-[64px] px-3 py-2.5',
-    className
-  );
-  const artClassName = isShowcase
-    ? 'h-14 w-14 rounded-[14px]'
-    : 'h-11 w-11 rounded-xl';
-  const titleClassName = isShowcase
-    ? 'text-base font-[630] tracking-[-0.03em] text-white'
-    : 'text-app font-semibold leading-[1.1] text-white/92';
-  const metaClassName = isShowcase
-    ? 'text-[11.5px] text-white/56'
-    : 'text-[10.5px] text-white/52';
-  const artistMetaLine = (
-    <p className={cn('truncate font-semibold', metaClassName)}>{artist.name}</p>
-  );
+  const styles = buildCardStyles(size, className);
 
   if (state.kind === 'release_countdown' || state.kind === 'release_live') {
-    const href = `/${artist.handle}/${state.release.slug}`;
-    const wrapperHref =
-      state.kind === 'release_countdown' || !onPlayClick ? href : undefined;
-    const actionClick = state.kind === 'release_live' ? onPlayClick : undefined;
-    const actionLabel =
-      renderMode === 'preview' ? previewActionLabel : 'Listen';
-    const releaseDate = toDateValue(state.release.releaseDate);
-
     return (
-      <ActionCardShell
-        kind={state.kind}
-        href={wrapperHref}
-        onClick={actionClick}
-        className={shellClassName}
+      <ReleaseCard
+        state={state}
+        artist={artist}
+        styles={styles}
+        renderMode={renderMode}
+        previewActionLabel={previewActionLabel}
+        onPlayClick={onPlayClick}
         dataTestId={dataTestId}
-      >
-        {state.release.artworkUrl ? (
-          <div
-            className={cn('relative shrink-0 overflow-hidden', artClassName)}
-          >
-            <ImageWithFallback
-              src={state.release.artworkUrl}
-              alt={`${state.release.title} artwork`}
-              fill
-              sizes={isShowcase ? '56px' : '44px'}
-              className='object-cover'
-              fallbackVariant='release'
-            />
-          </div>
-        ) : (
-          <div
-            className={cn(
-              'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
-              artClassName
-            )}
-          >
-            <Play className='h-4 w-4 fill-current' />
-          </div>
-        )}
-
-        <div className='min-w-0 flex-1'>
-          <p className={cn('truncate', titleClassName)}>
-            {state.release.title}
-          </p>
-          <div className='mt-1 space-y-0.5'>
-            {artistMetaLine}
-            {state.collaboratorLine ? (
-              <p className={cn('truncate font-caption', metaClassName)}>
-                {state.collaboratorLine}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        {state.kind === 'release_countdown' ? (
-          releaseDate ? (
-            <div className='shrink-0 rounded-[18px] border border-white/10 bg-black/16 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-              <ReleaseCountdown releaseDate={releaseDate} compact />
-            </div>
-          ) : (
-            <ActionPill label={actionLabel} />
-          )
-        ) : (
-          <ActionPill label={actionLabel} />
-        )}
-      </ActionCardShell>
+      />
     );
   }
 
   if (state.kind === 'tour_nearby' || state.kind === 'tour_next') {
-    const locationLabel =
-      getTourLocationLabel(state.tourDate) || 'Upcoming show';
-    const ctaLabel = state.tourDate.ticketUrl ? 'Tickets' : 'Details';
-
     return (
-      <ActionCardShell
-        kind={state.kind}
-        href={state.tourDate.ticketUrl ?? `/${artist.handle}/tour`}
-        className={shellClassName}
+      <TourCard
+        state={state}
+        artist={artist}
+        styles={styles}
         dataTestId={dataTestId}
-      >
-        <div
-          className={cn(
-            'flex shrink-0 flex-col items-center justify-center bg-white/[0.04] leading-none text-white',
-            artClassName
-          )}
-        >
-          <span className='text-[9px] font-semibold uppercase tracking-[0.14em] text-white/48'>
-            {getMonthLabel(state.tourDate.startDate)}
-          </span>
-          <span className='mt-1 text-xl font-bold tracking-[-0.06em]'>
-            {getDayLabel(state.tourDate.startDate)}
-          </span>
-        </div>
-
-        <div className='min-w-0 flex-1'>
-          <p className={cn('truncate', titleClassName)}>
-            {state.tourDate.venueName ?? artist.name}
-          </p>
-          <div className='mt-1 space-y-0.5'>
-            <p className={cn('truncate font-semibold', metaClassName)}>
-              {locationLabel}
-            </p>
-            <p className={cn('truncate font-caption', metaClassName)}>
-              {state.kind === 'tour_nearby' ? 'Near you' : 'Next date'}
-            </p>
-          </div>
-        </div>
-
-        <ActionPill label={ctaLabel} emphasis='dark' />
-      </ActionCardShell>
+      />
     );
   }
 
   if (state.kind === 'playlist_fallback') {
     return (
-      <ActionCardShell
-        kind={state.kind}
-        href={state.playlist.url}
-        className={shellClassName}
+      <PlaylistCard
+        state={state}
+        artist={artist}
+        styles={styles}
         dataTestId={dataTestId}
-      >
-        {state.playlist.imageUrl ? (
-          <div
-            className={cn('relative shrink-0 overflow-hidden', artClassName)}
-          >
-            <ImageWithFallback
-              src={state.playlist.imageUrl}
-              alt={state.playlist.title}
-              fill
-              sizes={isShowcase ? '56px' : '44px'}
-              className='object-cover'
-              fallbackVariant='release'
-            />
-          </div>
-        ) : (
-          <div
-            className={cn(
-              'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
-              artClassName
-            )}
-          >
-            <Play className='h-4 w-4 fill-current' />
-          </div>
-        )}
-
-        <div className='min-w-0 flex-1'>
-          <p className={cn('truncate', titleClassName)}>
-            {state.playlist.title}
-          </p>
-          <div className='mt-1 space-y-0.5'>{artistMetaLine}</div>
-        </div>
-
-        <ActionPill label='Open playlist' emphasis='dark' />
-      </ActionCardShell>
+      />
     );
   }
 
   return (
-    <ActionCardShell
-      kind={state.kind}
-      href={onPlayClick ? undefined : `/${artist.handle}/listen`}
-      onClick={onPlayClick}
-      className={shellClassName}
+    <ListenCard
+      artist={artist}
+      styles={styles}
+      renderMode={renderMode}
+      previewActionLabel={previewActionLabel}
+      onPlayClick={onPlayClick}
       dataTestId={dataTestId}
-    >
-      {artist.image_url ? (
-        <div className={cn('relative shrink-0 overflow-hidden', artClassName)}>
-          <ImageWithFallback
-            src={artist.image_url}
-            alt={artist.name}
-            fill
-            sizes={isShowcase ? '56px' : '44px'}
-            className='object-cover'
-            fallbackVariant='avatar'
-          />
-        </div>
-      ) : (
-        <div
-          className={cn(
-            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
-            artClassName
-          )}
-        >
-          <Play className='h-4 w-4 fill-current' />
-        </div>
-      )}
-
-      <div className='min-w-0 flex-1'>
-        <p className={cn('truncate', titleClassName)}>{artist.name}</p>
-        <div className='mt-1 space-y-0.5'>
-          <p className={cn('truncate font-semibold', metaClassName)}>
-            Listen across your preferred platforms
-          </p>
-        </div>
-      </div>
-
-      <ActionPill
-        label={renderMode === 'preview' ? previewActionLabel : 'Listen'}
-      />
-    </ActionCardShell>
+    />
   );
 }
