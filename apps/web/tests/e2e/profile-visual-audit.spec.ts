@@ -318,7 +318,14 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
     const trigger = candidate.first();
     if (await trigger.isVisible().catch(() => false)) {
       await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
-      await trigger.click();
+      try {
+        await trigger.click();
+      } catch {
+        if (await hasVisibleComposer()) {
+          return;
+        }
+        throw new Error('Failed to reveal the notifications composer');
+      }
       break;
     }
   }
