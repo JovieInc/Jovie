@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { notFound } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { ReleaseCalendar } from '@/components/jovie/release-calendar/ReleaseCalendar';
 import { ReleaseMomentDrawer } from '@/components/jovie/release-calendar/ReleaseMomentDrawer';
+import { useAppFlag } from '@/lib/flags/client';
 import {
   type DemoMoment,
   EP_TRACKS,
@@ -10,8 +12,17 @@ import {
 } from '@/lib/release-planning/demo-plan';
 
 export default function ReleasePlanPage() {
+  const enabled = useAppFlag('RELEASE_PLAN_DEMO');
   const [plan, setPlan] = useState<DemoMoment[] | null>(null);
-  const [selected, setSelected] = useState<DemoMoment | null>(null);
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const selected = useMemo(
+    () => plan?.find(m => m.slug === selectedSlug) ?? null,
+    [plan, selectedSlug]
+  );
+
+  if (!enabled) {
+    notFound();
+  }
 
   return (
     <div className='flex flex-col gap-6 p-6'>
@@ -70,13 +81,13 @@ export default function ReleasePlanPage() {
         <ReleaseCalendar
           plan={plan}
           onPlanChange={setPlan}
-          onMomentClick={setSelected}
+          onMomentClick={moment => setSelectedSlug(moment.slug)}
         />
       )}
 
       <ReleaseMomentDrawer
         moment={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedSlug(null)}
       />
     </div>
   );

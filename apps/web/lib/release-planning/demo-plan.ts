@@ -219,7 +219,7 @@ export function moveRemixNearLAShow(plan: DemoMoment[]): DemoMoment[] {
     return { ...m, friday: target, tourDateId: LA_TOUR_ID };
   });
   if (!mutated) return next;
-  next.sort((a, b) => (a.friday < b.friday ? -1 : a.friday > b.friday ? 1 : 0));
+  next.sort((a, b) => a.friday.localeCompare(b.friday));
   return next;
 }
 

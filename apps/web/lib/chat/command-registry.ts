@@ -29,11 +29,13 @@ interface CommandDefinition {
 
 const COMMANDS: readonly CommandDefinition[] = [
   {
-    keywords: ['move', 'remix', 'la', 'show'],
+    keywords: ['move', 'remix', 'la show'],
     result: () => {
+      const win = globalThis.window as Window | undefined;
       const onPlan =
-        typeof window !== 'undefined' &&
-        window.location.pathname.startsWith(APP_ROUTES.DASHBOARD_RELEASE_PLAN);
+        win !== undefined &&
+        win.location.pathname.startsWith(APP_ROUTES.DASHBOARD_RELEASE_PLAN) &&
+        win.document.querySelector('[data-testid="release-calendar"]') !== null;
       const target = laShowFriday();
       return {
         confirmationMessage: onPlan

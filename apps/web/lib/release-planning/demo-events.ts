@@ -10,6 +10,7 @@ export const RELEASE_PLAN_MOVE_REMIX_NEAR_LA =
   'jovie:release-plan:move-remix-near-la';
 
 export function dispatchMoveRemixNearLAShow(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(RELEASE_PLAN_MOVE_REMIX_NEAR_LA));
+  const win = globalThis.window as Window | undefined;
+  if (!win) return;
+  win.dispatchEvent(new CustomEvent(RELEASE_PLAN_MOVE_REMIX_NEAR_LA));
 }

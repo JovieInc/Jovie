@@ -12,22 +12,10 @@ import {
   type DemoMoment,
   fanNotificationForMoment,
   formatFridayLong,
-  type MomentType,
   workflowTaskSlugsForMoment,
 } from '@/lib/release-planning/demo-plan';
 import { DEMO_WORKFLOW_TASKS_BY_SLUG } from '@/lib/release-planning/demo-workflow-tasks';
-
-const MOMENT_LABEL: Readonly<Record<MomentType, string>> = {
-  single: 'Single',
-  remix: 'Remix',
-  acoustic: 'Acoustic',
-  lyric_video: 'Lyric video',
-  visualizer: 'Visualizer',
-  merch_drop: 'Merch drop',
-  tour_tie_in: 'Tour tie-in',
-  media_appearance: 'Media appearance',
-  anniversary: 'Anniversary',
-};
+import { MOMENT_LABEL } from '@/lib/release-planning/moment-display';
 
 function formatRelativeDays(n: number): string {
   if (n === 0) return 'Day-of';
@@ -118,7 +106,7 @@ export function ReleaseMomentDrawer({
   );
 }
 
-function FanNotificationPreview({ moment }: { moment: DemoMoment }) {
+function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
   const notif = fanNotificationForMoment(moment);
   return (
     <section
