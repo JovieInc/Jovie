@@ -158,12 +158,13 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.goto('/demo', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2000);
-    await setTheme(page, theme);
-
+    // Wait for hydration via the asserted target instead of a fixed sleep.
+    // setTheme toggles a documentElement class that Tailwind keys off;
+    // it only needs the page rendered, not a wall-clock delay.
     const primaryReleaseTitle = getPrimaryReleaseTitle();
     const firstReleaseRow = page.getByTestId('release-row');
     await expect(firstReleaseRow).toBeVisible();
+    await setTheme(page, theme);
     await expect(
       firstReleaseRow.getByText(primaryReleaseTitle, { exact: true })
     ).toBeVisible();
@@ -231,10 +232,9 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.goto('/demo/audience', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2000);
-    await setTheme(page, theme);
-
+    // Wait for hydration via the asserted target instead of a fixed sleep.
     await expect(page.getByTestId('demo-audience-shell')).toBeVisible();
+    await setTheme(page, theme);
 
     const drawer = page.getByTestId('demo-analytics-sidebar');
     const drawerInitiallyVisible = await drawer.isVisible().catch(() => false);
