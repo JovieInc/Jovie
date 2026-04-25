@@ -36,7 +36,7 @@ export function InstantlyPixel() {
 
   useEffect(() => {
     if (skip) return;
-    if (typeof globalThis.window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     // Sync consent state on mount (covers SSR → client transition)
     setAllowed(isMarketingAllowed());

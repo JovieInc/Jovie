@@ -121,10 +121,10 @@ const ZERO_WIDTH_PATTERN = new RegExp(
  */
 export function sanitizeText(input: string, maxLength: number): string {
   let cleaned = input
-    .replace(CONTROL_PATTERN, ' ')
-    .replace(ZERO_WIDTH_PATTERN, '');
-  cleaned = cleaned.replace(URL_PATTERN, ' ');
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    .replaceAll(CONTROL_PATTERN, ' ')
+    .replaceAll(ZERO_WIDTH_PATTERN, '');
+  cleaned = cleaned.replaceAll(URL_PATTERN, ' ');
+  cleaned = cleaned.replaceAll(/\s+/g, ' ').trim();
 
   if (cleaned.length <= maxLength) return cleaned;
 

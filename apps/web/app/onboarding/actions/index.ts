@@ -132,14 +132,14 @@ async function applyPendingClaimTx(
   displayName: string
 ): Promise<CompletionResult> {
   const userRecord =
-    existingUserId !== null
-      ? { id: existingUserId }
-      : await (async () => {
+    existingUserId === null
+      ? await (async () => {
           if (userEmail) {
             await ensureEmailAvailable(tx, clerkUserId, userEmail);
           }
           return ensureOnboardingUserRow(tx, { clerkUserId, userEmail });
-        })();
+        })()
+      : { id: existingUserId };
 
   const existingProfile = await fetchExistingProfile(tx, userRecord.id);
 

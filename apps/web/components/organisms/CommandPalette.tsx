@@ -65,8 +65,8 @@ function CommandPaletteInner({ isAdmin }: { readonly isAdmin: boolean }) {
       event.preventDefault();
       setOpen(prev => !prev);
     }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
   }, []);
 
   // Reset query when closing so the next open starts clean.
