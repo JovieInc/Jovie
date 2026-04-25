@@ -584,6 +584,24 @@ export const RATE_LIMITERS = {
     prefix: 'verification:request',
     analytics: true,
   } satisfies RateLimitConfig,
+
+  /** Bio import from URL (chat tool): per-user, fan-out cap inside a single chat turn */
+  bioImportFromUrl: {
+    name: 'Bio Import From URL',
+    limit: 5,
+    window: '1 m',
+    prefix: 'bio_import_from_url',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Bio import from URL (chat tool): hourly cap to absorb chat-level burstiness */
+  bioImportFromUrlHourly: {
+    name: 'Bio Import From URL Hourly',
+    limit: 20,
+    window: '1 h',
+    prefix: 'bio_import_from_url_hourly',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

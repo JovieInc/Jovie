@@ -38,13 +38,30 @@ export function createProfileEditTool(context: ProfileEditContext) {
       .string()
       .optional()
       .describe('Brief explanation of why this change was suggested'),
+    sourceUrl: z
+      .string()
+      .url()
+      .refine(value => value.startsWith('https://'), {
+        message: 'sourceUrl must be https',
+      })
+      .optional()
+      .describe(
+        'Provenance: the public https URL the value was imported from, when applicable. Set this when the value came from importBioFromUrl so the confirmation card can show "imported from {host}". Must start with https://.'
+      ),
+    sourceTitle: z
+      .string()
+      .max(200)
+      .optional()
+      .describe(
+        'Provenance: the page title of the source URL, when known. Display only.'
+      ),
   });
 
   return tool({
     description:
-      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio.',
+      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio. If the value came from importBioFromUrl, pass sourceUrl (and sourceTitle if available) so the confirmation card can show provenance.',
     inputSchema: profileEditSchema,
-    execute: async ({ field, newValue, reason }) => {
+    execute: async ({ field, newValue, reason, sourceUrl, sourceTitle }) => {
       // Return preview data for the UI to render
       return {
         success: true,
@@ -54,6 +71,8 @@ export function createProfileEditTool(context: ProfileEditContext) {
           currentValue: context[field],
           newValue,
           reason,
+          sourceUrl,
+          sourceTitle,
         },
       };
     },

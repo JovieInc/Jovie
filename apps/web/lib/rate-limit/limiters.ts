@@ -80,6 +80,22 @@ export const dashboardLinksLimiter = createRateLimiter(
   RATE_LIMITERS.dashboardLinks
 );
 
+/**
+ * Rate limiter for the bio-import-from-URL chat tool.
+ * Limit: 5 imports per minute per user (fan-out cap inside a chat turn).
+ */
+export const bioImportFromUrlLimiter = createRateLimiter(
+  RATE_LIMITERS.bioImportFromUrl
+);
+
+/**
+ * Hourly companion limiter for the bio-import-from-URL chat tool.
+ * Limit: 20 imports per hour per user.
+ */
+export const bioImportFromUrlHourlyLimiter = createRateLimiter(
+  RATE_LIMITERS.bioImportFromUrlHourly
+);
+
 // ============================================================================
 // Payment Operations
 // ============================================================================
