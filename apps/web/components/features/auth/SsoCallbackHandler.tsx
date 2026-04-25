@@ -37,7 +37,7 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
       aria-live='polite'
     >
       <LoadingSpinner size='md' tone='muted' label='Signing you in' />
-      <p className='text-[13px] text-tertiary-token'>
+      <p className='text-app text-tertiary-token'>
         {isStalled ? 'Still signing you in…' : 'Signing you in…'}
       </p>
       {isStalled && (

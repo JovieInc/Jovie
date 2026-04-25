@@ -243,7 +243,7 @@ export function LeadPipelineControls({
             title='Pipeline controls'
             subtitle='Toggle discovery, qualification, and auto-ingest settings.'
             actions={
-              <span className='text-[12px] font-semibold text-secondary-token'>
+              <span className='text-xs font-semibold text-secondary-token'>
                 {settings.enabled ? 'Active' : 'Paused'}
               </span>
             }
