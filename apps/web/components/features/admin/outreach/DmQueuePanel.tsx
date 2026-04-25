@@ -97,7 +97,7 @@ export function DmQueuePanel() {
         title='DM queue'
         subtitle='Copy the prepared message, send it manually, and mark each lead as completed.'
         actions={
-          <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
+          <span className='text-xs font-semibold tabular-nums text-secondary-token'>
             {total} queued
           </span>
         }

@@ -226,7 +226,7 @@ export function EmailQueuePanel() {
               >
                 {queueing ? 'Queueing...' : 'Queue Next Batch'}
               </Button>
-              <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
+              <span className='text-xs font-semibold tabular-nums text-secondary-token'>
                 {pendingTotal} pending
               </span>
             </div>
