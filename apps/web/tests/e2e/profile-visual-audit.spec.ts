@@ -278,7 +278,7 @@ async function waitForVisibleSelector(
 async function ensureComposerVisible(page: import('@playwright/test').Page) {
   const composerSelectors = [
     '[data-testid="profile-mobile-notifications-flow"]',
-    '[data-testid="profile-mobile-notifications-step-intro"]',
+    '[data-testid="profile-mobile-notifications-step-preferences"]',
     '[data-testid="profile-mobile-notifications-step-email"]',
   ] as const;
 
@@ -336,16 +336,16 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
 
   await waitForVisibleSelector(
     page,
-    '[data-testid="profile-mobile-notifications-flow"], [data-testid="profile-mobile-notifications-step-intro"], [data-testid="profile-mobile-notifications-step-email"]'
+    '[data-testid="profile-mobile-notifications-flow"], [data-testid="profile-mobile-notifications-step-preferences"], [data-testid="profile-mobile-notifications-step-email"]'
   );
 }
 
 async function focusComposerInput(page: import('@playwright/test').Page) {
-  const introStep = page
-    .getByTestId('profile-mobile-notifications-step-intro')
+  const preferencesStep = page
+    .getByTestId('profile-mobile-notifications-step-preferences')
     .last();
-  if (await introStep.isVisible().catch(() => false)) {
-    await introStep.getByRole('button', { name: /^continue$/i }).click();
+  if (await preferencesStep.isVisible().catch(() => false)) {
+    await preferencesStep.getByRole('switch', { name: /new music/i }).click();
   }
 
   const input = page.getByTestId('mobile-email-input').last();

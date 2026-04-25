@@ -110,45 +110,55 @@ export function ReleasesView({
             <a
               href={`/${artistHandle}/${release.slug}`}
               className={cn(
-                'group flex items-center gap-3.5 py-4 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:bg-white/[0.025]',
+                'group flex items-center gap-2.5 py-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:bg-white/[0.02]',
                 index > 0 && 'border-t border-white/[0.075]'
               )}
               aria-label={ariaLabel}
             >
-              <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-white/[0.04] shadow-[0_12px_28px_rgba(0,0,0,0.26)]'>
+              <div className='relative h-[50px] w-[50px] shrink-0 overflow-hidden rounded-[11px] bg-white/[0.04] shadow-[0_10px_22px_rgba(0,0,0,0.22)]'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={release.title}
                   fill
-                  sizes='56px'
+                  sizes='50px'
                   className='object-cover'
                 />
               </div>
 
-              <div className='min-w-0 flex-1 space-y-1'>
-                <div className='flex items-center gap-2'>
-                  <span className='truncate text-[16px] font-medium tracking-[-0.03em] text-white'>
+              <div className='min-w-0 flex-1 space-y-px'>
+                <div className='flex items-center gap-1.25'>
+                  <span className='truncate text-[15px] font-medium leading-tight tracking-[-0.028em] text-white'>
                     {release.title}
                   </span>
                   {index === 0 ? (
-                    <span className='inline-flex h-5 items-center rounded-full border border-white/10 bg-white px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#15161a]'>
+                    <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-[#15161a]'>
                       New
                     </span>
                   ) : null}
                   {release.releaseType === 'music_video' ? (
-                    <span className='inline-flex h-5 items-center rounded-full border border-white/10 bg-white/[0.04] px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/68'>
+                    <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white/[0.04] px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-white/64'>
                       Video
                     </span>
                   ) : null}
                 </div>
-                <p className='text-2xs truncate text-[14px] font-normal tracking-[-0.02em] text-white/52'>
+                <p className='text-2xs truncate text-[11.5px] font-medium tracking-[-0.01em] text-white/38'>
                   {meta}
                 </p>
               </div>
 
-              <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/82 transition-[border-color,background-color] duration-200 group-hover:border-white/18 group-hover:bg-white/[0.06]'>
-                <Play className='ml-0.5 h-4 w-4 fill-current' />
-              </span>
+              <div className='ml-1 flex shrink-0 items-center gap-3'>
+                <span className='flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/78 transition-[border-color,background-color] duration-200 group-hover:border-white/14 group-hover:bg-white/[0.05]'>
+                  <Play className='ml-0.5 h-3 w-3 fill-current' />
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='flex items-center gap-[3px] text-white/24 transition-colors duration-200 group-hover:text-white/36'
+                >
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                </span>
+              </div>
             </a>
           </div>
         );

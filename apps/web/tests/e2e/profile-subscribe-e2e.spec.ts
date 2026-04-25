@@ -55,7 +55,7 @@ async function setupProfilePage(page: Page) {
 
   await page
     .locator(
-      '[data-testid="profile-mobile-notifications-step-intro"], [data-testid="profile-inline-notifications-trigger"]'
+      '[data-testid="profile-mobile-notifications-step-preferences"], [data-testid="profile-inline-notifications-trigger"]'
     )
     .first()
     .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
@@ -66,22 +66,24 @@ async function setupProfilePage(page: Page) {
  * Returns `false` if the trigger is not found.
  */
 async function clickTurnOnNotifications(page: Page) {
-  const introStep = page.getByTestId('profile-mobile-notifications-step-intro');
-  const introVisible = await introStep
+  const preferencesStep = page.getByTestId(
+    'profile-mobile-notifications-step-preferences'
+  );
+  const preferencesVisible = await preferencesStep
     .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
     .catch(() => false);
 
-  if (!introVisible) {
+  if (!preferencesVisible) {
     const btn = page.getByTestId('profile-inline-notifications-trigger');
     await btn.waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
     await btn.click();
-    await introStep.waitFor({
+    await preferencesStep.waitFor({
       state: 'visible',
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   }
 
-  await introStep.getByRole('button', { name: /^continue$/i }).click();
+  await preferencesStep.getByRole('switch', { name: /new music/i }).click();
 
   await page
     .getByTestId('profile-mobile-notifications-step-email')

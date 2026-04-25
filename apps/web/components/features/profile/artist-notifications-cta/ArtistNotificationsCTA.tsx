@@ -6,6 +6,7 @@ import type { ArtistNotificationsCTAProps } from './types';
 export function ArtistNotificationsCTA({
   artist,
   presentation,
+  portalContainer,
   variant = 'link',
   autoOpen = false,
   forceExpanded = false,
@@ -19,6 +20,7 @@ export function ArtistNotificationsCTA({
       artist={artist}
       variant={variant}
       presentation={resolvedPresentation}
+      portalContainer={portalContainer}
       autoOpen={autoOpen || forceExpanded}
       source={source}
     />

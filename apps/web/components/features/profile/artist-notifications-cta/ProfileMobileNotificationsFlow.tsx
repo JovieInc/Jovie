@@ -2,7 +2,6 @@
 
 import { Switch } from '@jovie/ui';
 import {
-  Bell,
   CalendarDays,
   Check,
   ChevronLeft,
@@ -18,7 +17,6 @@ import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 
 export type ProfileMobileNotificationsFlowStep =
-  | 'intro'
   | 'email'
   | 'otp'
   | 'name'
@@ -29,6 +27,7 @@ export type ProfileMobileNotificationsFlowStep =
 interface ProfileMobileNotificationsFlowProps {
   readonly open: boolean;
   readonly presentation?: 'inline' | 'overlay';
+  readonly portalContainer?: HTMLElement | null;
   readonly artistName: string;
   readonly channel?: 'email' | 'sms';
   readonly step: ProfileMobileNotificationsFlowStep;
@@ -46,6 +45,8 @@ interface ProfileMobileNotificationsFlowProps {
   readonly resendCooldownEnd: number;
   readonly isResending: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
+  readonly canEditPreferences?: boolean;
+  readonly canGoBackFromPreferences?: boolean;
   readonly artistEmailOptIn?: boolean;
   readonly artistEmailReady?: boolean;
   readonly showArtistEmailSection?: boolean;
@@ -337,6 +338,7 @@ function BirthdaySelectors({
 export function ProfileMobileNotificationsFlow({
   open,
   presentation = 'overlay',
+  portalContainer,
   artistName,
   channel = 'email',
   step,
@@ -354,6 +356,8 @@ export function ProfileMobileNotificationsFlow({
   resendCooldownEnd,
   isResending,
   contentPrefs,
+  canEditPreferences = false,
+  canGoBackFromPreferences = false,
   artistEmailOptIn = false,
   artistEmailReady = false,
   showArtistEmailSection = false,
@@ -413,29 +417,6 @@ export function ProfileMobileNotificationsFlow({
   }
 
   const screen = (() => {
-    if (step === 'intro') {
-      return (
-        <ScreenShell
-          title='Stay in the loop.'
-          body='Get notified about new music, shows, and exclusive updates.'
-          footer={
-            <div className='space-y-2'>
-              <PrimaryButton onClick={onEmailSubmit}>Continue</PrimaryButton>
-              <SecondaryTextButton onClick={onClose}>
-                Not now
-              </SecondaryTextButton>
-            </div>
-          }
-        >
-          <div className='flex h-full items-center justify-center'>
-            <div className='flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] shadow-[0_28px_60px_rgba(0,0,0,0.32)]'>
-              <Bell className='h-10 w-10 text-white/80' />
-            </div>
-          </div>
-        </ScreenShell>
-      );
-    }
-
     if (step === 'email') {
       return (
         <ScreenShell
@@ -582,12 +563,14 @@ export function ProfileMobileNotificationsFlow({
           title='Alerts'
           body='Get notified about new music, shows, and more.'
           footer={
-            <PrimaryButton
-              onClick={onPreferencesSubmit}
-              disabled={isPreferencesSaving}
-            >
-              Save & Finish
-            </PrimaryButton>
+            canEditPreferences ? (
+              <PrimaryButton
+                onClick={onPreferencesSubmit}
+                disabled={isPreferencesSaving}
+              >
+                Save & Finish
+              </PrimaryButton>
+            ) : null
           }
         >
           <div className='space-y-6'>
@@ -700,7 +683,10 @@ export function ProfileMobileNotificationsFlow({
     );
   })();
 
-  const showBackButton = step !== 'done';
+  const isRootPreferencesStep =
+    step === 'preferences' && !canGoBackFromPreferences;
+  const showBackButton =
+    step !== 'done' && (!isRootPreferencesStep || presentation === 'overlay');
 
   const contentBody = (
     <>
@@ -716,13 +702,12 @@ export function ProfileMobileNotificationsFlow({
         )}
       >
         <header className='flex items-center justify-between pb-6'>
-          {showBackButton &&
-          (step !== 'intro' || presentation === 'overlay') ? (
+          {showBackButton ? (
             <button
               type='button'
               onClick={onBack}
               className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-200 hover:bg-white/[0.08]'
-              aria-label={step === 'intro' ? 'Close' : 'Back'}
+              aria-label={isRootPreferencesStep ? 'Close' : 'Back'}
             >
               <ChevronLeft className='h-5 w-5' />
             </button>
@@ -759,7 +744,9 @@ export function ProfileMobileNotificationsFlow({
   const sharedContentProps = {
     className: cn(
       presentation === 'overlay'
-        ? 'pointer-events-auto fixed inset-0 z-[140] bg-[#0a0b0f]'
+        ? portalContainer === undefined
+          ? 'pointer-events-auto fixed inset-0 z-[140] bg-[#0a0b0f]'
+          : 'pointer-events-auto absolute inset-0 z-[140] bg-[#0a0b0f]'
         : 'relative min-h-[640px] rounded-[32px] bg-[#0a0b0f]',
       'text-white'
     ),
@@ -782,5 +769,9 @@ export function ProfileMobileNotificationsFlow({
     return content;
   }
 
-  return createPortal(content, document.body);
+  if (portalContainer === null) {
+    return null;
+  }
+
+  return createPortal(content, portalContainer ?? document.body);
 }

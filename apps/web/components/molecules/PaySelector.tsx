@@ -141,7 +141,7 @@ export function PaySelector({
   if (presentation === 'drawer') {
     return (
       <div
-        className={cn('space-y-6', className)}
+        className={cn('space-y-4.5', className)}
         data-presentation='drawer'
         data-test='pay-selector'
       >
@@ -151,15 +151,15 @@ export function PaySelector({
 
         <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
-        <div className='space-y-5'>
-          <div className='min-h-[182px]' data-testid='pay-selector-amount-slot'>
-            <div className='min-h-[102px]'>
+        <div className='space-y-4'>
+          <div className='min-h-[160px]' data-testid='pay-selector-amount-slot'>
+            <div className='min-h-[92px]'>
               {customMode ? (
-                <div className='flex min-h-[102px] items-center'>
+                <div className='flex min-h-[92px] items-center'>
                   <label className='w-full'>
                     <span className='sr-only'>Custom amount</span>
-                    <div className='flex h-[102px] items-center rounded-[26px] border border-white/12 bg-white/[0.03] px-6 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
-                      <span className='mr-3 text-[30px] font-medium tracking-[-0.04em] text-white/48'>
+                    <div className='flex h-[92px] items-center rounded-[22px] border border-white/12 bg-white/[0.03] px-4.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+                      <span className='mr-3 text-[26px] font-medium tracking-[-0.04em] text-white/42'>
                         $
                       </span>
                       <input
@@ -173,7 +173,7 @@ export function PaySelector({
                           );
                         }}
                         placeholder='0.00'
-                        className='h-full w-full bg-transparent text-[34px] font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-white/18'
+                        className='h-full w-full bg-transparent text-[30px] font-semibold tracking-[-0.05em] text-white outline-none placeholder:text-white/18'
                         aria-label='Custom amount'
                       />
                     </div>
@@ -181,7 +181,7 @@ export function PaySelector({
                 </div>
               ) : (
                 <fieldset
-                  className='grid grid-cols-3 gap-4 border-0 p-0 m-0'
+                  className='m-0 grid grid-cols-3 gap-3 border-0 p-0'
                   aria-label='Amount options'
                 >
                   {amounts.map((amount, idx) => {
@@ -194,13 +194,13 @@ export function PaySelector({
                         aria-label={`Select ${formatAmountForScreenReader(amount)} payment amount`}
                         onClick={() => handleAmountSelect(idx)}
                         className={cn(
-                          'flex h-[102px] items-center justify-center rounded-[26px] border text-center transition-[border-color,background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'flex h-[92px] items-center justify-center rounded-[22px] border text-center transition-[border-color,background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isSelected
                             ? 'border-white bg-white text-[#121216] shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
                             : 'border-white/10 bg-white/[0.02] text-white hover:border-white/18 hover:bg-white/[0.04]'
                         )}
                       >
-                        <span className='text-[22px] font-medium tracking-[-0.03em]'>
+                        <span className='text-[19px] font-medium tracking-[-0.03em]'>
                           {formatAmountForScreenReader(amount)}
                         </span>
                       </button>
@@ -210,11 +210,11 @@ export function PaySelector({
               )}
             </div>
 
-            <div className='mt-5 flex justify-end'>
+            <div className='mt-3.5 flex justify-end'>
               <button
                 type='button'
                 onClick={handleCustomToggle}
-                className='inline-flex items-center gap-2 text-[15px] font-medium tracking-[-0.02em] text-white/66 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/52 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-pressed={customMode}
                 aria-controls='pay-selector-heading'
               >
@@ -228,18 +228,18 @@ export function PaySelector({
             type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue}
-            className='flex h-14 w-full items-center justify-center rounded-full bg-white px-5 text-[19px] font-semibold tracking-[-0.03em] text-[#101013] transition-[opacity,transform] duration-200 hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            className='flex h-[50px] w-full items-center justify-center rounded-full bg-white px-5 text-[16px] font-semibold tracking-[-0.025em] text-[#101013] transition-[opacity,transform] duration-200 hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
             aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
             {isLoading ? 'Processing...' : primaryLabel}
           </button>
 
           {showOtherPaymentOptions && paymentLabel ? (
-            <div className='space-y-4'>
+            <div className='space-y-3.5'>
               <button
                 type='button'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='flex w-full items-center gap-4 text-[15px] font-medium tracking-[-0.02em] text-white/62 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='flex w-full items-center gap-3.5 text-[13px] font-medium tracking-[-0.015em] text-white/48 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />
@@ -257,7 +257,7 @@ export function PaySelector({
                 className={cn(
                   'overflow-hidden transition-[max-height,opacity] duration-200',
                   showOtherOptions
-                    ? 'max-h-28 opacity-100'
+                    ? 'max-h-24 opacity-100'
                     : 'max-h-0 opacity-0'
                 )}
               >
@@ -266,7 +266,7 @@ export function PaySelector({
                     type='button'
                     onClick={handleContinue}
                     disabled={isLoading || !canContinue}
-                    className='flex h-14 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-[16px] font-medium tracking-[-0.02em] text-white transition-[border-color,background-color,opacity] duration-200 hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
+                    className='flex h-[48px] w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-[14px] font-medium tracking-[-0.015em] text-white transition-[border-color,background-color,opacity] duration-200 hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
                   >
                     {paymentLabel === 'Venmo' ? <VenmoIcon /> : null}

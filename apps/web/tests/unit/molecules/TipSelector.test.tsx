@@ -71,14 +71,14 @@ describe('PaySelector', () => {
     );
 
     const amountSlot = screen.getByTestId('pay-selector-amount-slot');
-    expect(amountSlot.className).toContain('min-h-[182px]');
+    expect(amountSlot.className).toContain('min-h-[160px]');
     expect(
       screen.getByRole('button', { name: /Select \$5 payment amount/i })
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Custom amount/i }));
 
-    expect(amountSlot.className).toContain('min-h-[182px]');
+    expect(amountSlot.className).toContain('min-h-[160px]');
     expect(
       screen.queryByRole('button', { name: /Select \$5 payment amount/i })
     ).not.toBeInTheDocument();

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -346,6 +346,8 @@ export function ProfileCompactSurface({
   hideMoreMenu = false,
   headerSocialLinksOverride,
 }: Readonly<ProfileCompactSurfaceProps>) {
+  const [notificationsPortalContainer, setNotificationsPortalContainer] =
+    useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
     () =>
       sortDSPsByGeoPopularity(
@@ -437,6 +439,7 @@ export function ProfileCompactSurface({
       data-profile-mode={activeMode}
     >
       <div
+        ref={setNotificationsPortalContainer}
         className='relative flex h-full w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)]'
         data-testid='profile-compact-surface'
         data-presentation={presentation}
@@ -571,6 +574,7 @@ export function ProfileCompactSurface({
                         artist={artist}
                         onManageNotifications={onManageNotifications}
                         onRegisterReveal={onRegisterReveal}
+                        portalContainer={notificationsPortalContainer}
                         variant='hero'
                       />
                     ) : (
@@ -683,6 +687,7 @@ export function ProfileCompactSurface({
               mode={activePrimaryPanel ?? 'listen'}
               renderMode={renderMode}
               artist={artist}
+              notificationsPortalContainer={notificationsPortalContainer}
               dsps={mergedDSPs}
               enableDynamicEngagement={enableDynamicEngagement}
               subscribeTwoStep={subscribeTwoStep}

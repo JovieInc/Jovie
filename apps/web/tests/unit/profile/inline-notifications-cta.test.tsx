@@ -179,7 +179,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /turn on notifications/i })
     );
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
 
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
     await waitFor(() => {
@@ -204,7 +204,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /turn on notifications/i })
     );
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
   });
 
-  it('does not reset inline auto-open flow back to intro on rerender', async () => {
+  it('does not reset inline auto-open flow back to the initial alerts screen on rerender', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     const { ProfileInlineNotificationsCTA } = await import(
@@ -227,8 +227,8 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       />
     );
 
-    expect(await screen.findByText('Stay in the loop.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: /new music/i }));
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue({
@@ -245,7 +245,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     );
 
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
-    expect(screen.queryByText('Stay in the loop.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Alerts')).not.toBeInTheDocument();
   });
 
   it('progresses from OTP through name and birthday into the Alerts screen', async () => {
@@ -269,7 +269,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /turn on notifications/i })
     );
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 

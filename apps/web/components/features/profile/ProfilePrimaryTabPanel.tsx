@@ -26,6 +26,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly mode: Exclude<ProfilePrimaryTab, 'profile'>;
   readonly renderMode?: ProfileRenderMode;
   readonly artist: Artist;
+  readonly notificationsPortalContainer?: HTMLElement | null;
   readonly dsps: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
@@ -149,12 +150,14 @@ function PreviewAlertsPanel({
 function SubscribePanel({
   renderMode,
   artist,
+  notificationsPortalContainer,
   subscribeTwoStep,
   isSubscribed,
   previewNotificationsState,
 }: Readonly<{
   renderMode: ProfileRenderMode;
   artist: Artist;
+  notificationsPortalContainer?: HTMLElement | null;
   subscribeTwoStep: boolean;
   isSubscribed: boolean;
   previewNotificationsState?: ProfilePreviewNotificationsState;
@@ -179,11 +182,13 @@ function SubscribePanel({
       artist={artist}
       startExpanded
       presentation='overlay'
+      portalContainer={notificationsPortalContainer}
     />
   ) : (
     <ArtistNotificationsCTA
       artist={artist}
       presentation='overlay'
+      portalContainer={notificationsPortalContainer}
       variant='button'
       autoOpen
       forceExpanded
@@ -195,6 +200,7 @@ export function ProfilePrimaryTabPanel({
   mode,
   renderMode = 'interactive',
   artist,
+  notificationsPortalContainer,
   dsps,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
@@ -241,6 +247,7 @@ export function ProfilePrimaryTabPanel({
       <SubscribePanel
         renderMode={renderMode}
         artist={artist}
+        notificationsPortalContainer={notificationsPortalContainer}
         subscribeTwoStep={subscribeTwoStep}
         isSubscribed={isSubscribed}
         previewNotificationsState={previewNotificationsState}

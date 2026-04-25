@@ -37,15 +37,16 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly variant?: 'default' | 'hero' | 'button' | 'link';
   readonly presentation?: 'overlay' | 'inline';
+  readonly portalContainer?: HTMLElement | null;
   readonly autoOpen?: boolean;
   readonly source?: NotificationSource;
 }
 
-const DEFAULT_ALERT_PREFS: Record<NotificationContentType, boolean> = {
-  newMusic: true,
-  tourDates: true,
-  merch: true,
-  general: true,
+const EMPTY_ALERT_PREFS: Record<NotificationContentType, boolean> = {
+  newMusic: false,
+  tourDates: false,
+  merch: false,
+  general: false,
 };
 
 function birthdayDigitsToStorage(digits: string): string {
@@ -75,6 +76,7 @@ export function ProfileInlineNotificationsCTA({
   onRegisterReveal,
   variant = 'default',
   presentation = 'overlay',
+  portalContainer,
   autoOpen = false,
   source,
 }: ProfileInlineNotificationsCTAProps) {
@@ -103,41 +105,51 @@ export function ProfileInlineNotificationsCTA({
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
   const prefsMutation = useUpdateContentPreferencesMutation();
-  const [isFlowOpen, setIsFlowOpen] = useState(
-    presentation === 'inline' || autoOpen
-  );
-  const [step, setStep] = useState<ProfileMobileNotificationsFlowStep>('intro');
-  const [flowOrigin, setFlowOrigin] = useState<FlowOrigin>('subscribe');
-  const [nameInput, setNameInput] = useState('');
-  const [birthdayInput, setBirthdayInput] = useState('');
-  const [birthdayHintShown, setBirthdayHintShown] = useState(false);
-  const [alertPrefs, setAlertPrefs] = useState(DEFAULT_ALERT_PREFS);
-  const [artistEmailOptIn, setArtistEmailOptIn] = useState(false);
-  const subscribedEmailRef = useRef('');
-  const hasAutoOpenedRef = useRef(false);
-
-  const isInline = presentation === 'inline';
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
+  const [isFlowOpen, setIsFlowOpen] = useState(
+    presentation === 'inline' || autoOpen
+  );
+  const [step, setStep] =
+    useState<ProfileMobileNotificationsFlowStep>('preferences');
+  const [flowOrigin, setFlowOrigin] = useState<FlowOrigin>(
+    isSubscribed ? 'manage' : 'subscribe'
+  );
+  const [nameInput, setNameInput] = useState('');
+  const [birthdayInput, setBirthdayInput] = useState('');
+  const [birthdayHintShown, setBirthdayHintShown] = useState(false);
+  const [alertPrefs, setAlertPrefs] = useState(EMPTY_ALERT_PREFS);
+  const [artistEmailOptIn, setArtistEmailOptIn] = useState(false);
+  const [canEditPreferences, setCanEditPreferences] = useState(isSubscribed);
+  const subscribedEmailRef = useRef('');
+  const hasAutoOpenedRef = useRef(false);
+
+  const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const accentHex =
     readProfileAccentTheme(artist.theme)?.primaryHex ?? '#ed9962';
   const showArtistEmailSection =
+    canEditPreferences &&
     Boolean(subscriptionDetails.email || emailInput.trim()) &&
     !subscribedChannels.sms;
   const flowChannel =
     subscriptionDetails.sms && !showArtistEmailSection ? 'sms' : 'email';
 
   const syncPreferencesFromStatus = useCallback(() => {
-    setAlertPrefs(prev => ({
-      ...prev,
-      ...DEFAULT_ALERT_PREFS,
-      ...contentPreferences,
-    }));
-    setArtistEmailOptIn(artistEmail?.optedIn ?? false);
-  }, [artistEmail?.optedIn, contentPreferences]);
+    if (isSubscribed) {
+      setAlertPrefs({
+        ...EMPTY_ALERT_PREFS,
+        ...contentPreferences,
+      });
+      setArtistEmailOptIn(artistEmail?.optedIn ?? false);
+      return;
+    }
+
+    setAlertPrefs(EMPTY_ALERT_PREFS);
+    setArtistEmailOptIn(false);
+  }, [artistEmail?.optedIn, contentPreferences, isSubscribed]);
 
   const openFlow = useCallback(() => {
     handleChannelChange('email');
@@ -150,10 +162,12 @@ export function ProfileInlineNotificationsCTA({
         return;
       }
       setFlowOrigin('manage');
+      setCanEditPreferences(true);
       setStep('preferences');
     } else {
       setFlowOrigin('subscribe');
-      setStep('intro');
+      setCanEditPreferences(false);
+      setStep('preferences');
     }
 
     setIsFlowOpen(true);
@@ -201,13 +215,13 @@ export function ProfileInlineNotificationsCTA({
       !(isInline || autoOpen) ||
       !isFlowOpen ||
       !isSubscribed ||
-      step !== 'intro'
+      step !== 'preferences'
     ) {
       return;
     }
 
     setFlowOrigin('manage');
-    setStep('preferences');
+    setCanEditPreferences(true);
   }, [autoOpen, isFlowOpen, isInline, isSubscribed, step]);
 
   const activeEmail = useMemo(
@@ -221,24 +235,26 @@ export function ProfileInlineNotificationsCTA({
     if (isInline) {
       if (isSubscribed) {
         setFlowOrigin('manage');
+        setCanEditPreferences(true);
+        setStep('preferences');
+      } else {
+        setFlowOrigin('subscribe');
+        setCanEditPreferences(false);
         setStep('preferences');
       }
       return;
     }
     setIsFlowOpen(false);
-    if (!isSubscribed) {
-      setStep('intro');
-      setBirthdayHintShown(false);
-    }
+    setBirthdayHintShown(false);
+    setCanEditPreferences(isSubscribed);
+    setFlowOrigin(isSubscribed ? 'manage' : 'subscribe');
+    setStep('preferences');
   }, [isInline, isSubscribed]);
 
   const handleBack = useCallback(() => {
     switch (step) {
-      case 'intro':
-        handleClose();
-        return;
       case 'email':
-        setStep('intro');
+        setStep('preferences');
         return;
       case 'otp':
         setStep('email');
@@ -250,7 +266,7 @@ export function ProfileInlineNotificationsCTA({
         setStep('name');
         return;
       case 'preferences':
-        if (flowOrigin === 'manage') {
+        if (flowOrigin === 'manage' || !canEditPreferences) {
           handleClose();
           return;
         }
@@ -259,14 +275,9 @@ export function ProfileInlineNotificationsCTA({
       case 'done':
         handleClose();
     }
-  }, [flowOrigin, handleClose, step]);
+  }, [canEditPreferences, flowOrigin, handleClose, step]);
 
   const handleEmailSubmit = useCallback(async () => {
-    if (step === 'intro') {
-      setStep('email');
-      return;
-    }
-
     const result = await handleSubscribe();
     if (result === 'pending_confirmation') {
       setStep('otp');
@@ -280,7 +291,7 @@ export function ProfileInlineNotificationsCTA({
         '';
       setStep('name');
     }
-  }, [emailInput, handleSubscribe, step, subscriptionDetails.email]);
+  }, [emailInput, handleSubscribe, subscriptionDetails.email]);
 
   const handleOtpSubmit = useCallback(async () => {
     const result = await handleVerifyOtp();
@@ -336,6 +347,7 @@ export function ProfileInlineNotificationsCTA({
           setBirthdayHintShown(true);
           return;
         }
+        setCanEditPreferences(true);
         setStep('preferences');
         return;
       }
@@ -352,16 +364,47 @@ export function ProfileInlineNotificationsCTA({
         }
       }
 
+      setCanEditPreferences(true);
       setStep('preferences');
     },
     [activeEmail, artist.id, birthdayHintShown, birthdayInput, birthdayMutation]
   );
 
-  const handleTogglePref = useCallback((key: NotificationContentType) => {
-    setAlertPrefs(prev => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  const handleTogglePref = useCallback(
+    (key: NotificationContentType) => {
+      setAlertPrefs(prev => ({ ...prev, [key]: !prev[key] }));
+
+      if (canEditPreferences) {
+        return;
+      }
+
+      setFlowOrigin('subscribe');
+      setStep('email');
+    },
+    [canEditPreferences]
+  );
+
+  const handleArtistEmailToggle = useCallback(
+    (value: boolean) => {
+      setArtistEmailOptIn(value);
+
+      if (canEditPreferences) {
+        return;
+      }
+
+      setFlowOrigin('subscribe');
+      setStep('email');
+    },
+    [canEditPreferences]
+  );
 
   const handlePreferencesSubmit = useCallback(async () => {
+    if (!canEditPreferences) {
+      setFlowOrigin('subscribe');
+      setStep('email');
+      return;
+    }
+
     const email = activeEmail;
     const phone = subscriptionDetails.sms;
 
@@ -392,6 +435,7 @@ export function ProfileInlineNotificationsCTA({
     alertPrefs.tourDates,
     artist.id,
     artistEmailOptIn,
+    canEditPreferences,
     prefsMutation,
     showArtistEmailSection,
     subscriptionDetails.sms,
@@ -434,6 +478,7 @@ export function ProfileInlineNotificationsCTA({
         channel={flowChannel}
         step={step}
         accentHex={accentHex}
+        portalContainer={portalContainer}
         emailInput={emailInput}
         otpCode={otpCode}
         nameInput={nameInput}
@@ -447,6 +492,11 @@ export function ProfileInlineNotificationsCTA({
         resendCooldownEnd={resendCooldownEnd}
         isResending={isResending}
         contentPrefs={alertPrefs}
+        canEditPreferences={canEditPreferences}
+        canGoBackFromPreferences={
+          step !== 'preferences' ||
+          (flowOrigin === 'subscribe' && canEditPreferences)
+        }
         artistEmailOptIn={artistEmailOptIn}
         artistEmailReady={artistEmailReady}
         showArtistEmailSection={showArtistEmailSection}
@@ -470,7 +520,7 @@ export function ProfileInlineNotificationsCTA({
         }}
         onBirthdaySubmit={handleBirthdaySubmit}
         onTogglePref={handleTogglePref}
-        onArtistEmailToggle={setArtistEmailOptIn}
+        onArtistEmailToggle={handleArtistEmailToggle}
         onPreferencesSubmit={handlePreferencesSubmit}
       />
     </>

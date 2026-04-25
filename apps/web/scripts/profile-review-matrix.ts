@@ -68,7 +68,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
     selector: '[data-testid="profile-compact-shell"]',
   },
   {
-    id: 'subscribe-intro',
+    id: 'alerts-entry',
     route: '/dualipa?mode=subscribe',
     selector: '[data-testid="profile-mobile-notifications-flow"]',
   },
@@ -77,7 +77,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
     route: '/dualipa?mode=subscribe',
     selector: '[data-testid="profile-mobile-notifications-flow"]',
     prepare: async page => {
-      await continueFromIntro(page);
+      await continueFromAlertsEntry(page);
       await waitForStep(page, 'email');
     },
   },
@@ -190,7 +190,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
     route: '/testartist/notifications',
     selector: '[data-testid="profile-mobile-notifications-flow"]',
     prepare: async page => {
-      await waitForStep(page, 'intro');
+      await waitForStep(page, 'preferences');
     },
   },
 ] as const;
@@ -379,7 +379,7 @@ function getActiveFlow(page: Page): Locator {
 
 function getActiveStep(
   page: Page,
-  step: 'intro' | 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done'
+  step: 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done'
 ): Locator {
   return getActiveFlow(page).getByTestId(
     `profile-mobile-notifications-step-${step}`
@@ -396,7 +396,7 @@ function getCaptureLocator(page: Page, selector: string): Locator {
 
 async function waitForStep(
   page: Page,
-  step: 'intro' | 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done'
+  step: 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done'
 ) {
   await getActiveStep(page, step).waitFor({
     state: 'visible',
@@ -406,14 +406,7 @@ async function waitForStep(
 
 async function clickStepButton(
   page: Page,
-  step:
-    | 'intro'
-    | 'email'
-    | 'otp'
-    | 'name'
-    | 'birthday'
-    | 'preferences'
-    | 'done',
+  step: 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done',
   name: RegExp
 ) {
   await getActiveStep(page, step).getByRole('button', { name }).click({
@@ -421,13 +414,15 @@ async function clickStepButton(
   });
 }
 
-async function continueFromIntro(page: Page) {
-  await waitForStep(page, 'intro');
-  await clickStepButton(page, 'intro', /^continue$/i);
+async function continueFromAlertsEntry(page: Page) {
+  await waitForStep(page, 'preferences');
+  await getActiveStep(page, 'preferences')
+    .getByRole('switch', { name: /new music/i })
+    .click({ force: true });
 }
 
 async function reachOtpStep(page: Page) {
-  await continueFromIntro(page);
+  await continueFromAlertsEntry(page);
   await waitForStep(page, 'email');
   await page.getByTestId('mobile-email-input').fill('fan@example.com');
   await clickStepButton(page, 'email', /^continue$/i);

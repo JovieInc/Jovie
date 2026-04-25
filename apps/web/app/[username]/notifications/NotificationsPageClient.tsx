@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type CSSProperties } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
@@ -18,6 +18,8 @@ interface Props {
 }
 
 export function NotificationsPageClient({ artist }: Props) {
+  const [notificationsPortalContainer, setNotificationsPortalContainer] =
+    useState<HTMLDivElement | null>(null);
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks: [],
@@ -47,7 +49,10 @@ export function NotificationsPageClient({ artist }: Props) {
           className='pointer-events-none absolute bottom-[12%] right-[10%] h-52 w-52 rounded-full bg-[color:var(--profile-stage-glow-b)] blur-3xl sm:h-64 sm:w-64'
           aria-hidden='true'
         />
-        <div className='relative z-10 w-full max-w-sm overflow-hidden rounded-[32px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:p-6'>
+        <div
+          ref={setNotificationsPortalContainer}
+          className='relative z-10 flex h-[calc(100dvh-5rem)] min-h-[640px] w-full max-w-sm flex-col overflow-hidden rounded-[32px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:max-h-[844px] sm:p-6'
+        >
           <div className='mb-5 flex items-center justify-between'>
             <Link
               href={BASE_URL}
@@ -70,6 +75,7 @@ export function NotificationsPageClient({ artist }: Props) {
           <ArtistNotificationsCTA
             artist={artist}
             presentation='overlay'
+            portalContainer={notificationsPortalContainer}
             variant='button'
             autoOpen
             forceExpanded

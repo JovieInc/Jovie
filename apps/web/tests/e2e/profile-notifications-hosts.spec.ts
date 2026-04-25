@@ -53,7 +53,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-intro')
+        page.getByTestId('profile-mobile-notifications-step-preferences')
       ).toBeVisible();
     });
 
@@ -76,7 +76,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-intro')
+        page.getByTestId('profile-mobile-notifications-step-preferences')
       ).toBeVisible();
     });
 
@@ -100,7 +100,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-intro')
+        page.getByTestId('profile-mobile-notifications-step-preferences')
       ).toBeVisible();
     });
 

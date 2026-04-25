@@ -135,14 +135,14 @@ describe('public profile notifications OTP step', () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
   });
 
-  it('renders OTP verification UI in ArtistNotificationsCTA after the intro and email steps', async () => {
+  it('renders OTP verification UI in ArtistNotificationsCTA after the alerts and email steps', async () => {
     const { ArtistNotificationsCTA } = await import(
       '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
     );
 
     render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
@@ -156,14 +156,14 @@ describe('public profile notifications OTP step', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders OTP verification UI in TwoStepNotificationsCTA after the intro and email steps', async () => {
+  it('renders OTP verification UI in TwoStepNotificationsCTA after the alerts and email steps', async () => {
     const { TwoStepNotificationsCTA } = await import(
       '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
     );
 
     render(<TwoStepNotificationsCTA artist={artist} startExpanded />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
