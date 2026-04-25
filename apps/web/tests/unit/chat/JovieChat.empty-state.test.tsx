@@ -66,6 +66,21 @@ vi.mock('@/components/jovie/hooks', () => ({
     totalSizeRef: vi.fn(),
     scrollContainerRef: { current: null },
   }),
+  useChatJankMonitor: () => ({
+    onSend: vi.fn(),
+    getSummary: () => ({
+      conversationId: null,
+      jankEventCount: 0,
+      messageDisappearCount: 0,
+      duplicateCount: 0,
+      reorderCount: 0,
+      tokenRollbackCount: 0,
+      streamStallCount: 0,
+      unexpectedScrollJumpCount: 0,
+      noVisibleFeedbackCount: 0,
+      isJankFree: true,
+    }),
+  }),
 }));
 
 vi.mock('@/components/jovie/components', async () => {

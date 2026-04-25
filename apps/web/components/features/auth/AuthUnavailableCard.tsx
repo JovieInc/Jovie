@@ -21,7 +21,7 @@ export function AuthUnavailableCard({
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-white/55'
-          />
+          ></span>
           Auth unavailable
         </div>
       </div>
