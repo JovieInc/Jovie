@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
+function getProviderLabel(provider: string): string {
+  if (provider === 'apple_music') return 'Apple Music';
+  if (provider === 'deezer') return 'Deezer';
+  return 'Spotify';
+}
+
 interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
@@ -147,11 +153,7 @@ export function ArtistProfileHowItWorks({
                         className='h-4.5 w-4.5'
                       />
                       <p className='text-[13px] font-medium text-primary-token'>
-                        {provider.provider === 'apple_music'
-                          ? 'Apple Music'
-                          : provider.provider === 'deezer'
-                            ? 'Deezer'
-                            : 'Spotify'}
+                        {getProviderLabel(provider.provider)}
                       </p>
                     </div>
                     <span
