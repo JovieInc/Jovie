@@ -55,7 +55,7 @@ export function IntentRestorer({ intentId }: IntentRestorerProps) {
     <p
       role='status'
       aria-live='polite'
-      className='mb-6 text-center text-[13px] leading-[1.4] text-tertiary-token'
+      className='mb-6 text-center text-app leading-[1.4] text-tertiary-token'
       title={prompt}
     >
       Continuing with &ldquo;{truncated}&rdquo;
