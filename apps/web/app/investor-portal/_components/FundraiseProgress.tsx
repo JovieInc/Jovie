@@ -46,7 +46,7 @@ export function FundraiseProgress({
       />
 
       {/* Text */}
-      <p className='text-[length:var(--text-xs)] font-[510] text-[var(--color-text-tertiary-token)]'>
+      <p className='text-[length:var(--text-xs)] font-medium text-[var(--color-text-tertiary-token)]'>
         {formatAmount(committedAmount)} / {formatAmount(raiseTarget)} committed
         {investorCount > 0 &&
           ` · ${investorCount} investor${investorCount === 1 ? '' : 's'}`}

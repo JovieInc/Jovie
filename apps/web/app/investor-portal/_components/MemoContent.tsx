@@ -40,7 +40,7 @@ export function MemoContent({
         <div className='mb-8 flex items-start justify-between'>
           <div>
             <h1
-              className='text-[length:var(--text-3xl)] font-[680] text-[var(--color-text-primary-token)]'
+              className='text-[length:var(--text-3xl)] font-bold text-[var(--color-text-primary-token)]'
               style={{
                 letterSpacing: 'var(--tracking-tight)',
                 fontFeatureSettings: 'var(--font-features)',
