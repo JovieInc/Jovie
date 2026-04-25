@@ -93,7 +93,7 @@ export function BatchIngestForm({
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-[13px] font-[510] text-primary-token'>
+          <span className='text-[13px] font-medium text-primary-token'>
             Batch URL import
           </span>
           {summaryText && !isOpen && (
