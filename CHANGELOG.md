@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.177] - 2026-04-24
+
+### Fixed
+
+- Admin operator banner no longer flashes "Environment Issues: Rate limit exceeded" in local dev when Upstash isn't configured. The `/api/health/env` route's 429 branch was stuffing the limiter's "Rate limit exceeded" string into `currentValidation.errors`, which the banner then surfaced as a real environment failure. The route now returns a healthy-shaped body on 429 (status 429 + headers preserved for observability), and `useEnvHealthQuery` defensively maps any 429 to a healthy payload so a future endpoint regression can't resurrect this loop. Regression test added in `apps/web/tests/unit/admin.OperatorBanner.test.tsx`.
+
 ## [26.4.174] - 2026-04-24
 
 > Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.

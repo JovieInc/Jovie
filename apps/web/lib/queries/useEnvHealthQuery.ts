@@ -11,6 +11,33 @@ import { queryKeys } from './keys';
 /**
  * Query function for fetching environment health status.
  */
+function healthyEnvHealthFallback(): EnvHealthResponse {
+  return {
+    service: 'env',
+    status: 'ok',
+    ok: true,
+    timestamp: new Date().toISOString(),
+    details: {
+      environment: 'unknown',
+      platform: 'unknown',
+      nodeVersion: 'unknown',
+      startupValidationCompleted: false,
+      currentValidation: {
+        valid: true,
+        errors: [],
+        warnings: [],
+        critical: [],
+      },
+      integrations: {
+        database: false,
+        auth: false,
+        payments: false,
+        images: false,
+      },
+    },
+  };
+}
+
 async function fetchEnvHealth({
   signal,
 }: {
@@ -22,6 +49,11 @@ async function fetchEnvHealth({
     });
   } catch (error) {
     if (error instanceof FetchError && error.response) {
+      // 429 means we couldn't even check — not an env validation failure.
+      // Treat it as healthy so the OperatorBanner doesn't surface a fake issue.
+      if (error.status === 429) {
+        return healthyEnvHealthFallback();
+      }
       return (await error.response.json()) as EnvHealthResponse;
     }
 

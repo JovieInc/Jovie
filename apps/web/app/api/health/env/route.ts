@@ -22,11 +22,14 @@ export async function GET(request: Request) {
   const rateLimitResult = await healthLimiter.limit(clientIP);
 
   if (!rateLimitResult.success) {
+    // Rate-limited (or limiter unavailable) is not an env validation failure.
+    // Return ok:true with empty validation so the OperatorBanner stays hidden;
+    // the 429 status + headers remain for observability and clients that care.
     return NextResponse.json(
       {
         service: 'env',
-        status: 'error',
-        ok: false,
+        status: 'ok',
+        ok: true,
         timestamp: now,
         details: {
           environment: 'unknown',
@@ -34,8 +37,8 @@ export async function GET(request: Request) {
           nodeVersion: 'unknown',
           startupValidationCompleted: false,
           currentValidation: {
-            valid: false,
-            errors: ['Rate limit exceeded'],
+            valid: true,
+            errors: [],
             warnings: [],
             critical: [],
           },
