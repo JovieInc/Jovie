@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.178] - 2026-04-25
+
+> Closes two SonarCloud security hotspots on the bio-import sanitizer that shipped in 26.4.176. ReDoS-prone unbounded greedy quantifiers in the URL-stripping regex are now bounded; the bidi/zero-width char class is built via `new RegExp(string)` with `\u` escapes so the source file itself contains no bidi chars (trojan-source defense). No behavior change for real bios.
+
+### Fixed
+
+- `apps/web/lib/ai/tools/extract-bio-candidate.ts` — bounded `URL_PATTERN` quantifiers (`[^\s<>"']{1,2048}` and `[a-z0-9.-]{1,253}`) closing the `typescript:S5852` super-linear backtracking hotspot. Switched `ZERO_WIDTH_PATTERN` to `new RegExp('[\\u200B-...]', 'g')` so the source bytes are 100% ASCII, closing the `text:S6389` bidirectional-character hotspot. Also normalized `CONTROL_PATTERN` to use `\x` escapes for consistency.
+
 ## [26.4.176] - 2026-04-24
 
 > Jovie chat agent can now import an artist's bio from a public URL. Say "import my bio from timwhite.co" and the agent fetches the page server-side, extracts a candidate from JSON-LD or meta tags, sanitizes it, and routes it through the existing confirmation card with a clear "Imported from timwhite.co" provenance line. Closes the most common follow-up to "write me a bio" — owning the URL-import flow instead of telling the user to paste.
