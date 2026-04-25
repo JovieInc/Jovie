@@ -254,6 +254,59 @@ async function importDiscography(
 const streamingDspKeySet = new Set(STREAMING_DSP_KEYS);
 
 /**
+ * Upsert a single DSP artist match row, backfilling external ID via COALESCE
+ * so ISRC-discovered matches retain their richer confidence data.
+ */
+async function upsertDspArtistMatch(
+  creatorProfileId: string,
+  providerId: string,
+  externalArtistId: string | null,
+  artistUrl: string,
+  artistName: string | null,
+  imageUrl: string | null,
+  now: Date
+): Promise<void> {
+  await plainDb
+    .insert(dspArtistMatches)
+    .values({
+      creatorProfileId,
+      providerId,
+      externalArtistId,
+      externalArtistName: artistName,
+      externalArtistUrl: artistUrl,
+      externalArtistImageUrl: imageUrl,
+      confidenceScore: null,
+      confidenceBreakdown: null,
+      matchingIsrcCount: 0,
+      matchingUpcCount: 0,
+      totalTracksChecked: 0,
+      status: 'auto_confirmed',
+      confirmedAt: now,
+      matchSource: 'musicfetch',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [dspArtistMatches.creatorProfileId, dspArtistMatches.providerId],
+      set: {
+        ...(externalArtistId
+          ? {
+              externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
+            }
+          : {}),
+        externalArtistUrl: artistUrl,
+        externalArtistName: artistName,
+        externalArtistImageUrl: imageUrl,
+        updatedAt: now,
+      },
+      where: or(
+        isNull(dspArtistMatches.matchSource),
+        ne(dspArtistMatches.matchSource, 'manual')
+      ),
+    });
+}
+
+/**
  * Seed dspArtistMatches from MusicFetch discovery results.
  *
  * For each streaming DSP that MusicFetch resolved a URL for, upsert a row
@@ -272,6 +325,8 @@ async function seedPresenceFromMusicFetch(
   const now = new Date();
   let seeded = 0;
   const seededProviderIds = new Set<string>();
+  const artistName = artistData.name ?? null;
+  const imageUrl = artistData.image?.url ?? null;
 
   for (const [serviceKey, service] of Object.entries(artistData.services)) {
     const url = getMusicFetchServiceUrl(service);
@@ -290,47 +345,15 @@ async function seedPresenceFromMusicFetch(
     if (seededProviderIds.has(dspEntry.key)) continue;
 
     try {
-      await plainDb
-        .insert(dspArtistMatches)
-        .values({
-          creatorProfileId,
-          providerId: dspEntry.key,
-          externalArtistId: service.id ?? null,
-          externalArtistName: artistData.name ?? null,
-          externalArtistUrl: url,
-          externalArtistImageUrl: artistData.image?.url ?? null,
-          confidenceScore: null,
-          confidenceBreakdown: null,
-          matchingIsrcCount: 0,
-          matchingUpcCount: 0,
-          totalTracksChecked: 0,
-          status: 'auto_confirmed',
-          confirmedAt: now,
-          matchSource: 'musicfetch',
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dspArtistMatches.creatorProfileId,
-            dspArtistMatches.providerId,
-          ],
-          set: {
-            ...(service.id
-              ? {
-                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
-                }
-              : {}),
-            externalArtistUrl: url,
-            externalArtistName: artistData.name ?? null,
-            externalArtistImageUrl: artistData.image?.url ?? null,
-            updatedAt: now,
-          },
-          where: or(
-            isNull(dspArtistMatches.matchSource),
-            ne(dspArtistMatches.matchSource, 'manual')
-          ),
-        });
+      await upsertDspArtistMatch(
+        creatorProfileId,
+        dspEntry.key,
+        service.id ?? null,
+        url,
+        artistName,
+        imageUrl,
+        now
+      );
       seeded++;
       seededProviderIds.add(dspEntry.key);
     } catch (error) {
@@ -347,47 +370,15 @@ async function seedPresenceFromMusicFetch(
   if (spotifyUrl && !seededProviderIds.has('spotify')) {
     try {
       const spotifyId = extractSpotifyArtistId(spotifyUrl, null);
-      await plainDb
-        .insert(dspArtistMatches)
-        .values({
-          creatorProfileId,
-          providerId: 'spotify',
-          externalArtistId: spotifyId,
-          externalArtistName: artistData.name ?? null,
-          externalArtistUrl: spotifyUrl,
-          externalArtistImageUrl: artistData.image?.url ?? null,
-          confidenceScore: null,
-          confidenceBreakdown: null,
-          matchingIsrcCount: 0,
-          matchingUpcCount: 0,
-          totalTracksChecked: 0,
-          status: 'auto_confirmed',
-          confirmedAt: now,
-          matchSource: 'musicfetch',
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dspArtistMatches.creatorProfileId,
-            dspArtistMatches.providerId,
-          ],
-          set: {
-            ...(spotifyId
-              ? {
-                  externalArtistId: drizzleSql`COALESCE(${dspArtistMatches.externalArtistId}, excluded.external_artist_id)`,
-                }
-              : {}),
-            externalArtistUrl: spotifyUrl,
-            externalArtistName: artistData.name ?? null,
-            externalArtistImageUrl: artistData.image?.url ?? null,
-            updatedAt: now,
-          },
-          where: or(
-            isNull(dspArtistMatches.matchSource),
-            ne(dspArtistMatches.matchSource, 'manual')
-          ),
-        });
+      await upsertDspArtistMatch(
+        creatorProfileId,
+        'spotify',
+        spotifyId,
+        spotifyUrl,
+        artistName,
+        imageUrl,
+        now
+      );
       seeded++;
     } catch (error) {
       logger.warn('MusicFetch presence seed: failed to upsert Spotify match', {
@@ -410,6 +401,44 @@ async function seedPresenceFromMusicFetch(
 // ============================================================================
 // Job Processor
 // ============================================================================
+
+/**
+ * Handle errors from the MusicFetch API fetch call.
+ *
+ * Returns a result to short-circuit the job on permanent failures, or
+ * re-throws for transient errors to trigger retry.
+ */
+async function handleMusicFetchApiError(
+  tx: DbOrTransaction,
+  error: unknown,
+  creatorProfileId: string,
+  spotifyUrl: string,
+  result: MusicFetchEnrichmentResult
+): Promise<MusicFetchEnrichmentResult> {
+  if (error instanceof MusicfetchRequestError && error.statusCode === 400) {
+    // InvalidServices = no services returned; still a retryable shape
+    if (isMusicfetchInvalidServicesError(error)) {
+      await setEnrichmentJobStatus(
+        tx,
+        creatorProfileId,
+        'musicfetch',
+        'failed'
+      );
+      throw error;
+    }
+    // All other 400s are permanent failures (bad URL, removed artist, etc.)
+    logger.warn('MusicFetch enrichment: permanent failure (400)', {
+      creatorProfileId,
+      spotifyUrl,
+    });
+    result.errors.push(`MusicFetch API rejected request: ${error.message}`);
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
+    return result;
+  }
+  // Transient errors (5xx, timeout, network) — re-throw to trigger retry
+  await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
+  throw error;
+}
 
 /**
  * Process a MusicFetch enrichment job.
@@ -495,33 +524,13 @@ export async function processMusicFetchEnrichmentJob(
   try {
     artistData = await fetchArtistBySpotifyUrl(spotifyUrl);
   } catch (error) {
-    // 400 = bad URL, removed artist, non-artist entity — permanent failure, don't retry
-    if (error instanceof MusicfetchRequestError && error.statusCode === 400) {
-      if (isMusicfetchInvalidServicesError(error)) {
-        await setEnrichmentJobStatus(
-          tx,
-          creatorProfileId,
-          'musicfetch',
-          'failed'
-        );
-        throw error;
-      }
-      logger.warn('MusicFetch enrichment: permanent failure (400)', {
-        creatorProfileId,
-        spotifyUrl,
-      });
-      result.errors.push(`MusicFetch API rejected request: ${error.message}`);
-      await setEnrichmentJobStatus(
-        tx,
-        creatorProfileId,
-        'musicfetch',
-        'failed'
-      );
-      return result;
-    }
-    // Transient errors (5xx, timeout, network) — re-throw to trigger retry
-    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
-    throw error;
+    return handleMusicFetchApiError(
+      tx,
+      error,
+      creatorProfileId,
+      spotifyUrl,
+      result
+    );
   }
 
   if (!artistData) {
