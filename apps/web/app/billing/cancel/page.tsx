@@ -39,7 +39,7 @@ export default function CheckoutCancelPage() {
             <XCircle className='h-7 w-7 text-[var(--linear-warning)]' />
           </div>
 
-          <p className='text-[13px] leading-5 text-secondary-token'>
+          <p className='text-app leading-5 text-secondary-token'>
             You can come back at any time and restart checkout when you&apos;re
             ready.
           </p>
