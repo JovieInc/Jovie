@@ -360,7 +360,6 @@ export function ProfileMobileNotificationsFlow({
   canEditPreferences = false,
   canGoBackFromPreferences = false,
   artistEmailOptIn = false,
-  artistEmailReady = false,
   showArtistEmailSection = false,
   onClose,
   onBack,
@@ -670,9 +669,8 @@ export function ProfileMobileNotificationsFlow({
                       Sent by {artistName}
                     </p>
                     <p className='text-[14px] leading-6 text-white/58'>
-                      {artistEmailReady
-                        ? `Share your email with ${artistName} to receive occasional emails about related things.`
-                        : `Share your email with ${artistName} to receive occasional emails about related things.`}
+                      Share your email with {artistName} to receive occasional
+                      emails about related things.
                     </p>
                   </div>
 
