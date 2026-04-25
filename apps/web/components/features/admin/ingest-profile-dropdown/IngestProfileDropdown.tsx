@@ -95,7 +95,7 @@ export function IngestProfileDropdown({
                 Ingest social profile
               </span>
             </div>
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-2xs text-tertiary-token'>
               Paste a URL or handle. We’ll normalize it and match the platform
               automatically.
             </p>
