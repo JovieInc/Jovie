@@ -304,7 +304,8 @@ export function HomepageV2SystemOverview() {
                   {card.ctaLabel}
                   <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
                 </Link>
-              ) : card.status ? (
+              ) : null}
+              {!card.href && card.status ? (
                 <p
                   data-testid='homepage-v2-release-pages-preview'
                   className='mt-5 inline-flex rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/46'

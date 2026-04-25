@@ -89,7 +89,7 @@ function PayDrawerPreview({
   card,
 }: Readonly<{ card: ArtistProfileOutcomeDuoCopy['cards']['getPaid'] }>) {
   return (
-    <div className={DRAWER_BASE_CLASSES} role='presentation'>
+    <div className={DRAWER_BASE_CLASSES} aria-hidden='true'>
       <DrawerHandle />
       <DrawerTitle title={card.drawerTitle} />
       <div className='flex flex-col gap-2'>
@@ -136,7 +136,7 @@ function TourDrawerPreview({
   card,
 }: Readonly<{ card: ArtistProfileOutcomeDuoCopy['cards']['sellOut'] }>) {
   return (
-    <div className={DRAWER_BASE_CLASSES} role='presentation'>
+    <div className={DRAWER_BASE_CLASSES} aria-hidden='true'>
       <DrawerHandle />
       <DrawerTitle title={card.drawerTitle} />
       <div className='flex flex-col'>
