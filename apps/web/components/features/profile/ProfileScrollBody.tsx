@@ -360,11 +360,13 @@ function SubscribeSection({
           <TwoStepNotificationsCTA
             artist={artist}
             startExpanded={subscribeModeActive}
+            presentation='overlay'
           />
         ) : (
           <ArtistNotificationsCTA
             key={subscribeModeActive ? 'subscribe-focus' : 'subscribe-default'}
             artist={artist}
+            presentation='overlay'
             variant='button'
             autoOpen={true}
             forceExpanded={true}

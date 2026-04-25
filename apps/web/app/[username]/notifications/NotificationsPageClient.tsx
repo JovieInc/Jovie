@@ -69,6 +69,7 @@ export function NotificationsPageClient({ artist }: Props) {
           <h1 className='sr-only'>Turn On Notifications for {artist.name}</h1>
           <ArtistNotificationsCTA
             artist={artist}
+            presentation='overlay'
             variant='button'
             autoOpen
             forceExpanded

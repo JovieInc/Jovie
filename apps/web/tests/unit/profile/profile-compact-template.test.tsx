@@ -16,6 +16,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
@@ -184,6 +185,27 @@ const mockContacts = [
     ],
   },
 ] satisfies PublicContact[];
+
+const mockReleases = [
+  {
+    id: 'release-1',
+    title: "Don't Look Down",
+    slug: 'dont-look-down',
+    releaseType: 'single',
+    releaseDate: '2024-11-01T00:00:00.000Z',
+    artworkUrl: 'https://example.com/release-1.jpg',
+    artistNames: ['Test Artist'],
+  },
+  {
+    id: 'release-2',
+    title: 'Holding On',
+    slug: 'holding-on',
+    releaseType: 'single',
+    releaseDate: '2023-10-01T00:00:00.000Z',
+    artworkUrl: 'https://example.com/release-2.jpg',
+    artistNames: ['Test Artist'],
+  },
+] satisfies readonly PublicRelease[];
 
 let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
 
@@ -382,7 +404,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('renders the alerts primary tab body when ?mode=subscribe is in the URL', async () => {
+  it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
 
@@ -401,15 +423,43 @@ describe('ProfileCompactTemplate', () => {
           modeOverride: 'subscribe',
         })
       );
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
     });
-    expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-      'data-mode',
-      'subscribe'
+  });
+
+  it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
     );
-    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-      'data-open',
-      'false'
-    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
+
+    expect(window.location.search).toBe('?mode=listen');
   });
 
   it('prioritizes the On Tour status chip over release and alert fallbacks', async () => {
@@ -542,6 +592,7 @@ describe('ProfileCompactTemplate', () => {
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
+        releases={mockReleases}
       />
     );
 
@@ -553,14 +604,18 @@ describe('ProfileCompactTemplate', () => {
           modeOverride: 'listen',
         })
       );
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
     });
-    expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-      'data-mode',
-      'listen'
-    );
   });
 
-  it('routes the inline subscribed CTA into the alerts primary tab', async () => {
+  it('routes the inline subscribed CTA into the alerts tab', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -585,14 +640,16 @@ describe('ProfileCompactTemplate', () => {
 
     fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
 
-    expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-      'data-mode',
-      'subscribe'
-    );
-    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-      'data-open',
-      'false'
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
   });
 
   it('does not rewrite the URL when a non-mode drawer opens over a deep-linked mode', async () => {

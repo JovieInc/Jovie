@@ -7,6 +7,7 @@ import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
@@ -602,6 +603,7 @@ export function DemoTimWhiteProfileSurface() {
           showTourButton
           showSubscriptionConfirmedBanner={false}
           profileSettings={SHOWCASE_PROFILE_SETTINGS}
+          releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
           hideJovieBranding
           hideMoreMenu
         />

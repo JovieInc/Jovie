@@ -217,7 +217,27 @@ function getUpcomingTourDate(
   );
 }
 
-function resolveActivePrimaryTab(mode: ProfileMode): ProfilePrimaryTab {
+function resolveActivePrimaryTab(params: {
+  readonly mode: ProfileMode;
+  readonly drawerOpen: boolean;
+  readonly drawerView: DrawerView;
+}): ProfilePrimaryTab {
+  if (params.drawerOpen) {
+    switch (params.drawerView) {
+      case 'listen':
+      case 'releases':
+        return 'listen';
+      case 'tour':
+        return 'tour';
+      case 'subscribe':
+      case 'notifications':
+        return 'subscribe';
+      default:
+        return 'profile';
+    }
+  }
+
+  const { mode } = params;
   switch (mode) {
     case 'listen':
     case 'tour':
@@ -371,8 +391,13 @@ export function ProfileCompactSurface({
     [showPayButton, socialLinks]
   );
   const hasReleases = releases.length >= 2;
-  const activePrimaryTab = resolveActivePrimaryTab(activeMode);
-  const isHomeMode = activePrimaryTab === 'profile';
+  const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
+  const activePrimaryTab = resolveActivePrimaryTab({
+    mode: activeMode,
+    drawerOpen: isDrawerOverlayActive,
+    drawerView,
+  });
+  const isHomeMode = activePrimaryTab === 'profile' || isDrawerOverlayActive;
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
   const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
@@ -726,6 +751,7 @@ export function ProfileCompactSurface({
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}
           view={drawerView}
+          presentation={presentation}
           onViewChange={onDrawerViewChange}
           shareContext={shareContext}
           artist={artist}

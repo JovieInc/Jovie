@@ -6,8 +6,9 @@ import {
   CalendarDays,
   Check,
   ChevronLeft,
-  Disc3,
-  ShoppingBag,
+  Mail,
+  Music2,
+  Shirt,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
@@ -89,12 +90,12 @@ const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
   {
     readonly label: string;
-    readonly icon: typeof Disc3;
+    readonly icon: typeof Music2;
   }
 > = {
   newMusic: {
     label: 'New Music',
-    icon: Disc3,
+    icon: Music2,
   },
   tourDates: {
     label: 'Shows',
@@ -102,7 +103,7 @@ const PREFERENCE_META: Record<
   },
   merch: {
     label: 'Merch',
-    icon: ShoppingBag,
+    icon: Shirt,
   },
 };
 
@@ -415,8 +416,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'intro') {
       return (
         <ScreenShell
-          title='Turn On Alerts'
-          body='Get concise, verified updates about new music, shows, and more.'
+          title='Stay in the loop.'
+          body='Get notified about new music, shows, and exclusive updates.'
           footer={
             <div className='space-y-2'>
               <PrimaryButton onClick={onEmailSubmit}>Continue</PrimaryButton>
@@ -439,11 +440,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title={channel === 'sms' ? 'Enter your phone' : 'Enter your email'}
-          body={
-            channel === 'sms'
-              ? "We'll use it to send your Jovie alerts."
-              : "We'll use it to send your Jovie alerts."
-          }
+          body="We'll use it to send your alerts."
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -583,6 +580,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Alerts'
+          body='Get notified about new music, shows, and more.'
           footer={
             <PrimaryButton
               onClick={onPreferencesSubmit}
@@ -601,7 +599,7 @@ export function ProfileMobileNotificationsFlow({
                 <p className='text-[14px] leading-6 text-white/58'>
                   Jovie Alerts are concise, one-time, verified notifications to
                   your {channel === 'sms' ? 'phone' : 'email'} about verified
-                  new releases, shows, and merch.
+                  new releases of music and shows.
                 </p>
               </div>
 
@@ -615,10 +613,10 @@ export function ProfileMobileNotificationsFlow({
                   return (
                     <div
                       key={key}
-                      className='flex items-center justify-between gap-4 rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-3'
+                      className='flex items-center justify-between gap-4 py-2'
                     >
                       <div className='flex items-center gap-3'>
-                        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70'>
+                        <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
                           <Icon className='h-4.5 w-4.5' />
                         </span>
                         <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
@@ -629,7 +627,7 @@ export function ProfileMobileNotificationsFlow({
                         checked={enabled}
                         onCheckedChange={() => onTogglePref(key)}
                         aria-label={meta.label}
-                        className='data-[state=checked]:bg-white data-[state=unchecked]:bg-white/18'
+                        className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
                       />
                     </div>
                   );
@@ -648,24 +646,19 @@ export function ProfileMobileNotificationsFlow({
                     <p className='text-[14px] leading-6 text-white/58'>
                       {artistEmailReady
                         ? `Share your email with ${artistName} to receive occasional emails about related things.`
-                        : `Share your email with ${artistName}. We'll save this until they can send through their own provider.`}
+                        : `Share your email with ${artistName} to receive occasional emails about related things.`}
                     </p>
                   </div>
 
-                  <div className='flex items-center justify-between gap-4 rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-3'>
+                  <div className='flex items-center justify-between gap-4 py-2'>
                     <div className='flex items-center gap-3'>
-                      <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70'>
-                        <Bell className='h-4.5 w-4.5' />
+                      <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
+                        <Mail className='h-4.5 w-4.5' />
                       </span>
                       <div>
                         <p className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
                           Subscribe to Other Alerts
                         </p>
-                        {!artistEmailReady ? (
-                          <p className='mt-1 text-[13px] leading-5 text-white/46'>
-                            Saved now, visible later.
-                          </p>
-                        ) : null}
                       </div>
                     </div>
                     <Switch
@@ -674,7 +667,7 @@ export function ProfileMobileNotificationsFlow({
                         onArtistEmailToggle?.(checked)
                       }
                       aria-label='Subscribe to other alerts'
-                      className='data-[state=checked]:bg-white data-[state=unchecked]:bg-white/18'
+                      className='data-[state=checked]:bg-[var(--mobile-flow-accent)] data-[state=unchecked]:bg-white/14'
                     />
                   </div>
                 </div>
@@ -688,11 +681,7 @@ export function ProfileMobileNotificationsFlow({
     return (
       <ScreenShell
         title="You're all set!"
-        body={
-          showArtistEmailSection && artistEmailOptIn
-            ? `Jovie alerts are on, and your artist-email preference is saved for ${artistName}.`
-            : `Jovie alerts are on for ${artistName}.`
-        }
+        body="We'll send alerts for the things you care about."
         footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}
       >
         <div className='flex h-full items-center justify-center'>
@@ -743,11 +732,10 @@ export function ProfileMobileNotificationsFlow({
 
           <span
             className={cn(
-              'text-[13px] font-medium tracking-[-0.01em] text-white/36',
-              step === 'done' && 'opacity-0'
+              'text-[13px] font-medium tracking-[-0.01em] text-white/36 opacity-0'
             )}
           >
-            {step === 'done' ? '.' : artistName}
+            .
           </span>
         </header>
 
@@ -771,7 +759,7 @@ export function ProfileMobileNotificationsFlow({
   const sharedContentProps = {
     className: cn(
       presentation === 'overlay'
-        ? 'fixed inset-0 z-[140] bg-[#0a0b0f]'
+        ? 'pointer-events-auto fixed inset-0 z-[140] bg-[#0a0b0f]'
         : 'relative min-h-[640px] rounded-[32px] bg-[#0a0b0f]',
       'text-white'
     ),

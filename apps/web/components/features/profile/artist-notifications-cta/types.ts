@@ -4,6 +4,7 @@ export type NotificationSource = 'profile_inline' | 'tour_drawer';
 
 export interface ArtistNotificationsCTAProps {
   readonly artist: Artist;
+  readonly presentation?: 'overlay' | 'inline';
   /**
    * Controls the base rendering style when notifications are disabled or idle.
    * "link" matches the static profile button, "button" matches CTAButton.

@@ -114,6 +114,7 @@ export function ProfileInlineNotificationsCTA({
   const [alertPrefs, setAlertPrefs] = useState(DEFAULT_ALERT_PREFS);
   const [artistEmailOptIn, setArtistEmailOptIn] = useState(false);
   const subscribedEmailRef = useRef('');
+  const hasAutoOpenedRef = useRef(false);
 
   const isInline = presentation === 'inline';
   const hasSubscriptions = Boolean(
@@ -190,9 +191,24 @@ export function ProfileInlineNotificationsCTA({
   }, [isFlowOpen, syncPreferencesFromStatus]);
 
   useEffect(() => {
-    if (!(autoOpen || isInline)) return;
+    if (!(autoOpen || isInline) || hasAutoOpenedRef.current) return;
+    hasAutoOpenedRef.current = true;
     openFlow();
   }, [autoOpen, isInline, openFlow]);
+
+  useEffect(() => {
+    if (
+      !(isInline || autoOpen) ||
+      !isFlowOpen ||
+      !isSubscribed ||
+      step !== 'intro'
+    ) {
+      return;
+    }
+
+    setFlowOrigin('manage');
+    setStep('preferences');
+  }, [autoOpen, isFlowOpen, isInline, isSubscribed, step]);
 
   const activeEmail = useMemo(
     () =>

@@ -5,9 +5,6 @@ import { chromium, type Page } from 'playwright';
 import sharp from 'sharp';
 import {
   PROFILE_MOCK_HOME_APPROVAL_CAPTURES,
-  PROFILE_MOCK_HOME_CAPTURE_SELECTOR,
-  PROFILE_MOCK_HOME_DIFF_CROPS,
-  PROFILE_MOCK_HOME_REVIEW_ROUTE,
   type ProfileMockCropRect,
 } from '../lib/profile/mock-home-diff-manifest';
 
@@ -55,7 +52,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
   const options = {
     baseUrl: process.env.BASE_URL ?? 'http://localhost:3002',
     cycle: process.env.PROFILE_MOCK_DIFF_CYCLE ?? 'latest',
-    targetPath: path.resolve(repoRoot, '.context/attachments/image-v1.png'),
+    targetPath: path.resolve(repoRoot, '.context/attachments/image-v5.png'),
   };
 
   for (const arg of argv) {
@@ -83,13 +80,10 @@ function resolveOutputPaths(cycle: string) {
 
   return {
     cycleRoot,
-    currentRoot: path.join(cycleRoot, 'current'),
-    cropRoot: path.join(cycleRoot, 'crops'),
     approvalRoot: path.join(cycleRoot, 'approval'),
+    targetRoot: path.join(cycleRoot, 'targets'),
     summaryPath: path.join(cycleRoot, 'summary.json'),
     targetCopyPath: path.join(cycleRoot, 'target.png'),
-    currentCapturePath: path.join(cycleRoot, 'current', 'full-shell-raw.png'),
-    currentResizedPath: path.join(cycleRoot, 'current', 'full-shell.png'),
   };
 }
 
@@ -238,11 +232,19 @@ async function main() {
 
   await Promise.all([
     mkdir(outputPaths.cycleRoot, { recursive: true }),
-    mkdir(outputPaths.currentRoot, { recursive: true }),
-    mkdir(outputPaths.cropRoot, { recursive: true }),
     mkdir(outputPaths.approvalRoot, { recursive: true }),
+    mkdir(outputPaths.targetRoot, { recursive: true }),
   ]);
   await copyFile(options.targetPath, outputPaths.targetCopyPath);
+
+  const targetImage = sharp(options.targetPath);
+  const targetMetadata = await targetImage.metadata();
+  const targetWidth = targetMetadata.width ?? 0;
+  const targetHeight = targetMetadata.height ?? 0;
+
+  if (targetWidth === 0 || targetHeight === 0) {
+    throw new Error('Target mock dimensions could not be resolved.');
+  }
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
@@ -255,62 +257,69 @@ async function main() {
   );
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
+  const summary: DiffSummaryEntry[] = [];
+
   try {
-    await captureLocatorScreenshot({
-      page,
-      route: `${options.baseUrl}${PROFILE_MOCK_HOME_REVIEW_ROUTE}`,
-      selector: PROFILE_MOCK_HOME_CAPTURE_SELECTOR,
-      outputPath: outputPaths.currentCapturePath,
-    });
-
-    const targetImage = sharp(options.targetPath);
-    const targetMetadata = await targetImage.metadata();
-    const targetWidth = targetMetadata.width ?? 0;
-    const targetHeight = targetMetadata.height ?? 0;
-
-    if (targetWidth === 0 || targetHeight === 0) {
-      throw new Error('Target mock dimensions could not be resolved.');
-    }
-
-    const currentResized = await sharp(outputPaths.currentCapturePath)
-      .resize({
-        width: targetWidth,
-        height: targetHeight,
-        fit: 'fill',
-      })
-      .png()
-      .toBuffer();
-    await writeFile(outputPaths.currentResizedPath, currentResized);
-
-    const summary: DiffSummaryEntry[] = [];
-
-    for (const crop of PROFILE_MOCK_HOME_DIFF_CROPS) {
-      const extractRect = toExtractRect(crop.rect, targetWidth, targetHeight);
-      const targetCrop = await sharp(options.targetPath)
-        .extract(extractRect)
-        .png()
-        .toBuffer();
-      const currentCrop = await sharp(currentResized)
-        .extract(extractRect)
-        .png()
-        .toBuffer();
-
-      const targetCropPath = path.join(
-        outputPaths.cropRoot,
-        `${crop.id}-target.png`
+    for (const approvalCapture of PROFILE_MOCK_HOME_APPROVAL_CAPTURES) {
+      const rawCapturePath = path.join(
+        outputPaths.approvalRoot,
+        `${approvalCapture.id}-raw.png`
       );
       const currentCropPath = path.join(
-        outputPaths.cropRoot,
-        `${crop.id}-current.png`
+        outputPaths.approvalRoot,
+        `${approvalCapture.id}-current.png`
+      );
+      const targetCropPath = path.join(
+        outputPaths.targetRoot,
+        `${approvalCapture.id}-target.png`
       );
       const heatmapPath = path.join(
-        outputPaths.cropRoot,
-        `${crop.id}-heatmap.png`
+        outputPaths.approvalRoot,
+        `${approvalCapture.id}-heatmap.png`
       );
 
+      await captureLocatorScreenshot({
+        page,
+        route: `${options.baseUrl}${approvalCapture.route}`,
+        selector: approvalCapture.selector,
+        outputPath: rawCapturePath,
+      });
+
+      const targetCrop = await sharp(options.targetPath)
+        .extract(
+          toExtractRect(approvalCapture.targetRect, targetWidth, targetHeight)
+        )
+        .png()
+        .toBuffer();
+      const targetCropMetadata = await sharp(targetCrop).metadata();
+      const captureWidth = targetCropMetadata.width ?? 0;
+      const captureHeight = targetCropMetadata.height ?? 0;
+
+      if (captureWidth === 0 || captureHeight === 0) {
+        throw new Error(
+          `Target crop dimensions could not be resolved for ${approvalCapture.id}.`
+        );
+      }
+
+      const currentCrop = await sharp(rawCapturePath)
+        .extract(
+          toExtractRect(
+            approvalCapture.currentRect,
+            (await sharp(rawCapturePath).metadata()).width ?? 0,
+            (await sharp(rawCapturePath).metadata()).height ?? 0
+          )
+        )
+        .resize({
+          width: captureWidth,
+          height: captureHeight,
+          fit: 'fill',
+        })
+        .png()
+        .toBuffer();
+
       await Promise.all([
-        writeFile(targetCropPath, targetCrop),
         writeFile(currentCropPath, currentCrop),
+        writeFile(targetCropPath, targetCrop),
       ]);
 
       const { diffRatio, heatmap } = await buildHeatmap({
@@ -320,23 +329,11 @@ async function main() {
       await writeFile(heatmapPath, heatmap);
 
       summary.push({
-        id: crop.id,
-        label: crop.label,
-        threshold: crop.threshold,
+        id: approvalCapture.id,
+        label: approvalCapture.label,
+        threshold: approvalCapture.threshold,
         diffRatio,
-        passed: diffRatio <= crop.threshold,
-      });
-    }
-
-    for (const approvalCapture of PROFILE_MOCK_HOME_APPROVAL_CAPTURES) {
-      await captureLocatorScreenshot({
-        page,
-        route: `${options.baseUrl}${approvalCapture.route}`,
-        selector: approvalCapture.selector,
-        outputPath: path.join(
-          outputPaths.approvalRoot,
-          `${approvalCapture.id}.png`
-        ),
+        passed: diffRatio <= approvalCapture.threshold,
       });
     }
 
@@ -347,10 +344,6 @@ async function main() {
           baseUrl: options.baseUrl,
           cycle: options.cycle,
           targetPath: options.targetPath,
-          thresholds: PROFILE_MOCK_HOME_DIFF_CROPS.map(crop => ({
-            id: crop.id,
-            threshold: crop.threshold,
-          })),
           summary,
           passed: summary.every(entry => entry.passed),
         },

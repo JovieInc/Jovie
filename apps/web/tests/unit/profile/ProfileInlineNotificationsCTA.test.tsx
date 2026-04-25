@@ -172,7 +172,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Turn On Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Stay in the loop.')).toBeInTheDocument();
   });
 
   it('routes subscribed users into manage mode when a handler is provided', () => {
@@ -231,6 +231,82 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(
       screen.getByRole('switch', { name: /subscribe to other alerts/i })
     ).toBeChecked();
+  });
+
+  it('switches inline auto-open flow into manage mode after subscribed status hydrates', async () => {
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+
+    const view = render(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        presentation='inline'
+      />
+    );
+
+    expect(await screen.findByText('Stay in the loop.')).toBeInTheDocument();
+
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: false,
+          visibleToArtist: true,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        presentation='inline'
+      />
+    );
+
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(screen.queryByText('Stay in the loop.')).not.toBeInTheDocument();
+  });
+
+  it('switches overlay auto-open flow into manage mode after subscribed status hydrates', async () => {
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByText('Stay in the loop.')).toBeInTheDocument();
+
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: false,
+          visibleToArtist: true,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(screen.queryByText('Stay in the loop.')).not.toBeInTheDocument();
   });
 
   it('submits Jovie preferences and artist email consent together', async () => {

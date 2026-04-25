@@ -321,10 +321,15 @@ export function ProfileModeDrawer({
       {activeMode === 'subscribe' ? (
         <div data-testid='profile-mode-drawer-subscribe'>
           {subscribeTwoStep ? (
-            <TwoStepNotificationsCTA artist={artist} startExpanded />
+            <TwoStepNotificationsCTA
+              artist={artist}
+              startExpanded
+              presentation='overlay'
+            />
           ) : (
             <ArtistNotificationsCTA
               artist={artist}
+              presentation='overlay'
               variant='button'
               autoOpen
               forceExpanded
@@ -374,7 +379,11 @@ export function ProfileModeDrawer({
             <PaySelector
               amounts={PAY_AMOUNTS}
               onContinue={handleTipAmountSelected}
+              presentation='drawer'
+              primaryLabel='Send payment'
               paymentLabel='Venmo'
+              showOtherPaymentOptions
+              otherPaymentOptionsLabel='Other payment options'
             />
           ) : (
             <ProfileModeFallback

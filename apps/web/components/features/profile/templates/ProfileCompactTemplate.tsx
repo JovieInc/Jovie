@@ -91,12 +91,14 @@ function resolveDrawerView(
       return options.hasContacts ? mode : null;
     case 'pay':
       return options.hasTip ? mode : null;
-    case 'releases':
-      return options.hasReleases ? mode : null;
-    case 'about':
     case 'listen':
+      return options.hasReleases ? 'releases' : 'listen';
     case 'subscribe':
     case 'tour':
+      return mode;
+    case 'releases':
+      return options.hasReleases ? 'releases' : null;
+    case 'about':
     case 'profile':
     default:
       return null;
@@ -147,6 +149,20 @@ function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
     default:
       return null;
   }
+}
+
+function resolveHistoryMode(params: {
+  readonly drawerOpen: boolean;
+  readonly drawerView: DrawerView;
+  readonly requestedMode: ProfileMode;
+}): ProfileMode | null {
+  const { drawerOpen, drawerView, requestedMode } = params;
+
+  if (!drawerOpen || drawerView === 'menu' || drawerView === 'notifications') {
+    return requestedMode === 'profile' ? null : requestedMode;
+  }
+
+  return getModeFromDrawerView(drawerView) ?? requestedMode;
 }
 
 export function ProfileCompactTemplate({
@@ -443,10 +459,11 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    const activeMode =
-      drawerOpen && drawerView !== 'menu' && drawerView !== 'notifications'
-        ? drawerView
-        : null;
+    const activeMode = resolveHistoryMode({
+      drawerOpen,
+      drawerView,
+      requestedMode,
+    });
     const isHistoryModeSettled =
       requestedMode === 'profile'
         ? activeMode === null

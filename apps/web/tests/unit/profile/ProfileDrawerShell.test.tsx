@@ -80,11 +80,17 @@ describe('ProfileDrawerShell', () => {
     expect(screen.getByText('Drawer body')).toBeInTheDocument();
   });
 
-  it('renders an always-visible close button that invokes onOpenChange', () => {
+  it('renders a close button for secondary navigation headers', () => {
     const onOpenChange = vi.fn();
 
     render(
-      <ProfileDrawerShell open onOpenChange={onOpenChange} title='Menu'>
+      <ProfileDrawerShell
+        open
+        onOpenChange={onOpenChange}
+        title='Menu'
+        onBack={vi.fn()}
+        navigationLevel='secondary'
+      >
         <div>Drawer body</div>
       </ProfileDrawerShell>
     );
@@ -100,7 +106,7 @@ describe('ProfileDrawerShell', () => {
 
   // Regression: tap targets on mode drawers must meet WCAG 2.5.5 (44×44 min).
   // Found by /qa on 2026-04-23 against every mode drawer on mobile viewport.
-  it('sizes the header tap targets to at least 44×44', () => {
+  it('sizes the secondary-header tap targets to at least 44×44', () => {
     render(
       <ProfileDrawerShell
         open
@@ -122,18 +128,20 @@ describe('ProfileDrawerShell', () => {
     expect(back.className).toMatch(/\bw-11\b/);
   });
 
-  it('reserves the back-button slot for root-level drawers', () => {
+  it('uses the simplified root header without nav chrome', () => {
     render(
       <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>
         <div>Drawer body</div>
       </ProfileDrawerShell>
     );
 
-    expect(screen.getByTestId('profile-drawer-back-placeholder')).toBeVisible();
+    expect(screen.queryByTestId('profile-drawer-back-placeholder')).toBeNull();
+    expect(screen.queryByTestId('profile-drawer-close-button')).toBeNull();
+    expect(screen.getByTestId('profile-drawer-root-header')).toBeVisible();
     expect(screen.getByTestId('profile-drawer-title-slot')).toBeInTheDocument();
     expect(
-      screen.getByTestId('profile-drawer-subtitle-placeholder')
-    ).toBeInTheDocument();
+      screen.queryByTestId('profile-drawer-subtitle-placeholder')
+    ).toBeNull();
   });
 
   it('renders the back button only for secondary navigation levels', () => {

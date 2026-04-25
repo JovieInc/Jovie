@@ -175,10 +175,15 @@ function SubscribePanel({
   }
 
   return subscribeTwoStep ? (
-    <TwoStepNotificationsCTA artist={artist} startExpanded />
+    <TwoStepNotificationsCTA
+      artist={artist}
+      startExpanded
+      presentation='overlay'
+    />
   ) : (
     <ArtistNotificationsCTA
       artist={artist}
+      presentation='overlay'
       variant='button'
       autoOpen
       forceExpanded

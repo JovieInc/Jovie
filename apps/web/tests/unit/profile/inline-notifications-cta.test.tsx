@@ -213,6 +213,41 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
   });
 
+  it('does not reset inline auto-open flow back to intro on rerender', async () => {
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+
+    const { ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    );
+
+    const view = render(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        presentation='inline'
+      />
+    );
+
+    expect(await screen.findByText('Stay in the loop.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
+
+    mockUseSubscriptionForm.mockReturnValue({
+      ...buildFormState(),
+      handleChannelChange: vi.fn(),
+      openSubscription: vi.fn(),
+    });
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        presentation='inline'
+      />
+    );
+
+    expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
+    expect(screen.queryByText('Stay in the loop.')).not.toBeInTheDocument();
+  });
+
   it('progresses from OTP through name and birthday into the Alerts screen', async () => {
     const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
     const handleVerifyOtp = vi.fn().mockResolvedValue('subscribed');

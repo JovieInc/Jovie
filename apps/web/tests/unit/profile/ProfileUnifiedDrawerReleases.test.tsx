@@ -19,6 +19,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     subtitle,
     children,
     dataTestId,
+    presentation,
   }: {
     readonly open: boolean;
     readonly onOpenChange: (open: boolean) => void;
@@ -26,8 +27,12 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     readonly subtitle?: string;
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
+    readonly presentation?: 'standalone' | 'embedded';
   }) => (
-    <div data-testid={dataTestId ?? 'profile-drawer-shell'}>
+    <div
+      data-testid={dataTestId ?? 'profile-drawer-shell'}
+      data-presentation={presentation ?? 'standalone'}
+    >
       {open ? (
         <button
           type='button'
@@ -175,6 +180,15 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     render(<ProfileUnifiedDrawer {...defaultProps} />);
 
     expect(screen.getByTestId('profile-mode-drawer-releases')).toBeDefined();
+  });
+
+  it('passes embedded presentation through to the shared drawer shell', () => {
+    render(<ProfileUnifiedDrawer {...defaultProps} presentation='embedded' />);
+
+    expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
+      'data-presentation',
+      'embedded'
+    );
   });
 
   it('does not reopen the menu when the drawer closes', async () => {
@@ -457,7 +471,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     );
   });
 
-  it('shows dynamic subtitle with catalog composition', async () => {
+  it('omits the old catalog subtitle for the mock-faithful releases drawer', async () => {
     const { ProfileUnifiedDrawer } = await import(
       '@/features/profile/ProfileUnifiedDrawer'
     );
@@ -470,9 +484,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    expect(screen.getByTestId('drawer-subtitle').textContent).toBe(
-      '2 singles, 1 album'
-    );
+    expect(screen.queryByTestId('drawer-subtitle')).toBeNull();
   });
 
   it('skips releases with missing slugs', async () => {

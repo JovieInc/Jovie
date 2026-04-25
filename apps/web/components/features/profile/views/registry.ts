@@ -118,8 +118,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   pay: {
     key: 'pay',
-    title: 'Pay',
-    subtitle: 'Send support instantly with Venmo.',
+    title: 'Send payment',
     icon: Wallet,
     menuOrder: 3,
     analyticsEvent: 'tip_drawer_open',
@@ -136,8 +135,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   tour: {
     key: 'tour',
-    title: 'Tour Dates',
-    subtitle: 'Upcoming shows and ticket links.',
+    title: 'All Shows',
     icon: Ticket,
     menuOrder: 5,
     analyticsEvent: 'tour_drawer_open',
@@ -146,7 +144,6 @@ export const PROFILE_VIEW_REGISTRY: Record<
   releases: {
     key: 'releases',
     title: 'Releases',
-    subtitle: 'Discography',
     icon: Disc3,
     menuOrder: 6,
     analyticsEvent: 'releases_drawer_open',
