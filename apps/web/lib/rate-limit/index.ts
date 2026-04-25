@@ -55,6 +55,8 @@ export {
   appleMusicSearchLimiter,
   artworkUploadLimiter,
   avatarUploadLimiter,
+  bioImportFromUrlHourlyLimiter,
+  bioImportFromUrlLimiter,
   changelogSubscribeLimiter,
   checkAccountDeleteRateLimit,
   checkAccountExportRateLimit,

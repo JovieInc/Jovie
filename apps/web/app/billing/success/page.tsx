@@ -90,6 +90,45 @@ const GENERIC_UNLOCK_TILES: readonly UnlockTile[] = [
   },
 ];
 
+function resolveCanonicalPlan(
+  billingPlan: string | null | undefined,
+  rawPlanIdParam: string | null,
+  validatedSessionPlan: PaidPlanId | null
+): {
+  readonly canonical: PaidPlanId | null;
+  readonly displayName: string | null;
+} {
+  const fromBilling = resolvePaidPlan(billingPlan ?? null);
+  const fromParam = resolvePaidPlan(rawPlanIdParam);
+  const validatedParam =
+    fromParam &&
+    (fromParam === validatedSessionPlan ||
+      (!validatedSessionPlan && fromParam === fromBilling))
+      ? fromParam
+      : null;
+  const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
+  if (canonicalPlan) {
+    return {
+      canonical: canonicalPlan,
+      displayName: getPlanDisplayName(canonicalPlan),
+    };
+  }
+  return { canonical: null, displayName: null };
+}
+
+async function fetchValidatedSessionPlan(
+  sessionId: string,
+  signal: AbortSignal
+): Promise<PaidPlanId | null> {
+  const response = await fetch(
+    `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
+    { cache: 'no-store', signal }
+  );
+  if (!response.ok) return null;
+  const body = (await response.json()) as { plan?: string | null };
+  return resolvePaidPlan(body.plan ?? null);
+}
+
 function resolveUnlockTiles(
   canonicalPlan: PaidPlanId | null
 ): readonly UnlockTile[] {
@@ -114,8 +153,8 @@ function FeatureCard({ icon: Icon, title, description }: UnlockTile) {
   return (
     <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
       <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-      <p className='text-[13px] font-semibold text-primary-token'>{title}</p>
-      <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
+      <p className='text-app font-semibold text-primary-token'>{title}</p>
+      <p className='text-xs leading-5 text-tertiary-token'>{description}</p>
     </ContentSurfaceCard>
   );
 }
@@ -155,60 +194,36 @@ export default function CheckoutSuccessPage() {
     const controller = new AbortController();
     setIsSessionPlanPending(true);
 
-    async function validateCheckoutSession() {
-      try {
-        const response = await fetch(
-          `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
-          {
-            cache: 'no-store',
-            signal: controller.signal,
-          }
-        );
-
-        if (!response.ok) {
-          setValidatedSessionPlan(null);
-          return;
-        }
-
-        const body = (await response.json()) as { plan?: string | null };
-        setValidatedSessionPlan(resolvePaidPlan(body.plan ?? null));
-      } catch (_error) {
+    void fetchValidatedSessionPlan(sessionId, controller.signal)
+      .then(plan => {
         if (controller.signal.aborted) return;
+        setValidatedSessionPlan(plan);
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        console.error(
+          '[billing/success] checkout session validation failed',
+          error
+        );
         setValidatedSessionPlan(null);
-      } finally {
+      })
+      .finally(() => {
         if (controller.signal.aborted) return;
         setIsSessionPlanPending(false);
-      }
-    }
-
-    void validateCheckoutSession();
+      });
 
     return () => controller.abort();
   }, [checkoutSessionId]);
 
-  const resolvedPlan = useMemo<{
-    readonly canonical: PaidPlanId | null;
-    readonly displayName: string | null;
-  }>(() => {
-    const fromBilling = resolvePaidPlan(billingData?.plan ?? null);
-    const fromParam = resolvePaidPlan(rawPlanIdParam);
-    const validatedParam =
-      fromParam &&
-      (fromParam === validatedSessionPlan ||
-        (!validatedSessionPlan && fromParam === fromBilling))
-        ? fromParam
-        : null;
-    const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
-
-    if (canonicalPlan) {
-      return {
-        canonical: canonicalPlan,
-        displayName: getPlanDisplayName(canonicalPlan),
-      };
-    }
-
-    return { canonical: null, displayName: null };
-  }, [billingData?.plan, rawPlanIdParam, validatedSessionPlan]);
+  const resolvedPlan = useMemo(
+    () =>
+      resolveCanonicalPlan(
+        billingData?.plan,
+        rawPlanIdParam,
+        validatedSessionPlan
+      ),
+    [billingData?.plan, rawPlanIdParam, validatedSessionPlan]
+  );
 
   const unlockTiles = useMemo(
     () => resolveUnlockTiles(resolvedPlan.canonical),
@@ -296,11 +311,26 @@ export default function CheckoutSuccessPage() {
     }
   };
 
-  const successTitle = isOnboardingUpgrade
-    ? 'Your profile is live and upgraded'
-    : resolvedPlan.displayName
-      ? `Welcome to ${resolvedPlan.displayName}!`
-      : 'Welcome to your new plan!';
+  let successTitle: string;
+  if (isOnboardingUpgrade) {
+    successTitle = 'Your profile is live and upgraded';
+  } else if (resolvedPlan.displayName) {
+    successTitle = `Welcome to ${resolvedPlan.displayName}!`;
+  } else {
+    successTitle = 'Welcome to your new plan!';
+  }
+
+  let contentClassName: string;
+  if (shouldSuppressMotion) {
+    contentClassName = 'space-y-6 px-5 py-5 text-center sm:px-6';
+  } else if (isVisible) {
+    contentClassName =
+      'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6';
+  } else {
+    contentClassName =
+      'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6';
+  }
+
   const successSubtitle = isOnboardingUpgrade
     ? "You're all set. Here's what you just unlocked."
     : "Your plan is active. Here's what you just unlocked.";
@@ -312,7 +342,7 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      {shouldSuppressMotion ? null : hasHydratedMotion ? (
+      {!shouldSuppressMotion && hasHydratedMotion ? (
         <ConfettiOverlay viewport />
       ) : null}
 
@@ -323,15 +353,7 @@ export default function CheckoutSuccessPage() {
           subtitle={successSubtitle}
         />
 
-        <div
-          className={
-            shouldSuppressMotion
-              ? 'space-y-6 px-5 py-5 text-center sm:px-6'
-              : isVisible
-                ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
-                : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
-          }
-        >
+        <div className={contentClassName}>
           <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
             <PartyPopper className='h-8 w-8 text-success' />
           </div>
@@ -377,7 +399,7 @@ export default function CheckoutSuccessPage() {
 
             {feedback ? (
               <output
-                className='text-[13px] text-secondary-token'
+                className='text-app text-secondary-token'
                 aria-live='polite'
                 aria-atomic='true'
               >

@@ -1,4 +1,5 @@
 export { useChatImageAttachments } from './useChatImageAttachments';
+export { useChatJankMonitor } from './useChatJankMonitor';
 export { useJovieChat } from './useJovieChat';
 export { useSpeechRecognition } from './useSpeechRecognition';
 export { useStickToBottom } from './useStickToBottom';

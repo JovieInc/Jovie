@@ -13,6 +13,7 @@ import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
@@ -1532,6 +1533,7 @@ function buildChatTools(
       ? { showTopInsights: createShowTopInsightsTool(resolvedProfileId) }
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
+    importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(

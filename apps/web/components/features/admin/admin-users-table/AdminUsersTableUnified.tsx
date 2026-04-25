@@ -112,10 +112,10 @@ function AdminUserMobileCard({
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
-            <p className='truncate text-[14px] font-semibold tracking-[-0.01em] text-primary-token'>
+            <p className='truncate text-sm font-semibold tracking-[-0.01em] text-primary-token'>
               {user.name || 'Email Subscriber'}
             </p>
-            <p className='truncate text-[12px] text-secondary-token'>
+            <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
             </p>
           </div>
@@ -123,7 +123,7 @@ function AdminUserMobileCard({
         <TableActionMenu items={actionItems} align='end' />
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 px-3 py-2 text-[12px]'>
+      <div className='flex flex-wrap items-center gap-2 px-3 py-2 text-xs'>
         <Badge
           size='sm'
           variant={user.plan === 'pro' ? 'primary' : 'secondary'}
@@ -642,7 +642,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         <div className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
-                        <div className='text-[12px] text-secondary-token'>
+                        <div className='text-xs text-secondary-token'>
                           {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
@@ -693,7 +693,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         <div className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
-                        <div className='text-[12px] text-secondary-token'>
+                        <div className='text-xs text-secondary-token'>
                           {filterTerm
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
@@ -708,7 +708,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   getContextMenuItems={getContextMenuItems}
                   enableVirtualization={true}
                   minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                  className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
+                  className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
                   onLoadMore={() => {

@@ -61,4 +61,24 @@ describe('profile theme helpers', () => {
       '--color-focus-ring': expect.stringMatching(/^#/),
     });
   });
+
+  it('uses AA contrast text for medium-bright accent buttons', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#cf824c',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#0f172a');
+  });
+
+  it('falls back to black when slate text is not AA-safe', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#888888',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#000000');
+  });
 });

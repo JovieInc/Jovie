@@ -95,7 +95,7 @@ function SignUpClaimDataPersistence() {
 
   return (
     <output
-      className='mb-4 block rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'
+      className='mb-4 block rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center lg:text-left'
       aria-live='polite'
     >
       {availability === 'checking' && (
@@ -201,7 +201,7 @@ function SignUpPageContent() {
           fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
         />
       </div>
-      <p className='mt-4 text-center text-[11px] leading-relaxed text-white/80'>
+      <p className='mt-4 text-center text-[11px] leading-relaxed text-white/80 lg:text-left'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
@@ -231,6 +231,7 @@ export default function SignUpPage() {
       formTitle='Create your account'
       showFormTitle={false}
       showFooterPrompt={false}
+      layoutVariant='split'
     >
       <Suspense fallback={<AuthFormSkeleton />}>
         <SignUpPageContent />

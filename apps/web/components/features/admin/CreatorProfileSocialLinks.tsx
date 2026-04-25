@@ -22,7 +22,7 @@ export const CreatorProfileSocialLinks = memo(
     }, []);
 
     if (!socialLinks || socialLinks.length === 0) {
-      return <span className='text-[12px] text-tertiary-token'>—</span>;
+      return <span className='text-xs text-tertiary-token'>—</span>;
     }
 
     return (

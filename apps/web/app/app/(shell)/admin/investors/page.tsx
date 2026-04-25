@@ -114,7 +114,7 @@ async function InvestorTable() {
           <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
             <Link2 className='h-4 w-4' aria-hidden='true' />
           </div>
-          <p className='max-w-md text-[13px] leading-[19px] text-secondary-token'>
+          <p className='max-w-md text-app leading-[19px] text-secondary-token'>
             Investor links become the canonical handoff surface for deck access,
             memo reviews, and response tracking.
           </p>
@@ -134,9 +134,9 @@ async function InvestorTable() {
         subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
       />
       <div className='overflow-x-auto'>
-        <table className='w-full min-w-[760px] border-collapse text-[13px]'>
+        <table className='w-full min-w-[760px] border-collapse text-app'>
           <thead className='bg-surface-0'>
-            <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+            <tr className='border-b border-subtle text-left text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
               <th className='px-4 py-2.5 font-semibold'>Label</th>
               <th className='px-4 py-2.5 font-semibold'>Investor</th>
               <th className='px-4 py-2.5 font-semibold'>Stage</th>
@@ -230,7 +230,7 @@ function ScoreBadge({ score }: Readonly<{ score: number }>) {
   return (
     <span
       className={cn(
-        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-[12px] font-semibold tabular-nums',
+        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-xs font-semibold tabular-nums',
         toneClassName
       )}
     >
@@ -241,12 +241,12 @@ function ScoreBadge({ score }: Readonly<{ score: number }>) {
 
 function StatusBadge({ isActive }: { readonly isActive: boolean }) {
   return isActive ? (
-    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       <CheckCircle2 className='h-3.5 w-3.5 text-success' />
       Active
     </span>
   ) : (
-    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       <CircleSlash className='h-3.5 w-3.5 text-tertiary-token' />
       Disabled
     </span>
@@ -275,11 +275,11 @@ function SummaryCard({
 }>) {
   return (
     <ContentSurfaceCard surface='nested' className='p-3.5'>
-      <p className='text-[11px] text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-[14px] font-semibold tracking-[-0.016em] text-primary-token'>
+      <p className='text-2xs text-tertiary-token'>{label}</p>
+      <p className='mt-1 text-sm font-semibold tracking-[-0.016em] text-primary-token'>
         {value}
       </p>
-      <p className='mt-1 text-[12px] leading-[18px] text-secondary-token'>
+      <p className='mt-1 text-xs leading-[18px] text-secondary-token'>
         {description}
       </p>
     </ContentSurfaceCard>

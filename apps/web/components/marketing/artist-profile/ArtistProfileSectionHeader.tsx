@@ -28,7 +28,7 @@ export function ArtistProfileSectionHeader({
     >
       <h2
         className={cn(
-          'text-[clamp(3rem,6vw,5.6rem)] font-semibold leading-[0.9] tracking-[-0.08em] text-primary-token',
+          'text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token',
           headlineClassName
         )}
       >

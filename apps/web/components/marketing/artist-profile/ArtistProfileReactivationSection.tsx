@@ -16,7 +16,7 @@ export function ArtistProfileReactivationSection({
 }: Readonly<ArtistProfileReactivationSectionProps>) {
   return (
     <ArtistProfileSectionShell
-      className='overflow-hidden bg-[#040506] py-24 sm:py-28 lg:py-32'
+      className='overflow-hidden bg-[#050608]'
       id={id}
       width='page'
     >
@@ -29,7 +29,7 @@ export function ArtistProfileReactivationSection({
           bodyClassName='mx-auto max-w-[35rem]'
         />
         <ArtistProfileReactivationVisual
-          className='mt-12'
+          className='mt-10'
           notification={notification}
           reactivation={reactivation}
         />

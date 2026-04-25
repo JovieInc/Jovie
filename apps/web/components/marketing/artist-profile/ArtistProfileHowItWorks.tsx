@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
+function getProviderLabel(provider: string): string {
+  if (provider === 'apple_music') return 'Apple Music';
+  if (provider === 'deezer') return 'Deezer';
+  return 'Spotify';
+}
+
 interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
@@ -41,21 +47,21 @@ export function ArtistProfileHowItWorks({
   ]);
 
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.008] py-24 sm:py-28 lg:py-32'>
+    <ArtistProfileSectionShell className='bg-white/[0.012]'>
       <div className='mx-auto max-w-[1120px]'>
         <ArtistProfileSectionHeader
           align='left'
           headline={howItWorks.headline}
           body={howItWorks.body}
           className='max-w-[40rem]'
-          headlineClassName='max-w-none text-[clamp(2.8rem,4.8vw,4.35rem)]'
+          headlineClassName='max-w-none'
           bodyClassName='max-w-[30rem]'
         />
 
-        <div className='mt-12 grid gap-6 lg:grid-cols-3 lg:gap-5'>
-          <article className='flex flex-col gap-4'>
+        <div className='mt-10 grid gap-5 lg:grid-cols-3 lg:gap-5'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={1} />
-            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
@@ -110,7 +116,7 @@ export function ArtistProfileHowItWorks({
             </div>
           </article>
 
-          <article className='flex flex-col gap-4'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={2} />
             <DrawerSurfaceCard
               variant='card'
@@ -147,11 +153,7 @@ export function ArtistProfileHowItWorks({
                         className='h-4.5 w-4.5'
                       />
                       <p className='text-[13px] font-medium text-primary-token'>
-                        {provider.provider === 'apple_music'
-                          ? 'Apple Music'
-                          : provider.provider === 'deezer'
-                            ? 'Deezer'
-                            : 'Spotify'}
+                        {getProviderLabel(provider.provider)}
                       </p>
                     </div>
                     <span
@@ -181,9 +183,9 @@ export function ArtistProfileHowItWorks({
             </div>
           </article>
 
-          <article className='flex flex-col gap-4'>
+          <article className='flex flex-col gap-3'>
             <StepNumber value={3} />
-            <div className='relative min-h-[11.75rem] space-y-3 pt-1'>
+            <div className='relative min-h-[10.5rem] space-y-3 pt-1'>
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'

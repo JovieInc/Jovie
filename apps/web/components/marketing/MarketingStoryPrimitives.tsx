@@ -118,7 +118,7 @@ export function ArtistProfileCaptureVisual({
   const reducedMotion = useReducedMotion();
   const [activated, setActivated] = useState(reducedMotion);
   const [phase, setPhase] = useState<CapturePhase>(
-    reducedMotion ? 'done' : 'idle'
+    reducedMotion ? 'done' : 'typing'
   );
 
   useEffect(() => {
@@ -143,13 +143,10 @@ export function ArtistProfileCaptureVisual({
         }
 
         setActivated(true);
-        setPhase(currentPhase =>
-          currentPhase === 'idle' ? 'typing' : currentPhase
-        );
         observer.disconnect();
       },
       {
-        threshold: 0.55,
+        threshold: 0.15,
       }
     );
 
@@ -185,6 +182,20 @@ export function ArtistProfileCaptureVisual({
 
     return () => {
       globalThis.clearTimeout(finishTimer);
+    };
+  }, [activated, phase, reducedMotion]);
+
+  useEffect(() => {
+    if (!activated || reducedMotion || phase !== 'done') {
+      return;
+    }
+
+    const loopTimer = globalThis.setTimeout(() => {
+      setPhase('typing');
+    }, 2600);
+
+    return () => {
+      globalThis.clearTimeout(loopTimer);
     };
   }, [activated, phase, reducedMotion]);
 
@@ -324,32 +335,39 @@ function WorkflowCell({
   tone?: WorkflowTone;
   value: string;
 }>) {
+  let wrapperClass: string;
+  if (tone === 'destination') {
+    wrapperClass =
+      'rounded-full border border-white/12 bg-white/[0.07] px-3.5 py-2 text-primary-token';
+  } else if (tone === 'message') {
+    wrapperClass =
+      'rounded-full border border-white/8 bg-white/[0.045] px-3.5 py-2 text-white/88';
+  } else if (tone === 'audience') {
+    wrapperClass =
+      'rounded-full border border-white/8 bg-white/[0.028] px-3.5 py-2 text-secondary-token';
+  } else {
+    wrapperClass =
+      'rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-2 text-primary-token';
+  }
+
+  let textClass: string;
+  if (tone === 'destination') {
+    textClass =
+      'text-[15px] font-semibold tracking-[-0.03em] text-primary-token';
+  } else if (tone === 'audience') {
+    textClass =
+      'text-[14px] font-medium tracking-[-0.02em] text-secondary-token';
+  } else if (tone === 'message') {
+    textClass = 'text-[14px] font-medium tracking-[-0.02em] text-white/88';
+  } else {
+    textClass =
+      'text-[15px] font-semibold tracking-[-0.03em] text-primary-token';
+  }
+
   return (
-    <div
-      className={
-        tone === 'destination'
-          ? 'rounded-full border border-white/12 bg-white/[0.07] px-3.5 py-2 text-primary-token'
-          : tone === 'message'
-            ? 'rounded-full border border-white/8 bg-white/[0.045] px-3.5 py-2 text-white/88'
-            : tone === 'audience'
-              ? 'rounded-full border border-white/8 bg-white/[0.028] px-3.5 py-2 text-secondary-token'
-              : 'rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-2 text-primary-token'
-      }
-    >
+    <div className={wrapperClass}>
       <p className='sr-only'>{label}</p>
-      <p
-        className={
-          tone === 'destination'
-            ? 'text-[15px] font-semibold tracking-[-0.03em] text-primary-token'
-            : tone === 'audience'
-              ? 'text-[14px] font-medium tracking-[-0.02em] text-secondary-token'
-              : tone === 'message'
-                ? 'text-[14px] font-medium tracking-[-0.02em] text-white/88'
-                : 'text-[15px] font-semibold tracking-[-0.03em] text-primary-token'
-        }
-      >
-        {value}
-      </p>
+      <p className={textClass}>{value}</p>
     </div>
   );
 }

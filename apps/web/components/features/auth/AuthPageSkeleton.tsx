@@ -9,6 +9,7 @@ interface AuthPageSkeletonProps {
   readonly footerPrompt?: string;
   readonly footerLinkText?: string;
   readonly footerLinkHref?: string;
+  readonly layoutVariant?: 'stack' | 'split';
 }
 
 export function AuthPageSkeleton({
@@ -19,6 +20,7 @@ export function AuthPageSkeleton({
   footerPrompt,
   footerLinkText,
   footerLinkHref,
+  layoutVariant,
 }: Readonly<AuthPageSkeletonProps>) {
   return (
     <AuthLayout
@@ -29,6 +31,7 @@ export function AuthPageSkeleton({
       footerPrompt={footerPrompt}
       footerLinkText={footerLinkText}
       footerLinkHref={footerLinkHref}
+      layoutVariant={layoutVariant}
     >
       <AuthFormSkeleton />
     </AuthLayout>

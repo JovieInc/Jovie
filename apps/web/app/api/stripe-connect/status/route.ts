@@ -11,7 +11,7 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
@@ -72,13 +72,23 @@ export async function GET() {
       );
     }
 
-    // Fetch the latest status from Stripe
+    // Fetch the latest status from Stripe. The account may have been deleted
+    // on Stripe's side — tolerate that (we still return our cached DB flags),
+    // but surface every failure to logs/Sentry so silent breakage is visible.
     let payoutEmail: string | null = null;
     try {
       const account = await stripe.accounts.retrieve(profile.stripeAccountId);
       payoutEmail = typeof account.email === 'string' ? account.email : null;
-    } catch {
-      // Account may have been deleted on Stripe's side
+    } catch (stripeErr) {
+      await captureWarning(
+        'Stripe Connect account retrieve failed',
+        stripeErr,
+        {
+          clerkUserId,
+          stripeAccountId: profile.stripeAccountId,
+          route: '/api/stripe-connect/status',
+        }
+      );
     }
 
     return NextResponse.json(

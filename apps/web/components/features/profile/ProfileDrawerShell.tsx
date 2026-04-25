@@ -31,8 +31,8 @@ export function ProfileDrawerShell({
   onBack,
   navigationLevel = 'root',
   children,
-  contentClassName,
-  bodyClassName,
+  contentClassName, // NOSONAR -- deprecated prop kept for backward compat; used internally to apply caller overrides
+  bodyClassName, // NOSONAR -- deprecated prop kept for backward compat; used internally to apply caller overrides
   dataTestId,
   presentation = 'standalone',
 }: ProfileDrawerShellProps) {
@@ -155,13 +155,13 @@ export function ProfileDrawerShell({
           className='fixed inset-0 z-10 bg-black/48 backdrop-blur-sm'
           onClick={() => onOpenChange(false)}
         />
-        <div
-          className='absolute inset-x-0 bottom-0 z-20'
+        <dialog
+          className='absolute inset-x-0 bottom-0 z-20 m-0 max-w-none border-0 bg-transparent p-0'
           data-testid={dataTestId}
-          role='dialog'
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
           style={drawerHeightStyle}
+          open
         >
           <div
             className={`relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-desktop)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
@@ -172,7 +172,7 @@ export function ProfileDrawerShell({
             {header}
             {body}
           </div>
-        </div>
+        </dialog>
       </>
     );
   }

@@ -145,7 +145,7 @@ export function mergeProfileTheme(
   updates: Partial<ProfileThemeRecord>
 ): ProfileThemeRecord {
   const merged = {
-    ...(existingTheme ?? {}),
+    ...existingTheme,
     ...updates,
   } as ProfileThemeRecord;
 
@@ -176,11 +176,15 @@ export function normalizeProfileAccentHex(hex: string): string {
 
   const { h, s, l } = rgbToHsl(normalizedHex);
   const adjustedSaturation = clamp(Math.max(s, 0.34), 0.34, 0.78);
-  const adjustedLightness = clamp(
-    l < 0.34 ? 0.46 : l > 0.68 ? 0.58 : l,
-    0.42,
-    0.62
-  );
+  let clampedLightness: number;
+  if (l < 0.34) {
+    clampedLightness = 0.46;
+  } else if (l > 0.68) {
+    clampedLightness = 0.58;
+  } else {
+    clampedLightness = l;
+  }
+  const adjustedLightness = clamp(clampedLightness, 0.42, 0.62);
 
   return hslToHex(h, adjustedSaturation, adjustedLightness);
 }

@@ -23,7 +23,7 @@ export function ChipTray({ chips, onRemoveAt }: ChipTrayProps) {
           return (
             <span
               key={chip.uid}
-              className='inline-flex items-center gap-1 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[12px] font-medium text-secondary-token'
+              className='inline-flex items-center gap-1 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-xs font-medium text-secondary-token'
             >
               <span>/{chip.id}</span>
               <button

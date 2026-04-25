@@ -75,9 +75,7 @@ function AccordionSection({
             isOpen && 'rotate-90'
           )}
         />
-        <span className='text-[13px] font-[510] text-primary-token'>
-          {title}
-        </span>
+        <span className='text-app font-medium text-primary-token'>{title}</span>
       </button>
       <AnimatedAccordion isOpen={isOpen}>{children}</AnimatedAccordion>
     </ContentSurfaceCard>
@@ -177,7 +175,7 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
       >
         {everOpened.has(1) && (
           <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-            <p className='mb-3 text-[12px] font-[450] text-secondary-token'>
+            <p className='mb-3 text-xs font-book text-secondary-token'>
               These values are set automatically by the speed dial. Override
               here if needed.
             </p>

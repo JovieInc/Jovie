@@ -29,10 +29,10 @@ function MetricCard({
         <Icon className={cn('h-4 w-4', colorClass)} aria-hidden />
       </div>
       <div className='min-w-0'>
-        <p className='text-[13px] font-semibold tracking-normal text-secondary-token'>
+        <p className='text-app font-semibold tracking-normal text-secondary-token'>
           {label}
         </p>
-        <p className='text-[15px] font-semibold leading-tight tabular-nums text-primary-token'>
+        <p className='text-mid font-semibold leading-tight tabular-nums text-primary-token'>
           {value.toLocaleString()}
         </p>
       </div>

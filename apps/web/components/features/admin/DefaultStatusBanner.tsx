@@ -91,7 +91,7 @@ export function DefaultStatusBanner({
             <Icon className={`size-4 ${statusTone}`} />
           </div>
           <div className='min-w-0 space-y-1'>
-            <p className='text-[13px] font-semibold tracking-normal text-secondary-token'>
+            <p className='text-app font-semibold tracking-normal text-secondary-token'>
               Company Health
             </p>
             <p

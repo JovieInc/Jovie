@@ -22,6 +22,8 @@ import {
   ensureOnboardingUserRow,
   reservePrebuiltProfileForUser,
 } from '@/lib/claim/finalize';
+import type { PendingClaimContext } from '@/lib/claim/types';
+import type { DbOrTransaction } from '@/lib/db';
 import { withRetry } from '@/lib/db/client';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -118,6 +120,122 @@ async function runBoundedPostOnboardingSideEffect(
       contextData,
     });
   }
+}
+
+async function applyPendingClaimTx(
+  tx: DbOrTransaction,
+  clerkUserId: string,
+  pendingClaim: PendingClaimContext,
+  existingUserId: string | null,
+  userEmail: string | null,
+  normalizedUsername: string,
+  displayName: string
+): Promise<CompletionResult> {
+  const userRecord =
+    existingUserId !== null
+      ? { id: existingUserId }
+      : await (async () => {
+          if (userEmail) {
+            await ensureEmailAvailable(tx, clerkUserId, userEmail);
+          }
+          return ensureOnboardingUserRow(tx, { clerkUserId, userEmail });
+        })();
+
+  const existingProfile = await fetchExistingProfile(tx, userRecord.id);
+
+  if (
+    existingProfile?.isClaimed &&
+    existingProfile.id !== pendingClaim.creatorProfileId
+  ) {
+    throw new Error(
+      `[PROFILE_CONFLICT] You already own @${existingProfile.usernameNormalized}.`
+    );
+  }
+
+  if (pendingClaim.mode === 'direct_profile') {
+    return reservePrebuiltProfileForUser(tx, {
+      userId: userRecord.id,
+      creatorProfileId: pendingClaim.creatorProfileId,
+      expectedUsername: normalizedUsername,
+      displayName,
+    });
+  }
+
+  return claimPrebuiltProfileForUser(tx, {
+    userId: userRecord.id,
+    creatorProfileId: pendingClaim.creatorProfileId,
+    expectedUsername: normalizedUsername,
+    displayName,
+    source: 'token_backed_onboarding',
+    finalizeOnboarding: true,
+  });
+}
+
+async function applyExistingUserProfileTx(
+  tx: DbOrTransaction,
+  clerkUserId: string,
+  existingUserId: string,
+  userEmail: string | null,
+  normalizedUsername: string,
+  displayName: string,
+  rawUsername: string
+): Promise<CompletionResult> {
+  const existingProfile = await fetchExistingProfile(tx, existingUserId);
+
+  const handleChanged =
+    existingProfile?.usernameNormalized !== normalizedUsername;
+
+  if (handleChanged) {
+    await ensureHandleAvailable(tx, normalizedUsername, existingProfile?.id);
+  }
+
+  const needsPublish = !profileIsPublishable(existingProfile);
+  // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
+  // which filters profiles by isClaimed=true. Without this, users with
+  // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
+  const needsClaim = existingProfile && !existingProfile.isClaimed;
+
+  if (existingProfile && (needsPublish || handleChanged || needsClaim)) {
+    const result = await updateExistingProfile(
+      tx,
+      existingProfile,
+      normalizedUsername,
+      displayName,
+      rawUsername
+    );
+
+    if (result.profileId) {
+      await deactivateOrphanedProfiles(tx, existingUserId, result.profileId);
+    }
+
+    return result;
+  }
+
+  if (existingProfile) {
+    return {
+      username: existingProfile.usernameNormalized,
+      status: 'complete',
+      profileId: existingProfile.id,
+    };
+  }
+
+  // Fallback: user exists but no profile yet
+  if (userEmail) {
+    await ensureEmailAvailable(tx, clerkUserId, userEmail);
+  }
+  await ensureHandleAvailable(tx, normalizedUsername, null);
+  const newProfile = await createProfileForExistingUser(
+    tx,
+    existingUserId,
+    normalizedUsername,
+    displayName
+  );
+
+  if (newProfile.profileId) {
+    await deactivateOrphanedProfiles(tx, existingUserId, newProfile.profileId);
+  }
+
+  return newProfile;
 }
 
 export async function completeOnboarding({
@@ -220,50 +338,15 @@ export async function completeOnboarding({
             const existingUser = await fetchExistingUser(tx, clerkUserId);
 
             if (pendingClaim) {
-              const userRecord =
-                existingUser ??
-                (await (async () => {
-                  if (userEmail) {
-                    await ensureEmailAvailable(tx, clerkUserId, userEmail);
-                  }
-
-                  return ensureOnboardingUserRow(tx, {
-                    clerkUserId,
-                    userEmail,
-                  });
-                })());
-
-              const existingProfile = await fetchExistingProfile(
+              return applyPendingClaimTx(
                 tx,
-                userRecord.id
+                clerkUserId,
+                pendingClaim,
+                existingUser?.id ?? null,
+                userEmail,
+                normalizedUsername,
+                trimmedDisplayName
               );
-
-              if (
-                existingProfile?.isClaimed &&
-                existingProfile.id !== pendingClaim.creatorProfileId
-              ) {
-                throw new Error(
-                  `[PROFILE_CONFLICT] You already own @${existingProfile.usernameNormalized}.`
-                );
-              }
-
-              if (pendingClaim.mode === 'direct_profile') {
-                return reservePrebuiltProfileForUser(tx, {
-                  userId: userRecord.id,
-                  creatorProfileId: pendingClaim.creatorProfileId,
-                  expectedUsername: normalizedUsername,
-                  displayName: trimmedDisplayName,
-                });
-              }
-
-              return claimPrebuiltProfileForUser(tx, {
-                userId: userRecord.id,
-                creatorProfileId: pendingClaim.creatorProfileId,
-                expectedUsername: normalizedUsername,
-                displayName: trimmedDisplayName,
-                source: 'token_backed_onboarding',
-                finalizeOnboarding: true,
-              });
             }
 
             // If the user record does not exist, the stored function will create both user + profile
@@ -272,7 +355,7 @@ export async function completeOnboarding({
                 await ensureEmailAvailable(tx, clerkUserId, userEmail);
               }
               await ensureHandleAvailable(tx, normalizedUsername, null);
-              return await createUserAndProfile(
+              return createUserAndProfile(
                 tx,
                 clerkUserId,
                 userEmail,
@@ -281,85 +364,15 @@ export async function completeOnboarding({
               );
             }
 
-            const existingProfile = await fetchExistingProfile(
+            return applyExistingUserProfileTx(
               tx,
-              existingUser.id
-            );
-
-            // If a profile already exists, ensure the handle is either the same or available
-            const handleChanged =
-              existingProfile?.usernameNormalized !== normalizedUsername;
-
-            if (handleChanged) {
-              await ensureHandleAvailable(
-                tx,
-                normalizedUsername,
-                existingProfile?.id
-              );
-            }
-
-            const needsPublish = !profileIsPublishable(existingProfile);
-            // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
-            // which filters profiles by isClaimed=true. Without this, users with
-            // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
-            const needsClaim = existingProfile && !existingProfile.isClaimed;
-
-            if (
-              existingProfile &&
-              (needsPublish || handleChanged || needsClaim)
-            ) {
-              const result = await updateExistingProfile(
-                tx,
-                existingProfile,
-                normalizedUsername,
-                trimmedDisplayName,
-                username
-              );
-
-              // Deactivate orphaned unclaimed profiles to prevent stale public pages
-              if (result.profileId) {
-                await deactivateOrphanedProfiles(
-                  tx,
-                  existingUser.id,
-                  result.profileId
-                );
-              }
-
-              return result;
-            }
-
-            if (existingProfile) {
-              const completed: CompletionResult = {
-                username: existingProfile.usernameNormalized,
-                status: 'complete',
-                profileId: existingProfile.id,
-              };
-
-              return completed;
-            }
-
-            // Fallback: user exists but no profile yet
-            if (userEmail) {
-              await ensureEmailAvailable(tx, clerkUserId, userEmail);
-            }
-            await ensureHandleAvailable(tx, normalizedUsername, null);
-            const newProfile = await createProfileForExistingUser(
-              tx,
+              clerkUserId,
               existingUser.id,
+              userEmail,
               normalizedUsername,
-              trimmedDisplayName
+              trimmedDisplayName,
+              username
             );
-
-            // Deactivate orphaned unclaimed profiles to prevent stale public pages
-            if (newProfile.profileId) {
-              await deactivateOrphanedProfiles(
-                tx,
-                existingUser.id,
-                newProfile.profileId
-              );
-            }
-
-            return newProfile;
           },
           { isolationLevel: 'serializable' }
         ),

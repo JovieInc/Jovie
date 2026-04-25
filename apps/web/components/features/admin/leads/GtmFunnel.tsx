@@ -19,16 +19,12 @@ function FunnelStage({
   return (
     <div className='flex items-center gap-1.5'>
       <div className='flex flex-col'>
-        <span className='text-[13px] font-[450] text-secondary-token'>
-          {label}
-        </span>
-        <span className='text-[20px] font-[510] tabular-nums text-primary-token'>
+        <span className='text-app font-book text-secondary-token'>{label}</span>
+        <span className='text-[20px] font-medium tabular-nums text-primary-token'>
           {count.toLocaleString()}
         </span>
         {rate && (
-          <span className='text-[11px] font-[450] text-tertiary-token'>
-            {rate}
-          </span>
+          <span className='text-2xs font-book text-tertiary-token'>{rate}</span>
         )}
       </div>
       {!isLast && (
@@ -46,7 +42,7 @@ function DropOff({
   if (count === 0) return null;
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <span className='text-[11px] font-[450] text-destructive/70'>
+    <span className='text-2xs font-book text-destructive/70'>
       {count.toLocaleString()} {label} ({pct}%)
     </span>
   );
@@ -63,7 +59,7 @@ function EmptyFunnel() {
       className='px-(--linear-app-content-padding-x) py-6'
       data-testid='gtm-pipeline-status'
     >
-      <p className='text-center text-[13px] font-[450] text-secondary-token'>
+      <p className='text-center text-app font-book text-secondary-token'>
         Pipeline hasn&apos;t run yet. Select a speed above to start.
       </p>
     </ContentSurfaceCard>
@@ -113,7 +109,7 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
       data-testid='gtm-pipeline-status'
     >
       {/* Pipeline status (all time) */}
-      <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='mb-2 text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
         Pipeline status
       </p>
       <div className='flex flex-wrap items-start gap-x-1 gap-y-3'>
@@ -138,10 +134,10 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
       {/* Conversion (last 30 days) */}
       {summary.contacted > 0 && (
         <div className='mt-4 border-t border-subtle pt-3'>
-          <p className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='mb-1 text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
             Conversion (last 30 days)
           </p>
-          <p className='text-[13px] font-[450] text-secondary-token'>
+          <p className='text-app font-book text-secondary-token'>
             Contacted: {summary.contacted}
             {' · '}
             Claimed: {summary.claimClicks} (

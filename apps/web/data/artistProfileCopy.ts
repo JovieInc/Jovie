@@ -714,7 +714,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   monetization: {
     headline: 'Get paid. Again and again.',
-    subhead: 'Turn a $5 busking tip into a lifelong customer.',
+    subhead: 'Turn a $10 busking tip into a lifelong customer.',
     irlPaymentsCard: {
       textAnchor: 'top',
       title: 'Accept payments',
@@ -768,7 +768,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       outputs: [
         {
           id: 'payment',
-          title: 'Jessica paid you $5',
+          title: 'Jessica paid you $10',
           detail: 'From busking QR code',
         },
         {
@@ -785,9 +785,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   capture: {
-    headline: 'Capture every fan.',
-    subhead: 'Turn anonymous profile visits into fans you can reach again.',
-    body: 'Collect permission once. Bring fans back for every release, show, drop, and update.',
+    headline: 'Build the list. Keep it working.',
+    subhead:
+      'Every visit is a chance to add a fan. Every fan gets reached automatically for the next drop.',
+    body: 'New fans opt in from every profile visit, QR scan, and link click. Jovie notifies them for every release, show, and update — so your audience grows without starting over each time.',
     action: {
       title: 'Get updates',
       detail: 'Release and show alerts.',
@@ -975,7 +976,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   socialProof: {
-    headline: 'Real Artists. Real Workflows.',
+    headline: 'Built by an artist. For artists.',
     intro: 'Real artist profiles built around real release moments.',
   },
   faq: {

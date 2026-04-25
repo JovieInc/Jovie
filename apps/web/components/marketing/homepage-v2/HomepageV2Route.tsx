@@ -25,6 +25,7 @@ import {
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { cn } from '@/lib/utils';
 
 export function HomepageV2Route() {
   return (
@@ -51,6 +52,53 @@ export function HomepageV2BelowHero() {
       <HomepageV2FinalCta />
       <HomepageV2FooterLinks />
     </>
+  );
+}
+
+function HomepageStoryHeader({
+  headline,
+  body,
+  align = 'center',
+  className,
+  headlineClassName,
+  bodyClassName,
+  headlineTestId,
+}: Readonly<{
+  headline: string;
+  body?: string;
+  align?: 'center' | 'left';
+  className?: string;
+  headlineClassName?: string;
+  bodyClassName?: string;
+  headlineTestId?: string;
+}>) {
+  const centered = align === 'center';
+
+  return (
+    <div
+      className={cn(
+        centered ? 'mx-auto text-center' : 'max-w-[38rem]',
+        className
+      )}
+    >
+      <h2
+        className={cn('homepage-story-heading', headlineClassName)}
+        data-testid={headlineTestId}
+      >
+        {headline}
+      </h2>
+      {body ? (
+        <p
+          className={cn(
+            'homepage-story-body',
+            centered && 'mx-auto',
+            bodyClassName
+          )}
+        >
+          {body}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -235,46 +283,36 @@ export function HomepageV2SystemOverview() {
   return (
     <section
       data-testid='homepage-v2-system-overview'
-      className='section-spacing-linear-sm'
+      className='homepage-story-section'
     >
       <MarketingContainer width='page'>
-        <ArtistProfileSectionHeader
-          align='left'
+        <HomepageStoryHeader
+          align='center'
           headline={HOMEPAGE_V2_COPY.systemOverview.headline}
           body={HOMEPAGE_V2_COPY.systemOverview.subhead}
-          className='max-w-[44rem]'
-          headlineClassName='text-[clamp(2.8rem,5vw,4.4rem)]'
-          bodyClassName='max-w-[36rem]'
+          className='max-w-[42rem]'
+          bodyClassName='max-w-[32rem]'
         />
 
-        <div className='mt-8 grid gap-4 lg:grid-cols-3'>
+        <div className='homepage-overview-grid'>
           {HOMEPAGE_V2_COPY.systemOverview.cards.map(card => (
-            <article
-              key={card.title}
-              className='rounded-[1.5rem] border border-white/10 bg-white/[0.025] p-5'
-            >
-              <p className='text-[1.05rem] font-semibold tracking-[-0.03em] text-primary-token'>
-                {card.title}
-              </p>
-              <p className='mt-3 text-[14px] leading-[1.65] text-secondary-token'>
-                {card.body}
-              </p>
+            <article key={card.title} className='homepage-overview-item'>
+              <p className='homepage-overview-title'>{card.title}</p>
+              <p className='homepage-overview-body'>{card.body}</p>
               {card.href ? (
-                <Link
-                  href={card.href}
-                  className='mt-5 inline-flex items-center gap-2 text-[13px] font-medium tracking-[-0.01em] text-primary-token'
-                >
+                <Link href={card.href} className='homepage-story-link mt-5'>
                   {card.ctaLabel}
                   <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
                 </Link>
-              ) : (
+              ) : null}
+              {!card.href && card.status ? (
                 <p
                   data-testid='homepage-v2-release-pages-preview'
-                  className='mt-5 inline-flex rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-medium text-tertiary-token'
+                  className='mt-5 inline-flex rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/46'
                 >
                   {card.status}
                 </p>
-              )}
+              ) : null}
             </article>
           ))}
         </div>
@@ -287,7 +325,7 @@ export function HomepageV2Spotlight() {
   return (
     <section
       data-testid='homepage-v2-spotlight'
-      className='section-spacing-linear-sm relative overflow-hidden'
+      className='homepage-story-section relative overflow-hidden'
     >
       <style>{`
         .homepage-v2-spotlight-stage {
@@ -300,40 +338,34 @@ export function HomepageV2Spotlight() {
 
         @media (min-width: 1024px) and (min-height: 821px) {
           .homepage-v2-spotlight-stage {
-            min-height: calc(100svh + 12rem);
+            min-height: clamp(38rem, 62vw, 50rem);
           }
 
           .homepage-v2-spotlight-rail {
             position: sticky;
             top: clamp(
-              calc(var(--linear-header-height) + 1.5rem),
-              15svh,
-              calc(var(--linear-header-height) + 6rem)
+              calc(var(--linear-header-height) + 1.25rem),
+              11svh,
+              calc(var(--linear-header-height) + 4rem)
             );
           }
         }
       `}</style>
       <MarketingContainer width='page'>
-        <div className='grid gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start'>
-          <div className='max-w-[32rem] lg:pt-10'>
-            <ArtistProfileSectionHeader
-              align='left'
-              headline={HOMEPAGE_V2_COPY.spotlight.headline}
-              body={HOMEPAGE_V2_COPY.spotlight.body}
-              className='max-w-[34rem]'
-              headlineClassName='text-[clamp(2.9rem,5vw,4.5rem)]'
-              bodyClassName='max-w-[28rem]'
-            />
-            <Link
-              href={HOMEPAGE_V2_COPY.spotlight.href}
-              className='mt-6 inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.01em] text-primary-token'
-            >
-              {HOMEPAGE_V2_COPY.spotlight.ctaLabel}
-              <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
-            </Link>
+        <div className='mx-auto grid max-w-[72rem] gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
+          <div className='max-w-[23rem] lg:self-center'>
+            <div className='max-w-[23rem]'>
+              <h2 className='homepage-story-heading max-w-[11ch]'>
+                <span className='block'>One Link.</span>
+                <span className='block whitespace-nowrap'>Always In Sync.</span>
+              </h2>
+              <p className='homepage-story-body max-w-[20rem]'>
+                {HOMEPAGE_V2_COPY.spotlight.body}
+              </p>
+            </div>
           </div>
 
-          <div className='homepage-v2-spotlight-stage'>
+          <div className='homepage-spotlight-stage homepage-v2-spotlight-stage px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12'>
             <div className='homepage-v2-spotlight-rail'>
               <ArtistProfileModeSwitcher
                 adaptive={ARTIST_PROFILE_COPY.adaptive}
@@ -353,23 +385,24 @@ export function HomepageV2CaptureReactivate() {
   return (
     <section
       data-testid='homepage-v2-capture-reactivate'
-      className='section-spacing-linear-sm relative overflow-hidden bg-white/[0.012]'
+      className='homepage-story-section relative overflow-hidden'
     >
       <MarketingContainer width='page'>
-        <ArtistProfileSectionHeader
+        <HomepageStoryHeader
           align='center'
           headline={HOMEPAGE_V2_COPY.captureReactivation.headline}
           body={HOMEPAGE_V2_COPY.captureReactivation.body}
-          className='max-w-[48rem]'
-          bodyClassName='mx-auto max-w-[38rem]'
+          className='max-w-[42rem]'
+          headlineClassName='whitespace-pre-line'
+          bodyClassName='mx-auto max-w-[29rem]'
         />
 
-        <div className='mt-12 grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'>
-          <article className='rounded-[1.6rem] border border-white/10 bg-black/35 p-5 sm:p-6'>
-            <p className='text-[12px] font-medium tracking-[0.12em] text-tertiary-token'>
+        <div className='homepage-split-surface mt-10 grid gap-0 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]'>
+          <article className='homepage-split-column'>
+            <p className='homepage-split-label'>
               {HOMEPAGE_V2_COPY.captureReactivation.captureLabel}
             </p>
-            <p className='mt-3 max-w-[30rem] text-[15px] leading-[1.65] text-secondary-token'>
+            <p className='homepage-split-copy'>
               {HOMEPAGE_V2_COPY.captureReactivation.captureBody}
             </p>
             <ArtistProfileCaptureVisual
@@ -378,11 +411,11 @@ export function HomepageV2CaptureReactivate() {
             />
           </article>
 
-          <article className='rounded-[1.6rem] border border-white/10 bg-black/35 p-5 sm:p-6'>
-            <p className='text-[12px] font-medium tracking-[0.12em] text-tertiary-token'>
+          <article className='homepage-split-column'>
+            <p className='homepage-split-label'>
               {HOMEPAGE_V2_COPY.captureReactivation.reactivateLabel}
             </p>
-            <p className='mt-3 max-w-[34rem] text-[15px] leading-[1.65] text-secondary-token'>
+            <p className='homepage-split-copy'>
               {HOMEPAGE_V2_COPY.captureReactivation.reactivateBody}
             </p>
             <ArtistProfileReactivationVisual
@@ -391,15 +424,6 @@ export function HomepageV2CaptureReactivate() {
               reactivation={ARTIST_PROFILE_COPY.reactivation}
             />
           </article>
-        </div>
-
-        <div className='mt-8 flex justify-center'>
-          <Link
-            href={HOMEPAGE_V2_COPY.captureReactivation.href}
-            className='public-action-secondary'
-          >
-            {HOMEPAGE_V2_COPY.captureReactivation.ctaLabel}
-          </Link>
         </div>
       </MarketingContainer>
     </section>
@@ -471,48 +495,26 @@ export function HomepageV2Pricing() {
   return (
     <section
       data-testid='homepage-v2-pricing'
-      className='section-spacing-linear-sm'
+      className='homepage-story-section'
     >
       <MarketingContainer width='page'>
-        <ArtistProfileSectionHeader
+        <HomepageStoryHeader
           align='center'
           headline={HOMEPAGE_V2_COPY.pricing.headline}
-          body={HOMEPAGE_V2_COPY.pricing.body}
-          className='max-w-[42rem]'
-          bodyClassName='mx-auto max-w-[32rem]'
+          className='max-w-[40rem]'
+          headlineClassName='max-w-[10ch]'
         />
 
-        <div className='mt-8 grid gap-4 md:grid-cols-2'>
+        <div className='homepage-pricing-grid'>
           <PricingCard
-            body={ENTITLEMENT_REGISTRY.free.marketing.tagline}
-            ctaHref={`${APP_ROUTES.SIGNUP}?plan=free`}
-            ctaLabel='Start Free'
-            price='$0'
-            testId='homepage-v2-pricing-free'
-            title={ENTITLEMENT_REGISTRY.free.marketing.displayName}
-          />
-          <PricingCard
-            body={ENTITLEMENT_REGISTRY.pro.marketing.tagline}
+            body='One plan. 14-day free trial. Then the workspace keeps running.'
             ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
-            ctaLabel='Start Pro Trial'
+            ctaLabel='Start 14-Day Free Trial'
             featured
             price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}/mo`}
             testId='homepage-v2-pricing-pro'
             title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
           />
-        </div>
-
-        <div className='mt-6 text-center'>
-          <p className='text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
-            {HOMEPAGE_V2_COPY.pricing.supportLine}
-          </p>
-          <Link
-            href={HOMEPAGE_V2_COPY.pricing.href}
-            className='mt-4 inline-flex items-center gap-2 text-[14px] font-medium tracking-[-0.01em] text-primary-token'
-          >
-            {HOMEPAGE_V2_COPY.pricing.ctaLabel}
-            <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
-          </Link>
         </div>
       </MarketingContainer>
     </section>
@@ -521,34 +523,42 @@ export function HomepageV2Pricing() {
 
 export function HomepageV2FinalCta() {
   return (
-    <section className='section-glow section-glow-cta relative overflow-hidden border-t border-white/8 py-20 sm:py-24 lg:py-28'>
+    <section
+      data-testid='homepage-v2-final-cta'
+      className='homepage-story-section homepage-story-final-cta relative overflow-hidden'
+    >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/3 h-[24rem] w-[38rem] -translate-x-1/2 -translate-y-1/2 blur-3xl'
+        className='pointer-events-none absolute left-1/2 top-1/2 h-[24rem] w-[38rem] -translate-x-1/2 -translate-y-1/2 blur-3xl'
         style={{
           background:
-            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.34), transparent 68%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.28), transparent 70%)',
         }}
       />
       <MarketingContainer width='page'>
-        <div className='relative mx-auto max-w-[40rem] text-center'>
-          <h2
-            className='marketing-h2-linear text-primary-token'
-            data-testid='homepage-v2-final-cta-heading'
+        <HomepageStoryHeader
+          align='center'
+          headline={HOMEPAGE_V2_COPY.finalCta.headline}
+          className='relative mx-auto max-w-[40rem]'
+          headlineClassName='text-[clamp(2.8rem,5vw,4.55rem)]'
+          headlineTestId='homepage-v2-final-cta-heading'
+        />
+        <div className='relative mt-8 flex flex-wrap items-center justify-center gap-3'>
+          <Link
+            href={APP_ROUTES.SIGNUP}
+            className='public-action-primary'
+            data-testid='homepage-v2-final-cta-primary'
           >
-            {HOMEPAGE_V2_COPY.finalCta.headline}
-          </h2>
-          <p className='mx-auto mt-4 max-w-[32rem] text-[15px] leading-[1.65] text-secondary-token sm:text-[16px]'>
-            {HOMEPAGE_V2_COPY.finalCta.body}
-          </p>
-          <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
-            <Link href={APP_ROUTES.SIGNUP} className='public-action-primary'>
-              {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
-            </Link>
-            <Link href={APP_ROUTES.PRICING} className='public-action-secondary'>
-              {HOMEPAGE_V2_COPY.finalCta.secondaryCtaLabel}
-            </Link>
-          </div>
+            {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
+          </Link>
+          <Link
+            href={APP_ROUTES.PRICING}
+            className='homepage-story-link px-3 py-2'
+            data-testid='homepage-v2-final-cta-secondary'
+          >
+            {HOMEPAGE_V2_COPY.finalCta.secondaryCtaLabel}
+            <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
+          </Link>
         </div>
       </MarketingContainer>
     </section>
@@ -604,11 +614,10 @@ function PricingCard({
   return (
     <article
       data-testid={testId}
-      className={`rounded-[1.5rem] border p-6 ${
-        featured
-          ? 'border-white/18 bg-white/[0.04]'
-          : 'border-white/10 bg-white/[0.02]'
-      }`}
+      className={cn(
+        'homepage-pricing-card',
+        featured && 'homepage-pricing-card--featured'
+      )}
     >
       <p className='text-[1.1rem] font-semibold tracking-[-0.03em] text-primary-token'>
         {title}
@@ -616,10 +625,10 @@ function PricingCard({
       <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
         {body}
       </p>
-      <p className='mt-6 text-[2.4rem] font-semibold tracking-[-0.07em] text-primary-token'>
+      <p className='mt-auto pt-8 text-[2.4rem] font-semibold tracking-[-0.07em] text-primary-token'>
         {price}
       </p>
-      <Link href={ctaHref} className='public-action-primary mt-6 inline-flex'>
+      <Link href={ctaHref} className='public-action-primary mt-5 inline-flex'>
         {ctaLabel}
       </Link>
     </article>

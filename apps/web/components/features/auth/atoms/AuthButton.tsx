@@ -13,10 +13,10 @@ const authButtonVariants = cva(
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
     // Mobile-optimized height matching Linear
     'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px]',
-    // Touch-optimized transitions
-    'transition-all duration-150 ease-out',
-    // Active press state for mobile
-    'active:scale-[0.98] active:opacity-90',
+    // Keep hover states visual, never positional
+    'transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out',
+    // Press feedback stays visual, not positional
+    'active:opacity-90',
     // Prevent text selection on touch
     'select-none touch-manipulation',
     // Smooth tap highlight removal for iOS
@@ -42,9 +42,9 @@ const authButtonVariants = cva(
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[400] text-secondary-token',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-normal text-secondary-token',
           'hover:text-primary-token',
-          'active:scale-100 active:opacity-70',
+          'active:opacity-70',
         ].join(' '),
       },
     },

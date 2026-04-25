@@ -207,14 +207,14 @@ export function ArtistProfileMonetizationSection({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-[#050505]'
+      className='bg-[#050608]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
       <div>
         <div className='mx-auto max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
           <div className='max-w-[34rem]'>
-            <h2 className='text-[clamp(2.9rem,5.2vw,4.7rem)] font-semibold leading-[0.92] tracking-[-0.08em] text-primary-token'>
+            <h2 className='text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'>
               <span className='block'>Get paid.</span>
               <span className='block'>Again and again.</span>
             </h2>
@@ -471,6 +471,12 @@ function SayThanksVisual({
   );
 }
 
+function getOutputTransform(index: number): string {
+  if (index === 0) return 'translateX(0px)';
+  if (index === 1) return 'translateX(10px)';
+  return 'translateX(20px)';
+}
+
 function ReengageVisual({
   card,
 }: Readonly<{
@@ -494,12 +500,7 @@ function ReengageVisual({
               index > 0 && 'mt-2.5'
             )}
             style={{
-              transform:
-                index === 0
-                  ? 'translateX(0px)'
-                  : index === 1
-                    ? 'translateX(10px)'
-                    : 'translateX(20px)',
+              transform: getOutputTransform(index),
             }}
           >
             <div className='flex items-start gap-3'>

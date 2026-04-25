@@ -212,20 +212,28 @@ export async function POST(request: NextRequest) {
 
     const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
+    const planIdSuffix = selectedPlan
+      ? `&plan_id=${encodeURIComponent(selectedPlan)}`
+      : '';
+
+    let successUrl: string;
+    let cancelUrl: string;
+    if (checkoutSource === 'onboarding') {
+      successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
+    } else {
+      successUrl = `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}/billing/cancel`;
+    }
+
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({
         customerId,
         priceId,
         plan: selectedPlan,
         userId,
-        successUrl:
-          checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${selectedPlan ? `&plan_id=${encodeURIComponent(selectedPlan)}` : ''}`
-            : `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${selectedPlan ? `&plan_id=${encodeURIComponent(selectedPlan)}` : ''}`,
-        cancelUrl:
-          checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=cancel`
-            : `${baseUrl}/billing/cancel`,
+        successUrl,
+        cancelUrl,
         idempotencyKey,
         referralCode,
       })
