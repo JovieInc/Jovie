@@ -6,7 +6,13 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { notifySlackFeedbackSubmission } from '@/lib/notifications/providers/slack';
+import {
+  createRateLimitHeaders,
+  generalLimiter,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 const payloadSchema = z.object({
@@ -17,11 +23,37 @@ const payloadSchema = z.object({
 
 export const runtime = 'nodejs';
 
+/** Max feedback body size: 16KB (message alone capped at 2000 chars). */
+const MAX_BODY_SIZE = 16 * 1024;
+
 export async function POST(request: Request) {
   try {
     const { userId } = await getCachedAuth();
-    const body = await request.json();
-    const parsed = payloadSchema.safeParse(body);
+
+    // Rate limit by userId when available, otherwise by client IP. Prevents
+    // unauthenticated flooding of the feedback DB + Slack channel.
+    const clientIp = getClientIP(request);
+    const limiterKey = userId ?? clientIp;
+    const rateLimit = await generalLimiter.limit(limiterKey);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many feedback submissions' },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimit),
+        }
+      );
+    }
+
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: '/api/feedback',
+      maxBodySize: MAX_BODY_SIZE,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
+    const parsed = payloadSchema.safeParse(parsedBody.data);
 
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
