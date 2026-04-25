@@ -1,5 +1,7 @@
 import { toast } from 'sonner';
 import { APP_ROUTES } from '@/constants/routes';
+import { dispatchMoveRemixNearLAShow } from '@/lib/release-planning/demo-events';
+import { laShowFriday } from '@/lib/release-planning/demo-plan';
 
 /**
  * Deterministic chat commands that bypass AI processing.
@@ -26,6 +28,25 @@ interface CommandDefinition {
 }
 
 const COMMANDS: readonly CommandDefinition[] = [
+  {
+    keywords: ['move', 'remix', 'la', 'show'],
+    result: () => {
+      const onPlan =
+        typeof window !== 'undefined' &&
+        window.location.pathname.startsWith(APP_ROUTES.DASHBOARD_RELEASE_PLAN);
+      const target = laShowFriday();
+      return {
+        confirmationMessage: onPlan
+          ? `Done. The remix is now Friday ${target} — three days before the LA show. Fans who opted in to remix drops will get notified the morning of.`
+          : `Open Release Plan and I'll move it next to the LA show.`,
+        execute: () => {
+          if (onPlan) {
+            dispatchMoveRemixNearLAShow();
+          }
+        },
+      };
+    },
+  },
   {
     keywords: ['preview', 'profile'],
     result: ctx => ({
