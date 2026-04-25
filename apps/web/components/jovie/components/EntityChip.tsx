@@ -42,7 +42,7 @@ export function EntityChip({
           }
         : {})}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-0 px-1.5 py-0.5 align-baseline text-[13px] leading-5 text-primary-token',
+        'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-0 px-1.5 py-0.5 align-baseline text-app leading-5 text-primary-token',
         'select-none',
         variant === 'input' &&
           'mx-0.5 cursor-default shadow-[0_1px_1px_rgba(0,0,0,0.04)]'
