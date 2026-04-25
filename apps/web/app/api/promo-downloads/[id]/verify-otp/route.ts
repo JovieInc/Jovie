@@ -28,6 +28,7 @@ import {
   verifyEmailOtp,
 } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
+import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
 
@@ -131,8 +132,7 @@ export async function POST(
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
     const ua = request.headers.get('user-agent') ?? null;
-    const rawCity = request.headers.get('x-vercel-ip-city');
-    const city = rawCity ? decodeURIComponent(rawCity) : null;
+    const city = decodeCityHeader(request.headers.get('x-vercel-ip-city'));
     const country = request.headers.get('x-vercel-ip-country') ?? null;
 
     // Fire-and-forget: download events
