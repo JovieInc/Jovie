@@ -179,13 +179,13 @@ export function getContrastSafeIconColor(
 }
 
 /**
- * Choose white or dark text that meets WCAG 3:1 contrast on a brand-colored background.
+ * Choose white or dark text that meets WCAG AA contrast on a brand-colored background.
  * Uses actual contrast ratio calculation instead of luminance threshold heuristic.
  * @param brandHex - Brand hex color used as background
  * @returns '#ffffff' or '#0f172a'
  */
 export function getContrastTextOnBrand(brandHex: string): string {
-  return contrastRatio('#ffffff', brandHex) >= 3 ? '#ffffff' : '#0f172a';
+  return contrastRatio('#ffffff', brandHex) >= 4.5 ? '#ffffff' : '#0f172a';
 }
 
 /**

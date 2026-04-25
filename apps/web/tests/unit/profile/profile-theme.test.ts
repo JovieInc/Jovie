@@ -61,4 +61,14 @@ describe('profile theme helpers', () => {
       '--profile-pearl-primary-bg': expect.stringMatching(/^#/),
     });
   });
+
+  it('uses AA contrast text for medium-bright accent buttons', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#cf824c',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#0f172a');
+  });
 });
