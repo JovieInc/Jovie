@@ -277,7 +277,7 @@ function CreatorProfileTableRowComponent({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-[510] text-primary-token'>
+              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-medium text-primary-token'>
                 {displayName}
               </div>
             ) : null}
@@ -287,7 +287,7 @@ function CreatorProfileTableRowComponent({
                 'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
                 displayName
                   ? 'text-[12px]'
-                  : 'text-[13px] font-[510] text-primary-token'
+                  : 'text-[13px] font-medium text-primary-token'
               )}
               onClick={event => event.stopPropagation()}
             >

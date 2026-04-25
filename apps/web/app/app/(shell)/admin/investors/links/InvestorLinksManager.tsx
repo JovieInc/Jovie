@@ -336,12 +336,12 @@ function StageBadge({ stage }: Readonly<{ stage: string }>) {
 
 function StatusBadge({ isActive }: { readonly isActive: boolean }) {
   return isActive ? (
-    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       <CheckCircle2 className='h-3.5 w-3.5 text-success' />
       Active
     </span>
   ) : (
-    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       <CircleSlash className='h-3.5 w-3.5 text-tertiary-token' />
       Disabled
     </span>
@@ -416,7 +416,7 @@ function LinkActions({
           <div className='absolute right-0 top-full z-50 mt-1 w-44 rounded-lg border border-subtle bg-(--linear-app-content-surface) p-1 shadow-popover'>
             <button
               type='button'
-              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
+              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
               onClick={() => {
                 onToggleActive(link.id, !link.isActive);
                 setMenuOpen(false);
@@ -436,7 +436,7 @@ function LinkActions({
             </button>
             <button
               type='button'
-              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-destructive transition-colors hover:bg-destructive/8'
+              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-destructive transition-colors hover:bg-destructive/8'
               onClick={() => {
                 setMenuOpen(false);
                 // Deactivates the link (soft-delete) — confirm first
@@ -603,7 +603,7 @@ export function InvestorLinksManager() {
             <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
               <Link2 className='h-4 w-4' aria-hidden='true' />
             </div>
-            <p className='max-w-md text-[13px] leading-[19px] text-secondary-token'>
+            <p className='max-w-md text-app leading-[19px] text-secondary-token'>
               Each investor link is a unique, token-gated entry point to your
               portal. Create one per investor for personalized tracking.
             </p>
@@ -614,9 +614,9 @@ export function InvestorLinksManager() {
           </div>
         ) : (
           <div className='overflow-x-auto'>
-            <table className='w-full min-w-[700px] border-collapse text-[13px]'>
+            <table className='w-full min-w-[700px] border-collapse text-app'>
               <thead className='bg-surface-0'>
-                <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+                <tr className='border-b border-subtle text-left text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
                   <th className='px-4 py-2.5 font-semibold'>Label</th>
                   <th className='px-4 py-2.5 font-semibold'>Investor</th>
                   <th className='px-4 py-2.5 font-semibold'>Stage</th>
@@ -642,7 +642,7 @@ export function InvestorLinksManager() {
                       <div>
                         <span>{link.investorName || 'Unknown'}</span>
                         {link.email && (
-                          <span className='ml-1 text-[11px] text-tertiary-token'>
+                          <span className='ml-1 text-2xs text-tertiary-token'>
                             ({link.email})
                           </span>
                         )}
