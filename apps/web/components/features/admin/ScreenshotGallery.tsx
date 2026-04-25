@@ -191,10 +191,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
         <div className='flex items-center justify-between gap-3 p-3'>
           <div className='min-w-0'>
-            <p className='truncate text-[12px] font-[510] text-primary-token'>
+            <p className='truncate text-xs font-medium text-primary-token'>
               {screenshot.title}
             </p>
-            <div className='mt-1 flex flex-wrap items-center gap-2 text-[11px] text-secondary-token'>
+            <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-secondary-token'>
               {screenshot.canonicalSurfaceLabel ? (
                 <span className='rounded-full bg-surface-1 px-2 py-0.5'>
                   {screenshot.canonicalSurfaceLabel}
@@ -207,13 +207,13 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               <span>{formatSize(screenshot.sizeBytes)}</span>
             </div>
             <div className='mt-2 flex flex-wrap gap-1.5'>
-              <span className='rounded-full bg-surface-1 px-2 py-0.5 text-[10px] text-secondary-token'>
+              <span className='rounded-full bg-surface-1 px-2 py-0.5 text-3xs text-secondary-token'>
                 {screenshot.groupLabel}
               </span>
               {screenshot.consumers.filter(isDisplayConsumer).map(consumer => (
                 <span
                   key={consumer}
-                  className='rounded-full bg-surface-1 px-2 py-0.5 text-[10px] text-secondary-token'
+                  className='rounded-full bg-surface-1 px-2 py-0.5 text-3xs text-secondary-token'
                 >
                   {formatConsumerLabel(consumer)}
                 </span>
@@ -240,10 +240,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         <ContentSurfaceCard className='space-y-4 p-4'>
           <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
             <div>
-              <p className='text-[12px] font-semibold text-primary-token'>
+              <p className='text-xs font-semibold text-primary-token'>
                 Filters
               </p>
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 Showing {filteredScreenshots.length} of {screenshots.length}{' '}
                 captures. Canonical: {totalCanonicalCaptures}. Other:{' '}
                 {totalOtherCaptures}.
@@ -256,7 +256,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   type='button'
                   onClick={() => setSurfaceFilter(filter.id)}
                   aria-pressed={surfaceFilter === filter.id}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] ${
+                  className={`rounded-full border px-3 py-1.5 text-xs ${
                     surfaceFilter === filter.id
                       ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
@@ -268,7 +268,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
           </div>
           <div className='space-y-2'>
-            <p className='text-[12px] font-semibold text-primary-token'>
+            <p className='text-xs font-semibold text-primary-token'>
               Capture Group
             </p>
             <div className='flex flex-wrap gap-2'>
@@ -278,7 +278,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   type='button'
                   onClick={() => setGroupFilter(filter.id)}
                   aria-pressed={groupFilter === filter.id}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] ${
+                  className={`rounded-full border px-3 py-1.5 text-xs ${
                     groupFilter === filter.id
                       ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
@@ -290,9 +290,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
           </div>
           <div className='space-y-2'>
-            <p className='text-[12px] font-semibold text-primary-token'>
-              Use Case
-            </p>
+            <p className='text-xs font-semibold text-primary-token'>Use Case</p>
             <div className='flex flex-wrap gap-2'>
               {CONSUMER_FILTERS.map(filter => (
                 <button
@@ -300,7 +298,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   type='button'
                   onClick={() => setConsumerFilter(filter.id)}
                   aria-pressed={consumerFilter === filter.id}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] ${
+                  className={`rounded-full border px-3 py-1.5 text-xs ${
                     consumerFilter === filter.id
                       ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
@@ -316,10 +314,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {canonicalSections.length > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
                 Canonical Surfaces
               </h2>
-              <p className='mt-1 text-[12px] text-secondary-token'>
+              <p className='mt-1 text-xs text-secondary-token'>
                 Review the four repo-owned design-system surfaces directly.
               </p>
             </div>
@@ -333,13 +331,13 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   <div className='border-b border-subtle px-4 py-3'>
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
-                        <h3 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
+                        <h3 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
                           {surface.label}
                         </h3>
-                        <p className='mt-1 text-[12px] text-secondary-token'>
+                        <p className='mt-1 text-xs text-secondary-token'>
                           {surface.description}
                         </p>
-                        <div className='mt-2 flex flex-wrap items-center gap-2 text-[11px] text-secondary-token'>
+                        <div className='mt-2 flex flex-wrap items-center gap-2 text-2xs text-secondary-token'>
                           <span className='rounded-full bg-surface-1 px-2 py-0.5'>
                             Review Route: {surface.reviewRoute}
                           </span>
@@ -363,10 +361,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {otherGroups.size > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
                 Other Captures
               </h2>
-              <p className='mt-1 text-[12px] text-secondary-token'>
+              <p className='mt-1 text-xs text-secondary-token'>
                 Supporting screenshot coverage outside the four canonical review
                 surfaces.
               </p>
@@ -379,10 +377,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   className='overflow-hidden bg-surface-0'
                 >
                   <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
-                    <h3 className='truncate text-[13px] font-semibold tracking-[-0.01em] text-primary-token'>
+                    <h3 className='truncate text-app font-semibold tracking-[-0.01em] text-primary-token'>
                       {sourceLabel}
                     </h3>
-                    <span className='shrink-0 text-[12px] text-secondary-token'>
+                    <span className='shrink-0 text-xs text-secondary-token'>
                       {items.length}
                     </span>
                   </div>
@@ -397,10 +395,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
         {filteredScreenshots.length === 0 ? (
           <ContentSurfaceCard className='p-6'>
-            <p className='text-[13px] font-semibold text-primary-token'>
+            <p className='text-app font-semibold text-primary-token'>
               No screenshots match the current filters.
             </p>
-            <p className='mt-1 text-[12px] text-secondary-token'>
+            <p className='mt-1 text-xs text-secondary-token'>
               Clear one or more filters to see canonical surfaces and supporting
               captures again.
             </p>
@@ -462,10 +460,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               </ContentSurfaceCard>
               <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-surface-0 p-3.5'>
                 <div>
-                  <p className='text-[13px] font-semibold text-primary-token'>
+                  <p className='text-app font-semibold text-primary-token'>
                     {selected.title}
                   </p>
-                  <div className='mt-1 flex flex-wrap gap-2 text-[12px] text-secondary-token'>
+                  <div className='mt-1 flex flex-wrap gap-2 text-xs text-secondary-token'>
                     {selected.canonicalSurfaceLabel ? (
                       <>
                         <span>{selected.canonicalSurfaceLabel}</span>
@@ -481,12 +479,12 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                     <span>{formatSize(selected.sizeBytes)}</span>
                   </div>
                   {selected.canonicalSurfaceReviewRoute ? (
-                    <p className='mt-1 text-[11px] text-secondary-token'>
+                    <p className='mt-1 text-2xs text-secondary-token'>
                       Review Route: {selected.canonicalSurfaceReviewRoute}
                     </p>
                   ) : null}
                   {selected.gitSha ? (
-                    <p className='mt-1 text-[11px] text-secondary-token'>
+                    <p className='mt-1 text-2xs text-secondary-token'>
                       {selected.gitSha.slice(0, 8)}
                     </p>
                   ) : null}
