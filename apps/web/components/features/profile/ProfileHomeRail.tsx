@@ -41,22 +41,27 @@ interface ProfileHomeRailProps {
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
 }
 
+type ProfileDateInput = Date | string | null | undefined;
+
 const PROFILE_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
 });
 
-function getProfileDateValue(value: Date | string | null | undefined) {
+function normalizeProfileDateString(value: string): string | Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return `${value}T00:00:00`;
+  }
+  return value;
+}
+
+function getProfileDateValue(value: ProfileDateInput) {
   if (!value) {
     return null;
   }
 
   const normalizedValue =
-    value instanceof Date
-      ? new Date(value)
-      : /^\d{4}-\d{2}-\d{2}$/.test(value)
-        ? `${value}T00:00:00`
-        : value;
+    value instanceof Date ? new Date(value) : normalizeProfileDateString(value);
   const date = new Date(normalizedValue);
 
   return Number.isNaN(date.getTime()) ? null : date;
@@ -187,12 +192,14 @@ function AlertsRailCard({
   renderMode: ProfileRenderMode;
   previewNotificationsState?: ProfilePreviewNotificationsState;
 }>) {
-  const actionLabel =
-    renderMode === 'preview'
-      ? previewNotificationsState?.label || 'Get alerts'
-      : isSubscribed
-        ? 'Manage alerts'
-        : 'Get alerts';
+  let actionLabel: string;
+  if (renderMode === 'preview') {
+    actionLabel = previewNotificationsState?.label || 'Get alerts';
+  } else if (isSubscribed) {
+    actionLabel = 'Manage alerts';
+  } else {
+    actionLabel = 'Get alerts';
+  }
   const title = isSubscribed ? 'Alerts are on' : 'Never miss a release';
   const body = isSubscribed
     ? 'Tune your music, tour, merch, and general update preferences.'
@@ -384,11 +391,7 @@ export function ProfileHomeRail({
                 hasPlayableDestinations={card.kind === 'listen'}
                 renderMode={renderMode}
                 previewActionLabel={
-                  card.kind === 'release'
-                    ? previewActionLabel
-                    : card.kind === 'listen'
-                      ? 'Listen'
-                      : previewActionLabel
+                  card.kind === 'listen' ? 'Listen' : previewActionLabel
                 }
                 onPlayClick={onPlayClick}
                 viewerLocation={viewerLocation}
