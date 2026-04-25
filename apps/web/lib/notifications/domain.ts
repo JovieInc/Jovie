@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { and, eq, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
@@ -9,6 +10,7 @@ import {
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { unsubscribeTokens } from '@/lib/db/schema/suppression';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
@@ -46,7 +48,7 @@ import {
   type NotificationSubscribeDomainResponse,
 } from '@/lib/notifications/response';
 import { sendNotification } from '@/lib/notifications/service';
-import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import { hashEmail, isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
@@ -97,6 +99,10 @@ const sanitizeCountryCode = (raw: string | null | undefined) => {
   const normalized = trimmed.replaceAll(/[^A-Z]/g, '');
   return normalized.length === 2 ? normalized : null;
 };
+
+function hashOpaqueToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 export { buildInvalidRequestResponse };
 
@@ -908,6 +914,90 @@ async function validateUnsubscribeIdentifiers(
   return { normalizedEmail, normalizedPhone, targetChannel };
 }
 
+async function resolveTokenBackedUnsubscribe(
+  artist_id: string,
+  token: string | undefined,
+  method: string | undefined,
+  channel: NotificationChannel | undefined
+): Promise<
+  | {
+      normalizedEmail: string;
+      tokenId: string;
+    }
+  | NotificationDomainResponse<NotificationUnsubscribeResponse>
+  | null
+> {
+  if (!token) {
+    return null;
+  }
+
+  const targetChannel = channel || 'email';
+  const [tokenRecord] = await db
+    .select({
+      id: unsubscribeTokens.id,
+      emailHash: unsubscribeTokens.emailHash,
+      scopeType: unsubscribeTokens.scopeType,
+      scopeId: unsubscribeTokens.scopeId,
+      usedAt: unsubscribeTokens.usedAt,
+      expiresAt: unsubscribeTokens.expiresAt,
+    })
+    .from(unsubscribeTokens)
+    .where(eq(unsubscribeTokens.tokenHash, hashOpaqueToken(token)))
+    .limit(1);
+
+  const now = new Date();
+  const tokenIsUsable =
+    tokenRecord &&
+    tokenRecord.scopeType === 'artist' &&
+    tokenRecord.scopeId === artist_id &&
+    !tokenRecord.usedAt &&
+    tokenRecord.expiresAt > now;
+
+  if (!tokenIsUsable) {
+    await trackUnsubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Invalid or expired unsubscribe token'],
+      method,
+      channel: targetChannel,
+    });
+    return buildValidationErrorResponse('Invalid or expired unsubscribe token');
+  }
+
+  const emailRows = await db
+    .select({ email: notificationSubscriptions.email })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, artist_id),
+        eq(notificationSubscriptions.channel, 'email')
+      )
+    );
+
+  const matchingEmail =
+    emailRows.find(
+      row =>
+        typeof row.email === 'string' &&
+        hashEmail(row.email) === tokenRecord.emailHash
+    )?.email ?? null;
+
+  if (!matchingEmail) {
+    await trackUnsubscribeError({
+      artist_id,
+      error_type: 'validation_error',
+      validation_errors: ['Unsubscribe token does not match a subscriber'],
+      method,
+      channel: targetChannel,
+    });
+    return buildValidationErrorResponse('Invalid or expired unsubscribe token');
+  }
+
+  return {
+    normalizedEmail: matchingEmail.toLowerCase(),
+    tokenId: tokenRecord.id,
+  };
+}
+
 export const unsubscribeFromNotificationsDomain = async (
   payload: unknown
 ): Promise<NotificationDomainResponse<NotificationUnsubscribeResponse>> => {
@@ -930,9 +1020,24 @@ export const unsubscribeFromNotificationsDomain = async (
     }
 
     const { artist_id, email, phone, token, method, channel } = result.data;
+    const tokenResolution = await resolveTokenBackedUnsubscribe(
+      artist_id,
+      token,
+      method,
+      channel
+    );
+
+    if (tokenResolution && 'status' in tokenResolution) {
+      return tokenResolution;
+    }
+
+    const resolvedEmail =
+      tokenResolution && 'normalizedEmail' in tokenResolution
+        ? tokenResolution.normalizedEmail
+        : email;
 
     const validation = await validateUnsubscribeIdentifiers(
-      email,
+      resolvedEmail,
       phone,
       token,
       artist_id,
@@ -966,6 +1071,13 @@ export const unsubscribeFromNotificationsDomain = async (
       .delete(notificationSubscriptions)
       .where(and(...whereClauses))
       .returning({ id: notificationSubscriptions.id });
+
+    if (deleted.length > 0 && tokenResolution && 'tokenId' in tokenResolution) {
+      await db
+        .update(unsubscribeTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(unsubscribeTokens.id, tokenResolution.tokenId));
+    }
 
     await trackUnsubscribeSuccess({
       artist_id,

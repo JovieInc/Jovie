@@ -10,7 +10,7 @@
 |--------|---------|-------------|
 | `auth/` | Authentication gate, session management, Clerk identity sync | `requireAuth`, `getCachedAuth`, `syncEmailFromClerk` |
 | `admin/` | Admin role verification (database-backed), impersonation, audit logging | `requireAdmin`, `isAdmin`, `startImpersonation`, `getEffectiveClerkId` |
-| `entitlements/` | Plan entitlement registry (free/founding/pro/growth) and server-side resolution | `ENTITLEMENT_REGISTRY`, `getCurrentUserEntitlements`, `getCreatorEntitlements` |
+| `entitlements/` | Plan entitlement registry (free, trial, pro, max) and server-side resolution with backward-compat aliases handled centrally | `ENTITLEMENT_REGISTRY`, `getCurrentUserEntitlements`, `getCreatorEntitlements` |
 | `cookies/` | Server-side cookie helpers for user preferences | `getListenPreference`, `setListenPreference` |
 
 ## Data
@@ -90,6 +90,7 @@
 | `env-client.ts` | Client-side env constants (NODE_ENV, IS_DEV, IS_TEST) | `env` |
 | `env-public.ts` | Public env vars with lazy getter for Vercel cold-start safety | `publicEnv` |
 | `error-tracking.ts` | Structured error logging with Sentry | `captureError`, `captureCriticalError` |
+| `flags/` | Canonical app flag contracts, Statsig integration, server evaluation, and client overrides | `APP_FLAG_KEYS`, `getAppFlagValue`, `AppFlagProvider`, `useAppFlag` |
 | `rate-limit/` | Redis-backed rate limiting with 40+ pre-configured limiters, plan-aware | `createRateLimiter`, `createPlanAwareRateLimiter` |
 | `fetch/` | Request deduplication with in-memory cache and prefetch | `dedupedFetch`, `useDedupedFetch`, `prefetch` |
 | `nuqs/` | Type-safe URL search params with server/client caches | `useTableParams`, `audienceSearchParams` |

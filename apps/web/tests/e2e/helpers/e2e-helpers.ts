@@ -84,7 +84,13 @@ interface OnboardingDiscoveryReadiness {
     | 'awaiting_first_release'
     | null;
   canProceedToDashboard: boolean;
-  phase: 'connecting' | 'importing' | 'discovering' | 'ready' | 'failed';
+  phase:
+    | 'connecting'
+    | 'importing'
+    | 'discovering'
+    | 'waiting_for_first_release'
+    | 'ready'
+    | 'failed';
 }
 
 interface OnboardingDiscoverySnapshot {
@@ -136,11 +142,14 @@ export function onboardingProfileIsReady(
     return false;
   }
 
+  const releaseCount = Number(state.release_count ?? 0);
+
   return Boolean(
     state.spotify_id &&
       state.spotify_url &&
       state.is_public &&
-      state.onboarding_completed_at
+      state.onboarding_completed_at &&
+      releaseCount > 0
   );
 }
 
@@ -177,12 +186,18 @@ export async function waitForSpotifyImport(clerkUserId: string) {
         SELECT COUNT(*)
         FROM discog_releases dr
         WHERE dr.creator_profile_id = cp.id
+          AND dr.deleted_at IS NULL
+          AND dr.status <> 'draft'
+          AND (dr.reveal_date IS NULL OR dr.reveal_date <= NOW())
       )::int AS release_count,
       (
         SELECT COUNT(*)
         FROM provider_links pl
         INNER JOIN discog_releases dr ON dr.id = pl.release_id
         WHERE dr.creator_profile_id = cp.id
+          AND dr.deleted_at IS NULL
+          AND dr.status <> 'draft'
+          AND (dr.reveal_date IS NULL OR dr.reveal_date <= NOW())
           AND pl.provider_id = 'spotify'
           AND pl.owner_type = 'release'
       )::int AS spotify_release_link_count
@@ -453,7 +468,12 @@ export function buildValidOnboardingHandle(
 export async function completeOnboardingV2(
   page: Page,
   spotifyArtistUrl: string = DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url,
-  options: Readonly<{ clerkUserId?: string; expectedHandle?: string }> = {}
+  options: Readonly<{
+    clerkUserId?: string;
+    expectedHandle?: string;
+    seedVisibleRelease?: boolean;
+    seededReleaseTitle?: string;
+  }> = {}
 ) {
   if (options.clerkUserId) {
     await ensureServerAuthenticated(page, options.clerkUserId);
@@ -548,7 +568,7 @@ export async function completeOnboardingV2(
   await artistInput.fill(spotifyArtistUrl);
 
   await expect(
-    page.getByRole('heading', { name: 'Spotify is connected' })
+    page.getByRole('heading', { name: /^Spotify(?: is)? connected$/i })
   ).toBeVisible({ timeout: 60_000 });
   const upgradeHeading = page.getByRole('heading', {
     name: 'Want the full profile from day one?',
@@ -566,8 +586,28 @@ export async function completeOnboardingV2(
     name: /^(Your profile is ready|Your Link Is Live)$/i,
   });
 
+  if (options.clerkUserId && options.seedVisibleRelease) {
+    await seedVisibleReleaseForUser({
+      clerkUserId: options.clerkUserId,
+      releaseTitle: options.seededReleaseTitle,
+      spotifyArtistUrl,
+    });
+  }
+
   if (options.clerkUserId) {
     await waitForOnboardingReadiness(page, options.clerkUserId);
+
+    const spotifyConnectedHeading = page.getByRole('heading', {
+      name: /^Spotify(?: is)? connected$/i,
+    });
+    const stillShowingImportGate =
+      (await spotifyConnectedHeading.isVisible().catch(() => false)) &&
+      !(await artistConfirmContinue.isEnabled().catch(() => false));
+
+    if (stillShowingImportGate) {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForHydration(page, { timeout: 90_000 });
+    }
   }
 
   await expect
@@ -787,10 +827,6 @@ export async function waitForOnboardingReadiness(
           return 'missing-profile';
         }
 
-        if (importState?.spotify_import_status === 'importing') {
-          return 'spotify_import_in_progress';
-        }
-
         const discovery = await fetchOnboardingDiscoverySnapshot(
           page,
           profileId
@@ -930,6 +966,207 @@ async function clearCachedUserState(clerkUserId: string) {
   } catch {
     // Non-critical — stale cache will self-heal, but local E2E may need a reload
   }
+}
+
+async function clearCachedProfileState(username: string | null) {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token || !username) return;
+
+  try {
+    await fetch(
+      `${url}/del/${encodeURIComponent(`profile:data:${username.toLowerCase()}`)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+  } catch {
+    // Non-critical — stale cache will self-heal, but local E2E may need a reload
+  }
+}
+
+function extractSpotifyArtistIdFromUrl(
+  spotifyArtistUrl: string
+): string | null {
+  return (
+    /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(
+      spotifyArtistUrl
+    )?.[1] ?? null
+  );
+}
+
+export async function seedVisibleReleaseForUser(
+  options: Readonly<{
+    clerkUserId: string;
+    releaseTitle?: string;
+    spotifyArtistId?: string | null;
+    spotifyArtistUrl?: string | null;
+  }>
+): Promise<{
+  handle: string;
+  profileId: string;
+  releaseSlug: string;
+  releaseTitle: string;
+}> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for launch-path release seeding');
+  }
+
+  const sql = neon(dbUrl);
+  const releaseTitle =
+    options.releaseTitle ??
+    `Launch Path ${Date.now().toString(36).toUpperCase()}`;
+  const releaseSlug = `launch-${Date.now().toString(36)}`.slice(0, 28);
+  const spotifyArtistId =
+    options.spotifyArtistId ??
+    extractSpotifyArtistIdFromUrl(
+      options.spotifyArtistUrl ?? DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url
+    ) ??
+    DEFAULT_ONBOARDING_SPOTIFY_ARTIST.id;
+  const spotifyArtistUrl =
+    options.spotifyArtistUrl ?? DEFAULT_ONBOARDING_SPOTIFY_ARTIST.url;
+
+  let profile:
+    | {
+        id: string;
+        username_normalized: string | null;
+        spotify_id: string | null;
+        spotify_url: string | null;
+      }
+    | undefined;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    [profile] = (await sql`
+      SELECT
+        cp.id,
+        cp.username_normalized,
+        cp.spotify_id,
+        cp.spotify_url
+      FROM creator_profiles cp
+      INNER JOIN users u ON u.id = cp.user_id
+      WHERE u.clerk_id = ${options.clerkUserId}
+      LIMIT 1
+    `) as Array<{
+      id: string;
+      username_normalized: string | null;
+      spotify_id: string | null;
+      spotify_url: string | null;
+    }>;
+
+    if (profile?.id && profile.username_normalized) {
+      break;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+  }
+
+  if (!profile?.id || !profile.username_normalized) {
+    throw new Error(
+      `No creator profile found for launch-path seed user ${options.clerkUserId}`
+    );
+  }
+
+  await sql`
+    UPDATE creator_profiles
+    SET
+      spotify_id = COALESCE(spotify_id, ${spotifyArtistId}),
+      spotify_url = COALESCE(spotify_url, ${spotifyArtistUrl}),
+      avatar_url = COALESCE(
+        avatar_url,
+        'https://images.unsplash.com/placeholder'
+      ),
+      onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
+      settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('spotifyImportStatus', 'complete'),
+      updated_at = NOW()
+    WHERE id = ${profile.id}
+  `;
+
+  const [release] = (await sql`
+    INSERT INTO discog_releases (
+      creator_profile_id,
+      title,
+      slug,
+      release_type,
+      release_date,
+      status,
+      total_tracks,
+      is_explicit,
+      source_type,
+      artwork_url,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${profile.id},
+      ${releaseTitle},
+      ${releaseSlug},
+      'single',
+      NOW() - INTERVAL '1 day',
+      'released',
+      1,
+      false,
+      'ingested',
+      'https://images.unsplash.com/placeholder',
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (creator_profile_id, slug) DO UPDATE SET
+      title = ${releaseTitle},
+      deleted_at = NULL,
+      status = 'released',
+      reveal_date = NULL,
+      updated_at = NOW()
+    RETURNING id, slug
+  `) as Array<{ id: string; slug: string }>;
+
+  if (!release?.id) {
+    throw new Error(
+      `Failed to seed a visible release for ${options.clerkUserId}`
+    );
+  }
+
+  await sql`
+    INSERT INTO provider_links (
+      provider_id,
+      owner_type,
+      release_id,
+      external_id,
+      url,
+      is_primary,
+      source_type,
+      metadata,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      'spotify',
+      'release',
+      ${release.id},
+      ${`${spotifyArtistId}:${release.slug}`},
+      ${`https://open.spotify.com/album/${release.slug}`},
+      true,
+      'ingested',
+      '{}'::jsonb,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (provider_id, release_id) DO UPDATE SET
+      url = EXCLUDED.url,
+      is_primary = true,
+      source_type = 'ingested',
+      updated_at = NOW()
+  `;
+
+  await clearCachedProfileState(profile.username_normalized);
+  await clearCachedUserState(options.clerkUserId);
+
+  return {
+    handle: profile.username_normalized,
+    profileId: profile.id,
+    releaseSlug: release.slug,
+    releaseTitle,
+  };
 }
 
 export interface SeedOnboardedCreatorProfileOptions {
@@ -1206,6 +1443,14 @@ export async function interceptTrackingCalls(page: Page) {
  * with the magic code 424242 before a session is created.
  */
 export async function createFreshUser(page: Page, uniqueSeed: string) {
+  return createFreshUserWithOptions(page, uniqueSeed, {});
+}
+
+export async function createFreshUserWithOptions(
+  page: Page,
+  uniqueSeed: string,
+  options: Readonly<{ authPath?: string | null }> = {}
+) {
   const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
 
   if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
@@ -1223,10 +1468,13 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
 
   await setupClerkTestingToken({ page });
 
-  await smokeNavigateWithRetry(page, '/signin', {
-    timeout: 120_000,
-    retries: 2,
-  });
+  const authPath = options.authPath ?? '/signin';
+  if (authPath) {
+    await smokeNavigateWithRetry(page, authPath, {
+      timeout: 120_000,
+      retries: 2,
+    });
+  }
 
   const loaded = await waitForClerkSignInApi(page);
 

@@ -9,7 +9,16 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  sql as drizzleSql,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  or,
+} from 'drizzle-orm';
 import { unstable_cache as unstableCache } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -22,6 +31,7 @@ import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorProfile,
@@ -477,10 +487,58 @@ async function fetchDashboardBaseWithSession(
     return createEmptyCoreData({ user: userData });
   }
 
+  const visibleReleaseCounts = await dashboardQuery(
+    () =>
+      tx
+        .select({
+          creatorProfileId: discogReleases.creatorProfileId,
+          count: drizzleSql<number>`count(*)::int`,
+        })
+        .from(discogReleases)
+        .where(
+          and(
+            inArray(
+              discogReleases.creatorProfileId,
+              creatorData.map(profile => profile.id)
+            ),
+            isNull(discogReleases.deletedAt),
+            ne(discogReleases.status, 'draft'),
+            drizzleSql`(${discogReleases.revealDate} IS NULL OR ${discogReleases.revealDate} <= NOW())`
+          )
+        )
+        .groupBy(discogReleases.creatorProfileId),
+    'Visible release counts query'
+  ).catch((error: unknown) => {
+    Sentry.captureException(error, {
+      level: 'warning',
+      tags: {
+        query: 'visible_release_counts',
+        context: 'dashboard_data_settled',
+      },
+    });
+    return [];
+  });
+
+  const visibleReleaseCountByProfileId = new Map(
+    visibleReleaseCounts.map(row => [
+      row.creatorProfileId,
+      Number(row.count ?? 0),
+    ])
+  );
+
+  const isLaunchReadyProfile = (profile: CreatorProfile | null) =>
+    Boolean(
+      profile &&
+        profileIsPublishable(profile) &&
+        (visibleReleaseCountByProfileId.get(profile.id) ?? 0) > 0
+    );
+
   const selected = userData.activeProfileId
     ? (creatorData.find(p => p.id === userData.activeProfileId) ??
+      creatorData.find(isLaunchReadyProfile) ??
       selectDashboardProfile(creatorData))
-    : selectDashboardProfile(creatorData);
+    : (creatorData.find(isLaunchReadyProfile) ??
+      selectDashboardProfile(creatorData));
 
   const settings =
     options?.includeSettings === false
@@ -524,7 +582,7 @@ async function fetchDashboardBaseWithSession(
     creatorProfiles: creatorData,
     selectedProfile: selected,
     avatarQuality: UNKNOWN_AVATAR_QUALITY,
-    needsOnboarding: !profileIsPublishable(selected),
+    needsOnboarding: !isLaunchReadyProfile(selected),
     sidebarCollapsed: settings?.sidebarCollapsed ?? false,
     hasSocialLinks: false,
     hasMusicLinks: false,

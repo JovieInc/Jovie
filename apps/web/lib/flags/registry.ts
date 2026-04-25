@@ -42,10 +42,7 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean, FlagEntities> {
 
 export const APP_FLAG_REGISTRY = {
   PROFILE_V2: buildBooleanFlag('PROFILE_V2'),
-  CLAIM_HANDLE: buildBooleanFlag('CLAIM_HANDLE'),
-  HERO_SPOTIFY_CLAIM_FLOW: buildBooleanFlag('HERO_SPOTIFY_CLAIM_FLOW'),
   BILLING_UPGRADE_DIRECT: buildBooleanFlag('BILLING_UPGRADE_DIRECT'),
-  SUBSCRIBE_TWO_STEP: buildBooleanFlag('SUBSCRIBE_TWO_STEP'),
   LATEST_RELEASE_CARD: buildBooleanFlag('LATEST_RELEASE_CARD'),
   SMARTLINK_PRE_SAVE: buildBooleanFlag('SMARTLINK_PRE_SAVE'),
   IOS_APPLE_MUSIC_PRIORITY: buildBooleanFlag('IOS_APPLE_MUSIC_PRIORITY'),

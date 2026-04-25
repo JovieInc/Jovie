@@ -747,7 +747,8 @@ test.describe('YC Demo Recording', () => {
       `/${publicHandle}?mode=subscribe`,
       {
         readyLocator: demoPage.locator('body'),
-        readyText: /turn on notifications|never miss a release/i,
+        readyText:
+          /turn on notifications|notify me about new releases|never miss a release/i,
       }
     );
     await injectCaptionOverlay(demoPage);

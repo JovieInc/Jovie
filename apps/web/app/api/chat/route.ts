@@ -29,8 +29,7 @@ import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
-import { checkGateForUser } from '@/lib/flags/server';
+import { checkGateForUser, getAppFlagValue } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -1922,7 +1921,9 @@ export async function POST(req: Request) {
 
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
-    const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
+    const albumArtEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+      userId,
+    });
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);

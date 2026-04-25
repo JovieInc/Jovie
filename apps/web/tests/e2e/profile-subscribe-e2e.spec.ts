@@ -59,11 +59,13 @@ async function setupProfilePage(page: Page): Promise<boolean> {
 }
 
 /**
- * Click the "Turn on notifications" button and wait for the email input to
- * appear. Returns `false` if the button is not found.
+ * Click the inline subscribe CTA and wait for the email input to appear.
+ * Returns `false` if the button is not found.
  */
 async function clickTurnOnNotifications(page: Page): Promise<boolean> {
-  const btn = page.getByRole('button', { name: /turn on notifications/i });
+  const btn = page.getByRole('button', {
+    name: /turn on notifications|notify me about new releases/i,
+  });
   const visible = await btn
     .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
     .catch(() => false);

@@ -49,9 +49,9 @@ export function MarketingHeader({
       logoSize={logoSize}
       authMode='public-static'
       hideNav={variant === 'minimal'}
-      minimalAuth={variant === 'minimal' || variant === 'homepage'}
-      minimalAuthVariant={variant === 'homepage' ? 'pill' : 'link'}
-      includePublicLoginInMobileNav={variant !== 'homepage'}
+      minimalAuth={variant === 'minimal'}
+      minimalAuthVariant='link'
+      includePublicLoginInMobileNav
       containerSize='homepage'
       navLinks={resolvedNavLinks}
     />

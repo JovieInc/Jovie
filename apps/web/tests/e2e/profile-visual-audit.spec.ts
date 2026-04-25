@@ -293,7 +293,7 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
 
   const revealCandidates = [
     page.getByRole('button', {
-      name: /turn on notifications|get notified|manage notification preferences/i,
+      name: /turn on notifications|notify me about new releases|get notified|manage notification preferences/i,
     }),
     page.locator('[data-testid="subscribe-cta-container"] button'),
     page.locator('[data-testid="notifications-page"] button'),

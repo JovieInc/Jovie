@@ -170,7 +170,11 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     const drawerContent = page
       .locator('input[type="email"], input[type="tel"]')
       .first()
-      .or(page.getByText(/turn on notifications/i).first())
+      .or(
+        page
+          .getByText(/turn on notifications|notify me about new releases/i)
+          .first()
+      )
       .or(page.getByText(/get notified/i).first());
 
     if (!(await drawerContent.isVisible().catch(() => false))) {

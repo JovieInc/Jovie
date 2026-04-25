@@ -490,6 +490,27 @@ describe('Onboarding screen performance budgets', () => {
     ).toBeInTheDocument();
   });
 
+  it('restores a spotify resume into the connected flow for ready profiles', async () => {
+    mockDiscoveryResponse(createDiscoverySnapshot());
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='spotify'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    await screen.findByRole('heading', {
+      name: 'Spotify connected',
+    });
+    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled();
+  });
+
   it('shows error state when Spotify import fails', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
@@ -523,7 +544,7 @@ describe('Onboarding screen performance budgets', () => {
     expect(screen.getByRole('button', { name: /Try again/i })).toBeEnabled();
   });
 
-  it('lets creators continue when Spotify import completed without releases', async () => {
+  it('keeps creators blocked when Spotify import completed without releases', async () => {
     mockDiscoveryResponse(
       createDiscoverySnapshot({
         counts: {
@@ -535,8 +556,8 @@ describe('Onboarding screen performance budgets', () => {
         },
         readiness: {
           blockingReason: 'awaiting_first_release',
-          canProceedToDashboard: true,
-          phase: 'ready',
+          canProceedToDashboard: false,
+          phase: 'waiting_for_first_release',
         },
         releases: [],
       })
@@ -555,7 +576,7 @@ describe('Onboarding screen performance budgets', () => {
     );
 
     await screen.findByRole('heading', { name: 'Your release preview' });
-    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeDisabled();
     expect(
       screen.getByText(
         'Your first releases have not landed yet. This is taking longer than usual.'

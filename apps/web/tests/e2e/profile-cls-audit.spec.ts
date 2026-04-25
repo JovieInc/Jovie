@@ -161,7 +161,9 @@ test.describe('Profile CLS Audit @nightly', () => {
     // Trigger subscribe form — try clicking the CTA, fall back to query param
     const notifyButton = page
       .locator('button, a')
-      .filter({ hasText: /turn on notifications/i })
+      .filter({
+        hasText: /turn on notifications|notify me about new releases/i,
+      })
       .first();
     const hasButton = await notifyButton
       .isVisible({ timeout: 5_000 })

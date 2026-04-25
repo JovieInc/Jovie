@@ -124,7 +124,7 @@ export default async function OnboardingCheckoutPage({
   }
 
   // Smart plan recommendation only for organic users with no expressed paid intent.
-  // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
+  // If the user has a paid-intent cookie (e.g., pro), preserve it — don't override
   // with recommendPlan. Also fall back to pro if Max plan is disabled.
   const hadPaidIntentFromCookie = isPaidIntent(
     getPlanIntentFromCookies(cookieHeader)

@@ -11,6 +11,7 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { buildVisibleReleaseExistsSql } from '@/lib/discography/public-release-visibility';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
@@ -468,6 +469,9 @@ export async function resolveUserState(
       profileIsPublic: creatorProfiles.isPublic,
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      profileHasVisibleRelease: buildVisibleReleaseExistsSql(
+        creatorProfiles.id
+      ),
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -539,6 +543,7 @@ export async function resolveUserState(
         avatarUrl: dbResult.profileAvatarUrl,
         isPublic: dbResult.profileIsPublic,
         onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
+        hasVisibleRelease: dbResult.profileHasVisibleRelease,
         isClaimed: true, // joined via activeProfileId = claimed
       }
     : null;

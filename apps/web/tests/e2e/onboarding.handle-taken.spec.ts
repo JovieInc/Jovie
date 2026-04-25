@@ -85,7 +85,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    // The handle claim form is behind a feature flag (CLAIM_HANDLE).
+    // The handle claim form is always on for the launch path.
     // In mocked mode, skip tests if the form isn't on the homepage.
     if (!runWithRealAPI) {
       const handleInput = page.getByLabel(

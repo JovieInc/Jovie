@@ -450,7 +450,9 @@ test.describe('Profile Modes @smoke @critical', () => {
     }
 
     const notificationsUi = page
-      .getByRole('button', { name: /turn on notifications/i })
+      .getByRole('button', {
+        name: /turn on notifications|notify me about new releases/i,
+      })
       .or(page.getByRole('button', { name: /get notified/i }))
       .or(page.locator('input[type="email"], input[type="tel"]').first());
     await expect(

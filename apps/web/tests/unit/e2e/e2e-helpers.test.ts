@@ -5,7 +5,7 @@ import {
 } from '@/tests/e2e/helpers/e2e-helpers';
 
 describe('e2e helper state checks', () => {
-  it('treats onboarding profile linkage as ready before release import settles', () => {
+  it('requires a visible release before the onboarding profile is launch-ready', () => {
     expect(
       onboardingProfileIsReady({
         id: 'profile_123',
@@ -18,7 +18,7 @@ describe('e2e helper state checks', () => {
         release_count: 0,
         spotify_release_link_count: 0,
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('still requires persisted releases for spotify import readiness', () => {

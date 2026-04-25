@@ -133,11 +133,11 @@ describe('signup page', () => {
 
   it('shows the oauth compatibility banner and removes only oauth_error from the URL', async () => {
     searchParamsState.value =
-      'oauth_error=account_exists&plan=founding&redirect_url=%2Fapp';
+      'oauth_error=account_exists&plan=pro&redirect_url=%2Fapp';
     globalThis.history.replaceState(
       null,
       '',
-      '/signup?oauth_error=account_exists&plan=founding&redirect_url=%2Fapp'
+      '/signup?oauth_error=account_exists&plan=pro&redirect_url=%2Fapp'
     );
     const replaceStateSpy = vi.spyOn(globalThis.history, 'replaceState');
 
@@ -151,15 +151,13 @@ describe('signup page', () => {
     ).toHaveAttribute('href', '/signin?redirect_url=%2Fapp');
 
     await waitFor(() => {
-      expect(globalThis.location.search).toBe(
-        '?plan=founding&redirect_url=%2Fapp'
-      );
+      expect(globalThis.location.search).toBe('?plan=pro&redirect_url=%2Fapp');
     });
 
     expect(replaceStateSpy).toHaveBeenCalledWith(
       globalThis.history.state,
       '',
-      '/signup?plan=founding&redirect_url=%2Fapp'
+      '/signup?plan=pro&redirect_url=%2Fapp'
     );
 
     replaceStateSpy.mockRestore();

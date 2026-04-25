@@ -12,6 +12,7 @@ import {
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildVisibleReleaseWhereClause } from '@/lib/discography/public-release-visibility';
 import { isActiveDiscoveryJob } from '@/lib/discovery/is-active-discovery-job';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -182,7 +183,7 @@ export async function GET(request: Request) {
           spotifyPopularity: discogReleases.spotifyPopularity,
         })
         .from(discogReleases)
-        .where(eq(discogReleases.creatorProfileId, validatedProfileId))
+        .where(buildVisibleReleaseWhereClause(validatedProfileId))
         .orderBy(
           drizzleSql`COALESCE(${discogReleases.spotifyPopularity}, -1) DESC`,
           drizzleSql`COALESCE(${discogReleases.releaseDate}, ${discogReleases.createdAt}) DESC`,
@@ -192,7 +193,7 @@ export async function GET(request: Request) {
       db
         .select({ value: count() })
         .from(discogReleases)
-        .where(eq(discogReleases.creatorProfileId, validatedProfileId)),
+        .where(buildVisibleReleaseWhereClause(validatedProfileId)),
       db
         .select({ value: count() })
         .from(discogRecordings)

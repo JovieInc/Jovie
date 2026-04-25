@@ -42,7 +42,8 @@ export const PAGE_SUBTITLES = {
   contact: 'Contact',
 } as const;
 
-// Legacy FEATURE_FLAGS removed (waitlist deprecated). Use `lib/feature-flags.ts`.
+// Canonical runtime flags live in `lib/flags/*`. Compatibility wrappers under
+// `lib/feature-flags/*` are deprecated and should not be used in new code.
 
 export const LEGAL = {
   privacyPath: '/legal/privacy',

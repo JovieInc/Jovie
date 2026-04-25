@@ -317,9 +317,9 @@ describe('GET /api/onboarding/discovery', () => {
       hasImportedReleases: true,
     });
     expect(payload.snapshot.readiness).toEqual({
-      phase: 'discovering',
-      canProceedToDashboard: false,
-      blockingReason: 'discovery_in_progress',
+      phase: 'ready',
+      canProceedToDashboard: true,
+      blockingReason: null,
     });
     expect(payload.snapshot.hasPendingDiscoveryJob).toBe(true);
     expect(mockIsActiveDiscoveryJob).toHaveBeenCalledWith(

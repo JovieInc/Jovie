@@ -35,7 +35,7 @@ function SignUpClaimDataPersistence() {
     const artistName = searchParams.get('artist_name');
     const plan = searchParams.get('plan');
 
-    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
+    // Capture plan intent from pricing CTA (e.g., /signup?plan=pro)
     if (plan) {
       const validatedPlan = validatePlan(plan);
       if (validatedPlan) {

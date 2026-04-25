@@ -11,6 +11,7 @@
  * - displayName (not empty after trim)
  * - isPublic (not explicitly false)
  * - onboardingCompletedAt (onboarding finished)
+ * - hasVisibleRelease when the caller can resolve launch readiness
  *
  * Avatar is NOT checked here — it's enforced client-side by
  * ProfileCompletionRedirect to avoid redirect loops during
@@ -35,14 +36,21 @@ export interface ProfileCompletenessFields {
   displayName: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
+  hasVisibleRelease?: boolean | null;
 }
 
 export function isProfileComplete(profile: ProfileCompletenessFields): boolean {
+  const passesVisibleReleaseRequirement =
+    profile.hasVisibleRelease === undefined
+      ? true
+      : profile.hasVisibleRelease === true;
+
   return (
     Boolean(profile.username?.trim()) &&
     Boolean(profile.usernameNormalized?.trim()) &&
     Boolean(profile.displayName?.trim()) &&
     profile.isPublic !== false &&
-    Boolean(profile.onboardingCompletedAt)
+    Boolean(profile.onboardingCompletedAt) &&
+    passesVisibleReleaseRequirement
   );
 }

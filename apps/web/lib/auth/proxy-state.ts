@@ -7,6 +7,7 @@ import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildVisibleReleaseExistsSql } from '@/lib/discography/public-release-visibility';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
@@ -172,6 +173,7 @@ function hasCompleteProfile(result: {
   profileDisplayName: string | null;
   profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
+  profileHasVisibleRelease?: boolean | null;
 }): boolean {
   if (!result.profileId) return false;
   return isProfileComplete({
@@ -180,6 +182,7 @@ function hasCompleteProfile(result: {
     displayName: result.profileDisplayName,
     isPublic: result.profileIsPublic,
     onboardingCompletedAt: result.profileComplete,
+    hasVisibleRelease: result.profileHasVisibleRelease,
   });
 }
 
@@ -199,6 +202,7 @@ function determineUserState(
         profileDisplayName: string | null;
         profileAvatarUrl: string | null;
         profileIsPublic: boolean | null;
+        profileHasVisibleRelease?: boolean | null;
       }
     | undefined,
   waitlistEnabled: boolean
@@ -311,6 +315,9 @@ async function executeUserStateQuery(clerkUserId: string) {
           profileDisplayName: creatorProfiles.displayName,
           profileAvatarUrl: creatorProfiles.avatarUrl,
           profileIsPublic: creatorProfiles.isPublic,
+          profileHasVisibleRelease: buildVisibleReleaseExistsSql(
+            creatorProfiles.id
+          ),
         })
         .from(users)
         .leftJoin(

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { getAppFlagValue } from '@/lib/flags/server';
 
 export async function requireAlbumArtUser() {
   const { userId } = await getOptionalAuth();
@@ -14,7 +14,10 @@ export async function requireAlbumArtUser() {
     };
   }
 
-  if (!FEATURE_FLAGS.ALBUM_ART_GENERATION) {
+  const albumArtEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
+    userId,
+  });
+  if (!albumArtEnabled) {
     return {
       ok: false as const,
       response: NextResponse.json(

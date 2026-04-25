@@ -537,12 +537,42 @@ async function fetchDiscoverySnapshot(
   profileId: string,
   signal?: AbortSignal
 ): Promise<DiscoverySnapshot> {
+  const timeoutController = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => {
+    timeoutController.abort();
+  }, 10_000);
+
+  const requestSignal = (() => {
+    if (!signal) {
+      return timeoutController.signal;
+    }
+
+    const combinedController = new AbortController();
+    const abortCombined = () => {
+      combinedController.abort();
+    };
+
+    if (signal.aborted || timeoutController.signal.aborted) {
+      abortCombined();
+      return combinedController.signal;
+    }
+
+    signal.addEventListener('abort', abortCombined, { once: true });
+    timeoutController.signal.addEventListener('abort', abortCombined, {
+      once: true,
+    });
+
+    return combinedController.signal;
+  })();
+
   const response = await fetch(
     `/api/onboarding/discovery?profileId=${encodeURIComponent(profileId)}`,
     {
-      signal,
+      signal: requestSignal,
     }
-  );
+  ).finally(() => {
+    globalThis.clearTimeout(timeoutId);
+  });
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -985,7 +1015,6 @@ export function OnboardingV2Form({
     if (
       !profileId ||
       currentStep !== 'spotify' ||
-      initialStep ||
       didResolveInitialResumeRef.current
     ) {
       return;
@@ -999,7 +1028,7 @@ export function OnboardingV2Form({
     return () => {
       controller.abort();
     };
-  }, [currentStep, initialStep, profileId, refreshDiscovery]);
+  }, [currentStep, profileId, refreshDiscovery]);
 
   useEffect(() => {
     if (!profileId) return;
@@ -1034,7 +1063,7 @@ export function OnboardingV2Form({
       didResolveInitialResumeRef.current = true;
       return;
     }
-    if (initialStep) {
+    if (initialStep && initialStep !== 'spotify') {
       didResolveInitialResumeRef.current = true;
       return;
     }

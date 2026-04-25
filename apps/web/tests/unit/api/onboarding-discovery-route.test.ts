@@ -20,7 +20,22 @@ describe('onboarding discovery readiness', () => {
     });
   });
 
-  it('treats pending discovery jobs as blocking after import completes', () => {
+  it('returns ready once the first release is visible even while import is still running', () => {
+    expect(
+      buildReadinessState({
+        hasPendingDiscoveryJob: false,
+        hasSpotifySelection: true,
+        releaseCount: 5,
+        spotifyImportStatus: 'importing',
+      })
+    ).toEqual({
+      blockingReason: null,
+      canProceedToDashboard: true,
+      phase: 'ready',
+    });
+  });
+
+  it('treats pending discovery jobs as non-blocking once releases are visible', () => {
     expect(
       buildReadinessState({
         hasPendingDiscoveryJob: true,
@@ -29,9 +44,9 @@ describe('onboarding discovery readiness', () => {
         spotifyImportStatus: 'complete',
       })
     ).toEqual({
-      blockingReason: 'discovery_in_progress',
-      canProceedToDashboard: false,
-      phase: 'discovering',
+      blockingReason: null,
+      canProceedToDashboard: true,
+      phase: 'ready',
     });
   });
 
@@ -50,7 +65,7 @@ describe('onboarding discovery readiness', () => {
     });
   });
 
-  it('allows creators with no imported releases to continue once import is complete', () => {
+  it('blocks creators with no visible releases even after import completes', () => {
     expect(
       buildReadinessState({
         hasPendingDiscoveryJob: false,
@@ -60,8 +75,8 @@ describe('onboarding discovery readiness', () => {
       })
     ).toEqual({
       blockingReason: 'awaiting_first_release',
-      canProceedToDashboard: true,
-      phase: 'ready',
+      canProceedToDashboard: false,
+      phase: 'waiting_for_first_release',
     });
   });
 

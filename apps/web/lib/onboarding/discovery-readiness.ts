@@ -9,6 +9,7 @@ export type OnboardingReadinessPhase =
   | 'connecting'
   | 'importing'
   | 'discovering'
+  | 'waiting_for_first_release'
   | 'ready'
   | 'failed';
 
@@ -67,6 +68,14 @@ export function buildReadinessState({
     };
   }
 
+  if (releaseCount > 0) {
+    return {
+      phase: 'ready',
+      canProceedToDashboard: true,
+      blockingReason: null,
+    };
+  }
+
   if (
     spotifyImportStatus === 'importing' ||
     spotifyImportStatus === 'unknown'
@@ -86,9 +95,17 @@ export function buildReadinessState({
     };
   }
 
+  if (releaseCount <= 0) {
+    return {
+      phase: 'waiting_for_first_release',
+      canProceedToDashboard: false,
+      blockingReason: 'awaiting_first_release',
+    };
+  }
+
   return {
     phase: 'ready',
     canProceedToDashboard: true,
-    blockingReason: releaseCount <= 0 ? 'awaiting_first_release' : null,
+    blockingReason: null,
   };
 }

@@ -19,6 +19,7 @@ export interface ProfileData {
   avatarUrl: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
+  hasVisibleRelease?: boolean | null;
 }
 
 /**

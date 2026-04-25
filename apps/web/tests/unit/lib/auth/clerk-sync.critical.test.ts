@@ -36,9 +36,10 @@ vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: mockSentryAddBreadcrumb,
 }));
 
-// Mock drizzle-orm eq (passthrough)
+// Mock drizzle-orm helpers used by the query builder.
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((a, b) => ({ column: a, value: b })),
+  sql: vi.fn((strings, ...values) => ({ strings, values })),
 }));
 
 // Mock database
@@ -73,6 +74,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     userId: 'userId',
     onboardingCompletedAt: 'onboardingCompletedAt',
     username: 'username',
+    usernameNormalized: 'usernameNormalized',
     displayName: 'displayName',
     isPublic: 'isPublic',
   },

@@ -20,7 +20,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 

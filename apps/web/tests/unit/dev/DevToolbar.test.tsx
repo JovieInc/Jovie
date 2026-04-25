@@ -15,15 +15,15 @@ function setLocalOverrides(overrides: Record<string, boolean>) {
 
 vi.mock('@/lib/flags/contracts', () => ({
   APP_FLAG_OVERRIDE_KEYS: {
-    CLAIM_HANDLE: 'code:CLAIM_HANDLE',
-    HERO_SPOTIFY: 'code:HERO_SPOTIFY',
-    BILLING_UPGRADE: 'code:BILLING_UPGRADE',
+    PROFILE_V2: 'code:PROFILE_V2',
+    LATEST_RELEASE_CARD: 'code:LATEST_RELEASE_CARD',
+    BILLING_UPGRADE_DIRECT: 'code:BILLING_UPGRADE_DIRECT',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
   },
   APP_FLAG_DEFAULTS: {
-    CLAIM_HANDLE: false,
-    HERO_SPOTIFY: false,
-    BILLING_UPGRADE: false,
+    PROFILE_V2: true,
+    LATEST_RELEASE_CARD: true,
+    BILLING_UPGRADE_DIRECT: false,
     THREADS_ENABLED: false,
   },
 }));
@@ -261,10 +261,10 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
-      fireEvent.change(searchInput, { target: { value: 'claim' } });
+      fireEvent.change(searchInput, { target: { value: 'profile' } });
 
-      expect(screen.getByText('claim handle')).toBeInTheDocument();
-      expect(screen.queryByText('hero spotify')).not.toBeInTheDocument();
+      expect(screen.getByText('profile v2')).toBeInTheDocument();
+      expect(screen.queryByText('latest release card')).not.toBeInTheDocument();
     });
 
     it('is case-insensitive', () => {
@@ -272,9 +272,9 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
-      fireEvent.change(searchInput, { target: { value: 'CLAIM' } });
+      fireEvent.change(searchInput, { target: { value: 'PROFILE' } });
 
-      expect(screen.getByText('claim handle')).toBeInTheDocument();
+      expect(screen.getByText('profile v2')).toBeInTheDocument();
     });
 
     it('shows empty state when no flags match', () => {
@@ -295,7 +295,7 @@ describe('DevToolbar', () => {
       expect(screen.getByText('4 of 4')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
-      fireEvent.change(searchInput, { target: { value: 'claim' } });
+      fireEvent.change(searchInput, { target: { value: 'profile' } });
 
       expect(screen.getByText('1 of 4')).toBeInTheDocument();
     });
@@ -305,7 +305,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
-      fireEvent.change(searchInput, { target: { value: 'claim' } });
+      fireEvent.change(searchInput, { target: { value: 'profile' } });
 
       expect(screen.getByText('1 of 4')).toBeInTheDocument();
 
@@ -330,7 +330,7 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      expect(screen.getByText('claim handle')).toBeInTheDocument();
+      expect(screen.getByText('profile v2')).toBeInTheDocument();
       expect(screen.getByText('threads enabled')).toBeInTheDocument();
     });
 
@@ -347,7 +347,7 @@ describe('DevToolbar', () => {
 
   describe('override sorting', () => {
     it('shows overrides group when flags are overridden', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -362,15 +362,15 @@ describe('DevToolbar', () => {
     });
 
     it('shows server default for overridden flags', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      expect(screen.getByText('server: off')).toBeInTheDocument();
+      expect(screen.getByText('server: on')).toBeInTheDocument();
     });
 
     it('shows clear all button in overrides group', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -378,7 +378,7 @@ describe('DevToolbar', () => {
     });
 
     it('clears all overrides when clear all is clicked', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -388,7 +388,7 @@ describe('DevToolbar', () => {
 
     it('shows correct override count for multiple overrides', () => {
       setLocalOverrides({
-        'code:CLAIM_HANDLE': true,
+        'code:PROFILE_V2': false,
         'code:THREADS_ENABLED': true,
       });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
@@ -439,7 +439,7 @@ describe('DevToolbar', () => {
 
   describe('toggle flash feedback', () => {
     it('applies flash class when an already-overridden flag is toggled', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -457,7 +457,7 @@ describe('DevToolbar', () => {
 
   describe('override badge', () => {
     it('shows override count in collapsed bar when overrides exist', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       renderToolbar();
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
@@ -465,7 +465,7 @@ describe('DevToolbar', () => {
 
     it('uses plural for multiple overrides', () => {
       setLocalOverrides({
-        'code:CLAIM_HANDLE': true,
+        'code:PROFILE_V2': false,
         'code:THREADS_ENABLED': true,
       });
       renderToolbar();
@@ -480,7 +480,7 @@ describe('DevToolbar', () => {
     });
 
     it('opens panel when badge is clicked and panel is collapsed', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      setLocalOverrides({ 'code:PROFILE_V2': false });
       renderToolbar();
 
       // Panel should be collapsed

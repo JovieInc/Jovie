@@ -24,7 +24,7 @@ test.describe('Signup Funnel Smoke @smoke', () => {
 
     const response = await smokeNavigateWithRetry(
       page,
-      '/signup?handle=SmokeArtist&plan=founding&redirect_url=%2Fonboarding%3Fhandle%3Dsmokeartist',
+      '/signup?handle=SmokeArtist&plan=pro&redirect_url=%2Fonboarding%3Fhandle%3Dsmokeartist',
       {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
         retries: 2,
@@ -46,7 +46,7 @@ test.describe('Signup Funnel Smoke @smoke', () => {
     ).not.toContainText(/application error|internal server error/i);
     const currentUrl = new URL(page.url());
     expect(currentUrl.searchParams.get('handle')).toBe('SmokeArtist');
-    expect(currentUrl.searchParams.get('plan')).toBe('founding');
+    expect(currentUrl.searchParams.get('plan')).toBe('pro');
     expect(currentUrl.searchParams.get('redirect_url')).toContain(
       '/onboarding'
     );

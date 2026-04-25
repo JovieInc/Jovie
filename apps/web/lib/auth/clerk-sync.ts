@@ -3,12 +3,13 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
-
+import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { db } from '@/lib/db';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildVisibleReleaseExistsSql } from '@/lib/discography/public-release-visibility';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 
 /**
@@ -126,8 +127,10 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
         profileId: creatorProfiles.id,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
         username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
         displayName: creatorProfiles.displayName,
         isPublic: creatorProfiles.isPublic,
+        hasVisibleRelease: buildVisibleReleaseExistsSql(creatorProfiles.id),
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
@@ -149,10 +152,14 @@ export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
     // Determine if profile is complete
     const hasCompleteProfile = Boolean(
       result.profileId &&
-        result.onboardingCompletedAt &&
-        result.username &&
-        result.displayName &&
-        result.isPublic !== false
+        isProfileComplete({
+          username: result.username,
+          usernameNormalized: result.usernameNormalized ?? result.username,
+          displayName: result.displayName,
+          isPublic: result.isPublic,
+          onboardingCompletedAt: result.onboardingCompletedAt,
+          hasVisibleRelease: result.hasVisibleRelease,
+        })
     );
 
     // Map userStatus lifecycle enum to Clerk's simpler status

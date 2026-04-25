@@ -143,8 +143,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       await waitForHydration(page);
 
       await expect(page).toHaveURL(`/${testHandle}`);
-      const publicProfile = page.locator('[data-test="public-profile-root"]');
-      await expect(publicProfile).toBeVisible({ timeout: 15000 });
+      const publicProfileHeader = page.locator(
+        '[data-testid="profile-header"]'
+      );
+      await expect(publicProfileHeader).toBeVisible({ timeout: 15000 });
 
       console.log('[Synthetic] ✅ All critical paths verified successfully');
     } catch (error) {

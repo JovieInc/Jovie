@@ -7,7 +7,7 @@ import {
 describe('buildAuthRouteUrl', () => {
   it('forwards only a valid redirect_url', () => {
     const searchParams = new URLSearchParams(
-      'redirect_url=%2Fonboarding&plan=founding'
+      'redirect_url=%2Fonboarding&plan=pro'
     );
 
     expect(buildAuthRouteUrl('/signin', searchParams)).toBe(
@@ -25,7 +25,7 @@ describe('buildAuthRouteUrl', () => {
 
   it('does not leak the parsing base for protocol-relative paths', () => {
     const searchParams = new URLSearchParams(
-      'redirect_url=%2Fonboarding&plan=founding'
+      'redirect_url=%2Fonboarding&plan=pro'
     );
 
     expect(buildAuthRouteUrl('//evil.com/path', searchParams)).toBe(

@@ -37,7 +37,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
@@ -154,7 +154,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     useState(false);
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
-  const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
+  const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
 
   const {
     rows,
