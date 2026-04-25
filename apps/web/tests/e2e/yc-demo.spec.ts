@@ -765,4 +765,91 @@ test.describe('YC Demo Recording', () => {
       console.log('[yc-demo] Video saved to test-results/yc-demo.webm');
     }
   });
+
+  test('release plan - move remix near LA show', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+
+    const { generateDemoPlan, moveRemixNearLAShow } = await import(
+      '@/lib/release-planning/demo-plan'
+    );
+    const expectedNewRemixFriday = moveRemixNearLAShow(generateDemoPlan()).find(
+      m => m.momentType === 'remix'
+    )?.friday;
+    if (!expectedNewRemixFriday) {
+      throw new Error('Expected remix moment missing from generated plan');
+    }
+
+    const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
+    const cookieBaseUrl =
+      baseURL ?? process.env.BASE_URL ?? 'http://localhost:3100';
+    if (!demoClerkUserId) {
+      throw new Error('DEMO_CLERK_USER_ID is required');
+    }
+
+    await configureRecordingContext(page.context(), cookieBaseUrl);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+
+    await authenticateDemoPage(page, demoClerkUserId);
+    await page.goto('/app/dashboard/release-plan');
+
+    await expect(page.getByTestId('release-plan-empty-state')).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const i of [0, 1, 2, 3]) {
+      await expect(page.getByTestId(`release-plan-track-${i}`)).toBeVisible();
+    }
+
+    await page.getByTestId('release-plan-generate-button').click();
+    await expect(page.getByTestId('release-calendar')).toBeVisible();
+
+    const cards = page.locator('[data-testid^="release-moment-card-"]');
+    await expect(cards).toHaveCount(12);
+
+    const remixCards = page.locator('[data-moment-type="remix"]');
+    await expect(remixCards).toHaveCount(1);
+    const originalRemixFriday = await remixCards
+      .first()
+      .getAttribute('data-release-date');
+    expect(originalRemixFriday).toBeTruthy();
+    expect(originalRemixFriday).not.toBe(expectedNewRemixFriday);
+
+    await expect(page.getByTestId('release-tour-date-la')).toBeVisible();
+
+    const chatInput = page.getByLabel('Chat message input').first();
+    await expect(chatInput).toBeVisible({ timeout: 30_000 });
+    await chatInput.fill('Move the remix closer to the LA show');
+    await page.getByLabel('Send message').first().click();
+
+    await expect(page.getByTestId('chat-content')).toContainText(
+      expectedNewRemixFriday,
+      { timeout: 10_000 }
+    );
+
+    await expect(remixCards).toHaveCount(1);
+    await expect(remixCards.first()).toHaveAttribute(
+      'data-release-date',
+      expectedNewRemixFriday
+    );
+
+    await remixCards.first().click();
+    await expect(page.getByTestId('release-moment-drawer')).toBeVisible();
+
+    const workflowTasks = page.locator(
+      '[data-testid^="release-moment-workflow-task-"]'
+    );
+    await expect(workflowTasks.first()).toBeVisible();
+    const taskCount = await workflowTasks.count();
+    expect(taskCount).toBeGreaterThan(0);
+    for (let i = 0; i < taskCount; i++) {
+      const rd = await workflowTasks.nth(i).getAttribute('data-relative-days');
+      expect(Number.isFinite(Number(rd))).toBe(true);
+    }
+
+    await expect(page.getByTestId('fan-notification-preview')).toContainText(
+      expectedNewRemixFriday
+    );
+
+    await page.getByTestId('release-moment-drawer-close').click();
+    await expect(page.getByTestId('release-moment-drawer')).toHaveCount(0);
+  });
 });
