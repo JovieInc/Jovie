@@ -636,6 +636,45 @@ function StepCircleIcon({
   color: string;
   state: 'complete' | 'current' | 'pending';
 }>) {
+  let innerShape: React.ReactNode;
+  if (state === 'complete') {
+    innerShape = (
+      <circle cx='12' cy='12' r='10' stroke={color} strokeWidth='2' />
+    );
+  } else if (state === 'current') {
+    innerShape = (
+      <>
+        {/* Solid left half */}
+        <path
+          d='M12 2a10 10 0 0 0 0 20'
+          stroke={color}
+          strokeWidth='2'
+          fill='none'
+        />
+        {/* Dotted right half */}
+        <path
+          d='M12 2a10 10 0 0 1 0 20'
+          stroke={color}
+          strokeWidth='2'
+          strokeDasharray='2.5 2.5'
+          fill='none'
+        />
+      </>
+    );
+  } else {
+    innerShape = (
+      <circle
+        cx='12'
+        cy='12'
+        r='10'
+        stroke='currentColor'
+        strokeWidth='2'
+        strokeDasharray='2.5 2.5'
+        opacity={0.35}
+      />
+    );
+  }
+
   return (
     <svg
       aria-hidden='true'
@@ -643,37 +682,7 @@ function StepCircleIcon({
       viewBox='0 0 24 24'
       fill='none'
     >
-      {state === 'complete' ? (
-        <circle cx='12' cy='12' r='10' stroke={color} strokeWidth='2' />
-      ) : state === 'current' ? (
-        <>
-          {/* Solid left half */}
-          <path
-            d='M12 2a10 10 0 0 0 0 20'
-            stroke={color}
-            strokeWidth='2'
-            fill='none'
-          />
-          {/* Dotted right half */}
-          <path
-            d='M12 2a10 10 0 0 1 0 20'
-            stroke={color}
-            strokeWidth='2'
-            strokeDasharray='2.5 2.5'
-            fill='none'
-          />
-        </>
-      ) : (
-        <circle
-          cx='12'
-          cy='12'
-          r='10'
-          stroke='currentColor'
-          strokeWidth='2'
-          strokeDasharray='2.5 2.5'
-          opacity={0.35}
-        />
-      )}
+      {innerShape}
     </svg>
   );
 }
@@ -1621,6 +1630,9 @@ export function OnboardingV2Form({
       >
         {results.map(artist => {
           const unavailable = isReservedArtist(artist);
+          const followerLabel = artist.followers
+            ? `${artist.followers.toLocaleString()} followers`
+            : 'Spotify';
 
           return (
             <li key={artist.id}>
@@ -1662,11 +1674,7 @@ export function OnboardingV2Form({
                     {artist.name}
                   </p>
                   <p className='text-xs text-secondary-token'>
-                    {unavailable
-                      ? 'Unavailable'
-                      : artist.followers
-                        ? `${artist.followers.toLocaleString()} followers`
-                        : 'Spotify'}
+                    {unavailable ? 'Unavailable' : followerLabel}
                   </p>
                 </div>
 
@@ -1693,7 +1701,7 @@ export function OnboardingV2Form({
     );
   };
 
-  const stepContent = (() => {
+  function renderEarlyStep() {
     switch (currentStep) {
       case 'handle':
         return (
@@ -1755,15 +1763,20 @@ export function OnboardingV2Form({
           isConnecting ||
           isEnriching ||
           isDiscoveryLoading;
+        const artistConfirmTitle = hasError
+          ? 'Import ran into an issue'
+          : 'Spotify connected';
+        const artistConfirmPrompt = hasError
+          ? 'You can try connecting again or skip ahead.'
+          : "We'll import your discography in the background. You can keep going.";
+        const chooseArtistLabel = hasError
+          ? 'Try again'
+          : 'Choose a different artist';
 
         return (
           <StepFrame
-            title={hasError ? 'Import ran into an issue' : 'Spotify connected'}
-            prompt={
-              hasError
-                ? 'You can try connecting again or skip ahead.'
-                : "We'll import your discography in the background. You can keep going."
-            }
+            title={artistConfirmTitle}
+            prompt={artistConfirmPrompt}
             actions={
               <>
                 <Button
@@ -1774,7 +1787,7 @@ export function OnboardingV2Form({
                   disabled={isImporting}
                   variant='secondary'
                 >
-                  {hasError ? 'Try again' : 'Choose a different artist'}
+                  {chooseArtistLabel}
                 </Button>
                 <Button
                   onClick={() => setCurrentStep('upgrade')}
@@ -1836,6 +1849,13 @@ export function OnboardingV2Form({
           </StepFrame>
         );
 
+      default:
+        return null;
+    }
+  }
+
+  function renderLateStep() {
+    switch (currentStep) {
       case 'dsp':
         return (
           <StepFrame
@@ -2197,8 +2217,13 @@ export function OnboardingV2Form({
             </FlatPanel>
           </StepFrame>
         );
+
+      default:
+        return null;
     }
-  })();
+  }
+
+  const stepContent = renderEarlyStep() ?? renderLateStep();
 
   return (
     <OnboardingExperienceShell

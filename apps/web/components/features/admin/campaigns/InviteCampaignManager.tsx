@@ -158,7 +158,7 @@ function CampaignTableHeaderCell({
   children: ReactNode;
 }>) {
   return (
-    <th className='px-4 py-2.5 text-left text-[12px] font-semibold tracking-normal text-secondary-token'>
+    <th className='px-4 py-2.5 text-left text-xs font-semibold tracking-normal text-secondary-token'>
       {children}
     </th>
   );

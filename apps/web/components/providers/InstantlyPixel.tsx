@@ -36,7 +36,7 @@ export function InstantlyPixel() {
 
   useEffect(() => {
     if (skip) return;
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
 
     // Sync consent state on mount (covers SSR → client transition)
     setAllowed(isMarketingAllowed());
@@ -58,9 +58,9 @@ export function InstantlyPixel() {
     }
 
     const onReady = () => attach();
-    window.addEventListener('jvconsent:ready', onReady, { once: true });
+    globalThis.addEventListener('jvconsent:ready', onReady, { once: true });
     return () => {
-      window.removeEventListener('jvconsent:ready', onReady);
+      globalThis.removeEventListener('jvconsent:ready', onReady);
       unsubConsent?.();
     };
   }, [skip]);

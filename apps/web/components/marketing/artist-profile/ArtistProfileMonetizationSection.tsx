@@ -471,6 +471,12 @@ function SayThanksVisual({
   );
 }
 
+function getOutputTransform(index: number): string {
+  if (index === 0) return 'translateX(0px)';
+  if (index === 1) return 'translateX(10px)';
+  return 'translateX(20px)';
+}
+
 function ReengageVisual({
   card,
 }: Readonly<{
@@ -494,12 +500,7 @@ function ReengageVisual({
               index > 0 && 'mt-2.5'
             )}
             style={{
-              transform:
-                index === 0
-                  ? 'translateX(0px)'
-                  : index === 1
-                    ? 'translateX(10px)'
-                    : 'translateX(20px)',
+              transform: getOutputTransform(index),
             }}
           >
             <div className='flex items-start gap-3'>

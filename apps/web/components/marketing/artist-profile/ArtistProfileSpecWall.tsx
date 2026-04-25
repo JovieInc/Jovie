@@ -96,8 +96,14 @@ function IconBadgeVisual({
   badgeIcon: 'speed' | 'sync' | 'chart';
   badgeLabel: string;
 }>) {
-  const Icon =
-    badgeIcon === 'sync' ? RefreshCw : badgeIcon === 'chart' ? BarChart2 : Zap;
+  let Icon: typeof RefreshCw;
+  if (badgeIcon === 'sync') {
+    Icon = RefreshCw;
+  } else if (badgeIcon === 'chart') {
+    Icon = BarChart2;
+  } else {
+    Icon = Zap;
+  }
 
   return (
     <div

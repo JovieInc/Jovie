@@ -3,7 +3,7 @@
 import { Mail, Phone } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import {
@@ -308,6 +308,145 @@ function ChannelInputRow({
   );
 }
 
+function useAutoFocusOnInputStep(
+  step: Step,
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  prefersReducedMotion: boolean | null
+) {
+  useEffect(() => {
+    if (step !== 'input') return;
+    const delay = prefersReducedMotion ? 0 : 350;
+    const timeoutId = globalThis.setTimeout(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    }, delay);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [step, prefersReducedMotion, inputRef]);
+}
+
+function useStepSyncWithNotificationsState(
+  notificationsState: string,
+  setStep: (s: Step) => void
+) {
+  useEffect(() => {
+    if (
+      notificationsState === 'editing' ||
+      notificationsState === 'pending_confirmation'
+    ) {
+      setStep('input');
+    }
+  }, [notificationsState, setStep]);
+}
+
+function useRedirectIfSubscribed(
+  isSubscribed: boolean,
+  artistName: string,
+  artistHandle: string
+) {
+  const router = useRouter();
+  const { info: showInfo } = useNotifications();
+  const hasRedirected = useRef(false);
+  useEffect(() => {
+    if (!isSubscribed || hasRedirected.current) return;
+    hasRedirected.current = true;
+    showInfo(`You're already subscribed to ${artistName}`);
+    router.replace(`/${artistHandle}`);
+  }, [isSubscribed, artistName, artistHandle, router, showInfo]);
+}
+
+interface PrefillInputParams {
+  step: Step;
+  notificationsState: string;
+  channel: 'email' | 'sms';
+  emailInput: string;
+  phoneInput: string;
+  dialCode: string;
+  primaryEmail: string;
+  primaryPhone: string;
+  handleEmailChange: (v: string) => void;
+  handlePhoneChange: (v: string) => void;
+}
+
+function usePrefillInput({
+  step,
+  notificationsState,
+  channel,
+  emailInput,
+  phoneInput,
+  dialCode,
+  primaryEmail,
+  primaryPhone,
+  handleEmailChange,
+  handlePhoneChange,
+}: PrefillInputParams) {
+  useEffect(() => {
+    if (step !== 'input' || notificationsState !== 'editing') return;
+
+    if (channel === 'email' && !emailInput && primaryEmail) {
+      handleEmailChange(primaryEmail);
+      return;
+    }
+
+    if (channel === 'sms' && !phoneInput && primaryPhone) {
+      handlePhoneChange(getPhonePrefillValue(primaryPhone, dialCode));
+    }
+  }, [
+    channel,
+    dialCode,
+    emailInput,
+    handleEmailChange,
+    handlePhoneChange,
+    notificationsState,
+    phoneInput,
+    primaryEmail,
+    primaryPhone,
+    step,
+  ]);
+}
+
+interface TwoStepFeedbackMessageParams {
+  readonly error: string | null;
+  readonly showInlineErrorCopy: boolean;
+  readonly disclaimerId: string;
+  readonly confirmMessage: string | null;
+  readonly otpStep: string;
+  readonly isInputFocused: boolean;
+}
+
+function getTwoStepFeedbackMessage({
+  error,
+  showInlineErrorCopy,
+  disclaimerId,
+  confirmMessage,
+  otpStep,
+  isInputFocused,
+}: TwoStepFeedbackMessageParams): React.ReactNode {
+  if (error && showInlineErrorCopy) {
+    return (
+      <span id={disclaimerId} role='alert'>
+        {error}
+      </span>
+    );
+  }
+  if (confirmMessage) {
+    return (
+      <span id={disclaimerId} className={subscriptionSuccessTextClassName}>
+        {confirmMessage}
+      </span>
+    );
+  }
+  if (otpStep === 'verify') {
+    return (
+      <span id={disclaimerId}>
+        Enter the 6-digit code we sent to your email.
+      </span>
+    );
+  }
+  if (isInputFocused) {
+    return <span id={disclaimerId}>No spam. Opt-out anytime.</span>;
+  }
+  return null;
+}
+
 export function TwoStepNotificationsCTA({
   artist,
   startExpanded = false,
@@ -377,52 +516,22 @@ export function TwoStepNotificationsCTA({
     }
   }, [openSubscription, startExpanded]);
 
-  useEffect(() => {
-    if (
-      notificationsState === 'editing' ||
-      notificationsState === 'pending_confirmation'
-    ) {
-      setStep('input');
-    }
-  }, [notificationsState]);
+  useStepSyncWithNotificationsState(notificationsState, setStep);
 
-  useEffect(() => {
-    if (step !== 'input' || notificationsState !== 'editing') return;
-
-    const primaryEmail = user?.primaryEmailAddress?.emailAddress ?? '';
-    const primaryPhone = user?.primaryPhoneNumber?.phoneNumber ?? '';
-
-    if (channel === 'email' && !emailInput && primaryEmail) {
-      handleEmailChange(primaryEmail);
-      return;
-    }
-
-    if (channel === 'sms' && !phoneInput && primaryPhone) {
-      handlePhoneChange(getPhonePrefillValue(primaryPhone, country.dialCode));
-    }
-  }, [
+  usePrefillInput({
+    step,
+    notificationsState,
     channel,
-    country.dialCode,
     emailInput,
+    phoneInput,
+    dialCode: country.dialCode,
+    primaryEmail: user?.primaryEmailAddress?.emailAddress ?? '',
+    primaryPhone: user?.primaryPhoneNumber?.phoneNumber ?? '',
     handleEmailChange,
     handlePhoneChange,
-    notificationsState,
-    phoneInput,
-    step,
-    user,
-  ]);
+  });
 
-  // Auto-focus the input after transition
-  useEffect(() => {
-    if (step !== 'input') return;
-    const timeoutId = globalThis.setTimeout(
-      () => {
-        inputRef.current?.focus({ preventScroll: true });
-      },
-      prefersReducedMotion ? 0 : 350
-    );
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [step, prefersReducedMotion]);
+  useAutoFocusOnInputStep(step, inputRef, prefersReducedMotion);
 
   useEffect(() => {
     return () => clearOtpConfirmTimeout(confirmTimeoutRef);
@@ -433,16 +542,7 @@ export function TwoStepNotificationsCTA({
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
 
-  // Redirect to normal profile when already subscribed (subscribe mode)
-  const router = useRouter();
-  const { info: showInfo } = useNotifications();
-  const hasRedirected = useRef(false);
-  useEffect(() => {
-    if (!isSubscribed || hasRedirected.current) return;
-    hasRedirected.current = true;
-    showInfo(`You're already subscribed to ${artist.name}`);
-    router.replace(`/${artist.handle}`);
-  }, [isSubscribed, artist.name, artist.handle, router, showInfo]);
+  useRedirectIfSubscribed(isSubscribed, artist.name, artist.handle);
 
   if (hydrationStatus === 'checking') {
     return <SubscriptionFormSkeleton />;
@@ -471,6 +571,31 @@ export function TwoStepNotificationsCTA({
     channel === 'sms'
       ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
       : emailInput;
+  const handleOtpResend = () => {
+    requestOtpResendConfirmation({
+      handleResendOtp,
+      confirmTimeoutRef,
+      setConfirmMessage,
+    });
+  };
+
+  let feedbackSideAction: React.ReactNode;
+  if (otpStep === 'verify') {
+    feedbackSideAction = (
+      <>
+        {error && shouldShowDesktopTooltip ? (
+          <SubscriptionDesktopErrorIndicator error={error} />
+        ) : null}
+        <SubscriptionOtpResendAction
+          resendCooldownEnd={resendCooldownEnd}
+          isResending={isResending}
+          onResend={handleOtpResend}
+        />
+      </>
+    );
+  } else if (error && shouldShowDesktopTooltip) {
+    feedbackSideAction = <SubscriptionDesktopErrorIndicator error={error} />;
+  }
 
   return (
     <div
@@ -529,48 +654,15 @@ export function TwoStepNotificationsCTA({
                 error={error}
               />
               <SubscriptionFeedbackRail
-                message={
-                  error && showInlineErrorCopy ? (
-                    <span id={disclaimerId} role='alert'>
-                      {error}
-                    </span>
-                  ) : confirmMessage ? (
-                    <span
-                      id={disclaimerId}
-                      className={subscriptionSuccessTextClassName}
-                    >
-                      {confirmMessage}
-                    </span>
-                  ) : otpStep === 'verify' ? (
-                    <span id={disclaimerId}>
-                      Enter the 6-digit code we sent to your email.
-                    </span>
-                  ) : isInputFocused ? (
-                    <span id={disclaimerId}>No spam. Opt-out anytime.</span>
-                  ) : null
-                }
-                sideAction={
-                  otpStep === 'verify' ? (
-                    <>
-                      {error && shouldShowDesktopTooltip ? (
-                        <SubscriptionDesktopErrorIndicator error={error} />
-                      ) : null}
-                      <SubscriptionOtpResendAction
-                        resendCooldownEnd={resendCooldownEnd}
-                        isResending={isResending}
-                        onResend={() => {
-                          requestOtpResendConfirmation({
-                            handleResendOtp,
-                            confirmTimeoutRef,
-                            setConfirmMessage,
-                          });
-                        }}
-                      />
-                    </>
-                  ) : error && shouldShowDesktopTooltip ? (
-                    <SubscriptionDesktopErrorIndicator error={error} />
-                  ) : null
-                }
+                message={getTwoStepFeedbackMessage({
+                  error,
+                  showInlineErrorCopy,
+                  disclaimerId,
+                  confirmMessage,
+                  otpStep,
+                  isInputFocused,
+                })}
+                sideAction={feedbackSideAction}
               />
             </div>
           </motion.div>

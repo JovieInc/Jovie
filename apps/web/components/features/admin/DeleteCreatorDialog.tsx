@@ -99,7 +99,7 @@ export function DeleteCreatorDialog({
 
         {/* Items list */}
         <ContentSurfaceCard className='bg-surface-1 p-4'>
-          <p className='mb-3 text-[13px] font-medium tracking-normal text-secondary-token'>
+          <p className='mb-3 text-app font-medium tracking-normal text-secondary-token'>
             Data to be deleted
           </p>
           <ul className='space-y-2'>
