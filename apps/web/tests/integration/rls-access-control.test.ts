@@ -27,9 +27,7 @@ const db = (
 
 if (!db) {
   describe.skip('RLS access control (database)', () => {
-    it('skips because no database connection is configured', () => {
-      expect(true).toBe(true);
-    });
+    it.todo('skips because no database connection is configured');
   });
 } else {
   describe('RLS access control (database)', () => {

@@ -147,21 +147,9 @@ describe('FeaturedCreators Component', () => {
 });
 
 describe('FeaturedCreators Database Integration', () => {
-  it('should handle timeout with mock data fallback', () => {
-    // This test verifies the component design handles timeouts
-    // The actual timeout logic is tested via E2E tests
-    expect(true).toBe(true);
-  });
+  it.todo('should handle timeout with mock data fallback');
 
-  it('should handle schema errors with mock data fallback', () => {
-    // This test verifies the component design handles schema errors
-    // The actual error handling is tested via E2E tests
-    expect(true).toBe(true);
-  });
+  it.todo('should handle schema errors with mock data fallback');
 
-  it('should handle empty results with mock data fallback', () => {
-    // This test verifies the component design handles empty results
-    // The actual fallback logic is tested via E2E tests
-    expect(true).toBe(true);
-  });
+  it.todo('should handle empty results with mock data fallback');
 });
