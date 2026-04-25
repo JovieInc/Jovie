@@ -63,89 +63,105 @@ export const DEMO_PLAN_START_FRIDAY = '2026-05-01';
 const REMIX_SLUG = 'remix-midnight-static';
 const LA_TOUR_ID = 'la';
 
-const RAW_MOMENTS: readonly DemoMoment[] = Object.freeze([
-  {
-    slug: 'single-midnight-static',
-    title: 'Midnight Static — lead single',
-    momentType: 'single',
-    friday: '2026-05-01',
-    trackSlug: 'midnight-static',
-  },
-  {
-    slug: 'lyric-video-midnight-static',
-    title: 'Midnight Static — lyric video',
-    momentType: 'lyric_video',
-    friday: '2026-05-08',
-    trackSlug: 'midnight-static',
-  },
-  {
-    slug: 'single-paper-cathedrals',
-    title: 'Paper Cathedrals — single',
-    momentType: 'single',
-    friday: '2026-05-22',
-    trackSlug: 'paper-cathedrals',
-  },
-  {
-    slug: 'visualizer-paper-cathedrals',
-    title: 'Paper Cathedrals — visualizer',
-    momentType: 'visualizer',
-    friday: '2026-05-29',
-    trackSlug: 'paper-cathedrals',
-  },
-  {
-    slug: 'acoustic-midnight-static',
-    title: 'Midnight Static — acoustic',
-    momentType: 'acoustic',
-    friday: '2026-06-05',
-    trackSlug: 'midnight-static',
-  },
-  {
-    slug: 'merch-drop-tour-tee',
-    title: 'Tour tee + vinyl pre-order',
-    momentType: 'merch_drop',
-    friday: '2026-06-12',
-  },
-  {
-    slug: 'single-long-way-down',
-    title: 'Long Way Down — single',
-    momentType: 'single',
-    friday: '2026-06-19',
-    trackSlug: 'long-way-down',
-  },
-  {
-    slug: 'media-appearance-tiny-desk',
-    title: 'Tiny Desk session airs',
-    momentType: 'media_appearance',
-    friday: '2026-06-26',
-  },
-  {
-    slug: 'single-no-vacancy',
-    title: 'No Vacancy — EP closer',
-    momentType: 'single',
-    friday: '2026-07-03',
-    trackSlug: 'no-vacancy',
-  },
-  {
-    slug: 'tour-tie-in-summer',
-    title: 'Summer tour announcement',
-    momentType: 'tour_tie_in',
-    friday: '2026-08-07',
-  },
-  {
-    slug: REMIX_SLUG,
-    title: 'Midnight Static (remix)',
-    momentType: 'remix',
-    friday: '2026-10-16',
-    trackSlug: 'midnight-static',
-  },
-  {
-    slug: 'anniversary-midnight-static',
-    title: 'Midnight Static — 1 year',
-    momentType: 'anniversary',
-    friday: '2027-04-30',
-    trackSlug: 'midnight-static',
-  },
+type RawMoment = readonly [
+  slug: string,
+  title: string,
+  momentType: MomentType,
+  friday: string,
+  trackSlug?: string,
+];
+
+const RAW_MOMENT_TUPLES: readonly RawMoment[] = Object.freeze([
+  [
+    'single-midnight-static',
+    'Midnight Static — lead single',
+    'single',
+    '2026-05-01',
+    'midnight-static',
+  ],
+  [
+    'lyric-video-midnight-static',
+    'Midnight Static — lyric video',
+    'lyric_video',
+    '2026-05-08',
+    'midnight-static',
+  ],
+  [
+    'single-paper-cathedrals',
+    'Paper Cathedrals — single',
+    'single',
+    '2026-05-22',
+    'paper-cathedrals',
+  ],
+  [
+    'visualizer-paper-cathedrals',
+    'Paper Cathedrals — visualizer',
+    'visualizer',
+    '2026-05-29',
+    'paper-cathedrals',
+  ],
+  [
+    'acoustic-midnight-static',
+    'Midnight Static — acoustic',
+    'acoustic',
+    '2026-06-05',
+    'midnight-static',
+  ],
+  [
+    'merch-drop-tour-tee',
+    'Tour tee + vinyl pre-order',
+    'merch_drop',
+    '2026-06-12',
+  ],
+  [
+    'single-long-way-down',
+    'Long Way Down — single',
+    'single',
+    '2026-06-19',
+    'long-way-down',
+  ],
+  [
+    'media-appearance-tiny-desk',
+    'Tiny Desk session airs',
+    'media_appearance',
+    '2026-06-26',
+  ],
+  [
+    'single-no-vacancy',
+    'No Vacancy — EP closer',
+    'single',
+    '2026-07-03',
+    'no-vacancy',
+  ],
+  [
+    'tour-tie-in-summer',
+    'Summer tour announcement',
+    'tour_tie_in',
+    '2026-08-07',
+  ],
+  [
+    REMIX_SLUG,
+    'Midnight Static (remix)',
+    'remix',
+    '2026-10-16',
+    'midnight-static',
+  ],
+  [
+    'anniversary-midnight-static',
+    'Midnight Static — 1 year',
+    'anniversary',
+    '2027-04-30',
+    'midnight-static',
+  ],
 ]);
+
+const RAW_MOMENTS: readonly DemoMoment[] = Object.freeze(
+  RAW_MOMENT_TUPLES.map(([slug, title, momentType, friday, trackSlug]) =>
+    trackSlug
+      ? { slug, title, momentType, friday, trackSlug }
+      : { slug, title, momentType, friday }
+  )
+);
 
 export const DEMO_MOMENTS: readonly DemoMoment[] = RAW_MOMENTS;
 

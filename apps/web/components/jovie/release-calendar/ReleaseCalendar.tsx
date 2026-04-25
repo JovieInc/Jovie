@@ -39,7 +39,7 @@ function buildWeeks(plan: DemoMoment[]): WeekColumn[] {
     DEMO_PLAN_START_FRIDAY,
     ...planFridays,
     ...tourFridays,
-  ].sort();
+  ].sort((a, b) => a.localeCompare(b));
   const start = allFridays[0] ?? DEMO_PLAN_START_FRIDAY;
   const end = allFridays.at(-1) ?? DEMO_PLAN_START_FRIDAY;
   const buffer = addDaysIso(end, 7);
