@@ -103,7 +103,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
 
-          const resultsFile = 'apps/web/test-results/results.json';
+          const resultsFiles = [
+            'apps/web/test-results/results.json',
+            'apps/web/test-results/public-profile-smoke-results.json',
+          ];
           const outputFile = process.env.GITHUB_OUTPUT;
 
           function emit(line) {
@@ -120,13 +123,14 @@ jobs:
             emit('EOF');
           }
 
-          if (!fs.existsSync(resultsFile)) {
+          const existingResultsFiles = resultsFiles.filter(file => fs.existsSync(file));
+
+          if (existingResultsFiles.length === 0) {
             emit('test_status=error');
-            emitMultiline('failed_tests', ['Test results file not found']);
+            emitMultiline('failed_tests', ['Test results files not found']);
             process.exit(0);
           }
 
-          const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
           const specs = [];
 
           function collectSpecs(suites = []) {
@@ -136,7 +140,10 @@ jobs:
             }
           }
 
-          collectSpecs(results.suites ?? []);
+          for (const file of existingResultsFiles) {
+            const results = JSON.parse(fs.readFileSync(file, 'utf8'));
+            collectSpecs(results.suites ?? []);
+          }
 
           const tests = specs.flatMap(spec =>
             (spec.tests ?? []).map(testCase => ({ spec, testCase }))
