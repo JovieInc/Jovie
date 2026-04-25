@@ -48,6 +48,8 @@ import {
   getFeaturedPlaylistFallbackCandidate,
 } from '@/lib/profile/featured-playlist-fallback';
 
+export const dynamic = 'force-dynamic';
+
 // ============================================================================
 // Types
 // ============================================================================

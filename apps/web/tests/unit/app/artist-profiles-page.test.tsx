@@ -104,24 +104,21 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo',
+  '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel',
   () => ({
-    ArtistProfileOutcomeDuo: ({
-      headline,
-      duo,
+    ArtistProfileOutcomesCarousel: ({
+      outcomes,
     }: {
-      readonly headline: string;
-      readonly duo: typeof ARTIST_PROFILE_COPY.outcomeDuo;
+      readonly outcomes: typeof ARTIST_PROFILE_COPY.outcomes;
     }) => (
       <section>
-        <h2>{headline}</h2>
-        <div data-testid='artist-profile-outcome-duo-grid'>
-          <article data-testid='artist-profile-outcome-card'>
-            {duo.cards.getPaid.label}
-          </article>
-          <article data-testid='artist-profile-outcome-card'>
-            {duo.cards.sellOut.label}
-          </article>
+        <h2>{outcomes.headline}</h2>
+        <div data-testid='artist-profile-outcomes-grid'>
+          {outcomes.cards.map(card => (
+            <article key={card.id} data-testid='artist-profile-outcome-card'>
+              {card.title}
+            </article>
+          ))}
         </div>
       </section>
     ),
@@ -370,7 +367,7 @@ describe('ArtistProfilesPage', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
-      2
+      ARTIST_PROFILE_COPY.outcomes.cards.length
     );
     expect(
       screen.getAllByTestId('artist-profile-monetization-card')

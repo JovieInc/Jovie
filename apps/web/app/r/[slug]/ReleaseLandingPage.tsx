@@ -260,11 +260,10 @@ export function ReleaseLandingPage({
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
-  const sharePathname = artist.handle
-    ? `/${artist.handle}/${shareSlug}`
-    : tracking?.smartLinkSlug
-      ? `/r/${tracking.smartLinkSlug}`
-      : undefined;
+  let sharePathname: string | undefined;
+  if (artist.handle) sharePathname = `/${artist.handle}/${shareSlug}`;
+  else if (tracking?.smartLinkSlug)
+    sharePathname = `/r/${tracking.smartLinkSlug}`;
   const shareContext = useMemo(
     () =>
       buildReleaseShareContext({

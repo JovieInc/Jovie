@@ -104,6 +104,7 @@ export default function SignInPage() {
       formTitle='Sign in'
       showFormTitle={false}
       showFooterPrompt={false}
+      layoutVariant='split'
     >
       <Suspense fallback={<AuthFormSkeleton />}>
         <SignInPageContent />

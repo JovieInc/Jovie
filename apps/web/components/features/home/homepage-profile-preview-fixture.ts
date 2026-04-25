@@ -3,6 +3,7 @@ import {
   HOME_RELEASE_DESTINATION_PRESAVE_MOCK,
 } from '@/features/home/home-surface-seed';
 import type {
+  ProfilePrimaryTab,
   ProfileShowcaseState,
   ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
@@ -155,7 +156,13 @@ export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   image_url: TIM_WHITE_PROFILE.avatarSrc,
   tagline: 'Producer, songwriter, and after-hours romantic.',
   settings: {},
-  theme: {},
+  theme: {
+    profileAccent: {
+      version: 1,
+      primaryHex: '#d3834e',
+      sourceUrl: TIM_WHITE_PROFILE.avatarSrc,
+    },
+  },
   spotify_url: TIM_WHITE_PROFILE.spotifyUrl,
   apple_music_url: 'https://music.apple.com/us/artist/tim-white/123456789',
   youtube_url: 'https://www.youtube.com/@timwhite',
@@ -578,3 +585,18 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     showSubscriptionConfirmedBanner: false,
   }),
 };
+
+export function getPreviewActiveMode(
+  stateId: ProfileShowcaseStateId
+): ProfilePrimaryTab {
+  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
+
+  switch (drawerView) {
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+      return drawerView;
+    default:
+      return 'profile';
+  }
+}

@@ -288,7 +288,7 @@ interface ChannelPreferences {
 
 ### Creator Dashboard Settings
 
-Location: `/app/settings/notifications`
+Location: pending dedicated notification preferences page (see Linear issue). Interim location: `/app/settings/account`.
 
 **Sections:**
 

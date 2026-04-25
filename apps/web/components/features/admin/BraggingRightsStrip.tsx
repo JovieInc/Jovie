@@ -34,7 +34,7 @@ function BadgeRow({
     <div className='space-y-2'>
       <div className='flex items-center gap-1.5'>
         <Icon className='size-3.5 text-tertiary-token' />
-        <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
+        <p className='text-[11px] font-medium tracking-[0.04em] text-tertiary-token'>
           {title}
         </p>
       </div>

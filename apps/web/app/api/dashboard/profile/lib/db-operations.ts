@@ -10,6 +10,8 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { mergeProfileTheme } from '@/lib/profile/profile-theme';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { NO_STORE_HEADERS } from './constants';
 
 export interface UpdateProfileRecordsParams {
@@ -42,6 +44,8 @@ export async function updateProfileRecords({
     .select({
       usernameNormalized: creatorProfiles.usernameNormalized,
       settings: creatorProfiles.settings,
+      theme: creatorProfiles.theme,
+      avatarUrl: creatorProfiles.avatarUrl,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, user.id))
@@ -58,10 +62,41 @@ export async function updateProfileRecords({
         }
       : undefined;
 
-  const finalProfileUpdates =
-    mergedSettings === undefined
-      ? dbProfileUpdates
-      : { ...dbProfileUpdates, settings: mergedSettings };
+  const incomingTheme = dbProfileUpdates.theme;
+  const mergedTheme =
+    incomingTheme &&
+    typeof incomingTheme === 'object' &&
+    !Array.isArray(incomingTheme)
+      ? mergeProfileTheme(
+          existingProfile?.theme as Record<string, unknown> | null | undefined,
+          incomingTheme as Record<string, unknown>
+        )
+      : undefined;
+
+  const nextAvatarUrl =
+    typeof dbProfileUpdates.avatarUrl === 'string' &&
+    dbProfileUpdates.avatarUrl !== existingProfile?.avatarUrl
+      ? dbProfileUpdates.avatarUrl
+      : null;
+
+  const finalTheme =
+    nextAvatarUrl !== null
+      ? await buildThemeWithProfileAccent({
+          existingTheme:
+            mergedTheme ??
+            (existingProfile?.theme as
+              | Record<string, unknown>
+              | null
+              | undefined),
+          sourceUrl: nextAvatarUrl,
+        })
+      : mergedTheme;
+
+  const finalProfileUpdates = {
+    ...dbProfileUpdates,
+    ...(mergedSettings === undefined ? {} : { settings: mergedSettings }),
+    ...(finalTheme === undefined ? {} : { theme: finalTheme }),
+  };
 
   const [updatedProfile] = await db
     .update(creatorProfiles)

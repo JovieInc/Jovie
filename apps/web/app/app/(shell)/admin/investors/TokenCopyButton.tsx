@@ -15,7 +15,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
           // Ignore clipboard failures in insecure/local contexts.
         });
       }}
-      className='inline-flex items-center gap-1 text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
+      className='inline-flex items-center gap-1 text-2xs text-tertiary-token transition-colors hover:text-secondary-token'
       title='Click to copy full token'
     >
       {token.slice(0, 8)}&hellip;

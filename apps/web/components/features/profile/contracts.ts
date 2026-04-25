@@ -50,6 +50,21 @@ export type ProfileRenderMode = 'interactive' | 'preview';
 
 export type ProfileSurfacePresentation = 'standalone' | 'embedded';
 
+export const PROFILE_PRIMARY_TAB_KEYS = [
+  'profile',
+  'listen',
+  'tour',
+  'subscribe',
+  'about',
+] as const;
+
+export type ProfilePrimaryTab = (typeof PROFILE_PRIMARY_TAB_KEYS)[number];
+
+export interface ProfileRailCard {
+  readonly id: string;
+  readonly kind: 'release' | 'tour' | 'alerts' | 'playlist' | 'listen';
+}
+
 export type ProfileShowcaseStateId =
   | 'streams-latest'
   | 'streams-presave'

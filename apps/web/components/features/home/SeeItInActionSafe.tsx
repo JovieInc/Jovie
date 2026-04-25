@@ -13,5 +13,5 @@ export function SeeItInActionSafe({
 
   if (!showSection) return null;
 
-  return <HomeLiveProofSection creators={FALLBACK_AVATARS.slice(0, 3)} />;
+  return <HomeLiveProofSection creators={FALLBACK_AVATARS} />;
 }

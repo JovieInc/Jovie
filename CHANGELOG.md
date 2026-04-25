@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.174] - 2026-04-24
+
+> Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
+
+### Added
+
+- `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and related mutation paths now support a versioned `theme.profileAccent` payload. Avatar-driven accent colors are extracted server-side, normalized for contrast, reused as CSS vars, and persisted across avatar upload, suggestion selection, ingestion, and admin/dashboard update flows.
+- `apps/web/components/features/profile/ProfileHomeRail.tsx` adds a manual horizontal Home rail with dot pagination, driven from existing profile resolver data so featured release, tour, alerts, and listen states can rotate without changing route semantics.
+
+### Changed
+
+- `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` were rebuilt into the new shared public shell: full-bleed hero, verified identity row, contextual status pill, notifications-first CTA, quick social actions, and the five-tab bottom nav mapping `Home`, `Music`, `Events`, `Alerts`, and `Profile` to the existing profile modes.
+- Preview and demo profile surfaces now use the same accent/theme contract and refreshed shell so homepage showcases and live `/:username` pages stay visually aligned.
+
+### Fixed
+
+- Theme writes now merge instead of replacing the entire theme object, preventing user theme changes from wiping persisted `profileAccent` data.
+- Public render fallback accent derivation now skips local and `/_next/image` sources, avoiding invalid-host fetch noise while preserving neutral fallbacks when no usable remote image exists.
+
+## [26.4.173] - 2026-04-24
+
+> Public view-tracking endpoint now rejects malformed handles before they touch Redis or the rate limiter. Arbitrary 100-char strings (unicode, control bytes, path-traversal probes, XSS payloads) used to reach `profile:views:${x}` Redis keys and per-handle rate-limit keys via `/api/profile/view`; the endpoint now enforces the canonical 3-24 char `[a-z0-9-]` handle schema used everywhere else in the app.
+
+### Fixed
+
+- `apps/web/app/api/profile/view/route.ts` — tightened the POST body schema from `z.string().min(1).max(100)` to the canonical lowercase handle pattern (3-24 chars, `[a-z0-9-]`), with pre-normalization to lowercase so mixed-case input is still accepted by legitimate clients. Closes three hardening gaps: Redis keyspace pollution via `profile:views:${attacker-supplied-bytes}`, per-handle rate-limit key pollution via `${handle}:${ip}`, and wasted DB lookups on handles that can never exist in `usernameNormalized`. No legitimate traffic breaks — the only caller (`ProfileViewTracker` on `/[username]/page.tsx`) always passes the canonical `artist.handle`.
+
+### Added
+
+- `apps/web/tests/unit/profile/profile-view-api.test.ts` — 13 new adversarial test cases (script injection, path traversal, null byte, internal whitespace, RTL override, zero-width joiner, combining marks, emoji, whitespace padding, colon/slash for key pollution, underscore/dot outside charset) plus length-boundary tests and a mixed-case normalization test. All previously passing tests still pass.
+
 ## [26.4.172] - 2026-04-23
 
 > The intercepted signup modal no longer blows out to the full viewport when the intent hint is short. The dialog now hugs its content, centers cleanly, and the Clerk form sits flush inside our modal chrome instead of stacking a second card inside a card.

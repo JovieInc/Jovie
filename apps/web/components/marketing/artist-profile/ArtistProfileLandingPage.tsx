@@ -14,7 +14,7 @@ import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
-import { ArtistProfileOutcomeDuo } from './ArtistProfileOutcomeDuo';
+import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfileReactivationSection } from './ArtistProfileReactivationSection';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from './ArtistProfileSpecWall';
@@ -56,10 +56,7 @@ export function ArtistProfileLandingPage({
         phoneSubcaption={copy.hero.phoneSubcaption}
       />
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
-        <ArtistProfileOutcomeDuo
-          headline={copy.outcomeDuo.marketingHeadline}
-          duo={copy.outcomeDuo}
-        />
+        <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection

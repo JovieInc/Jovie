@@ -4,12 +4,14 @@
  * Centralized profile update operations.
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, type SQL } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { mergeProfileTheme } from '@/lib/profile/profile-theme';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getRedis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';
 
@@ -19,6 +21,36 @@ const VIEW_COUNT_KEY_PREFIX = 'profile:views:';
 const VIEW_FLUSH_THRESHOLD = 10;
 // TTL for view counts in Redis (1 hour) - ensures eventual consistency
 const VIEW_COUNT_TTL_SECONDS = 3600;
+
+async function resolveProfileThemeUpdates(
+  profileFilter: SQL<unknown>,
+  updates: ProfileUpdateData
+): Promise<ProfileUpdateData> {
+  const [existingProfile] = await db
+    .select({
+      avatarUrl: creatorProfiles.avatarUrl,
+      theme: creatorProfiles.theme,
+    })
+    .from(creatorProfiles)
+    .where(profileFilter)
+    .limit(1);
+
+  const mergedTheme =
+    updates.theme &&
+    typeof updates.theme === 'object' &&
+    !Array.isArray(updates.theme)
+      ? mergeProfileTheme(existingProfile?.theme, updates.theme)
+      : undefined;
+  const finalTheme =
+    updates.avatarUrl && updates.avatarUrl !== existingProfile?.avatarUrl
+      ? await buildThemeWithProfileAccent({
+          existingTheme: mergedTheme ?? existingProfile?.theme,
+          sourceUrl: updates.avatarUrl,
+        })
+      : mergedTheme;
+
+  return finalTheme === undefined ? updates : { ...updates, theme: finalTheme };
+}
 
 /**
  * Update a profile by ID.
@@ -31,10 +63,15 @@ export async function updateProfileById(
   profileId: string,
   updates: ProfileUpdateData
 ): Promise<ProfileData | null> {
+  const profileUpdates = await resolveProfileThemeUpdates(
+    eq(creatorProfiles.id, profileId),
+    updates
+  );
+
   const [updated] = await db
     .update(creatorProfiles)
     .set({
-      ...updates,
+      ...profileUpdates,
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))
@@ -69,10 +106,15 @@ export async function updateProfileByClerkId(
     throw new TypeError('User not found');
   }
 
+  const profileUpdates = await resolveProfileThemeUpdates(
+    eq(creatorProfiles.userId, user.id),
+    updates
+  );
+
   const [updated] = await db
     .update(creatorProfiles)
     .set({
-      ...updates,
+      ...profileUpdates,
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.userId, user.id))

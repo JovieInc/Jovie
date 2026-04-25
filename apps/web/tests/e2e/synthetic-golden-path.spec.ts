@@ -4,6 +4,9 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
+const HOMEPAGE_INTENT_PROMPT = 'Help me launch my artist profile';
+const SIGNUP_PATH = '/signup';
+
 /**
  * Synthetic Monitoring Golden Path Test
  *
@@ -55,15 +58,19 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       });
       await waitForHydration(page);
 
-      // Essential homepage elements
-      await expect(page.locator('[data-test="signup-btn"]')).toBeVisible({
+      // Essential homepage entry point
+      const promptInput = page.locator('#homepage-intent-input');
+      await expect(promptInput).toBeVisible({
         timeout: 15000,
       });
 
       // CRITICAL PATH 2: Sign up flow initiation
       console.log('[Synthetic] Step 2: Sign up flow test');
-      await page.locator('[data-test="signup-btn"]').click();
-      await expect(page).toHaveURL(/sign-up/, { timeout: 20000 });
+      await promptInput.fill(HOMEPAGE_INTENT_PROMPT);
+      await page.getByRole('button', { name: 'Submit prompt' }).click();
+      await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
+        timeout: 20000,
+      });
 
       // CRITICAL PATH 3: Clerk registration
       console.log('[Synthetic] Step 3: Clerk registration test');
@@ -108,7 +115,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       console.log('[Synthetic] Step 4: Onboarding flow test');
       await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
 
-      const usernameInput = page.locator('[data-test="username-input"]');
+      const usernameInput = page.getByLabel('Claim your handle');
       await expect(usernameInput).toBeVisible({ timeout: 15000 });
 
       await usernameInput.fill(testHandle);
@@ -116,23 +123,26 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       await expect
         .poll(
           async () => {
-            const claimBtn = page.locator('[data-test="claim-btn"]');
+            const claimBtn = page.getByTestId('onboarding-handle-submit');
             return claimBtn.isEnabled().catch(() => false);
           },
           { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
         )
         .toBeTruthy();
 
-      const claimButton = page.locator('[data-test="claim-btn"]');
+      const claimButton = page.getByTestId('onboarding-handle-submit');
       await expect(claimButton).toBeEnabled({ timeout: 15000 });
       await claimButton.click();
 
-      // CRITICAL PATH 5: Dashboard access
-      console.log('[Synthetic] Step 5: Dashboard access test');
-      await expect(page).toHaveURL('/app/dashboard', { timeout: 45000 });
+      // CRITICAL PATH 5: Onboarding continuation
+      console.log('[Synthetic] Step 5: Onboarding continuation test');
+      await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
+        timeout: 45000,
+      });
 
-      const dashboardWelcome = page.locator('[data-test="dashboard-welcome"]');
-      await expect(dashboardWelcome).toBeVisible({ timeout: 15000 });
+      await expect(
+        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
+      ).toBeVisible({ timeout: 15000 });
 
       // CRITICAL PATH 6: Public profile accessibility
       console.log('[Synthetic] Step 6: Public profile test');
@@ -187,7 +197,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       { path: '/dualipa', name: 'Profile Page' },
       { path: '/dualipa?mode=listen', name: 'Listen Mode' },
       { path: '/dualipa?mode=pay', name: 'Pay Mode' },
-      { path: '/sign-up', name: 'Sign Up' },
+      { path: SIGNUP_PATH, name: 'Sign Up' },
     ];
 
     for (const { path, name } of criticalPages) {
@@ -262,7 +272,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
 
     // Check for performance-critical elements
-    await expect(page.locator('[data-test="signup-btn"]')).toBeVisible({
+    await expect(page.locator('#homepage-intent-input')).toBeVisible({
       timeout: 5000,
     });
 

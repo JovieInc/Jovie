@@ -6,49 +6,32 @@ import { useCallback, useEffect, useRef } from 'react';
 
 interface AuthModalShellProps {
   readonly children: React.ReactNode;
-  /**
-   * Optional status row rendered to the right of the back button.
-   * Used for the "Continuing with '{prompt}'" intent hint.
-   */
   readonly statusRow?: React.ReactNode;
-  /** aria-label for the dialog element. Defaults to "Authentication". */
   readonly ariaLabel?: string;
+  /**
+   * aria-label for the back/dismiss button. Defaults to "Go back" so the
+   * shell is accurate no matter which entry point opened it (chat intake,
+   * profile claim, direct /signup, dev unavailable card, etc.). Callers
+   * that know their origin — e.g. chat intake — can pass a more specific
+   * label like "Back to chat".
+   */
+  readonly backButtonLabel?: string;
 }
 
-/**
- * Shared shell for intercepted auth modals (desktop signup/signin).
- *
- * Wraps children in a native `<dialog>` opened via `showModal()` for free
- * focus trap + Escape handling. Dismissal via Escape, backdrop click, or
- * the back affordance — all route through `router.back()` so the URL stays
- * in sync with modal state (refresh on /signup shows the full-page, which
- * is the documented intercepting-route behavior).
- *
- * Used by:
- *   - `@auth/(.)signup/page.tsx`      — around Clerk's <SignUp />
- *   - `@auth/layout.tsx` (unavailable) — around <AuthUnavailableCard /> in dev
- *
- * Having both paths use the same shell means dev:local:browse shows the
- * same modal chrome as production; the content inside differs (unavailable
- * card vs real Clerk form) but the dialog a11y and dismissal behavior stay
- * identical. This catches modal-layering bugs in dev without needing real
- * Clerk keys on every developer's machine.
- */
 export function AuthModalShell({
   children,
   statusRow,
   ariaLabel = 'Authentication',
+  backButtonLabel = 'Go back',
 }: AuthModalShellProps) {
+  // Guard against callers passing an empty or whitespace-only string — a
+  // literal '' on an aria-label makes the button invisible to assistive tech
+  // even though the default prop would otherwise have fallen through.
+  const resolvedBackButtonLabel =
+    backButtonLabel.trim().length > 0 ? backButtonLabel : 'Go back';
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Open as native modal for focus-trap behavior at no React cost.
-  //
-  // The cleanup does NOT call dialog.close(). In StrictMode dev, React runs
-  // effect cleanup between double-mount cycles, which would fire a `close`
-  // event on the dialog — and any handler listening for that event would
-  // trigger before the second mount, causing surprise navigation. Relying
-  // on DOM removal on unmount is enough; native dialogs handle it cleanly.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -59,9 +42,6 @@ export function AuthModalShell({
     router.back();
   }, [router]);
 
-  // Listen for `cancel` (Escape-only, user intent), NOT `close` (also fires
-  // on programmatic close from unmount/StrictMode cleanup). Keeps URL in
-  // sync when the user presses Escape to dismiss the modal.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -75,8 +55,6 @@ export function AuthModalShell({
 
   const onBackdropMouseDown = useCallback(
     (event: React.MouseEvent<HTMLDialogElement>) => {
-      // Native dialog backdrop click targets the dialog element itself. Only
-      // dismiss if the click originated on the backdrop, not on card content.
       if (event.target === dialogRef.current) dismiss();
     },
     [dismiss]
@@ -87,25 +65,34 @@ export function AuthModalShell({
     <dialog
       ref={dialogRef}
       aria-label={ariaLabel}
+      data-auth-modal-shell
       onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-fit max-h-[calc(100svh-48px)] w-[calc(100%-32px)] max-w-[400px] overflow-auto rounded-2xl border border-white/[0.08] bg-[var(--color-bg-surface-3,#2a2c32)] p-5 text-primary-token shadow-[0_5px_50px_rgba(0,0,0,0.5),0_4px_30px_rgba(0,0,0,0.4)] backdrop:bg-black/60 backdrop:backdrop-blur-sm'
+      className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-40px)] w-[min(calc(100vw-24px),600px)] overflow-auto rounded-[2rem] border border-white/[0.08] bg-[#08090a]/96 p-3 text-primary-token shadow-[0_36px_100px_rgba(0,0,0,0.5)] backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:w-[min(calc(100vw-32px),600px)] sm:p-4'
     >
-      <div className='mb-2 flex items-center'>
-        <button
-          type='button'
-          onClick={dismiss}
-          aria-label='Back to chat'
-          className='inline-flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
-        >
-          <ArrowLeft className='h-4 w-4' strokeWidth={2} aria-hidden='true' />
-        </button>
-      </div>
-      {statusRow ? (
-        <div className='mb-3 px-1 text-center text-[12px] leading-[1.4] text-tertiary-token'>
-          {statusRow}
+      <div
+        data-auth-modal-body
+        className='flex min-h-0 flex-col rounded-[1.6rem] bg-transparent px-3 py-3 sm:px-4 sm:py-4'
+      >
+        <div className='mb-5 flex min-w-0 items-center gap-3 sm:mb-6'>
+          <button
+            type='button'
+            onClick={dismiss}
+            aria-label={resolvedBackButtonLabel}
+            className='inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-secondary-token transition-colors hover:bg-white/[0.08] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+          >
+            <ArrowLeft className='h-4 w-4' strokeWidth={2} aria-hidden='true' />
+          </button>
+          {statusRow ? (
+            <div className='min-w-0 flex-1 text-[12px] leading-[1.45] tracking-[-0.01em] text-white/54'>
+              {statusRow}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      {children}
+
+        <div className='mx-auto flex w-full max-w-[520px] min-h-0 flex-1 flex-col'>
+          {children}
+        </div>
+      </div>
     </dialog>
   );
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
@@ -134,13 +135,23 @@ export async function POST(request: NextRequest) {
     const { userId } = await getCachedAuth();
     if (!userId) return jsonError('Unauthorized', 401);
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody<{
+      priceId?: unknown;
+      referralCode?: unknown;
+      returnTo?: unknown;
+      source?: unknown;
+    }>(request, {
+      route: '/api/stripe/checkout',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) return parsedBody.response;
+
     const {
       priceId,
       referralCode: rawReferralCode,
       returnTo: rawReturnTo,
       source: rawSource,
-    } = body;
+    } = parsedBody.data;
     const checkoutSource =
       rawSource === 'onboarding' ? 'onboarding' : undefined;
 
@@ -201,19 +212,28 @@ export async function POST(request: NextRequest) {
 
     const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
+    const planIdSuffix = selectedPlan
+      ? `&plan_id=${encodeURIComponent(selectedPlan)}`
+      : '';
+
+    let successUrl: string;
+    let cancelUrl: string;
+    if (checkoutSource === 'onboarding') {
+      successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
+    } else {
+      successUrl = `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}/billing/cancel`;
+    }
+
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({
         customerId,
         priceId,
+        plan: selectedPlan,
         userId,
-        successUrl:
-          checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=success`
-            : `${baseUrl}/billing/success`,
-        cancelUrl:
-          checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=cancel`
-            : `${baseUrl}/billing/cancel`,
+        successUrl,
+        cancelUrl,
         idempotencyKey,
         referralCode,
       })

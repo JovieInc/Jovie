@@ -50,10 +50,7 @@ export function ArtistProfileHeroAdaptiveIntro({
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}
         className='relative z-30 lg:-mt-28 xl:-mt-32'
       >
-        <HomeTrustSection
-          variant='compact'
-          className='border-y border-white/[0.04] bg-[#030507]'
-        />
+        <HomeTrustSection label='Trusted by Artists' />
       </div>
 
       <style>{`
@@ -67,29 +64,29 @@ export function ArtistProfileHeroAdaptiveIntro({
 
         @media (min-width: 768px) and (min-height: 821px) {
           .artist-profile-intro-stage {
-            min-height: calc(100svh + 14rem);
+            min-height: calc(100svh + 2rem);
           }
 
           .artist-profile-intro-rail {
             position: sticky;
             top: clamp(
               calc(var(--linear-header-height) + 1.5rem),
-              16svh,
-              calc(var(--linear-header-height) + 6rem)
+              12svh,
+              calc(var(--linear-header-height) + 4rem)
             );
           }
         }
 
         @media (min-width: 1024px) and (min-height: 821px) {
           .artist-profile-intro-stage {
-            min-height: calc(100svh + 24rem);
+            min-height: calc(100svh + 4rem);
           }
 
           .artist-profile-intro-rail {
             top: clamp(
               calc(var(--linear-header-height) + 2rem),
-              18svh,
-              calc(var(--linear-header-height) + 8rem)
+              14svh,
+              calc(var(--linear-header-height) + 6rem)
             );
           }
         }

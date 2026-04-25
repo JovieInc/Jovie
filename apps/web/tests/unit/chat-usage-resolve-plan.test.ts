@@ -1,50 +1,50 @@
 import { describe, expect, it } from 'vitest';
+import { resolveChatUsagePlan } from '@/lib/entitlements/registry';
 
 /**
- * resolvePlan is a private function in the chat usage route.
- * We extract and test its logic here to ensure legacy plan names
- * are correctly mapped.
+ * resolveChatUsagePlan is the real helper used by the chat usage API route
+ * (apps/web/app/api/chat/usage/route.ts) and other plan-gate callers. The
+ * test previously shadowed this logic by redeclaring `resolvePlan` locally,
+ * which meant any drift in the production function (new legacy alias, new
+ * plan tier, case-sensitivity change) would silently pass the suite.
+ * Importing the production symbol keeps the test anchored to the real
+ * contract.
  */
-function resolvePlan(plan: string | null | undefined): 'free' | 'pro' | 'max' {
-  if (plan === 'max' || plan === 'growth') {
-    return 'max';
-  }
-  if (plan === 'pro' || plan === 'founding') {
-    return 'pro';
-  }
-  return 'free';
-}
 
-describe('resolvePlan', () => {
+describe('resolveChatUsagePlan', () => {
   it('maps "free" to free', () => {
-    expect(resolvePlan('free')).toBe('free');
+    expect(resolveChatUsagePlan('free')).toBe('free');
   });
 
   it('maps "pro" to pro', () => {
-    expect(resolvePlan('pro')).toBe('pro');
+    expect(resolveChatUsagePlan('pro')).toBe('pro');
   });
 
   it('maps legacy "founding" to pro', () => {
-    expect(resolvePlan('founding')).toBe('pro');
+    expect(resolveChatUsagePlan('founding')).toBe('pro');
   });
 
   it('maps "max" to max', () => {
-    expect(resolvePlan('max')).toBe('max');
+    expect(resolveChatUsagePlan('max')).toBe('max');
   });
 
   it('maps legacy "growth" to max', () => {
-    expect(resolvePlan('growth')).toBe('max');
+    expect(resolveChatUsagePlan('growth')).toBe('max');
   });
 
   it('maps null to free', () => {
-    expect(resolvePlan(null)).toBe('free');
+    expect(resolveChatUsagePlan(null)).toBe('free');
   });
 
   it('maps undefined to free', () => {
-    expect(resolvePlan(undefined)).toBe('free');
+    expect(resolveChatUsagePlan(undefined)).toBe('free');
   });
 
   it('maps unknown string to free', () => {
-    expect(resolvePlan('unknown')).toBe('free');
+    expect(resolveChatUsagePlan('unknown')).toBe('free');
+  });
+
+  it('maps trial to free (chat usage narrows to three-tier plan)', () => {
+    expect(resolveChatUsagePlan('trial')).toBe('free');
   });
 });

@@ -66,7 +66,7 @@ export function isReleasesShellRoute(pathname: string | null): boolean {
 
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname.startsWith(`${APP_ROUTES.DASHBOARD_OVERVIEW}/`);
+  return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {
