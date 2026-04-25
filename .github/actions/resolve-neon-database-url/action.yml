@@ -92,19 +92,34 @@ runs:
         fi
 
         RESOLVED_URL="$(
-          CANDIDATE="$CANDIDATE" CREDENTIAL_SOURCE="$CREDENTIAL_SOURCE" node <<'NODE'
+          CANDIDATE="$CANDIDATE" FALLBACK_CANDIDATE="$FALLBACK_CANDIDATE" CREDENTIAL_SOURCE="$CREDENTIAL_SOURCE" node <<'NODE'
         const candidate = new URL(process.env.CANDIDATE);
-        const source = new URL(process.env.CREDENTIAL_SOURCE);
+        const credentialSources = [
+          process.env.FALLBACK_CANDIDATE,
+          process.env.CREDENTIAL_SOURCE,
+        ].flatMap((value) => {
+          if (!value) {
+            return [];
+          }
 
-        // Preserve credentials baked into the Neon branch URL. Branch-specific
-        // passwords can differ from the long-lived main DB secret, and replacing
-        // them causes auth and endpoint failures across downstream CI jobs.
-        if (!candidate.username && source.username) {
-          candidate.username = source.username;
+          try {
+            return [new URL(value)];
+          } catch {
+            return [];
+          }
+        });
+
+        const usernameSource = credentialSources.find((source) => source.username);
+        const passwordSource = credentialSources.find((source) => source.password);
+
+        // Preserve credentials baked into Neon branch URLs. Pooled URLs can omit
+        // branch credentials while the direct branch URL has the correct values.
+        if (!candidate.username && usernameSource) {
+          candidate.username = usernameSource.username;
         }
 
-        if (!candidate.password && source.password) {
-          candidate.password = source.password;
+        if (!candidate.password && passwordSource) {
+          candidate.password = passwordSource.password;
         }
 
         console.log(candidate.toString());

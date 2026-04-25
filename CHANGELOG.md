@@ -240,24 +240,22 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.159] - 2026-04-18
 
-> Tim White profile proof now uses the real action-card system, notification capture stays stable through every step, and the releases dashboard polish is ready to review on the same branch.
+> Coverage enforcement now starts on pull requests instead of only on `main`, and bug-fix PRs get a durable regression-test policy warning before they ship.
 
 ### Added
 
-- Added shared Tim White profile action-card and demo review boards for latest release, countdown, nearby tour, next tour, playlist fallback, listen fallback, and inline subscription states.
-- Added focused regression coverage for Tim White profile cards, OTP recovery, fixed-height notification states, and the releases dashboard date-picker and action-menu polish.
+- [internal] Added `scripts/check-regression-test.mjs` plus CI and `/verify` wiring so bug-fix PRs warn when they ship without a matching regression test or a documented exception.
+- [internal] Added repo-owned coverage and smoke-policy guidance to the PR template, `AGENTS.md`, and `CLAUDE.md` so the rollout survives upstream gstack changes.
 
 ### Changed
 
-- Rebuilt the Artist Profile marketing page around real Tim White proof surfaces, including the adaptive hero, outcomes grid, spec-wall crops, how-it-works visuals, and proof styling.
-- Refined the public profile and home/demo fixtures so Tim White remains the canonical founder/profile identity, with collaboration credits rendered consistently as `w/ Cosmic Gate`.
-- Refreshed the add-release drawer and provider-matrix expansion rows to use the shared calendar picker and cleaner bounded child-row layout.
-- [internal] Adopted the latest runtime flag and Stripe-connect platform changes from `origin/main` while keeping the branch’s artist-profile QA fixes intact.
+- [internal] CI now runs the web unit suite with coverage on pull requests and `main`, uploads shard coverage to Codecov, and emits empty-upload statuses for skipped PR lanes so future required Codecov checks do not deadlock on docs-only changes.
+- [internal] Tightened the Codecov rollout config to use an informational soak window, an 80% default patch target, and a 95% critical-path target for billing, auth, entitlements, and webhook paths.
+- [internal] `apps/web` fast tests now use the dedicated `vitest.config.fast.mts` config instead of relying on the default alias.
 
 ### Fixed
 
-- Fixed the inline notifications composer so email, OTP, name, birthday, and done states keep one stable shell, and OTP recovery no longer loops or wipes trailing digits after an error.
-- Fixed artist-profile accessibility follow-ups, including hero mode contrast, ingesting badge contrast, reactivation and monetization muted text contrast, and keyboard access into the monetization scroller.
+- [internal] Fixed the future required-check path for Codecov by explicitly emitting passing statuses on pull requests where the unit-test lane is intentionally skipped.
 - [internal] Synced the canonical version file, workspace package versions, and the changelog head to `26.4.159`.
 
 ## [26.4.158] - 2026-04-17

@@ -66,21 +66,28 @@ function isPrivateIpv4Literal(hostname: string | null): boolean {
   return PRIVATE_IPV4_BLOCKS.some(pattern => pattern.test(hostname));
 }
 
-export function isTrustedTestBypassHostname(hostname: string | null): boolean {
+export function isLocalTestBypassHostname(hostname: string | null): boolean {
   const normalizedHostname = hostname?.trim().toLowerCase() ?? null;
 
   return (
     normalizedHostname === 'localhost' ||
+    normalizedHostname === '0.0.0.0' ||
     normalizedHostname === '127.0.0.1' ||
     normalizedHostname === '::1' ||
     normalizedHostname === '[::1]' ||
     Boolean(normalizedHostname?.endsWith('.localhost')) ||
     Boolean(normalizedHostname?.endsWith('.local')) ||
-    Boolean(normalizedHostname?.endsWith('.vercel.app')) ||
-    Boolean(
-      normalizedHostname && TRUSTED_PREVIEW_HOSTS.has(normalizedHostname)
-    ) ||
     isPrivateIpv4Literal(normalizedHostname)
+  );
+}
+
+export function isTrustedTestBypassHostname(hostname: string | null): boolean {
+  const normalizedHostname = hostname?.trim().toLowerCase() ?? null;
+
+  return (
+    isLocalTestBypassHostname(normalizedHostname) ||
+    Boolean(normalizedHostname?.endsWith('.vercel.app')) ||
+    Boolean(normalizedHostname && TRUSTED_PREVIEW_HOSTS.has(normalizedHostname))
   );
 }
 

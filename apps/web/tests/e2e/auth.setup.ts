@@ -1,5 +1,10 @@
 import { test as setup } from '@playwright/test';
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
+import {
+  ClerkTestError,
+  setTestAuthBypassSession,
+  signInUser,
+  waitForAuthenticatedHealth,
+} from '../helpers/clerk-auth';
 
 const AUTH_FILE = 'tests/.auth/user.json';
 
@@ -8,6 +13,14 @@ setup.describe.configure({ mode: 'serial' });
 setup.setTimeout(360_000); // 6min to absorb local cold-start compilation plus Clerk bootstrap
 
 setup('authenticate', async ({ page }) => {
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    await setTestAuthBypassSession(page, null);
+    await waitForAuthenticatedHealth(page, process.env.E2E_CLERK_USER_ID);
+    await page.context().storageState({ path: AUTH_FILE });
+    console.log(`  Test auth bypass session saved to ${AUTH_FILE}`);
+    return;
+  }
+
   const username = process.env.E2E_CLERK_USER_USERNAME;
   const password = process.env.E2E_CLERK_USER_PASSWORD;
 

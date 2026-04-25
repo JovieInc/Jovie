@@ -105,6 +105,27 @@ describe('test-mode auth bypass', () => {
     ).toBe('user_private_host');
   });
 
+  it('allows bypass markers on the standalone bind host', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return '0.0.0.0:3100';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_bind_host';
+          }
+          return null;
+        },
+      })
+    ).toBe('user_bind_host');
+  });
+
   it('allows bypass markers on trusted preview hosts', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
 

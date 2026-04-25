@@ -763,8 +763,9 @@ AI agents MUST follow the "draft PR first, commit often" pattern for all non-tri
 Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
 
 - Add `testing` when a PR needs the heavyweight verification lanes (E2E, smoke tests, full build with secrets) beyond the default merge gate.
-- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
+- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, entitlements, webhooks, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
 - Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
+- For billing, auth, entitlements, webhook, migration, and env/config PRs, `testing` is mandatory so `E2E Smoke (PR Fast Feedback)` runs before merge.
 
 - Add `needs-human` when the PR should be held for human review or automation must stop.
 - Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
@@ -1434,7 +1435,7 @@ Tests are part of the deploy path. Slow tests slow shipping. Test runtime perfor
 
 ### Test Coverage Guidelines (When to Write Tests)
 
-Tests must be written **at feature creation time**, not retroactively. Apply coverage selectively — don't slow iteration speed.
+Tests should usually be written **at feature creation time**. Bug fixes must add a regression test or include a concrete justification for why one is not practical. Apply coverage selectively — don't slow iteration speed.
 
 **Tests REQUIRED for:**
 - Core logic and data processing (parsers, transformers, validators)
@@ -1451,10 +1452,12 @@ Tests must be written **at feature creation time**, not retroactively. Apply cov
 - Marketing page content and static pages
 
 **Coverage philosophy:**
-- No strict coverage % targets — quality over quantity
+- No single repo-wide vanity target; use Codecov patch coverage as the PR readiness signal and project coverage as a ratchet
+- Patch coverage floors: 80% for normal changes, 95% for billing/auth/entitlements/webhooks
 - Deterministic workflows must have 100% path coverage
 - AI-dependent workflows should use mocked LLM responses for determinism
 - Focus testing where correctness and reliability are critical
+- Bug-fix PRs must either change a `*.test.*` or `*.spec.*` file or explain the regression-test exception in the PR body
 
 | Area | Tests Required? | Why |
 |------|----------------|-----|

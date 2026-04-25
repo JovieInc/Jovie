@@ -1181,7 +1181,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               }
 
               console.warn(
-                '    ⚠ Detected conflicting E2E profile ownership; reclaiming canonical profile'
+                '    Warning: Detected conflicting E2E profile ownership; reclaiming canonical profile'
               );
 
               const reclaimed = await reclaimCanonicalE2EProfile(

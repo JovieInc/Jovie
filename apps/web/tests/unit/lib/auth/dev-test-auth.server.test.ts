@@ -93,7 +93,7 @@ describe('dev-test-auth.server', () => {
     });
   });
 
-  it('rejects production even if the bypass env is enabled', async () => {
+  it('allows production builds to use bypass auth on loopback hosts', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', 'production');
@@ -102,6 +102,21 @@ describe('dev-test-auth.server', () => {
     );
 
     expect(getDevTestAuthAvailability('localhost')).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
+    });
+  });
+
+  it('rejects production hosts even if the bypass env is enabled', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    expect(getDevTestAuthAvailability('jov.ie')).toEqual({
       enabled: false,
       trustedHost: false,
       reason: 'Not available in production',

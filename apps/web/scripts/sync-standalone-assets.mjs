@@ -16,6 +16,60 @@ const appRoot = path.resolve(scriptDir, '..');
 const standaloneOutputRoot = path.join(appRoot, '.next', 'standalone');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
 const standaloneNextRoot = path.join(standaloneRoot, '.next');
+const repoRoot = path.resolve(appRoot, '..', '..');
+
+const standaloneNextNodeModules = path.join(standaloneNextRoot, 'node_modules');
+
+const standaloneJsdomDependencies = [
+  '@asamuzakjp/css-color',
+  '@csstools/color-helpers',
+  '@csstools/css-calc',
+  '@csstools/css-color-parser',
+  '@csstools/css-parser-algorithms',
+  '@csstools/css-tokenizer',
+  'agent-base',
+  'cssstyle',
+  'data-urls',
+  'decimal.js',
+  'entities',
+  'html-encoding-sniffer',
+  'http-proxy-agent',
+  'https-proxy-agent',
+  'iconv-lite',
+  'is-potential-custom-element-name',
+  'lru-cache',
+  'nwsapi',
+  'parse5',
+  'punycode',
+  'rrweb-cssom',
+  'safer-buffer',
+  'saxes',
+  'symbol-tree',
+  'tough-cookie',
+  'tr46',
+  'w3c-xmlserializer',
+  'webidl-conversions',
+  'whatwg-encoding',
+  'whatwg-mimetype',
+  'whatwg-url',
+  'ws',
+  'xml-name-validator',
+  'xmlchars',
+];
+
+function pnpmPackagePath(...segments) {
+  return path.join(
+    repoRoot,
+    'node_modules',
+    '.pnpm',
+    'node_modules',
+    ...segments
+  );
+}
+
+function standaloneNextPackagePath(...segments) {
+  return path.join(standaloneNextNodeModules, ...segments);
+}
 
 const copyTargets = [
   {
@@ -27,6 +81,46 @@ const copyTargets = [
     label: 'standalone static assets',
     source: path.join(appRoot, '.next', 'static'),
     destination: path.join(standaloneNextRoot, 'static'),
+  },
+  {
+    label: 'standalone Sentry debug dependency',
+    source: pnpmPackagePath('debug'),
+    destination: standaloneNextPackagePath('debug'),
+  },
+  {
+    label: 'standalone Sentry ms dependency',
+    source: pnpmPackagePath('ms'),
+    destination: standaloneNextPackagePath('ms'),
+  },
+  {
+    label: 'standalone Sentry module-details dependency',
+    source: pnpmPackagePath('module-details-from-path'),
+    destination: standaloneNextPackagePath('module-details-from-path'),
+  },
+  ...standaloneJsdomDependencies.map(dependency => ({
+    label: `standalone jsdom ${dependency} dependency`,
+    source: pnpmPackagePath(dependency),
+    destination: standaloneNextPackagePath(dependency),
+  })),
+  {
+    label: 'standalone jsdom tldts transitive dependency',
+    source: pnpmPackagePath('tldts'),
+    destination: standaloneNextPackagePath('tldts'),
+  },
+  {
+    label: 'standalone jsdom tldts-core transitive dependency',
+    source: pnpmPackagePath('tldts-core'),
+    destination: standaloneNextPackagePath('tldts-core'),
+  },
+  {
+    label: 'standalone SWC helper dependency',
+    source: pnpmPackagePath('@swc', 'helpers'),
+    destination: path.join(standaloneRoot, 'node_modules', '@swc', 'helpers'),
+  },
+  {
+    label: 'standalone Next env dependency',
+    source: pnpmPackagePath('@next', 'env'),
+    destination: path.join(standaloneRoot, 'node_modules', '@next', 'env'),
   },
 ];
 

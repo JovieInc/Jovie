@@ -39,7 +39,7 @@ function isClerkRedirect(url: string): boolean {
 // HOMEPAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('homepage loads with hero heading, CTA, sections, and footer', async ({
+test('homepage loads with hero heading, prompt CTA, and action pills', async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -81,7 +81,7 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   // Wait for page to have meaningful content (h1 or any loading indicator)
   // Under parallel load the page may render a Clerk loading state first
   await page
-    .waitForSelector('h1, main[class], [data-clerk-loaded], footer', {
+    .waitForSelector('h1, main#main-content, [data-clerk-loaded]', {
       timeout: 60_000,
     })
     .catch(() => null);
@@ -137,20 +137,24 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   // CTA must be present — if no signup entry point, users can't convert
   const cta = page
     .locator(
-      '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a:has-text("Get started")'
+      '#homepage-intent-input, #handle-input, a[href*="/signup"], a[href*="/sign-up"], a:has-text("Get started")'
     )
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  // At least 2 sections — proves page rendered beyond just the shell
-  const sectionCount = await page.locator('section').count();
+  // The current homepage is a single intent surface; prove the shell and action cluster rendered.
+  await expect(page.locator('header').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('main#main-content')).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByLabel('Submit prompt')).toBeVisible({
+    timeout: 20_000,
+  });
+  const actionPillCount = await page.locator('.homepage-intent button').count();
   expect(
-    sectionCount,
-    'Homepage missing sections — page may be blank'
+    actionPillCount,
+    'Homepage action cluster is missing - page may be blank'
   ).toBeGreaterThanOrEqual(2);
-
-  // Footer — proves the full page loaded
-  await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
 
   // No error text
   const bodyText =

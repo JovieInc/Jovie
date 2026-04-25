@@ -213,7 +213,8 @@ export function Footer({
                 variant='light'
                 className='text-2xs leading-[16px] font-normal tracking-[-0.01em] opacity-100'
                 style={{
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--linear-text-secondary)',
+                  opacity: 1,
                 }}
               />
             </div>
@@ -289,7 +290,8 @@ export function Footer({
               variant={config.colorVariant}
               className='text-2xs leading-[16px] font-normal tracking-[-0.01em] opacity-100'
               style={{
-                color: 'var(--linear-text-tertiary)',
+                color: 'var(--linear-text-secondary)',
+                opacity: 1,
               }}
             />
           </>

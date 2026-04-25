@@ -1,4 +1,7 @@
-import type { ProfileMode } from '@/features/profile/contracts';
+import type {
+  ProfileMode,
+  ProfileRenderMode,
+} from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
@@ -97,6 +100,8 @@ export function StaticArtistPage({
     profileSettings,
     featuredPlaylistFallback,
   });
+  const renderMode: ProfileRenderMode =
+    presentation === 'compact-preview' ? 'preview' : 'interactive';
 
   // Live public profiles and compact preview callers intentionally share the
   // same Apple-native compact shell. Homepage preview uses ProfileCompactSurface
@@ -104,6 +109,7 @@ export function StaticArtistPage({
   return (
     <ProfileCompactTemplate
       key={`${presentation}-${viewModel.artist.id}`}
+      renderMode={renderMode}
       mode={viewModel.mode}
       artist={viewModel.artist}
       socialLinks={viewModel.socialLinks}

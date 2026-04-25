@@ -9,6 +9,7 @@ import type {
   DevTestAuthPersona,
 } from '@/lib/auth/dev-test-auth-types';
 import {
+  isLocalTestBypassHostname,
   isTestAuthBypassEnabled,
   isTrustedTestBypassHostname,
   resolveTestBypassUserId,
@@ -159,7 +160,9 @@ export function parseDevTestAuthPersona(
 export function getDevTestAuthAvailability(
   hostname: string | null
 ): DevTestAuthAvailability {
-  if (isProductionEnvironment()) {
+  const isLocalHost = isLocalTestBypassHostname(hostname);
+
+  if (isProductionEnvironment() && !isLocalHost) {
     return {
       enabled: false,
       trustedHost: false,

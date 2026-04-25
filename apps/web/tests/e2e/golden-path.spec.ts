@@ -475,6 +475,13 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
+    if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' && process.env.BASE_URL) {
+      test.skip(
+        true,
+        'Real Clerk golden path runs in Full E2E; standalone smoke uses test-auth bypass.'
+      );
+    }
+
     if (!hasRealEnv()) {
       test.skip(true, 'Real Clerk/DB env vars not configured');
     }

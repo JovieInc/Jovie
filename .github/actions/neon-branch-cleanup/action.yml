@@ -1,36 +1,36 @@
-name: 'Neon Branch Cleanup'
-description: 'Cleans up old ephemeral Neon branches when approaching the branch limit, protecting long-lived and manually-created branches'
+name: "Neon Branch Cleanup"
+description: "Cleans up old ephemeral Neon branches when approaching the branch limit, protecting long-lived and manually-created branches"
 
 inputs:
   neon_api_key:
-    description: 'Neon API key'
+    description: "Neon API key"
     required: true
   neon_project_id:
-    description: 'Neon project ID'
+    description: "Neon project ID"
     required: true
   branch_limit:
-    description: 'Maximum number of branches allowed (Neon plan limit)'
+    description: "Maximum number of branches allowed (Neon plan limit)"
     required: false
-    default: '10'
+    default: "10"
   protected_branches:
-    description: 'Comma-separated list of branch names to never delete'
+    description: "Comma-separated list of branch names to never delete"
     required: false
-    default: 'main,production,development,br-main,br-production'
+    default: "main,production,development,br-main,br-production"
   cleanup_threshold:
-    description: 'Start cleanup when this many branches exist (should be less than limit)'
+    description: "Start cleanup when this many branches exist (should be less than limit)"
     required: false
-    default: '7'
+    default: "7"
 
 outputs:
   branches_deleted:
-    description: 'Number of branches deleted'
+    description: "Number of branches deleted"
     value: ${{ steps.cleanup.outputs.deleted_count }}
   branches_remaining:
-    description: 'Number of branches remaining after cleanup'
+    description: "Number of branches remaining after cleanup"
     value: ${{ steps.cleanup.outputs.remaining_count }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Validate inputs
       id: validate
@@ -79,10 +79,14 @@ runs:
         # Convert protected branches to array for checking
         IFS=',' read -ra PROTECTED_ARRAY <<< "$PROTECTED_BRANCHES"
 
-        # Get branches sorted by creation time (oldest first), excluding protected ones
+        # Get branches sorted by creation time (oldest first), excluding protected ones.
+        # Compare both ID and friendly name because Neon branch deletion accepts either,
+        # and some list responses expose ephemeral branches by their br-* IDs.
         DELETABLE_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r '
           sort_by(.created_at) |
-          .[].name
+          .[] |
+          [.id, .name] |
+          @tsv
         ')
 
         DELETED_COUNT=0
@@ -92,21 +96,23 @@ runs:
           TARGET_COUNT=1
         fi
 
-        while IFS= read -r branch_name; do
-          [ -z "$branch_name" ] && continue
+        while IFS=$'\t' read -r branch_id branch_name; do
+          [ -z "$branch_id" ] && [ -z "$branch_name" ] && continue
+          delete_ref="${branch_id:-$branch_name}"
+          display_name="${branch_name:-$branch_id}"
 
           # Skip protected branches
           is_protected_branch=false
           for protected in "${PROTECTED_ARRAY[@]}"; do
             protected=$(echo "$protected" | xargs)
-            if [[ "$branch_name" == "$protected" ]]; then
+            if [[ "$branch_name" == "$protected" || "$branch_id" == "$protected" ]]; then
               is_protected_branch=true
               break
             fi
           done
 
           if [ "$is_protected_branch" = true ]; then
-            echo "Skipping protected branch: $branch_name"
+            echo "Skipping protected branch: $display_name ($branch_id)"
             continue
           fi
 
@@ -123,8 +129,8 @@ runs:
           #
           # This protects manually-created branches (e.g., 'dev', 'staging', 'tim-dev')
           EPHEMERAL_RE='^(pr-[0-9]+-[0-9]+|preview-pr-[0-9]+|main-[0-9]+-[0-9]+|e2e-full-[0-9]+(-[A-Za-z0-9._-]+)?|e2e-smoke-[0-9]+-[0-9]+|nightly-e2e-[0-9]+|br-[a-z0-9-]+-ad[0-9a-z]+|[a-z0-9._-]+-[0-9]+-[0-9]+)$'
-          if ! [[ "$branch_name" =~ $EPHEMERAL_RE ]]; then
-            echo "Skipping non-ephemeral branch (no pattern match): $branch_name"
+          if ! [[ "$branch_name" =~ $EPHEMERAL_RE || "$branch_id" =~ $EPHEMERAL_RE ]]; then
+            echo "Skipping non-ephemeral branch (no pattern match): $display_name ($branch_id)"
             continue
           fi
 
@@ -135,8 +141,8 @@ runs:
             break
           fi
 
-          echo "Deleting old ephemeral branch: $branch_name"
-          if npx neonctl branches delete "$branch_name" \
+          echo "Deleting old ephemeral branch: $display_name ($branch_id)"
+          if npx neonctl branches delete "$delete_ref" \
             --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
             DELETED_COUNT=$((DELETED_COUNT + 1))
             echo "  Deleted successfully"

@@ -697,7 +697,7 @@ export function ProfileInlineNotificationsCTA({
       <div
         data-testid='profile-inline-cta'
         data-ui='step-stack'
-        className='min-h-[116px]'
+        className={inlineComposerWrapperClassName}
       >
         <SubscriptionFormSkeleton />
       </div>
