@@ -161,8 +161,8 @@ export const useErrorHandler = () => {
   );
 
   // Provide additional state for consumers that need to check SDK status
-  const sentryMode = React.useMemo(() => getSentryMode(), []);
-  const isSentryReady = React.useMemo(() => isSentryInitialized(), []);
+  const sentryMode = getSentryMode();
+  const isSentryReady = isSentryInitialized();
 
   return { handleError, sentryMode, isSentryReady };
 };
