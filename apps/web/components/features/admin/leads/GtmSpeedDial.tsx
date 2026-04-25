@@ -121,7 +121,7 @@ export function GtmSpeedDial() {
   if (settingsQuery.isError || !settings) {
     return (
       <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
-        <p className='text-[12px] font-[450] text-destructive'>
+        <p className='text-xs font-book text-destructive'>
           Failed to load pipeline settings.
         </p>
       </ContentSurfaceCard>
@@ -166,7 +166,7 @@ export function GtmSpeedDial() {
             disabled={mutation.isPending}
             aria-pressed={currentSpeed === speed}
             className={cn(
-              'rounded-[10px] px-3.5 py-1.5 text-[13px] font-[510] transition-colors',
+              'rounded-[10px] px-3.5 py-1.5 text-app font-medium transition-colors',
               currentSpeed === speed
                 ? 'bg-primary-token text-on-primary'
                 : 'bg-surface-0 text-secondary-token hover:text-primary-token hover:bg-surface-0/80'
@@ -176,8 +176,8 @@ export function GtmSpeedDial() {
           </button>
         ))}
         {currentSpeed === 'custom' && (
-          <span className='flex items-center gap-2 text-[13px] text-secondary-token'>
-            <span className='rounded-[10px] bg-surface-0 px-3 py-1.5 font-[510]'>
+          <span className='flex items-center gap-2 text-app text-secondary-token'>
+            <span className='rounded-[10px] bg-surface-0 px-3 py-1.5 font-medium'>
               Custom: {settings.dailySendCap}/day, {settings.maxPerHour}/hr
             </span>
             <button
@@ -191,7 +191,7 @@ export function GtmSpeedDial() {
           </span>
         )}
       </div>
-      <p className='mt-2 text-[12px] font-[450] text-secondary-token'>
+      <p className='mt-2 text-xs font-book text-secondary-token'>
         {isActive ? (
           <>
             <span className='mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-success' />
