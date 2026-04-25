@@ -13,6 +13,9 @@
 import { isPrivateHostname } from '@/lib/ingestion/avatar/network-safety';
 import { isSafeExternalHttpsUrl } from '@/lib/ingestion/flows/avatar-hosting';
 import { logger } from '@/lib/utils/logger';
+import { sanitizeText } from './extract-bio-candidate';
+
+const TITLE_MAX_LENGTH = 120;
 
 export type SafeFetchError =
   | 'invalid_url'
@@ -113,7 +116,12 @@ function isAuthWallRedirectTarget(targetUrl: URL): boolean {
 function extractTitle(html: string): string | undefined {
   const match = /<title[^>]*>([^<]{1,300})<\/title>/i.exec(html);
   if (!match?.[1]) return undefined;
-  return match[1].trim().replace(/\s+/g, ' ').slice(0, 200) || undefined;
+  // Route title through the same defense pipeline as bio text: strip URLs,
+  // control chars, zero-width chars, then cap. The confirmation card displays
+  // this string to the user, so attacker-controlled `<title>BUY $XYZ at
+  // evil.com</title>` should not ride through unchanged.
+  const sanitized = sanitizeText(match[1], TITLE_MAX_LENGTH);
+  return sanitized || undefined;
 }
 
 async function readBodyWithCap(response: Response): Promise<string | null> {

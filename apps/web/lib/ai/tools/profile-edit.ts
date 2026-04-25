@@ -41,9 +41,12 @@ export function createProfileEditTool(context: ProfileEditContext) {
     sourceUrl: z
       .string()
       .url()
+      .refine(value => value.startsWith('https://'), {
+        message: 'sourceUrl must be https',
+      })
       .optional()
       .describe(
-        'Provenance: the public URL the value was imported from, when applicable. Set this when the value came from importBioFromUrl so the confirmation card can show "imported from {host}".'
+        'Provenance: the public https URL the value was imported from, when applicable. Set this when the value came from importBioFromUrl so the confirmation card can show "imported from {host}". Must start with https://.'
       ),
     sourceTitle: z
       .string()

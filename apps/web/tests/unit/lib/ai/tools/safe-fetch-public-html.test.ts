@@ -68,6 +68,24 @@ describe('safeFetchPublicHtml — happy path', () => {
     expect(result.html).toContain('<title>Tim</title>');
     expect(result.sourceTitle).toBe('Tim');
   });
+
+  it('strips URLs and control chars from sourceTitle', async () => {
+    vi.stubGlobal(
+      'fetch',
+      fetchMock(() =>
+        htmlResponse(
+          '<html><head><title>BUY $XYZ at https://evil.com/promo</title></head></html>'
+        )
+      )
+    );
+
+    const result = await safeFetchPublicHtml('https://example.com/bio');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.sourceTitle).toBeDefined();
+    expect(result.sourceTitle).not.toContain('http');
+    expect(result.sourceTitle).not.toContain('evil.com');
+  });
 });
 
 describe('safeFetchPublicHtml — URL validation', () => {
