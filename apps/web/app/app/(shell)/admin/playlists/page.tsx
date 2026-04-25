@@ -245,7 +245,7 @@ export default async function AdminPlaylistsPage({
             <ContentSurfaceCard key={playlist.id} className='p-4'>
               <div className='flex items-start justify-between'>
                 <div>
-                  <h3 className='text-[15px] font-[510] text-white'>
+                  <h3 className='text-[15px] font-medium text-white'>
                     {playlist.title}
                   </h3>
                   <p className='mt-1 text-[13px] text-white/40'>
@@ -268,7 +268,7 @@ export default async function AdminPlaylistsPage({
                       />
                       <button
                         type='submit'
-                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-[13px] font-[510] text-white hover:opacity-90'
+                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90'
                       >
                         Approve
                       </button>
@@ -281,7 +281,7 @@ export default async function AdminPlaylistsPage({
                       />
                       <button
                         type='submit'
-                        className='rounded-md bg-white/5 px-3 py-1.5 text-[13px] font-[450] text-white/60 hover:bg-white/10'
+                        className='rounded-md bg-white/5 px-3 py-1.5 text-[13px] font-book text-white/60 hover:bg-white/10'
                       >
                         Reject
                       </button>
