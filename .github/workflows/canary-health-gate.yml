@@ -345,59 +345,57 @@ jobs:
 
           echo "✅ Homepage renders correctly"
 
+          check_route_renders() {
+            local route_label="$1"
+            local route_path="$2"
+            local min_chars="$3"
+            local status_key="$4"
+            local route_url="${deployment_url%/}${route_path}"
+            local attempt=1
+            local max_attempts=5
+            local response route_code route_body sleep_seconds
+
+            echo "Checking ${route_label} route renders..."
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+              route_code="${response##*$'\n'}"
+              route_body="${response%$'\n'*}"
+
+              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
+                echo "✅ ${route_label} renders correctly"
+                return 0
+              fi
+
+              if [ "$route_code" = "000" ] || [ "$route_code" = "500" ] || [ "$route_code" = "502" ] || [ "$route_code" = "503" ] || [ "$route_code" = "504" ]; then
+                sleep_seconds=$((attempt * 10))
+                echo "⚠ ${route_label} got transient HTTP $route_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+                sleep "$sleep_seconds"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              if [ "$route_code" != "200" ]; then
+                echo "❌ Canary failed: ${route_path} returned HTTP $route_code"
+              elif [ ${#route_body} -lt "$min_chars" ]; then
+                echo "❌ Canary failed: ${route_path} body too short (${#route_body} chars) - likely broken"
+              else
+                echo "❌ Canary failed: ${route_path} contains error message"
+              fi
+              echo "canary_status=${status_key}" >> "$GITHUB_OUTPUT"
+              exit 1
+            done
+
+            echo "❌ Canary failed: ${route_path} did not render after transient retries (last HTTP $route_code)"
+            echo "canary_status=${status_key}" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+
           # Verify signup still renders because this is the top conversion entrypoint.
-          echo "Checking signup route renders..."
-          signup_url="${deployment_url%/}/signup"
-          signup_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${signup_url}$( [[ "$signup_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
-          signup_code="${signup_response##*$'\n'}"
-          signup_body="${signup_response%$'\n'*}"
-
-          if [ "$signup_code" != "200" ]; then
-            echo "❌ Canary failed: /signup returned HTTP $signup_code"
-            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if [ ${#signup_body} -lt 500 ]; then
-            echo "❌ Canary failed: /signup body too short (${#signup_body} chars) - likely broken"
-            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if echo "$signup_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
-            echo "❌ Canary failed: /signup contains error message"
-            echo "canary_status=failed_signup" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          echo "✅ Signup renders correctly"
+          check_route_renders "Signup" "/signup" 500 "failed_signup"
 
           # Verify signin still renders because staging auth must stay healthy.
-          echo "Checking signin route renders..."
-          signin_url="${deployment_url%/}/signin"
-          signin_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${signin_url}$( [[ "$signin_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
-          signin_code="${signin_response##*$'\n'}"
-          signin_body="${signin_response%$'\n'*}"
-
-          if [ "$signin_code" != "200" ]; then
-            echo "❌ Canary failed: /signin returned HTTP $signin_code"
-            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if [ ${#signin_body} -lt 500 ]; then
-            echo "❌ Canary failed: /signin body too short (${#signin_body} chars) - likely broken"
-            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if echo "$signin_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
-            echo "❌ Canary failed: /signin contains error message"
-            echo "canary_status=failed_signin" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          echo "✅ Signin renders correctly"
+          check_route_renders "Signin" "/signin" 500 "failed_signin"
 
           # Verify /api/chat is reachable and auth-gated.
           #

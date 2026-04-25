@@ -224,7 +224,7 @@ https://instagram.com/artist'
         className='text-xs'
         aria-label='Batch URLs input'
       />
-      <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
+      <div className='flex items-center justify-between gap-3 text-2xs text-tertiary-token'>
         <span>
           {parsedUrls.length} URL{parsedUrls.length === 1 ? '' : 's'} parsed
         </span>
@@ -299,7 +299,7 @@ https://instagram.com/artist'
         className='text-xs'
         aria-label='Queue URLs input'
       />
-      <div className='flex items-center justify-between gap-3 text-[11px] text-tertiary-token'>
+      <div className='flex items-center justify-between gap-3 text-2xs text-tertiary-token'>
         <span>
           {queuedUrls.length} URL{queuedUrls.length === 1 ? '' : 's'} ready for
           intake
@@ -351,7 +351,7 @@ export function GrowthIntakeComposer({
   return (
     <div className='space-y-3' data-testid='admin-growth-view-ingest'>
       <div className='space-y-1'>
-        <h3 className='text-[13px] font-[510] text-primary-token'>
+        <h3 className='text-app font-medium text-primary-token'>
           Unified Intake
         </h3>
         <p className='text-xs text-secondary-token'>
