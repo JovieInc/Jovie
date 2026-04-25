@@ -123,6 +123,7 @@ describe('GET /api/stripe-connect/status', () => {
     expect(err).toBe(stripeErr);
     expect(context).toMatchObject({
       clerkUserId: 'clerk_user_123',
+      stripeAccountId: 'acct_abc',
       route: '/api/stripe-connect/status',
     });
   });

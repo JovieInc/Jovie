@@ -85,6 +85,7 @@ export async function GET() {
         stripeErr,
         {
           clerkUserId,
+          stripeAccountId: profile.stripeAccountId,
           route: '/api/stripe-connect/status',
         }
       );
