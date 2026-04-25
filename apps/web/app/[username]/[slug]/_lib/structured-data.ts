@@ -25,6 +25,93 @@ const CREDIT_ROLE_SCHEMA_MAP: Record<string, string> = {
   featured_artist: 'contributor',
 };
 
+type TrackListItem = {
+  title: string;
+  slug: string;
+  trackNumber: number;
+  durationMs: number | null;
+};
+
+/** Build the image value for a music schema object. */
+function buildArtworkImageValue(
+  artworkUrl: string,
+  opts: {
+    title: string;
+    artistName: string;
+    contentType: 'release' | 'track';
+    artworkSizes?: Record<string, string> | null;
+  }
+): Record<string, unknown> | (Record<string, unknown> | string)[] {
+  const primaryImage = generateArtworkImageObject(artworkUrl, opts);
+
+  const additionalImages: string[] = [];
+  if (opts.artworkSizes?.['1000'])
+    additionalImages.push(opts.artworkSizes['1000']);
+  if (opts.artworkSizes?.original)
+    additionalImages.push(opts.artworkSizes.original);
+
+  return additionalImages.length > 0
+    ? [primaryImage, ...additionalImages]
+    : primaryImage;
+}
+
+/** Map credit groups to flattened schema.org Person references. */
+function buildFlatCredits(
+  credits: SmartLinkCreditGroup[] | null | undefined
+): Record<string, unknown> {
+  const creditProps: Record<string, unknown[]> = {};
+  if (credits) {
+    for (const group of credits) {
+      const schemaProp = CREDIT_ROLE_SCHEMA_MAP[group.role];
+      if (!schemaProp) continue;
+      if (!creditProps[schemaProp]) creditProps[schemaProp] = [];
+      for (const entry of group.entries) {
+        creditProps[schemaProp].push({
+          '@type': 'Person',
+          name: entry.name,
+          ...(entry.handle && { url: `${BASE_URL}/${entry.handle}` }),
+        });
+      }
+    }
+  }
+
+  const flatCredits: Record<string, unknown> = {};
+  for (const [prop, people] of Object.entries(creditProps)) {
+    flatCredits[prop] = people.length === 1 ? people[0] : people;
+  }
+  return flatCredits;
+}
+
+/** Build an ItemList schema for an album's track listing. */
+function buildTrackListSchema(
+  contentType: 'release' | 'track',
+  trackList: TrackListItem[] | null | undefined,
+  contentUrl: string,
+  artistUrl: string
+): Record<string, unknown> | undefined {
+  if (contentType !== 'release' || !trackList || trackList.length === 0) {
+    return undefined;
+  }
+  return {
+    '@type': 'ItemList',
+    numberOfItems: trackList.length,
+    itemListElement: trackList.map((t, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      item: {
+        '@type': 'MusicRecording',
+        name: t.title,
+        url: `${contentUrl}/${t.slug}`,
+        ...(t.durationMs &&
+          t.durationMs > 0 && {
+            duration: msToIsoDuration(t.durationMs),
+          }),
+        byArtist: { '@id': `${artistUrl}#musicgroup` },
+      },
+    })),
+  };
+}
+
 /**
  * Generate a single @graph JSON-LD for music content SEO.
  * Includes MusicAlbum/MusicRecording + BreadcrumbList + credits + track list.
@@ -51,98 +138,36 @@ export function generateMusicStructuredData(
     username: string;
     usernameNormalized: string;
   },
-  trackList?: Array<{
-    title: string;
-    slug: string;
-    trackNumber: number;
-    durationMs: number | null;
-  }> | null
+  trackList?: TrackListItem[] | null
 ) {
   const artistName = creator.displayName ?? creator.username;
   const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
   const artistUrl = `${BASE_URL}/${creator.usernameNormalized}`;
 
   const sameAs = content.providerLinks.map(link => link.url);
-
   const schemaType =
     content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
 
-  let imageValue:
-    | Record<string, unknown>
-    | (Record<string, unknown> | string)[]
-    | undefined;
-  if (content.artworkUrl) {
-    const primaryImage = generateArtworkImageObject(content.artworkUrl, {
-      title: content.title,
-      artistName,
-      contentType: content.type,
-      artworkSizes: content.artworkSizes,
-    });
-
-    const additionalImages: string[] = [];
-    if (content.artworkSizes?.['1000'])
-      additionalImages.push(content.artworkSizes['1000']);
-    if (content.artworkSizes?.original)
-      additionalImages.push(content.artworkSizes.original);
-
-    imageValue =
-      additionalImages.length > 0
-        ? [primaryImage, ...additionalImages]
-        : primaryImage;
-  }
+  const imageValue = content.artworkUrl
+    ? buildArtworkImageValue(content.artworkUrl, {
+        title: content.title,
+        artistName,
+        contentType: content.type,
+        artworkSizes: content.artworkSizes,
+      })
+    : undefined;
 
   const listenActions = buildListenActions(
     content.providerLinks,
     PROVIDER_CONFIG as Record<string, { label: string }>
   );
-
-  // Map credits to schema.org Person references
-  const creditProps: Record<string, unknown[]> = {};
-  if (content.credits) {
-    for (const group of content.credits) {
-      const schemaProp = CREDIT_ROLE_SCHEMA_MAP[group.role];
-      if (!schemaProp) continue;
-      if (!creditProps[schemaProp]) creditProps[schemaProp] = [];
-      for (const entry of group.entries) {
-        creditProps[schemaProp].push({
-          '@type': 'Person',
-          name: entry.name,
-          ...(entry.handle && {
-            url: `${BASE_URL}/${entry.handle}`,
-          }),
-        });
-      }
-    }
-  }
-
-  // Flatten single-element credit arrays
-  const flatCredits: Record<string, unknown> = {};
-  for (const [prop, people] of Object.entries(creditProps)) {
-    flatCredits[prop] = people.length === 1 ? people[0] : people;
-  }
-
-  // Build track list for albums
-  let trackListSchema: Record<string, unknown> | undefined;
-  if (content.type === 'release' && trackList && trackList.length > 0) {
-    trackListSchema = {
-      '@type': 'ItemList',
-      numberOfItems: trackList.length,
-      itemListElement: trackList.map((t, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'MusicRecording',
-          name: t.title,
-          url: `${contentUrl}/${t.slug}`,
-          ...(t.durationMs &&
-            t.durationMs > 0 && {
-              duration: msToIsoDuration(t.durationMs),
-            }),
-          byArtist: { '@id': `${artistUrl}#musicgroup` },
-        },
-      })),
-    };
-  }
+  const flatCredits = buildFlatCredits(content.credits);
+  const trackListSchema = buildTrackListSchema(
+    content.type,
+    trackList,
+    contentUrl,
+    artistUrl
+  );
 
   const musicSchema: Record<string, unknown> = {
     '@type': schemaType,
