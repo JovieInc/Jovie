@@ -285,7 +285,7 @@ export default function CheckoutSuccessPage() {
         source: 'billing_success',
       });
       setRequestState('success');
-      setFeedback('Request sent. Tim has been notified.');
+      setFeedback('Request sent. Our team has been notified.');
     } catch (error) {
       setRequestState('error');
       setFeedback(

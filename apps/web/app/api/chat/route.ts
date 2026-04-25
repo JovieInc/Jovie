@@ -75,6 +75,8 @@ import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
+export const dynamic = 'force-dynamic';
+
 export const maxDuration = 60;
 
 /** Maximum allowed message length (characters) */

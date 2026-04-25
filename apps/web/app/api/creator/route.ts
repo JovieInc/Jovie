@@ -3,6 +3,8 @@ import { captureError } from '@/lib/error-tracking';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { logger } from '@/lib/utils/logger';
 
+export const revalidate = 3600;
+
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Cache successful responses for 1 hour, allow stale-while-revalidate for 24 hours
