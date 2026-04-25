@@ -21,7 +21,7 @@ export function OutreachKpis({ counts }: OutreachKpisProps) {
         title='Outreach Pipeline'
         subtitle='Across email, DM, and manual-review queues'
         actions={
-          <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
+          <span className='text-xs font-semibold tabular-nums text-secondary-token'>
             {counts.total} total
           </span>
         }

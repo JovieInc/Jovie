@@ -116,7 +116,7 @@ function PayDrawerPreview({
               <span
                 className={cn(
                   'text-[12px] font-medium',
-                  featured ? 'text-black/50' : 'text-white/44'
+                  featured ? 'text-black/60' : 'text-white/56'
                 )}
               >
                 {row.currency}
@@ -148,7 +148,7 @@ function TourDrawerPreview({
               index === 0 ? 'pt-1.5' : 'border-t border-white/[0.08]'
             )}
           >
-            <span className='text-[11px] font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/44'>
+            <span className='text-[11px] font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/56'>
               {row.month}
               <strong className='mt-0.5 block text-[18px] font-semibold normal-case tracking-[-0.02em] text-white'>
                 {row.day}
@@ -158,7 +158,7 @@ function TourDrawerPreview({
               <span className='block truncate text-[14px] font-semibold tracking-[-0.02em] text-white'>
                 {row.venue}
               </span>
-              <span className='mt-0.5 block truncate text-[12px] text-white/44'>
+              <span className='mt-0.5 block truncate text-[12px] text-white/56'>
                 {row.location}
               </span>
             </span>

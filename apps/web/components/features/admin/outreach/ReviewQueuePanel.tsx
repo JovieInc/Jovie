@@ -122,7 +122,7 @@ export function ReviewQueuePanel() {
           title='Manual review'
           subtitle='Leads requiring a human pass before outreach continues.'
           actions={
-            <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
+            <span className='text-xs font-semibold tabular-nums text-secondary-token'>
               {total} queued
             </span>
           }
@@ -210,7 +210,7 @@ export function ReviewQueuePanel() {
                         void handleSkip(lead.id);
                       }}
                       disabled={skippingId === lead.id}
-                      className='h-8 px-3 text-[12px]'
+                      className='h-8 px-3 text-xs'
                     >
                       {skippingId === lead.id ? (
                         <LoadingSpinner
