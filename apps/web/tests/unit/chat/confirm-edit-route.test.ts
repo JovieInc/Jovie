@@ -1,44 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { POST } from '@/app/api/chat/confirm-edit/route';
+const hoisted = vi.hoisted(() => ({
+  getCachedAuthMock: vi.fn(),
+  getOwnedChatProfileMock: vi.fn(),
+  updateWhereMock: vi.fn().mockResolvedValue(undefined),
+  updateSetMock: vi.fn(),
+  updateMock: vi.fn(),
+  insertValuesMock: vi.fn().mockResolvedValue(undefined),
+  insertMock: vi.fn(),
+}));
 
-// --- Hoisted mocks for DB operations ---
-const hoisted = vi.hoisted(() => {
-  const findFirstMock = vi.fn();
-  const updateSetMock = vi.fn().mockReturnValue({
-    where: vi.fn().mockResolvedValue(undefined),
-  });
-  const updateMock = vi.fn().mockReturnValue({
-    set: updateSetMock,
-  });
-  const insertValuesMock = vi.fn().mockResolvedValue(undefined);
-  const insertMock = vi.fn().mockReturnValue({
-    values: insertValuesMock,
-  });
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.getCachedAuthMock,
+}));
 
-  return {
-    findFirstMock,
-    updateMock,
-    updateSetMock,
-    insertMock,
-    insertValuesMock,
-  };
-});
-
-// --- Module mocks ---
-let mockUserId: string | null = 'user_abc';
-
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: mockUserId })),
+vi.mock('@/lib/chat/profile-ownership', () => ({
+  getOwnedChatProfile: hoisted.getOwnedChatProfileMock,
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    query: {
-      creatorProfiles: {
-        findFirst: hoisted.findFirstMock,
-      },
-    },
     update: hoisted.updateMock,
     insert: hoisted.insertMock,
   },
@@ -51,7 +32,6 @@ vi.mock('@/lib/db/schema/chat', () => ({
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',
-    userId: 'userId',
     displayName: 'displayName',
     bio: 'bio',
   },
@@ -77,7 +57,12 @@ vi.mock('@/lib/http/headers', () => ({
   NO_CACHE_HEADERS: { 'Cache-Control': 'no-store' },
 }));
 
-/** Helper to create a Request with JSON body. */
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+}));
+
+import { POST } from '@/app/api/chat/confirm-edit/route';
+
 function makeRequest(body: unknown): Request {
   return new Request('http://localhost/api/chat/confirm-edit', {
     method: 'POST',
@@ -89,17 +74,29 @@ function makeRequest(body: unknown): Request {
 describe('POST /api/chat/confirm-edit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUserId = 'user_abc';
-    hoisted.findFirstMock.mockResolvedValue({
+
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_abc' });
+    hoisted.getOwnedChatProfileMock.mockResolvedValue({
       id: '550e8400-e29b-41d4-a716-446655440000',
-      userId: 'user_abc',
+      internalUserId: 'internal_user_1',
       displayName: 'Old Name',
       bio: 'Old bio',
+      username: 'artist',
+    });
+
+    hoisted.updateSetMock.mockReturnValue({
+      where: hoisted.updateWhereMock,
+    });
+    hoisted.updateMock.mockReturnValue({
+      set: hoisted.updateSetMock,
+    });
+    hoisted.insertMock.mockReturnValue({
+      values: hoisted.insertValuesMock,
     });
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockUserId = null;
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: null });
 
     const res = await POST(
       makeRequest({
@@ -165,7 +162,7 @@ describe('POST /api/chat/confirm-edit', () => {
   });
 
   it('returns 404 when profile is not found', async () => {
-    hoisted.findFirstMock.mockResolvedValue(null);
+    hoisted.getOwnedChatProfileMock.mockResolvedValue(null);
 
     const res = await POST(
       makeRequest({
@@ -180,13 +177,8 @@ describe('POST /api/chat/confirm-edit', () => {
     expect(body.error).toBe('Profile not found');
   });
 
-  it('returns 403 when profile belongs to a different user', async () => {
-    hoisted.findFirstMock.mockResolvedValue({
-      id: '550e8400-e29b-41d4-a716-446655440000',
-      userId: 'other_user',
-      displayName: 'Other Artist',
-      bio: 'Other bio',
-    });
+  it('returns 404 when profile belongs to a different user', async () => {
+    hoisted.getOwnedChatProfileMock.mockResolvedValue(null);
 
     const res = await POST(
       makeRequest({
@@ -196,9 +188,9 @@ describe('POST /api/chat/confirm-edit', () => {
       })
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error).toContain('not your profile');
+    expect(body.error).toBe('Profile not found');
   });
 
   it('returns 200 and updates displayName in database', async () => {
@@ -217,8 +209,6 @@ describe('POST /api/chat/confirm-edit', () => {
       field: 'displayName',
       newValue: 'New Name',
     });
-
-    // Verify DB update was called
     expect(hoisted.updateMock).toHaveBeenCalled();
   });
 
@@ -240,7 +230,7 @@ describe('POST /api/chat/confirm-edit', () => {
     });
   });
 
-  it('creates an audit log entry', async () => {
+  it('creates an audit log entry with the internal user id', async () => {
     await POST(
       makeRequest({
         profileId: '550e8400-e29b-41d4-a716-446655440000',
@@ -252,7 +242,7 @@ describe('POST /api/chat/confirm-edit', () => {
     expect(hoisted.insertMock).toHaveBeenCalled();
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: 'user_abc',
+        userId: 'internal_user_1',
         creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
         action: 'profile_edit',
         field: 'displayName',
@@ -263,10 +253,8 @@ describe('POST /api/chat/confirm-edit', () => {
   });
 
   it('returns 500 when database operation fails', async () => {
-    hoisted.updateMock.mockReturnValueOnce({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockRejectedValue(new Error('DB connection lost')),
-      }),
+    hoisted.updateSetMock.mockReturnValueOnce({
+      where: vi.fn().mockRejectedValue(new Error('DB connection lost')),
     });
 
     const res = await POST(
