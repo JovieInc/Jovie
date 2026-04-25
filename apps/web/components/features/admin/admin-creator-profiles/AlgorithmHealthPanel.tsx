@@ -190,10 +190,10 @@ function PrimarySummaryCard({
       </div>
 
       <div className='space-y-1'>
-        <p className='text-[14px] font-semibold tracking-[-0.01em] text-primary-token'>
+        <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
           {statusTitle}
         </p>
-        <p className='text-[12px] leading-[18px] text-secondary-token'>
+        <p className='text-xs leading-[18px] text-secondary-token'>
           {report.verdict.detail}
         </p>
       </div>
@@ -226,13 +226,11 @@ function MetricTile({
 }: Readonly<{ label: string; value: string; icon: ReactNode }>) {
   return (
     <div className='rounded-xl bg-surface-0 px-3 py-2'>
-      <div className='flex items-center gap-1.5 text-[11px] text-tertiary-token'>
+      <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
         {icon}
         <span>{label}</span>
       </div>
-      <p className='mt-1 text-[12px] font-semibold text-primary-token'>
-        {value}
-      </p>
+      <p className='mt-1 text-xs font-semibold text-primary-token'>{value}</p>
     </div>
   );
 }
@@ -250,11 +248,11 @@ function PanelEmptyState({
 }>) {
   return (
     <DrawerSurfaceCard variant='card' className='space-y-2 p-3' testId={testId}>
-      <div className='flex items-center gap-2 text-[12px] font-semibold text-primary-token'>
+      <div className='flex items-center gap-2 text-xs font-semibold text-primary-token'>
         {icon}
         <span>{title}</span>
       </div>
-      <p className='text-[12px] leading-[18px] text-secondary-token'>
+      <p className='text-xs leading-[18px] text-secondary-token'>
         {description}
       </p>
     </DrawerSurfaceCard>
@@ -276,7 +274,7 @@ function BulletList({
         return (
           <li
             key={`${tone}-${item}-${duplicateCount}`}
-            className='flex items-start gap-2 text-[12px] leading-[18px]'
+            className='flex items-start gap-2 text-xs leading-[18px]'
           >
             <span
               className={`mt-1 size-1.5 rounded-full ${tone === 'warning' ? 'bg-warning' : 'bg-secondary-token'}`}
@@ -309,21 +307,21 @@ function NeighbourRow({ neighbour }: Readonly<{ neighbour: ScoredNeighbour }>) {
           unoptimized
         />
       ) : (
-        <div className='flex size-10 items-center justify-center rounded-full bg-surface-1 text-[11px] text-secondary-token'>
+        <div className='flex size-10 items-center justify-center rounded-full bg-surface-1 text-2xs text-secondary-token'>
           ?
         </div>
       )}
 
       <div className='min-w-0 flex-1'>
         <div className='flex flex-wrap items-center gap-1.5'>
-          <p className='truncate text-[12px] font-semibold text-primary-token'>
+          <p className='truncate text-xs font-semibold text-primary-token'>
             {neighbour.artist.name}
           </p>
           <Badge variant={getSizeBadgeVariant(neighbour.size)} size='sm'>
             {capitalizeWord(neighbour.size)}
           </Badge>
         </div>
-        <p className='mt-1 text-[11px] leading-[16px] text-secondary-token'>
+        <p className='mt-1 text-2xs leading-[16px] text-secondary-token'>
           Pop {neighbour.artist.popularity} (
           {formatDelta(neighbour.popularityDelta)}) ·{' '}
           {neighbour.artist.followerCount.toLocaleString()} followers ·{' '}
