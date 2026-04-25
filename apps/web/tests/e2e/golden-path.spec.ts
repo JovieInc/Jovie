@@ -522,11 +522,15 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       const testHandle = `gp-${Date.now().toString(36)}`;
       await claimInput.fill(testHandle);
 
-      // Wait for availability check to complete. The spinner is rendered
-      // with accessible name "Checking availability" while the debounced
-      // API check is in flight; once hidden, the form's aria-busy flips
-      // false and Enter submission will proceed without racing the check.
-      await expect(page.getByLabel('Checking availability')).toBeHidden({
+      // Wait for the availability check to reach a terminal state. We
+      // can't just poll the spinner's visibility — the spinner is
+      // conditionally rendered (only present while `showChecking` is
+      // true), so `toBeHidden` passes both before the spinner mounts
+      // AND after the check completes. Instead, wait for the success
+      // helper text, which only appears in the available terminal state
+      // (the handle is generated with Date.now().toString(36) so a
+      // collision with an existing creator is extremely unlikely).
+      await expect(page.getByText(/is available — tap/i)).toBeVisible({
         timeout: 10_000,
       });
 
