@@ -62,10 +62,10 @@ function ProfileCompletenessBar({
   return (
     <div className='space-y-2.5'>
       <div className='flex items-center justify-between'>
-        <span className='text-[12px] font-medium tracking-normal text-secondary-token'>
+        <span className='text-xs font-medium tracking-normal text-secondary-token'>
           Profile completeness
         </span>
-        <span className='text-[12px] font-semibold text-primary-token'>
+        <span className='text-xs font-semibold text-primary-token'>
           {score}%
         </span>
       </div>
@@ -79,7 +79,7 @@ function ProfileCompletenessBar({
         {fields.map(field => (
           <li
             key={field.label}
-            className='flex items-center gap-2 text-[11px] text-secondary-token'
+            className='flex items-center gap-2 text-2xs text-secondary-token'
           >
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${field.filled ? 'bg-success' : 'bg-error'}`}
@@ -217,7 +217,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
                 href={link.url}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex items-center justify-between rounded-md border border-subtle px-2.5 py-2 text-[12px] transition-colors hover:bg-surface-0'
+                className='flex items-center justify-between rounded-md border border-subtle px-2.5 py-2 text-xs transition-colors hover:bg-surface-0'
               >
                 <span className='text-primary-token capitalize'>
                   {link.displayText ?? link.platform.replaceAll('_', ' ')}
@@ -230,7 +230,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
       ) : null}
 
       <DrawerSection title='Details' className='space-y-1.5' surface='card'>
-        <dl className='space-y-2 text-[12px]'>
+        <dl className='space-y-2 text-xs'>
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>
             <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>

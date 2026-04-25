@@ -121,7 +121,7 @@ export function AdminProfileSidebar({
                 />
               }
               meta={
-                <div className='flex flex-wrap items-center gap-2 text-[11px] text-tertiary-token'>
+                <div className='flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
                   <span>
                     {links.length} linked destination
                     {links.length === 1 ? '' : 's'}
@@ -131,14 +131,14 @@ export function AdminProfileSidebar({
               }
               footer={
                 <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-3'>
-                  <Label className='text-[11px] font-medium text-secondary-token'>
+                  <Label className='text-2xs font-medium text-secondary-token'>
                     Profile link
                   </Label>
                   <CopyLinkInput
                     url={`${BASE_URL}/${profile.username}`}
                     size='md'
                     className='flex-1'
-                    inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
+                    inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-2xs'
                   />
                 </div>
               }
