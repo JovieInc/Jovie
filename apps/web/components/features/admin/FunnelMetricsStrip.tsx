@@ -76,7 +76,7 @@ function PlaceholderMetricCard({
 }: Readonly<PlaceholderMetricCardProps>) {
   return (
     <ContentSurfaceCard className='space-y-2 p-4'>
-      <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
+      <p className='text-[11px] font-medium tracking-[0.04em] text-tertiary-token'>
         {title}
       </p>
       <div className='flex items-center justify-between gap-3'>
