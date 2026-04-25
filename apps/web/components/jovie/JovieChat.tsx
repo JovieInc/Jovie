@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-
+import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
@@ -19,6 +19,7 @@ import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import {
   useChatImageAttachments,
+  useChatJankMonitor,
   useJovieChat,
   useStickToBottom,
 } from './hooks';
@@ -56,6 +57,7 @@ export function JovieChat({
     isLoadingConversation,
     conversationTitle,
     status,
+    activeConversationId,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -106,6 +108,43 @@ export function JovieChat({
     disabled: isLoading || isSubmitting,
   });
 
+  // ─── Synthetic thinking message (render-only) ───────────────────
+  // Append a placeholder when waiting for the AI to start responding.
+  // This is a displayMessages array, NOT a modification to the real messages.
+  const lastMessage = messages[messages.length - 1];
+  const displayMessages =
+    isLoading && lastMessage?.role === 'user'
+      ? [
+          ...messages,
+          {
+            id: THINKING_PLACEHOLDER_ID,
+            role: 'assistant' as const,
+            parts: [] as MessagePart[],
+            createdAt: new Date(),
+          },
+        ]
+      : messages;
+
+  // ─── Sticky scroll via ResizeObserver ────────────────────────────
+  const {
+    isStuckToBottom,
+    setStuckToBottom,
+    onScroll,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom({ messageCount: displayMessages.length });
+
+  // ─── Chat jank instrumentation (flag-gated) ─────────────────
+  const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
+  const { onSend: notifyJankSend } = useChatJankMonitor({
+    conversationId: activeConversationId,
+    messages,
+    status,
+    isStuckToBottom,
+    scrollContainerRef,
+    enabled: jankMonitorEnabled,
+  });
+
   const openImagePicker = useCallback(() => {
     imageFileInputRef.current?.click();
   }, []);
@@ -136,10 +175,26 @@ export function JovieChat({
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
       const files = toFileUIParts();
+      notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
       clearImages();
     },
-    [handleSubmit, toFileUIParts, clearImages, isLoading, isSubmitting]
+    [
+      handleSubmit,
+      toFileUIParts,
+      clearImages,
+      isLoading,
+      isSubmitting,
+      notifyJankSend,
+    ]
+  );
+
+  const handleSuggestedPromptWithJank = useCallback(
+    (prompt: string) => {
+      notifyJankSend();
+      handleSuggestedPrompt(prompt);
+    },
+    [handleSuggestedPrompt, notifyJankSend]
   );
 
   // Notify parent when the conversation title changes
@@ -159,9 +214,10 @@ export function JovieChat({
       !isLoadingConversation
     ) {
       initialQuerySubmitted.current = true;
+      notifyJankSend();
       submitMessage(initialQuery);
     }
-  }, [initialQuery, isLoadingConversation, submitMessage]);
+  }, [initialQuery, isLoadingConversation, submitMessage, notifyJankSend]);
 
   // Populate known message IDs from hydrated conversation to skip entrance animations
   useEffect(() => {
@@ -171,32 +227,6 @@ export function JovieChat({
       }
     }
   }, [messages]);
-
-  // ─── Synthetic thinking message (render-only) ───────────────────
-  // Append a placeholder when waiting for the AI to start responding.
-  // This is a displayMessages array, NOT a modification to the real messages.
-  const lastMessage = messages[messages.length - 1];
-  const displayMessages =
-    isLoading && lastMessage?.role === 'user'
-      ? [
-          ...messages,
-          {
-            id: THINKING_PLACEHOLDER_ID,
-            role: 'assistant' as const,
-            parts: [] as MessagePart[],
-            createdAt: new Date(),
-          },
-        ]
-      : messages;
-
-  // ─── Sticky scroll via ResizeObserver ────────────────────────────
-  const {
-    isStuckToBottom,
-    setStuckToBottom,
-    onScroll,
-    totalSizeRef,
-    scrollContainerRef,
-  } = useStickToBottom({ messageCount: displayMessages.length });
 
   // Virtualizer
   const virtualizer = useVirtualizer({
@@ -472,7 +502,7 @@ export function JovieChat({
                 placeholder='Ask a follow-up...'
                 variant='compact'
                 quickActions={followUpQuickActions}
-                onQuickActionSelect={handleSuggestedPrompt}
+                onQuickActionSelect={handleSuggestedPromptWithJank}
               />
             </div>
           </div>
@@ -486,7 +516,7 @@ export function JovieChat({
               </h1>
               <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
                 <SuggestedPrompts
-                  onSelect={handleSuggestedPrompt}
+                  onSelect={handleSuggestedPromptWithJank}
                   isFirstSession={isFirstSession}
                   latestReleaseTitle={latestReleaseTitle}
                   layout='rail'

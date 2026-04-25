@@ -575,13 +575,13 @@ export function useJovieChat({
       if (!command) return false;
 
       const userMsg = {
-        id: `cmd-user-${Date.now()}`,
+        id: `cmd-user-${crypto.randomUUID()}`,
         role: 'user' as const,
         parts: [{ type: 'text' as const, text: trimmedText }],
         createdAt: new Date(),
       };
       const assistantMsg = {
-        id: `cmd-assistant-${Date.now()}`,
+        id: `cmd-assistant-${crypto.randomUUID()}`,
         role: 'assistant' as const,
         parts: [{ type: 'text' as const, text: command.confirmationMessage }],
         createdAt: new Date(),
