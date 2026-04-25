@@ -61,7 +61,7 @@ function ReleaseTypeBadge({ type }: { readonly type: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize',
+        'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-medium capitalize',
         variant
       )}
     >
@@ -76,7 +76,7 @@ function SourceTypeBadge({ type }: { readonly type: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize',
+        'inline-flex items-center rounded-full px-1.5 py-0.5 text-3xs font-medium capitalize',
         variant
       )}
     >
@@ -111,7 +111,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
   }
 
   if (issues.length === 0) {
-    return <span className='text-[11px] text-tertiary-token'>—</span>;
+    return <span className='text-2xs text-tertiary-token'>—</span>;
   }
 
   return (
@@ -119,7 +119,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
       {issues.map(issue => (
         <span
           key={issue.label}
-          className='inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400'
+          className='inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-3xs font-medium text-red-600 dark:text-red-400'
           title={issue.label}
         >
           {issue.icon}
@@ -167,7 +167,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
               )}
             </div>
             <div className='min-w-0'>
-              <p className='truncate text-[13px] font-medium text-primary-token'>
+              <p className='truncate text-app font-medium text-primary-token'>
                 {release.title}
               </p>
               <ReleaseTypeBadge type={release.releaseType} />
@@ -194,16 +194,16 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
               {release.artistAvatarUrl ? (
                 <AvatarImage src={release.artistAvatarUrl} alt='' />
               ) : null}
-              <AvatarFallback className='text-[10px]'>
+              <AvatarFallback className='text-3xs'>
                 <User className='size-3' />
               </AvatarFallback>
             </Avatar>
             <div className='min-w-0'>
-              <p className='truncate text-[12px] font-medium text-primary-token'>
+              <p className='truncate text-xs font-medium text-primary-token'>
                 @{release.artistUsername}
               </p>
               {release.artistDisplayName ? (
-                <p className='truncate text-[11px] text-tertiary-token'>
+                <p className='truncate text-2xs text-tertiary-token'>
                   {release.artistDisplayName}
                 </p>
               ) : null}
@@ -219,14 +219,12 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
         const count = getValue();
         if (count === 0) {
           return (
-            <span className='inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400'>
+            <span className='inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-2xs font-medium text-red-600 dark:text-red-400'>
               0
             </span>
           );
         }
-        return (
-          <span className='text-[12px] text-secondary-token'>{count}</span>
-        );
+        return <span className='text-xs text-secondary-token'>{count}</span>;
       },
     }),
     columnHelper.accessor('sourceType', {
@@ -238,7 +236,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
       header: 'Released',
       size: 110,
       cell: ({ getValue }) => (
-        <span className='text-[12px] text-secondary-token'>
+        <span className='text-xs text-secondary-token'>
           {formatDate(getValue())}
         </span>
       ),
@@ -247,7 +245,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
       header: 'Ingested',
       size: 110,
       cell: ({ getValue }) => (
-        <span className='text-[12px] text-secondary-token'>
+        <span className='text-xs text-secondary-token'>
           {formatDate(getValue())}
         </span>
       ),

@@ -42,8 +42,8 @@ function ConversionMetric({
       icon={Icon}
       iconClassName={iconClassName}
       className='rounded-md px-2.5 py-2'
-      labelClassName='text-[12px] font-[500] text-secondary-token'
-      valueClassName='text-[12px] font-semibold text-primary-token tabular-nums'
+      labelClassName='text-xs font-[500] text-secondary-token'
+      valueClassName='text-xs font-semibold text-primary-token tabular-nums'
     />
   );
 }
@@ -72,7 +72,7 @@ function PipelineStep({
       icon={Icon}
       iconClassName={iconClassName}
       valueClassName='text-[24px] font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'
-      subtitleClassName='text-[11px] leading-[16px] text-secondary-token'
+      subtitleClassName='text-2xs leading-[16px] text-secondary-token'
     />
   );
 }
@@ -89,7 +89,7 @@ export function OutreachPipelineCard({
         subtitle='Last 7 days · Email & DM campaigns'
         actions={
           hasOutreachData ? (
-            <span className='text-[12px] font-semibold tabular-nums text-secondary-token'>
+            <span className='text-xs font-semibold tabular-nums text-secondary-token'>
               {formatPercent(metrics.claimRate)} conv.
             </span>
           ) : null

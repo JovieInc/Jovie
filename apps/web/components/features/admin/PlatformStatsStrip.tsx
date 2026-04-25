@@ -21,7 +21,7 @@ function StatCard({ value, label }: Readonly<StatCardProps>) {
       className='p-3'
       bodyClassName='space-y-1'
       valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-primary-token tabular-nums'
-      labelClassName='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'
+      labelClassName='text-2xs font-medium tracking-[0.04em] text-tertiary-token'
     />
   );
 }
