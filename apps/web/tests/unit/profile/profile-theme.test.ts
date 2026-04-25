@@ -71,4 +71,14 @@ describe('profile theme helpers', () => {
 
     expect(vars['--profile-pearl-primary-fg']).toBe('#0f172a');
   });
+
+  it('falls back to black when slate text is not AA-safe', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#888888',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#000000');
+  });
 });
