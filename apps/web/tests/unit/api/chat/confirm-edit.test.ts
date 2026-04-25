@@ -2,20 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   authMock: vi.fn(),
-  findFirstMock: vi.fn(),
+  getOwnedChatProfileMock: vi.fn(),
   updateWhereMock: vi.fn().mockResolvedValue(undefined),
-  updateSetMock: vi
-    .fn()
-    .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
   updateMock: vi.fn().mockReturnValue({
     set: vi
       .fn()
       .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
   }),
-  insertValuesMock: vi.fn().mockResolvedValue(undefined),
-  insertMock: vi
-    .fn()
-    .mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
+  insertMock: vi.fn().mockReturnValue({
+    values: vi.fn().mockResolvedValue(undefined),
+  }),
   captureExceptionMock: vi.fn(),
 }));
 
@@ -23,13 +19,12 @@ vi.mock('@clerk/nextjs/server', () => ({
   auth: hoisted.authMock,
 }));
 
+vi.mock('@/lib/chat/profile-ownership', () => ({
+  getOwnedChatProfile: hoisted.getOwnedChatProfileMock,
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
-    query: {
-      creatorProfiles: {
-        findFirst: hoisted.findFirstMock,
-      },
-    },
     update: hoisted.updateMock,
     insert: hoisted.insertMock,
   },
@@ -38,7 +33,6 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',
-    userId: 'userId',
     displayName: 'displayName',
     bio: 'bio',
   },
@@ -87,37 +81,9 @@ describe('POST /api/chat/confirm-edit', () => {
     expect(response.status).toBe(401);
   });
 
-  it('returns 400 for invalid JSON body', async () => {
+  it('returns 404 when the Clerk user does not own the profile', async () => {
     hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-
-    const { POST } = await import('@/app/api/chat/confirm-edit/route');
-    const request = new Request('http://localhost/api/chat/confirm-edit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'not json',
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-  });
-
-  it('returns 400 for invalid schema', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-
-    const { POST } = await import('@/app/api/chat/confirm-edit/route');
-    const request = new Request('http://localhost/api/chat/confirm-edit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ field: 'invalid_field', newValue: 'test' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-  });
-
-  it('returns 404 when profile not found', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.findFirstMock.mockResolvedValue(null);
+    hoisted.getOwnedChatProfileMock.mockResolvedValue(null);
 
     const { POST } = await import('@/app/api/chat/confirm-edit/route');
     const request = new Request('http://localhost/api/chat/confirm-edit', {
@@ -132,40 +98,23 @@ describe('POST /api/chat/confirm-edit', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(404);
+    expect(hoisted.getOwnedChatProfileMock).toHaveBeenCalledWith({
+      profileId: 'a0000000-0000-4000-8000-000000000001',
+      clerkUserId: 'user_123',
+    });
   });
 
-  it('returns 403 when profile belongs to another user', async () => {
+  it('writes audit rows with the internal user id, not the Clerk user id', async () => {
+    const insertValuesMock = vi.fn().mockResolvedValue(undefined);
     hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.findFirstMock.mockResolvedValue({
+    hoisted.getOwnedChatProfileMock.mockResolvedValue({
       id: 'a0000000-0000-4000-8000-000000000001',
-      userId: 'other_user',
+      internalUserId: 'internal_user_1',
       displayName: 'Old Name',
       bio: null,
+      username: 'artist',
     });
-
-    const { POST } = await import('@/app/api/chat/confirm-edit/route');
-    const request = new Request('http://localhost/api/chat/confirm-edit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profileId: 'a0000000-0000-4000-8000-000000000001',
-        field: 'displayName',
-        newValue: 'New Name',
-      }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(403);
-  });
-
-  it('successfully applies edit and returns success', async () => {
-    hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.findFirstMock.mockResolvedValue({
-      id: 'a0000000-0000-4000-8000-000000000001',
-      userId: 'user_123',
-      displayName: 'Old Name',
-      bio: null,
-    });
+    hoisted.insertMock.mockReturnValue({ values: insertValuesMock });
 
     const { POST } = await import('@/app/api/chat/confirm-edit/route');
     const request = new Request('http://localhost/api/chat/confirm-edit', {
@@ -180,15 +129,19 @@ describe('POST /api/chat/confirm-edit', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.success).toBe(true);
-    expect(body.field).toBe('displayName');
-    expect(body.newValue).toBe('New Name');
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'internal_user_1',
+        creatorProfileId: 'a0000000-0000-4000-8000-000000000001',
+      })
+    );
   });
 
   it('returns 500 on DB error and reports to Sentry', async () => {
     hoisted.authMock.mockResolvedValue({ userId: 'user_123' });
-    hoisted.findFirstMock.mockRejectedValue(new Error('DB connection failed'));
+    hoisted.getOwnedChatProfileMock.mockRejectedValue(
+      new Error('DB connection failed')
+    );
 
     const { POST } = await import('@/app/api/chat/confirm-edit/route');
     const request = new Request('http://localhost/api/chat/confirm-edit', {

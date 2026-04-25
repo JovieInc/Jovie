@@ -115,7 +115,10 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
 
   if (!result.success) {
     return (
-      <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-[13px] text-primary-token'>
+      <output
+        role='alert'
+        className='block min-h-[72px] rounded-xl border border-red-500/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--color-surface-1))] p-3 text-[13px] text-primary-token'
+      >
         <span className='block font-medium'>Album Art Failed</span>
         <span className='mt-1 block text-secondary-token'>{result.error}</span>
         {result.retryable ? (
@@ -166,7 +169,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
   else if (result.hasExistingArtwork) applyButtonLabel = 'Replace Artwork';
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
+    <div className='min-h-[72px] rounded-xl border border-subtle bg-surface-1 p-3'>
       <div className='flex items-center justify-between gap-3'>
         <div className='min-w-0'>
           <div className='truncate text-[13px] font-medium text-primary-token'>
@@ -241,7 +244,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         </Button>
       </div>
       {applyMutation.isError || createMutation.isError ? (
-        <output className='mt-2 block text-[12px] text-red-500'>
+        <output role='alert' className='mt-2 block text-[12px] text-red-500'>
           Could not apply artwork. Try again.
         </output>
       ) : null}

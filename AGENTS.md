@@ -525,6 +525,14 @@ These registries are the **single source of truth** consumed by the CSP builder,
 - Only use a personalized first-name greeting when the source string clearly looks like a conventional human first-and-last name; if there is real doubt, fall back to a generic opener
 - When fixing one risky personalization path, search sibling email templates that use the same creator/user fields and apply the same guard there
 
+### 19. Main Chat Route Must Stay Orchestration-Only
+
+- `apps/web/app/api/chat/route.ts` owns chat orchestration only: auth, entitlements, quotas, request validation, context loading, model selection, streaming, and imported tool registration
+- **NEVER** add provider calls, image processing, uploads, direct DB mutations, or other feature-specific business logic to `apps/web/app/api/chat/route.ts`
+- **NEVER** add new inline `create*Tool()` builders or inline `tool({ execute })` implementations to that file
+- New or changed chat tools must live under `apps/web/lib/chat/tools/` and call shared services or dedicated route-local backends
+- If a chat feature needs long-running work, bounded external HTTP, uploads, or durable mutations, move that work behind a dedicated service or route and keep the streaming route as the coordinator only
+
 ---
 
 ## Custom ESLint Rules (Quick Reference)

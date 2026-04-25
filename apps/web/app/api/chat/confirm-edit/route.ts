@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getOwnedChatProfile } from '@/lib/chat/profile-ownership';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -60,15 +61,9 @@ export async function POST(req: Request) {
     parseResult.data;
 
   try {
-    // Fetch the profile and verify ownership
-    const profile = await db.query.creatorProfiles.findFirst({
-      where: eq(creatorProfiles.id, profileId),
-      columns: {
-        id: true,
-        userId: true,
-        displayName: true,
-        bio: true,
-      },
+    const profile = await getOwnedChatProfile({
+      profileId,
+      clerkUserId: userId,
     });
 
     if (!profile) {
@@ -78,17 +73,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (profile.userId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - not your profile' },
-        { status: 403, headers: NO_CACHE_HEADERS }
-      );
-    }
+    const oldValue =
+      field === 'displayName' ? profile.displayName : profile.bio;
 
-    // Get the old value for audit logging
-    const oldValue = profile[field];
-
-    // Apply the update
     await db
       .update(creatorProfiles)
       .set({
@@ -102,7 +89,7 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get('user-agent');
 
     await db.insert(chatAuditLog).values({
-      userId,
+      userId: profile.internalUserId,
       creatorProfileId: profileId,
       conversationId: conversationId ?? null,
       messageId: messageId ?? null,

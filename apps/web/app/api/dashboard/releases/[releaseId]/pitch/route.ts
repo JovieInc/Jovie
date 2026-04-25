@@ -4,7 +4,10 @@ import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { buildPitchInput, generatePitches } from '@/lib/services/pitch';
+import {
+  generateAndSaveReleasePitches,
+  ReleasePitchGenerationError,
+} from '@/lib/services/pitch/save-generated-pitches';
 
 export const runtime = 'nodejs';
 
@@ -12,28 +15,6 @@ const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
   Pragma: 'no-cache',
 } as const;
-
-/** Simple in-memory rate limiter: 10 generations per hour per profile */
-const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT = 10;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-function checkRateLimit(profileId: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(profileId);
-
-  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
-    rateLimitMap.set(profileId, { count: 1, windowStart: now });
-    return true;
-  }
-
-  if (entry.count >= RATE_LIMIT) {
-    return false;
-  }
-
-  entry.count++;
-  return true;
-}
 
 /**
  * POST /api/dashboard/releases/[releaseId]/pitch
@@ -55,36 +36,19 @@ export async function POST(
     }
 
     const { releaseId } = await params;
-
-    // Rate limit check
-    if (!checkRateLimit(profile.id)) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Try again later.' },
-        { status: 429, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const pitchInput = await buildPitchInput(profile.id, releaseId).catch(
-      () => null
-    );
-
-    if (!pitchInput) {
-      return NextResponse.json(
-        { error: 'Release not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const result = await generatePitches(pitchInput);
-
-    // Save to database
-    await db
-      .update(discogReleases)
-      .set({ generatedPitches: result.pitches })
-      .where(eq(discogReleases.id, releaseId));
+    const result = await generateAndSaveReleasePitches({
+      profileId: profile.id,
+      releaseId,
+    });
 
     return NextResponse.json(result.pitches, { headers: NO_STORE_HEADERS });
   } catch (error) {
+    if (error instanceof ReleasePitchGenerationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
     Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Failed to generate pitches' },

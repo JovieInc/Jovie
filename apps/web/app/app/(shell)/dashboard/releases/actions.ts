@@ -81,6 +81,10 @@ import {
   getCanvasStatusFromMetadata,
 } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
+import {
+  createManagedRelease,
+  ReleaseCreationError,
+} from '@/lib/services/releases/create-release';
 import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -90,6 +94,7 @@ import { getDashboardData, getDashboardShellData } from '../actions';
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
 const EDITABLE_ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+type ReleaseStatusValue = 'draft' | 'scheduled' | 'released';
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
   return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
@@ -2252,26 +2257,6 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
-type ReleaseStatusValue = 'draft' | 'scheduled' | 'released';
-
-function determineReleaseStatus(releaseDate: Date | null): ReleaseStatusValue {
-  if (!releaseDate) return 'draft';
-  return releaseDate > new Date() ? 'scheduled' : 'released';
-}
-
-function computeRevealDate(
-  formRevealDate: string | null,
-  releaseDate: Date | null,
-  status: ReleaseStatusValue
-): Date | null {
-  if (formRevealDate) return new Date(formRevealDate);
-  if (!releaseDate || status !== 'scheduled') return null;
-  const thirtyDaysBefore = new Date(releaseDate);
-  thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
-  const now = new Date();
-  return thirtyDaysBefore > now ? thirtyDaysBefore : now;
-}
-
 export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
@@ -2289,49 +2274,18 @@ export async function createRelease(formData: {
 
   const profile = await requireProfile();
 
-  const title = formData.title.trim();
-  if (!title) {
-    return { success: false, message: 'Title is required.' };
-  }
-
-  const slug = slugify(title);
-  if (!slug) {
-    return {
-      success: false,
-      message: 'Could not generate a valid slug from the title.',
-    };
-  }
-
-  const releaseDate = formData.releaseDate
-    ? new Date(formData.releaseDate)
-    : null;
-
-  const status = determineReleaseStatus(releaseDate);
-  const revealDate = computeRevealDate(
-    formData.revealDate ?? null,
-    releaseDate,
-    status
-  );
-
   try {
-    const [inserted] = await db
-      .insert(discogReleases)
-      .values({
-        creatorProfileId: profile.id,
-        title,
-        slug,
-        releaseType: formData.releaseType,
-        releaseDate,
-        status,
-        revealDate,
-        genres: formData.genres?.slice(0, 3) ?? null,
-        isExplicit: formData.isExplicit ?? false,
-        sourceType: 'manual',
-        totalTracks: formData.releaseType === 'single' ? 1 : 0,
-      })
-      .returning({ id: discogReleases.id });
+    const created = await createManagedRelease({
+      profileId: profile.id,
+      title: formData.title,
+      releaseType: formData.releaseType,
+      releaseDate: formData.releaseDate ?? null,
+      revealDate: formData.revealDate ?? null,
+      genres: formData.genres,
+      isExplicit: formData.isExplicit,
+    });
 
-    const releaseId = inserted.id;
+    const releaseId = created.id;
     const insertedRelease = await getReleaseById(releaseId);
     const providerLabels = buildProviderLabels();
 
@@ -2356,24 +2310,22 @@ export async function createRelease(formData: {
 
     return {
       success: true,
-      message: `Release "${title}" created.`,
+      message: `Release "${created.title}" created.`,
       releaseId,
       release,
     };
   } catch (error) {
     throwIfRedirect(error);
-
-    // Handle duplicate slug
-    if (isUniqueViolation(error)) {
+    if (error instanceof ReleaseCreationError) {
       return {
         success: false,
-        message: `A release with the slug "${slug}" already exists. Please choose a different title.`,
+        message: error.message,
       };
     }
 
     void captureError('createRelease failed', error as Error, {
       action: 'createRelease',
-      title,
+      title: formData.title,
     });
     return {
       success: false,

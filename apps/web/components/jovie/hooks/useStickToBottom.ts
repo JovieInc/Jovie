@@ -43,6 +43,7 @@ export function useStickToBottom({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<ResizeObserver | null>(null);
   const isStuckRef = useRef(true);
+  const previousHeightRef = useRef(0);
 
   // Reset stuck state when message count changes (new message sent/received)
   useEffect(() => {
@@ -91,11 +92,21 @@ export function useStickToBottom({
     if (!node) return;
     if (typeof ResizeObserver === 'undefined') return;
 
-    const observer = new ResizeObserver(() => {
+    previousHeightRef.current = node.getBoundingClientRect().height;
+
+    const observer = new ResizeObserver(entries => {
       if (!isStuckRef.current) return;
 
       const container = scrollContainerRef.current;
       if (!container) return;
+
+      const nextHeight = entries[0]?.contentRect.height ?? 0;
+      const previousHeight = previousHeightRef.current;
+      previousHeightRef.current = nextHeight;
+
+      if (nextHeight <= previousHeight) {
+        return;
+      }
 
       // Use instant scroll to avoid lag during streaming
       container.scrollTop = container.scrollHeight;

@@ -86,6 +86,22 @@ if [[ "$file_path" =~ ^apps/web/(app|components)/.*\.(ts|tsx)$ ]] \
   fi
 fi
 
+# HARD GUARDRAIL: Main chat route must remain orchestration-only
+if [[ "$file_path" == "apps/web/app/api/chat/route.ts" ]] && [ -n "$content" ]; then
+  if echo "$content" | grep -qE "function create[A-Z].*Tool\s*\(" || \
+     echo "$content" | grep -qE "tool\s*\(\s*\{[[:space:][:print:]]*execute\s*:"; then
+    echo "🚨 BLOCKED: apps/web/app/api/chat/route.ts must not define inline chat tools"
+    echo "File: $file_path"
+    echo ""
+    echo "Keep the chat route orchestration-only. Move tool implementations into:"
+    echo "  apps/web/lib/chat/tools/"
+    echo ""
+    echo "The main chat route may compose imported tool builders, but it may not"
+    echo "define create*Tool functions or inline tool({ execute }) blocks."
+    exit 1
+  fi
+fi
+
 # HARD GUARDRAIL: Marketing pages must remain fully static
 if [[ "$file_path" =~ ^apps/web/app/\(marketing\)/.*\.(ts|tsx)$ ]]; then
   if echo "$content" | grep -qE "export const revalidate\s*=" \

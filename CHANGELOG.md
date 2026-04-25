@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.175] - 2026-04-24
+
+> Chat is no longer a second backend hidden inside `apps/web/app/api/chat/route.ts`. Album-art generation now runs behind a dedicated worker route with fail-fast config handling, chat confirmation and release/pitch mutations now share canonical services, and failed album-art cards stay visible instead of collapsing and scrolling off-screen.
+
+### Added
+
+- `apps/web/app/api/chat/album-art/generate/route.ts` — dedicated album-art generation worker route with its own request budget and shared service boundary.
+- `apps/web/lib/chat/tools/*` — extracted chat tool builders and shared release lookup helpers so the main chat route stays orchestration-only.
+- Shared services for the drifted chat product logic:
+  `apps/web/lib/services/releases/create-release.ts`,
+  `apps/web/lib/services/pitch/save-generated-pitches.ts`,
+  `apps/web/lib/services/canvas/mark-uploaded.ts`,
+  `apps/web/lib/services/album-art/generate.ts`,
+  plus direct unit coverage for chat route orchestration, ownership resolution, release creation, pitch persistence, album-art generation, ESLint boundary enforcement, and the file-protection hook.
+
+### Changed
+
+- `apps/web/app/api/chat/route.ts` now composes imported tool builders only. Auth, rate limits, validation, context loading, model selection, and streaming stay here; provider calls, uploads, business logic, and persistence moved out.
+- `apps/web/app/app/(shell)/dashboard/releases/actions.ts`,
+  `apps/web/app/api/dashboard/releases/[releaseId]/pitch/route.ts`, and
+  `apps/web/lib/services/album-art/apply.ts` now reuse the same shared release and pitch services instead of maintaining parallel chat-only behavior.
+- `.claude/hooks/file-protection-check.sh`, `apps/web/eslint.config.js`, `AGENTS.md`, and `LESSONS.md` now enforce the new rule: no inline tool builders or feature-specific backend logic inside the main chat route.
+
+### Fixed
+
+- `apps/web/app/api/chat/confirm-edit/route.ts`,
+  `confirm-link/route.ts`, and `confirm-remove-link/route.ts` now resolve ownership through the canonical Clerk-to-user join instead of comparing the wrong id types.
+- `apps/web/components/jovie/hooks/useStickToBottom.ts`,
+  `components/jovie/components/ChatAlbumArtCard.tsx`, and
+  `components/jovie/tool-ui.tsx` now preserve failed album-art artifacts in view: no auto-scroll on height shrink, stable error-card height, `role="alert"` on failure, and no extra hidden follow-up artifact behavior.
+
 ## [26.4.174] - 2026-04-24
 
 > Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.

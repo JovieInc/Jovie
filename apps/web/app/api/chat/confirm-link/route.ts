@@ -3,12 +3,11 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getOwnedChatProfile } from '@/lib/chat/profile-ownership';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
@@ -60,29 +59,15 @@ export async function POST(req: Request) {
   const { profileId, platform, normalizedUrl } = parseResult.data;
 
   try {
-    // Verify profile ownership by joining users table to compare Clerk IDs
-    const [profile] = await db
-      .select({
-        id: creatorProfiles.id,
-        internalUserId: creatorProfiles.userId,
-        clerkId: users.clerkId,
-      })
-      .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
-      .limit(1);
+    const profile = await getOwnedChatProfile({
+      profileId,
+      clerkUserId: userId,
+    });
 
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
         { status: 404, headers: NO_CACHE_HEADERS }
-      );
-    }
-
-    if (profile.clerkId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - not your profile' },
-        { status: 403, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -161,7 +146,7 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get('user-agent');
 
     await db.insert(chatAuditLog).values({
-      userId: profile.internalUserId!,
+      userId: profile.internalUserId,
       creatorProfileId: profileId,
       action: 'add_social_link',
       field: 'social_links',

@@ -6,12 +6,11 @@ import { eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { processArtworkBufferToSizes } from '@/app/api/images/artwork/upload/process';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { getOwnedChatProfile } from '@/lib/chat/profile-ownership';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { generateUniqueSlug } from '@/lib/discography/slug';
 import { env } from '@/lib/env-server';
+import { createManagedRelease } from '@/lib/services/releases/create-release';
 import {
   fetchAlbumArtManifest,
   fetchCandidateBuffer,
@@ -30,28 +29,6 @@ function buildOriginalArtworkFields(
     }
   }
   return fields;
-}
-
-async function getOwnedProfile(params: {
-  readonly profileId: string;
-  readonly clerkUserId: string;
-}) {
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      clerkId: users.clerkId,
-    })
-    .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.id, params.profileId))
-    .limit(1);
-
-  if (profile?.clerkId !== params.clerkUserId) {
-    throw new Error('Profile not found');
-  }
-
-  return profile;
 }
 
 async function uploadProcessedReleaseArtwork(params: {
@@ -162,10 +139,13 @@ export async function applyGeneratedAlbumArt(params: {
   readonly artworkUrl: string;
   readonly sizes: Record<string, string>;
 }> {
-  const profile = await getOwnedProfile({
+  const profile = await getOwnedChatProfile({
     profileId: params.profileId,
     clerkUserId: params.clerkUserId,
   });
+  if (!profile) {
+    throw new Error('Profile not found');
+  }
   const [release] = await db
     .select({
       id: discogReleases.id,
@@ -232,16 +212,13 @@ export async function createReleaseAndApplyGeneratedAlbumArt(params: {
   readonly generationId: string;
   readonly candidateId: string;
 }) {
-  const profile = await getOwnedProfile({
+  const profile = await getOwnedChatProfile({
     profileId: params.profileId,
     clerkUserId: params.clerkUserId,
   });
-  const parsedDate = params.releaseDate ? new Date(params.releaseDate) : null;
-  const slug = await generateUniqueSlug(
-    params.profileId,
-    params.title,
-    'release'
-  );
+  if (!profile) {
+    throw new Error('Profile not found');
+  }
   const releaseId = randomUUID();
   const prepared = await prepareGeneratedArtwork({
     profileId: params.profileId,
@@ -249,32 +226,23 @@ export async function createReleaseAndApplyGeneratedAlbumArt(params: {
     releaseId,
     candidateId: params.candidateId,
   });
-  const now = new Date();
   let release;
   try {
-    [release] = await db
-      .insert(discogReleases)
-      .values({
-        id: releaseId,
-        creatorProfileId: params.profileId,
-        title: params.title,
-        slug,
-        releaseType: params.releaseType,
-        releaseDate:
-          parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
-        artworkUrl: prepared.artworkUrl,
-        sourceType: 'manual',
-        metadata: {
-          artworkSizes: prepared.sizes,
-          generatedArtwork: buildGeneratedArtworkMetadata({
-            candidate: prepared.candidate,
-            generationId: params.generationId,
-          }),
-        },
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
+    release = await createManagedRelease({
+      id: releaseId,
+      profileId: params.profileId,
+      title: params.title,
+      releaseType: params.releaseType,
+      releaseDate: params.releaseDate ?? null,
+      artworkUrl: prepared.artworkUrl,
+      metadata: {
+        artworkSizes: prepared.sizes,
+        generatedArtwork: buildGeneratedArtworkMetadata({
+          candidate: prepared.candidate,
+          generationId: params.generationId,
+        }),
+      },
+    });
   } catch (error) {
     await deleteProcessedReleaseArtwork(prepared.sizes).catch(() => undefined);
     throw error;

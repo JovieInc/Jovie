@@ -10,6 +10,7 @@ const readonlyComponentPropsRule = require('./eslint-rules/readonly-component-pr
 const noDbTransactionRule = require('./eslint-rules/no-db-transaction');
 const noManualDbPoolingRule = require('./eslint-rules/no-manual-db-pooling');
 const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
+const noInlineChatToolsRule = require('./eslint-rules/no-inline-chat-tools');
 const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
 const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
 
@@ -30,6 +31,7 @@ const baseConfig = {
         'no-db-transaction': noDbTransactionRule,
         'no-manual-db-pooling': noManualDbPoolingRule,
         'no-hardcoded-routes': noHardcodedRoutesRule,
+        'no-inline-chat-tools': noInlineChatToolsRule,
         'require-query-cache-config': requireQueryCacheConfigRule,
         'require-abort-signal': requireAbortSignalRule,
       },
@@ -172,6 +174,7 @@ const baseConfig = {
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',
+    '@jovie/no-inline-chat-tools': 'error',
     '@jovie/require-query-cache-config': 'error',
     '@jovie/require-abort-signal': 'error',
   },

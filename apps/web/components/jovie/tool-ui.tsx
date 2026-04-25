@@ -306,7 +306,7 @@ function renderArtifactCard(
   event: PersistedToolEvent,
   profileId?: string
 ): ReactNode {
-  if (event.state !== 'succeeded') {
+  if (event.state !== 'succeeded' && event.state !== 'failed') {
     return null;
   }
 

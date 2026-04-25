@@ -92,6 +92,20 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** Only personalize outbound greetings when the source clearly looks like a conventional two-word human name. If there is any doubt, use a generic opener instead. When tightening one risky email template, audit sibling templates that interpolate the same creator/user fields and apply the same guard there too.
 
+## Chat Backend
+
+### Main chat route drift turns `/api/chat` into a second product backend
+
+**Mistake:** Album art generation, release creation, pitch persistence, and other product-specific backend work accumulated inside `apps/web/app/api/chat/route.ts`. That made the streaming route slow, fragile, and hard to test. The album-art production timeout was the obvious break, but the deeper failure was architectural drift.
+
+**Rule:** Keep `apps/web/app/api/chat/route.ts` orchestration-only. It may authenticate, load context, pick a model, register imported tools, and stream the response. It must not own provider calls, uploads, image rendering, direct persistence, or inline tool-builder implementations. New chat tools belong in `apps/web/lib/chat/tools/` and should call shared services or dedicated worker-style routes.
+
+### Chat confirm routes must resolve ownership through Clerk-to-user mapping
+
+**Mistake:** `confirm-edit` and `confirm-remove-link` compared internal `creatorProfiles.userId` values to Clerk `userId` values from `getCachedAuth()`. That silently mixed identifier systems and could reject valid owners or log audit rows under the wrong user.
+
+**Rule:** Any chat confirmation route that checks profile ownership must resolve the profile through the canonical Clerk-to-user join first. Do not compare internal user UUIDs directly to Clerk user IDs.
+
 ---
 
 ## Tailwind v4 / Design Tokens
