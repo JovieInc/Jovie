@@ -12,7 +12,7 @@
  * Env (via Doppler):
  *   AIRTABLE_API_KEY  required PAT (data.records:read+write, schema.bases:read)
  *   AIRTABLE_BASE_ID  default appln0KH60XfDQc6N
- *   AIRTABLE_TABLE_ID default tblSuSH1vAmjUsjs0
+ *   AIRTABLE_TABLE_ID default tblnFs2ZBzqwa2uhP
  */
 
 import * as fs from 'node:fs';
@@ -161,7 +161,7 @@ function parseArgs(argv: string[]): Args {
         a.table = next();
         break;
       case '--batch-id':
-        a.batchId = next();
+        a.batchId = sanitizeBatchId(next());
         break;
       case '--force':
         a.force = true;
@@ -376,11 +376,6 @@ function dedupe(
   if (allowDuplicates) {
     const seen = new Map<string, Row>();
     for (const r of rows) seen.set(r.Name.trim().toLowerCase(), r);
-    const seenLi = new Map<string, Row>();
-    for (const r of seen.values()) {
-      const li = r.LinkedIn?.trim();
-      if (li) seenLi.set(li, r);
-    }
     const out: Row[] = [];
     const usedLi = new Set<string>();
     for (const r of seen.values()) {
@@ -543,7 +538,10 @@ async function upsertBatch(
     })),
   };
   let lastErr = '';
+  let lastStatus = 0;
+  let attempts = 0;
   for (let attempt = 0; attempt < 3; attempt++) {
+    attempts = attempt + 1;
     const res = await fetch(url, {
       method: 'PATCH',
       headers: {
@@ -552,6 +550,7 @@ async function upsertBatch(
       },
       body: JSON.stringify(body),
     });
+    lastStatus = res.status;
     if (res.status === 401 || res.status === 403) {
       fail(
         `Airtable auth failed (${res.status})`,
@@ -560,6 +559,12 @@ async function upsertBatch(
       );
     }
     if (res.status === 429) {
+      // Capture body excerpt for diagnostics if all retries fail.
+      try {
+        lastErr = (await res.text()).slice(0, 500);
+      } catch {
+        lastErr = '<no body>';
+      }
       const wait = attempt === 0 ? 1000 : 2000;
       warn(
         `429 rate-limited; backing off ${wait}ms (attempt ${attempt + 1}/3)`
@@ -573,7 +578,9 @@ async function upsertBatch(
     }
     return (await res.json()) as UpsertResponse;
   }
-  throw new Error(`Airtable upsert exhausted retries: ${lastErr}`);
+  throw new Error(
+    `Airtable upsert exhausted retries after ${attempts} attempts (last status ${lastStatus}): ${lastErr || '<empty body>'}`
+  );
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -584,10 +591,34 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+/**
+ * Strict batch-id validator. Rejects path traversal and odd characters;
+ * filenames are derived from this value, so allow only [A-Za-z0-9_.-].
+ */
+function sanitizeBatchId(value: string): string {
+  if (
+    !value ||
+    value.includes('/') ||
+    value.includes('\\') ||
+    value.includes('..') ||
+    value.includes('\0') ||
+    !/^[A-Za-z0-9_.-]+$/.test(value)
+  ) {
+    fail(
+      `invalid --batch-id: ${JSON.stringify(value)}`,
+      'batch-id must match [A-Za-z0-9_.-]+ (no slashes, dots-dots, or null bytes)',
+      'pass a slug like 20260425-paste'
+    );
+  }
+  // Defense-in-depth: collapse to basename in case future refactors widen the regex.
+  return path.basename(value);
+}
+
 function writeAudit(audit: AuditLog): string {
   const dir = path.resolve(process.cwd(), '.context');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `airtable-load-result-${audit.batchId}.json`);
+  const safeBatchId = sanitizeBatchId(audit.batchId);
+  const file = path.join(dir, `airtable-load-result-${safeBatchId}.json`);
   fs.writeFileSync(file, JSON.stringify(audit, null, 2));
   return file;
 }
