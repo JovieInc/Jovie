@@ -179,7 +179,7 @@ export function AuthLayout({
               </main>
 
               {showFooterPrompt && !isKeyboardVisible ? (
-                <p className='mt-6 text-center text-[13px] font-[400] text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+                <p className='mt-6 text-center text-app font-[400] text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
                   {footerPrompt}{' '}
                   <Link
                     href={footerLinkHref}
@@ -253,7 +253,7 @@ export function AuthLayout({
           </div>
 
           {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='relative z-10 mt-auto pt-8 text-center text-[13px] font-[400] text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
+            <p className='relative z-10 mt-auto pt-8 text-center text-app font-[400] text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
