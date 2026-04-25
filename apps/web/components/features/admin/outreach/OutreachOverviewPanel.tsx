@@ -82,7 +82,7 @@ export function OutreachOverviewPanel() {
   return (
     <div className='flex flex-col gap-4'>
       {loadError && (
-        <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-3 text-[13px] leading-[18px] text-secondary-token'>
+        <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-3 text-app leading-[18px] text-secondary-token'>
           <p>{loadError}</p>
         </ContentSurfaceCard>
       )}
