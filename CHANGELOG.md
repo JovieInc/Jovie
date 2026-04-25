@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.175] - 2026-04-24
+
+> New creators now have a stricter Spotify-first launch path: they do not count as onboarded until their public profile is live and at least one fan-visible release exists. The ship path is covered end to end, subscribe persistence is verified at the API layer, and the feature inventory docs now reflect the actual repo instead of stale flag and plan references.
+
+### Added
+
+- `apps/web/lib/discography/public-release-visibility.ts` centralizes the “fan-visible release” predicate so onboarding, auth gating, Clerk metadata sync, session context, and mobile readiness can share the same launch-ready check.
+- `apps/web/tests/integration/notifications-subscriptions.test.ts` adds DB-backed coverage for subscribe, OTP verification, and unsubscribe-token consumption, and `apps/web/tests/e2e/onboarding-completion.spec.ts` now covers the creator ship path from homepage signup through public profile edit and fan subscribe entrypoint.
+- `docs/FEATURE_REGISTRY.md` and `docs/FEATURE_REGISTRY.data.json` add a repo-truth feature inventory for current capabilities, coverage, docs, flags, entitlements, and hardening gaps.
+
+### Changed
+
+- The Spotify-first onboarding contract now requires a claimed public profile plus at least one visible release before users are treated as launch-ready across discovery readiness, auth/proxy state, dashboard redirects, Clerk metadata sync, and the mobile `/api/mobile/v1/me` readiness response.
+- Creator docs under `apps/docs/app/docs/` were rewritten around the actual launch path: sign up, import music, go live immediately, edit the profile, and collect subscribers from the public page.
+- Signup and homepage launch-path surfaces now emit canonical plan intent, the homepage signup entrypoint is restored, and the deterministic launch-path E2E helpers were updated to handle the current auth and onboarding flow reliably.
+
+### Fixed
+
+- Unsubscribe requests backed by email tokens now resolve the matching subscriber correctly and mark the token as used only after the delete succeeds, closing the persistence gap in the notifications flow.
+- Client-side and server-side completeness checks no longer disagree about zero-release creators, which removes a class of redirect and readiness drift between dashboard, mobile, and auth-gated paths.
+
+### Removed
+
+- Stale launch-path flags `CLAIM_HANDLE`, `HERO_SPOTIFY_CLAIM_FLOW`, and `SUBSCRIBE_TWO_STEP`, along with outdated `apps/web/lib/feature-flags/*` references in the docs and flag guidance.
+
 ## [26.4.174] - 2026-04-24
 
 > Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
