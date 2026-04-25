@@ -59,7 +59,7 @@ export function WaitlistSettingsPanel() {
         title='People Intake Defaults'
         description='Set the approval rules for new people entering the pipeline.'
       >
-        <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
+        <div className='flex items-center gap-2 px-4 py-4 text-app text-secondary-token sm:px-5'>
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
           Loading waitlist settings...
         </div>
@@ -73,7 +73,7 @@ export function WaitlistSettingsPanel() {
         title='People Intake Defaults'
         description='Set the approval rules for new people entering the pipeline.'
       >
-        <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
+        <div className='px-4 py-4 text-app text-destructive sm:px-5'>
           {error instanceof Error
             ? error.message
             : 'Unable to load waitlist settings. Please refresh and try again.'}
