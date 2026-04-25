@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -52,6 +52,18 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
+
+  // Sync fresh server rows into local state while preserving drawer selection.
+  // Without this, TanStack refetches never update the visible table, and the
+  // earlier pattern of remounting to pick up new data also wiped editingRelease.
+  useEffect(() => {
+    setRawRows(releases);
+    setEditingRelease(current => {
+      if (!current) return current;
+      const fresh = releases.find(r => r.id === current.id);
+      return fresh ?? current;
+    });
+  }, [releases]);
   const [refreshingReleaseId, setRefreshingReleaseId] = useState<string | null>(
     null
   );

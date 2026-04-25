@@ -170,7 +170,7 @@ test.describe('Dashboard Navigation @smoke', () => {
 
     try {
       for (const route of [
-        APP_ROUTES.DASHBOARD_OVERVIEW,
+        APP_ROUTES.LEGACY_DASHBOARD,
         APP_ROUTES.ONBOARDING,
       ]) {
         await smokeNavigateWithRetry(page, route, {

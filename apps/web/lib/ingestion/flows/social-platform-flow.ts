@@ -16,6 +16,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureWarning } from '@/lib/error-tracking';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
 import type { SpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 import { evaluateProfileQuality } from './profile-quality-gate';
@@ -230,6 +231,10 @@ export async function createNewSocialProfile(
     avatarUrl: spotifyData?.imageUrl ?? null,
     linkCount: 1, // Social profiles always create exactly one link
   });
+  const theme = await buildThemeWithProfileAccent({
+    existingTheme: null,
+    sourceUrl: spotifyData?.imageUrl ?? null,
+  });
 
   const [created] = await tx
     .insert(creatorProfiles)
@@ -253,7 +258,7 @@ export async function createNewSocialProfile(
       claimToken: claimTokenHash,
       claimTokenExpiresAt,
       settings: {},
-      theme: {},
+      theme,
       ingestionStatus: 'idle',
       ingestionSourcePlatform: platformId,
       createdAt: new Date(),

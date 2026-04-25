@@ -398,9 +398,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: `Play ${mockArtist.name}` })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Music' }));
 
     await waitFor(() => {
       expect(window.location.search).toContain('mode=listen');

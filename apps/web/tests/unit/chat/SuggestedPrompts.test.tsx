@@ -4,18 +4,22 @@ import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  it('renders default prompts', () => {
+  it('renders default hero-style pills (mirrors homepage intent)', () => {
     const onSelect = vi.fn();
     const { getByText, getByTestId, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByText('Preview profile')).toBeTruthy();
-    expect(getByText('Change photo')).toBeTruthy();
-    expect(getByText('Release link')).toBeTruthy();
+    expect(getByText('Plan a release')).toBeTruthy();
+    expect(getByText('Generate album art')).toBeTruthy();
+    expect(getByText('Pitch playlists')).toBeTruthy();
+    expect(getByText('Build artist profile')).toBeTruthy();
+    expect(getByText('Analyze momentum')).toBeTruthy();
 
-    // First-session suggestions should not appear in default mode
+    // Old task-list entries should be gone — they belong in the profile switcher.
+    expect(queryByText('Preview profile')).toBeNull();
+    expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Getting paid')).toBeNull();
   });
 
@@ -37,7 +41,7 @@ describe('SuggestedPrompts', () => {
     expect(getByTestId('suggested-prompts-flat')).toBeTruthy();
   });
 
-  it('renders first-session prompts including all suggestions', () => {
+  it('renders first-session pills including all four starter suggestions', () => {
     const onSelect = vi.fn();
     const { getByRole } = fastRender(
       <SuggestedPrompts
@@ -47,21 +51,17 @@ describe('SuggestedPrompts', () => {
       />
     );
 
-    // First-session suggestions
-    expect(
-      getByRole('button', {
-        name: 'Link \u201CMidnight Drive\u201D',
-      })
-    ).toBeTruthy();
-    expect(getByRole('button', { name: 'Preview profile' })).toBeTruthy();
-    expect(getByRole('button', { name: 'Getting paid' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Plan a release' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Generate album art' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Pitch playlists' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Build artist profile' })).toBeTruthy();
   });
 
-  it('calls onSelect with prompt when clicked', () => {
+  it('calls onSelect with the full prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Preview profile').closest('button')?.click();
-    expect(onSelect).toHaveBeenCalledWith('Preview my profile.');
+    getByText('Plan a release').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Help me plan my next release.');
   });
 
   it('renders pitch and feedback actions for returning users with advanced tools', () => {

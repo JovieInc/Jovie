@@ -835,6 +835,34 @@ export async function checkAccountExportRateLimit(
 }
 
 // ============================================================================
+// Verification Operations
+// ============================================================================
+
+/**
+ * Rate limiter for profile verification requests
+ * Limit: 3 requests per day per user
+ * CRITICAL: each request fans out to a Slack webhook; without this a single
+ * authenticated Pro user can spam the internal #verification channel.
+ */
+export const verificationRequestLimiter = createRateLimiter(
+  RATE_LIMITERS.verificationRequest
+);
+
+/**
+ * Check verification request rate limit.
+ * Returns success or the first failure with a caller-ready reason.
+ */
+export async function checkVerificationRequestRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    verificationRequestLimiter,
+    userId,
+    'You have submitted too many verification requests. Please try again later.'
+  );
+}
+
+// ============================================================================
 // Link Wrapping
 // ============================================================================
 
@@ -920,5 +948,6 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     accountExport: accountExportLimiter,
     wrapLink: wrapLinkLimiter,
     wrapLinkAnonymous: wrapLinkAnonymousLimiter,
+    verificationRequest: verificationRequestLimiter,
   };
 }

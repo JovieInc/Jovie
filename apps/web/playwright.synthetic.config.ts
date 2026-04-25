@@ -12,7 +12,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: '**/synthetic-golden-path.spec.ts',
+  testMatch: [
+    '**/synthetic-golden-path.spec.ts',
+    '**/public-profile-smoke.spec.ts',
+  ],
   fullyParallel: false, // Sequential for stability in prod
   forbidOnly: true, // Always enforced in synthetic mode
   retries: 2, // Retry failed tests to avoid false alarms

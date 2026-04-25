@@ -34,6 +34,9 @@ describe('profile shell token contract', () => {
     expect(contents).toMatch(/--profile-shell-max-width\s*:\s*[^;]+;/);
     expect(contents).toMatch(/--profile-shell-card-radius\s*:\s*[^;]+;/);
     expect(contents).toMatch(/--profile-drawer-radius-mobile\s*:\s*[^;]+;/);
+    expect(contents).toMatch(/--profile-tab-active-bg\s*:\s*[^;]+;/);
+    expect(contents).toMatch(/--profile-status-pill-bg\s*:\s*[^;]+;/);
+    expect(contents).toMatch(/--profile-rail-dot-active\s*:\s*[^;]+;/);
   });
 
   it('uses the shared profile aliases in the canonical shell files', () => {
@@ -50,6 +53,8 @@ describe('profile shell token contract', () => {
       PROFILE_COMPACT_SURFACE,
       'utf8'
     );
-    expect(compactSurfaceContents).toContain('--profile-action-radius');
+    expect(compactSurfaceContents).toContain('--profile-dock-border');
+    expect(compactSurfaceContents).toContain('--profile-tab-active-bg');
+    expect(compactSurfaceContents).toContain('--profile-status-pill-bg');
   });
 });

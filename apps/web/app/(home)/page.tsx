@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
@@ -11,6 +12,7 @@ import {
   HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
   buildOrganizationSchema,
@@ -188,6 +190,10 @@ export default function HomePage() {
         </div>
       </section>
       <div className='homepage-story-stack'>
+        <ArtistProfileOutcomeDuo
+          headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
+          duo={ARTIST_PROFILE_COPY.outcomeDuo}
+        />
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
           <HomepageV2SystemOverview />
         ) : null}
@@ -201,7 +207,9 @@ export default function HomePage() {
           <HomepageV2PowerGrid />
         ) : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
-        <HomepageV2FinalCta />
+        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
+          <HomepageV2FinalCta />
+        ) : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FOOTER_LINKS ? (
           <HomepageV2FooterLinks />
         ) : null}

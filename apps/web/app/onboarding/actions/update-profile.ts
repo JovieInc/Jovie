@@ -14,6 +14,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 
 /**
  * Verify that the user's profile has an avatar URL set.
@@ -76,7 +77,11 @@ export async function updateOnboardingProfile(updates: {
   }
 
   const [profile] = await db
-    .select({ id: creatorProfiles.id })
+    .select({
+      id: creatorProfiles.id,
+      avatarUrl: creatorProfiles.avatarUrl,
+      theme: creatorProfiles.theme,
+    })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
@@ -96,6 +101,10 @@ export async function updateOnboardingProfile(updates: {
   }
   if (updates.avatarUrl !== undefined) {
     profileUpdates.avatarUrl = updates.avatarUrl;
+    profileUpdates.theme = await buildThemeWithProfileAccent({
+      existingTheme: profile.theme,
+      sourceUrl: updates.avatarUrl,
+    });
   }
 
   if (Object.keys(profileUpdates).length > 0) {

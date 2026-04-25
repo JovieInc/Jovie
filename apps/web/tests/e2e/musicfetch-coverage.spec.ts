@@ -274,7 +274,7 @@ test.describe('MusicFetch error handling — chaos', () => {
       }
     });
 
-    await page.goto(APP_ROUTES.DASHBOARD_OVERVIEW, {
+    await page.goto(APP_ROUTES.LEGACY_DASHBOARD, {
       waitUntil: 'domcontentloaded',
       timeout: 90_000,
     });

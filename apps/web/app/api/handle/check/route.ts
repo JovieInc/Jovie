@@ -12,6 +12,7 @@ import {
 } from '@/lib/onboarding/handle-availability-cache';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { validateUsername } from '@/lib/validation/username';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -92,27 +93,39 @@ export async function GET(request: Request) {
     );
   }
 
-  // Validate handle format
-  if (handle.length < 3) {
+  // Validate handle format using the canonical shared validator so this API
+  // accepts the same inputs as the onboarding form and completeOnboarding
+  // server action. Previously this route used a stricter local regex that
+  // rejected dots and underscores, even though those characters are allowed
+  // throughout the rest of the system — users would see a "green" client-side
+  // validation for "my.handle" but then get blocked here with a confusing
+  // "letters, numbers, and hyphens" error.
+  //
+  // Wrapped in try/catch so that an unexpected throw from the validator
+  // (e.g. content-filter loaded at runtime) still produces a constant-time
+  // response rather than bypassing the constant-time guarantee with a 500.
+  //
+  // A validator throw is a transient internal failure, not bad client input,
+  // so return 503 — a 400 here would mislead clients into believing their
+  // input was rejected and hide incident semantics from monitoring.
+  let formatCheck: { isValid: boolean; error?: string };
+  try {
+    formatCheck = validateUsername(handle);
+  } catch (error) {
+    await captureError('validateUsername threw', error, {
+      handle,
+      route: '/api/handle/check',
+    });
     return respondWithConstantTime(
-      { available: false, error: 'Handle must be at least 3 characters' },
-      { status: 400 }
+      { available: false, error: 'Handle check temporarily unavailable' },
+      { status: 503 }
     );
   }
-
-  if (handle.length > 24) {
+  if (!formatCheck.isValid) {
+    // `validateUsername` always populates `error` on the `isValid: false`
+    // branch (see `validateUsernameCore`), so no runtime fallback is needed.
     return respondWithConstantTime(
-      { available: false, error: 'Handle must be no more than 24 characters' },
-      { status: 400 }
-    );
-  }
-
-  if (!/^[a-zA-Z0-9-]+$/.test(handle)) {
-    return respondWithConstantTime(
-      {
-        available: false,
-        error: 'Handle can only contain letters, numbers, and hyphens',
-      },
+      { available: false, error: formatCheck.error },
       { status: 400 }
     );
   }

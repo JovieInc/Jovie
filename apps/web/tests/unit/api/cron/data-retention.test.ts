@@ -7,6 +7,10 @@ vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
 }));
 
+const TRUSTED_CRON_HEADERS = {
+  'x-forwarded-host': 'staging.jov.ie',
+} as const;
+
 describe('GET /api/cron/data-retention', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -25,7 +29,7 @@ describe('GET /api/cron/data-retention', () => {
       {
         headers: {
           Authorization: 'Bearer wrong-secret',
-          'x-vercel-cron': '1',
+          ...TRUSTED_CRON_HEADERS,
         },
       }
     );
@@ -44,7 +48,7 @@ describe('GET /api/cron/data-retention', () => {
       {
         headers: {
           Authorization: 'Bearer Bearer test-secret',
-          'x-vercel-cron': '1',
+          ...TRUSTED_CRON_HEADERS,
         },
       }
     );
@@ -86,7 +90,7 @@ describe('GET /api/cron/data-retention', () => {
       {
         headers: {
           Authorization: 'Bearer test-secret',
-          'x-vercel-cron': '1',
+          ...TRUSTED_CRON_HEADERS,
         },
       }
     );
@@ -97,5 +101,24 @@ describe('GET /api/cron/data-retention', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.result).toBeDefined();
+  });
+
+  it('returns 403 for untrusted origins before bearer auth', async () => {
+    const { GET } = await import('@/app/api/cron/data-retention/route');
+    const request = new NextRequest(
+      'http://localhost/api/cron/data-retention',
+      {
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'x-forwarded-host': 'attacker-project.vercel.app',
+        },
+      }
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Forbidden');
   });
 });

@@ -86,7 +86,7 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page
         .getByTestId('homepage-phone-state-playlist-fallback')
-        .locator('[data-testid="profile-primary-action-card"]')
+        .getByTestId('profile-home-rail-playlist')
     ).toHaveAttribute('data-state', 'playlist_fallback');
   });
 });

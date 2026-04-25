@@ -569,6 +569,27 @@ export function getLimit(
   return getEntitlements(plan).limits[key];
 }
 
+/**
+ * Resolve a raw plan string to the three-tier billing plan used by
+ * chat-usage accounting and client-facing plan gates. Unlike
+ * {@link getEntitlements}, this narrows to `'free' | 'pro' | 'max'`
+ * (no 'trial'), which is the invariant callers like the chat usage
+ * API and `usePlanGate` rely on. Maps legacy names ('founding' -> 'pro',
+ * 'growth' -> 'max') and returns 'free' for null, undefined, trial, or
+ * unknown plans.
+ */
+export function resolveChatUsagePlan(
+  plan: string | null | undefined
+): 'free' | 'pro' | 'max' {
+  if (plan === 'max' || plan === 'growth') {
+    return 'max';
+  }
+  if (plan === 'pro' || plan === 'founding') {
+    return 'pro';
+  }
+  return 'free';
+}
+
 /** Whether the plan is pro or higher. */
 export function isProPlan(plan: string | null | undefined): boolean {
   return (
@@ -593,4 +614,41 @@ export function getPlanDisplayName(plan: string | null | undefined): string {
 /** All valid plan IDs. */
 export function getAllPlanIds(): readonly PlanId[] {
   return PLAN_IDS;
+}
+
+/** Recognized legacy plan aliases that map to a canonical PlanId. */
+const LEGACY_PLAN_ALIASES = {
+  founding: 'pro',
+  growth: 'max',
+} as const satisfies Readonly<Record<string, PlanId>>;
+
+/**
+ * Validates whether the given string is a recognized plan identifier.
+ * Accepts canonical `PlanId` values as well as legacy aliases
+ * (`founding` -> pro, `growth` -> max).
+ *
+ * Prefer this over passing unknown strings to `getPlanDisplayName()` in
+ * user-facing UI — `getEntitlements()` silently falls back to Free for
+ * unrecognized values, which can render incorrect plan labels (e.g.,
+ * "Welcome to Free" on an upgrade success page).
+ */
+export function isValidPlanId(plan: string | null | undefined): boolean {
+  if (typeof plan !== 'string' || plan.length === 0) return false;
+  if ((PLAN_IDS as readonly string[]).includes(plan)) return true;
+  return Object.hasOwn(LEGACY_PLAN_ALIASES, plan);
+}
+
+/**
+ * Resolves a raw plan string to its canonical `PlanId`, handling legacy
+ * aliases. Returns `null` for unrecognized input.
+ */
+export function resolveCanonicalPlanId(
+  plan: string | null | undefined
+): PlanId | null {
+  if (typeof plan !== 'string' || plan.length === 0) return null;
+  if ((PLAN_IDS as readonly string[]).includes(plan)) return plan as PlanId;
+  if (Object.hasOwn(LEGACY_PLAN_ALIASES, plan)) {
+    return LEGACY_PLAN_ALIASES[plan as keyof typeof LEGACY_PLAN_ALIASES];
+  }
+  return null;
 }
