@@ -195,7 +195,7 @@ function SpotifyTabContent({
 
       <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
         <div>
-          <p className='font-[510] text-primary-token'>Active Publisher</p>
+          <p className='font-medium text-primary-token'>Active Publisher</p>
           <p className='mt-1 text-secondary-token'>
             {spotifyStatus.accountLabel ??
               spotifyStatus.clerkUserId ??
@@ -208,7 +208,9 @@ function SpotifyTabContent({
           </p>
         </div>
         <div>
-          <p className='font-[510] text-primary-token'>Current Admin Account</p>
+          <p className='font-medium text-primary-token'>
+            Current Admin Account
+          </p>
           <p className='mt-1 text-secondary-token'>
             {currentUser.hasSpotify
               ? (currentUser.label ?? 'Spotify connected')
@@ -404,13 +406,13 @@ function EngineTabContent({
 
         <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
           <div>
-            <p className='font-[510] text-primary-token'>Last Generated</p>
+            <p className='font-medium text-primary-token'>Last Generated</p>
             <p className='mt-1 text-secondary-token'>
               {formatDate(engineSettings.lastGeneratedAt)}
             </p>
           </div>
           <div>
-            <p className='font-[510] text-primary-token'>Next Eligible</p>
+            <p className='font-medium text-primary-token'>Next Eligible</p>
             <p className='mt-1 text-secondary-token'>
               {formatDate(engineSettings.nextEligibleAt)}
             </p>
