@@ -4,6 +4,9 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
+const HOMEPAGE_INTENT_PROMPT = 'Help me launch my artist profile';
+const SIGNUP_PATH = '/signup';
+
 /**
  * Synthetic Monitoring Golden Path Test
  *
@@ -55,15 +58,19 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       });
       await waitForHydration(page);
 
-      // Essential homepage elements
-      await expect(page.locator('[data-test="signup-btn"]')).toBeVisible({
+      // Essential homepage entry point
+      const promptInput = page.locator('#homepage-intent-input');
+      await expect(promptInput).toBeVisible({
         timeout: 15000,
       });
 
       // CRITICAL PATH 2: Sign up flow initiation
       console.log('[Synthetic] Step 2: Sign up flow test');
-      await page.locator('[data-test="signup-btn"]').click();
-      await expect(page).toHaveURL(/sign-up/, { timeout: 20000 });
+      await promptInput.fill(HOMEPAGE_INTENT_PROMPT);
+      await page.getByRole('button', { name: 'Submit prompt' }).click();
+      await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
+        timeout: 20000,
+      });
 
       // CRITICAL PATH 3: Clerk registration
       console.log('[Synthetic] Step 3: Clerk registration test');
@@ -187,7 +194,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       { path: '/dualipa', name: 'Profile Page' },
       { path: '/dualipa?mode=listen', name: 'Listen Mode' },
       { path: '/dualipa?mode=pay', name: 'Pay Mode' },
-      { path: '/sign-up', name: 'Sign Up' },
+      { path: SIGNUP_PATH, name: 'Sign Up' },
     ];
 
     for (const { path, name } of criticalPages) {
@@ -262,7 +269,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
 
     // Check for performance-critical elements
-    await expect(page.locator('[data-test="signup-btn"]')).toBeVisible({
+    await expect(page.locator('#homepage-intent-input')).toBeVisible({
       timeout: 5000,
     });
 
