@@ -118,9 +118,7 @@ export function WeeklyTrendChart({ data }: Readonly<WeeklyTrendChartProps>) {
               className='h-2 w-2 rounded-full'
               style={{ backgroundColor: item.color }}
             />
-            <span className='text-[11px] text-tertiary-token'>
-              {item.label}
-            </span>
+            <span className='text-2xs text-tertiary-token'>{item.label}</span>
           </div>
         ))}
       </div>
