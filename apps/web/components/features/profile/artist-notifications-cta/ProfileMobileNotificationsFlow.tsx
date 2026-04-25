@@ -388,6 +388,12 @@ export function ProfileMobileNotificationsFlow({
       return;
     }
 
+    // Inline presentations live inside an existing layout — they should not
+    // hijack body scroll the way overlay/modal presentations do.
+    if (presentation === 'inline') {
+      return;
+    }
+
     const scrollY = window.scrollY;
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
@@ -435,7 +441,7 @@ export function ProfileMobileNotificationsFlow({
       document.documentElement.style.overflow = originalHtmlOverflow;
       window.scrollTo(0, scrollY);
     };
-  }, [open]);
+  }, [open, presentation]);
 
   useEffect(() => {
     if (!open) {

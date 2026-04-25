@@ -32,6 +32,7 @@ import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
@@ -352,6 +353,11 @@ export function ProfileDesktopSurface({
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const hasReleases = visibleReleases.length > 0;
+  // The artist-email opt-in row should only appear when the artist has wired
+  // up an email destination AND the visitor has actually subscribed —
+  // otherwise the toggle is meaningless and confuses unsubscribed visitors.
+  const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
+  const showArtistEmailRow = isSubscribed && artistEmailReady;
 
   const homeOverview = (
     <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.95fr)]'>
@@ -478,12 +484,14 @@ export function ProfileDesktopSurface({
                         .join(', ')}
                     </p>
                   </div>
-                  <a
-                    href={tourDate.ticketUrl ?? undefined}
-                    className='inline-flex h-10 items-center rounded-full border border-white/12 px-4 text-[13px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
-                  >
-                    Tickets
-                  </a>
+                  {tourDate.ticketUrl ? (
+                    <a
+                      href={tourDate.ticketUrl}
+                      className='inline-flex h-10 items-center rounded-full border border-white/12 px-4 text-[13px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
+                    >
+                      Tickets
+                    </a>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -657,32 +665,36 @@ export function ProfileDesktopSurface({
                 );
               })}
             </div>
-            <div className='h-px bg-white/8' />
-            <div className='space-y-3'>
-              <div className='space-y-1'>
-                <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
-                  Sent by {artist.name}
-                </p>
-                <p className='text-[14px] leading-6 text-white/58'>
-                  Share your email with {artist.name} to receive occasional
-                  emails about related things.
-                </p>
-              </div>
-              <div className='flex items-center justify-between gap-4'>
-                <div className='flex items-center gap-3'>
-                  <Mail className='h-4.5 w-4.5 text-white/68' />
-                  <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
-                    Subscribe to Other Alerts
-                  </span>
+            {showArtistEmailRow ? (
+              <>
+                <div className='h-px bg-white/8' />
+                <div className='space-y-3'>
+                  <div className='space-y-1'>
+                    <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
+                      Sent by {artist.name}
+                    </p>
+                    <p className='text-[14px] leading-6 text-white/58'>
+                      Share your email with {artist.name} to receive occasional
+                      emails about related things.
+                    </p>
+                  </div>
+                  <div className='flex items-center justify-between gap-4'>
+                    <div className='flex items-center gap-3'>
+                      <Mail className='h-4.5 w-4.5 text-white/68' />
+                      <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                        Subscribe to Other Alerts
+                      </span>
+                    </div>
+                    <Switch
+                      checked={false}
+                      onCheckedChange={() => onModeSelect('subscribe')}
+                      aria-label='Subscribe to other alerts'
+                      className='data-[state=checked]:bg-[color:var(--profile-accent-primary)] data-[state=unchecked]:bg-white/14'
+                    />
+                  </div>
                 </div>
-                <Switch
-                  checked={false}
-                  onCheckedChange={() => onModeSelect('subscribe')}
-                  aria-label='Subscribe to other alerts'
-                  className='data-[state=checked]:bg-[color:var(--profile-accent-primary)] data-[state=unchecked]:bg-white/14'
-                />
-              </div>
-            </div>
+              </>
+            ) : null}
           </div>
         </DesktopSurfaceCard>
       </div>
