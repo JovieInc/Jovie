@@ -29,19 +29,61 @@ export function extractBearerToken(
   return token;
 }
 
-export function verifyTrustedCronOrigin(request: Request): boolean {
-  const vercelCronHeader = request.headers.get('x-vercel-cron');
-  if (vercelCronHeader === '1') {
-    return true;
-  }
+/**
+ * Default set of Jovie-owned hosts that are always trusted as cron origins.
+ *
+ * Explicitly does NOT include a `*.vercel.app` wildcard. Anyone can deploy to
+ * `*.vercel.app`, so allowing the whole namespace lets an attacker forge the
+ * `x-forwarded-host` header from an unrelated preview project. Legitimate
+ * Vercel cron invocations are accepted only via the built-in Jovie-owned hosts
+ * plus explicit Jovie-owned aliases in `CRON_TRUSTED_HOSTS`.
+ */
+const DEFAULT_TRUSTED_CRON_HOSTS: readonly string[] = [
+  'jov.ie',
+  'www.jov.ie',
+  'staging.jov.ie',
+];
 
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  if (
-    forwardedHost?.endsWith('.vercel.app') ||
-    forwardedHost?.endsWith('.jov.ie') ||
-    forwardedHost === 'jov.ie'
-  ) {
-    return true;
+function normalizeHost(host: string | null | undefined): string | null {
+  if (!host) return null;
+  // `x-forwarded-host` may contain a port and/or a comma-separated list when
+  // the request traversed multiple proxies. Take the first entry and drop the
+  // port to compare against the allowlist.
+  const first = host.split(',')[0]?.trim().toLowerCase();
+  if (!first) return null;
+  const withoutPort = first.replace(/:\d+$/, '');
+  return withoutPort || null;
+}
+
+function parseTrustedHostsEnv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map(entry => normalizeHost(entry))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
+function getTrustedCronHosts(): Set<string> {
+  return new Set<string>([
+    ...DEFAULT_TRUSTED_CRON_HOSTS,
+    ...parseTrustedHostsEnv(env.CRON_TRUSTED_HOSTS),
+  ]);
+}
+
+/**
+ * Validate cron origin using only trusted host headers.
+ *
+ * `x-vercel-cron` is intentionally ignored because callers can set it
+ * themselves. We trust only exact Jovie-owned hosts plus explicitly configured
+ * preview aliases in `CRON_TRUSTED_HOSTS`.
+ */
+export function verifyTrustedCronOrigin(request: Request): boolean {
+  const forwardedHost = normalizeHost(request.headers.get('x-forwarded-host'));
+  if (forwardedHost) {
+    const trustedHosts = getTrustedCronHosts();
+    if (trustedHosts.has(forwardedHost)) {
+      return true;
+    }
   }
 
   return env.NODE_ENV === 'development';

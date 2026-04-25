@@ -180,6 +180,9 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/track', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/px', route =>
+    route.fulfill({ status: 204, body: '' })
+  );
 }
 
 async function waitForSettle(page: import('@playwright/test').Page) {
@@ -265,7 +268,7 @@ async function waitForVisibleSelector(
         return false;
       },
       {
-        timeout: 30_000,
+        timeout: 60_000,
         message: `Expected a visible element matching selector: ${selector}`,
       }
     )

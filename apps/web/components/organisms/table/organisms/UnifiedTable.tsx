@@ -416,9 +416,8 @@ export function UnifiedTable<TData>({
     !hasExpandedRows;
 
   // Initialize TanStack Table
-  // Memoize row model factories to prevent recreation
-  const coreRowModel = useMemo(() => getCoreRowModel(), []);
-  const sortedRowModel = useMemo(() => getSortedRowModel(), []);
+  const coreRowModel = getCoreRowModel();
+  const sortedRowModel = getSortedRowModel();
   const filteredRowModel = useMemo(
     () => (enableFiltering ? getFilteredRowModel() : undefined),
     [enableFiltering]

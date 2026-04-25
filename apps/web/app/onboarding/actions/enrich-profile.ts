@@ -32,6 +32,7 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
 import { uploadRemoteAvatar } from './avatar';
 
@@ -316,6 +317,7 @@ export async function enrichProfileFromDsp(
       username: creatorProfiles.username,
       spotifyUrl: creatorProfiles.spotifyUrl,
       spotifyId: creatorProfiles.spotifyId,
+      theme: creatorProfiles.theme,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       appleMusicId: creatorProfiles.appleMusicId,
       youtubeUrl: creatorProfiles.youtubeUrl,
@@ -380,6 +382,12 @@ export async function enrichProfileFromDsp(
   // enriched data to the client even if the DB write fails.
   try {
     if (Object.keys(profileUpdates).length > 0) {
+      if (typeof profileUpdates.avatarUrl === 'string') {
+        profileUpdates.theme = await buildThemeWithProfileAccent({
+          existingTheme: profile.theme,
+          sourceUrl: profileUpdates.avatarUrl,
+        });
+      }
       profileUpdates.updatedAt = new Date();
       await db
         .update(creatorProfiles)

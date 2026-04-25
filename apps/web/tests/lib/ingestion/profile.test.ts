@@ -2,13 +2,27 @@ import { describe, expect, it, vi } from 'vitest';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 
+vi.mock('@/lib/profile/profile-theme.server', () => ({
+  buildThemeWithProfileAccent: vi.fn().mockResolvedValue({
+    profileAccent: {
+      version: 1,
+      primaryHex: '#d3834e',
+      sourceUrl: 'https://cdn.example.com/avatar.jpg',
+    },
+  }),
+}));
+
 function createTxMock() {
+  const limit = vi.fn().mockResolvedValue([{ theme: null }]);
+  const whereSelect = vi.fn().mockReturnValue({ limit });
+  const from = vi.fn().mockReturnValue({ where: whereSelect });
+  const select = vi.fn().mockReturnValue({ from });
   const where = vi.fn().mockResolvedValue(undefined);
   const set = vi.fn(() => ({ where }));
   const update = vi.fn(() => ({ set }));
 
   return {
-    tx: { update },
+    tx: { select, update },
     update,
     set,
     where,

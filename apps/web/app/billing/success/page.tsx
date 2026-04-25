@@ -5,22 +5,38 @@ import {
   BarChart3,
   Bell,
   PartyPopper,
+  Rocket,
   ShieldCheck,
+  Sparkles,
   Upload,
+  Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import {
+  getPlanDisplayName,
+  type PlanId,
+  resolveCanonicalPlanId,
+} from '@/lib/entitlements/registry';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { useBillingStatusQuery } from '@/lib/queries';
 
-const UNLOCKED_FEATURES = [
+interface UnlockTile {
+  readonly icon: typeof Bell;
+  readonly title: string;
+  readonly description: string;
+}
+
+type PaidPlanId = Exclude<PlanId, 'free'>;
+
+const PRO_UNLOCK_TILES: readonly UnlockTile[] = [
   {
     icon: Bell,
     title: 'Release Notifications',
@@ -36,7 +52,57 @@ const UNLOCKED_FEATURES = [
     title: 'Contact Export',
     description: 'Download your fan list and use it anywhere.',
   },
-] as const;
+];
+
+const MAX_UNLOCK_TILES: readonly UnlockTile[] = [
+  {
+    icon: Workflow,
+    title: 'Release Plan Generation',
+    description: 'AI drafts your full release plan with tasks and deadlines.',
+  },
+  {
+    icon: Rocket,
+    title: 'Metadata Submission Agent',
+    description: 'Hands-off DSP metadata submission with approval workflow.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Unlimited Analytics',
+    description: 'No retention cap. Full history across every release.',
+  },
+];
+
+const GENERIC_UNLOCK_TILES: readonly UnlockTile[] = [
+  {
+    icon: Sparkles,
+    title: 'Your plan is active',
+    description: 'New capabilities are unlocked and ready to use.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Track what works',
+    description: 'Analytics and audience insights refresh automatically.',
+  },
+  {
+    icon: Upload,
+    title: 'Own your audience',
+    description: 'Contacts, exports, and smart links stay in your control.',
+  },
+];
+
+function resolveUnlockTiles(
+  canonicalPlan: PaidPlanId | null
+): readonly UnlockTile[] {
+  if (canonicalPlan === 'max') return MAX_UNLOCK_TILES;
+  if (canonicalPlan === 'pro' || canonicalPlan === 'trial')
+    return PRO_UNLOCK_TILES;
+  return GENERIC_UNLOCK_TILES;
+}
+
+function resolvePaidPlan(plan: string | null | undefined): PaidPlanId | null {
+  const canonical = resolveCanonicalPlanId(plan);
+  return canonical && canonical !== 'free' ? canonical : null;
+}
 
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';
@@ -44,11 +110,7 @@ function getVerificationButtonLabel(state: string): string {
   return 'Request Verification';
 }
 
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-}: Readonly<(typeof UNLOCKED_FEATURES)[number]>) {
+function FeatureCard({ icon: Icon, title, description }: UnlockTile) {
   return (
     <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
       <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
@@ -61,14 +123,97 @@ function FeatureCard({
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
+  const checkoutSessionId = searchParams.get('session_id');
+  const rawPlanIdParam = searchParams.get('plan_id');
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
   const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [hasHydratedMotion, setHasHydratedMotion] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isSessionPlanPending, setIsSessionPlanPending] = useState(
+    Boolean(checkoutSessionId)
+  );
+  const [validatedSessionPlan, setValidatedSessionPlan] =
+    useState<PaidPlanId | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
 
-  const planName = getPlanDisplayName(billingData?.plan);
+  useEffect(() => {
+    setHasHydratedMotion(true);
+  }, []);
+
+  useEffect(() => {
+    if (!checkoutSessionId) {
+      setIsSessionPlanPending(false);
+      setValidatedSessionPlan(null);
+      return;
+    }
+
+    const sessionId = checkoutSessionId;
+    const controller = new AbortController();
+    setIsSessionPlanPending(true);
+
+    async function validateCheckoutSession() {
+      try {
+        const response = await fetch(
+          `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          setValidatedSessionPlan(null);
+          return;
+        }
+
+        const body = (await response.json()) as { plan?: string | null };
+        setValidatedSessionPlan(resolvePaidPlan(body.plan ?? null));
+      } catch (_error) {
+        if (controller.signal.aborted) return;
+        setValidatedSessionPlan(null);
+      } finally {
+        if (controller.signal.aborted) return;
+        setIsSessionPlanPending(false);
+      }
+    }
+
+    void validateCheckoutSession();
+
+    return () => controller.abort();
+  }, [checkoutSessionId]);
+
+  const resolvedPlan = useMemo<{
+    readonly canonical: PaidPlanId | null;
+    readonly displayName: string | null;
+  }>(() => {
+    const fromBilling = resolvePaidPlan(billingData?.plan ?? null);
+    const fromParam = resolvePaidPlan(rawPlanIdParam);
+    const validatedParam =
+      fromParam &&
+      (fromParam === validatedSessionPlan ||
+        (!validatedSessionPlan && fromParam === fromBilling))
+        ? fromParam
+        : null;
+    const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
+
+    if (canonicalPlan) {
+      return {
+        canonical: canonicalPlan,
+        displayName: getPlanDisplayName(canonicalPlan),
+      };
+    }
+
+    return { canonical: null, displayName: null };
+  }, [billingData?.plan, rawPlanIdParam, validatedSessionPlan]);
+
+  const unlockTiles = useMemo(
+    () => resolveUnlockTiles(resolvedPlan.canonical),
+    [resolvedPlan.canonical]
+  );
 
   useEffect(() => {
     track('subscription_success', {
@@ -80,20 +225,40 @@ export default function CheckoutSuccessPage() {
       section: 'success',
       conversion: true,
     });
-
-    const frame = requestAnimationFrame(() => setIsVisible(true));
-    return () => cancelAnimationFrame(frame);
   }, []);
 
-  const onboardingTrackedRef = useRef(false);
   useEffect(() => {
-    if (!billingData?.plan) return;
-    track('checkout_celebration_shown', { planType: billingData.plan });
+    if (!hasHydratedMotion) return;
+
+    if (prefersReducedMotion) {
+      setIsVisible(true);
+      return;
+    }
+
+    setIsVisible(false);
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, [hasHydratedMotion, prefersReducedMotion]);
+
+  const onboardingTrackedRef = useRef(false);
+  const celebrationTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!resolvedPlan.canonical) return;
+    if (checkoutSessionId && isSessionPlanPending) return;
+    if (!celebrationTrackedRef.current) {
+      celebrationTrackedRef.current = true;
+      track('checkout_celebration_shown', { planType: resolvedPlan.canonical });
+    }
     if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
       onboardingTrackedRef.current = true;
-      track('onboarding_upgrade_success', { plan: billingData.plan });
+      track('onboarding_upgrade_success', { plan: resolvedPlan.canonical });
     }
-  }, [billingData?.plan, isOnboardingUpgrade]);
+  }, [
+    checkoutSessionId,
+    isOnboardingUpgrade,
+    isSessionPlanPending,
+    resolvedPlan.canonical,
+  ]);
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
@@ -120,7 +285,7 @@ export default function CheckoutSuccessPage() {
         source: 'billing_success',
       });
       setRequestState('success');
-      setFeedback('Request sent. Tim has been notified.');
+      setFeedback('Request sent. Our team has been notified.');
     } catch (error) {
       setRequestState('error');
       setFeedback(
@@ -133,7 +298,9 @@ export default function CheckoutSuccessPage() {
 
   const successTitle = isOnboardingUpgrade
     ? 'Your profile is live and upgraded'
-    : `Welcome to ${planName}!`;
+    : resolvedPlan.displayName
+      ? `Welcome to ${resolvedPlan.displayName}!`
+      : 'Welcome to your new plan!';
   const successSubtitle = isOnboardingUpgrade
     ? "You're all set. Here's what you just unlocked."
     : "Your plan is active. Here's what you just unlocked.";
@@ -145,7 +312,9 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      <ConfettiOverlay viewport />
+      {shouldSuppressMotion ? null : hasHydratedMotion ? (
+        <ConfettiOverlay viewport />
+      ) : null}
 
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeader
@@ -156,9 +325,11 @@ export default function CheckoutSuccessPage() {
 
         <div
           className={
-            isVisible
-              ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
-              : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
+            shouldSuppressMotion
+              ? 'space-y-6 px-5 py-5 text-center sm:px-6'
+              : isVisible
+                ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
+                : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
           }
         >
           <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
@@ -166,19 +337,28 @@ export default function CheckoutSuccessPage() {
           </div>
 
           <div className='grid gap-4 sm:grid-cols-3'>
-            {UNLOCKED_FEATURES.map(feature => (
-              <FeatureCard key={feature.title} {...feature} />
+            {unlockTiles.map(tile => (
+              <FeatureCard key={tile.title} {...tile} />
             ))}
           </div>
 
           <div className='flex flex-col items-center gap-3'>
             <Button asChild size='lg'>
-              <Link href={APP_ROUTES.DASHBOARD}>
-                {isOnboardingUpgrade
-                  ? 'Explore your dashboard'
-                  : 'Go to Dashboard'}
+              <Link
+                href={
+                  isOnboardingUpgrade ? APP_ROUTES.DASHBOARD : APP_ROUTES.CHAT
+                }
+              >
+                {isOnboardingUpgrade ? 'Explore your dashboard' : 'Go to chat'}
               </Link>
             </Button>
+            {isOnboardingUpgrade ? null : (
+              <Button asChild variant='ghost' size='sm'>
+                <Link href={APP_ROUTES.DASHBOARD_RELEASES}>
+                  View your releases
+                </Link>
+              </Button>
+            )}
 
             {billingData?.isPro ? (
               <Button

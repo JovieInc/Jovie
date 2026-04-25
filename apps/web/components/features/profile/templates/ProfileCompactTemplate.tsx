@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import {
   ProfileNotificationsContext,
@@ -21,6 +28,10 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import {
+  buildProfileAccentCssVars,
+  readProfileAccentTheme,
+} from '@/lib/profile/profile-theme';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
@@ -243,6 +254,13 @@ export function ProfileCompactTemplate({
         null
     );
   }, [artist.image_url, photoDownloadSizes]);
+  const profileAccentStyle = useMemo(
+    () =>
+      buildProfileAccentCssVars(
+        readProfileAccentTheme(artist.theme)
+      ) as CSSProperties,
+    [artist.theme]
+  );
 
   const initialSource = useMemo(() => {
     if (globalThis.window === undefined) return null;
@@ -545,7 +563,10 @@ export function ProfileCompactTemplate({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div className='profile-viewport relative h-[100dvh] overflow-clip bg-[color:var(--profile-stage-bg)] text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden'>
+      <div
+        className='profile-viewport relative h-[100dvh] overflow-clip bg-[color:var(--profile-stage-bg)] text-primary-token md:h-auto md:min-h-[100dvh] md:overflow-x-hidden'
+        style={profileAccentStyle}
+      >
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
             <ImageWithFallback
@@ -592,6 +613,11 @@ export function ProfileCompactTemplate({
                 hideMoreMenu={hideMoreMenu}
                 drawerOpen={drawerOpen}
                 drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
                 onDrawerOpenChange={handleDrawerOpenChange}
                 onDrawerViewChange={handleDrawerViewChange}
                 onOpenMenu={() => openDrawerMode('menu')}

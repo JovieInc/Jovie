@@ -418,7 +418,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Empty selection for subheader export (simplified - no bulk selection)
-  const selectedIds = useMemo(() => new Set<string>(), []);
+  const selectedIds = useRef(new Set<string>()).current;
 
   const handleArtistConnected = useCallback(
     (newReleases: ReleaseViewModel[], newArtistName: string) => {

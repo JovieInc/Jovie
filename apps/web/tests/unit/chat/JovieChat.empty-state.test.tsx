@@ -95,7 +95,7 @@ describe('JovieChat empty state', () => {
     mockChatState.isSubmitting = false;
   });
 
-  it('renders the minimal welcome state with just heading and input', () => {
+  it('renders the minimal welcome state with hero-style heading, pills, and composer', () => {
     const { getByTestId, getByText, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
@@ -105,9 +105,14 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
-    expect(getByText('Preview profile')).toBeTruthy();
-    expect(getByText('Change photo')).toBeTruthy();
-    expect(getByText('Release link')).toBeTruthy();
+    // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
+    expect(getByText('Plan a release')).toBeTruthy();
+    expect(getByText('Generate album art')).toBeTruthy();
+    expect(getByText('Pitch playlists')).toBeTruthy();
+    // Old task-list-style actions should NOT appear — they belong in the profile switcher.
+    expect(queryByText('Preview profile')).toBeNull();
+    expect(queryByText('Change photo')).toBeNull();
+    expect(queryByText('Release link')).toBeNull();
   });
 
   it('renders first-session greeting for new users', () => {

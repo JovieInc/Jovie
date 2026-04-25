@@ -8,6 +8,7 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { creatorTypeEnum } from '@/lib/db/schema/enums';
 import type { CreatorContact, CreatorProfile } from '@/lib/db/schema/profiles';
+import type { ProfileThemeRecord } from '@/lib/profile/profile-theme';
 import type { PressPhoto } from '@/types/press-photos';
 
 /** Creator type enum values */
@@ -134,7 +135,7 @@ export interface ProfileUpdateData {
   isPublic?: boolean;
   marketingOptOut?: boolean;
   settings?: Record<string, unknown>;
-  theme?: Record<string, unknown>;
+  theme?: ProfileThemeRecord;
   location?: string;
   activeSinceYear?: number;
   onboardingCompletedAt?: Date | null;

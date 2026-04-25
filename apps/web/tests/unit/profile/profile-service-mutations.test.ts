@@ -24,6 +24,7 @@ const mockInvalidateProfileCache = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockGetRedis = vi.hoisted(() => vi.fn());
+const mockBuildThemeWithProfileAccent = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -43,6 +44,10 @@ vi.mock('@/lib/cache/profile', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
   captureWarning: mockCaptureWarning,
+}));
+
+vi.mock('@/lib/profile/profile-theme.server', () => ({
+  buildThemeWithProfileAccent: mockBuildThemeWithProfileAccent,
 }));
 
 // Mock drizzle-orm sql template tag
@@ -85,6 +90,17 @@ function createSelectChain(result: unknown[] = []) {
   return chain;
 }
 
+function queueSelectResults(...results: unknown[][]) {
+  for (const result of results) {
+    const chain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue(result),
+    };
+    mockDbSelect.mockImplementationOnce(() => chain);
+  }
+}
+
 function createRedisMock() {
   const redis = {
     incr: mockRedisIncr,
@@ -103,6 +119,11 @@ describe('Profile Service Mutations', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
+    mockBuildThemeWithProfileAccent.mockImplementation(
+      async ({ existingTheme }) => {
+        return (existingTheme ?? {}) as Record<string, unknown>;
+      }
+    );
   });
 
   afterEach(() => {
@@ -112,6 +133,7 @@ describe('Profile Service Mutations', () => {
 
   describe('updateProfileById', () => {
     it('updates profile and invalidates cache', async () => {
+      queueSelectResults([{ avatarUrl: null, theme: null }]);
       createUpdateChain([mockUpdatedProfile]);
       mockInvalidateProfileCache.mockResolvedValue(undefined);
 
@@ -127,6 +149,7 @@ describe('Profile Service Mutations', () => {
     });
 
     it('returns null when profile not found', async () => {
+      queueSelectResults([{ avatarUrl: null, theme: null }]);
       createUpdateChain([]);
 
       const { updateProfileById } = await import(
@@ -140,6 +163,7 @@ describe('Profile Service Mutations', () => {
     });
 
     it('sets updatedAt to current time', async () => {
+      queueSelectResults([{ avatarUrl: null, theme: null }]);
       const chain = createUpdateChain([mockUpdatedProfile]);
 
       const { updateProfileById } = await import(
@@ -157,7 +181,10 @@ describe('Profile Service Mutations', () => {
 
   describe('updateProfileByClerkId', () => {
     it('finds user by clerkId then updates profile', async () => {
-      createSelectChain([{ id: 'user-456' }]);
+      queueSelectResults(
+        [{ id: 'user-456' }],
+        [{ avatarUrl: null, theme: null }]
+      );
       createUpdateChain([mockUpdatedProfile]);
       mockInvalidateProfileCache.mockResolvedValue(undefined);
 
@@ -181,6 +208,47 @@ describe('Profile Service Mutations', () => {
       await expect(
         updateProfileByClerkId('nonexistent-clerk', { bio: 'Updated' })
       ).rejects.toThrow('User not found');
+    });
+
+    it('rebuilds accent theme when avatar changes', async () => {
+      queueSelectResults(
+        [{ id: 'user-456' }],
+        [{ avatarUrl: null, theme: { mode: 'light' } }]
+      );
+      mockBuildThemeWithProfileAccent.mockResolvedValue({
+        mode: 'light',
+        profileAccent: {
+          version: 1,
+          primaryHex: '#d3834e',
+          sourceUrl: 'https://example.com/avatar.jpg',
+        },
+      });
+      const chain = createUpdateChain([mockUpdatedProfile]);
+
+      const { updateProfileByClerkId } = await import(
+        '@/lib/services/profile/mutations'
+      );
+      await updateProfileByClerkId('clerk-789', {
+        avatarUrl: 'https://example.com/avatar.jpg',
+      });
+
+      expect(mockBuildThemeWithProfileAccent).toHaveBeenCalledWith({
+        existingTheme: { mode: 'light' },
+        sourceUrl: 'https://example.com/avatar.jpg',
+      });
+      expect(chain.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          avatarUrl: 'https://example.com/avatar.jpg',
+          theme: {
+            mode: 'light',
+            profileAccent: {
+              version: 1,
+              primaryHex: '#d3834e',
+              sourceUrl: 'https://example.com/avatar.jpg',
+            },
+          },
+        })
+      );
     });
   });
 

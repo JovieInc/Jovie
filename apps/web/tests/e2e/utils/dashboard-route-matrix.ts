@@ -258,7 +258,7 @@ const settingsRoutes = [
 
 const aliasRoutes = [
   {
-    path: APP_ROUTES.DASHBOARD_OVERVIEW,
+    path: APP_ROUTES.LEGACY_DASHBOARD,
     name: 'Legacy Dashboard Redirect',
     kind: 'redirect',
     surface: 'alias',
@@ -598,7 +598,7 @@ const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD_AUDIENCE,
   APP_ROUTES.DASHBOARD_RELEASES,
   APP_ROUTES.SETTINGS_ACCOUNT,
-  APP_ROUTES.DASHBOARD_OVERVIEW,
+  APP_ROUTES.LEGACY_DASHBOARD,
 ]);
 
 const fastAdminPaths = new Set(
