@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileNotificationsContext } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useProfileShell } from '@/components/organisms/profile-shell/useProfileShell';
@@ -20,6 +20,7 @@ interface Props {
 export function NotificationsPageClient({ artist }: Props) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks: [],
@@ -30,10 +31,28 @@ export function NotificationsPageClient({ artist }: Props) {
     readProfileAccentTheme(artist.theme)
   ) as CSSProperties;
 
+  useEffect(() => {
+    if (globalThis.window === undefined) {
+      return;
+    }
+
+    const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
+    const syncDesktop = () => setIsDesktopLayout(desktopQuery.matches);
+    syncDesktop();
+
+    if (typeof desktopQuery.addEventListener === 'function') {
+      desktopQuery.addEventListener('change', syncDesktop);
+      return () => desktopQuery.removeEventListener('change', syncDesktop);
+    }
+
+    desktopQuery.addListener(syncDesktop);
+    return () => desktopQuery.removeListener(syncDesktop);
+  }, []);
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative flex min-h-[calc(100dvh-7rem)] items-start justify-center overflow-hidden bg-[color:var(--profile-stage-bg)] px-4 pb-10 pt-10 sm:pt-14'
+        className='relative flex h-[100dvh] items-center justify-center overflow-hidden bg-[color:var(--profile-stage-bg)] p-4 sm:p-6'
         data-testid='notifications-page'
         style={accentStyle}
       >
@@ -51,7 +70,11 @@ export function NotificationsPageClient({ artist }: Props) {
         />
         <div
           ref={setNotificationsPortalContainer}
-          className='relative z-10 flex h-[calc(100dvh-5rem)] min-h-[640px] w-full max-w-sm flex-col overflow-hidden rounded-[32px] border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] p-5 shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl sm:max-h-[844px] sm:p-6'
+          className={`relative z-10 flex w-full flex-col overflow-hidden border border-[color:var(--profile-panel-border)] bg-[var(--profile-content-bg)] shadow-[var(--profile-panel-shadow)] backdrop-blur-2xl ${
+            isDesktopLayout
+              ? 'h-[min(940px,calc(100dvh-48px))] max-w-[1540px] rounded-[36px] p-8'
+              : 'h-[calc(100dvh-2rem)] max-w-sm rounded-[32px] p-5 sm:h-[min(844px,calc(100dvh-48px))] sm:p-6'
+          }`}
         >
           <div className='mb-5 flex items-center justify-between'>
             <Link
@@ -71,14 +94,15 @@ export function NotificationsPageClient({ artist }: Props) {
               Alerts for {artist.name}
             </p>
           </div>
-          <h1 className='sr-only'>Turn On Notifications for {artist.name}</h1>
+          <h1 className='sr-only'>Manage Alerts for {artist.name}</h1>
           <ArtistNotificationsCTA
             artist={artist}
-            presentation='overlay'
+            presentation={isDesktopLayout ? 'modal' : 'overlay'}
             portalContainer={notificationsPortalContainer}
             variant='button'
             autoOpen
             forceExpanded
+            hideTrigger
           />
         </div>
       </div>

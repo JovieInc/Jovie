@@ -145,6 +145,7 @@ const SCREENSHOT_CASES: readonly CaptureCase[] = [
       await reachOtpStep(page);
       await enterOtpCode(page, '123456');
       await waitForStep(page, 'name');
+      await page.getByTestId('mobile-name-input').fill('Alex');
       await clickStepButton(page, 'name', /^continue$/i);
       await waitForStep(page, 'birthday');
       await page.getByTestId('mobile-birthday-month').selectOption('04');
@@ -404,14 +405,67 @@ async function waitForStep(
   });
 }
 
+async function assertCaptureContained(params: {
+  readonly page: Page;
+  readonly locator: Locator;
+  readonly captureCase: CaptureCase;
+  readonly breakpoint: BreakpointConfig;
+}) {
+  const { page, locator, captureCase, breakpoint } = params;
+  const viewport = page.viewportSize();
+  const box = await locator.boundingBox();
+
+  if (!viewport || !box) {
+    throw new Error(`Unable to measure ${captureCase.id} @ ${breakpoint.name}`);
+  }
+
+  const overflow = {
+    left: Math.max(0, -box.x),
+    top: Math.max(0, -box.y),
+    right: Math.max(0, box.x + box.width - viewport.width),
+    bottom: Math.max(0, box.y + box.height - viewport.height),
+  };
+  const maxOverflow = Math.max(
+    overflow.left,
+    overflow.top,
+    overflow.right,
+    overflow.bottom
+  );
+
+  if (maxOverflow > 2) {
+    throw new Error(
+      [
+        `${captureCase.id} @ ${breakpoint.name} exceeds viewport bounds`,
+        `box=${JSON.stringify(box)}`,
+        `viewport=${JSON.stringify(viewport)}`,
+        `overflow=${JSON.stringify(overflow)}`,
+      ].join(' ')
+    );
+  }
+
+  const horizontalOverflow = await page.evaluate(() =>
+    Math.max(
+      0,
+      document.documentElement.scrollWidth - window.innerWidth,
+      document.body.scrollWidth - window.innerWidth
+    )
+  );
+
+  if (horizontalOverflow > 2) {
+    throw new Error(
+      `${captureCase.id} @ ${breakpoint.name} has horizontal page overflow: ${horizontalOverflow}px`
+    );
+  }
+}
+
 async function clickStepButton(
   page: Page,
   step: 'email' | 'otp' | 'name' | 'birthday' | 'preferences' | 'done',
   name: RegExp
 ) {
-  await getActiveStep(page, step).getByRole('button', { name }).click({
-    force: true,
-  });
+  const button = getActiveStep(page, step).getByRole('button', { name });
+  await button.waitFor({ state: 'visible', timeout: 20_000 });
+  await button.click({ timeout: 20_000, force: true });
 }
 
 async function continueFromAlertsEntry(page: Page) {
@@ -424,8 +478,16 @@ async function continueFromAlertsEntry(page: Page) {
 async function reachOtpStep(page: Page) {
   await continueFromAlertsEntry(page);
   await waitForStep(page, 'email');
-  await page.getByTestId('mobile-email-input').fill('fan@example.com');
-  await clickStepButton(page, 'email', /^continue$/i);
+  const emailStep = getActiveStep(page, 'email');
+  const emailInput = emailStep.getByTestId('mobile-email-input');
+  await emailInput.fill('fan@example.com');
+  const inputHandle = await emailInput.elementHandle();
+  await page.waitForFunction(
+    input => (input as HTMLInputElement).value === 'fan@example.com',
+    inputHandle
+  );
+  await page.waitForTimeout(250);
+  await emailStep.getByRole('button', { name: /^continue$/i }).click();
   await waitForStep(page, 'otp');
 }
 
@@ -484,6 +546,12 @@ async function captureReviewCase(params: {
   await waitForImages(page, captureCase.selector);
   await hideTransientUi(page);
   await page.waitForTimeout(500);
+  await assertCaptureContained({
+    page,
+    locator: captureLocator,
+    captureCase,
+    breakpoint,
+  });
 
   const screenshotPath = path.join(
     outputDir,

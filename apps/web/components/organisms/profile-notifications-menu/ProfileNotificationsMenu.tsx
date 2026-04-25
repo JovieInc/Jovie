@@ -217,7 +217,7 @@ export function ProfileNotificationsMenu({
             Add {label}
           </p>
           <p className='text-xs text-tertiary-token'>
-            Stay in the loop via {label.toLowerCase()}.
+            Manage alerts via {label.toLowerCase()}.
           </p>
         </div>
         <span aria-hidden className='text-xs text-tertiary-token'>

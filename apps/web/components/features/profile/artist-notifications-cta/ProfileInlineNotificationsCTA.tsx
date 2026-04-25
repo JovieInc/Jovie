@@ -22,7 +22,6 @@ import {
 import {
   noFontSynthesisStyle,
   profileHeroMorphPillClassName,
-  SubscriptionFormSkeleton,
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
@@ -36,9 +35,11 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly onManageNotifications?: () => void;
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly variant?: 'default' | 'hero' | 'button' | 'link';
-  readonly presentation?: 'overlay' | 'inline';
+  readonly presentation?: 'overlay' | 'inline' | 'modal';
   readonly portalContainer?: HTMLElement | null;
   readonly autoOpen?: boolean;
+  readonly hideTrigger?: boolean;
+  readonly onFlowClosed?: () => void;
   readonly source?: NotificationSource;
 }
 
@@ -78,6 +79,8 @@ export function ProfileInlineNotificationsCTA({
   presentation = 'overlay',
   portalContainer,
   autoOpen = false,
+  hideTrigger = false,
+  onFlowClosed,
   source,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
@@ -130,12 +133,17 @@ export function ProfileInlineNotificationsCTA({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const accentHex =
     readProfileAccentTheme(artist.theme)?.primaryHex ?? '#ed9962';
-  const showArtistEmailSection =
-    canEditPreferences &&
-    Boolean(subscriptionDetails.email || emailInput.trim()) &&
-    !subscribedChannels.sms;
-  const flowChannel =
-    subscriptionDetails.sms && !showArtistEmailSection ? 'sms' : 'email';
+  const hasEmailContact = Boolean(
+    subscriptionDetails.email || emailInput.trim()
+  );
+  const isSmsOnlyManageFlow = Boolean(
+    subscribedChannels.sms &&
+      !subscribedChannels.email &&
+      subscriptionDetails.sms &&
+      !hasEmailContact
+  );
+  const flowChannel = isSmsOnlyManageFlow ? 'sms' : 'email';
+  const showArtistEmailSection = flowChannel === 'email';
 
   const syncPreferencesFromStatus = useCallback(() => {
     if (isSubscribed) {
@@ -249,7 +257,8 @@ export function ProfileInlineNotificationsCTA({
     setCanEditPreferences(isSubscribed);
     setFlowOrigin(isSubscribed ? 'manage' : 'subscribe');
     setStep('preferences');
-  }, [isInline, isSubscribed]);
+    onFlowClosed?.();
+  }, [isInline, isSubscribed, onFlowClosed]);
 
   const handleBack = useCallback(() => {
     switch (step) {
@@ -446,34 +455,35 @@ export function ProfileInlineNotificationsCTA({
   }
 
   if (hydrationStatus === 'checking') {
-    return isInline ? <SubscriptionFormSkeleton /> : null;
+    return null;
   }
 
-  const triggerLabel = isSubscribed ? 'Manage Alerts' : 'Turn On Notifications';
+  const triggerLabel = isSubscribed ? 'Manage Alerts' : 'Turn on alerts';
   const triggerClassName = getTriggerClassName(variant);
-  const trigger = isInline ? null : (
-    <button
-      type='button'
-      onClick={openFlow}
-      className={triggerClassName}
-      style={noFontSynthesisStyle}
-      data-testid='profile-inline-notifications-trigger'
-    >
-      {isSubscribed ? (
-        <CheckCircle2 className='h-4.5 w-4.5' />
-      ) : (
-        <Bell className='h-4.5 w-4.5' />
-      )}
-      <span>{triggerLabel}</span>
-    </button>
-  );
+  const trigger =
+    isInline || hideTrigger ? null : (
+      <button
+        type='button'
+        onClick={openFlow}
+        className={triggerClassName}
+        style={noFontSynthesisStyle}
+        data-testid='profile-inline-notifications-trigger'
+      >
+        {isSubscribed ? (
+          <CheckCircle2 className='h-4.5 w-4.5' />
+        ) : (
+          <Bell className='h-4.5 w-4.5' />
+        )}
+        <span>{triggerLabel}</span>
+      </button>
+    );
 
   return (
     <>
       {trigger}
       <ProfileMobileNotificationsFlow
         open={isInline || isFlowOpen}
-        presentation={isInline ? 'inline' : 'overlay'}
+        presentation={isInline ? 'inline' : presentation}
         artistName={artist.name}
         channel={flowChannel}
         step={step}

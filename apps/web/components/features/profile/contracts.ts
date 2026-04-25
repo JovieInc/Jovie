@@ -48,7 +48,7 @@ export type ProfileV2OverlayMode =
 
 export type ProfileRenderMode = 'interactive' | 'preview';
 
-export type ProfileSurfacePresentation = 'standalone' | 'embedded';
+export type ProfileSurfacePresentation = 'standalone' | 'embedded' | 'modal';
 
 export const PROFILE_PRIMARY_TAB_KEYS = [
   'profile',

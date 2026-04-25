@@ -137,7 +137,7 @@ describe('notification flow shell sizing', () => {
     mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
   });
 
-  it('ArtistNotificationsCTA keeps the inline loading skeleton for hydration', async () => {
+  it('ArtistNotificationsCTA suppresses inline hydration chrome', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({ hydrationStatus: 'checking' })
     );
@@ -146,9 +146,11 @@ describe('notification flow shell sizing', () => {
       '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
     );
 
-    render(<ArtistNotificationsCTA artist={artist} autoOpen />);
+    const { container } = render(
+      <ArtistNotificationsCTA artist={artist} autoOpen />
+    );
 
-    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('ArtistNotificationsCTA uses the full-height inline flow shell when expanded', async () => {

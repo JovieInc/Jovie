@@ -21,8 +21,8 @@ export function SubscribeDrawer({
     <ProfileDrawerShell
       open={open}
       onOpenChange={onOpenChange}
-      title='Turn on notifications'
-      subtitle='New releases and shows.'
+      title='Alerts'
+      subtitle='New music, shows, and merch.'
     >
       <SubscribeView artist={artist} subscribeTwoStep={subscribeTwoStep} />
     </ProfileDrawerShell>

@@ -73,8 +73,8 @@ const MODE_META: Record<ProfileDrawerMode, DrawerMeta> = {
     icon: Music2,
   },
   subscribe: {
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
+    title: 'Alerts',
+    subtitle: 'Manage new music, shows, and merch alerts.',
     icon: Bell,
   },
   pay: {

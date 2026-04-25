@@ -42,7 +42,7 @@ export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
     },
     subscribe: {
       mode: 'subscribe',
-      subtitle: 'Turn on notifications',
+      subtitle: 'Manage alerts',
       pathSegment: 'subscribe',
       shell: {
         showBackButton: true,

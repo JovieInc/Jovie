@@ -3,14 +3,15 @@
 import { Bell, CheckCircle2 } from 'lucide-react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
-import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type {
   ProfilePreviewNotificationsState,
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
+import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: readonly TourDateViewModel[];
+  readonly releases?: readonly PublicRelease[];
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
 }
 
@@ -73,7 +75,7 @@ function PreviewAlertsPanel({
       ? 'Alerts On'
       : isSubscribed
         ? 'Manage Alerts'
-        : 'Turn On Notifications';
+        : 'Turn On Alerts';
   const resolvedBody =
     state.helper ??
     (state.kind === 'status'
@@ -106,9 +108,7 @@ function PreviewAlertsPanel({
         {state.kind === 'button' ? (
           <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white'>
             <Bell className='h-4 w-4' />
-            <span>
-              {isSubscribed ? 'Manage alerts' : 'Turn on notifications'}
-            </span>
+            <span>{isSubscribed ? 'Manage alerts' : 'Turn on alerts'}</span>
           </div>
         ) : null}
 
@@ -151,14 +151,12 @@ function SubscribePanel({
   renderMode,
   artist,
   notificationsPortalContainer,
-  subscribeTwoStep,
   isSubscribed,
   previewNotificationsState,
 }: Readonly<{
   renderMode: ProfileRenderMode;
   artist: Artist;
   notificationsPortalContainer?: HTMLElement | null;
-  subscribeTwoStep: boolean;
   isSubscribed: boolean;
   previewNotificationsState?: ProfilePreviewNotificationsState;
 }>) {
@@ -169,7 +167,7 @@ function SubscribePanel({
           previewNotificationsState ?? {
             kind: 'button',
             tone: 'quiet',
-            label: 'Turn on notifications',
+            label: 'Turn on alerts',
           }
         }
         isSubscribed={isSubscribed}
@@ -177,21 +175,14 @@ function SubscribePanel({
     );
   }
 
-  return subscribeTwoStep ? (
-    <TwoStepNotificationsCTA
-      artist={artist}
-      startExpanded
-      presentation='overlay'
-      portalContainer={notificationsPortalContainer}
-    />
-  ) : (
+  return (
     <ArtistNotificationsCTA
       artist={artist}
       presentation='overlay'
       portalContainer={notificationsPortalContainer}
-      variant='button'
       autoOpen
       forceExpanded
+      hideTrigger
     />
   );
 }
@@ -209,9 +200,28 @@ export function ProfilePrimaryTabPanel({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  releases = [],
   previewNotificationsState,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
   if (mode === 'listen') {
+    const visibleReleases = releases.filter(release => Boolean(release.slug));
+
+    if (visibleReleases.length > 0) {
+      return (
+        <div
+          className={PANEL_CLASS_NAME}
+          data-testid='profile-primary-tab-releases'
+        >
+          <SectionIntro title='Releases' />
+          <ReleasesView
+            releases={visibleReleases}
+            artistHandle={artist.handle}
+            artistName={artist.name}
+          />
+        </div>
+      );
+    }
+
     return (
       <div
         className={PANEL_CLASS_NAME}
@@ -248,7 +258,6 @@ export function ProfilePrimaryTabPanel({
         renderMode={renderMode}
         artist={artist}
         notificationsPortalContainer={notificationsPortalContainer}
-        subscribeTwoStep={subscribeTwoStep}
         isSubscribed={isSubscribed}
         previewNotificationsState={previewNotificationsState}
       />

@@ -177,6 +177,41 @@ export function ProfileDrawerShell({
     );
   }
 
+  if (presentation === 'modal') {
+    if (!open) {
+      return null;
+    }
+
+    return (
+      <div className='absolute inset-0 z-30 flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm'>
+        <button
+          type='button'
+          aria-label='Close modal overlay'
+          className='absolute inset-0'
+          onClick={() => onOpenChange(false)}
+        />
+        <div
+          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-[430px] flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+          data-testid={dataTestId}
+          role='dialog'
+          aria-describedby={accessibleDescriptionId}
+          aria-labelledby={titleId}
+          style={{
+            ['--profile-drawer-height-max' as string]:
+              'min(760px, calc(100dvh - 48px))',
+            ['--profile-drawer-header' as string]: '76px',
+          }}
+        >
+          <span id={accessibleDescriptionId} className='sr-only'>
+            {accessibleDescription}
+          </span>
+          {header}
+          {body}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>

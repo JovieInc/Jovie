@@ -700,8 +700,8 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
     kind: 'input',
-    label: 'Turn On Notifications',
-    helper: 'Fans turn on notifications once. After that, Jovie keeps working.',
+    label: 'Turn On Alerts',
+    helper: 'Fans choose alert types once. After that, Jovie keeps working.',
     value: 'fan@example.com',
   }),
   'fans-confirmed': createSuccessStatusShowcaseState({

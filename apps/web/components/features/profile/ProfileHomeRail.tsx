@@ -349,14 +349,14 @@ function AlertsRailCard({
   onOpenAlerts?: () => void;
   previewNotificationsState?: ProfilePreviewNotificationsState;
 }>) {
-  const title = isSubscribed ? 'Alerts On' : 'Never Miss A Release';
+  const title = isSubscribed ? 'Alerts On' : 'Turn On Alerts';
   const body = isSubscribed
-    ? 'Manage music, show, merch, and general update preferences.'
+    ? 'Manage music, show, and merch alert preferences.'
     : 'Get new music and tour updates by text or email the moment they land.';
   const label =
     previewNotificationsState?.kind === 'status' || isSubscribed
       ? 'Alerts On'
-      : 'Turn On Notifications';
+      : 'Turn On Alerts';
 
   return (
     <RailCardShell

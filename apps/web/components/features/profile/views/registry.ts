@@ -109,8 +109,8 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   subscribe: {
     key: 'subscribe',
-    title: 'Get Notified',
-    subtitle: 'Get notified about new releases and shows.',
+    title: 'Alerts',
+    subtitle: 'Manage new music, shows, and merch alerts.',
     icon: Bell,
     menuOrder: 2,
     analyticsEvent: 'subscribe_drawer_open',
@@ -118,7 +118,7 @@ export const PROFILE_VIEW_REGISTRY: Record<
   },
   pay: {
     key: 'pay',
-    title: 'Send payment',
+    title: 'Support',
     icon: Wallet,
     menuOrder: 3,
     analyticsEvent: 'tip_drawer_open',

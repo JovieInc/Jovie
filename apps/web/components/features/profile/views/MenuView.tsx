@@ -1,6 +1,6 @@
 'use client';
 
-import { Disc3, Mail, Share2, Ticket } from 'lucide-react';
+import { Disc3, Mail, Share2, Wallet } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
 import type { ProfileViewKey } from './registry';
 
@@ -61,8 +61,8 @@ export function MenuView({
           className={PROFILE_DRAWER_MENU_ITEM_CLASS}
           onClick={() => onNavigate('pay')}
         >
-          <Ticket className={ICON_CLASS} />
-          Pay
+          <Wallet className={ICON_CLASS} />
+          Support
         </button>
       ) : null}
 

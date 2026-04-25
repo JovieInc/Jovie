@@ -8,6 +8,7 @@ import {
   Mail,
   Music2,
   Shirt,
+  X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
@@ -26,7 +27,7 @@ export type ProfileMobileNotificationsFlowStep =
 
 interface ProfileMobileNotificationsFlowProps {
   readonly open: boolean;
-  readonly presentation?: 'inline' | 'overlay';
+  readonly presentation?: 'inline' | 'overlay' | 'modal';
   readonly portalContainer?: HTMLElement | null;
   readonly artistName: string;
   readonly channel?: 'email' | 'sms';
@@ -388,10 +389,52 @@ export function ProfileMobileNotificationsFlow({
       return;
     }
 
+    const scrollY = window.scrollY;
     const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    const profileViewports = Array.from(
+      document.querySelectorAll<HTMLElement>('.profile-viewport')
+    );
+    const resetViewportScroll = () => {
+      window.scrollTo(0, 0);
+      for (const viewport of profileViewports) {
+        viewport.scrollTop = 0;
+        viewport.scrollLeft = 0;
+      }
+    };
+
+    resetViewportScroll();
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = '0';
+    document.body.style.width = '100%';
+    document.documentElement.style.overflow = 'hidden';
+
+    const handleViewportScroll = () => {
+      requestAnimationFrame(resetViewportScroll);
+    };
+
+    for (const viewport of profileViewports) {
+      viewport.addEventListener('scroll', handleViewportScroll, {
+        passive: true,
+      });
+    }
+    document.addEventListener('focusin', resetViewportScroll);
+
     return () => {
+      for (const viewport of profileViewports) {
+        viewport.removeEventListener('scroll', handleViewportScroll);
+      }
+      document.removeEventListener('focusin', resetViewportScroll);
       document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      window.scrollTo(0, scrollY);
     };
   }, [open]);
 
@@ -561,7 +604,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Alerts'
-          body='Get notified about new music, shows, and more.'
+          body='New music, shows, and merch.'
           footer={
             canEditPreferences ? (
               <PrimaryButton
@@ -686,7 +729,8 @@ export function ProfileMobileNotificationsFlow({
   const isRootPreferencesStep =
     step === 'preferences' && !canGoBackFromPreferences;
   const showBackButton =
-    step !== 'done' && (!isRootPreferencesStep || presentation === 'overlay');
+    step !== 'done' && (!isRootPreferencesStep || presentation !== 'inline');
+  const showCloseButton = presentation === 'modal';
 
   const contentBody = (
     <>
@@ -698,7 +742,7 @@ export function ProfileMobileNotificationsFlow({
           'relative mx-auto flex w-full max-w-[430px] flex-col px-6',
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
-            : 'min-h-[640px] pb-8 pt-6'
+            : 'h-full pb-8 pt-6'
         )}
       >
         <header className='flex items-center justify-between pb-6'>
@@ -715,13 +759,18 @@ export function ProfileMobileNotificationsFlow({
             <span className='h-10 w-10' aria-hidden='true' />
           )}
 
-          <span
-            className={cn(
-              'text-[13px] font-medium tracking-[-0.01em] text-white/36 opacity-0'
-            )}
-          >
-            .
-          </span>
+          {showCloseButton ? (
+            <button
+              type='button'
+              onClick={onClose}
+              className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-200 hover:bg-white/[0.08]'
+              aria-label='Close'
+            >
+              <X className='h-4.5 w-4.5' />
+            </button>
+          ) : (
+            <span className='h-10 w-10' aria-hidden='true' />
+          )}
         </header>
 
         <AnimatePresence mode='wait'>
@@ -741,28 +790,48 @@ export function ProfileMobileNotificationsFlow({
     </>
   );
 
-  const sharedContentProps = {
-    className: cn(
-      presentation === 'overlay'
-        ? portalContainer === undefined
-          ? 'pointer-events-auto fixed inset-0 z-[140] bg-[#0a0b0f]'
-          : 'pointer-events-auto absolute inset-0 z-[140] bg-[#0a0b0f]'
-        : 'relative min-h-[640px] rounded-[32px] bg-[#0a0b0f]',
-      'text-white'
-    ),
-    'data-testid': 'profile-mobile-notifications-flow',
-    style: {
-      '--mobile-flow-accent': accentHex,
-    } as CSSProperties,
-  };
+  const overlayRootClassName =
+    portalContainer === undefined
+      ? 'pointer-events-auto fixed inset-0 z-[140]'
+      : 'pointer-events-auto absolute inset-0 z-[140]';
+  const contentStyle = {
+    '--mobile-flow-accent': accentHex,
+  } as CSSProperties;
 
   const content =
     presentation === 'overlay' ? (
-      <div {...sharedContentProps} role='dialog' aria-modal='true'>
+      <div
+        className={cn(overlayRootClassName, 'bg-[#0a0b0f] text-white')}
+        data-testid='profile-mobile-notifications-flow'
+        role='dialog'
+        aria-modal='true'
+        style={contentStyle}
+      >
         {contentBody}
       </div>
+    ) : presentation === 'modal' ? (
+      <div
+        className={cn(
+          overlayRootClassName,
+          'flex items-center justify-center bg-black/52 px-4 py-6 text-white backdrop-blur-sm'
+        )}
+        data-testid='profile-mobile-notifications-flow'
+        role='dialog'
+        aria-modal='true'
+        style={contentStyle}
+      >
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[#0a0b0f] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+          {contentBody}
+        </div>
+      </div>
     ) : (
-      <div {...sharedContentProps}>{contentBody}</div>
+      <div
+        className='relative min-h-[640px] rounded-[32px] bg-[#0a0b0f] text-white'
+        data-testid='profile-mobile-notifications-flow'
+        style={contentStyle}
+      >
+        {contentBody}
+      </div>
     );
 
   if (presentation === 'inline') {

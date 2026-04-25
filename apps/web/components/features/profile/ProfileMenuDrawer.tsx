@@ -168,7 +168,7 @@ export function ProfileMenuDrawer({
               onClick={() => handleAction(onOpenSubscribe)}
             >
               <Bell className={iconClass} />
-              Turn on notifications
+              Turn on alerts
             </button>
           )}
         </div>

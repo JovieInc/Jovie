@@ -6,7 +6,7 @@ import { ProfileInlineNotificationsCTA } from './ProfileInlineNotificationsCTA';
 interface TwoStepNotificationsCTAProps {
   readonly artist: Artist;
   readonly startExpanded?: boolean;
-  readonly presentation?: 'overlay' | 'inline';
+  readonly presentation?: 'overlay' | 'inline' | 'modal';
   readonly portalContainer?: HTMLElement | null;
 }
 

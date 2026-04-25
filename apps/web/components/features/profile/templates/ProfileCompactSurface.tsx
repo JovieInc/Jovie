@@ -240,14 +240,14 @@ function resolveActivePrimaryTab(params: {
   const { mode } = params;
   switch (mode) {
     case 'listen':
+    case 'releases':
     case 'tour':
     case 'subscribe':
     case 'about':
-      return mode;
+      return mode === 'releases' ? 'listen' : mode;
     case 'profile':
     case 'pay':
     case 'contact':
-    case 'releases':
     default:
       return 'profile';
   }
@@ -340,7 +340,7 @@ export function ProfileCompactSurface({
   previewNotificationsState = {
     kind: 'button',
     tone: 'quiet',
-    label: 'Get alerts',
+    label: 'Turn on alerts',
   },
   dataTestId,
   hideMoreMenu = false,
@@ -399,7 +399,8 @@ export function ProfileCompactSurface({
     drawerOpen: isDrawerOverlayActive,
     drawerView,
   });
-  const isHomeMode = activePrimaryTab === 'profile' || isDrawerOverlayActive;
+  const isHomeMode = activePrimaryTab === 'profile';
+  const showBottomNav = activePrimaryTab !== 'subscribe';
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
   const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
@@ -451,8 +452,8 @@ export function ProfileCompactSurface({
             'relative shrink-0 overflow-hidden',
             isHomeMode
               ? isPreviewEmbedded
-                ? 'min-h-[454px]'
-                : 'min-h-[480px]'
+                ? 'min-h-[440px]'
+                : 'min-h-[456px]'
               : isPreviewEmbedded
                 ? 'min-h-[316px]'
                 : 'min-h-[408px]'
@@ -555,15 +556,34 @@ export function ProfileCompactSurface({
                 </p>
               </div>
 
-              <div
-                className={cn(
-                  'flex items-end justify-between gap-3.5',
-                  isPreviewEmbedded ? 'pt-1' : ''
-                )}
-              >
+              <div className='space-y-3.5'>
                 <div
-                  className='flex min-w-0 flex-1 flex-wrap items-center gap-2.5'
-                  data-testid='profile-hero-action-row'
+                  className='flex min-w-0 flex-wrap items-center gap-2.5'
+                  data-testid='profile-hero-status-row'
+                >
+                  <span
+                    className='inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-4 text-[13px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+                    data-testid='profile-hero-status-pill'
+                  >
+                    <span className='h-2 w-2 rounded-full bg-[color:var(--profile-accent-primary)]' />
+                    <span>{statusPill.label}</span>
+                  </span>
+
+                  {heroRoleLabel ? (
+                    <span
+                      className='inline-flex h-11 shrink-0 items-center rounded-full border border-white/12 bg-black/18 px-4 text-[13px] font-medium tracking-[-0.01em] text-white/64 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl'
+                      data-testid='profile-hero-role-pill'
+                    >
+                      {heroRoleLabel}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div
+                  className={cn(
+                    'flex items-end justify-between gap-3.5',
+                    isPreviewEmbedded ? 'pt-1' : ''
+                  )}
                 >
                   <div
                     className='shrink-0'
@@ -587,85 +607,73 @@ export function ProfileCompactSurface({
                         tabIndex={-1}
                       >
                         <Bell className='h-4 w-4' />
-                        {isSubscribed
-                          ? 'Manage alerts'
-                          : 'Turn on notifications'}
+                        {isSubscribed ? 'Manage alerts' : 'Turn on alerts'}
                       </button>
                     )}
                   </div>
 
-                  <span
-                    className='inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-4 text-[13px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'
-                    data-testid='profile-hero-status-pill'
-                  >
-                    <span className='h-2 w-2 rounded-full bg-[color:var(--profile-accent-primary)]' />
-                    <span>{statusPill.label}</span>
-                  </span>
-
-                  {heroRoleLabel ? (
-                    <span
-                      className='inline-flex h-11 shrink-0 items-center rounded-full border border-white/12 bg-black/18 px-4 text-[13px] font-medium tracking-[-0.01em] text-white/64 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl'
-                      data-testid='profile-hero-role-pill'
+                  {visibleSocialLinks.length > 0 ? (
+                    <div
+                      className={cn(
+                        'flex shrink-0 items-center',
+                        isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
+                      )}
+                      data-testid='profile-hero-social-row'
                     >
-                      {heroRoleLabel}
-                    </span>
+                      {visibleSocialLinks.map((link, index) =>
+                        link.platform && link.url ? (
+                          <div
+                            key={link.id}
+                            className={cn(
+                              'flex items-center',
+                              isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
+                            )}
+                          >
+                            <a
+                              href={link.url}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/24 text-white shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color,transform] duration-200 hover:bg-black/34 active:scale-[0.98]'
+                              aria-label={link.platform}
+                            >
+                              <SocialIcon
+                                platform={link.platform}
+                                className='h-[18px] w-[18px]'
+                              />
+                            </a>
+                            {index < visibleSocialLinks.length - 1 ? (
+                              <span
+                                className='h-8 w-px bg-white/18'
+                                aria-hidden='true'
+                              />
+                            ) : null}
+                          </div>
+                        ) : null
+                      )}
+                    </div>
                   ) : null}
                 </div>
-
-                {visibleSocialLinks.length > 0 ? (
-                  <div
-                    className={cn(
-                      'flex shrink-0 items-center',
-                      isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
-                    )}
-                    data-testid='profile-hero-social-row'
-                  >
-                    {visibleSocialLinks.map((link, index) =>
-                      link.platform && link.url ? (
-                        <div
-                          key={link.id}
-                          className={cn(
-                            'flex items-center',
-                            isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
-                          )}
-                        >
-                          <a
-                            href={link.url}
-                            target='_blank'
-                            rel='noopener noreferrer'
-                            className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/24 text-white shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color,transform] duration-200 hover:bg-black/34 active:scale-[0.98]'
-                            aria-label={link.platform}
-                          >
-                            <SocialIcon
-                              platform={link.platform}
-                              className='h-[18px] w-[18px]'
-                            />
-                          </a>
-                          {index < visibleSocialLinks.length - 1 ? (
-                            <span
-                              className='h-8 w-px bg-white/18'
-                              aria-hidden='true'
-                            />
-                          ) : null}
-                        </div>
-                      ) : null
-                    )}
-                  </div>
-                ) : null}
               </div>
             </div>
           </div>
         </header>
 
-        <div className='relative z-10 flex flex-1 flex-col px-5 pt-4'>
+        <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-4'>
           {showSubscriptionConfirmedBanner ? (
-            <div className='pb-3'>
+            <div className='shrink-0 pb-3'>
               <SubscriptionConfirmedBanner />
             </div>
           ) : null}
 
-          {isHomeMode ? (
-            <div>
+          <div
+            className={cn(
+              'min-h-0 flex-1',
+              showBottomNav ? 'pb-4' : 'pb-0',
+              !isHomeMode &&
+                'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            )}
+          >
+            {isHomeMode ? (
               <ProfileHomeRail
                 artist={artist}
                 latestRelease={latestRelease}
@@ -681,73 +689,76 @@ export function ProfileCompactSurface({
                 isSubscribed={isSubscribed}
                 previewNotificationsState={previewNotificationsState}
               />
-            </div>
-          ) : (
-            <ProfilePrimaryTabPanel
-              mode={activePrimaryPanel ?? 'listen'}
-              renderMode={renderMode}
-              artist={artist}
-              notificationsPortalContainer={notificationsPortalContainer}
-              dsps={mergedDSPs}
-              enableDynamicEngagement={enableDynamicEngagement}
-              subscribeTwoStep={subscribeTwoStep}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={onTogglePref}
-              onUnsubscribe={onUnsubscribe}
-              isUnsubscribing={isUnsubscribing}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              tourDates={tourDates}
-              previewNotificationsState={previewNotificationsState}
-            />
-          )}
-
-          <div className='mt-auto pt-5'>
-            <nav
-              className='mx-[-20px] border-t border-[color:var(--profile-dock-border)] bg-[color:color-mix(in_srgb,var(--profile-dock-bg)_72%,transparent)] px-3 pt-2 backdrop-blur-2xl'
-              aria-label='Profile navigation'
-              data-testid='profile-bottom-nav'
-            >
-              <div className='flex items-stretch gap-1 pb-[max(env(safe-area-inset-bottom),10px)]'>
-                {PRIMARY_TABS.map(tab => {
-                  const Icon = tab.icon;
-                  const isActive = tab.mode === activePrimaryTab;
-                  return (
-                    <button
-                      key={tab.mode}
-                      type='button'
-                      onClick={() => onModeSelect(tab.mode)}
-                      className={cn(
-                        'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                        isActive
-                          ? 'text-white'
-                          : 'text-white/40 hover:text-white/62'
-                      )}
-                      aria-current={isActive ? 'page' : undefined}
-                    >
-                      {isActive ? (
-                        <span
-                          className='absolute left-1/2 top-0 h-1 w-9 -translate-x-1/2 rounded-full bg-[color:var(--profile-tab-active-bg)]'
-                          aria-hidden='true'
-                        />
-                      ) : null}
-                      <Icon
-                        className={cn(
-                          'h-5 w-5 shrink-0',
-                          isActive ? 'text-white' : 'text-white/52'
-                        )}
-                      />
-                      <span className='truncate text-[11px] font-semibold tracking-[-0.012em]'>
-                        {tab.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </nav>
+            ) : (
+              <ProfilePrimaryTabPanel
+                mode={activePrimaryPanel ?? 'listen'}
+                renderMode={renderMode}
+                artist={artist}
+                notificationsPortalContainer={notificationsPortalContainer}
+                dsps={mergedDSPs}
+                enableDynamicEngagement={enableDynamicEngagement}
+                subscribeTwoStep={subscribeTwoStep}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={onTogglePref}
+                onUnsubscribe={onUnsubscribe}
+                isUnsubscribing={isUnsubscribing}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                tourDates={tourDates}
+                releases={releases}
+                previewNotificationsState={previewNotificationsState}
+              />
+            )}
           </div>
+
+          {showBottomNav ? (
+            <div className='shrink-0 pt-1'>
+              <nav
+                className='mx-[-20px] border-t border-[color:var(--profile-dock-border)] bg-[color:color-mix(in_srgb,var(--profile-dock-bg)_72%,transparent)] px-3 pt-2 backdrop-blur-2xl'
+                aria-label='Profile navigation'
+                data-testid='profile-bottom-nav'
+              >
+                <div className='flex items-start gap-1 pb-6'>
+                  {PRIMARY_TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = tab.mode === activePrimaryTab;
+                    return (
+                      <button
+                        key={tab.mode}
+                        type='button'
+                        onClick={() => onModeSelect(tab.mode)}
+                        className={cn(
+                          'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          isActive
+                            ? 'text-white'
+                            : 'text-white/40 hover:text-white/62'
+                        )}
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        {isActive ? (
+                          <span
+                            className='absolute left-1/2 top-0 h-1 w-9 -translate-x-1/2 rounded-full bg-[color:var(--profile-tab-active-bg)]'
+                            aria-hidden='true'
+                          />
+                        ) : null}
+                        <Icon
+                          className={cn(
+                            'h-5 w-5 shrink-0',
+                            isActive ? 'text-white' : 'text-white/52'
+                          )}
+                        />
+                        <span className='truncate text-[11px] font-semibold tracking-[-0.012em]'>
+                          {tab.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </nav>
+            </div>
+          ) : null}
         </div>
       </div>
 

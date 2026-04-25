@@ -354,7 +354,7 @@ function SubscribeSection({
       className='space-y-3'
       data-testid='subscribe-cta-container'
     >
-      <SectionLabel>Get Notified</SectionLabel>
+      <SectionLabel>Alerts</SectionLabel>
       <div id='profile-subscribe-heading' className={panelClassName}>
         {subscribeTwoStep ? (
           <TwoStepNotificationsCTA

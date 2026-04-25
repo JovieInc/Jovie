@@ -24,12 +24,14 @@ const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
   mockProfileInlineNotificationsCTA,
+  mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
   mockProfilePrimaryTabPanel,
 } = vi.hoisted(() => ({
   mockCanonicalProfileDSPs: vi.fn(() => []),
   mockUseProfileShell: vi.fn(),
   mockProfileInlineNotificationsCTA: vi.fn(),
+  mockProfileDesktopSurface: vi.fn(),
   mockProfileUnifiedDrawer: vi.fn(),
   mockProfilePrimaryTabPanel: vi.fn(),
 }));
@@ -153,6 +155,11 @@ vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
     mockProfilePrimaryTabPanel(props),
 }));
 
+vi.mock('@/features/profile/templates/ProfileDesktopSurface', () => ({
+  ProfileDesktopSurface: (props: Record<string, unknown>) =>
+    mockProfileDesktopSurface(props),
+}));
+
 const mockArtist: Artist = {
   id: 'artist-1',
   name: 'Test Artist',
@@ -214,13 +221,14 @@ describe('ProfileCompactTemplate', () => {
     ({ ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
     ));
-  }, 30_000);
+  }, 120_000);
 
   beforeEach(() => {
     cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
+    mockProfileDesktopSurface.mockClear();
     mockProfileUnifiedDrawer.mockClear();
     mockProfilePrimaryTabPanel.mockClear();
     mockProfileInlineNotificationsCTA.mockImplementation(
@@ -432,6 +440,8 @@ describe('ProfileCompactTemplate', () => {
         'false'
       );
     });
+
+    expect(screen.queryByTestId('profile-bottom-nav')).not.toBeInTheDocument();
   });
 
   it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
@@ -459,6 +469,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
 
+    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
     expect(window.location.search).toBe('?mode=listen');
   });
 

@@ -10,6 +10,8 @@ export function ArtistNotificationsCTA({
   variant = 'link',
   autoOpen = false,
   forceExpanded = false,
+  hideTrigger = false,
+  onFlowClosed,
   source,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
@@ -22,6 +24,8 @@ export function ArtistNotificationsCTA({
       presentation={resolvedPresentation}
       portalContainer={portalContainer}
       autoOpen={autoOpen || forceExpanded}
+      hideTrigger={hideTrigger}
+      onFlowClosed={onFlowClosed}
       source={source}
     />
   );
