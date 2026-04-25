@@ -976,7 +976,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   socialProof: {
-    headline: 'Real Artists. Real Workflows.',
+    headline: 'Built by an artist. For artists.',
     intro: 'Real artist profiles built around real release moments.',
   },
   faq: {
