@@ -146,22 +146,27 @@ function renderArtistLine(
     return releaseArtistListFormatter.format(normalizedNames);
   }
 
-  return releaseArtistListFormatter
-    .formatToParts(normalizedNames)
-    .map((part, index) =>
-      part.type === 'element' ? (
-        <button
-          key={`artist-${index}`}
-          type='button'
-          onClick={() => onArtistClick(part.value)}
-          className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
-        >
-          {part.value}
-        </button>
-      ) : (
-        <span key={`sep-${index}`}>{part.value}</span>
-      )
+  const partCounts = new Map<string, number>();
+
+  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part => {
+    const keyBase = `${part.type}:${part.value}`;
+    const occurrence = partCounts.get(keyBase) ?? 0;
+    partCounts.set(keyBase, occurrence + 1);
+    const key = `${keyBase}:${occurrence}`;
+
+    return part.type === 'element' ? (
+      <button
+        key={key}
+        type='button'
+        onClick={() => onArtistClick(part.value)}
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+      >
+        {part.value}
+      </button>
+    ) : (
+      <span key={key}>{part.value}</span>
     );
+  });
 }
 
 function ReleaseEntityHeader({

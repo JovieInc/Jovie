@@ -7,7 +7,6 @@ type Row = { id: string; title: string; count: number };
 
 const columnHelper = createColumnHelper<Row>();
 
-// biome-ignore lint/suspicious/noExplicitAny: columnHelper.accessor narrows per-column types; outer array must be widened in test fixtures.
 const COLUMNS: ColumnDef<Row, any>[] = [
   columnHelper.accessor('title', {
     id: 'title',

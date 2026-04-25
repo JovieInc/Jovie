@@ -2,7 +2,9 @@ import { defineConfig } from 'vitest/config';
 import baseConfig from './vitest.config.fast.mts';
 
 const baseExclude = Array.isArray(baseConfig.test?.exclude)
-  ? baseConfig.test.exclude.filter(pattern => pattern !== 'tests/integration/**')
+  ? baseConfig.test.exclude.filter(
+      pattern => pattern !== 'tests/integration/**'
+    )
   : [];
 
 export default defineConfig({
