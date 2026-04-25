@@ -63,7 +63,7 @@ describe('POST /api/feedback', () => {
       success: true,
       limit: 60,
       remaining: 59,
-      reset: Date.now() + 60_000,
+      reset: new Date(Date.now() + 60_000),
     });
     mockFindFirst.mockResolvedValue({
       id: 'user_1',
@@ -142,7 +142,7 @@ describe('POST /api/feedback', () => {
       success: false,
       limit: 60,
       remaining: 0,
-      reset: Date.now() + 60_000,
+      reset: new Date(Date.now() + 60_000),
     });
 
     const { POST } = await import('@/app/api/feedback/route');
