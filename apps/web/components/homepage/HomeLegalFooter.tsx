@@ -3,7 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export function HomeLegalFooter() {
   return (
-    <footer className='homepage-legal-footer flex flex-col items-center justify-between gap-3 px-5 py-4 text-[11px] text-white/38 sm:flex-row sm:px-6 sm:py-5'>
+    <footer className='homepage-legal-footer flex flex-col items-center justify-between gap-3 px-5 py-4 text-[11px] text-white/56 sm:flex-row sm:px-6 sm:py-5'>
       <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
       <nav aria-label='Legal' className='flex items-center gap-4'>
         <Link

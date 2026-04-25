@@ -104,7 +104,7 @@ export function renderCreatedDateCell({
   const createdAt = row.original.createdAt;
 
   return (
-    <span className='whitespace-nowrap text-[11px] font-[400] tabular-nums text-tertiary-token'>
+    <span className='whitespace-nowrap text-2xs font-normal tabular-nums text-tertiary-token'>
       {createdAt
         ? createdAt.toLocaleDateString('en-US', {
             month: 'short',

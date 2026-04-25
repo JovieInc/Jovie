@@ -196,14 +196,16 @@ function resolveModeSummary(params: {
   hasReleases: boolean;
 }) {
   switch (params.mode) {
-    case 'listen':
+    case 'listen': {
+      const destinationSuffix = params.dspCount === 1 ? '' : 's';
       return {
         title: 'Streaming Destinations',
         body:
           params.dspCount > 0
-            ? `${params.artistName} is linked on ${params.dspCount} listening destination${params.dspCount === 1 ? '' : 's'}.`
+            ? `${params.artistName} is linked on ${params.dspCount} listening destination${destinationSuffix}.`
             : `Open alerts for ${params.artistName} until listening destinations are live.`,
       };
+    }
     case 'tour':
       return {
         title: 'Live Dates',
@@ -475,7 +477,9 @@ export function ProfileCompactSurface({
 
           <div className='relative z-10 flex h-full flex-col justify-between px-5 pb-5 pt-[max(env(safe-area-inset-top),20px)]'>
             <div className='flex items-center justify-between'>
-              {!hideJovieBranding ? (
+              {hideJovieBranding ? (
+                <span />
+              ) : (
                 <Link
                   href={artistProfilesHref ?? BASE_URL}
                   aria-label='Create your artist profile on Jovie'
@@ -489,11 +493,9 @@ export function ProfileCompactSurface({
                     aria-hidden={true}
                   />
                 </Link>
-              ) : (
-                <span />
               )}
 
-              {!hideMoreMenu ? (
+              {hideMoreMenu ? null : (
                 <CircleIconButton
                   onClick={onOpenMenu}
                   size='xs'
@@ -504,7 +506,7 @@ export function ProfileCompactSurface({
                 >
                   <MoreHorizontal className='h-[15px] w-[15px]' />
                 </CircleIconButton>
-              ) : null}
+              )}
             </div>
 
             <div className='space-y-4'>
@@ -625,14 +627,14 @@ export function ProfileCompactSurface({
           )}
 
           <div className='mt-auto space-y-3 pt-5'>
-            {!hideJovieBranding ? (
+            {hideJovieBranding ? null : (
               <a
                 href={BASE_URL}
                 className='block text-center text-[11px] font-semibold tracking-[-0.01em] text-primary-token/42 transition-colors duration-150 hover:text-primary-token/64'
               >
                 Powered by Jovie
               </a>
-            ) : null}
+            )}
 
             <nav
               className='rounded-[30px] border border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] p-1.5 shadow-[var(--profile-dock-shadow)] backdrop-blur-2xl'
@@ -668,7 +670,7 @@ export function ProfileCompactSurface({
         </div>
       </div>
 
-      {renderMode !== 'preview' ? (
+      {renderMode === 'preview' ? null : (
         <ProfileUnifiedDrawer
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}
@@ -699,7 +701,7 @@ export function ProfileCompactSurface({
           releases={releases}
           onRevealNotifications={onRevealNotifications}
         />
-      ) : null}
+      )}
     </div>
   );
 }
