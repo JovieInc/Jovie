@@ -142,7 +142,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-fit-score'
-                className='text-[13px] font-[510] text-primary-token'
+                className='text-[13px] font-medium text-primary-token'
               >
                 Minimum fit score
               </label>
@@ -170,7 +170,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-batch-size'
-                className='text-[13px] font-[510] text-primary-token'
+                className='text-[13px] font-medium text-primary-token'
               >
                 Batch size
               </label>
@@ -198,7 +198,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-min-delay'
-                className='text-[13px] font-[510] text-primary-token'
+                className='text-[13px] font-medium text-primary-token'
               >
                 Min delay (seconds)
               </label>
@@ -227,7 +227,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-max-delay'
-                className='text-[13px] font-[510] text-primary-token'
+                className='text-[13px] font-medium text-primary-token'
               >
                 Max delay (seconds)
               </label>
