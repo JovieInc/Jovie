@@ -216,11 +216,12 @@ export async function POST(request: NextRequest) {
       createCheckoutSession({
         customerId,
         priceId,
+        plan: selectedPlan,
         userId,
         successUrl:
           checkoutSource === 'onboarding'
-            ? `${baseUrl}${onboardingReturnTo}&upgrade=success`
-            : `${baseUrl}/billing/success`,
+            ? `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${selectedPlan ? `&plan_id=${encodeURIComponent(selectedPlan)}` : ''}`
+            : `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${selectedPlan ? `&plan_id=${encodeURIComponent(selectedPlan)}` : ''}`,
         cancelUrl:
           checkoutSource === 'onboarding'
             ? `${baseUrl}${onboardingReturnTo}&upgrade=cancel`

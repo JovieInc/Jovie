@@ -6,7 +6,6 @@
 |-----------|--------------|---------|------------|--------|
 | `app/dashboard/layout.tsx` | `DashboardLayoutClient` | Server layout wrapper securing routes and loading data | Uses legacy `Button`, `Sidebar` | Inconsistent tokens, manual error UI |
 | `app/dashboard/DashboardLayoutClient.tsx` | `Sidebar`, `Button`, `Tooltip`, `DashboardNav`, `EnhancedThemeToggle`, `FeedbackButton`, `UserButton` | Client shell with navigation and utilities | Multiple button and tooltip variants | Heavy client JS; duplicate components; mixed accessibility |
-| `app/dashboard/overview/page.tsx` | `DashboardOverview` | Overview metrics | Relies on custom card and table components | Styling drift, limited a11y checks |
 | `app/dashboard/analytics/page.tsx` | `DashboardAnalytics` | Analytics charts | Custom chart wrappers | Client-only charts not lazy-loaded |
 | `app/dashboard/audience/page.tsx` | `DashboardAudience` | Audience statistics | Reuses chart and table implementations | Duplicated loading states |
 | `app/dashboard/links/page.tsx` | `EnhancedDashboardLinks` | Manage profile links | Custom form controls and modals | Mixed component styles; multiple form inputs |

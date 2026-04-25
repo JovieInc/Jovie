@@ -126,7 +126,7 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 - **Problem it solves:** Fans who subscribed want to know when new music drops. Manual notifications are easy to forget.
 - **How it works:** Configure per-release notifications: preview (before drop) and release-day alerts. Jovie sends emails to all subscribers with a smart link to listen.
 - **Key benefits:** Automated fan communication, higher day-one streams, configurable per release
-- **Dashboard route:** /app/settings/notifications
+- **Dashboard route:** /app/settings/account (notification preferences are a pending feature; see Linear issue)
 - **Docs page:** /docs/features/audience
 
 ---
@@ -202,7 +202,7 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 - **Problem it solves:** Artists with established brands want their profile to look fully their own.
 - **How it works:** Toggle in dashboard settings removes the Jovie branding footer from all public-facing pages.
 - **Key benefits:** White-labeled appearance, professional brand presentation
-- **Dashboard route:** /app/settings/branding
+- **Dashboard route:** /app/settings/artist-profile
 - **Docs page:** /docs/features/profile
 
 ---
@@ -278,7 +278,7 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 - **Problem it solves:** Profile visitors disappear after leaving. Pixels enable retargeting them with ads.
 - **How it works:** Add pixel IDs in Settings > Ad Pixels. Jovie fires page view and click events on all public pages. Supports Facebook Pixel with Conversions API (CAPI) for server-side reliability, Google Analytics measurement IDs, and TikTok Pixel. Consent-aware, with UTM parameter forwarding.
 - **Key benefits:** Retargeting capability, server-side tracking (Facebook CAPI), multi-platform support
-- **Dashboard route:** /app/settings/ad-pixels
+- **Dashboard route:** /app/settings/audience (Audience & Tracking section)
 - **Docs page:** /docs/features/analytics/ad-pixels
 
 ---

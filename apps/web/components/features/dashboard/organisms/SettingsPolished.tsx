@@ -213,8 +213,8 @@ export function SettingsPolished({
     [isGrowth]
   );
 
-  // -- General (user-level) settings --
-  const userSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
+  // -- Account group --
+  const accountSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
     () => [
       {
         id: 'account',
@@ -223,34 +223,12 @@ export function SettingsPolished({
           'Manage your security, theme, and notification preferences.',
         render: renderAccountSection,
       },
-      {
-        id: 'billing',
-        title: 'Billing & Subscription',
-        description: 'Subscription, payment methods, and invoices.',
-        render: () => <SettingsBillingSection />,
-      },
-      ...(isStripeConnectEnabled
-        ? [
-            {
-              id: 'payments',
-              title: 'Payments',
-              description: 'Connect Stripe to receive payments from fans.',
-              render: () => <SettingsPaymentsSection />,
-            },
-          ]
-        : []),
-      {
-        id: 'data-privacy',
-        title: 'Data & Privacy',
-        description: 'Data export and account deletion.',
-        render: () => <DataPrivacySection />,
-      },
     ],
-    [renderAccountSection, isStripeConnectEnabled]
+    [renderAccountSection]
   );
 
-  // -- Artist-level settings --
-  const artistSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
+  // -- Creative group (artist identity, touring) --
+  const creativeSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
     () => [
       {
         id: 'artist-profile',
@@ -267,29 +245,24 @@ export function SettingsPolished({
         ),
       },
       {
-        id: 'contacts',
-        title: 'Contacts',
-        description: 'Manage bookings, management, and press contacts.',
-        render: () => <SettingsContactsSection artist={artist} />,
-      },
-      {
         id: 'touring',
         title: 'Touring',
         description:
           'Connect Bandsintown to display tour dates on your profile.',
         render: () => <SettingsTouringSection profileId={artist.id} />,
       },
+    ],
+    [artist, onArtistUpdate, router]
+  );
+
+  // -- Audience group (contacts, audience tracking, analytics) --
+  const audienceSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
+    () => [
       {
-        id: 'analytics',
-        title: 'Analytics',
-        description: 'Control how your visits appear in analytics.',
-        render: () => (
-          <SettingsAnalyticsSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
-            isPro={isPro}
-          />
-        ),
+        id: 'contacts',
+        title: 'Contacts',
+        description: 'Manage bookings, management, and press contacts.',
+        render: () => <SettingsContactsSection artist={artist} />,
       },
       {
         id: 'audience-tracking',
@@ -309,8 +282,56 @@ export function SettingsPolished({
           </div>
         ),
       },
+      {
+        id: 'analytics',
+        title: 'Analytics',
+        description: 'Control how your visits appear in analytics.',
+        render: () => (
+          <SettingsAnalyticsSection
+            artist={artist}
+            onArtistUpdate={onArtistUpdate}
+            isPro={isPro}
+          />
+        ),
+      },
     ],
-    [artist, isPro, onArtistUpdate, router]
+    [artist, isPro, onArtistUpdate]
+  );
+
+  // -- Monetization group (billing, payments) --
+  const monetizationSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
+    () => [
+      {
+        id: 'billing',
+        title: 'Billing & Subscription',
+        description: 'Subscription, payment methods, and invoices.',
+        render: () => <SettingsBillingSection />,
+      },
+      ...(isStripeConnectEnabled
+        ? [
+            {
+              id: 'payments',
+              title: 'Payments',
+              description: 'Connect Stripe to receive payments from fans.',
+              render: () => <SettingsPaymentsSection />,
+            },
+          ]
+        : []),
+    ],
+    [isStripeConnectEnabled]
+  );
+
+  // -- Privacy & Data group --
+  const privacySections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
+    () => [
+      {
+        id: 'data-privacy',
+        title: 'Data & Privacy',
+        description: 'Data export and account deletion.',
+        render: () => <DataPrivacySection />,
+      },
+    ],
+    []
   );
 
   // -- Admin-only settings (only visible to admin users) --
@@ -333,14 +354,29 @@ export function SettingsPolished({
   const sectionGroups = useMemo<ReadonlyArray<SettingsSectionGroup>>(
     () => [
       {
-        id: 'general',
-        label: 'General',
-        sections: userSections,
+        id: 'account',
+        label: 'Account',
+        sections: accountSections,
       },
       {
-        id: 'artist',
-        label: 'Artist',
-        sections: artistSections,
+        id: 'creative',
+        label: 'Creative',
+        sections: creativeSections,
+      },
+      {
+        id: 'audience',
+        label: 'Audience',
+        sections: audienceSections,
+      },
+      {
+        id: 'monetization',
+        label: 'Monetization',
+        sections: monetizationSections,
+      },
+      {
+        id: 'privacy',
+        label: 'Privacy & Data',
+        sections: privacySections,
       },
       ...(adminSections.length > 0
         ? [
@@ -352,7 +388,14 @@ export function SettingsPolished({
           ]
         : []),
     ],
-    [adminSections, artistSections, userSections]
+    [
+      accountSections,
+      adminSections,
+      audienceSections,
+      creativeSections,
+      monetizationSections,
+      privacySections,
+    ]
   );
 
   const allSections = useMemo(

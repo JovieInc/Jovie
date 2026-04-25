@@ -3,6 +3,7 @@ import {
   HOME_RELEASE_DESTINATION_PRESAVE_MOCK,
 } from '@/features/home/home-surface-seed';
 import type {
+  ProfilePrimaryTab,
   ProfileShowcaseState,
   ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
@@ -858,3 +859,18 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     showSubscriptionConfirmedBanner: false,
   }),
 };
+
+export function getPreviewActiveMode(
+  stateId: ProfileShowcaseStateId
+): ProfilePrimaryTab {
+  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
+
+  switch (drawerView) {
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+      return drawerView;
+    default:
+      return 'profile';
+  }
+}
