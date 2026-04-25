@@ -179,7 +179,7 @@ function classifyContentType(response: Response): SafeFetchError | null {
     response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ??
     '';
   if (!contentType) return 'not_html';
-  if (!ALLOWED_CONTENT_TYPES.some(allowed => contentType === allowed)) {
+  if (!(ALLOWED_CONTENT_TYPES as readonly string[]).includes(contentType)) {
     return 'not_html';
   }
   return null;
