@@ -40,6 +40,8 @@ import {
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 
+export const dynamic = 'force-dynamic';
+
 export const maxDuration = 60;
 
 const MAX_MESSAGE_LENGTH = 4000;

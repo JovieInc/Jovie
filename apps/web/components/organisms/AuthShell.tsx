@@ -17,6 +17,11 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
 
+// Module-scope singleton — stable identity prevents AppShellFrame memo from
+// breaking on breadcrumb/header changes. PersistentAudioBar uses hooks
+// internally for its own state updates.
+const AUDIO_PLAYER = <PersistentAudioBar />;
+
 export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -65,10 +70,6 @@ function AuthShellInner({
     [showMobileTabs]
   );
 
-  // Memoize audio player — uses hooks internally for state updates,
-  // empty deps prevents AppShellFrame memo from breaking on breadcrumb changes
-  const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
-
   return (
     <AppShellFrame
       sidebar={sidebar}
@@ -88,7 +89,7 @@ function AuthShellInner({
       }
       main={children}
       rightPanel={rightPanel}
-      audioPlayer={audioPlayer}
+      audioPlayer={AUDIO_PLAYER}
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { StatusBarMock } from '@/features/dashboard/molecules/StatusBarMock';
@@ -28,10 +28,10 @@ interface DashboardPreviewProps {
   readonly socialLinksOverride?: LegacySocialLink[];
 }
 
-export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
+export function DashboardPreview({
   artist,
   socialLinksOverride,
-}) => {
+}: DashboardPreviewProps) {
   // Fetch links via TanStack Query (skip if override provided)
   const { data: socialLinks = [] } = useDashboardSocialLinksQuery(artist.id);
 
@@ -136,4 +136,4 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       </div>
     </div>
   );
-};
+}
