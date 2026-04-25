@@ -23,7 +23,7 @@ export function AdminCreatorFilters({
   const pageSizeLabelId = React.useId();
 
   return (
-    <div className='flex items-center gap-2 text-[12px] text-secondary-token'>
+    <div className='flex items-center gap-2 text-xs text-secondary-token'>
       <input type='hidden' name='pageSize' value={pageSizeValue} />
       <span id={pageSizeLabelId} className='sr-only'>
         Rows per page
@@ -31,7 +31,7 @@ export function AdminCreatorFilters({
       <Select value={pageSizeValue} onValueChange={setPageSizeValue}>
         <SelectTrigger
           aria-labelledby={pageSizeLabelId}
-          className='h-8 w-20 rounded-full border-subtle bg-surface-0 px-2 text-[12px] text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
+          className='h-8 w-20 rounded-full border-subtle bg-surface-0 px-2 text-xs text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
         >
           <SelectValue />
         </SelectTrigger>

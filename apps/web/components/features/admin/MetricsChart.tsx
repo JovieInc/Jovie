@@ -123,7 +123,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
           <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>
         <div
-          className={`flex items-center gap-1.5 text-[13px] font-medium tabular-nums ${
+          className={`flex items-center gap-1.5 text-app font-medium tabular-nums ${
             stats.deltaPct >= 0 ? 'text-success' : 'text-error'
           }`}
         >
