@@ -71,7 +71,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
       >
         {/* Branding */}
         <div className='mb-8 px-2'>
-          <span className='text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+          <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
             Jovie
           </span>
           {investorName && (
@@ -86,7 +86,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
 
       {/* Mobile header bar */}
       <header className='fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-4 py-3 lg:hidden'>
-        <span className='text-[length:var(--text-base)] font-[680] text-[var(--color-text-primary-token)]'>
+        <span className='text-[length:var(--text-base)] font-bold text-[var(--color-text-primary-token)]'>
           Jovie
         </span>
         <div className='flex items-center gap-3'>
@@ -138,7 +138,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             {/* Branding */}
             <div className='mb-8 flex items-center justify-between px-2'>
               <div>
-                <span className='text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+                <span className='text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
                   Jovie
                 </span>
                 {investorName && (
@@ -183,7 +183,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={isActive ? 'page' : undefined}
-        className={`block rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-app)] font-[510] transition-colors ${
+        className={`block rounded-[var(--radius-sm)] px-2 py-1.5 text-[length:var(--text-app)] font-medium transition-colors ${
           isActive
             ? 'bg-[var(--color-interactive-hover)] text-[var(--color-text-primary-token)]'
             : 'text-[var(--color-text-tertiary-token)] hover:bg-[var(--color-interactive-hover)] hover:text-[var(--color-text-secondary-token)]'
