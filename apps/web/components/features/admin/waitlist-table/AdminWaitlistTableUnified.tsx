@@ -228,7 +228,7 @@ export function AdminWaitlistTableUnified({
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
-      className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
+      className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
       rowSelection={rowSelection}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}

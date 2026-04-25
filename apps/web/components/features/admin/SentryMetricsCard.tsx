@@ -101,11 +101,11 @@ export function SentryMetricsCard({
         </div>
 
         <ContentSurfaceCard className='p-3.5'>
-          <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
+          <p className='text-2xs font-medium tracking-[0.04em] text-tertiary-token'>
             Top unresolved issue
           </p>
           <p
-            className='mt-1 truncate text-[12px] leading-[18px] text-secondary-token'
+            className='mt-1 truncate text-xs leading-[18px] text-secondary-token'
             title={topIssueLabel}
           >
             {topIssueLabel}

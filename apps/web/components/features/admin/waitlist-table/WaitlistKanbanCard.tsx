@@ -51,12 +51,12 @@ export function WaitlistKanbanCard({
     >
       <div className='mb-2 flex items-start justify-between gap-2'>
         <div className='min-w-0 flex-1'>
-          <h4 className='truncate text-[13px] font-semibold text-primary-token'>
+          <h4 className='truncate text-app font-semibold text-primary-token'>
             {entry.fullName}
           </h4>
           <a
             href={`mailto:${entry.email}`}
-            className='mt-0.5 flex items-center gap-1 text-[11px] text-secondary-token hover:text-primary-token'
+            className='mt-0.5 flex items-center gap-1 text-2xs text-secondary-token hover:text-primary-token'
           >
             <Mail className='h-3 w-3' />
             <span className='truncate'>{entry.email}</span>
@@ -67,7 +67,7 @@ export function WaitlistKanbanCard({
         </Badge>
       </div>
 
-      <div className='space-y-1.5 text-[11px]'>
+      <div className='space-y-1.5 text-2xs'>
         {primaryGoalLabel && (
           <div>
             <span className='text-tertiary-token'>Goal: </span>
@@ -126,7 +126,7 @@ export function WaitlistKanbanCard({
           <Button
             size='sm'
             variant='primary'
-            className='h-8 w-full text-[12px]'
+            className='h-8 w-full text-xs'
             disabled={
               approveStatus === 'approving' || approveStatus === 'disapproving'
             }
