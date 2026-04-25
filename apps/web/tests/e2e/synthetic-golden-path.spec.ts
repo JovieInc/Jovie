@@ -115,7 +115,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       console.log('[Synthetic] Step 4: Onboarding flow test');
       await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
 
-      const usernameInput = page.locator('[data-test="username-input"]');
+      const usernameInput = page.getByLabel('Claim your handle');
       await expect(usernameInput).toBeVisible({ timeout: 15000 });
 
       await usernameInput.fill(testHandle);
@@ -123,23 +123,26 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       await expect
         .poll(
           async () => {
-            const claimBtn = page.locator('[data-test="claim-btn"]');
+            const claimBtn = page.getByTestId('onboarding-handle-submit');
             return claimBtn.isEnabled().catch(() => false);
           },
           { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
         )
         .toBeTruthy();
 
-      const claimButton = page.locator('[data-test="claim-btn"]');
+      const claimButton = page.getByTestId('onboarding-handle-submit');
       await expect(claimButton).toBeEnabled({ timeout: 15000 });
       await claimButton.click();
 
-      // CRITICAL PATH 5: Dashboard access
-      console.log('[Synthetic] Step 5: Dashboard access test');
-      await expect(page).toHaveURL('/app/dashboard', { timeout: 45000 });
+      // CRITICAL PATH 5: Onboarding continuation
+      console.log('[Synthetic] Step 5: Onboarding continuation test');
+      await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
+        timeout: 45000,
+      });
 
-      const dashboardWelcome = page.locator('[data-test="dashboard-welcome"]');
-      await expect(dashboardWelcome).toBeVisible({ timeout: 15000 });
+      await expect(
+        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
+      ).toBeVisible({ timeout: 15000 });
 
       // CRITICAL PATH 6: Public profile accessibility
       console.log('[Synthetic] Step 6: Public profile test');
