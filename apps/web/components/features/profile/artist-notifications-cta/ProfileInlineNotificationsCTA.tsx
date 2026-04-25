@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, Bell, CheckCircle2 } from 'lucide-react';
-import {
+import React, {
   type CSSProperties,
   useCallback,
   useEffect,
@@ -58,6 +58,90 @@ const circularButtonClassName = `${subscriptionPrimaryActionClassName} !h-10 !w-
 const EMAIL_INPUT_FOCUS_DELAY_MS = 180;
 const EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS = 0;
 const REVEAL_SHELL_BLUR_GUARD_MS = EMAIL_INPUT_FOCUS_DELAY_MS + 70;
+
+interface StepFocusRefs {
+  emailInputRef: React.RefObject<HTMLInputElement | null>;
+  otpStepRef: React.RefObject<HTMLDivElement | null>;
+  nameInputRef: React.RefObject<HTMLInputElement | null>;
+  birthdayStepRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function useStepAutoFocus(
+  step: Step,
+  prefersReducedMotion: boolean,
+  refs: StepFocusRefs
+) {
+  useEffect(() => {
+    const focusDelay = prefersReducedMotion
+      ? EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS
+      : EMAIL_INPUT_FOCUS_DELAY_MS;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    if (step === 'email') {
+      timeoutId = globalThis.setTimeout(() => {
+        refs.emailInputRef.current?.focus({ preventScroll: true });
+      }, focusDelay);
+    } else if (step === 'otp') {
+      timeoutId = globalThis.setTimeout(() => {
+        refs.otpStepRef.current
+          ?.querySelector<HTMLInputElement>('input')
+          ?.focus({ preventScroll: true });
+      }, focusDelay);
+    } else if (step === 'name') {
+      timeoutId = globalThis.setTimeout(() => {
+        refs.nameInputRef.current?.focus({ preventScroll: true });
+      }, focusDelay);
+    } else if (step === 'birthday') {
+      timeoutId = globalThis.setTimeout(() => {
+        refs.birthdayStepRef.current
+          ?.querySelector<HTMLInputElement>('input')
+          ?.focus({ preventScroll: true });
+      }, focusDelay);
+    }
+
+    return () => {
+      if (timeoutId) globalThis.clearTimeout(timeoutId);
+    };
+  }, [prefersReducedMotion, step, refs]);
+}
+
+function useStepSyncFromNotificationsState(
+  step: Step,
+  notificationsState: string,
+  emailInput: string,
+  subscribedEmailRef: React.MutableRefObject<string>,
+  setStep: (s: Step) => void
+) {
+  useEffect(() => {
+    if (step === 'email' && notificationsState === 'pending_confirmation') {
+      setStep('otp');
+    }
+  }, [step, notificationsState, setStep]);
+
+  useEffect(() => {
+    if (
+      (step === 'email' || step === 'otp') &&
+      notificationsState === 'success'
+    ) {
+      subscribedEmailRef.current = emailInput.trim();
+      setStep('name');
+    }
+  }, [step, notificationsState, emailInput, subscribedEmailRef, setStep]);
+}
+
+function useSubscribedStepSync(
+  isAlreadySubscribed: boolean,
+  step: Step,
+  setStep: (s: Step) => void
+) {
+  useEffect(() => {
+    if (isAlreadySubscribed) {
+      if (step === 'cta') setStep('done');
+      return;
+    }
+    if (step === 'done') setStep('cta');
+  }, [isAlreadySubscribed, step, setStep]);
+}
 
 function getRevealVisualState(
   step: Step,
@@ -330,6 +414,37 @@ function StepLayout({
   );
 }
 
+function getRevealRailMessage(
+  step: Step,
+  error: string | null,
+  showInlineErrorCopy: boolean,
+  isInputFocused: boolean
+): React.ReactNode {
+  if (step === 'email' && error && showInlineErrorCopy) {
+    return <span role='alert'>{error}</span>;
+  }
+  if (step === 'email' && isInputFocused) {
+    return 'No spam. Opt-out anytime.';
+  }
+  return null;
+}
+
+function getOtpRailMessage(
+  error: string | null,
+  showInlineErrorCopy: boolean,
+  confirmMessage: string | null
+): React.ReactNode {
+  if (error && showInlineErrorCopy) {
+    return <span role='alert'>{error}</span>;
+  }
+  if (confirmMessage && !error) {
+    return (
+      <span className={subscriptionSuccessTextClassName}>{confirmMessage}</span>
+    );
+  }
+  return 'Enter the 6-digit code we sent to your email.';
+}
+
 interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
   readonly onManageNotifications?: () => void;
@@ -419,75 +534,22 @@ export function ProfileInlineNotificationsCTA({
   );
   const revealActive = step === 'cta' || step === 'email';
 
-  useEffect(() => {
-    if (isAlreadySubscribed) {
-      if (step === 'cta') {
-        setStep('done');
-      }
-      return;
-    }
+  useSubscribedStepSync(isAlreadySubscribed, step, setStep);
 
-    if (step === 'done') {
-      setStep('cta');
-    }
-  }, [isAlreadySubscribed, step]);
+  useStepSyncFromNotificationsState(
+    step,
+    notificationsState,
+    emailInput,
+    subscribedEmailRef,
+    setStep
+  );
 
-  useEffect(() => {
-    if (step === 'email' && notificationsState === 'pending_confirmation') {
-      setStep('otp');
-    }
-  }, [step, notificationsState]);
-
-  useEffect(() => {
-    if (
-      (step === 'email' || step === 'otp') &&
-      notificationsState === 'success'
-    ) {
-      subscribedEmailRef.current = emailInput.trim();
-      setStep('name');
-    }
-  }, [step, notificationsState, emailInput]);
-
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const focusDelay = prefersReducedMotion
-      ? EMAIL_INPUT_FOCUS_DELAY_REDUCED_MS
-      : EMAIL_INPUT_FOCUS_DELAY_MS;
-
-    if (step === 'email') {
-      timeoutId = globalThis.setTimeout(() => {
-        emailInputRef.current?.focus({ preventScroll: true });
-      }, focusDelay);
-    }
-
-    if (step === 'otp') {
-      timeoutId = globalThis.setTimeout(() => {
-        otpStepRef.current
-          ?.querySelector<HTMLInputElement>('input')
-          ?.focus({ preventScroll: true });
-      }, focusDelay);
-    }
-
-    if (step === 'name') {
-      timeoutId = globalThis.setTimeout(() => {
-        nameInputRef.current?.focus({ preventScroll: true });
-      }, focusDelay);
-    }
-
-    if (step === 'birthday') {
-      timeoutId = globalThis.setTimeout(() => {
-        birthdayStepRef.current
-          ?.querySelector<HTMLInputElement>('input')
-          ?.focus({ preventScroll: true });
-      }, focusDelay);
-    }
-
-    return () => {
-      if (timeoutId) {
-        globalThis.clearTimeout(timeoutId);
-      }
-    };
-  }, [prefersReducedMotion, step]);
+  useStepAutoFocus(step, prefersReducedMotion, {
+    emailInputRef,
+    otpStepRef,
+    nameInputRef,
+    birthdayStepRef,
+  });
 
   useEffect(() => {
     if (step !== 'email' || emailInput) return;
@@ -790,13 +852,12 @@ export function ProfileInlineNotificationsCTA({
           }
           rail={
             <SubscriptionFeedbackRail
-              message={
-                step === 'email' && error && showInlineErrorCopy ? (
-                  <span role='alert'>{error}</span>
-                ) : step === 'email' && isInputFocused ? (
-                  'No spam. Opt-out anytime.'
-                ) : null
-              }
+              message={getRevealRailMessage(
+                step,
+                error,
+                showInlineErrorCopy,
+                isInputFocused
+              )}
               sideAction={
                 step === 'email' && error && shouldShowDesktopTooltip ? (
                   <SubscriptionDesktopErrorIndicator error={error} />
@@ -850,17 +911,11 @@ export function ProfileInlineNotificationsCTA({
           }
           rail={
             <SubscriptionFeedbackRail
-              message={
-                error && showInlineErrorCopy ? (
-                  <span role='alert'>{error}</span>
-                ) : confirmMessage && !error ? (
-                  <span className={subscriptionSuccessTextClassName}>
-                    {confirmMessage}
-                  </span>
-                ) : (
-                  'Enter the 6-digit code we sent to your email.'
-                )
-              }
+              message={getOtpRailMessage(
+                error,
+                showInlineErrorCopy,
+                confirmMessage
+              )}
               sideAction={
                 <>
                   {error && shouldShowDesktopTooltip ? (

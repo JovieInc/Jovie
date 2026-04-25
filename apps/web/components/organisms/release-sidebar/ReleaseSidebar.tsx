@@ -146,22 +146,20 @@ function renderArtistLine(
     return releaseArtistListFormatter.format(normalizedNames);
   }
 
-  return releaseArtistListFormatter
-    .formatToParts(normalizedNames)
-    .map((part, index) =>
-      part.type === 'element' ? (
-        <button
-          key={`artist-${index}`}
-          type='button'
-          onClick={() => onArtistClick(part.value)}
-          className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
-        >
-          {part.value}
-        </button>
-      ) : (
-        <span key={`sep-${index}`}>{part.value}</span>
-      )
-    );
+  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part =>
+    part.type === 'element' ? (
+      <button
+        key={`artist-${part.value}`}
+        type='button'
+        onClick={() => onArtistClick(part.value)}
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
+      >
+        {part.value}
+      </button>
+    ) : (
+      <span key={`sep-${part.value}`}>{part.value}</span>
+    )
+  );
 }
 
 function ReleaseEntityHeader({
@@ -656,6 +654,157 @@ export function ReleaseSidebar({
     platformRescanRemainingMs,
   ]);
 
+  function renderTabContent() {
+    if (!release) return null;
+
+    if (activeTab === 'overview') {
+      return (
+        <div className='space-y-2.5'>
+          <ReleasePropertiesPanel
+            release={release}
+            showCredits={showCredits}
+            isEditable={isEditable}
+            onSaveMetadata={readOnly ? undefined : onSaveMetadata}
+            onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
+            onCanvasStatusChange={
+              canEditCanvasStatus ? handleCanvasStatusChange : undefined
+            }
+          />
+          {isEditable ? (
+            <DrawerSection
+              title='Artwork'
+              surface='card'
+              defaultOpen={false}
+              lazyMount
+              testId='release-artwork-settings-card'
+              contentClassName='space-y-3 p-3'
+            >
+              <ReleaseArtworkDownloadsSetting
+                allowDownloads={allowDownloads}
+                onToggleArtworkDownloads={onToggleArtworkDownloads}
+              />
+            </DrawerSection>
+          ) : null}
+          <DrawerSection
+            title='Lyrics'
+            surface='card'
+            defaultOpen={false}
+            lazyMount
+            testId='release-lyrics-card'
+            contentClassName='p-0'
+          >
+            <ReleaseLyricsSection
+              releaseId={release.id}
+              lyrics={release.lyrics}
+              isEditable={isEditable}
+              isSaving={isLyricsSaving}
+              variant='flat'
+              onSaveLyrics={onSaveLyrics}
+              onFormatLyrics={onFormatLyrics}
+            />
+          </DrawerSection>
+          {(release.totalTracks ?? 0) > 0 ? (
+            <DrawerSection
+              title='Tracks'
+              surface='card'
+              defaultOpen={false}
+              lazyMount
+              testId='release-tracks-card'
+              contentClassName='p-0'
+            >
+              <ReleaseTrackList
+                release={release}
+                tracksOverride={tracksOverride}
+              />
+            </DrawerSection>
+          ) : null}
+        </div>
+      );
+    }
+
+    if (activeTab === 'dsps') {
+      return (
+        <ReleaseDspLinks
+          release={release}
+          providerConfig={providerConfig}
+          isEditable={isEditable}
+          isAddingLink={isAddingLink}
+          newLinkUrl={newLinkUrl}
+          selectedProvider={selectedProvider}
+          isAddingDspLink={isAddingDspLink}
+          isRemovingDspLink={isRemovingDspLink}
+          onSetIsAddingLink={setIsAddingLink}
+          onSetNewLinkUrl={setNewLinkUrl}
+          onSetSelectedProvider={setSelectedProvider}
+          onAddLink={handleAddLink}
+          onRemoveLink={handleRemoveLink}
+          onNewLinkKeyDown={handleNewLinkKeyDown}
+          showHeading={false}
+        />
+      );
+    }
+
+    if (activeTab === 'tasks') {
+      return (
+        <div data-testid='release-tasks-card'>
+          {isTasksWorkspaceGateLoading ? (
+            <div
+              className='animate-pulse px-1 py-1.5 text-[12px] text-secondary-token'
+              data-testid='release-tasks-loading-state'
+            >
+              Loading tasks...
+            </div>
+          ) : null}
+          {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (
+            <ReleaseTaskChecklist
+              releaseId={release.id}
+              variant='compact'
+              releaseDate={release.releaseDate}
+              onNavigateToFullPage={() => {
+                globalThis.location.href =
+                  APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+                    '[releaseId]',
+                    release.id
+                  );
+              }}
+            />
+          ) : null}
+          {!isTasksWorkspaceGateLoading &&
+          !canAccessTasksWorkspace &&
+          showTasksUpgrade ? (
+            <CompactReleasePlanUpgradeCard
+              onDismiss={() => setShowTasksUpgrade(false)}
+            />
+          ) : null}
+        </div>
+      );
+    }
+
+    if (activeTab === 'pitch') {
+      return (
+        <div className='space-y-3' data-testid='release-pitch-tab'>
+          <ReleaseTargetPlaylistsSection
+            key={release.id}
+            releaseId={release.id}
+            targetPlaylists={release.targetPlaylists}
+            onSave={readOnly ? undefined : onSaveTargetPlaylists}
+            readOnly={readOnly}
+            variant='flat'
+          />
+          {readOnly ? null : (
+            <ReleasePitchSection
+              releaseId={release.id}
+              existingPitches={release.generatedPitches}
+              variant='flat'
+            />
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -724,142 +873,7 @@ export function ReleaseSidebar({
             controls={activeTab === 'dsps' ? platformCardActions : undefined}
             contentClassName='pt-2'
           >
-            {activeTab === 'overview' ? (
-              <div className='space-y-2.5'>
-                <ReleasePropertiesPanel
-                  release={release}
-                  showCredits={showCredits}
-                  isEditable={isEditable}
-                  onSaveMetadata={readOnly ? undefined : onSaveMetadata}
-                  onSavePrimaryIsrc={readOnly ? undefined : onSavePrimaryIsrc}
-                  onCanvasStatusChange={
-                    canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                  }
-                />
-                {isEditable ? (
-                  <DrawerSection
-                    title='Artwork'
-                    surface='card'
-                    defaultOpen={false}
-                    lazyMount
-                    testId='release-artwork-settings-card'
-                    contentClassName='space-y-3 p-3'
-                  >
-                    <ReleaseArtworkDownloadsSetting
-                      allowDownloads={allowDownloads}
-                      onToggleArtworkDownloads={onToggleArtworkDownloads}
-                    />
-                  </DrawerSection>
-                ) : null}
-                <DrawerSection
-                  title='Lyrics'
-                  surface='card'
-                  defaultOpen={false}
-                  lazyMount
-                  testId='release-lyrics-card'
-                  contentClassName='p-0'
-                >
-                  <ReleaseLyricsSection
-                    releaseId={release.id}
-                    lyrics={release.lyrics}
-                    isEditable={isEditable}
-                    isSaving={isLyricsSaving}
-                    variant='flat'
-                    onSaveLyrics={onSaveLyrics}
-                    onFormatLyrics={onFormatLyrics}
-                  />
-                </DrawerSection>
-                {(release.totalTracks ?? 0) > 0 ? (
-                  <DrawerSection
-                    title='Tracks'
-                    surface='card'
-                    defaultOpen={false}
-                    lazyMount
-                    testId='release-tracks-card'
-                    contentClassName='p-0'
-                  >
-                    <ReleaseTrackList
-                      release={release}
-                      tracksOverride={tracksOverride}
-                    />
-                  </DrawerSection>
-                ) : null}
-              </div>
-            ) : null}
-
-            {activeTab === 'dsps' ? (
-              <ReleaseDspLinks
-                release={release}
-                providerConfig={providerConfig}
-                isEditable={isEditable}
-                isAddingLink={isAddingLink}
-                newLinkUrl={newLinkUrl}
-                selectedProvider={selectedProvider}
-                isAddingDspLink={isAddingDspLink}
-                isRemovingDspLink={isRemovingDspLink}
-                onSetIsAddingLink={setIsAddingLink}
-                onSetNewLinkUrl={setNewLinkUrl}
-                onSetSelectedProvider={setSelectedProvider}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                onNewLinkKeyDown={handleNewLinkKeyDown}
-                showHeading={false}
-              />
-            ) : null}
-
-            {activeTab === 'tasks' ? (
-              <div data-testid='release-tasks-card'>
-                {isTasksWorkspaceGateLoading ? (
-                  <div
-                    className='animate-pulse px-1 py-1.5 text-[12px] text-secondary-token'
-                    data-testid='release-tasks-loading-state'
-                  >
-                    Loading tasks...
-                  </div>
-                ) : null}
-                {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (
-                  <ReleaseTaskChecklist
-                    releaseId={release.id}
-                    variant='compact'
-                    releaseDate={release.releaseDate}
-                    onNavigateToFullPage={() => {
-                      globalThis.location.href =
-                        APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-                          '[releaseId]',
-                          release.id
-                        );
-                    }}
-                  />
-                ) : null}
-                {!isTasksWorkspaceGateLoading &&
-                !canAccessTasksWorkspace &&
-                showTasksUpgrade ? (
-                  <CompactReleasePlanUpgradeCard
-                    onDismiss={() => setShowTasksUpgrade(false)}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-
-            {activeTab === 'pitch' ? (
-              <div className='space-y-3' data-testid='release-pitch-tab'>
-                <ReleaseTargetPlaylistsSection
-                  key={release.id}
-                  releaseId={release.id}
-                  targetPlaylists={release.targetPlaylists}
-                  onSave={readOnly ? undefined : onSaveTargetPlaylists}
-                  readOnly={readOnly}
-                  variant='flat'
-                />
-                {readOnly ? null : (
-                  <ReleasePitchSection
-                    releaseId={release.id}
-                    existingPitches={release.generatedPitches}
-                    variant='flat'
-                  />
-                )}
-              </div>
-            ) : null}
+            {renderTabContent()}
           </DrawerTabbedCard>
         </div>
       )}

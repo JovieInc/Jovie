@@ -21,7 +21,7 @@ export function SortableHeaderButton({
       type='button'
       onClick={onClick}
       className={cn(
-        'inline-flex w-full items-center gap-2 text-left text-[13px] font-medium tracking-normal',
+        'inline-flex w-full items-center gap-2 text-left text-app font-medium tracking-normal',
         'rounded-full px-1.5 py-1 transition-[background-color,color,box-shadow] duration-150',
         'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
@@ -32,7 +32,7 @@ export function SortableHeaderButton({
       {label}
       <span
         className={cn(
-          'text-[10px] transition-opacity',
+          'text-3xs transition-opacity',
           direction
             ? 'opacity-100 text-primary-token'
             : 'opacity-50 text-secondary-token'

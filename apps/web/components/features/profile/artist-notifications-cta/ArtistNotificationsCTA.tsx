@@ -3,7 +3,7 @@
 import { Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
@@ -64,6 +64,99 @@ function ListenNowCTA({
       Listen Now
     </Link>
   );
+}
+
+interface ComposerInputContentProps {
+  readonly otpStep: string;
+  readonly otpCode: string;
+  readonly handleOtpChange: (v: string) => void;
+  readonly handleVerifyOtp: () => void;
+  readonly isSubmitting: boolean;
+  readonly error: string | null;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly inputId: string;
+  readonly disclaimerId: string;
+  readonly inputConfig: ReturnType<typeof getInputConfig>;
+  readonly inputValue: string;
+  readonly handleInputChange: (v: string) => void;
+  readonly handleInputBlur: () => void;
+  readonly handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
+  readonly setIsInputFocused: (focused: boolean) => void;
+}
+
+function ComposerInputContent({
+  otpStep,
+  otpCode,
+  handleOtpChange,
+  handleVerifyOtp,
+  isSubmitting,
+  error,
+  inputRef,
+  inputId,
+  disclaimerId,
+  inputConfig,
+  inputValue,
+  handleInputChange,
+  handleInputBlur,
+  handleKeyDown,
+  setIsInputFocused,
+}: ComposerInputContentProps) {
+  if (otpStep === 'verify') {
+    return (
+      <div className='px-2 py-2'>
+        <OtpInput
+          value={otpCode}
+          onChange={handleOtpChange}
+          onComplete={() => {
+            if (!error) handleVerifyOtp();
+          }}
+          autoFocus
+          aria-label='Enter 6-digit verification code'
+          disabled={isSubmitting}
+          error={Boolean(error)}
+        />
+      </div>
+    );
+  }
+  return (
+    <>
+      <label htmlFor={inputId} className='sr-only'>
+        {inputConfig.label}
+      </label>
+      <input
+        ref={inputRef}
+        id={inputId}
+        data-testid='subscription-input'
+        aria-describedby={disclaimerId}
+        type={inputConfig.type}
+        inputMode={inputConfig.inputMode}
+        className={subscriptionInputClassName}
+        placeholder={inputConfig.placeholder}
+        value={inputValue}
+        onChange={event => handleInputChange(event.target.value)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={handleInputBlur}
+        onKeyDown={handleKeyDown}
+        disabled={isSubmitting}
+        aria-invalid={error ? true : undefined}
+        autoComplete={inputConfig.autoComplete}
+        maxLength={inputConfig.maxLength}
+        style={noFontSynthesisStyle}
+      />
+    </>
+  );
+}
+
+interface SubscriberEmailProps {
+  readonly channel: 'email' | 'sms';
+  readonly emailInput: string;
+}
+
+function getSubscriberEmail({
+  channel,
+  emailInput,
+}: SubscriberEmailProps): string | undefined {
+  return channel === 'email' ? emailInput.trim() : undefined;
 }
 
 interface ChannelToggleProps {
@@ -260,6 +353,110 @@ function shouldShowFallbackCTA(
   return !notificationsEnabled || (notificationsState === 'idle' && !autoOpen);
 }
 
+interface FeedbackMessageParams {
+  readonly error: string | null;
+  readonly showInlineErrorCopy: boolean;
+  readonly disclaimerId: string;
+  readonly confirmMessage: string | null;
+  readonly otpStep: string;
+  readonly isInputFocused: boolean;
+}
+
+function getFeedbackMessage({
+  error,
+  showInlineErrorCopy,
+  disclaimerId,
+  confirmMessage,
+  otpStep,
+  isInputFocused,
+}: FeedbackMessageParams): React.ReactNode {
+  if (error && showInlineErrorCopy) {
+    return (
+      <span id={disclaimerId} role='alert'>
+        {error}
+      </span>
+    );
+  }
+  if (confirmMessage) {
+    return (
+      <span id={disclaimerId} className={subscriptionSuccessTextClassName}>
+        {confirmMessage}
+      </span>
+    );
+  }
+  if (otpStep === 'verify') {
+    return (
+      <span id={disclaimerId}>
+        Enter the 6-digit code we sent to your email.
+      </span>
+    );
+  }
+  if (isInputFocused) {
+    return <span id={disclaimerId}>No spam. Opt-out anytime.</span>;
+  }
+  return null;
+}
+
+interface ComposerSlotsParams {
+  readonly otpStep: string;
+  readonly shouldShowCountrySelector: boolean;
+  readonly smsEnabled: boolean;
+  readonly channel: 'email' | 'sms';
+  readonly isInputFocused: boolean;
+  readonly isSubmitting: boolean;
+  readonly country: Parameters<typeof CountrySelector>[0]['country'];
+  readonly isCountryOpen: boolean;
+  readonly setIsCountryOpen: (open: boolean) => void;
+  readonly setCountry: (
+    c: Parameters<typeof CountrySelector>[0]['country']
+  ) => void;
+  readonly handleChannelChange: (ch: 'email' | 'sms') => void;
+}
+
+function getComposerLeftSlot({
+  otpStep,
+  shouldShowCountrySelector,
+  smsEnabled,
+  channel,
+  isSubmitting,
+  country,
+  isCountryOpen,
+  setIsCountryOpen,
+  setCountry,
+  handleChannelChange,
+}: ComposerSlotsParams): React.ReactNode {
+  if (otpStep === 'verify') return undefined;
+  if (shouldShowCountrySelector) {
+    return (
+      <CountrySelector
+        country={country}
+        isOpen={isCountryOpen}
+        onOpenChange={setIsCountryOpen}
+        onSelect={setCountry}
+      />
+    );
+  }
+  if (smsEnabled) {
+    return (
+      <ChannelToggle
+        channel={channel}
+        isSubmitting={isSubmitting}
+        onChannelChange={handleChannelChange}
+      />
+    );
+  }
+  return undefined;
+}
+
+function getComposerClassName(
+  otpStep: string,
+  isInputFocused: boolean
+): string | undefined {
+  if (otpStep === 'verify') return 'px-3 py-3';
+  if (isInputFocused) return subscriptionComposerFocusClassName;
+  return undefined;
+}
+
 /** Whether the subscribe form should trigger impression tracking. */
 function isSubscribeFormVisible(
   notificationsEnabled: boolean,
@@ -403,7 +600,7 @@ export function ArtistNotificationsCTA({
           handle={artist.handle}
           subscribedChannels={subscribedChannels}
           artistId={artist.id}
-          subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
+          subscriberEmail={getSubscriberEmail({ channel, emailInput })}
         />
       </div>
     );
@@ -428,39 +625,52 @@ export function ArtistNotificationsCTA({
   const handleFormSubmit =
     otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
 
-  let leftSlot: React.ReactNode;
+  const handleOtpResend = () => {
+    requestOtpResendConfirmation({
+      handleResendOtp,
+      confirmTimeoutRef,
+      setConfirmMessage,
+    });
+  };
+
+  let feedbackSideAction: React.ReactNode;
   if (otpStep === 'verify') {
-    leftSlot = undefined;
-  } else if (shouldShowCountrySelector) {
-    leftSlot = (
-      <CountrySelector
-        country={country}
-        isOpen={isCountryOpen}
-        onOpenChange={setIsCountryOpen}
-        onSelect={setCountry}
-      />
+    feedbackSideAction = (
+      <>
+        {error && shouldShowDesktopTooltip ? (
+          <SubscriptionDesktopErrorIndicator error={error} />
+        ) : null}
+        <SubscriptionOtpResendAction
+          resendCooldownEnd={resendCooldownEnd}
+          isResending={isResending}
+          onResend={handleOtpResend}
+        />
+      </>
     );
-  } else if (smsEnabled) {
-    leftSlot = (
-      <ChannelToggle
-        channel={channel}
-        isSubmitting={isSubmitting}
-        onChannelChange={handleChannelChange}
-      />
-    );
+  } else if (error && shouldShowDesktopTooltip) {
+    feedbackSideAction = <SubscriptionDesktopErrorIndicator error={error} />;
   }
+
+  const leftSlot = getComposerLeftSlot({
+    otpStep,
+    shouldShowCountrySelector,
+    smsEnabled,
+    channel,
+    isInputFocused,
+    isSubmitting,
+    country,
+    isCountryOpen,
+    setIsCountryOpen,
+    setCountry,
+    handleChannelChange,
+  });
 
   const actionClassName =
     otpStep === 'verify'
       ? `${subscriptionPrimaryActionClassName} min-w-[7rem]`
       : subscriptionPrimaryActionClassName;
 
-  let composerClassName: string | undefined;
-  if (otpStep === 'verify') {
-    composerClassName = 'px-3 py-3';
-  } else if (isInputFocused) {
-    composerClassName = subscriptionComposerFocusClassName;
-  }
+  const composerClassName = getComposerClassName(otpStep, isInputFocused);
 
   return (
     <div className='min-h-[180px] space-y-3'>
@@ -487,92 +697,35 @@ export function ArtistNotificationsCTA({
         }
         className={composerClassName}
       >
-        {otpStep === 'verify' ? (
-          <div className='px-2 py-2'>
-            <OtpInput
-              value={otpCode}
-              onChange={handleOtpChange}
-              onComplete={() => {
-                if (!error) handleVerifyOtp();
-              }}
-              autoFocus
-              aria-label='Enter 6-digit verification code'
-              disabled={isSubmitting}
-              error={Boolean(error)}
-            />
-          </div>
-        ) : (
-          <>
-            <label htmlFor={inputId} className='sr-only'>
-              {inputConfig.label}
-            </label>
-            <input
-              ref={inputRef}
-              id={inputId}
-              data-testid='subscription-input'
-              aria-describedby={disclaimerId}
-              type={inputConfig.type}
-              inputMode={inputConfig.inputMode}
-              className={subscriptionInputClassName}
-              placeholder={inputConfig.placeholder}
-              value={inputValue}
-              onChange={event => handleInputChange(event.target.value)}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={handleInputBlur}
-              onKeyDown={handleKeyDown}
-              disabled={isSubmitting}
-              aria-invalid={error ? true : undefined}
-              autoComplete={inputConfig.autoComplete}
-              maxLength={inputConfig.maxLength}
-              style={noFontSynthesisStyle}
-            />
-          </>
-        )}
+        <ComposerInputContent
+          otpStep={otpStep}
+          otpCode={otpCode}
+          handleOtpChange={handleOtpChange}
+          handleVerifyOtp={handleVerifyOtp}
+          isSubmitting={isSubmitting}
+          error={error}
+          inputRef={inputRef}
+          inputId={inputId}
+          disclaimerId={disclaimerId}
+          inputConfig={inputConfig}
+          inputValue={inputValue}
+          handleInputChange={handleInputChange}
+          handleInputBlur={handleInputBlur}
+          handleKeyDown={handleKeyDown}
+          setIsInputFocused={setIsInputFocused}
+        />
       </SubscriptionPearlComposer>
 
       <SubscriptionFeedbackRail
-        message={
-          error && showInlineErrorCopy ? (
-            <span id={disclaimerId} role='alert'>
-              {error}
-            </span>
-          ) : confirmMessage ? (
-            <span
-              id={disclaimerId}
-              className={subscriptionSuccessTextClassName}
-            >
-              {confirmMessage}
-            </span>
-          ) : otpStep === 'verify' ? (
-            <span id={disclaimerId}>
-              Enter the 6-digit code we sent to your email.
-            </span>
-          ) : isInputFocused ? (
-            <span id={disclaimerId}>No spam. Opt-out anytime.</span>
-          ) : null
-        }
-        sideAction={
-          otpStep === 'verify' ? (
-            <>
-              {error && shouldShowDesktopTooltip ? (
-                <SubscriptionDesktopErrorIndicator error={error} />
-              ) : null}
-              <SubscriptionOtpResendAction
-                resendCooldownEnd={resendCooldownEnd}
-                isResending={isResending}
-                onResend={() => {
-                  requestOtpResendConfirmation({
-                    handleResendOtp,
-                    confirmTimeoutRef,
-                    setConfirmMessage,
-                  });
-                }}
-              />
-            </>
-          ) : error && shouldShowDesktopTooltip ? (
-            <SubscriptionDesktopErrorIndicator error={error} />
-          ) : null
-        }
+        message={getFeedbackMessage({
+          error,
+          showInlineErrorCopy,
+          disclaimerId,
+          confirmMessage,
+          otpStep,
+          isInputFocused,
+        })}
+        sideAction={feedbackSideAction}
       />
     </div>
   );
