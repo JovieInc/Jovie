@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import dynamic from 'next/dynamic';
-import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate';
+import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate'; // NOSONAR -- AnimatedArtistPage is itself deprecated; both are legacy non-production components
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import {
   getFadeUpMotionProps,
