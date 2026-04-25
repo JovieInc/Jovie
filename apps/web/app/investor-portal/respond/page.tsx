@@ -75,7 +75,7 @@ export default async function InvestorRespondPage({
     return (
       <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
         <div className='text-center'>
-          <span className='mb-6 block text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+          <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
             Jovie
           </span>
           <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>
@@ -98,7 +98,7 @@ export default async function InvestorRespondPage({
   return (
     <div className='dark flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]'>
       <div className='max-w-md text-center'>
-        <span className='mb-6 block text-[length:var(--text-lg)] font-[680] tracking-tight text-[var(--color-text-primary-token)]'>
+        <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-[var(--color-text-primary-token)]'>
           Jovie
         </span>
         <h1 className='text-[length:var(--text-2xl)] font-[var(--font-weight-bold)] text-[var(--color-text-primary-token)]'>

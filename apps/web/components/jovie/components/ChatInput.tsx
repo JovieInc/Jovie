@@ -557,7 +557,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                'py-1.5 text-[14px] leading-6',
+                'py-1.5 text-sm leading-6',
                 isAtMaxHeight && 'overflow-y-auto',
                 isAtMaxHeight &&
                   'shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.2)]'
@@ -687,7 +687,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ) : null}
 
                   <div className='flex items-center justify-end'>
-                    <span className='text-[11px] text-tertiary-token'>
+                    <span className='text-2xs text-tertiary-token'>
                       ⏎ to send · Shift+Enter for newline
                     </span>
                   </div>

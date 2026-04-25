@@ -103,7 +103,7 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='text-[15px] leading-6 tracking-[-0.01em]'>
+            <div className='text-mid leading-6 tracking-[-0.01em]'>
               <TokenizedText content={messageText} />
             </div>
           )}
@@ -120,10 +120,10 @@ export function ChatMessage({
                 >
                   <BrandLogo size={10} tone='auto' rounded={false} />
                 </span>
-                <span className='text-[11px] font-semibold tracking-[-0.01em] text-secondary-token'>
+                <span className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
-                <span className='text-[11px] text-tertiary-token'>
+                <span className='text-2xs text-tertiary-token'>
                   Writing reply…
                 </span>
               </div>
@@ -151,10 +151,10 @@ export function ChatMessage({
                 <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
                   <BrandLogo size={10} tone='auto' rounded={false} />
                 </span>
-                <span className='text-[11px] font-semibold tracking-[-0.01em] text-secondary-token'>
+                <span className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
-                <span className='text-[11px] text-tertiary-token'>
+                <span className='text-2xs text-tertiary-token'>
                   {isStreaming ? 'Writing reply…' : 'Reply'}
                 </span>
               </div>

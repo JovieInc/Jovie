@@ -57,14 +57,14 @@ export default function OnboardingLoading() {
             <h1 className='text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-[36px]'>
               Preparing your setup
             </h1>
-            <p className='text-[15px] leading-6 text-secondary-token'>
+            <p className='text-mid leading-6 text-secondary-token'>
               Loading your handle step and profile context.
             </p>
           </div>
 
           <div className='w-full rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-4 sm:p-5'>
             <div className='flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3'>
-              <span className='text-[13px] text-tertiary-token'>@</span>
+              <span className='text-app text-tertiary-token'>@</span>
               <div className='h-2 flex-1 rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)]' />
             </div>
             <div className='mt-4 h-11 rounded-full bg-primary-token/14' />

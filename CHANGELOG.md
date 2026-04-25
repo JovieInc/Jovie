@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.176] - 2026-04-24
+
+> Jovie chat agent can now import an artist's bio from a public URL. Say "import my bio from timwhite.co" and the agent fetches the page server-side, extracts a candidate from JSON-LD or meta tags, sanitizes it, and routes it through the existing confirmation card with a clear "Imported from timwhite.co" provenance line. Closes the most common follow-up to "write me a bio" — owning the URL-import flow instead of telling the user to paste.
+
+### Added
+
+- `apps/web/lib/ai/tools/safe-fetch-public-html.ts` — SSRF-safe HTML fetcher for arbitrary user-supplied URLs. Composes the existing `isPrivateHostname` (DNS-resolved gate) and `isSafeExternalHttpsUrl` (literal-host gate) primitives with manual redirect handling so every redirect hop is re-validated. HTTPS only, 5s timeout, 512 KiB body cap, 3 redirect cap. Detects auth walls (401/403, `WWW-Authenticate`, redirects to known identity providers like Clerk/Auth0/Google). Returns a typed discriminated union — callers never rethrow.
+- `apps/web/lib/ai/tools/extract-bio-candidate.ts` — extracts a bio from raw HTML in priority order: JSON-LD `Person`/`MusicGroup`/`ProfilePage` `description` (tolerates `@graph` and array `@type`), then `og:description`, then `<meta name="description">`. Sanitizes before any model sees the text: strips URLs, C0/C1 control chars, zero-width and bidi chars, then word-boundary truncates at 600 chars. The "first non-trivial `<p>` in `<main>`" fallback was deliberately cut as the highest-injection-surface, lowest-signal path.
+- `apps/web/lib/ai/tools/import-bio-from-url.ts` — chat tool that wires the fetcher and extractor together, gated by per-user-per-tool rate limits (5/min and 20/hour, scoped to the tool not the chat to absorb fan-out within a single chat turn). Returns `{ ok: true, candidateBio, sourceUrl, sourceTitle }` on success and a typed `reason` plus model-readable `hint` on failure. The system prompt instructs the model to pass the candidate verbatim through `proposeProfileEdit` and to treat all returned text as untrusted external data, never instructions.
+- `apps/web/lib/rate-limit/{config,limiters,index}.ts` — registers `bioImportFromUrl` (5/min) and `bioImportFromUrlHourly` (20/hour) limiters following the existing per-feature pattern.
+- 49 unit tests across `apps/web/tests/unit/lib/ai/tools/` covering: SSRF guards (literal IPs, IPv6 link-local, IPv4-mapped IPv6, metadata hosts, internal suffixes), DNS-rebinding mitigation across redirect hops, redirect chain to private IP, redirect cap, auth-wall detection (status + IDP host fragments), content-type and body-size enforcement, timeout, JSON-LD extraction priority and edge cases, prompt-injection round-trip with URL stripping, and rate-limit short-circuit.
+
+### Changed
+
+- `apps/web/app/api/chat/route.ts` — registers `importBioFromUrl` in the paid-plan tools map alongside `proposeProfileEdit`.
+- `apps/web/lib/chat/system-prompt.ts` — instructs the model to call `importBioFromUrl` when the artist names or pastes a URL, then chain `proposeProfileEdit` with the returned candidate. Establishes the untrusted-content posture so injection attempts in fetched bios cannot redirect agent behavior.
+- `apps/web/lib/ai/tools/profile-edit.ts` — adds optional `sourceUrl` and `sourceTitle` fields on `proposeProfileEdit` so the confirmation card can surface provenance when the value originated from a URL import.
+- `apps/web/components/features/dashboard/organisms/ProfileEditPreviewCard.tsx` — renders an "Imported from {host}" line linking to the source URL above the diff. The host is the user-facing safety signal that prevents click-through approval of attacker-controlled bio content.
+
 ## [26.4.174] - 2026-04-24
 
 > Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
