@@ -7,6 +7,7 @@ import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { buildVisibleReleaseExistsSql } from '@/lib/discography/public-release-visibility';
 
 /** Shared error messages for auth/profile resolution. Used by route guards. */
 export const SESSION_ERRORS = {
@@ -252,6 +253,7 @@ export interface ProfileContext {
   isPublic: boolean | null;
   isClaimed: boolean | null;
   onboardingCompletedAt: Date | null;
+  hasVisibleRelease?: boolean | null;
 }
 
 /**
@@ -312,6 +314,7 @@ export async function getProfileByDbUserId(
       isPublic: creatorProfiles.isPublic,
       isClaimed: creatorProfiles.isClaimed,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      hasVisibleRelease: buildVisibleReleaseExistsSql(creatorProfiles.id),
     })
     .from(users)
     .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -370,6 +373,9 @@ export async function getSessionContext(options?: {
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileIsPublic: creatorProfiles.isPublic,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      profileHasVisibleRelease: buildVisibleReleaseExistsSql(
+        creatorProfiles.id
+      ),
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -426,6 +432,7 @@ export async function getSessionContext(options?: {
         isPublic: result.profileIsPublic,
         isClaimed: true, // joined via activeProfileId = claimed
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
+        hasVisibleRelease: result.profileHasVisibleRelease,
       }
     : null;
 

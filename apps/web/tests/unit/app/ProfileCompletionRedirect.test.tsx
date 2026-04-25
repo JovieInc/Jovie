@@ -61,7 +61,7 @@ function renderGuard(value: DashboardData) {
 }
 
 describe('ProfileCompletionRedirect', () => {
-  it('does not redirect when profile has both username and display name', () => {
+  it('does not redirect when onboarding is complete', () => {
     mockReplace.mockClear();
     renderGuard(baseDashboardData);
 
@@ -75,27 +75,11 @@ describe('ProfileCompletionRedirect', () => {
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
 
-  it('redirects when username is blank', () => {
+  it('redirects when needsOnboarding is true', () => {
     mockReplace.mockClear();
     renderGuard({
       ...baseDashboardData,
-      selectedProfile: {
-        ...baseDashboardData.selectedProfile!,
-        username: '   ',
-      },
-    });
-
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
-  });
-
-  it('redirects when display name is blank', () => {
-    mockReplace.mockClear();
-    renderGuard({
-      ...baseDashboardData,
-      selectedProfile: {
-        ...baseDashboardData.selectedProfile!,
-        displayName: '   ',
-      },
+      needsOnboarding: true,
     });
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');

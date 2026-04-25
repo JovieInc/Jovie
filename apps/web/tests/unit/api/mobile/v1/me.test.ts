@@ -90,6 +90,7 @@ describe('GET /api/mobile/v1/me', () => {
         avatarUrl: 'https://cdn.jov.ie/avatar.png',
         isPublic: true,
         onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+        hasVisibleRelease: true,
       },
     });
 
@@ -114,6 +115,7 @@ describe('GET /api/mobile/v1/me', () => {
       displayName: 'DJ Shadow',
       isPublic: true,
       onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      hasVisibleRelease: true,
     });
   });
 
@@ -175,6 +177,7 @@ describe('GET /api/mobile/v1/me', () => {
         avatarUrl: null,
         isPublic: true,
         onboardingCompletedAt: null,
+        hasVisibleRelease: false,
       },
     });
 
@@ -191,6 +194,47 @@ describe('GET /api/mobile/v1/me', () => {
       qrPayload: null,
       avatarUrl: null,
       continueOnWebUrl: 'https://jov.ie/app',
+    });
+  });
+
+  it('returns needs_onboarding when the profile has no visible release yet', async () => {
+    hoisted.isProfileCompleteMock.mockReturnValue(false);
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'active',
+      },
+      profile: {
+        username: 'djshadow',
+        usernameNormalized: 'djshadow',
+        displayName: 'DJ Shadow',
+        avatarUrl: null,
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+        hasVisibleRelease: false,
+      },
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      state: 'needs_onboarding',
+      displayName: null,
+      username: null,
+      publicProfileUrl: null,
+      qrPayload: null,
+      avatarUrl: null,
+      continueOnWebUrl: 'https://jov.ie/app',
+    });
+    expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
+      username: 'djshadow',
+      usernameNormalized: 'djshadow',
+      displayName: 'DJ Shadow',
+      isPublic: true,
+      onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      hasVisibleRelease: false,
     });
   });
 

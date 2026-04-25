@@ -13,6 +13,7 @@ function makeProfile(
     displayName: 'Tim White',
     isPublic: true,
     onboardingCompletedAt: new Date('2026-03-19T17:56:33.757Z'),
+    hasVisibleRelease: true,
     ...overrides,
   };
 }
@@ -64,5 +65,23 @@ describe('isProfileComplete', () => {
     expect(
       isProfileComplete(makeProfile({ onboardingCompletedAt: null }))
     ).toBe(false);
+  });
+
+  it('returns false when hasVisibleRelease is false', () => {
+    expect(isProfileComplete(makeProfile({ hasVisibleRelease: false }))).toBe(
+      false
+    );
+  });
+
+  it('returns false when hasVisibleRelease is null', () => {
+    expect(isProfileComplete(makeProfile({ hasVisibleRelease: null }))).toBe(
+      false
+    );
+  });
+
+  it('returns true when hasVisibleRelease is omitted', () => {
+    expect(
+      isProfileComplete(makeProfile({ hasVisibleRelease: undefined }))
+    ).toBe(true);
   });
 });

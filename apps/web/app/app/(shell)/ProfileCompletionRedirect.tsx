@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { APP_ROUTES } from '@/constants/routes';
-import { isProfileComplete } from '@/lib/auth/profile-completeness';
 
 /**
  * Client-side safety net for onboarding redirects.
@@ -19,7 +18,8 @@ import { isProfileComplete } from '@/lib/auth/profile-completeness';
  * an infinite redirect loop: /app → /onboarding (ACTIVE guard) → /app.
  */
 export function ProfileCompletionRedirect() {
-  const { selectedProfile, dashboardLoadError, isAdmin } = useDashboardData();
+  const { selectedProfile, dashboardLoadError, isAdmin, needsOnboarding } =
+    useDashboardData();
   const router = useRouter();
 
   useEffect(() => {
@@ -39,11 +39,10 @@ export function ProfileCompletionRedirect() {
       return;
     }
 
-    // Canonical completeness check (username, displayName, isPublic, onboarding).
-    if (!isProfileComplete(selectedProfile)) {
+    if (needsOnboarding) {
       router.replace(APP_ROUTES.ONBOARDING);
     }
-  }, [dashboardLoadError, isAdmin, router, selectedProfile]);
+  }, [dashboardLoadError, isAdmin, needsOnboarding, router, selectedProfile]);
 
   return null;
 }

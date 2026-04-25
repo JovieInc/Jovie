@@ -84,6 +84,7 @@ export async function GET() {
         displayName: profile.displayName,
         isPublic: profile.isPublic,
         onboardingCompletedAt: profile.onboardingCompletedAt,
+        hasVisibleRelease: profile.hasVisibleRelease,
       })
     ) {
       return buildNeedsOnboardingResponse();
