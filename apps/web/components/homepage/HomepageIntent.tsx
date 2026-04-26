@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { trackHomepageEvent } from './homepage-analytics';
 import {
   HERO_COPY,
   HOMEPAGE_INTENT_EXPERIMENT_ID,
@@ -21,15 +22,6 @@ import {
 } from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
-
-function trackHomepageEvent(
-  event: string,
-  properties?: Record<string, unknown>
-) {
-  void import('@/lib/analytics').then(({ track }) => {
-    track(event, properties);
-  });
-}
 
 /**
  * Viewport gate: desktop (≥768px) gets an intercepted modal via `router.push`;
