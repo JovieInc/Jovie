@@ -5,6 +5,7 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
 } from 'node:fs';
@@ -32,7 +33,12 @@ const copyTargets = [
   },
 ];
 
-const standaloneRuntimePackages = ['@next/env', '@swc/helpers', 'debug', 'ms'];
+const standaloneRuntimePackages = [
+  '@next/env',
+  '@swc/helpers',
+  'require-in-the-middle',
+];
+const copiedRuntimePackages = new Set();
 
 if (!existsSync(standaloneRoot)) {
   throw new Error(
@@ -90,11 +96,19 @@ function materializeSymlinks(rootDir) {
   return materialized;
 }
 
-function copyRuntimePackageToStandalone(packageName) {
+function copyRuntimePackageToStandalone(
+  packageName,
+  resolveFrom = path.dirname(require.resolve('next/package.json'))
+) {
+  if (copiedRuntimePackages.has(packageName)) {
+    return;
+  }
+
   const packageJsonPath = require.resolve(`${packageName}/package.json`, {
-    paths: [path.dirname(require.resolve('next/package.json'))],
+    paths: [resolveFrom, path.dirname(require.resolve('next/package.json'))],
   });
   const packageRoot = path.dirname(packageJsonPath);
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
   const destination = path.join(
     standaloneRoot,
     'node_modules',
@@ -104,6 +118,11 @@ function copyRuntimePackageToStandalone(packageName) {
   rmSync(destination, { force: true, recursive: true });
   mkdirSync(path.dirname(destination), { recursive: true });
   cpSync(packageRoot, destination, { recursive: true, dereference: true });
+  copiedRuntimePackages.add(packageName);
+
+  for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
+    copyRuntimePackageToStandalone(dependencyName, packageRoot);
+  }
 }
 
 for (const target of copyTargets) {
