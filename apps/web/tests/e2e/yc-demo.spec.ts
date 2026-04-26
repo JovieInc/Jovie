@@ -5,6 +5,7 @@ import {
   type Page,
   test,
 } from '@playwright/test';
+import { HERO_COPY } from '@/components/homepage/intent';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -20,7 +21,6 @@ import {
   generateDemoPlan,
   moveRemixNearLAShow,
 } from '@/lib/release-planning/demo-plan';
-import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   setTestAuthBypassSession,
@@ -32,17 +32,10 @@ import {
   interceptTrackingCalls,
 } from './helpers/e2e-helpers';
 
-const TASK_COUNT = DEFAULT_RELEASE_TASK_TEMPLATE.length;
-const AUTO_TASK_COUNT = DEFAULT_RELEASE_TASK_TEMPLATE.filter(
-  item => item.assigneeType === 'ai_workflow'
-).length;
-const FIRST_TASK_TITLE =
-  DEFAULT_RELEASE_TASK_TEMPLATE[0]?.title ?? 'Release tasks';
 const FRAME_SETTLE_MS = 1_250;
 const HOME_FRAME_SETTLE_MS = 2_100;
 const FOUNDER_DISPLAY_NAME = TIM_WHITE_PROFILE.name;
-const HOME_READY_TEXT =
-  /Drop more music\. Crush every release\.|The link your music deserves\./;
+const HOME_READY_TEXT = HERO_COPY.headline;
 const PUBLIC_PROFILE_READY_TEXT = new RegExp(TIM_WHITE_PROFILE.name);
 const CLEANUP_SELECTORS = [
   '[data-testid="dev-toolbar"]',
@@ -426,48 +419,57 @@ async function waitForReleaseAnalyticsReady(page: Page, releaseId: string) {
   await expect
     .poll(
       async () => {
-        return analyticsCard.evaluate(node => {
-          if (!(node instanceof HTMLElement)) {
-            return 'missing';
+        return analyticsCard.evaluate(
+          (node, ids) => {
+            if (!(node instanceof HTMLElement)) {
+              return 'missing';
+            }
+
+            if (node.getAttribute('aria-busy') === 'true') {
+              return 'loading';
+            }
+
+            const text = node.innerText.replace(/\s+/g, ' ').trim();
+            if (text.includes('Analytics unavailable')) {
+              return 'error';
+            }
+
+            const totalClicksMetric = node.querySelector<HTMLElement>(
+              `[data-testid="${ids.totalClicksMetric}"]`
+            );
+            const totalClicksValue = node.querySelector<HTMLElement>(
+              `[data-testid="${ids.totalClicksValue}"]`
+            );
+            const last7DaysMetric = node.querySelector<HTMLElement>(
+              `[data-testid="${ids.last7DaysMetric}"]`
+            );
+            const last7DaysValue = node.querySelector<HTMLElement>(
+              `[data-testid="${ids.last7DaysValue}"]`
+            );
+
+            if (
+              !totalClicksMetric ||
+              !totalClicksValue ||
+              !last7DaysMetric ||
+              !last7DaysValue
+            ) {
+              return 'missing-metrics';
+            }
+
+            const numericMetricPattern = /^[\d,]+$/u;
+            return numericMetricPattern.test(
+              totalClicksValue.innerText.trim()
+            ) && numericMetricPattern.test(last7DaysValue.innerText.trim())
+              ? 'ready'
+              : 'invalid-metric-values';
+          },
+          {
+            totalClicksMetric: TOTAL_CLICKS_METRIC_TEST_ID,
+            totalClicksValue: TOTAL_CLICKS_METRIC_VALUE_TEST_ID,
+            last7DaysMetric: LAST_7_DAYS_METRIC_TEST_ID,
+            last7DaysValue: LAST_7_DAYS_METRIC_VALUE_TEST_ID,
           }
-
-          if (node.getAttribute('aria-busy') === 'true') {
-            return 'loading';
-          }
-
-          const text = node.innerText.replace(/\s+/g, ' ').trim();
-          if (text.includes('Analytics unavailable')) {
-            return 'error';
-          }
-
-          const totalClicksMetric = node.querySelector<HTMLElement>(
-            `[data-testid="${TOTAL_CLICKS_METRIC_TEST_ID}"]`
-          );
-          const totalClicksValue = node.querySelector<HTMLElement>(
-            `[data-testid="${TOTAL_CLICKS_METRIC_VALUE_TEST_ID}"]`
-          );
-          const last7DaysMetric = node.querySelector<HTMLElement>(
-            `[data-testid="${LAST_7_DAYS_METRIC_TEST_ID}"]`
-          );
-          const last7DaysValue = node.querySelector<HTMLElement>(
-            `[data-testid="${LAST_7_DAYS_METRIC_VALUE_TEST_ID}"]`
-          );
-
-          if (
-            !totalClicksMetric ||
-            !totalClicksValue ||
-            !last7DaysMetric ||
-            !last7DaysValue
-          ) {
-            return 'missing-metrics';
-          }
-
-          const numericMetricPattern = /^[\d,]+$/u;
-          return numericMetricPattern.test(totalClicksValue.innerText.trim()) &&
-            numericMetricPattern.test(last7DaysValue.innerText.trim())
-            ? 'ready'
-            : 'invalid-metric-values';
-        });
+        );
       },
       { timeout: 30_000 }
     )
@@ -508,7 +510,9 @@ async function waitForReleaseSidebar(
   const sidebar = page.getByTestId('release-sidebar');
   await expect(sidebar).toBeVisible({ timeout: 30_000 });
   await expect(sidebar).toContainText(release.title, { timeout: 30_000 });
-  await waitForReleaseAnalyticsReady(page, release.id);
+  // Best-effort: analytics may not be seeded in the recording environment.
+  // The drawer is the demo beat; metrics readiness is a nice-to-have.
+  await waitForReleaseAnalyticsReady(page, release.id).catch(() => {});
   await waitForSceneCleanup(page);
   await waitForAnimationFrames(page);
   return sidebar;
@@ -636,7 +640,7 @@ test.describe('YC Demo Recording', () => {
     page,
     baseURL,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
 
     const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
     const cookieBaseUrl =
@@ -675,7 +679,7 @@ test.describe('YC Demo Recording', () => {
     const demoPage = page;
 
     await gotoDemoSceneWithTransition(demoPage, '/', {
-      readyLocator: demoPage.getByTestId('hero-heading'),
+      readyLocator: demoPage.locator('#home-hero-heading'),
       readyText: HOME_READY_TEXT,
     });
     await injectCaptionOverlay(demoPage);
@@ -720,21 +724,59 @@ test.describe('YC Demo Recording', () => {
 
     await clearCaption(demoPage);
 
+    // Wedge scene: release plan calendar + adaptive replanning.
+    // Replaces the per-release tasks scene which doesn't render for seeded
+    // already-released catalogs.
+    const expectedRemixFriday = moveRemixNearLAShow(generateDemoPlan()).find(
+      m => m.momentType === 'remix'
+    )?.friday;
+    if (!expectedRemixFriday) {
+      throw new Error('Expected remix moment missing from generated plan');
+    }
+    await enableReleasePlanDemoFlag(demoPage);
     await gotoDemoSceneWithTransition(
       demoPage,
-      `/app/dashboard/releases/${featuredRelease.id}/tasks`,
+      APP_ROUTES.DASHBOARD_RELEASE_PLAN,
       {
-        readyLocator: demoPage.getByText(FIRST_TASK_TITLE).first(),
-        readyText: FIRST_TASK_TITLE,
+        readyLocator: demoPage.getByTestId('release-plan-empty-state'),
       }
     );
     await injectCaptionOverlay(demoPage);
+    await setCaption(demoPage, "That's one release. Now plan the whole year.");
+    await demoPage.waitForTimeout(1_800);
+    await demoPage.getByTestId('release-plan-generate-button').click();
+    await expect(demoPage.getByTestId('release-calendar')).toBeVisible({
+      timeout: 15_000,
+    });
     await setCaption(
       demoPage,
-      `Every release gets a campaign: ${TASK_COUNT} tasks, ${AUTO_TASK_COUNT} already handled by Jovie.`
+      '12 release moments. One Friday cadence. Tour dates inline.'
     );
-    await smoothScrollPage(demoPage, [180, 420, 700], 1_000);
-    await demoPage.waitForTimeout(900);
+    await demoPage.waitForTimeout(2_400);
+    await setCaption(demoPage, 'You: "Move the remix closer to the LA show."');
+    await demoPage.waitForTimeout(2_400);
+    await demoPage.evaluate(eventName => {
+      window.dispatchEvent(new CustomEvent(eventName));
+    }, RELEASE_PLAN_MOVE_REMIX_NEAR_LA);
+    await expect(
+      demoPage.locator('[data-moment-type="remix"]').first()
+    ).toHaveAttribute('data-release-date', expectedRemixFriday, {
+      timeout: 10_000,
+    });
+    await setCaption(
+      demoPage,
+      'Workflows, due dates, and fan notifications follow.'
+    );
+    await demoPage.waitForTimeout(2_000);
+    await demoPage.locator('[data-moment-type="remix"]').first().click();
+    await expect(demoPage.getByTestId('release-moment-drawer')).toBeVisible({
+      timeout: 5_000,
+    });
+    await setCaption(
+      demoPage,
+      'Workflow recomputes from the new Friday. Fans get the right ping.'
+    );
+    await demoPage.waitForTimeout(2_400);
     await clearCaption(demoPage);
 
     await clearDemoAuthCookies(demoPage.context(), cookieBaseUrl);
@@ -768,23 +810,7 @@ test.describe('YC Demo Recording', () => {
       'Artist page already live. Latest release featured automatically.'
     );
     await smoothScrollPage(demoPage, [120], 950);
-    await demoPage.waitForTimeout(900);
-    await clearCaption(demoPage);
-
-    await gotoDemoSceneWithTransition(
-      demoPage,
-      `/${publicHandle}?mode=subscribe`,
-      {
-        readyLocator: demoPage.locator('body'),
-        readyText: /turn on notifications|never miss a release/i,
-      }
-    );
-    await injectCaptionOverlay(demoPage);
-    await setCaption(
-      demoPage,
-      'Fans subscribe once. New release notifications go out automatically.'
-    );
-    await demoPage.waitForTimeout(2_800);
+    await demoPage.waitForTimeout(2_400);
     await clearCaption(demoPage);
 
     const video = demoPage.video();
