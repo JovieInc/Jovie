@@ -38,12 +38,12 @@ export function DrawerPropertyRow({
     sm: {
       container: 'min-h-[22px] gap-2 rounded-[6px] px-1 py-px',
       label: 'text-2xs leading-[15px] tracking-normal',
-      value: 'text-[12px] leading-[16px] tracking-normal',
+      value: 'text-xs leading-[16px] tracking-normal',
     },
     md: {
       container: 'min-h-[24px] gap-2 rounded-[6px] px-1 py-0.5',
       label: 'text-2xs leading-[15px] tracking-normal',
-      value: 'text-[12px] leading-[16px] tracking-normal',
+      value: 'text-xs leading-[16px] tracking-normal',
     },
   } as const;
 
