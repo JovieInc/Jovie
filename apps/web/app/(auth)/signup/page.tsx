@@ -99,23 +99,23 @@ function SignUpClaimDataPersistence() {
       aria-live='polite'
     >
       {availability === 'checking' && (
-        <p className='text-[13px] font-[450] text-secondary-token'>
+        <p className='text-app font-book text-secondary-token'>
           Checking if @{normalizedHandle} is available...
         </p>
       )}
       {availability === 'available' && (
-        <p className='text-[13px] font-[450] text-primary-token'>
+        <p className='text-app font-book text-primary-token'>
           @{normalizedHandle} is available. Sign up to claim it.
         </p>
       )}
       {availability === 'taken' && (
-        <p className='text-[13px] font-[450] text-secondary-token'>
+        <p className='text-app font-book text-secondary-token'>
           @{normalizedHandle} is already taken. You can pick another handle
           after signing up.
         </p>
       )}
       {availability === 'error' && (
-        <p className='text-[13px] font-[450] text-secondary-token'>
+        <p className='text-app font-book text-secondary-token'>
           Couldn&apos;t check if @{normalizedHandle} is available. You can still
           sign up and choose a handle.
         </p>
@@ -201,7 +201,7 @@ function SignUpPageContent() {
           fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
         />
       </div>
-      <p className='mt-4 text-center text-[11px] leading-relaxed text-white/80 lg:text-left'>
+      <p className='mt-4 text-center text-2xs leading-relaxed text-white/80 lg:text-left'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
