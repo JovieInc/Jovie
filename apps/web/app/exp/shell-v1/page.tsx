@@ -2204,7 +2204,7 @@ function AudioBar({
       {/* Fixed control row — never moves when the waveform opens. */}
       <div
         className='grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center'
-        style={{ height: 56 }}
+        style={{ height: 52 }}
       >
         <div />
         {transportButtons}
@@ -4567,15 +4567,6 @@ function TracksView({
             onSort={toggleSort}
           />
           <ColumnLabel
-            field='artist'
-            label='Artist'
-            width='w-[170px]'
-            align='left'
-            sortBy={sortBy}
-            sortDir={sortDir}
-            onSort={toggleSort}
-          />
-          <ColumnLabel
             field='bpm'
             label='BPM'
             width='w-[44px]'
@@ -4595,8 +4586,8 @@ function TracksView({
           <span className='w-[176px] shrink-0 text-left text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
             Waveform
           </span>
-          <span className='w-[44px] shrink-0 text-right text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
-            State
+          <span className='w-[64px] shrink-0 text-right text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+            Status
           </span>
           <span className='w-10 shrink-0 text-right text-[10px] tabular-nums text-quaternary-token/70'>
             {sorted.length}
@@ -4720,32 +4711,23 @@ function TrackRow({
         </button>
       </div>
 
-      {/* Artwork — small cropped sliver */}
-      <div className='relative h-7 w-7 rounded-sm overflow-hidden shrink-0'>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={track.artwork}
-          alt=''
-          className='h-full w-full object-cover'
-        />
-      </div>
+      {/* Artwork — small cropped sliver with clean fallback. */}
+      <ArtworkThumb src={track.artwork} title={track.title} size={28} />
 
-      {/* Title — bright, takes the negative space. Plain text — clicking
-          a row should select / play, not collapse the table. Click-to-
-          filter lives on the Releases list (stacked layout, intent is
-          clearer) and on the right rail when it lands. */}
+      {/* Title (with feat. subtitle for collabs). We're inside an artist
+          context (Bahamas / Dashboard breadcrumb), so the primary artist
+          is implicit — only collaborators surface here. */}
       <div className='flex-1 min-w-0'>
-        <span className='block w-full max-w-full truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
-          {track.title}
-        </span>
-      </div>
-
-      {/* Artist — its own column so the title isn't crammed. Same: plain
-          text, no click-to-filter on the table. */}
-      <div className='w-[170px] shrink-0 min-w-0'>
-        <span className='block w-full max-w-full truncate text-[12px] text-tertiary-token'>
-          {track.artist}
-        </span>
+        <div className='flex items-baseline gap-2 min-w-0'>
+          <span className='truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
+            {track.title}
+          </span>
+          {track.artist.includes(' & ') && (
+            <span className='truncate text-[11px] text-tertiary-token'>
+              feat. {track.artist.split(' & ').slice(1).join(' & ')}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* BPM — heavier weight, monochrome, right-aligned */}
@@ -4760,8 +4742,16 @@ function TrackRow({
         </span>
       </span>
 
-      {/* Mini waveform — wider (176px), cue markers as overlays */}
-      <div className='w-[176px] shrink-0'>
+      {/* Mini waveform — fades to ~16% opacity for inactive rows so the
+          playing/selected row's waveform pops by contrast. */}
+      <div
+        className={cn(
+          'w-[176px] shrink-0 transition-opacity duration-150 ease-out',
+          isCurrentTrack || isFocused
+            ? 'opacity-100'
+            : 'opacity-60 group-hover/row:opacity-90'
+        )}
+      >
         <RowWaveform
           release={{
             id: track.id,
@@ -4776,9 +4766,9 @@ function TrackRow({
         />
       </div>
 
-      {/* Status icons cluster */}
-      <div className='w-[44px] shrink-0 text-right'>
-        <StatusIcons track={track} />
+      {/* Status as a labeled chip — Live / Queued / Draft. */}
+      <div className='w-[64px] shrink-0 flex justify-end'>
+        <StatusChip track={track} />
       </div>
 
       {/* Spacer column to align with header's count cell */}
@@ -4829,32 +4819,93 @@ function _RatingDots({ value }: { value: number }) {
   );
 }
 
-function StatusIcons({ track }: { track: Track }) {
+// Artwork with a clean placeholder fallback when the image fails to load.
+// Solid surface + first letter of the title — quiet, never looks broken.
+function ArtworkThumb({
+  src,
+  title,
+  size,
+}: {
+  src: string;
+  title: string;
+  size: number;
+}) {
+  // Preload via the Image() constructor so we can detect failures without
+  // attaching onError to a <img> (sidesteps eslint @next/next/no-img-element
+  // and biome's noninteractive-element rules — we never render an <img>).
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+    setErrored(false);
+    if (typeof window === 'undefined') return;
+    const img = new window.Image();
+    img.onload = () => setLoaded(true);
+    img.onerror = () => setErrored(true);
+    img.src = src;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [src]);
+
   return (
-    <span className='inline-flex items-center gap-1 text-quaternary-token'>
-      {track.status === 'scheduled' && (
-        <span title='Scheduled' className='text-amber-400'>
-          ◴
+    <div
+      className='relative rounded-sm overflow-hidden shrink-0 bg-surface-1 grid place-items-center'
+      style={{ height: size, width: size }}
+    >
+      {loaded && !errored ? (
+        <span
+          aria-hidden='true'
+          className='absolute inset-0 bg-cover bg-center'
+          style={{ backgroundImage: `url(${src})` }}
+        />
+      ) : (
+        <span className='text-[10px] font-caption text-tertiary-token tracking-tight'>
+          {title.trim().charAt(0).toUpperCase() || '·'}
         </span>
       )}
-      {track.status === 'draft' && (
-        <span title='Draft' className='text-tertiary-token italic'>
-          d
-        </span>
+    </div>
+  );
+}
+
+// Replaces the cryptic icon cluster with a single labeled chip. Has-video
+// / has-canvas indicators move into the detail panel where the user has
+// the room (and intent) to read them.
+function StatusChip({ track }: { track: Track }) {
+  const cfg = STATUS_CHIP[track.status];
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] border whitespace-nowrap',
+        cfg.cls
       )}
-      {track.hasVideo && (
-        <span title='Has music video' className='text-tertiary-token'>
-          ▶
-        </span>
-      )}
-      {track.hasCanvas && (
-        <span title='Has Spotify Canvas' className='text-tertiary-token'>
-          ◫
-        </span>
-      )}
+      title={cfg.tooltip}
+    >
+      {cfg.label}
     </span>
   );
 }
+const STATUS_CHIP: Record<
+  TrackStatus,
+  { label: string; cls: string; tooltip: string }
+> = {
+  released: {
+    label: 'Live',
+    cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300/90',
+    tooltip: 'Live on DSPs',
+  },
+  scheduled: {
+    label: 'Queued',
+    cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300/90',
+    tooltip: 'Scheduled for release',
+  },
+  draft: {
+    label: 'Draft',
+    cls: 'border-(--linear-app-shell-border) bg-surface-1/40 text-tertiary-token',
+    tooltip: 'Draft — not yet released',
+  },
+};
 
 function trackMatchesPill(
   t: Track,
