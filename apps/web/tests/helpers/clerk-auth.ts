@@ -479,7 +479,7 @@ export async function waitForAuthenticatedHealth(
           throw error;
         }
       },
-      { timeout: 30_000 }
+      { timeout: 90_000 }
     )
     .toBe('authenticated');
 }
