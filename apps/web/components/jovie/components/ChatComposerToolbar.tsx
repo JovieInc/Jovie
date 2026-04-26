@@ -96,7 +96,7 @@ export function ComposerSendButton({
           isInteractive
             ? 'bg-gradient-to-b from-white to-[#e8e8eb] text-black shadow-[inset_0_0.5px_0_rgba(255,255,255,0.6),inset_0_-0.5px_0_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.4)] hover:-translate-y-px hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.7),inset_0_-0.5px_0_rgba(0,0,0,0.1),0_4px_12px_-2px_rgba(0,0,0,0.5)]'
             : 'cursor-not-allowed bg-white/[0.04] text-quaternary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.04)]',
-          isCompact ? 'h-8 w-8' : 'h-8 w-8'
+          isCompact ? 'h-7 w-7' : 'h-8 w-8'
         )}
         aria-label={showStop ? 'Stop generating' : 'Send message'}
       >

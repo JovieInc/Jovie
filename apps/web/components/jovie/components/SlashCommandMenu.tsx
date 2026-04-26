@@ -14,12 +14,21 @@ import {
 import Image from 'next/image';
 import { useEffect, useMemo } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
-import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
+import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
+import {
+  artistResultToEntityRef,
+  type ReleaseLikeRow,
+  releaseRowMatches,
+  releaseRowToEntityRef,
+} from './entity-mappers';
 import { type PickerState } from './useChatPicker';
+
+// Re-export EntityRefMeta from a single canonical home for picker consumers.
+export type { EntityRefMeta } from '@/lib/commands/entities';
 
 export type SlashMenuMode = 'all' | EntityKind;
 
@@ -254,62 +263,10 @@ interface UseSlashItemsResult {
   readonly isLoading: boolean;
 }
 
-interface ReleaseLikeRow {
-  readonly id: string;
-  readonly title: string;
-  readonly artworkUrl?: string;
-  readonly artistNames?: string[];
-  readonly releaseDate?: string;
-  readonly releaseType?: string;
-  readonly spotifyPopularity?: number | null;
-  readonly totalTracks?: number;
-  readonly totalDurationMs?: number | null;
-}
-
-function shortMonth(iso?: string): string | undefined {
-  if (!iso) return undefined;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function releaseTypeLabel(type?: string): string {
-  if (!type) return 'Release';
-  const lower = type.toLowerCase();
-  if (lower === 'album') return 'Album';
-  if (lower === 'single') return 'Single';
-  if (lower === 'ep') return 'EP';
-  return type;
-}
-
-function releaseRowToEntity(release: ReleaseLikeRow): EntityRef {
-  const dateLabel = shortMonth(release.releaseDate);
-  const typeLabel = releaseTypeLabel(release.releaseType);
-  const subtitle = dateLabel ? `${typeLabel} · ${dateLabel}` : typeLabel;
-  return {
-    kind: 'release',
-    id: release.id,
-    label: release.title,
-    thumbnail: release.artworkUrl,
-    meta: {
-      kind: 'release',
-      subtitle,
-      releaseDate: release.releaseDate,
-      releaseType: release.releaseType,
-      spotifyPopularity: release.spotifyPopularity ?? null,
-      totalTracks: release.totalTracks,
-      totalDurationMs: release.totalDurationMs ?? null,
-    },
-  };
-}
-
-function releaseMatches(release: ReleaseLikeRow, lowerQuery: string): boolean {
-  if (!lowerQuery) return true;
-  if (release.title.toLowerCase().includes(lowerQuery)) return true;
-  return (release.artistNames ?? []).some(n =>
-    n.toLowerCase().includes(lowerQuery)
-  );
-}
+// Release / artist row → EntityRef mapping is centralized in
+// `entity-mappers.ts` so this picker and the EntityProvider registry
+// (release-provider.tsx, artist-provider.tsx) format subtitles, date stamps,
+// and popularity stats identically. See that file for the conversion logic.
 
 /**
  * Build the flat list of menu items + grouped sections for the picker.
@@ -345,27 +302,15 @@ export function useSlashItems(
       return { items: [], sections: [], isLoading: false };
     }
 
+    const lowerQuery = query.toLowerCase();
     const filteredReleases: EntityRef[] = (releaseData ?? [])
-      .filter(r => releaseMatches(r as ReleaseLikeRow, query.toLowerCase()))
+      .filter(r => releaseRowMatches(r as ReleaseLikeRow, lowerQuery))
       .slice(0, isEntity ? 8 : 4)
-      .map(r => releaseRowToEntity(r as ReleaseLikeRow));
+      .map(r => releaseRowToEntityRef(r as ReleaseLikeRow));
 
     const artistEntities: EntityRef[] = artistSearch.results
       .slice(0, isEntity ? 8 : 4)
-      .map(r => ({
-        kind: 'artist' as const,
-        id: r.id,
-        label: r.name,
-        thumbnail: r.imageUrl,
-        meta: {
-          kind: 'artist' as const,
-          subtitle: r.isClaimed ? 'You' : 'Spotify artist',
-          followers: r.followers,
-          popularity: r.popularity,
-          verified: r.verified,
-          isYou: r.isClaimed,
-        },
-      }));
+      .map(artistResultToEntityRef);
 
     if (state.status === 'entity') {
       const items: EntityRef[] =
@@ -600,5 +545,3 @@ export function activeEntityFor(
   if (item?.kind === 'entity' && item.entity) return item.entity;
   return null;
 }
-
-export type { EntityRefMeta };

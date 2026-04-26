@@ -164,8 +164,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // composer was already rendered in the compact follow-up variant). At that
     // size the entity surface stacks rail-on-top instead of two columns.
     useEffect(() => {
-      if (typeof window === 'undefined') return;
-      const mq = window.matchMedia('(max-width: 899px)');
+      if (typeof globalThis.window === 'undefined') return;
+      const mq = globalThis.matchMedia('(max-width: 899px)');
       const update = () => setIsViewportNarrow(mq.matches);
       update();
       mq.addEventListener('change', update);
@@ -636,6 +636,29 @@ interface InputRowProps {
   readonly hasBorderTop?: boolean;
 }
 
+function textareaAnimateProp(
+  reducedMotion: boolean | null,
+  isPillMode: boolean,
+  measuredHeight: number
+): { height: number } | undefined {
+  if (reducedMotion || isPillMode) return undefined;
+  return { height: measuredHeight };
+}
+
+function textareaStyleProp(
+  reducedMotion: boolean | null,
+  isPillMode: boolean,
+  isAtMaxHeight: boolean,
+  measuredHeight: number
+): React.CSSProperties {
+  const overflow = isAtMaxHeight ? 'auto' : 'hidden';
+  if (!reducedMotion) return { overflow };
+  return {
+    height: isPillMode ? undefined : measuredHeight,
+    overflow,
+  };
+}
+
 function InputRow({
   containerRef,
   hiddenDivRef,
@@ -719,9 +742,11 @@ function InputRow({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           rows={1}
-          animate={
-            reducedMotion || isPillMode ? undefined : { height: measuredHeight }
-          }
+          animate={textareaAnimateProp(
+            reducedMotion,
+            isPillMode,
+            measuredHeight
+          )}
           transition={reducedMotion ? undefined : SPRING_HEIGHT}
           className={cn(
             'min-w-0 flex-1 resize-none bg-transparent',
@@ -732,14 +757,12 @@ function InputRow({
               : 'py-2 px-1',
             isAtMaxHeight && 'overflow-y-auto'
           )}
-          style={
-            reducedMotion
-              ? {
-                  height: isPillMode ? undefined : measuredHeight,
-                  overflow: isAtMaxHeight ? 'auto' : 'hidden',
-                }
-              : { overflow: isAtMaxHeight ? 'auto' : 'hidden' }
-          }
+          style={textareaStyleProp(
+            reducedMotion,
+            isPillMode,
+            isAtMaxHeight,
+            measuredHeight
+          )}
           onKeyDown={handleKeyDown}
           onPaste={onPaste}
           onFocus={() => setIsFocused(true)}

@@ -52,24 +52,37 @@ function formatLongDate(iso: string | undefined): string | null {
   });
 }
 
+const KIND_FALLBACK_EYEBROW: Record<EntityRef['kind'], string> = {
+  release: 'Release',
+  artist: 'Artist',
+  track: 'Track',
+};
+
+function releaseEyebrow(
+  meta: Extract<EntityRefMeta, { kind: 'release' }>
+): string {
+  const type = meta.releaseType ? capitalize(meta.releaseType) : null;
+  return type ? `Release · ${type}` : 'Release';
+}
+
+function artistEyebrow(
+  meta: Extract<EntityRefMeta, { kind: 'artist' }>
+): string {
+  if (meta.isYou) return 'Artist · You';
+  if (meta.verified) return 'Artist · Verified';
+  return 'Artist';
+}
+
+function trackEyebrow(meta: Extract<EntityRefMeta, { kind: 'track' }>): string {
+  return meta.releaseTitle ? `Track · ${meta.releaseTitle}` : 'Track';
+}
+
 function eyebrowFor(entity: EntityRef): string {
   const meta = entity.meta;
-  if (!meta) {
-    if (entity.kind === 'release') return 'Release';
-    if (entity.kind === 'artist') return 'Artist';
-    return 'Track';
-  }
-  if (meta.kind === 'release') {
-    const type = meta.releaseType ? capitalize(meta.releaseType) : null;
-    return type ? `Release · ${type}` : 'Release';
-  }
-  if (meta.kind === 'artist') {
-    if (meta.isYou) return 'Artist · You';
-    if (meta.verified) return 'Artist · Verified';
-    return 'Artist';
-  }
-  if (meta.releaseTitle) return `Track · ${meta.releaseTitle}`;
-  return 'Track';
+  if (!meta) return KIND_FALLBACK_EYEBROW[entity.kind] ?? 'Item';
+  if (meta.kind === 'release') return releaseEyebrow(meta);
+  if (meta.kind === 'artist') return artistEyebrow(meta);
+  return trackEyebrow(meta);
 }
 
 function capitalize(value: string): string {
@@ -89,7 +102,7 @@ function buildReleaseStats(
           <strong className='font-semibold tabular-nums text-primary-token'>
             {meta.totalTracks}
           </strong>
-          tracks
+          <span>tracks</span>
         </span>
       ),
     });
@@ -106,7 +119,7 @@ function buildReleaseStats(
       key: 'spotify',
       label: (
         <span className='inline-flex items-center gap-[3px]'>
-          Spotify
+          <span>Spotify</span>
           <strong className='font-semibold tabular-nums text-primary-token'>
             {meta.spotifyPopularity}
           </strong>
@@ -132,7 +145,7 @@ function buildArtistStats(
           <strong className='font-semibold tabular-nums text-primary-token'>
             {followers}
           </strong>
-          followers
+          <span>followers</span>
         </span>
       ),
     });
@@ -146,7 +159,7 @@ function buildArtistStats(
       key: 'popularity',
       label: (
         <span className='inline-flex items-center gap-[3px]'>
-          Spotify
+          <span>Spotify</span>
           <strong className='font-semibold tabular-nums text-primary-token'>
             {meta.popularity}
           </strong>

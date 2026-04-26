@@ -3,11 +3,11 @@
 import { useEffect, useMemo } from 'react';
 import type {
   EntityProvider,
-  EntityRef,
   EntitySearchResult,
 } from '@/lib/commands/entities';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { EntityChip } from './EntityChip';
+import { artistResultToEntityRef } from './entity-mappers';
 
 /**
  * EntityProvider for artists. Uses Spotify artist search (debounced, cached
@@ -15,7 +15,8 @@ import { EntityChip } from './EntityChip';
  * Spotify catalog, not just artists previously linked to the profile.
  *
  * `isLoading` reflects the hook's own state — `loading` during fetch,
- * `idle` otherwise.
+ * `idle` otherwise. EntityRef shaping lives in `entity-mappers.ts` and is
+ * shared with the inline chat slash picker.
  */
 export const artistProvider: EntityProvider = {
   kind: 'artist',
@@ -30,23 +31,13 @@ export const artistProvider: EntityProvider = {
       search(query);
     }, [query, search]);
 
-    return useMemo(() => {
-      const items: EntityRef[] = results.map(r => ({
-        kind: 'artist',
-        id: r.id,
-        label: r.name,
-        thumbnail: r.imageUrl,
-        meta: {
-          kind: 'artist',
-          subtitle: r.isClaimed ? 'You' : 'Spotify artist',
-          followers: r.followers,
-          popularity: r.popularity,
-          verified: r.verified,
-          isYou: r.isClaimed,
-        },
-      }));
-      return { items, isLoading: state === 'loading' };
-    }, [results, state]);
+    return useMemo(
+      () => ({
+        items: results.map(artistResultToEntityRef),
+        isLoading: state === 'loading',
+      }),
+      [results, state]
+    );
   },
   renderChip(ref) {
     return <EntityChip data={ref} variant='input' isInputChip />;
