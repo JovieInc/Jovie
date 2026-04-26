@@ -27,7 +27,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     readonly subtitle?: string;
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
-    readonly presentation?: 'standalone' | 'embedded';
+    readonly presentation?: 'standalone' | 'embedded' | 'modal';
   }) => (
     <div
       data-testid={dataTestId ?? 'profile-drawer-shell'}

@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProfileDesktopSurface } from '@/components/features/profile/templates/ProfileDesktopSurface';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -92,18 +92,21 @@ vi.mock('@/lib/dsp', () => ({
 
 const artist = {
   id: 'artist-1',
+  owner_user_id: 'user-1',
   name: 'Tim White',
   handle: 'timwhite',
+  spotify_id: '4u',
   image_url: 'https://example.com/tim.jpg',
   tagline: 'Producer, songwriter, and after-hours romantic.',
   location: null,
   hometown: null,
   career_highlights: null,
-  is_public: true,
   is_verified: true,
   active_since_year: null,
   published: true,
-  is_verified_flag: true,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: '2026-04-24T00:00:00.000Z',
   settings: {
     heroRoleLabel: 'DJ / PRODUCER',
   },

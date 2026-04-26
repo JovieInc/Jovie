@@ -527,9 +527,9 @@ export function ProfileInlineNotificationsCTA({
         data-testid='profile-inline-notifications-trigger'
       >
         {isSubscribed ? (
-          <CheckCircle2 className='h-4.5 w-4.5' />
+          <CheckCircle2 className='size-4.5' />
         ) : (
-          <Bell className='h-4.5 w-4.5' />
+          <Bell className='size-4.5' />
         )}
         <span>{triggerLabel}</span>
       </button>

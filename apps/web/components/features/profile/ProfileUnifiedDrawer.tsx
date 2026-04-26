@@ -336,7 +336,7 @@ export function ProfileUnifiedDrawer({
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
-                <BellOff className='h-[16px] w-[16px] text-red-400/50' />
+                <BellOff className='size-4 text-red-400/50' />
                 {isUnsubscribing
                   ? 'Turning off\u2026'
                   : 'Turn off notifications'}

@@ -25,11 +25,5 @@
     "sentry.edge.config.ts",
     "proxy.ts"
   ],
-  "exclude": [
-    "node_modules",
-    ".next/types/validator.ts",
-    ".next/dev/types/validator.ts",
-    ".next/dev/dev/types/validator.ts",
-    "**/*.stories.*"
-  ]
+  "exclude": ["node_modules", ".next/types/validator.ts", "**/*.stories.*"]
 }

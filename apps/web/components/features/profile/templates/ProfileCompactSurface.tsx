@@ -27,6 +27,7 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
+import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { getProfileModeDefinition } from '@/features/profile/registry';
@@ -100,15 +101,7 @@ interface ProfileCompactSurfaceProps {
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly showPayButton?: boolean;
-  readonly latestRelease?: {
-    readonly title: string;
-    readonly slug: string;
-    readonly artworkUrl: string | null;
-    readonly releaseDate: Date | string | null;
-    readonly revealDate?: Date | string | null;
-    readonly releaseType: string;
-    readonly metadata?: Record<string, unknown> | null;
-  } | null;
+  readonly latestRelease?: ProfilePrimaryActionCardRelease | null;
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
@@ -425,7 +418,7 @@ export function ProfileCompactSurface({
   const heroRoleLabel = useMemo(() => readHeroRoleLabel(artist), [artist]);
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
   const topChromeButtonClassName =
-    '!h-12 !w-12 border-transparent bg-black/44 text-white shadow-[0_20px_44px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/56';
+    'h-12! w-12! border-transparent bg-black/44 text-white shadow-[0_20px_44px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/56';
 
   return (
     <div

@@ -4,7 +4,7 @@ import { Disc3, Mail, Share2, Wallet } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
 import type { ProfileViewKey } from './registry';
 
-const ICON_CLASS = 'h-[16px] w-[16px] text-white/40';
+const ICON_CLASS = 'size-4 text-white/40';
 
 export interface MenuViewProps {
   readonly onNavigate: (view: ProfileViewKey) => void;

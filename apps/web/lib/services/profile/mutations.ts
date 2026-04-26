@@ -30,6 +30,7 @@ async function applyProfileUpdate(
     .select({
       avatarUrl: creatorProfiles.avatarUrl,
       theme: creatorProfiles.theme,
+      usernameNormalized: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
     .where(whereClause)
@@ -60,7 +61,10 @@ async function applyProfileUpdate(
     .returning();
 
   if (updated?.usernameNormalized) {
-    await invalidateProfileCache(updated.usernameNormalized);
+    await invalidateProfileCache(
+      updated.usernameNormalized,
+      existingProfile?.usernameNormalized
+    );
   }
 
   return updated ?? null;

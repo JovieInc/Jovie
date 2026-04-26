@@ -38,18 +38,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and related mutation paths now support a versioned `theme.profileAccent` payload. Avatar-driven accent colors are extracted server-side, normalized for contrast, reused as CSS vars, and persisted across avatar upload, suggestion selection, ingestion, and admin/dashboard update flows.
-- `apps/web/components/features/profile/ProfileHomeRail.tsx` adds a manual horizontal Home rail with dot pagination, driven from existing profile resolver data so featured release, tour, alerts, and listen states can rotate without changing route semantics.
+- Profile accents now automatically adapt to artist photos and stay consistent across profile updates.
+- The new Home rail lets featured releases, shows, alerts, and listening options rotate in a compact horizontal preview.
+- [internal] Added versioned `theme.profileAccent` support in `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and upload, suggestion, ingestion, admin, and dashboard mutation paths.
+- [internal] Added `apps/web/components/features/profile/ProfileHomeRail.tsx`, driven by existing profile resolver data and route semantics.
 
 ### Changed
 
-- `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` were rebuilt into the new shared public shell: full-bleed hero, verified identity row, contextual status pill, notifications-first CTA, quick social actions, and the five-tab bottom nav mapping `Home`, `Music`, `Events`, `Alerts`, and `Profile` to the existing profile modes.
-- Preview and demo profile surfaces now use the same accent/theme contract and refreshed shell so homepage showcases and live `/:username` pages stay visually aligned.
+- Public profiles now use a shared compact shell with a full-bleed hero, status pill, alerts CTA, quick social actions, and five-tab navigation.
+- Preview, demo, and live profile surfaces now stay visually aligned.
+- [internal] Rebuilt `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` around the refreshed public shell and existing mode mapping.
+- [internal] Preview and demo surfaces now share the same accent/theme contract as live `/:username` pages.
 
 ### Fixed
 
-- Theme writes now merge instead of replacing the entire theme object, preventing user theme changes from wiping persisted `profileAccent` data.
-- Public render fallback accent derivation now skips local and `/_next/image` sources, avoiding invalid-host fetch noise while preserving neutral fallbacks when no usable remote image exists.
+- Theme updates now keep existing profile accents intact.
+- Public render fallbacks now avoid noisy local image lookups while keeping neutral accents when no usable image is available.
+- [internal] Theme mutations now merge rather than replace the full theme object, preserving persisted `profileAccent` data.
+- [internal] Fallback accent derivation skips local and `/_next/image` sources to avoid invalid-host fetch noise.
 
 ## [26.4.173] - 2026-04-24
 

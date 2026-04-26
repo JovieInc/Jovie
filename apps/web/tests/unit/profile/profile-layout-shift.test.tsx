@@ -165,7 +165,7 @@ describe('notification flow shell sizing', () => {
     const shell = await screen.findByTestId(
       'profile-mobile-notifications-flow'
     );
-    expect(shell.className).toContain('min-h-[640px]');
+    expect(shell.dataset.shellVariant).toBe('inline-full-height');
   });
 
   it('ProfileInlineNotificationsCTA reuses the same full-height inline shell', async () => {
@@ -182,6 +182,6 @@ describe('notification flow shell sizing', () => {
     const shell = await screen.findByTestId(
       'profile-mobile-notifications-flow'
     );
-    expect(shell.className).toContain('min-h-[640px]');
+    expect(shell.dataset.shellVariant).toBe('inline-full-height');
   });
 });

@@ -149,7 +149,8 @@ async function captureLocatorScreenshot(params: {
   const { page, route, selector, outputPath } = params;
 
   await page.goto(route, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2_500);
+  await page.locator(selector).waitFor({ state: 'visible', timeout: 20_000 });
+  await page.waitForLoadState('networkidle').catch(() => undefined);
   await hideTransientUi(page);
   await waitForImages(page);
   await page.locator(selector).screenshot({ path: outputPath });
@@ -301,12 +302,16 @@ async function main() {
         );
       }
 
+      const rawCaptureMetadata = await sharp(rawCapturePath).metadata();
+      const rawCaptureWidth = rawCaptureMetadata.width ?? 0;
+      const rawCaptureHeight = rawCaptureMetadata.height ?? 0;
+
       const currentCrop = await sharp(rawCapturePath)
         .extract(
           toExtractRect(
             approvalCapture.currentRect,
-            (await sharp(rawCapturePath).metadata()).width ?? 0,
-            (await sharp(rawCapturePath).metadata()).height ?? 0
+            rawCaptureWidth,
+            rawCaptureHeight
           )
         )
         .resize({

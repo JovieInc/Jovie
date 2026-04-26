@@ -334,7 +334,7 @@ describe('ProfileCompactTemplate', () => {
 
     const trigger = screen.getByRole('button', { name: /more options/i });
     expect(trigger.className).toContain('bg-black/44');
-    expect(trigger.className).toContain('!h-12');
+    expect(trigger.className).toContain('h-12!');
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {

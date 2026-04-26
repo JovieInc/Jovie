@@ -79,14 +79,16 @@ function DateBox({
       className={cn(
         'flex h-[68px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[15px] border',
         featured
-          ? 'border-[rgba(220,128,52,0.38)] bg-[rgba(220,128,52,0.08)]'
+          ? 'border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)]'
           : 'border-white/8 bg-white/[0.02]'
       )}
     >
       <span
         className={cn(
           'text-[9px] font-semibold uppercase tracking-[0.1em]',
-          featured ? 'text-[rgb(223,144,76)]' : 'text-white/42'
+          featured
+            ? 'text-[color:var(--profile-accent-primary)]'
+            : 'text-white/42'
         )}
       >
         {displayDate.month}
@@ -94,7 +96,7 @@ function DateBox({
       <span
         className={cn(
           'mt-1 text-[16px] font-semibold leading-none tracking-[-0.04em]',
-          featured ? 'text-[rgb(255,184,113)]' : 'text-white'
+          featured ? 'text-[color:var(--profile-accent-primary)]' : 'text-white'
         )}
       >
         {displayDate.day}
@@ -134,7 +136,7 @@ function TourDateRow({
       className={cn(
         'grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-2 px-[13px] py-[13px]',
         featured
-          ? 'rounded-[20px] border border-[rgba(220,128,52,0.32)] bg-[linear-gradient(180deg,rgba(220,128,52,0.08),rgba(220,128,52,0.03))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+          ? 'rounded-[20px] border border-[color:var(--profile-status-pill-border)] bg-[linear-gradient(180deg,var(--profile-accent-soft-strong),var(--profile-accent-soft))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
           : 'border-t border-white/[0.075] first:border-t-0'
       )}
     >
@@ -142,7 +144,7 @@ function TourDateRow({
 
       <div className='min-w-0'>
         {featured ? (
-          <div className='mb-1 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[rgb(223,144,76)]'>
+          <div className='mb-1 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[color:var(--profile-accent-primary)]'>
             <MapPin className='h-[10px] w-[10px]' />
             <span>{nearby ? 'Near You' : 'Upcoming'}</span>
           </div>

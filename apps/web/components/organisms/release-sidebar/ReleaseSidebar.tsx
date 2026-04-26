@@ -607,6 +607,21 @@ export function ReleaseSidebar({
     onRescanIsrc?.();
   }, [isPlatformRescanDisabled, onRescanIsrc]);
 
+  const handleNavigateToFullTasksPage = useCallback(() => {
+    if (!release) {
+      return;
+    }
+
+    globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+      '[releaseId]',
+      release.id
+    );
+  }, [release]);
+
+  const handleDismissTasksUpgrade = useCallback(() => {
+    setShowTasksUpgrade(false);
+  }, []);
+
   const platformCardActions = useMemo(() => {
     if (!isEditable) {
       return null;
@@ -744,7 +759,6 @@ export function ReleaseSidebar({
                 {isEditable ? (
                   <DrawerSection
                     title='Artwork'
-                    surface='card'
                     defaultOpen={false}
                     lazyMount
                     testId='release-artwork-settings-card'
@@ -758,7 +772,6 @@ export function ReleaseSidebar({
                 ) : null}
                 <DrawerSection
                   title='Lyrics'
-                  surface='card'
                   defaultOpen={false}
                   lazyMount
                   testId='release-lyrics-card'
@@ -777,7 +790,6 @@ export function ReleaseSidebar({
                 {(release.totalTracks ?? 0) > 0 ? (
                   <DrawerSection
                     title='Tracks'
-                    surface='card'
                     defaultOpen={false}
                     lazyMount
                     testId='release-tracks-card'
@@ -827,20 +839,14 @@ export function ReleaseSidebar({
                     releaseId={release.id}
                     variant='compact'
                     releaseDate={release.releaseDate}
-                    onNavigateToFullPage={() => {
-                      globalThis.location.href =
-                        APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-                          '[releaseId]',
-                          release.id
-                        );
-                    }}
+                    onNavigateToFullPage={handleNavigateToFullTasksPage}
                   />
                 ) : null}
                 {!isTasksWorkspaceGateLoading &&
                 !canAccessTasksWorkspace &&
                 showTasksUpgrade ? (
                   <CompactReleasePlanUpgradeCard
-                    onDismiss={() => setShowTasksUpgrade(false)}
+                    onDismiss={handleDismissTasksUpgrade}
                   />
                 ) : null}
               </div>

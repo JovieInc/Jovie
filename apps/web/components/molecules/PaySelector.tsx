@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { ChevronDown, PencilLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 
 type PaySelectorPresentation = 'default' | 'drawer';
@@ -42,23 +43,6 @@ function parseCustomAmount(value: string): number | null {
   }
 
   return Number(parsed.toFixed(2));
-}
-
-function VenmoIcon() {
-  return (
-    <svg
-      width='20'
-      height='20'
-      viewBox='0 0 24 24'
-      fill='currentColor'
-      className='shrink-0'
-      aria-hidden='true'
-      role='img'
-    >
-      <title>Venmo</title>
-      <path d='M19.04 2C19.7 3.19 20 4.41 20 5.97c0 4.87-4.16 11.19-7.54 15.64H5.2L2 3.28l6.29-.6 1.64 9.96c1.52-2.48 3.4-6.38 3.4-9.03 0-1.46-.25-2.45-.63-3.27L19.04 2z' />
-    </svg>
-  );
 }
 
 export function PaySelector({
@@ -269,7 +253,14 @@ export function PaySelector({
                     className='flex h-[48px] w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-[14px] font-medium tracking-[-0.015em] text-white transition-[border-color,background-color,opacity] duration-200 hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
                   >
-                    {paymentLabel === 'Venmo' ? <VenmoIcon /> : null}
+                    {paymentLabel === 'Venmo' ? (
+                      <SocialIcon
+                        platform='venmo'
+                        size={20}
+                        className='shrink-0'
+                        aria-hidden
+                      />
+                    ) : null}
                     <span>{`Continue with ${paymentLabel}`}</span>
                   </button>
                 ) : null}
@@ -329,7 +320,14 @@ export function PaySelector({
             : `Continue with ${formatAmountForScreenReader(selectedAmount)}`
         }
       >
-        {paymentLabel ? <VenmoIcon /> : null}
+        {paymentLabel ? (
+          <SocialIcon
+            platform='venmo'
+            size={20}
+            className='shrink-0'
+            aria-hidden
+          />
+        ) : null}
         {continueLabel}
       </Button>
     </div>

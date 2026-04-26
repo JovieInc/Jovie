@@ -349,14 +349,13 @@ function AlertsRailCard({
   onOpenAlerts?: () => void;
   previewNotificationsState?: ProfilePreviewNotificationsState;
 }>) {
-  const title = isSubscribed ? 'Alerts On' : 'Turn On Alerts';
-  const body = isSubscribed
+  const isAlertsOn =
+    isSubscribed || previewNotificationsState?.kind === 'status';
+  const title = isAlertsOn ? 'Alerts On' : 'Turn On Alerts';
+  const body = isAlertsOn
     ? 'Manage music, show, and merch alert preferences.'
     : 'Get new music and tour updates by text or email the moment they land.';
-  const label =
-    previewNotificationsState?.kind === 'status' || isSubscribed
-      ? 'Alerts On'
-      : 'Turn On Alerts';
+  const label = isAlertsOn ? 'Alerts On' : 'Turn On Alerts';
 
   return (
     <RailCardShell
@@ -367,7 +366,7 @@ function AlertsRailCard({
       className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
     >
       <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
-        <LabelChip>{isSubscribed ? 'Alerts On' : 'Alerts'}</LabelChip>
+        <LabelChip>{isAlertsOn ? 'Alerts On' : 'Alerts'}</LabelChip>
 
         <div className='space-y-3.5'>
           <div className='space-y-1.5'>
@@ -384,7 +383,7 @@ function AlertsRailCard({
               {label}
             </span>
             <CircleAction>
-              {isSubscribed ? (
+              {isAlertsOn ? (
                 <CheckCircle2 className='h-5 w-5' />
               ) : (
                 <ChevronRight className='h-5 w-5' />
@@ -551,9 +550,12 @@ export function ProfileHomeRail({
         return;
       }
 
+      const containerLeft = container.getBoundingClientRect().left;
       const nextIndex = cardElements.reduce(
         (best, element, index) => {
-          const distance = Math.abs(element.offsetLeft - container.scrollLeft);
+          const distance = Math.abs(
+            element.getBoundingClientRect().left - containerLeft
+          );
           return distance < best.distance ? { index, distance } : best;
         },
         { index: 0, distance: Number.POSITIVE_INFINITY }

@@ -209,7 +209,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-mock-home-mobile',
       title: 'Tim White Profile — Mock Home',
       route: '/demo/showcase/tim-white-profile?state=mock-home',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      waitFor: '[data-testid="homepage-phone-state-mock-home"]',
       captureTarget: 'locator',
       captureSelector: '[data-testid="homepage-phone-state-mock-home"]',
       viewport: 'mobile',

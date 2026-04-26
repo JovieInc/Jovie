@@ -650,7 +650,7 @@ export function ProfileDesktopSurface({
                     className='flex items-center justify-between gap-4'
                   >
                     <div className='flex items-center gap-3'>
-                      <Icon className='h-4.5 w-4.5 text-white/68' />
+                      <Icon className='size-4.5 text-white/68' />
                       <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
                         {item.label}
                       </span>
@@ -680,7 +680,7 @@ export function ProfileDesktopSurface({
                   </div>
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
-                      <Mail className='h-4.5 w-4.5 text-white/68' />
+                      <Mail className='size-4.5 text-white/68' />
                       <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
                         Subscribe to Other Alerts
                       </span>

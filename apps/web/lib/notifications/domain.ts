@@ -1130,7 +1130,7 @@ export const getNotificationStatusDomain = async (
     return buildStatusSuccessResponse(
       channels,
       details,
-      pickJovieAlertPreferences(mergedPrefs),
+      rows.length > 0 ? pickJovieAlertPreferences(mergedPrefs) : undefined,
       artistEmail
     );
   } catch (error) {

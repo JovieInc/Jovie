@@ -153,7 +153,9 @@ test.describe('Profile Notifications Hosts', () => {
       await expect(
         page.getByTestId('profile-mobile-notifications-step-preferences')
       ).toBeVisible();
-      await expect(page.getByText('Sent from Jovie')).toBeVisible();
+      await expect(
+        page.getByTestId('profile-mobile-notifications-sent-from')
+      ).toBeVisible();
     });
   }
 });

@@ -90,9 +90,9 @@ function PreviewAlertsPanel({
       <div className='space-y-4'>
         <div className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] text-[color:var(--profile-status-pill-fg)]'>
           {state.kind === 'status' ? (
-            <CheckCircle2 className='h-4.5 w-4.5' />
+            <CheckCircle2 className='size-4.5' />
           ) : (
-            <Bell className='h-4.5 w-4.5' />
+            <Bell className='size-4.5' />
           )}
         </div>
 

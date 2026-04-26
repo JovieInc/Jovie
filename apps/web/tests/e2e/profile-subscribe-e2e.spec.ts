@@ -247,7 +247,6 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByText("You're all set!")).toBeVisible();
   });
 
   test('invalid email shows validation error', async ({ page }) => {

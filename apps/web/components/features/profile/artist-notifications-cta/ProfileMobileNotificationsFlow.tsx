@@ -88,6 +88,8 @@ const MONTH_OPTIONS = [
   'December',
 ] as const;
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
   {
@@ -190,15 +192,18 @@ function PrimaryButton({
 function SecondaryTextButton({
   children,
   onClick,
+  disabled = false,
 }: Readonly<{
   children: React.ReactNode;
   onClick: () => void;
+  disabled?: boolean;
 }>) {
   return (
     <button
       type='button'
       onClick={onClick}
-      className='inline-flex h-12 w-full items-center justify-center rounded-[18px] px-5 text-[15px] font-medium tracking-[-0.02em] text-white/58 transition-colors duration-200 hover:text-white/76'
+      disabled={disabled}
+      className='inline-flex h-12 w-full items-center justify-center rounded-[18px] px-5 text-[15px] font-medium tracking-[-0.02em] text-white/58 transition-colors duration-200 hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -257,10 +262,9 @@ function BirthdaySelectors({
   onChange: (value: string) => void;
 }>) {
   const parts = extractBirthdayParts(value);
-  const currentYear = new Date().getFullYear();
   const yearOptions = useMemo(
-    () => Array.from({ length: 100 }, (_, index) => currentYear - index),
-    [currentYear]
+    () => Array.from({ length: 100 }, (_, index) => CURRENT_YEAR - index),
+    []
   );
 
   const updatePart = (key: 'month' | 'day' | 'year', nextValue: string) => {
@@ -378,6 +382,7 @@ export function ProfileMobileNotificationsFlow({
   onPreferencesSubmit,
 }: Readonly<ProfileMobileNotificationsFlowProps>) {
   const [mounted, setMounted] = useState(false);
+  const isResendCooldownActive = resendCooldownEnd > Date.now();
 
   useEffect(() => {
     setMounted(true);
@@ -522,7 +527,10 @@ export function ProfileMobileNotificationsFlow({
               >
                 Verify
               </PrimaryButton>
-              <SecondaryTextButton onClick={onResendOtp}>
+              <SecondaryTextButton
+                onClick={onResendOtp}
+                disabled={isResending || isResendCooldownActive}
+              >
                 {isResending
                   ? 'Sending...'
                   : formatCountdown(resendCooldownEnd)}
@@ -624,7 +632,10 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <div className='space-y-1'>
-                <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'>
+                <p
+                  className='text-[13px] font-semibold tracking-[-0.01em] text-white/42'
+                  data-testid='profile-mobile-notifications-sent-from'
+                >
                   Sent from Jovie
                 </p>
                 <p className='text-[14px] leading-6 text-white/58'>
@@ -648,7 +659,7 @@ export function ProfileMobileNotificationsFlow({
                     >
                       <div className='flex items-center gap-3'>
                         <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
-                          <Icon className='h-4.5 w-4.5' />
+                          <Icon className='size-4.5' />
                         </span>
                         <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
                           {meta.label}
@@ -683,7 +694,7 @@ export function ProfileMobileNotificationsFlow({
                   <div className='flex items-center justify-between gap-4 py-2'>
                     <div className='flex items-center gap-3'>
                       <span className='inline-flex h-8 w-8 items-center justify-center text-white/68'>
-                        <Mail className='h-4.5 w-4.5' />
+                        <Mail className='size-4.5' />
                       </span>
                       <div>
                         <p className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
@@ -770,7 +781,7 @@ export function ProfileMobileNotificationsFlow({
               className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-200 hover:bg-white/[0.08]'
               aria-label='Close'
             >
-              <X className='h-4.5 w-4.5' />
+              <X className='size-4.5' />
             </button>
           ) : (
             <span className='h-10 w-10' aria-hidden='true' />
@@ -832,6 +843,7 @@ export function ProfileMobileNotificationsFlow({
       <div
         className='relative min-h-[640px] rounded-[32px] bg-[#0a0b0f] text-white'
         data-testid='profile-mobile-notifications-flow'
+        data-shell-variant='inline-full-height'
         style={contentStyle}
       >
         {contentBody}

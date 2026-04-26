@@ -115,6 +115,9 @@ export function readProfileAccentTheme(
     return null;
   }
   const accentRecord = accent as Record<string, unknown>;
+  if (accentRecord.version !== 1) {
+    return null;
+  }
 
   const sourceUrl =
     typeof accentRecord.sourceUrl === 'string' &&
@@ -144,9 +147,10 @@ export function mergeProfileTheme(
   existingTheme: Record<string, unknown> | null | undefined,
   updates: Partial<ProfileThemeRecord>
 ): ProfileThemeRecord {
+  const { profileAccent: _profileAccent, ...safeUpdates } = updates;
   const merged = {
     ...existingTheme,
-    ...updates,
+    ...safeUpdates,
   } as ProfileThemeRecord;
 
   if (updates.profileAccent === undefined) {
@@ -162,6 +166,13 @@ export function mergeProfileTheme(
     });
     if (normalizedAccent) {
       merged.profileAccent = normalizedAccent;
+    } else {
+      const existingAccent = readProfileAccentTheme(existingTheme);
+      if (existingAccent) {
+        merged.profileAccent = existingAccent;
+      } else {
+        delete merged.profileAccent;
+      }
     }
   }
 
