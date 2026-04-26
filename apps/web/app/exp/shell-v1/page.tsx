@@ -1273,6 +1273,8 @@ export default function ShellV1Experiment() {
     emptyLibraryFilters()
   );
   const [librarySort, setLibrarySort] = useState<LibrarySortKey>('addedAt');
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSectionId>('account');
   const [libraryViewMode, setLibraryViewMode] =
     useState<LibraryViewMode>('grid');
   const [librarySelectedId, setLibrarySelectedId] = useState<string | null>(
@@ -1694,6 +1696,14 @@ export default function ShellV1Experiment() {
                 }
               : undefined
           }
+          settingsProps={
+            view === 'settings'
+              ? {
+                  activeSection: settingsSection,
+                  onSelectSection: setSettingsSection,
+                }
+              : undefined
+          }
         />
       </div>
 
@@ -1898,7 +1908,7 @@ export default function ShellV1Experiment() {
                   onClearFilters={clearLibraryFilters}
                 />
               ) : view === 'settings' ? (
-                <SettingsView />
+                <SettingsView section={settingsSection} />
               ) : view === 'thread' ? (
                 <ThreadView
                   thread={
@@ -2193,6 +2203,7 @@ function Sidebar({
   activeView,
   tight,
   libraryProps,
+  settingsProps,
   activeThreadId,
   onSelectThread,
   onThreadContextMenu,
@@ -2215,6 +2226,13 @@ function Sidebar({
     onFilters: (f: LibraryFiltersType) => void;
     onClearAll: () => void;
   };
+  // Mirror of libraryProps for settings: when provided, the sidebar
+  // body swaps to the settings section nav and the brand row becomes
+  // a `← Settings` back chip.
+  settingsProps?: {
+    activeSection: SettingsSectionId;
+    onSelectSection: (id: SettingsSectionId) => void;
+  };
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
@@ -2232,6 +2250,9 @@ function Sidebar({
   };
 }) {
   const inLibraryMode = !!libraryProps;
+  const inSettingsMode = !!settingsProps;
+  const inContextMode = inLibraryMode || inSettingsMode;
+  const contextLabel = inLibraryMode ? 'Library' : 'Settings';
   const collapsed = false;
   // Pin button stays visible briefly after the sidebar appears or when the
   // user hovers it. Otherwise it gets out of the way.
@@ -2273,7 +2294,7 @@ function Sidebar({
           chip, mirroring the Linear settings nav pattern. */}
       <div className={cn('px-2', tight ? 'pt-2 pb-2' : 'pt-3 pb-4')}>
         <div className='relative flex items-center h-7 gap-2.5'>
-          {inLibraryMode ? (
+          {inContextMode ? (
             <button
               type='button'
               onClick={() => onSelectView?.('demo')}
@@ -2287,7 +2308,7 @@ function Sidebar({
                 className='text-[13px] font-semibold tracking-[-0.012em] flex-1 truncate text-left'
                 style={{ letterSpacing: '-0.012em' }}
               >
-                Library
+                {contextLabel}
               </span>
             </button>
           ) : (
@@ -2344,6 +2365,37 @@ function Sidebar({
             onFilters={libraryProps.onFilters}
             onClearAll={libraryProps.onClearAll}
           />
+        </nav>
+      ) : inSettingsMode && settingsProps ? (
+        <nav className='flex-1 overflow-y-auto px-2 pt-2 pb-3 space-y-px'>
+          {SETTINGS_SECTIONS.map(s => {
+            const active = settingsProps.activeSection === s.id;
+            return (
+              <button
+                key={s.id}
+                type='button'
+                onClick={() => settingsProps.onSelectSection(s.id)}
+                className={cn(
+                  'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-150 ease-out',
+                  active
+                    ? 'bg-surface-1/80 text-primary-token'
+                    : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
+                )}
+              >
+                <span
+                  className={cn(
+                    'text-[12.5px] font-medium tracking-[-0.005em]',
+                    s.id === 'danger' && 'text-rose-300/90'
+                  )}
+                >
+                  {s.label}
+                </span>
+                <span className='text-[10.5px] text-quaternary-token leading-tight'>
+                  {s.description}
+                </span>
+              </button>
+            );
+          })}
         </nav>
       ) : (
         <nav
@@ -5916,59 +5968,20 @@ function ChatComposer({ placeholder }: { placeholder: string }) {
   );
 }
 
-function SettingsView() {
-  const [section, setSection] = useState<SettingsSectionId>('account');
-  return (
-    <div className='h-full grid' style={{ gridTemplateColumns: '220px 1fr' }}>
-      <aside className='border-r border-(--linear-app-shell-border) bg-(--surface-0) overflow-y-auto py-3 px-2 space-y-px'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold px-2 pt-1 pb-2'>
-          Settings
-        </p>
-        {SETTINGS_SECTIONS.map(s => {
-          const active = section === s.id;
-          return (
-            <button
-              key={s.id}
-              type='button'
-              onClick={() => setSection(s.id)}
-              className={cn(
-                'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-150 ease-out',
-                active
-                  ? 'bg-surface-1/80 text-primary-token'
-                  : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
-              )}
-            >
-              <span
-                className={cn(
-                  'text-[12.5px] font-medium tracking-[-0.005em]',
-                  s.id === 'danger' && 'text-rose-300/90'
-                )}
-              >
-                {s.label}
-              </span>
-              <span className='text-[10.5px] text-quaternary-token leading-tight'>
-                {s.description}
-              </span>
-            </button>
-          );
-        })}
-      </aside>
-      <div className='overflow-y-auto'>
-        <SettingsSection id={section} />
-      </div>
-    </div>
-  );
-}
-
-function SettingsSection({ id }: { id: SettingsSectionId }) {
-  const meta = SETTINGS_SECTIONS.find(s => s.id === id);
+// Settings — context-shifts the sidebar (same pattern as Library). The
+// canvas no longer carries its own nav rail; the active section is the
+// only thing on the canvas. All rows for a section group into ONE card
+// — no more per-row carding.
+function SettingsView({ section }: { section: SettingsSectionId }) {
+  const meta = SETTINGS_SECTIONS.find(s => s.id === section);
   if (!meta) return null;
+  const rows = settingsRowsFor(section);
   return (
     <article className='max-w-2xl mx-auto px-8 pt-8 pb-12'>
       <h1
         className={cn(
           'text-[24px] font-display tracking-[-0.018em] leading-tight',
-          id === 'danger' ? 'text-rose-300' : 'text-primary-token'
+          section === 'danger' ? 'text-rose-300' : 'text-primary-token'
         )}
       >
         {meta.label}
@@ -5977,9 +5990,18 @@ function SettingsSection({ id }: { id: SettingsSectionId }) {
         {meta.description}
       </p>
 
-      <div className='mt-6 space-y-4'>
-        {settingsRowsFor(id).map(row => (
-          <SettingsRow key={row.label} {...row} />
+      {/* Single card per section. Rows stack inside with hairline
+          dividers — no per-row card chrome. */}
+      <div
+        className={cn(
+          'mt-6 rounded-xl border bg-(--surface-0)/40 overflow-hidden',
+          section === 'danger'
+            ? 'border-rose-500/25 bg-rose-500/[0.03]'
+            : 'border-(--linear-app-shell-border)/70'
+        )}
+      >
+        {rows.map((row, i) => (
+          <SettingsRow key={row.label} {...row} divider={i > 0} />
         ))}
       </div>
     </article>
@@ -5991,17 +6013,19 @@ function SettingsRow({
   description,
   control,
   tone,
+  divider,
 }: {
   label: string;
   description?: string;
   control: React.ReactNode;
   tone?: 'default' | 'danger';
+  divider?: boolean;
 }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-4 px-4 py-3 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40',
-        tone === 'danger' && 'border-rose-500/25 bg-rose-500/[0.03]'
+        'flex items-center gap-4 px-4 py-3.5',
+        divider && 'border-t border-(--linear-app-shell-border)/50'
       )}
     >
       <div className='flex-1 min-w-0'>
