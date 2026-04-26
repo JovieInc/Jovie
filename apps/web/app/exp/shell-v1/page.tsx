@@ -55,6 +55,7 @@ import {
   AudioLines,
   AudioWaveform,
   BarChart3,
+  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -3285,64 +3286,61 @@ function DashboardHome() {
             >
               {greeting}
             </h1>
-            <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
-              The single most important thing today.
-            </p>
           </div>
 
           <SuggestionCard suggestion={current} />
 
-          {/* Pagination — minimal dot row, no chrome. Prev/next live on
-              hover via arrow keys; clicking a dot jumps directly. */}
-          <div className='mt-4 flex items-center gap-1.5'>
-            {sorted.map((s, i) => (
-              <button
-                key={s.id}
-                type='button'
-                onClick={() => setIndex(i)}
-                aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
-                className={cn(
-                  'h-1 rounded-full transition-[width,background-color] duration-200 ease-out',
-                  i === index
-                    ? 'w-5 bg-primary-token'
-                    : 'w-1 bg-quaternary-token/45 hover:bg-tertiary-token'
-                )}
-              />
-            ))}
-          </div>
-
-          <div className='mt-5 flex items-center gap-3 text-[11.5px] text-tertiary-token'>
+          {/* Tight control row — View all on the left, dot pagination
+              centered, prev/next on the right. One row, all aligned. */}
+          <div className='mt-4 flex items-center justify-between gap-3 w-full'>
             <button
               type='button'
-              className='hover:text-primary-token transition-colors duration-150 ease-out'
+              className='text-[11.5px] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
             >
               View all
             </button>
-            <span className='text-quaternary-token/40'>·</span>
-            <Tooltip label='Previous'>
-              <button
-                type='button'
-                onClick={() =>
-                  setIndex(i => (i === 0 ? sorted.length - 1 : i - 1))
-                }
-                className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                aria-label='Previous suggestion'
-              >
-                <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
-              </button>
-            </Tooltip>
-            <Tooltip label='Next'>
-              <button
-                type='button'
-                onClick={() =>
-                  setIndex(i => (i === sorted.length - 1 ? 0 : i + 1))
-                }
-                className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                aria-label='Next suggestion'
-              >
-                <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
-              </button>
-            </Tooltip>
+            <div className='flex items-center gap-1.5'>
+              {sorted.map((s, i) => (
+                <button
+                  key={s.id}
+                  type='button'
+                  onClick={() => setIndex(i)}
+                  aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
+                  className={cn(
+                    'h-1 rounded-full transition-[width,background-color] duration-200 ease-out',
+                    i === index
+                      ? 'w-5 bg-primary-token'
+                      : 'w-1 bg-quaternary-token/45 hover:bg-tertiary-token'
+                  )}
+                />
+              ))}
+            </div>
+            <div className='flex items-center gap-0.5'>
+              <Tooltip label='Previous'>
+                <button
+                  type='button'
+                  onClick={() =>
+                    setIndex(i => (i === 0 ? sorted.length - 1 : i - 1))
+                  }
+                  className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                  aria-label='Previous suggestion'
+                >
+                  <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
+                </button>
+              </Tooltip>
+              <Tooltip label='Next'>
+                <button
+                  type='button'
+                  onClick={() =>
+                    setIndex(i => (i === sorted.length - 1 ? 0 : i + 1))
+                  }
+                  className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                  aria-label='Next suggestion'
+                >
+                  <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
+                </button>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </div>
@@ -6877,7 +6875,13 @@ function agentLabel(s: ReleaseAgentState) {
 // Overview → Distribution → Activity → Details. Cues is tracks-only;
 // hidden when the entity is a release. Tab choice persists across
 // entities per kind so power users don't re-click on every nav.
-type DrawerTab = 'overview' | 'distribution' | 'cues' | 'activity' | 'details';
+type DrawerTab =
+  | 'overview'
+  | 'distribution'
+  | 'lyrics'
+  | 'cues'
+  | 'activity'
+  | 'details';
 type EntityKind = 'release' | 'track' | 'contact';
 
 const DEFAULT_TAB_FOR_KIND: Record<EntityKind, DrawerTab> = {
@@ -6887,14 +6891,17 @@ const DEFAULT_TAB_FOR_KIND: Record<EntityKind, DrawerTab> = {
 };
 
 const TABS_FOR_KIND: Record<EntityKind, DrawerTab[]> = {
+  // Releases: no audio file → no Cues, no Lyrics. They live on tracks.
   release: ['overview', 'distribution', 'activity', 'details'],
-  track: ['overview', 'distribution', 'cues', 'activity', 'details'],
+  // Tracks: Lyrics + Cues both live on the audio file.
+  track: ['overview', 'distribution', 'lyrics', 'cues', 'activity', 'details'],
   contact: ['overview', 'activity', 'details'],
 };
 
 const TAB_LABEL: Record<DrawerTab, string> = {
   overview: 'Overview',
   distribution: 'Distribution',
+  lyrics: 'Lyrics',
   cues: 'Cues',
   activity: 'Activity',
   details: 'Details',
@@ -6959,10 +6966,12 @@ function ReleaseDrawer({
   return (
     <aside
       aria-hidden={!open}
-      className='hidden md:flex flex-col h-full overflow-hidden border-l border-(--linear-app-shell-border) bg-(--linear-app-content-surface)'
+      // Linear-style: page background between the two elevated cards.
+      // Page bg is page (darkest), each card is contentSurface elevated
+      // with a thin border and a soft shadow. The gap between cards is
+      // intentional and reads as a structural separation.
+      className='hidden md:flex flex-col h-full overflow-hidden border-l border-(--linear-app-shell-border) bg-(--linear-bg-page)'
       style={{
-        // Inner content slides 16px from the right while opacity fades.
-        // The grid-template-columns morph on the parent does the width work.
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',
         transition: `opacity 220ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
@@ -6970,16 +6979,30 @@ function ReleaseDrawer({
         minWidth: 0,
       }}
     >
-      <DrawerHero release={r} onClose={onClose} onPlay={onPlay} />
-      <DrawerTabStrip tabs={tabs} active={tab} onChange={setTab} />
-      <div className='flex-1 min-h-0 overflow-y-auto'>
-        {tab === 'overview' && <DrawerOverviewTab release={r} />}
-        {tab === 'distribution' && <DrawerDistribution release={r} />}
-        {tab === 'cues' && <DrawerCues release={r} onSeek={onSeek} />}
-        {tab === 'activity' && (
-          <DrawerActivityTab release={r} onOpenTasks={onOpenTasks} />
-        )}
-        {tab === 'details' && <DrawerDetailsTab release={r} />}
+      {/* Hero card — elevated. Holds artwork, title, status, drop-in-N
+          callout, and the smart-link share row. Always visible. */}
+      <div className='shrink-0 px-3 pt-3'>
+        <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_8px_24px_rgba(0,0,0,0.18)] overflow-hidden'>
+          <DrawerHero release={r} onClose={onClose} onPlay={onPlay} />
+        </div>
+      </div>
+
+      {/* Detail card — elevated. Pill tabs at the top, tab content
+          below. Each tab owns its own scroll. */}
+      <div className='flex-1 min-h-0 px-3 pt-3 pb-3 flex flex-col'>
+        <div className='flex-1 min-h-0 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_8px_24px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden'>
+          <DrawerTabStrip tabs={tabs} active={tab} onChange={setTab} />
+          <div className='flex-1 min-h-0 overflow-y-auto'>
+            {tab === 'overview' && <DrawerOverviewTab release={r} />}
+            {tab === 'distribution' && <DrawerDistribution release={r} />}
+            {tab === 'lyrics' && <DrawerLyricsTab release={r} />}
+            {tab === 'cues' && <DrawerCues release={r} onSeek={onSeek} />}
+            {tab === 'activity' && (
+              <DrawerActivityTab release={r} onOpenTasks={onOpenTasks} />
+            )}
+            {tab === 'details' && <DrawerDetailsTab release={r} />}
+          </div>
+        </div>
       </div>
     </aside>
   );
@@ -6994,26 +7017,35 @@ function DrawerTabStrip({
   active: DrawerTab;
   onChange: (t: DrawerTab) => void;
 }) {
+  // Pill tabs sitting in a track. Active pill gets the surface fill;
+  // others stay flat. Tracks scrolls horizontally if the rail narrows.
   return (
-    <div className='shrink-0 flex items-center gap-0.5 px-3 border-b border-(--linear-app-shell-border)/60'>
-      {tabs.map(t => {
-        const on = active === t;
-        return (
-          <button
-            key={t}
-            type='button'
-            onClick={() => onChange(t)}
-            className={cn(
-              'h-9 px-2.5 text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out border-b -mb-px',
-              on
-                ? 'text-primary-token border-cyan-300/70'
-                : 'text-tertiary-token border-transparent hover:text-primary-token'
-            )}
-          >
-            {TAB_LABEL[t]}
-          </button>
-        );
-      })}
+    <div className='shrink-0 px-2 pt-2 pb-2 border-b border-(--linear-app-shell-border)/60'>
+      <div
+        role='tablist'
+        className='inline-flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+      >
+        {tabs.map(t => {
+          const on = active === t;
+          return (
+            <button
+              key={t}
+              type='button'
+              role='tab'
+              aria-selected={on}
+              onClick={() => onChange(t)}
+              className={cn(
+                'h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
+                on
+                  ? 'bg-(--surface-2) text-primary-token shadow-[0_1px_0_0_rgba(255,255,255,0.04)]'
+                  : 'text-tertiary-token hover:text-primary-token'
+              )}
+            >
+              {TAB_LABEL[t]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -7028,8 +7060,9 @@ function DrawerHero({
   onPlay?: (id: string) => void;
 }) {
   const status = statusFromRelease(release);
+  const dropMeta = relativeDropMeta(release.releaseDate);
   return (
-    <section className='shrink-0 relative pt-4 pb-4 px-4'>
+    <section className='group/drawer relative px-4 pt-4 pb-3'>
       {/* Status pill + close + overflow live in the top-right corner so
           they don't compete with the title. Status stays visible at all
           times; close + overflow only show on hover for a calmer rest
@@ -7057,13 +7090,13 @@ function DrawerHero({
         </Tooltip>
       </div>
 
-      <div className='flex items-start gap-3 group/drawer'>
+      <div className='flex items-start gap-3'>
         {/* Hover-play overlay on the artwork — replaces the action row. */}
         <button
           type='button'
           onClick={() => onPlay?.(release.id)}
           aria-label={`Play ${release.title}`}
-          className='shrink-0 relative group/art rounded-md overflow-hidden focus-visible:outline-none'
+          className='shrink-0 relative group/art rounded-lg overflow-hidden focus-visible:outline-none'
         >
           <ArtworkThumb src={release.artwork} title={release.title} size={88} />
           <span
@@ -7090,12 +7123,116 @@ function DrawerHero({
           <p className='mt-1 text-[12px] text-tertiary-token truncate'>
             {release.artist} · {release.album}
           </p>
-          <div className='mt-2'>
+          <div className='mt-2 flex items-center gap-1.5 flex-wrap'>
             <TypeBadge type={release.type} />
+            <DropDateChip
+              date={release.releaseDate}
+              tone={dropMeta.tone}
+              label={dropMeta.label}
+            />
           </div>
         </div>
       </div>
+
+      {/* Smart link — copy + open. Sits inside the hero card so the
+          most-shared affordance is one move from any drawer state. */}
+      <div className='mt-4'>
+        <DrawerSmartLinkRow release={release} />
+      </div>
     </section>
+  );
+}
+
+function relativeDropMeta(iso: string): {
+  label: string;
+  tone: 'past' | 'soon' | 'future';
+} {
+  const ms = new Date(iso).getTime() - Date.now();
+  const days = Math.round(ms / 86400000);
+  if (days < -1) return { label: `${Math.abs(days)}d ago`, tone: 'past' };
+  if (days === -1) return { label: 'Yesterday', tone: 'past' };
+  if (days === 0) return { label: 'Today', tone: 'soon' };
+  if (days === 1) return { label: 'Tomorrow', tone: 'soon' };
+  if (days <= 7) return { label: `Drops in ${days}d`, tone: 'soon' };
+  if (days <= 30) return { label: `Drops in ${days}d`, tone: 'future' };
+  return {
+    label: `Drops ${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+    tone: 'future',
+  };
+}
+
+function DropDateChip({
+  date: _date,
+  tone,
+  label,
+}: {
+  date: string;
+  tone: 'past' | 'soon' | 'future';
+  label: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap',
+        tone === 'soon'
+          ? 'border-cyan-300/40 bg-cyan-500/10 text-cyan-200/90'
+          : tone === 'past'
+            ? 'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token'
+            : 'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token'
+      )}
+    >
+      <Calendar
+        className={cn(
+          'h-2.5 w-2.5 shrink-0',
+          tone === 'soon' ? 'text-cyan-300/80' : 'text-quaternary-token'
+        )}
+        strokeWidth={2.25}
+      />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function DrawerSmartLinkRow({ release }: { release: Release }) {
+  const [copied, setCopied] = useState(false);
+  const url = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
+  return (
+    <div className='flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token'>
+      <LinkIcon
+        className='h-3 w-3 text-quaternary-token shrink-0'
+        strokeWidth={2.25}
+      />
+      <span className='flex-1 truncate font-mono tabular-nums'>{url}</span>
+      <Tooltip label={copied ? 'Copied!' : 'Copy smart link'}>
+        <button
+          type='button'
+          onClick={() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
+          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          aria-label='Copy smart link'
+        >
+          {copied ? (
+            <CheckCircle2
+              className='h-3 w-3 text-cyan-300'
+              strokeWidth={2.25}
+            />
+          ) : (
+            <Copy className='h-3 w-3' strokeWidth={2.25} />
+          )}
+        </button>
+      </Tooltip>
+      <Tooltip label='Open smart link'>
+        <button
+          type='button'
+          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          aria-label='Open smart link'
+        >
+          <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -7116,30 +7253,56 @@ function DrawerOverviewTab({ release }: { release: Release }) {
         />
       </div>
       <DrawerPerformance release={release} />
-      <DrawerDropDate release={release} />
     </div>
   );
 }
 
-function DrawerDropDate({ release }: { release: Release }) {
+// Lyrics tab — tracks-only. Mock content for the design pass; production
+// pulls from the lyrics service. Shows the lyric text with cue-aligned
+// timestamps; clicking a line will seek (wired the same as Cues).
+function DrawerLyricsTab({ release: _release }: { release: Release }) {
+  // Mock lyrics — release-agnostic for the design pass.
+  const lines = [
+    { at: 6, text: 'Walking through the static of a city that forgets' },
+    { at: 14, text: 'Every name it whispered, every promise that it kept' },
+    { at: 26, text: 'I was lost in the light' },
+    { at: 30, text: 'Found a quiet in the noise' },
+    { at: 38, text: 'Something steady in the wreckage of the choice' },
+    { at: 52, text: 'Lost in the light, lost in the light' },
+    { at: 62, text: 'Holding on tight, holding on tight' },
+    { at: 73, text: 'You said the world is what you build it' },
+    { at: 81, text: 'I said the world is what you let go' },
+    { at: 88, text: 'Both of us were right' },
+  ];
   return (
-    <div className='flex items-center justify-between text-[11.5px] text-tertiary-token'>
-      <span className='inline-flex items-center gap-1.5'>
-        <span className='text-quaternary-token'>Drops</span>
-        <span className='text-secondary-token tabular-nums'>
-          {new Date(release.releaseDate).toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })}
-        </span>
-      </span>
-      <button
-        type='button'
-        className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
-      >
-        Reschedule
-      </button>
+    <div className='px-4 py-4'>
+      <div className='flex items-center justify-between pb-2'>
+        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          Lyrics
+        </p>
+        <button
+          type='button'
+          className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        >
+          Edit
+        </button>
+      </div>
+      <ol className='flex flex-col -mx-2'>
+        {lines.map(line => (
+          <li key={line.at}>
+            <button
+              type='button'
+              className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out text-left'
+            >
+              <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-150 ease-out'>
+                {Math.floor(line.at / 60)}:
+                {String(line.at % 60).padStart(2, '0')}
+              </span>
+              <span className='flex-1 leading-snug'>{line.text}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -7174,25 +7337,27 @@ function Stat({
 }
 
 function DrawerPerformance({ release }: { release: Release }) {
+  // Until DSP stream data is wired we surface the metric we DO own —
+  // smart-link click-throughs. Same shape (number + delta + sparkline);
+  // labelling is the only thing that flips when stream data lands.
+  // weeklyStreams is reused as a stand-in for click count in the mock.
   const sparkPoints = useMemo(
     () => generateSparkline(release.waveformSeed, release.weeklyStreams),
     [release.waveformSeed, release.weeklyStreams]
   );
   const trendUp = release.weeklyDelta > 0;
   const trendFlat = release.weeklyDelta === 0;
-  // Streams + delta — wired to mock today; production will fill these in
-  // from real DSP analytics. Empty / loading state is a `—` placeholder
-  // (no skeleton) per the no-jank rule.
+  const clicks = Math.round(release.weeklyStreams * 0.18); // mock ratio
   return (
     <div>
       <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
-        7-day streams
+        Smart link · 7d
       </p>
       <div className='flex items-baseline gap-2'>
         <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
-          {release.weeklyStreams.toLocaleString()}
+          {clicks.toLocaleString()}
         </span>
-        <span className='text-[11px] text-tertiary-token'>streams · 7d</span>
+        <span className='text-[11px] text-tertiary-token'>clicks</span>
         <span
           className={cn(
             'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
