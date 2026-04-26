@@ -1399,6 +1399,39 @@ export default function ShellV1Experiment() {
     ]);
   };
 
+  const onThreadContextMenu = (e: React.MouseEvent, thread: Thread) => {
+    openContextMenu(e, [
+      {
+        label: 'Open thread',
+        icon: ExternalLink,
+        onSelect: () => openThread(thread.id),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Copy as Markdown',
+        icon: Copy,
+        onSelect: noop(`copy md ${thread.id}`),
+      },
+      {
+        label: 'Copy thread ID',
+        icon: Copy,
+        onSelect: noop(`copy id ${thread.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Archive',
+        icon: Archive,
+        onSelect: noop(`archive ${thread.id}`),
+      },
+      {
+        label: 'Delete',
+        icon: Trash2,
+        tone: 'danger',
+        onSelect: noop(`delete ${thread.id}`),
+      },
+    ]);
+  };
+
   const onTaskContextMenu = (e: React.MouseEvent, task: Task) => {
     openContextMenu(e, [
       {
@@ -1641,6 +1674,7 @@ export default function ShellV1Experiment() {
           tight={sidebarTight}
           activeThreadId={selectedThreadId}
           onSelectThread={openThread}
+          onThreadContextMenu={onThreadContextMenu}
           libraryProps={
             view === 'library'
               ? {
@@ -1670,6 +1704,7 @@ export default function ShellV1Experiment() {
         tight={sidebarTight}
         activeThreadId={selectedThreadId}
         onSelectThread={openThread}
+        onThreadContextMenu={onThreadContextMenu}
       />
 
       {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
@@ -2047,6 +2082,7 @@ function FloatingSidebarLayer({
   tight,
   activeThreadId,
   onSelectThread,
+  onThreadContextMenu,
 }: {
   active: boolean;
   peekOpen: boolean;
@@ -2057,6 +2093,7 @@ function FloatingSidebarLayer({
   tight?: boolean;
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
+  onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2115,6 +2152,7 @@ function FloatingSidebarLayer({
           tight={tight}
           activeThreadId={activeThreadId}
           onSelectThread={onSelectThread}
+          onThreadContextMenu={onThreadContextMenu}
         />
       </div>
     </>
@@ -2130,6 +2168,7 @@ function Sidebar({
   libraryProps,
   activeThreadId,
   onSelectThread,
+  onThreadContextMenu,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
@@ -2149,6 +2188,7 @@ function Sidebar({
   };
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
+  onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
 }) {
   const inLibraryMode = !!libraryProps;
   const collapsed = false;
@@ -2308,6 +2348,7 @@ function Sidebar({
               activeView === 'thread' ? (activeThreadId ?? null) : null
             }
             onSelect={onSelectThread}
+            onThreadContextMenu={onThreadContextMenu}
             tight={tight}
             collapsed={collapsed}
           />
@@ -2450,12 +2491,14 @@ function SidebarThreadsSection({
   threads,
   activeThreadId,
   onSelect,
+  onThreadContextMenu,
   tight,
   collapsed,
 }: {
   threads: Thread[];
   activeThreadId: string | null;
   onSelect?: (id: string) => void;
+  onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
   tight?: boolean;
   collapsed: boolean;
 }) {
@@ -2489,37 +2532,61 @@ function SidebarThreadsSection({
         {visible.map(t => {
           const active = activeThreadId === t.id;
           return (
-            <button
+            // biome-ignore lint/a11y/noStaticElementInteractions: row hosts two real buttons; div is hover container with right-click menu
+            // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same
+            <div
               key={t.id}
-              type='button'
-              onClick={() => onSelect?.(t.id)}
               className={cn(
-                'flex items-center gap-2 rounded-md text-left transition-colors duration-150 ease-out',
-                tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2',
+                'group/thread relative flex items-center rounded-md transition-colors duration-150 ease-out',
+                tight ? 'h-6' : 'h-7',
                 active
                   ? 'bg-surface-1 text-primary-token'
                   : 'text-tertiary-token hover:bg-surface-1/50 hover:text-primary-token'
               )}
+              onContextMenu={e => onThreadContextMenu?.(e, t)}
             >
-              <span
+              <button
+                type='button'
+                onClick={() => onSelect?.(t.id)}
                 className={cn(
-                  'h-1.5 w-1.5 rounded-full shrink-0',
-                  t.status === 'running'
-                    ? 'bg-cyan-300/80 animate-pulse'
-                    : t.status === 'errored'
-                      ? 'bg-rose-400/85'
-                      : 'bg-white/30'
-                )}
-              />
-              <span
-                className={cn(
-                  'flex-1 truncate',
-                  tight ? 'text-[12px]' : 'text-[12.5px]'
+                  'flex-1 flex items-center gap-2 min-w-0 text-left',
+                  tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2'
                 )}
               >
-                {t.title}
-              </span>
-            </button>
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full shrink-0',
+                    t.status === 'running'
+                      ? 'bg-cyan-300/80 animate-pulse'
+                      : t.status === 'errored'
+                        ? 'bg-rose-400/85'
+                        : 'bg-white/30'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'flex-1 truncate',
+                    tight ? 'text-[12px]' : 'text-[12.5px]'
+                  )}
+                >
+                  {t.title}
+                </span>
+              </button>
+              {/* Hover ellipsis — opens the per-thread menu (Archive,
+                  Copy as Markdown, Copy thread ID, Delete). Right-click
+                  the row anywhere also opens the same menu. */}
+              <button
+                type='button'
+                onClick={e => onThreadContextMenu?.(e, t)}
+                aria-label='Thread actions'
+                className={cn(
+                  'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+                  'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+                )}
+              >
+                <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -3206,158 +3273,161 @@ function DashboardHome() {
 
   return (
     <div className='h-full flex flex-col px-6 pb-4'>
-      {/* Greeting strip — one calm line, no bg, no widgets. */}
-      <div className='shrink-0 pt-12 pb-8 text-center'>
-        <h1
-          className='text-[22px] font-semibold text-primary-token'
-          style={{ letterSpacing: '-0.02em' }}
-        >
-          {greeting}
-        </h1>
-        <p className='mt-1.5 text-[13px] text-tertiary-token'>
-          Here’s the single most important thing today.
-        </p>
-      </div>
-
-      {/* Suggestion carousel — one card at a time. Prev/next + dots. */}
+      {/* Suggestion focus zone — greeting + intro + card all sit together
+          as one connected unit, vertically centered. The card is the hero;
+          the greeting is its setup, not a separate strip way up top. */}
       <div className='flex-1 grid place-items-center min-h-0'>
-        <div className='w-full max-w-[560px]'>
-          <SuggestionCard
-            suggestion={current}
-            count={sorted.length}
-            indexAt={index}
-          />
-          <div className='mt-3 flex items-center justify-between'>
-            <Tooltip label='Previous suggestion' shortcut='searchSlash'>
+        <div className='w-full max-w-[480px] flex flex-col items-center'>
+          <div className='shrink-0 text-center pb-5'>
+            <h1
+              className='text-[20px] font-semibold text-primary-token'
+              style={{ letterSpacing: '-0.018em' }}
+            >
+              {greeting}
+            </h1>
+            <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+              The single most important thing today.
+            </p>
+          </div>
+
+          <SuggestionCard suggestion={current} />
+
+          {/* Pagination — minimal dot row, no chrome. Prev/next live on
+              hover via arrow keys; clicking a dot jumps directly. */}
+          <div className='mt-4 flex items-center gap-1.5'>
+            {sorted.map((s, i) => (
+              <button
+                key={s.id}
+                type='button'
+                onClick={() => setIndex(i)}
+                aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
+                className={cn(
+                  'h-1 rounded-full transition-[width,background-color] duration-200 ease-out',
+                  i === index
+                    ? 'w-5 bg-primary-token'
+                    : 'w-1 bg-quaternary-token/45 hover:bg-tertiary-token'
+                )}
+              />
+            ))}
+          </div>
+
+          <div className='mt-5 flex items-center gap-3 text-[11.5px] text-tertiary-token'>
+            <button
+              type='button'
+              className='hover:text-primary-token transition-colors duration-150 ease-out'
+            >
+              View all
+            </button>
+            <span className='text-quaternary-token/40'>·</span>
+            <Tooltip label='Previous'>
               <button
                 type='button'
                 onClick={() =>
                   setIndex(i => (i === 0 ? sorted.length - 1 : i - 1))
                 }
-                className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                aria-label='Previous'
+                className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                aria-label='Previous suggestion'
               >
-                <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
+                <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
               </button>
             </Tooltip>
-            <div className='flex items-center gap-1.5'>
-              {sorted.map((s, i) => (
-                <button
-                  key={s.id}
-                  type='button'
-                  onClick={() => setIndex(i)}
-                  aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
-                  className={cn(
-                    'h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out',
-                    i === index
-                      ? 'w-6 bg-primary-token'
-                      : 'w-1.5 bg-quaternary-token/50 hover:bg-tertiary-token'
-                  )}
-                />
-              ))}
-            </div>
-            <Tooltip label='Next suggestion'>
+            <Tooltip label='Next'>
               <button
                 type='button'
                 onClick={() =>
                   setIndex(i => (i === sorted.length - 1 ? 0 : i + 1))
                 }
-                className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                aria-label='Next'
+                className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                aria-label='Next suggestion'
               >
-                <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+                <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
               </button>
             </Tooltip>
-          </div>
-
-          <div className='mt-6 flex items-center justify-center gap-4 text-[12px] text-tertiary-token'>
-            <button
-              type='button'
-              className='hover:text-primary-token transition-colors duration-150 ease-out underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70'
-            >
-              View all suggestions
-            </button>
-            <span className='text-quaternary-token/60'>·</span>
-            <button
-              type='button'
-              className='hover:text-primary-token transition-colors duration-150 ease-out underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70'
-            >
-              Ask Jovie
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Composer locked to the bottom of the canvas. Above audio bar
-          (audio bar is sibling, not parent). When you send a message the
-          carousel fades and the thread takes over — for now this is a
-          static composer. */}
+      {/* Composer locked to the bottom of the canvas. Pill input with a
+          circular white send button — Variant F adoption is queued (will
+          replace this with the real ChatInput component). */}
       <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
-        <ChatComposer placeholder='Ask Jovie or type a command…' />
+        <PillComposer placeholder='Ask Jovie' />
       </div>
     </div>
   );
 }
 
-function SuggestionCard({
-  suggestion,
-  count,
-  indexAt,
-}: {
-  suggestion: JovieSuggestion;
-  count: number;
-  indexAt: number;
-}) {
-  const kindLabel: Record<JovieSuggestion['kind'], string> = {
-    dsp: 'DSP',
-    geo: 'Geography',
-    booking: 'Booking',
-    release: 'Release',
-    pitch: 'Pitch',
-  };
+// Apple-esque suggestion card. No caption, no top-right Jovie label —
+// the card IS Jovie. Title leads. Body is short. Primary action and
+// dismiss balance to the right edge so the eye lands on the action.
+function SuggestionCard({ suggestion }: { suggestion: JovieSuggestion }) {
   return (
     <article
-      className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-6 py-6 shadow-[0_24px_60px_rgba(0,0,0,0.32)]'
+      key={suggestion.id}
+      className='w-full rounded-2xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-6 py-5'
       style={{
         opacity: 1,
         transition: `opacity 220ms ${EASE_CINEMATIC}`,
       }}
-      key={suggestion.id}
     >
-      <div className='flex items-center justify-between'>
-        <span className='text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          {kindLabel[suggestion.kind]} · {indexAt + 1} of {count}
-        </span>
-        <span className='inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token'>
-          <Sparkles className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
-          Jovie
-        </span>
-      </div>
       <h2
-        className='mt-4 text-[20px] font-semibold leading-snug text-primary-token'
+        className='text-[19px] font-semibold leading-snug text-primary-token'
         style={{ letterSpacing: '-0.018em' }}
       >
         {suggestion.title}
       </h2>
-      <p className='mt-2 text-[13.5px] leading-relaxed text-secondary-token'>
+      <p className='mt-2 text-[13px] leading-relaxed text-secondary-token'>
         {suggestion.body}
       </p>
-      <div className='mt-5 flex items-center gap-2'>
+      <div className='mt-5 flex items-center justify-end gap-1.5'>
         <button
           type='button'
-          className='inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md text-[12.5px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
+          className='inline-flex items-center h-8 px-3 rounded-full text-[12.5px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        >
+          Dismiss
+        </button>
+        <button
+          type='button'
+          className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
         >
           {suggestion.action}
           <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
         </button>
-        <button
-          type='button'
-          className='inline-flex items-center h-8 px-3 rounded-md text-[12.5px] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
-        >
-          Dismiss
-        </button>
       </div>
     </article>
+  );
+}
+
+// Pill composer — placeholder for the Variant F ChatInput. Round 44px-tall
+// pill input with a circular white send button on the right. The full
+// ChatInput (slash picker, entity chips, morphing surface) gets adopted
+// next batch (task #38).
+function PillComposer({ placeholder }: { placeholder: string }) {
+  const [value, setValue] = useState('');
+  return (
+    <form
+      onSubmit={e => {
+        e.preventDefault();
+        setValue('');
+      }}
+      className='flex items-center gap-2 h-11 pl-4 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-(--surface-1)/60 focus-within:border-cyan-400/40 transition-colors duration-150 ease-out'
+    >
+      <input
+        type='text'
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder={placeholder}
+        className='flex-1 min-w-0 bg-transparent border-0 outline-none text-[13.5px] text-primary-token placeholder:text-quaternary-token'
+      />
+      <button
+        type='submit'
+        disabled={!value.trim()}
+        className='inline-flex items-center justify-center h-8 w-8 rounded-full bg-white text-black hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 ease-out'
+        aria-label='Send'
+      >
+        <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
+      </button>
+    </form>
   );
 }
 
