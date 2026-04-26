@@ -128,7 +128,7 @@ describe('CommandPalette', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     const threadRow = screen
-      .getAllByRole('menuitem')
+      .getAllByRole('option')
       .find(el => el.textContent?.includes('Q1 release plan'));
     expect(threadRow).toBeDefined();
     fireEvent.mouseDown(threadRow!);

@@ -110,7 +110,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     // Click the Releases nav row.
     const releasesNav = screen
-      .getAllByRole('menuitem')
+      .getAllByRole('option')
       .find(el => el.textContent?.includes('Manage your release catalog'));
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
@@ -122,7 +122,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     // Click the "Generate album art" skill row.
     const skillRow = screen
-      .getAllByRole('menuitem')
+      .getAllByRole('option')
       .find(el => el.textContent?.includes('Generate album art'));
     expect(skillRow).toBeDefined();
     fireEvent.mouseDown(skillRow!);
@@ -133,7 +133,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     const releaseRow = screen
-      .getAllByRole('menuitem')
+      .getAllByRole('option')
       .find(el => el.textContent?.includes('Midnight Run'));
     expect(releaseRow).toBeDefined();
     fireEvent.mouseDown(releaseRow!);
@@ -172,7 +172,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
     expect(screen.getByText('Recent threads')).toBeInTheDocument();
     const threadRow = screen
-      .getAllByRole('menuitem')
+      .getAllByRole('option')
       .find(el => el.textContent?.includes('Album planning'));
     expect(threadRow).toBeDefined();
     fireEvent.mouseDown(threadRow!);
