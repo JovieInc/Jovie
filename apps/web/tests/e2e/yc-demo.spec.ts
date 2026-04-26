@@ -5,6 +5,7 @@ import {
   type Page,
   test,
 } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
@@ -12,6 +13,13 @@ import {
   TEST_USER_ID_COOKIE,
   TEST_USER_ID_HEADER,
 } from '@/lib/auth/test-mode-constants';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
+import { RELEASE_PLAN_MOVE_REMIX_NEAR_LA } from '@/lib/release-planning/demo-events';
+import {
+  generateDemoPlan,
+  moveRemixNearLAShow,
+} from '@/lib/release-planning/demo-plan';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
@@ -188,6 +196,27 @@ function escapeRegExp(value: string): string {
 async function authenticateDemoPage(page: Page, clerkUserId: string) {
   await setTestAuthBypassSession(page, null, clerkUserId);
   await waitForAuthenticatedHealth(page, clerkUserId);
+}
+
+async function enableReleasePlanDemoFlag(page: Page) {
+  await page.addInitScript(
+    ({ key, overrideKey }) => {
+      try {
+        const existing = localStorage.getItem(key);
+        const parsed: Record<string, boolean> = existing
+          ? JSON.parse(existing)
+          : {};
+        parsed[overrideKey] = true;
+        localStorage.setItem(key, JSON.stringify(parsed));
+      } catch {
+        // localStorage may be unavailable (e.g. about:blank); ignore.
+      }
+    },
+    {
+      key: FF_OVERRIDES_KEY,
+      overrideKey: APP_FLAG_OVERRIDE_KEYS.RELEASE_PLAN_DEMO,
+    }
+  );
 }
 
 async function clearDemoAuthCookies(
@@ -769,9 +798,6 @@ test.describe('YC Demo Recording', () => {
   test('release plan - move remix near LA show', async ({ page, baseURL }) => {
     test.setTimeout(120_000);
 
-    const { generateDemoPlan, moveRemixNearLAShow } = await import(
-      '@/lib/release-planning/demo-plan'
-    );
     const expectedNewRemixFriday = moveRemixNearLAShow(generateDemoPlan()).find(
       m => m.momentType === 'remix'
     )?.friday;
@@ -787,10 +813,11 @@ test.describe('YC Demo Recording', () => {
     }
 
     await configureRecordingContext(page.context(), cookieBaseUrl);
+    await enableReleasePlanDemoFlag(page);
     await page.setViewportSize({ width: 1920, height: 1080 });
 
     await authenticateDemoPage(page, demoClerkUserId);
-    await page.goto('/app/dashboard/release-plan');
+    await page.goto(APP_ROUTES.DASHBOARD_RELEASE_PLAN);
 
     await expect(page.getByTestId('release-plan-empty-state')).toBeVisible({
       timeout: 30_000,
@@ -851,5 +878,85 @@ test.describe('YC Demo Recording', () => {
 
     await page.getByTestId('release-moment-drawer-close').click();
     await expect(page.getByTestId('release-moment-drawer')).toHaveCount(0);
+  });
+
+  test('release plan recording - wedge demo video', async ({
+    page,
+    baseURL,
+  }) => {
+    test.setTimeout(180_000);
+
+    const expectedRemixFriday = moveRemixNearLAShow(generateDemoPlan()).find(
+      m => m.momentType === 'remix'
+    )?.friday;
+    if (!expectedRemixFriday) {
+      throw new Error('Expected remix moment missing from generated plan');
+    }
+
+    const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
+    const cookieBaseUrl =
+      baseURL ?? process.env.BASE_URL ?? 'http://localhost:3100';
+    if (!demoClerkUserId) {
+      throw new Error('DEMO_CLERK_USER_ID is required');
+    }
+
+    await configureRecordingContext(page.context(), cookieBaseUrl);
+    await enableReleasePlanDemoFlag(page);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await authenticateDemoPage(page, demoClerkUserId);
+
+    await gotoDemoSceneWithTransition(page, APP_ROUTES.DASHBOARD_RELEASE_PLAN, {
+      readyLocator: page.getByTestId('release-plan-empty-state'),
+      readyText: 'Release plan',
+    });
+    await injectCaptionOverlay(page);
+    await setCaption(page, "That's one release. Now plan the whole year.");
+    await page.waitForTimeout(1_800);
+
+    await page.getByTestId('release-plan-generate-button').click();
+    await expect(page.getByTestId('release-calendar')).toBeVisible({
+      timeout: 15_000,
+    });
+    await setCaption(
+      page,
+      '12 release moments. One Friday cadence. Tour dates inline.'
+    );
+    await page.waitForTimeout(2_400);
+
+    await setCaption(page, 'You: "Move the remix closer to the LA show."');
+    await page.waitForTimeout(2_400);
+    await page.evaluate(eventName => {
+      window.dispatchEvent(new CustomEvent(eventName));
+    }, RELEASE_PLAN_MOVE_REMIX_NEAR_LA);
+    await expect(
+      page.locator('[data-moment-type="remix"]').first()
+    ).toHaveAttribute('data-release-date', expectedRemixFriday, {
+      timeout: 10_000,
+    });
+    await setCaption(
+      page,
+      'Workflows, due dates, and fan notifications follow.'
+    );
+    await page.waitForTimeout(2_000);
+
+    await page.locator('[data-moment-type="remix"]').first().click();
+    await expect(page.getByTestId('release-moment-drawer')).toBeVisible({
+      timeout: 5_000,
+    });
+    await setCaption(
+      page,
+      'Workflow recomputes from the new Friday. Fans get the right ping.'
+    );
+    await page.waitForTimeout(2_400);
+    await clearCaption(page);
+
+    const video = page.video();
+    if (video) {
+      await page.close();
+      await video.saveAs('test-results/release-plan-demo.webm');
+      console.log(
+        '[release-plan-demo] Video saved to test-results/release-plan-demo.webm'
+      );
+    }
   });
 });
