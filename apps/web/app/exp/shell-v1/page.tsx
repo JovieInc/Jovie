@@ -6416,12 +6416,7 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
   const rows = settingsRowsFor(section);
   return (
     <article className='max-w-2xl mx-auto px-8 pt-8 pb-12'>
-      <h1
-        className={cn(
-          'text-[24px] font-display tracking-[-0.018em] leading-tight',
-          section === 'danger' ? 'text-rose-300' : 'text-primary-token'
-        )}
-      >
+      <h1 className='text-[24px] font-display tracking-[-0.018em] leading-tight text-primary-token'>
         {meta.label}
       </h1>
       <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
@@ -6429,15 +6424,10 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
       </p>
 
       {/* Single card per section. Rows stack inside with hairline
-          dividers — no per-row card chrome. */}
-      <div
-        className={cn(
-          'mt-6 rounded-xl border bg-(--surface-0)/40 overflow-hidden',
-          section === 'danger'
-            ? 'border-rose-500/25 bg-rose-500/[0.03]'
-            : 'border-(--linear-app-shell-border)/70'
-        )}
-      >
+          dividers — no per-row card chrome. Danger keeps the same
+          neutral shell; only the action buttons carry the rose
+          accent so the page doesn't shout. */}
+      <div className='mt-6 rounded-xl border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40 overflow-hidden'>
         {rows.map((row, i) => (
           <SettingsRow key={row.label} {...row} divider={i > 0} />
         ))}
@@ -6467,14 +6457,7 @@ function SettingsRow({
       )}
     >
       <div className='flex-1 min-w-0'>
-        <p
-          className={cn(
-            'text-[13px] font-medium',
-            tone === 'danger' ? 'text-rose-300/90' : 'text-primary-token'
-          )}
-        >
-          {label}
-        </p>
+        <p className='text-[13px] font-medium text-primary-token'>{label}</p>
         {description && (
           <p className='text-[11.5px] text-tertiary-token mt-0.5'>
             {description}
@@ -6580,7 +6563,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
             >
               Upgrade to Pro
             </button>
@@ -6641,7 +6624,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-rose-300/90 hover:text-rose-200 border border-rose-500/30 bg-(--surface-0) hover:bg-rose-500/10 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
             >
               Reset workspace
             </button>
@@ -6654,7 +6637,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-rose-300/90 hover:text-rose-200 border border-rose-500/30 bg-(--surface-0) hover:bg-rose-500/10 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
             >
               Delete account
             </button>
