@@ -41,13 +41,16 @@ import {
   Circle as CircleIcon,
   CircleSlash,
   Disc3,
+  GripVertical,
   Heart,
   Inbox,
   LayoutDashboard,
   LogOut,
   Mic,
+  Mic2,
   Minimize2,
   Pause,
+  Pencil,
   Pin,
   PinOff,
   Play,
@@ -58,6 +61,7 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  Sparkles,
   Users,
   Volume2,
 } from 'lucide-react';
@@ -65,7 +69,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
-type CanvasView = 'demo' | 'releases' | 'tracks' | 'tasks';
+type CanvasView = 'demo' | 'releases' | 'tracks' | 'tasks' | 'lyrics';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -1014,6 +1018,30 @@ const TASKS: Task[] = [
   },
 ];
 
+// --- Lyrics mock -----------------------------------------------------------
+// Karaoke-style timed lyrics for the currently playing track ("Lost in the
+// Light", 213s). Sixteen lines, hand-paced so verses breathe and the chorus
+// lands on the cue at 0:52. Bahamas-ish: warm, wistful, road-weary.
+type LyricLine = { startSec: number; text: string };
+const MOCK_LYRICS: LyricLine[] = [
+  { startSec: 6, text: 'I was sleeping in the back of the car' },
+  { startSec: 18, text: 'Watching the highway turn into stars' },
+  { startSec: 30, text: 'You were humming a tune I forgot' },
+  { startSec: 42, text: 'Half a song from a place we both lost' },
+  { startSec: 54, text: 'Oh, lost in the light, lost in the light' },
+  { startSec: 66, text: 'Carry me home through the long Carolina night' },
+  { startSec: 80, text: 'Headlights bleed through the window glass' },
+  { startSec: 94, text: 'And the radio plays like nothing has passed' },
+  { startSec: 108, text: 'I keep your name like a coin in my coat' },
+  { startSec: 122, text: 'Spend it slow when the cold gets close' },
+  { startSec: 136, text: 'Oh, lost in the light, lost in the light' },
+  { startSec: 150, text: "I'll find you again on the other side" },
+  { startSec: 164, text: 'Tell me the part where the morning comes' },
+  { startSec: 176, text: 'Tell me you waited, tell me you come' },
+  { startSec: 190, text: 'Lost in the light, lost in the light' },
+  { startSec: 202, text: 'Carry me home, carry me home tonight' },
+];
+
 function trackFromRelease(r: Release): TrackInfo {
   return {
     title: r.title,
@@ -1333,6 +1361,13 @@ export default function ShellV1Experiment() {
                   }}
                   onFilter={(field, value) => addPill(field, value)}
                 />
+              ) : view === 'lyrics' ? (
+                <LyricsView
+                  track={currentTrack}
+                  durationSec={playingRelease?.durationSec ?? TRACK.duration}
+                  currentTimeSec={currentTimeSec}
+                  onSeek={sec => setCurrentTimeSec(sec)}
+                />
               ) : (
                 <TasksView tasks={TASKS} />
               )}
@@ -1370,6 +1405,10 @@ export default function ShellV1Experiment() {
             }
             waveformOn={waveformOn}
             onToggleWaveform={() => setWaveformOn(v => !v)}
+            lyricsActive={view === 'lyrics'}
+            onOpenLyrics={() =>
+              setView(v => (v === 'lyrics' ? 'demo' : 'lyrics'))
+            }
           />
         </div>
       </div>
@@ -2135,6 +2174,8 @@ function AudioBar({
   onCycleLoop,
   waveformOn,
   onToggleWaveform,
+  lyricsActive,
+  onOpenLyrics,
 }: {
   variant: Variant;
   isPlaying: boolean;
@@ -2145,6 +2186,8 @@ function AudioBar({
   onCycleLoop: () => void;
   waveformOn: boolean;
   onToggleWaveform: () => void;
+  lyricsActive: boolean;
+  onOpenLyrics: () => void;
 }) {
   // All variants share the V1a 64px / two-row Spotify shell.
   // What differs is the *scrub* — playing with how loud or quiet the
@@ -2191,6 +2234,9 @@ function AudioBar({
 
   const rightCluster = (
     <div className='flex items-center gap-1 justify-self-end'>
+      <IconBtn label='Lyrics' onClick={onOpenLyrics} active={lyricsActive}>
+        <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
+      </IconBtn>
       <IconBtn
         label={waveformOn ? 'Hide waveform (W)' : 'Show waveform (W)'}
         onClick={onToggleWaveform}
@@ -2888,15 +2934,18 @@ function IconBtn({
   onClick?: () => void;
   active?: boolean;
 }) {
+  // Flat at rest — Spotify-quiet. Hover lights up text + adds a subtle
+  // surface-1 background so the button reads as clickable, hinting at
+  // the dropdown / popover that follows.
   return (
     <button
       type='button'
       onClick={onClick}
       className={cn(
-        'h-7 w-7 rounded grid place-items-center transition-colors duration-150 ease-out',
+        'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
         active
-          ? 'text-primary-token'
-          : 'text-quaternary-token hover:text-primary-token'
+          ? 'text-primary-token bg-surface-1/60'
+          : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
       )}
       aria-label={label}
       title={label}
@@ -2936,16 +2985,10 @@ function VariantPicker({
   // Picker is dev-only chrome — start collapsed so it doesn't cover the
   // top-right corner of the actual UI being designed.
   const [open, setOpen] = useState(false);
-  const variants: Array<{ id: Variant; name: string }> = useMemo(
-    () => [
-      { id: 'c', name: 'Filled (locked)' },
-      { id: 'a', name: 'Hairlines' },
-      { id: 'b', name: 'Stereo split' },
-      { id: 'd', name: 'Peaks + RMS' },
-      { id: 'e', name: 'Dense bars' },
-    ],
-    []
-  );
+  // Filled is the locked waveform style; the picker no longer offers
+  // alternates. Variant prop kept for type stability.
+  void variant;
+  void onVariant;
 
   if (!open) {
     return (
@@ -2976,8 +3019,10 @@ function VariantPicker({
           <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
         </button>
       </div>
-      <div className='grid grid-cols-4 gap-0.5 px-1 pb-2 border-b border-subtle'>
-        {(['demo', 'releases', 'tracks', 'tasks'] as CanvasView[]).map(v => (
+      <div className='grid grid-cols-5 gap-0.5 px-1 pb-2 border-b border-subtle'>
+        {(
+          ['demo', 'releases', 'tracks', 'tasks', 'lyrics'] as CanvasView[]
+        ).map(v => (
           <button
             key={v}
             type='button'
@@ -2990,26 +3035,6 @@ function VariantPicker({
             )}
           >
             {v}
-          </button>
-        ))}
-      </div>
-      <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-2 pt-2 pb-1.5 font-semibold'>
-        Waveform style
-      </p>
-      <div className='space-y-0.5'>
-        {variants.map(v => (
-          <button
-            key={v.id}
-            type='button'
-            onClick={() => onVariant(v.id)}
-            className={cn(
-              'w-full text-left rounded-md px-2 py-1 text-[12px] font-caption leading-tight transition-colors duration-150 ease-out',
-              variant === v.id
-                ? 'bg-primary text-on-primary'
-                : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-            )}
-          >
-            {v.name}
           </button>
         ))}
       </div>
@@ -5164,16 +5189,22 @@ function TaskListItem({
         </div>
         {(task.dueIso || task.labels.length > 0) && (
           <div className='mt-0.5 flex items-center gap-2 text-[10.5px] text-quaternary-token/85 min-w-0'>
-            {task.dueIso && (
-              <span
-                className={cn(
-                  'tabular-nums shrink-0',
-                  isDueSoon(task.dueIso) && task.status !== 'done'
-                    ? 'text-amber-400/90'
-                    : 'text-tertiary-token'
-                )}
-              >
-                {relativeDate(task.dueIso)}
+            {/* Reserve a fixed-width slot for the date so weird-length
+                strings ("tomorrow" vs "in 2w" vs "5d ago") don't push
+                the labels around row to row. */}
+            <span
+              className={cn(
+                'tabular-nums shrink-0 inline-block w-[60px]',
+                task.dueIso && isDueSoon(task.dueIso) && task.status !== 'done'
+                  ? 'text-amber-400/90'
+                  : 'text-tertiary-token'
+              )}
+            >
+              {task.dueIso ? relativeDate(task.dueIso) : ''}
+            </span>
+            {task.dueIso && task.labels.length > 0 && (
+              <span aria-hidden='true' className='text-quaternary-token/50'>
+                ·
               </span>
             )}
             {task.labels.length > 0 && (
@@ -5434,4 +5465,404 @@ function isDueSoon(iso: string, now = new Date('2026-04-25')) {
   const d = new Date(iso);
   const days = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
   return days <= 3 && days >= -3;
+}
+
+// ---------------------------------------------------------------------------
+// LyricsView — karaoke-style timed lyrics editor for the playing track.
+// Same visual language as TasksView / TracksView: column header strip up top,
+// big focused content in the middle, subtle sticky footer (timeline) at the
+// bottom. The active line tracks `currentTimeSec`; clicking a cue marker or
+// a line's time stamp seeks the playhead. Edit mode swaps the static lines
+// for inline editable text with a grip + time-stamp affordance.
+// ---------------------------------------------------------------------------
+function LyricsView({
+  track,
+  durationSec,
+  currentTimeSec,
+  onSeek,
+}: {
+  track: TrackInfo;
+  durationSec: number;
+  currentTimeSec: number;
+  onSeek: (sec: number) => void;
+}) {
+  const [lines, setLines] = useState<LyricLine[]>(MOCK_LYRICS);
+  const [editing, setEditing] = useState(false);
+  const [empty, setEmpty] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+
+  // Active line = last line whose startSec <= currentTimeSec. -1 before the
+  // first cue (intro instrumentation) so every line stays dim until it lands.
+  const activeIndex = useMemo(() => {
+    let idx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startSec <= currentTimeSec) idx = i;
+      else break;
+    }
+    return idx;
+  }, [lines, currentTimeSec]);
+
+  // Keep focusedIndex in lockstep with the playhead unless the user is
+  // actively keyboard-navigating (J/K). For the design pass we just follow
+  // the playhead — focusedIndex tracks activeIndex when not -1.
+  useEffect(() => {
+    if (activeIndex >= 0) setFocusedIndex(activeIndex);
+  }, [activeIndex]);
+
+  function handleKey(e: React.KeyboardEvent) {
+    // J / ArrowDown → next line, K / ArrowUp → previous line.
+    if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIndex(i => Math.min(lines.length - 1, i + 1));
+    } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIndex(i => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      // Enter on a focused line stamps it to the current playhead.
+      e.preventDefault();
+      stampLine(focusedIndex);
+    }
+  }
+
+  function stampLine(index: number) {
+    setLines(prev =>
+      prev.map((l, i) => (i === index ? { ...l, startSec: currentTimeSec } : l))
+    );
+  }
+
+  function updateLineText(index: number, text: string) {
+    setLines(prev => prev.map((l, i) => (i === index ? { ...l, text } : l)));
+  }
+
+  // Empty state for the design pass — toggled by clearing all lines from
+  // the picker or starting fresh on a track with no lyrics yet.
+  if (empty) {
+    return (
+      <section
+        aria-label='Lyrics'
+        className='flex h-full flex-col focus:outline-none'
+      >
+        <LyricsHeader
+          track={track}
+          editing={editing}
+          onToggleEdit={() => setEditing(e => !e)}
+          showEditToggle={false}
+        />
+        <div className='flex-1 min-h-0 grid place-items-center px-6'>
+          <div className='max-w-md w-full rounded-xl border border-(--linear-app-shell-border) bg-surface-0/60 px-6 py-8 text-center'>
+            <div className='mx-auto h-10 w-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 grid place-items-center mb-4'>
+              <Mic2 className='h-4 w-4 text-cyan-300' strokeWidth={2.25} />
+            </div>
+            <h2 className='text-[18px] font-display tracking-[-0.012em] text-primary-token'>
+              No lyrics yet
+            </h2>
+            <p className='mt-2 text-[13px] leading-[1.55] text-tertiary-token'>
+              Jovie will time them automatically and you can fine-tune timings
+              line by line.
+            </p>
+            <div className='mt-5 flex items-center justify-center gap-2'>
+              <button
+                type='button'
+                className='inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-cyan-500 text-on-primary text-[12.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out hover:bg-cyan-400'
+              >
+                <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
+                Transcribe with Jovie
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setEmpty(false);
+                  setEditing(true);
+                }}
+                className='inline-flex items-center h-8 px-3 rounded-md border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token tracking-[-0.005em] transition-colors duration-150 ease-out hover:text-primary-token hover:bg-surface-1'
+              >
+                Paste lyrics
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: keyboard list root for J/K + Enter, mirrors TracksView
+    <section
+      className='flex h-full flex-col focus:outline-none'
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point
+      tabIndex={0}
+      onKeyDown={handleKey}
+      aria-label='Lyrics'
+    >
+      <LyricsHeader
+        track={track}
+        editing={editing}
+        onToggleEdit={() => setEditing(e => !e)}
+        onClear={() => setEmpty(true)}
+        showEditToggle
+      />
+
+      {/* Body — one big stack of lines. Active line full-bright, others dim.
+          Centered horizontally; vertical scroll keeps long lyrics navigable
+          without auto-scroll jank for the design pass. */}
+      <div className='flex-1 min-h-0 overflow-y-auto'>
+        <ul className='mx-auto max-w-2xl px-6 py-10 space-y-5'>
+          {lines.map((line, i) => {
+            const isActive = i === activeIndex;
+            const isFocused = i === focusedIndex;
+            return (
+              <LyricRow
+                // biome-ignore lint/suspicious/noArrayIndexKey: lyric lines are positional in the timeline; multiple lines may share a startSec (e.g. mid-edit) so index is the only stable identity for this design-pass mock
+                key={i}
+                line={line}
+                index={i}
+                isActive={isActive}
+                isFocused={isFocused}
+                editing={editing}
+                onFocus={() => setFocusedIndex(i)}
+                onSeek={() => onSeek(line.startSec)}
+                onStamp={() => stampLine(i)}
+                onChangeText={text => updateLineText(i, text)}
+              />
+            );
+          })}
+        </ul>
+      </div>
+
+      <LyricsTimeline
+        durationSec={durationSec}
+        currentTimeSec={currentTimeSec}
+        lines={lines}
+        activeIndex={activeIndex}
+        onSeek={onSeek}
+      />
+    </section>
+  );
+}
+
+function LyricsHeader({
+  track,
+  editing,
+  onToggleEdit,
+  onClear,
+  showEditToggle,
+}: {
+  track: TrackInfo;
+  editing: boolean;
+  onToggleEdit: () => void;
+  onClear?: () => void;
+  showEditToggle: boolean;
+}) {
+  return (
+    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 pt-3 pb-2 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+      <span className='text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+        Lyrics
+      </span>
+      <span className='text-[12.5px] font-caption text-primary-token tracking-[-0.012em] truncate'>
+        {track.title}
+      </span>
+      <span className='text-[11px] text-tertiary-token truncate'>
+        {track.artist}
+      </span>
+      <div className='ml-auto flex items-center gap-1'>
+        {onClear && (
+          <button
+            type='button'
+            onClick={onClear}
+            className='hidden md:inline-flex h-7 px-2 rounded text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token/85 hover:text-secondary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+            title='Clear lyrics (preview empty state)'
+          >
+            Clear
+          </button>
+        )}
+        {showEditToggle && (
+          <button
+            type='button'
+            onClick={onToggleEdit}
+            aria-pressed={editing}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out',
+              editing
+                ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'
+                : 'text-secondary-token border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1'
+            )}
+            title={editing ? 'Done editing' : 'Edit lyric timings'}
+          >
+            <Pencil className='h-3 w-3' strokeWidth={2.25} />
+            {editing ? 'Done' : 'Edit'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LyricRow({
+  line,
+  index,
+  isActive,
+  isFocused,
+  editing,
+  onFocus,
+  onSeek,
+  onStamp,
+  onChangeText,
+}: {
+  line: LyricLine;
+  index: number;
+  isActive: boolean;
+  isFocused: boolean;
+  editing: boolean;
+  onFocus: () => void;
+  onSeek: () => void;
+  onStamp: () => void;
+  onChangeText: (text: string) => void;
+}) {
+  // Display mode — one big centered line that softly fades the dim-state
+  // siblings. Click anywhere on the line to seek to its cue.
+  if (!editing) {
+    return (
+      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row delegates seek; keyboard handled by parent section
+      // biome-ignore lint/a11y/useKeyWithClickEvents: parent section owns J/K/Enter; row click is a redundant pointer affordance
+      <li
+        onClick={onSeek}
+        data-focused={isFocused && !isActive ? '' : undefined}
+        className={cn(
+          'group/lyric text-center cursor-pointer select-none',
+          'transition-[color,opacity,transform] duration-[250ms] ease-out',
+          isActive
+            ? 'text-primary-token text-[28px] leading-[1.25] font-display tracking-[-0.018em] opacity-100'
+            : 'text-tertiary-token text-[20px] leading-[1.35] font-display tracking-[-0.012em] opacity-60 hover:opacity-90 hover:text-secondary-token'
+        )}
+      >
+        {line.text}
+      </li>
+    );
+  }
+
+  // Edit mode — grip on the left, time stamp + inline-editable text. Layout
+  // is left-aligned (vs centered) so editors can scan / drag without the
+  // text flying around as it grows.
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: row click focuses the row; nested controls handle the real interactions
+    // biome-ignore lint/a11y/useKeyWithClickEvents: parent section owns J/K/Enter
+    <li
+      onClick={onFocus}
+      data-focused={isFocused && !isActive ? '' : undefined}
+      data-selected={isActive ? '' : undefined}
+      className={cn(
+        'group/lyricedit relative flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors duration-150 ease-out',
+        !isFocused && !isActive && 'hover:bg-surface-1/40',
+        SELECTED_ROW_CLASSES
+      )}
+    >
+      <span
+        aria-hidden='true'
+        className='shrink-0 text-quaternary-token/70 hover:text-secondary-token cursor-grab active:cursor-grabbing transition-colors duration-150 ease-out'
+        title={`Drag to reorder line ${index + 1}`}
+      >
+        <GripVertical className='h-3.5 w-3.5' strokeWidth={2.25} />
+      </span>
+      <button
+        type='button'
+        onClick={e => {
+          e.stopPropagation();
+          onStamp();
+        }}
+        className={cn(
+          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-150 ease-out',
+          isActive
+            ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+            : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
+        )}
+        title='Stamp this line to the current playhead (Enter)'
+      >
+        {formatTime(line.startSec)}
+      </button>
+      <input
+        type='text'
+        value={line.text}
+        onChange={e => onChangeText(e.target.value)}
+        onFocus={onFocus}
+        className={cn(
+          'flex-1 min-w-0 bg-transparent outline-none text-[15px] font-display tracking-[-0.012em] placeholder:text-quaternary-token/60',
+          isActive ? 'text-primary-token' : 'text-secondary-token'
+        )}
+        placeholder='Lyric line'
+        aria-label={`Lyric line ${index + 1}`}
+      />
+    </li>
+  );
+}
+
+function LyricsTimeline({
+  durationSec,
+  currentTimeSec,
+  lines,
+  activeIndex,
+  onSeek,
+}: {
+  durationSec: number;
+  currentTimeSec: number;
+  lines: LyricLine[];
+  activeIndex: number;
+  onSeek: (sec: number) => void;
+}) {
+  const pct = Math.max(0, Math.min(100, (currentTimeSec / durationSec) * 100));
+  function handleScrub(e: React.MouseEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    onSeek(Math.max(0, Math.min(durationSec, ratio * durationSec)));
+  }
+  return (
+    <div className='shrink-0 border-t border-(--linear-app-shell-border)/50 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 py-3'>
+      <div className='flex items-center gap-3'>
+        <span className='text-[10px] tabular-nums text-quaternary-token w-9 text-right shrink-0'>
+          {formatTime(currentTimeSec)}
+        </span>
+        <button
+          type='button'
+          onClick={handleScrub}
+          className='relative flex-1 h-6 rounded-full grid focus:outline-none'
+          aria-label='Lyric timeline'
+        >
+          <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--linear-app-shell-border)' />
+          <span
+            className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-cyan-400/80 transition-[width] duration-150 ease-out'
+            style={{ width: `${pct}%` }}
+          />
+          {/* Cue markers — one per lyric line, color-keyed by active state. */}
+          {lines.map((line, i) => {
+            const left = Math.max(
+              0,
+              Math.min(100, (line.startSec / durationSec) * 100)
+            );
+            const isActive = i === activeIndex;
+            return (
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: stable per-render index
+                key={i}
+                aria-hidden='true'
+                className={cn(
+                  'pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full transition-colors duration-150 ease-out',
+                  isActive
+                    ? 'h-2 w-2 bg-cyan-300 shadow-[0_0_0_2px_rgb(34_211_238/0.18)]'
+                    : 'h-1 w-1 bg-quaternary-token/80'
+                )}
+                style={{ left: `${left}%` }}
+              />
+            );
+          })}
+          <span
+            aria-hidden='true'
+            className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_0_3px_rgb(34_211_238/0.18)] transition-[left] duration-150 ease-out'
+            style={{ left: `${pct}%` }}
+          />
+        </button>
+        <span className='text-[10px] tabular-nums text-quaternary-token w-9 text-left shrink-0'>
+          {formatTime(durationSec)}
+        </span>
+      </div>
+    </div>
+  );
 }
