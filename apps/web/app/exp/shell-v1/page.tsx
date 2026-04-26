@@ -121,6 +121,7 @@ import {
   Table as LibraryTable,
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
+import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -3574,36 +3575,25 @@ function SuggestionCard({ suggestion }: { suggestion: JovieSuggestion }) {
   );
 }
 
-// Pill composer — placeholder for the Variant F ChatInput. Round 44px-tall
-// pill input with a circular white send button on the right. The full
-// ChatInput (slash picker, entity chips, morphing surface) gets adopted
-// next batch (task #38).
+// Variant F adoption — wraps the shipped ChatInput from
+// apps/web/components/jovie/components/ChatInput.tsx so /exp/shell-v1
+// gets the morphing pill surface, slash picker, chip tray, and motion
+// transitions. Backend wiring (useJovieChat / streaming / images) is
+// kept stubbed for the design pass — those wires land at flip-time.
 function PillComposer({ placeholder }: { placeholder: string }) {
   const [value, setValue] = useState('');
   return (
-    <form
+    <ChatInput
+      value={value}
+      onChange={setValue}
       onSubmit={e => {
-        e.preventDefault();
+        e?.preventDefault();
         setValue('');
       }}
-      className='flex items-center gap-2 h-11 pl-4 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-(--surface-1)/60 focus-within:border-cyan-400/40 transition-colors duration-150 ease-out'
-    >
-      <input
-        type='text'
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        placeholder={placeholder}
-        className='flex-1 min-w-0 bg-transparent border-0 outline-none text-[13.5px] text-primary-token placeholder:text-quaternary-token'
-      />
-      <button
-        type='submit'
-        disabled={!value.trim()}
-        className='inline-flex items-center justify-center h-8 w-8 rounded-full bg-white text-black hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 ease-out'
-        aria-label='Send'
-      >
-        <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
-      </button>
-    </form>
+      isLoading={false}
+      isSubmitting={false}
+      placeholder={placeholder}
+    />
   );
 }
 
@@ -5940,31 +5930,21 @@ function ThreadTurn({
 }
 
 function ChatComposer({ placeholder }: { placeholder: string }) {
+  // Same Variant F surface as the dashboard PillComposer. Reused here
+  // so the thread reply matches the home composer exactly.
   const [value, setValue] = useState('');
   return (
-    <form
+    <ChatInput
+      value={value}
+      onChange={setValue}
       onSubmit={e => {
-        e.preventDefault();
+        e?.preventDefault();
         setValue('');
       }}
-      className='flex items-center gap-2 h-11 px-3 rounded-lg border border-(--linear-app-shell-border) bg-(--surface-1)/60 focus-within:border-cyan-400/40 transition-colors duration-150 ease-out'
-    >
-      <input
-        type='text'
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        placeholder={placeholder}
-        className='flex-1 min-w-0 bg-transparent border-0 outline-none text-[13.5px] text-primary-token placeholder:text-quaternary-token'
-      />
-      <button
-        type='submit'
-        disabled={!value.trim()}
-        className='inline-flex items-center justify-center h-7 w-7 rounded-md bg-white text-black text-[12px] font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 ease-out'
-        aria-label='Send'
-      >
-        <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
-      </button>
-    </form>
+      isLoading={false}
+      isSubmitting={false}
+      placeholder={placeholder}
+    />
   );
 }
 
