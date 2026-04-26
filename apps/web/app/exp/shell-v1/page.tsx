@@ -40,6 +40,7 @@ const SHORTCUTS: Record<string, { keys: string; description: string }> = {
   toggleBar: { keys: '`', description: 'Toggle audio bar in / out' },
   toggleBarAlt: { keys: '⌘\\', description: 'Toggle audio bar (alt)' },
   toggleWaveform: { keys: 'W', description: 'Toggle waveform drawer' },
+  toggleLyrics: { keys: 'L', description: 'Open / close the lyrics view' },
   playPause: { keys: 'Space', description: 'Play / pause current track' },
   jovieDictate: { keys: 'Hold ⌘J', description: 'Push-to-talk to Jovie' },
   closeOverlay: { keys: 'Esc', description: 'Close overlay / clear input' },
@@ -306,6 +307,9 @@ type Thread = {
   entityId?: string;
   // ISO timestamp — most recent first when sorted descending.
   updatedAt: string;
+  // Whether the user has opened the thread since it last updated. Unread
+  // rows highlight in the sidebar so they pull attention.
+  unread?: boolean;
 };
 
 const THREADS: Thread[] = [
@@ -330,6 +334,7 @@ const THREADS: Thread[] = [
     entityKind: 'release',
     entityId: 'stronger-than-that',
     updatedAt: '2026-04-26T08:12:00Z',
+    unread: true,
   },
   {
     id: 'thr-4',
@@ -338,12 +343,14 @@ const THREADS: Thread[] = [
     entityKind: 'task',
     entityId: 'J-119',
     updatedAt: '2026-04-25T22:04:00Z',
+    unread: true,
   },
   {
     id: 'thr-5',
     title: 'Weekly playlist pitch sweep',
     status: 'complete',
     updatedAt: '2026-04-25T16:30:00Z',
+    unread: true,
   },
   {
     id: 'thr-6',
@@ -1270,10 +1277,28 @@ export default function ShellV1Experiment() {
   const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  // Threads the user has opened in this session — clears the per-thread
+  // unread highlight in the sidebar.
+  const [readThreadIds, setReadThreadIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
   const openThread = (id: string) => {
     setSelectedThreadId(id);
     setView('thread');
+    setReadThreadIds(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
+  const decoratedThreads = useMemo<Thread[]>(
+    () =>
+      THREADS.map(t =>
+        t.unread && readThreadIds.has(t.id) ? { ...t, unread: false } : t
+      ),
+    [readThreadIds]
+  );
   // Library state — lifted to the shell so the sidebar (filters/saved
   // views) and canvas (grid/table/drawer) share the same source of truth.
   // Standalone /exp/library-v1 still owns its own state internally.
@@ -1599,6 +1624,9 @@ export default function ShellV1Experiment() {
       } else if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         setWaveformOn(v => !v);
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        setView(v => (v === 'lyrics' ? 'demo' : 'lyrics'));
       } else if (e.key === 'Escape' && view === 'lyrics') {
         e.preventDefault();
         setView('demo');
@@ -1685,6 +1713,7 @@ export default function ShellV1Experiment() {
           onSelectView={setView}
           activeView={view}
           tight={sidebarTight}
+          threads={decoratedThreads}
           activeThreadId={selectedThreadId}
           onSelectThread={openThread}
           onThreadContextMenu={onThreadContextMenu}
@@ -1730,6 +1759,7 @@ export default function ShellV1Experiment() {
         onSelectView={setView}
         activeView={view}
         tight={sidebarTight}
+        threads={decoratedThreads}
         activeThreadId={selectedThreadId}
         onSelectThread={openThread}
         onThreadContextMenu={onThreadContextMenu}
@@ -2120,6 +2150,7 @@ function FloatingSidebarLayer({
   onSelectView,
   activeView,
   tight,
+  threads,
   activeThreadId,
   onSelectThread,
   onThreadContextMenu,
@@ -2133,6 +2164,7 @@ function FloatingSidebarLayer({
   onSelectView?: (v: CanvasView) => void;
   activeView?: CanvasView;
   tight?: boolean;
+  threads: Thread[];
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
@@ -2199,6 +2231,7 @@ function FloatingSidebarLayer({
           onSelectView={onSelectView}
           activeView={activeView}
           tight={tight}
+          threads={threads}
           activeThreadId={activeThreadId}
           onSelectThread={onSelectThread}
           onThreadContextMenu={onThreadContextMenu}
@@ -2218,6 +2251,7 @@ function Sidebar({
   tight,
   libraryProps,
   settingsProps,
+  threads,
   activeThreadId,
   onSelectThread,
   onThreadContextMenu,
@@ -2247,6 +2281,7 @@ function Sidebar({
     activeSection: SettingsSectionId;
     onSelectSection: (id: SettingsSectionId) => void;
   };
+  threads: Thread[];
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
@@ -2457,7 +2492,7 @@ function Sidebar({
               5 inline; the rest expand on demand. Status dot drives
               tone (running cyan / complete neutral / errored rose). */}
           <SidebarThreadsSection
-            threads={THREADS}
+            threads={threads}
             activeThreadId={
               activeView === 'thread' ? (activeThreadId ?? null) : null
             }
@@ -2709,10 +2744,10 @@ function SidebarThreadsSection({
         <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
           Threads
         </span>
-        {sorted.some(t => t.status === 'running') && (
+        {sorted.filter(t => t.unread).length > 0 && (
           <span className='inline-flex items-center gap-1 text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token'>
-            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
-            {sorted.filter(t => t.status === 'running').length}
+            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
+            {sorted.filter(t => t.unread).length}
           </span>
         )}
       </div>
@@ -2724,6 +2759,7 @@ function SidebarThreadsSection({
       >
         {visible.map(t => {
           const active = activeThreadId === t.id;
+          const unread = !!t.unread && !active;
           return (
             // biome-ignore lint/a11y/noStaticElementInteractions: row hosts two real buttons; div is hover container with right-click menu
             // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same
@@ -2734,7 +2770,9 @@ function SidebarThreadsSection({
                 tight ? 'h-6' : 'h-7',
                 active
                   ? 'bg-surface-1 text-primary-token'
-                  : 'text-tertiary-token hover:bg-surface-1/50 hover:text-primary-token'
+                  : unread
+                    ? 'text-primary-token hover:bg-surface-1/50'
+                    : 'text-tertiary-token hover:bg-surface-1/50 hover:text-primary-token'
               )}
               onContextMenu={e => onThreadContextMenu?.(e, t)}
             >
@@ -2750,16 +2788,19 @@ function SidebarThreadsSection({
                   className={cn(
                     'h-1.5 w-1.5 rounded-full shrink-0',
                     t.status === 'running'
-                      ? 'bg-cyan-300/80 animate-pulse'
+                      ? 'bg-cyan-300/85 animate-pulse'
                       : t.status === 'errored'
                         ? 'bg-rose-400/85'
-                        : 'bg-white/30'
+                        : unread
+                          ? 'bg-cyan-300/85'
+                          : 'bg-white/25'
                   )}
                 />
                 <span
                   className={cn(
                     'flex-1 truncate',
-                    tight ? 'text-[12px]' : 'text-[12.5px]'
+                    tight ? 'text-[12px]' : 'text-[12.5px]',
+                    unread && 'font-medium'
                   )}
                 >
                   {t.title}
@@ -3640,10 +3681,10 @@ function AudioBar({
   // player is, and what kind of artist control it surfaces.
   const transportButtons = (
     <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn label='Shuffle' tooltipSide='top'>
+      <IconBtn label='Shuffle' tooltipSide='top' tone='ghost'>
         <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
-      <IconBtn label='Previous' tooltipSide='top'>
+      <IconBtn label='Previous' tooltipSide='top' tone='ghost'>
         <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
       </IconBtn>
       <Tooltip
@@ -3672,7 +3713,7 @@ function AudioBar({
           )}
         </button>
       </Tooltip>
-      <IconBtn label='Next' tooltipSide='top'>
+      <IconBtn label='Next' tooltipSide='top' tone='ghost'>
         <SkipForward
           className='h-4 w-4'
           strokeWidth={2.5}
@@ -3687,9 +3728,11 @@ function AudioBar({
     <div className='flex items-center gap-1 justify-self-end'>
       <IconBtn
         label='Lyrics'
+        shortcut='toggleLyrics'
         onClick={onOpenLyrics}
         active={lyricsActive}
         tooltipSide='top'
+        tone='ghost'
       >
         <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
@@ -3699,6 +3742,7 @@ function AudioBar({
         onClick={onToggleWaveform}
         active={waveformOn}
         tooltipSide='top'
+        tone='ghost'
       >
         {waveformOn ? (
           <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -3706,7 +3750,7 @@ function AudioBar({
           <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
         )}
       </IconBtn>
-      <IconBtn label='Volume' tooltipSide='top'>
+      <IconBtn label='Volume' tooltipSide='top' tone='ghost'>
         <Volume2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
       <IconBtn
@@ -3714,6 +3758,7 @@ function AudioBar({
         shortcut='toggleBar'
         onClick={onCollapse}
         tooltipSide='top'
+        tone='ghost'
       >
         <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
@@ -4853,6 +4898,7 @@ function IconBtn({
   active,
   shortcut,
   tooltipSide = 'bottom',
+  tone = 'default',
 }: {
   children: React.ReactNode;
   label: string;
@@ -4860,10 +4906,13 @@ function IconBtn({
   active?: boolean;
   shortcut?: keyof typeof SHORTCUTS;
   tooltipSide?: 'top' | 'bottom' | 'right' | 'left';
+  // 'default' adds a subtle bg on hover/active (sidebar, header, drawer).
+  // 'ghost' drops the bg entirely — icon brightens to white on hover or
+  // when active. Used in the audio bar so the row feels like a dock,
+  // not a stack of cards.
+  tone?: 'default' | 'ghost';
 }) {
-  // Flat at rest — Spotify-quiet. Hover lights up text + adds a subtle
-  // surface-1 background so the button reads as clickable, hinting at
-  // the dropdown / popover that follows.
+  const isGhost = tone === 'ghost';
   return (
     <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
       <button
@@ -4871,9 +4920,13 @@ function IconBtn({
         onClick={onClick}
         className={cn(
           'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
-          active
-            ? 'text-primary-token bg-surface-1/60'
-            : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
+          isGhost
+            ? active
+              ? 'text-primary-token'
+              : 'text-quaternary-token hover:text-primary-token'
+            : active
+              ? 'text-primary-token bg-surface-1/60'
+              : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
         )}
         aria-label={label}
       >
@@ -5936,25 +5989,10 @@ function ThreadView({ thread }: { thread: Thread }) {
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12 flex flex-col h-full'>
       <header className='shrink-0'>
-        <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              thread.status === 'running'
-                ? 'bg-cyan-300/80 animate-pulse'
-                : thread.status === 'errored'
-                  ? 'bg-rose-400/85'
-                  : 'bg-white/30'
-            )}
-          />
-          {thread.status === 'running'
-            ? 'Running'
-            : thread.status === 'errored'
-              ? 'Errored'
-              : 'Complete'}
-        </div>
+        {/* No status eyebrow — status reads from the sidebar dot icon and
+            from the per-turn "Generating…" / error states inline below. */}
         <h1
-          className='mt-2 text-[24px] font-semibold leading-tight text-primary-token'
+          className='text-[24px] font-semibold leading-tight text-primary-token'
           style={{ letterSpacing: '-0.018em' }}
         >
           {thread.title}
