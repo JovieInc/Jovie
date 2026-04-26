@@ -213,7 +213,8 @@ export function EntityPreviewPane({
   const stats = statsFor(entity);
   const eyebrow = eyebrowFor(entity);
   return (
-    <div
+    <section
+      aria-label='Selected entity preview'
       className={cn(
         'flex flex-1 flex-col bg-gradient-to-b from-white/[0.022] to-transparent px-6 py-[22px]',
         className
@@ -226,7 +227,11 @@ export function EntityPreviewPane({
           <div className='mb-2 font-display text-[9.5px] font-semibold uppercase tracking-[0.12em] text-quaternary-token'>
             {eyebrow}
           </div>
-          <h3 className='m-0 mb-3.5 font-display text-[19px] font-semibold leading-[1.15] tracking-[-0.022em] text-primary-token'>
+          <h3
+            aria-live='polite'
+            aria-atomic='true'
+            className='m-0 mb-3.5 font-display text-[19px] font-semibold leading-[1.15] tracking-[-0.022em] text-primary-token'
+          >
             {entity.label}
           </h3>
           {stats.length > 0 ? (
@@ -252,6 +257,6 @@ export function EntityPreviewPane({
           ) : null}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

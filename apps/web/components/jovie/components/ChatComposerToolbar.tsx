@@ -122,6 +122,12 @@ export interface ComposerAttachButtonProps {
   readonly isImageProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  /**
+   * Caller-driven disable (e.g. slash picker has the keyboard). Independent
+   * of loading/submitting so the trigger can be inert without showing a
+   * spinner.
+   */
+  readonly disabled?: boolean;
   readonly plusMenuOpen: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -133,6 +139,7 @@ export function ComposerAttachButton({
   isImageProcessing,
   isLoading,
   isSubmitting,
+  disabled = false,
   plusMenuOpen,
   onOpenChange,
   onMouseDown,
@@ -145,7 +152,7 @@ export function ComposerAttachButton({
         <button
           type='button'
           onMouseDown={onMouseDown}
-          disabled={isImageProcessing || isLoading || isSubmitting}
+          disabled={isImageProcessing || isLoading || isSubmitting || disabled}
           className={cn(
             'flex shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color] duration-fast',
             'hover:bg-white/[0.04] hover:text-primary-token',
