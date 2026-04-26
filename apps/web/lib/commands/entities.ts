@@ -21,11 +21,50 @@
 import type { ReactNode } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
 
+/**
+ * Per-kind rich metadata used by the entity preview pane in the chat
+ * composer's morphing surface. Optional everywhere — providers attach what
+ * they have; consumers (preview pane, rich rows) gracefully skip missing
+ * fields. Adding a field here is non-breaking; consumers must treat new
+ * fields as optional.
+ */
+export type EntityRefMeta =
+  | {
+      readonly kind: 'release';
+      readonly subtitle?: string;
+      readonly releaseDate?: string;
+      readonly releaseType?: string;
+      readonly spotifyPopularity?: number | null;
+      readonly totalTracks?: number;
+      readonly totalDurationMs?: number | null;
+    }
+  | {
+      readonly kind: 'artist';
+      readonly subtitle?: string;
+      readonly handle?: string;
+      readonly profileUrl?: string;
+      readonly followers?: number;
+      readonly popularity?: number;
+      readonly verified?: boolean;
+      readonly isYou?: boolean;
+    }
+  | {
+      readonly kind: 'track';
+      readonly subtitle?: string;
+      readonly durationMs?: number | null;
+      readonly releaseTitle?: string;
+    };
+
 export interface EntityRef {
   readonly kind: EntityKind;
   readonly id: string;
   readonly label: string;
   readonly thumbnail?: string;
+  /**
+   * Optional per-kind rich data for the picker preview pane. Providers attach
+   * whatever they cheaply have; the preview tolerates absence.
+   */
+  readonly meta?: EntityRefMeta;
 }
 
 export interface EntitySearchResult {

@@ -1,21 +1,41 @@
 'use client';
 
-import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
-import Image from 'next/image';
 import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+  Calendar,
+  Disc3,
+  Image as ImageIcon,
+  Link2Off,
+  Link as LinkIcon,
+  type LucideIcon,
+  MessageSquare,
+  Music2,
+  UserCircle,
+} from 'lucide-react';
+import Image from 'next/image';
+import { useEffect, useMemo } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
-import type { EntityRef } from '@/lib/commands/entities';
-import { getEntityProvider } from '@/lib/commands/entities';
+import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
+import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
+import { type PickerState } from './useChatPicker';
 
 export type SlashMenuMode = 'all' | EntityKind;
+
+const SKILL_ICON_MAP: Record<string, LucideIcon> = {
+  Image: ImageIcon,
+  UserCircle,
+  Link: LinkIcon,
+  Link2Off,
+  MessageSquare,
+};
+
+const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
+  release: Disc3,
+  artist: UserCircle,
+  track: Music2,
+};
 
 export interface SlashMenuItem {
   readonly kind: 'skill' | 'entity';
@@ -23,16 +43,31 @@ export interface SlashMenuItem {
   readonly entity?: EntityRef;
 }
 
+interface ListSection {
+  readonly id: string;
+  readonly label: string;
+  readonly items: SlashMenuItem[];
+}
+
 interface SlashCommandMenuProps {
-  readonly open: boolean;
-  /** Ref to the element the popover anchors to (typically the textarea). */
-  readonly anchorRef: RefObject<HTMLElement | null>;
-  readonly query: string;
-  /** 'all' shows skills + entities; an entity kind scopes to that picker. */
-  readonly mode: SlashMenuMode;
+  /** Picker reducer state. Menu renders only when status !== 'closed'. */
+  readonly state: PickerState;
+  /**
+   * Active creator profile id, threaded through so release search can scope
+   * to this profile's catalog. Required for release rows; artist search is
+   * Spotify-global and does not need it.
+   */
+  readonly profileId: string;
   readonly onSelectSkill: (skill: SkillCommand) => void;
   readonly onSelectEntity: (entity: EntityRef) => void;
+  readonly onSetSelected: (index: number) => void;
+  readonly onMoveSelected: (delta: number, total: number) => void;
   readonly onClose: () => void;
+  /**
+   * Compact mode renders a single column with no fixed-height inner list —
+   * the parent surface (rail) caps the size instead.
+   */
+  readonly variant?: 'inline' | 'rail';
 }
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
@@ -40,134 +75,444 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
-function headerForMode(mode: SlashMenuMode): string {
-  if (mode === 'all') return 'Skills & references';
-  if (mode === 'release') return 'Pick a release';
-  if (mode === 'artist') return 'Pick an artist';
-  return 'Pick a track';
+function entityKindLabel(kind: EntityKind): string {
+  if (kind === 'release') return 'Release';
+  if (kind === 'artist') return 'Artist';
+  return 'Track';
 }
 
-function itemKey(item: SlashMenuItem): string {
-  if (item.kind === 'skill' && item.skill) return `skill:${item.skill.id}`;
-  return `entity:${item.entity?.kind}:${item.entity?.id}`;
+function formatRowMeta(entity: EntityRef): string | null {
+  const meta = entity.meta;
+  if (!meta) return entityKindLabel(entity.kind);
+  if (meta.kind === 'release') return meta.subtitle ?? 'Release';
+  if (meta.kind === 'artist') {
+    if (meta.handle) return `@${meta.handle}${meta.isYou ? ' · You' : ''}`;
+    return meta.subtitle ?? 'Artist';
+  }
+  return meta.subtitle ?? 'Track';
 }
 
-function SkillRow({ skill }: { readonly skill: SkillCommand }) {
-  return (
-    <>
-      <span className='font-medium'>{skill.label}</span>
-      <span className='ml-auto truncate text-2xs text-tertiary-token'>
-        {skill.description}
-      </span>
-    </>
-  );
-}
-
-function EntityRow({ entity }: { readonly entity: EntityRef }) {
-  return (
-    <>
-      {entity.thumbnail ? (
+function ReleaseArt({ entity }: { readonly entity: EntityRef }) {
+  if (entity.thumbnail) {
+    return (
+      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-md shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
         <Image
           src={entity.thumbnail}
           alt=''
-          width={24}
-          height={24}
-          className='h-6 w-6 rounded-sm object-cover'
+          fill
+          sizes='36px'
+          className='object-cover'
           unoptimized
         />
-      ) : (
-        <span className='h-6 w-6 rounded-sm bg-surface-2' />
-      )}
-      <span className='truncate'>{entity.label}</span>
-      <span className='ml-auto text-2xs text-tertiary-token capitalize'>
-        {entity.kind}
-      </span>
-    </>
+      </div>
+    );
+  }
+  return (
+    <div className='h-9 w-9 shrink-0 rounded-md bg-gradient-to-br from-[#2a2a2f] to-[#16161a] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]' />
   );
 }
 
-function SlashMenuRowContent({ item }: { readonly item: SlashMenuItem }) {
-  if (item.kind === 'skill' && item.skill) {
-    return <SkillRow skill={item.skill} />;
+function ArtistArt({ entity }: { readonly entity: EntityRef }) {
+  if (entity.thumbnail) {
+    return (
+      <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+        <Image
+          src={entity.thumbnail}
+          alt=''
+          fill
+          sizes='36px'
+          className='object-cover'
+          unoptimized
+        />
+      </div>
+    );
   }
+  const initials = entity.label
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase();
+  return (
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3a3a40] to-[#1a1a1d] text-[12px] font-semibold tracking-[-0.01em] text-primary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+      {initials || '·'}
+    </div>
+  );
+}
+
+function SkillArt({ skill }: { readonly skill: SkillCommand }) {
+  const Icon = SKILL_ICON_MAP[skill.iconName] ?? Calendar;
+  return (
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+      <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
+    </div>
+  );
+}
+
+interface RowVisualProps {
+  readonly item: SlashMenuItem;
+}
+
+function RowVisual({ item }: RowVisualProps) {
+  if (item.kind === 'skill' && item.skill)
+    return <SkillArt skill={item.skill} />;
   if (item.entity) {
-    return <EntityRow entity={item.entity} />;
+    if (item.entity.kind === 'release')
+      return <ReleaseArt entity={item.entity} />;
+    if (item.entity.kind === 'artist')
+      return <ArtistArt entity={item.entity} />;
+    return (
+      <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+        <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />
+      </div>
+    );
   }
   return null;
 }
 
+interface RowBodyProps {
+  readonly item: SlashMenuItem;
+}
+
+function RowBody({ item }: RowBodyProps) {
+  if (item.kind === 'skill' && item.skill) {
+    return (
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
+          {item.skill.label}
+        </p>
+        <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
+          {item.skill.description}
+        </p>
+      </div>
+    );
+  }
+  if (item.entity) {
+    const meta = formatRowMeta(item.entity);
+    return (
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[13.5px] font-medium leading-tight tracking-[-0.005em] text-primary-token'>
+          {item.entity.label}
+        </p>
+        {meta ? (
+          <p className='mt-[3px] truncate text-[11.5px] text-tertiary-token'>
+            {meta}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+  return null;
+}
+
+interface RowProps {
+  readonly item: SlashMenuItem;
+  readonly index: number;
+  readonly isActive: boolean;
+  readonly onMouseEnter: (index: number) => void;
+  readonly onCommit: (index: number) => void;
+}
+
+function PickerRow({
+  item,
+  index,
+  isActive,
+  onMouseEnter,
+  onCommit,
+}: RowProps) {
+  return (
+    <button
+      type='button'
+      role='menuitem'
+      aria-current={isActive ? 'true' : undefined}
+      onMouseEnter={() => onMouseEnter(index)}
+      onMouseDown={e => {
+        e.preventDefault();
+        onCommit(index);
+      }}
+      className={cn(
+        'flex w-full items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast',
+        isActive
+          ? 'bg-white/[0.06] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'
+          : 'hover:bg-white/[0.035]'
+      )}
+    >
+      <RowVisual item={item} />
+      <RowBody item={item} />
+    </button>
+  );
+}
+
+export function pickerEntityKind(state: PickerState): EntityKind | null {
+  if (state.status === 'entity') return state.kind;
+  return null;
+}
+
+interface UseSlashItemsResult {
+  readonly items: SlashMenuItem[];
+  readonly sections: ListSection[];
+  readonly isLoading: boolean;
+}
+
+interface ReleaseLikeRow {
+  readonly id: string;
+  readonly title: string;
+  readonly artworkUrl?: string;
+  readonly artistNames?: string[];
+  readonly releaseDate?: string;
+  readonly releaseType?: string;
+  readonly spotifyPopularity?: number | null;
+  readonly totalTracks?: number;
+  readonly totalDurationMs?: number | null;
+}
+
+function shortMonth(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function releaseTypeLabel(type?: string): string {
+  if (!type) return 'Release';
+  const lower = type.toLowerCase();
+  if (lower === 'album') return 'Album';
+  if (lower === 'single') return 'Single';
+  if (lower === 'ep') return 'EP';
+  return type;
+}
+
+function releaseRowToEntity(release: ReleaseLikeRow): EntityRef {
+  const dateLabel = shortMonth(release.releaseDate);
+  const typeLabel = releaseTypeLabel(release.releaseType);
+  const subtitle = dateLabel ? `${typeLabel} · ${dateLabel}` : typeLabel;
+  return {
+    kind: 'release',
+    id: release.id,
+    label: release.title,
+    thumbnail: release.artworkUrl,
+    meta: {
+      kind: 'release',
+      subtitle,
+      releaseDate: release.releaseDate,
+      releaseType: release.releaseType,
+      spotifyPopularity: release.spotifyPopularity ?? null,
+      totalTracks: release.totalTracks,
+      totalDurationMs: release.totalDurationMs ?? null,
+    },
+  };
+}
+
+function releaseMatches(release: ReleaseLikeRow, lowerQuery: string): boolean {
+  if (!lowerQuery) return true;
+  if (release.title.toLowerCase().includes(lowerQuery)) return true;
+  return (release.artistNames ?? []).some(n =>
+    n.toLowerCase().includes(lowerQuery)
+  );
+}
+
 /**
- * Slash command popover for the chat input.
+ * Build the flat list of menu items + grouped sections for the picker.
  *
- * Renders a filtered list of Skills + Entities anchored to the caret.
- * Keyboard: ↑/↓ navigate, Enter select, Esc close.
- *
- * Two-step picker is orchestrated by the caller: when the user picks a
- * Skill with a required `entitySlot`, the caller re-opens this menu with
- * `mode` set to that entity kind so the next pick is scoped.
+ * Calls `useReleasesQuery` and `useArtistSearchQuery` unconditionally so the
+ * hook count is stable from the first render (the prior provider-registry
+ * indirection produced a rules-of-hooks crash because the registry wasn't
+ * populated until after a useEffect ran).
  */
-export function SlashCommandMenu({
-  open,
-  anchorRef,
-  query,
-  mode,
-  onSelectSkill,
-  onSelectEntity,
-  onClose,
-}: SlashCommandMenuProps) {
-  const skills = useMemo(() => {
-    if (mode !== 'all') return [] as SkillCommand[];
-    return commandsForSurface('chat-slash')
+export function useSlashItems(
+  state: PickerState,
+  profileId: string
+): UseSlashItemsResult {
+  const isRoot = state.status === 'root';
+  const isEntity = state.status === 'entity';
+  const query = state.status === 'closed' ? '' : state.query;
+
+  // Releases come from a creator-scoped local catalog; substring filter.
+  const { data: releaseData, isLoading: releaseLoading } =
+    useReleasesQuery(profileId);
+
+  // Artist search is Spotify-global, debounced via TanStack Pacer.
+  const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
+  const artistSearchSearch = artistSearch.search;
+  const artistQueryNeeded = isRoot || (isEntity && state.kind === 'artist');
+  const artistQueryString = artistQueryNeeded ? query : '';
+  useEffect(() => {
+    artistSearchSearch(artistQueryString);
+  }, [artistQueryString, artistSearchSearch]);
+
+  return useMemo<UseSlashItemsResult>(() => {
+    if (state.status === 'closed') {
+      return { items: [], sections: [], isLoading: false };
+    }
+
+    const filteredReleases: EntityRef[] = (releaseData ?? [])
+      .filter(r => releaseMatches(r as ReleaseLikeRow, query.toLowerCase()))
+      .slice(0, isEntity ? 8 : 4)
+      .map(r => releaseRowToEntity(r as ReleaseLikeRow));
+
+    const artistEntities: EntityRef[] = artistSearch.results
+      .slice(0, isEntity ? 8 : 4)
+      .map(r => ({
+        kind: 'artist' as const,
+        id: r.id,
+        label: r.name,
+        thumbnail: r.imageUrl,
+        meta: {
+          kind: 'artist' as const,
+          subtitle: r.isClaimed ? 'You' : 'Spotify artist',
+          followers: r.followers,
+          popularity: r.popularity,
+          verified: r.verified,
+          isYou: r.isClaimed,
+        },
+      }));
+
+    if (state.status === 'entity') {
+      const items: EntityRef[] =
+        state.kind === 'release' ? filteredReleases : artistEntities;
+      const slashItems: SlashMenuItem[] = items.map(e => ({
+        kind: 'entity',
+        entity: e,
+      }));
+      const sections: ListSection[] = [
+        {
+          id: state.kind,
+          label: entityKindLabel(state.kind),
+          items: slashItems,
+        },
+      ];
+      return {
+        items: slashItems,
+        sections,
+        isLoading:
+          state.kind === 'release'
+            ? releaseLoading
+            : artistSearch.state === 'loading',
+      };
+    }
+
+    // root: skills + entity suggestions per kind
+    const skills = commandsForSurface('chat-slash')
       .filter((c): c is SkillCommand => c.kind === 'skill')
       .filter(s => fuzzyMatch(`${s.label} ${s.description}`, query));
-  }, [mode, query]);
 
-  const entityKind: EntityKind | null = mode === 'all' ? null : mode;
-  const entityProvider = entityKind ? getEntityProvider(entityKind) : undefined;
-  const entitySearch = entityProvider
-    ? entityProvider.useSearch(query)
-    : { items: [], isLoading: false };
-
-  const items: SlashMenuItem[] = useMemo(() => {
-    const out: SlashMenuItem[] = skills.map(skill => ({
-      kind: 'skill',
-      skill,
-    }));
-    for (const e of entitySearch.items) {
-      out.push({ kind: 'entity', entity: e });
+    const sections: ListSection[] = [];
+    const items: SlashMenuItem[] = [];
+    if (skills.length > 0) {
+      const skillItems: SlashMenuItem[] = skills.map(s => ({
+        kind: 'skill',
+        skill: s,
+      }));
+      sections.push({ id: 'skills', label: 'Skills', items: skillItems });
+      items.push(...skillItems);
     }
-    return out;
-  }, [skills, entitySearch.items]);
+    if (filteredReleases.length > 0) {
+      const groupItems: SlashMenuItem[] = filteredReleases.map(e => ({
+        kind: 'entity',
+        entity: e,
+      }));
+      sections.push({ id: 'release', label: 'Releases', items: groupItems });
+      items.push(...groupItems);
+    }
+    if (artistEntities.length > 0) {
+      const groupItems: SlashMenuItem[] = artistEntities.map(e => ({
+        kind: 'entity',
+        entity: e,
+      }));
+      sections.push({ id: 'artist', label: 'Artists', items: groupItems });
+      items.push(...groupItems);
+    }
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
+    return {
+      items,
+      sections,
+      isLoading: releaseLoading || artistSearch.state === 'loading',
+    };
+  }, [
+    state,
+    query,
+    isEntity,
+    releaseData,
+    releaseLoading,
+    artistSearch.results,
+    artistSearch.state,
+  ]);
+}
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query, mode]);
+interface SlashHeaderProps {
+  readonly state: PickerState;
+}
 
-  const commit = useCallback(
-    (index: number) => {
-      const item = items[index];
-      if (!item) return;
-      if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
-      else if (item.kind === 'entity' && item.entity)
-        onSelectEntity(item.entity);
-    },
-    [items, onSelectSkill, onSelectEntity]
+function SlashHeader({ state }: SlashHeaderProps) {
+  if (state.status === 'closed') return null;
+  if (state.status === 'entity') {
+    const Icon = KIND_ICON_MAP[state.kind];
+    return (
+      <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+        <span className='inline-flex items-center gap-1.5 rounded-[5px] border border-white/10 bg-white/[0.05] px-2 py-[2px] text-[11px] font-semibold uppercase tracking-[0.04em] text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.04)]'>
+          <Icon className='h-3 w-3' strokeWidth={1.6} />
+          {entityKindLabel(state.kind)}
+        </span>
+        {state.query ? (
+          <span className='truncate text-tertiary-token'>{state.query}</span>
+        ) : (
+          <span className='truncate text-tertiary-token'>type to filter…</span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+      <span className='inline-flex h-[21px] items-center rounded-[4px] bg-white/[0.06] px-1.5 text-[12.5px] font-semibold leading-none text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+        /
+      </span>
+      {state.query ? (
+        <span className='truncate text-primary-token'>{state.query}</span>
+      ) : (
+        <span className='truncate text-tertiary-token'>
+          type to filter skills, releases, artists
+        </span>
+      )}
+    </div>
   );
+}
 
+/**
+ * Inline picker rendered INSIDE the same surface as the chat input
+ * (no popover, no portal — see Variant F brief). Two modes:
+ *   - `inline`: 'root' state, list above the input row.
+ *   - `rail`:  'entity' state, list lives in the left rail of an entity surface.
+ */
+export function SlashCommandMenu({
+  state,
+  profileId,
+  onSelectSkill,
+  onSelectEntity,
+  onSetSelected,
+  onMoveSelected,
+  onClose,
+  variant = 'inline',
+}: SlashCommandMenuProps) {
+  const { items, sections, isLoading } = useSlashItems(state, profileId);
+
+  // Keyboard nav lives at this layer: arrow keys drive the picker,
+  // Enter commits the active item, Escape closes.
   useEffect(() => {
-    if (!open) return;
+    if (state.status === 'closed') return;
     function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex(i => Math.min(items.length - 1, i + 1));
+        onMoveSelected(1, items.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex(i => Math.max(0, i - 1));
-      } else if (e.key === 'Enter' && items.length > 0) {
+        onMoveSelected(-1, items.length);
+      } else if (e.key === 'Enter') {
+        const item = items[state.status === 'closed' ? 0 : state.selectedIndex];
+        if (!item) return;
         e.preventDefault();
-        commit(selectedIndex);
+        if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
+        else if (item.kind === 'entity' && item.entity)
+          onSelectEntity(item.entity);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -175,63 +520,85 @@ export function SlashCommandMenu({
     }
     globalThis.addEventListener('keydown', onKey, true);
     return () => globalThis.removeEventListener('keydown', onKey, true);
-  }, [open, items, selectedIndex, commit, onClose]);
+  }, [state, items, onMoveSelected, onSelectSkill, onSelectEntity, onClose]);
 
-  if (!open) return null;
+  if (state.status === 'closed') return null;
 
-  const headerLabel = headerForMode(mode);
+  const handleCommit = (index: number) => {
+    const item = items[index];
+    if (!item) return;
+    if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
+    else if (item.kind === 'entity' && item.entity) onSelectEntity(item.entity);
+  };
 
-  // Radix's virtualRef type requires a non-null current; this is safe because
-  // the menu only renders when the caller has a live textarea ref.
-  const virtualRef = anchorRef as RefObject<HTMLElement>;
+  const flatIndexFor = (sectionStartIdx: number, localIdx: number) =>
+    sectionStartIdx + localIdx;
 
   return (
-    <Popover open={open} onOpenChange={o => !o && onClose()}>
-      <PopoverAnchor virtualRef={virtualRef} />
-      <PopoverContent
-        side='top'
-        align='start'
-        sideOffset={8}
-        className='w-[320px] p-0'
-        onOpenAutoFocus={e => e.preventDefault()}
+    <div
+      className={cn('flex flex-col', variant === 'rail' && 'h-full min-h-0')}
+      data-testid='slash-command-menu'
+    >
+      {variant === 'inline' ? <SlashHeader state={state} /> : null}
+      {variant === 'rail' ? <SlashHeader state={state} /> : null}
+      <div
+        className={cn(
+          'flex-1 overflow-y-auto p-[5px]',
+          variant === 'inline' && 'max-h-[260px]'
+        )}
+        role='menu'
       >
-        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2 text-2xs font-medium text-tertiary-token'>
-          {headerLabel}
-        </div>
-        <div className='max-h-[280px] overflow-y-auto py-1' role='menu'>
-          {items.length === 0 ? (
-            <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
-              {entitySearch.isLoading ? 'Searching…' : 'No matches'}
-            </div>
-          ) : (
-            items.map((item, i) => {
-              const isSelected = i === selectedIndex;
-              const key = itemKey(item);
+        {items.length === 0 ? (
+          <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
+            {isLoading ? 'Searching…' : 'No matches'}
+          </div>
+        ) : (
+          (() => {
+            let cursor = 0;
+            return sections.map(section => {
+              const start = cursor;
+              cursor += section.items.length;
               return (
-                <button
-                  key={key}
-                  type='button'
-                  role='menuitem'
-                  aria-current={isSelected ? 'true' : undefined}
-                  onMouseEnter={() => setSelectedIndex(i)}
-                  onMouseDown={e => {
-                    e.preventDefault();
-                    commit(i);
-                  }}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-app',
-                    isSelected
-                      ? 'bg-surface-1 text-primary-token'
-                      : 'text-secondary-token hover:bg-surface-1'
-                  )}
-                >
-                  <SlashMenuRowContent item={item} />
-                </button>
+                <div key={section.id}>
+                  <div className='px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'>
+                    {section.label}
+                  </div>
+                  {section.items.map((item, localIdx) => {
+                    const flatIdx = flatIndexFor(start, localIdx);
+                    return (
+                      <PickerRow
+                        key={
+                          item.kind === 'skill' && item.skill
+                            ? `skill:${item.skill.id}`
+                            : `entity:${item.entity?.kind}:${item.entity?.id}`
+                        }
+                        item={item}
+                        index={flatIdx}
+                        isActive={flatIdx === state.selectedIndex}
+                        onMouseEnter={onSetSelected}
+                        onCommit={handleCommit}
+                      />
+                    );
+                  })}
+                </div>
               );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+            });
+          })()
+        )}
+      </div>
+    </div>
   );
 }
+
+/** Resolve the currently-active EntityRef from the picker state + items. */
+export function activeEntityFor(
+  state: PickerState,
+  items: SlashMenuItem[]
+): EntityRef | null {
+  if (state.status === 'closed') return null;
+  const item = items[state.selectedIndex];
+  if (item?.kind === 'entity' && item.entity) return item.entity;
+  return null;
+}
+
+export type { EntityRefMeta };
