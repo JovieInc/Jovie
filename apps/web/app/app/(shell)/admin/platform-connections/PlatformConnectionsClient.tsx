@@ -76,9 +76,7 @@ function ResultMessage({
   return (
     <p
       className={
-        result.success
-          ? 'text-[12px] text-emerald-300'
-          : 'text-[12px] text-red-300'
+        result.success ? 'text-xs text-emerald-300' : 'text-xs text-red-300'
       }
     >
       {result.message}
@@ -193,7 +191,7 @@ function SpotifyTabContent({
         </Button>
       </div>
 
-      <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
+      <div className='grid gap-3 px-4 py-4 text-app sm:grid-cols-2'>
         <div>
           <p className='font-medium text-primary-token'>Active Publisher</p>
           <p className='mt-1 text-secondary-token'>
@@ -201,7 +199,7 @@ function SpotifyTabContent({
               spotifyStatus.clerkUserId ??
               'Not set'}
           </p>
-          <p className='mt-1 text-[12px] text-tertiary-token'>
+          <p className='mt-1 text-xs text-tertiary-token'>
             {spotifyStatus.updatedAt
               ? `Updated ${formatDate(spotifyStatus.updatedAt)}`
               : 'Never updated'}
@@ -217,7 +215,7 @@ function SpotifyTabContent({
               : 'Spotify is not connected'}
           </p>
           {currentUser.missingScopes.length > 0 ? (
-            <p className='mt-1 text-[12px] text-red-300'>
+            <p className='mt-1 text-xs text-red-300'>
               Missing scopes: {currentUser.missingScopes.join(', ')}
             </p>
           ) : null}
@@ -225,7 +223,7 @@ function SpotifyTabContent({
       </div>
 
       {spotifyStatus.error ? (
-        <div className='px-4 py-3 text-[12px] text-red-300'>
+        <div className='px-4 py-3 text-xs text-red-300'>
           {spotifyStatus.error}
         </div>
       ) : null}
@@ -362,7 +360,7 @@ function EngineTabContent({
         </div>
 
         <div className='grid gap-4 px-4 py-4 sm:grid-cols-[1fr_1.2fr]'>
-          <div className='flex items-center gap-3 text-[13px] text-primary-token'>
+          <div className='flex items-center gap-3 text-app text-primary-token'>
             <Switch
               checked={enabled}
               onCheckedChange={setEnabled}
@@ -371,7 +369,7 @@ function EngineTabContent({
             <span id='playlist-engine-toggle-label'>Playlist Engine</span>
           </div>
 
-          <div className='flex flex-wrap items-center gap-2 text-[13px]'>
+          <div className='flex flex-wrap items-center gap-2 text-app'>
             <label
               htmlFor='playlist-generation-interval-value'
               className='text-secondary-token'
@@ -404,7 +402,7 @@ function EngineTabContent({
           </div>
         </div>
 
-        <div className='grid gap-3 px-4 py-4 text-[13px] sm:grid-cols-2'>
+        <div className='grid gap-3 px-4 py-4 text-app sm:grid-cols-2'>
           <div>
             <p className='font-medium text-primary-token'>Last Generated</p>
             <p className='mt-1 text-secondary-token'>
